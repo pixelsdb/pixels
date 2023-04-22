@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,21 +17,23 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.lambda;
+package io.pixelsdb.pixels.worker.common;
+
+import io.pixelsdb.pixels.common.turbo.Input;
+import io.pixelsdb.pixels.common.turbo.Output;
 
 /**
  * @author hank
- * @date 28/06/2022
+ * @create 2023-04-22
  */
-public class PixelsWorkerException extends RuntimeException
+public abstract class Worker<I extends Input, O extends Output>
 {
-    public PixelsWorkerException(String message)
+    protected final WorkerContext context;
+
+    public Worker(WorkerContext context)
     {
-        super(message);
+        this.context = context;
     }
 
-    public PixelsWorkerException(String message, Throwable cause)
-    {
-        super(message, cause);
-    }
+    public abstract O process(I input);
 }

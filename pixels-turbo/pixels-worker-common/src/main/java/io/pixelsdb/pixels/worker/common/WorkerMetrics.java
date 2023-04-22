@@ -17,16 +17,16 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.lambda;
+package io.pixelsdb.pixels.worker.common;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author hank
- * @date 02/08/2022
+ * @create 2022-08-02
  */
-public class MetricsCollector
+public class WorkerMetrics
 {
     public static class Timer
     {

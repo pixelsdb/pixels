@@ -39,6 +39,7 @@
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- hadoop -->

@@ -19,7 +19,8 @@ physical plan provides the methods to invoke the serverless workers to execute t
 - `pixels-invoker-[service]` implements the invokers to be used by the physical plan to invoker the serverless workers in a 
 specific cloud function service (e.g., AWS Lambda).
 - `pixels-worker-[service]` implements the serverless workers in a specific cloud function service (e.g., AWS Lambda).
-- [`pixels-executor`](../pixels-executor) implements the basic executors of relational operations, such as scan, filter, join, and aggregation.
+- `pixels-worker-common` has the common logics and the base implementations of the serverless workers.
+- [`pixels-executor`](../pixels-executor) implements the basic executors of relational operations, such as projection, filter, join, and aggregation.
 These executors are used in the serverless workers to execute the assigned physical operator.
 - `pixels-scaling-[service]` implements the auto-scaling metrics collector for the specific virtual machine service (e.g., AWS EC2). 
 It reports the performance metrics, such as CPU/memory usage and query concurrency, in the MPP cluster. These metrics are 

@@ -17,34 +17,39 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.lambda;
+package io.pixelsdb.pixels.worker.common;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
-import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
+import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 import static java.util.Objects.requireNonNull;
 
 /**
  * Some common functions for the lambda workers.
  * @author hank
- * @date 15/05/2022
+ * @create 2022-05-15
  */
 public class WorkerCommon
 {
@@ -69,6 +74,26 @@ public class WorkerCommon
         } catch (Exception e)
         {
             logger.error("failed to initialize AWS S3 storage", e);
+        }
+    }
+
+    public static void initStorage(StorageInfo storageInfo)
+    {
+        try
+        {
+            if (WorkerCommon.minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
+            {
+                ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
+                WorkerCommon.minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+            }
+            else if (WorkerCommon.redis == null && storageInfo.getScheme() == Storage.Scheme.redis)
+            {
+                ConfigRedis(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
+                WorkerCommon.redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
+            }
+        } catch (Exception e)
+        {
+            throw new WorkerException("failed to initialize Minio storage", e);
         }
     }
 
@@ -420,7 +445,7 @@ public class WorkerCommon
         return option;
     }
 
-    public static void setPerfMetrics(Output output, MetricsCollector collector)
+    public static void setPerfMetrics(Output output, WorkerMetrics collector)
     {
         output.setCumulativeInputCostMs((int) Math.round(collector.getInputCostNs() / 1000_000.0));
         output.setCumulativeComputeCostMs((int) Math.round(collector.getComputeCostNs() / 1000_000.0));

@@ -39,16 +39,17 @@
         <module>pixels-cache</module>
         <module>pixels-cli</module>
         <module>pixels-daemon</module>
-        <module>pixels-proxy</module>
         <module>pixels-example</module>
         <module>pixels-executor</module>
         <module>pixels-planner</module>
+        <module>pixels-proxy</module>
         <module>pixels-storage/pixels-storage-s3</module>
         <module>pixels-storage/pixels-storage-hdfs</module>
         <module>pixels-storage/pixels-storage-gcs</module>
         <module>pixels-storage/pixels-storage-redis</module>
         <module>pixels-storage/pixels-storage-localfs</module>
         <module>pixels-storage/pixels-storage-mock</module>
+        <module>pixels-turbo/pixels-worker-common</module>
         <module>pixels-turbo/pixels-worker-lambda</module>
         <module>pixels-turbo/pixels-invoker-lambda</module>
         <module>pixels-turbo/pixels-scaling-ec2</module>
@@ -171,6 +172,11 @@
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-invoker-lambda</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-worker-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
