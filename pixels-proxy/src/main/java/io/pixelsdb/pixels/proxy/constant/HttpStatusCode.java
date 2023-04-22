@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.proxy.constant;
 /**
  * Http status code
  */
-public class HttpStatus
+public class HttpStatusCode
 {
     /**
      * operation is successful

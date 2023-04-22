@@ -17,19 +17,32 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest.request;
+package io.pixelsdb.pixels.common.proxy.response;
+
+import io.pixelsdb.pixels.common.metadata.domain.Column;
+
+import java.util.List;
 
 /**
- * Created at: 3/14/23
- * Author: hank
+ * @author hank
+ * @create 2023-04-21
  */
-public class GetViews
+public class GetColumnsResponse
 {
     private String schemaName;
+    private String tableName;
+    private List<Column> columns;
 
-    public GetViews(String schemaName)
+    /**
+     * Default constructor for Jackson.
+     */
+    public GetColumnsResponse() { }
+
+    public GetColumnsResponse(String schemaName, String tableName, List<Column> columns)
     {
         this.schemaName = schemaName;
+        this.tableName = tableName;
+        this.columns = columns;
     }
 
     public String getSchemaName()
@@ -40,5 +53,25 @@ public class GetViews
     public void setSchemaName(String schemaName)
     {
         this.schemaName = schemaName;
+    }
+
+    public String getTableName()
+    {
+        return tableName;
+    }
+
+    public void setTableName(String tableName)
+    {
+        this.tableName = tableName;
+    }
+
+    public List<Column> getColumns()
+    {
+        return columns;
+    }
+
+    public void setColumns(List<Column> columns)
+    {
+        this.columns = columns;
     }
 }

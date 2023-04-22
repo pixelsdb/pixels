@@ -17,52 +17,45 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest.request;
+package io.pixelsdb.pixels.common.proxy.request;
 
 /**
- * Created at: 3/17/23
+ * Created at: 3/14/23
  * Author: hank
  */
-public class ExecuteQuery
+public class GetColumnsRequest
 {
-    private String connName;
-    private String sql;
-    private int previewCount;
+    private String schemaName;
+    private String tableName;
 
-    public ExecuteQuery(String connName, String sql, int previewCount)
+    /**
+     * Default constructor for Jackson.
+     */
+    public GetColumnsRequest() { }
+
+    public GetColumnsRequest(String schemaName, String tableName)
     {
-        this.connName = connName;
-        this.sql = sql;
-        this.previewCount = previewCount;
+        this.schemaName = schemaName;
+        this.tableName = tableName;
     }
 
-    public String getConnName()
+    public String getSchemaName()
     {
-        return connName;
+        return schemaName;
     }
 
-    public void setConnName(String connName)
+    public void setSchemaName(String schemaName)
     {
-        this.connName = connName;
+        this.schemaName = schemaName;
     }
 
-    public String getSql()
+    public String getTableName()
     {
-        return sql;
+        return tableName;
     }
 
-    public void setSql(String sql)
+    public void setTableName(String tableName)
     {
-        this.sql = sql;
-    }
-
-    public int getPreviewCount()
-    {
-        return previewCount;
-    }
-
-    public void setPreviewCount(int previewCount)
-    {
-        this.previewCount = previewCount;
+        this.tableName = tableName;
     }
 }

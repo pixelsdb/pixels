@@ -17,15 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest.response;
+package io.pixelsdb.pixels.common.proxy.response;
 
 import java.util.List;
 
 /**
- * Created at: 3/17/23
- * Author: hank
+ * @create 2023-03-17
+ * @author hank
  */
-public class QueryResult
+public class ExecuteQueryResponse
 {
     private List<String> schema;
     private List<String> previewRows;
@@ -33,8 +33,13 @@ public class QueryResult
     private double executeTimeMs;
     private double priceCents;
 
-    public QueryResult(List<String> schema, List<String> previewRows,
-                       boolean hasMore, double executeTimeMs, double priceCents)
+    /**
+     * Default constructor for Jackson.
+     */
+    public ExecuteQueryResponse() { }
+
+    public ExecuteQueryResponse(List<String> schema, List<String> previewRows,
+                                boolean hasMore, double executeTimeMs, double priceCents)
     {
         this.schema = schema;
         this.previewRows = previewRows;

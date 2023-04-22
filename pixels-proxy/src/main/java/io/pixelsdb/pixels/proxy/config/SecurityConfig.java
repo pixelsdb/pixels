@@ -49,6 +49,7 @@ public class SecurityConfig
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
                 .logoutSuccessUrl("/signin");
+        http.csrf().disable();
         // TODO: support login and signup.
         return http.build();
     }

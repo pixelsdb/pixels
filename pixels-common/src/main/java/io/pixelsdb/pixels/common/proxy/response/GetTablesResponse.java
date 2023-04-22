@@ -17,19 +17,30 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest.request;
+package io.pixelsdb.pixels.common.proxy.response;
+
+import io.pixelsdb.pixels.common.metadata.domain.Table;
+
+import java.util.List;
 
 /**
- * Created at: 3/14/23
- * Author: hank
+ * @author hank
+ * @create 2023-04-21
  */
-public class GetTables
+public class GetTablesResponse
 {
     private String schemaName;
+    private List<Table> tables;
 
-    public GetTables(String schemaName)
+    /**
+     * Default constructor for Jackson.
+     */
+    public GetTablesResponse() { }
+
+    public GetTablesResponse(String schemaName, List<Table> tables)
     {
         this.schemaName = schemaName;
+        this.tables = tables;
     }
 
     public String getSchemaName()
@@ -40,5 +51,15 @@ public class GetTables
     public void setSchemaName(String schemaName)
     {
         this.schemaName = schemaName;
+    }
+
+    public List<Table> getTables()
+    {
+        return tables;
+    }
+
+    public void setTables(List<Table> tables)
+    {
+        this.tables = tables;
     }
 }

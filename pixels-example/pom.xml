@@ -37,6 +37,11 @@
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-daemon</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-localfs</artifactId>
             <optional>true</optional>
         </dependency>
@@ -81,6 +86,13 @@
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- netty -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
             <optional>true</optional>
         </dependency>
     </dependencies>

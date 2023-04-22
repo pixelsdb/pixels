@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.proxy.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.pixelsdb.pixels.proxy.constant.HttpStatus;
+import io.pixelsdb.pixels.proxy.constant.HttpStatusCode;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
@@ -39,7 +39,7 @@ public class JsonAuthenticationFailHandler implements AuthenticationFailureHandl
     {
         Map<String, Object> result = new HashMap<>();
         result.put("msg", "invalid username or password！");
-        result.put("code", HttpStatus.ERROR);
+        result.put("code", HttpStatusCode.ERROR);
         result.put("exception", exception.getMessage());
         response.setContentType("application/json;charset=UTF-8");
         String jsonData = new ObjectMapper().writeValueAsString(result);

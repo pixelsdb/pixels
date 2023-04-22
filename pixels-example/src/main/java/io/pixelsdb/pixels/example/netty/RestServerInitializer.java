@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest;
+package io.pixelsdb.pixels.example.netty;
 
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -30,8 +30,8 @@ import io.netty.handler.codec.http.HttpServerExpectContinueHandler;
 import io.netty.handler.ssl.SslContext;
 
 /**
- * Created at: 3/13/23
- * Author: hank
+ * @create 2023-03-13
+ * @author hank
  */
 public class RestServerInitializer extends ChannelInitializer<SocketChannel>
 {

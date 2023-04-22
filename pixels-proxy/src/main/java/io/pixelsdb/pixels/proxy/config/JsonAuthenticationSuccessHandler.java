@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.proxy.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.pixelsdb.pixels.proxy.constant.HttpStatus;
+import io.pixelsdb.pixels.proxy.constant.HttpStatusCode;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
@@ -38,7 +38,7 @@ public class JsonAuthenticationSuccessHandler implements AuthenticationSuccessHa
     {
         Map<String, Object> result = new HashMap<>();
         result.put("msg", "sign in success");
-        result.put("code", HttpStatus.SUCCESS);
+        result.put("code", HttpStatusCode.SUCCESS);
         result.put("authentication", authentication);
         response.setContentType("application/json;charset=UTF-8");
         String jsonData = new ObjectMapper().writeValueAsString(result);
