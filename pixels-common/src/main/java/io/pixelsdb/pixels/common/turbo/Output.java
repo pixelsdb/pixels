@@ -19,8 +19,11 @@
  */
 package io.pixelsdb.pixels.common.turbo;
 
+import java.util.Objects;
+
 /**
  * The base class for the output of a cloud function.
+ *
  * @author hank
  * @create 2022-06-28
  */
@@ -40,18 +43,63 @@ public abstract class Output
     private long totalReadBytes;
     private long totalWriteBytes;
 
-    public String getRequestId()
-    {
+    public Output() {
+    }
+
+    public Output(String requestId, boolean successful, String errorMessage, long startTimeMs, int durationMs, int memoryMB, int cumulativeInputCostMs, int cumulativeComputeCostMs, int cumulativeOutputCostMs, int numReadRequests, int numWriteRequests, long totalReadBytes, long totalWriteBytes) {
+        this.requestId = requestId;
+        this.successful = successful;
+        this.errorMessage = errorMessage;
+        this.startTimeMs = startTimeMs;
+        this.durationMs = durationMs;
+        this.memoryMB = memoryMB;
+        this.cumulativeInputCostMs = cumulativeInputCostMs;
+        this.cumulativeComputeCostMs = cumulativeComputeCostMs;
+        this.cumulativeOutputCostMs = cumulativeOutputCostMs;
+        this.numReadRequests = numReadRequests;
+        this.numWriteRequests = numWriteRequests;
+        this.totalReadBytes = totalReadBytes;
+        this.totalWriteBytes = totalWriteBytes;
+    }
+
+    public Output(Output other) {
+        this.requestId = other.requestId;
+        this.successful = other.successful;
+        this.errorMessage = other.errorMessage;
+        this.startTimeMs = other.startTimeMs;
+        this.durationMs = other.durationMs;
+        this.memoryMB = other.memoryMB;
+        this.cumulativeInputCostMs = other.cumulativeInputCostMs;
+        this.cumulativeComputeCostMs = other.cumulativeComputeCostMs;
+        this.cumulativeOutputCostMs = other.cumulativeOutputCostMs;
+        this.numReadRequests = other.numReadRequests;
+        this.numWriteRequests = other.numWriteRequests;
+        this.totalReadBytes = other.totalReadBytes;
+        this.totalWriteBytes = other.totalWriteBytes;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Output output = (Output) o;
+        return successful == output.successful && startTimeMs == output.startTimeMs && durationMs == output.durationMs && memoryMB == output.memoryMB && cumulativeInputCostMs == output.cumulativeInputCostMs && cumulativeComputeCostMs == output.cumulativeComputeCostMs && cumulativeOutputCostMs == output.cumulativeOutputCostMs && numReadRequests == output.numReadRequests && numWriteRequests == output.numWriteRequests && totalReadBytes == output.totalReadBytes && totalWriteBytes == output.totalWriteBytes && requestId.equals(output.requestId) && errorMessage.equals(output.errorMessage);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(requestId, successful, errorMessage, startTimeMs, durationMs, memoryMB, cumulativeInputCostMs, cumulativeComputeCostMs, cumulativeOutputCostMs, numReadRequests, numWriteRequests, totalReadBytes, totalWriteBytes);
+    }
+
+    public String getRequestId() {
         return requestId;
     }
 
-    public void setRequestId(String requestId)
-    {
+    public void setRequestId(String requestId) {
         this.requestId = requestId;
     }
 
-    public boolean isSuccessful()
-    {
+    public boolean isSuccessful() {
         return successful;
     }
 

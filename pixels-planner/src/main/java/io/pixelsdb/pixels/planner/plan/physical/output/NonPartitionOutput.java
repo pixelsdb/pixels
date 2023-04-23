@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.planner.plan.physical.output;
 import io.pixelsdb.pixels.common.turbo.Output;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * The output format for serverless operators.
@@ -33,41 +35,70 @@ public abstract class NonPartitionOutput extends Output
     /**
      * The path of the result files. No need to contain endpoint information.
      */
-    private ArrayList<String> outputs = new ArrayList<>();
+    private List<String> outputs = new ArrayList<>();
 
     /**
      * The number of row groups in each result files.
      */
-    private ArrayList<Integer> rowGroupNums = new ArrayList<>();
+    private List<Integer> rowGroupNums = new ArrayList<>();
 
     /**
      * Default constructor for jackson.
      */
-    public NonPartitionOutput() { }
-
-    public ArrayList<String> getOutputs()
-    {
-        return outputs;
+    public NonPartitionOutput() {
+        super();
     }
 
-    public void setOutputs(ArrayList<String> outputs)
-    {
+    public NonPartitionOutput(List<String> outputs, List<Integer> rowGroupNums) {
+        super();
         this.outputs = outputs;
-    }
-
-    public ArrayList<Integer> getRowGroupNums()
-    {
-        return rowGroupNums;
-    }
-
-    public void setRowGroupNums(ArrayList<Integer> rowGroupNums)
-    {
         this.rowGroupNums = rowGroupNums;
     }
 
-    public synchronized void addOutput(String output, int rowGroupNum)
-    {
+    public NonPartitionOutput(Output output, List<String> outputs, List<Integer> rowGroupNums) {
+        super(output);
+        this.outputs = outputs;
+        this.rowGroupNums = rowGroupNums;
+    }
+
+    public NonPartitionOutput(NonPartitionOutput other) {
+        super(other);
+        this.outputs = other.outputs;
+        this.rowGroupNums = other.rowGroupNums;
+    }
+
+    public List<String> getOutputs() {
+        return outputs;
+    }
+
+    public void setOutputs(ArrayList<String> outputs) {
+        this.outputs = outputs;
+    }
+
+    public List<Integer> getRowGroupNums() {
+        return rowGroupNums;
+    }
+
+    public void setRowGroupNums(ArrayList<Integer> rowGroupNums) {
+        this.rowGroupNums = rowGroupNums;
+    }
+
+    public synchronized void addOutput(String output, int rowGroupNum) {
         this.outputs.add(output);
         this.rowGroupNums.add(rowGroupNum);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        NonPartitionOutput that = (NonPartitionOutput) o;
+        return outputs.equals(that.outputs) && rowGroupNums.equals(that.rowGroupNums);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), outputs, rowGroupNums);
     }
 }

@@ -24,6 +24,9 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ScanTableInfo;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * The input format for table scan.
  * @author hank
@@ -122,8 +125,19 @@ public class ScanInput extends Input
         this.output = output;
     }
 
-    public static Builder newBuilder() {
-        return new Builder();
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ScanInput scanInput = (ScanInput) o;
+        return queryId == scanInput.queryId && partialAggregationPresent == scanInput.partialAggregationPresent && tableInfo.equals(scanInput.tableInfo) && Arrays.equals(scanProjection, scanInput.scanProjection) && partialAggregationInfo.equals(scanInput.partialAggregationInfo) && output.equals(scanInput.output);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(queryId, tableInfo, partialAggregationPresent, partialAggregationInfo, output);
+        result = 31 * result + Arrays.hashCode(scanProjection);
+        return result;
     }
 
     public static final class Builder {

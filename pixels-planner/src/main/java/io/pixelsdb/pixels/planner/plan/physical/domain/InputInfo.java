@@ -19,12 +19,13 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical.domain;
 
+import java.util.Objects;
+
 /**
  * @author hank
  * @create 2022-06-02
  */
-public class InputInfo
-{
+public class InputInfo {
     private String path;
     private int rgStart;
     /**
@@ -45,8 +46,7 @@ public class InputInfo
      * @param rgLength the number of row groups to read, if it is non-positive,
      *                 it means read to the last row group in the file
      */
-    public InputInfo(String path, int rgStart, int rgLength)
-    {
+    public InputInfo(String path, int rgStart, int rgLength) {
         this.path = path;
         this.rgStart = rgStart;
         this.rgLength = rgLength;
@@ -56,13 +56,15 @@ public class InputInfo
         this(builder.path, builder.rgStart, builder.rgLength);
     }
 
-    public String getPath()
-    {
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
+    public String getPath() {
         return path;
     }
 
-    public void setPath(String path)
-    {
+    public void setPath(String path) {
         this.path = path;
     }
 
@@ -86,8 +88,17 @@ public class InputInfo
         this.rgLength = rgLength;
     }
 
-    public static Builder newBuilder() {
-        return new Builder();
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        InputInfo inputInfo = (InputInfo) o;
+        return rgStart == inputInfo.rgStart && rgLength == inputInfo.rgLength && path.equals(inputInfo.path);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(path, rgStart, rgLength);
     }
 
     public static final class Builder {

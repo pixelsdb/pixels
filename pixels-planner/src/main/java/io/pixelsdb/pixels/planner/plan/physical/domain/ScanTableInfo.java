@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner.plan.physical.domain;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * @author hank
@@ -55,6 +56,10 @@ public class ScanTableInfo extends TableInfo
         this.filter = builder.filter;
     }
 
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
     public List<InputSplit> getInputSplits()
     {
         return inputSplits;
@@ -75,8 +80,18 @@ public class ScanTableInfo extends TableInfo
         this.filter = filter;
     }
 
-    public static Builder newBuilder() {
-        return new Builder();
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        ScanTableInfo that = (ScanTableInfo) o;
+        return inputSplits.equals(that.inputSplits) && filter.equals(that.filter);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), inputSplits, filter);
     }
 
     public static final class Builder {

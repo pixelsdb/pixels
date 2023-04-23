@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical.domain;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * @author hank
  * @create 2022-06-02
@@ -31,7 +34,7 @@ public abstract class TableInfo
      * Whether this is a base table.
      * We don't check the existence of the base table files.
      */
-    private boolean base;
+    private boolean isBase;
 
     /**
      * The name of the columns to read.
@@ -51,7 +54,7 @@ public abstract class TableInfo
     public TableInfo(String tableName, boolean base, String[] columnsToRead, StorageInfo storageInfo)
     {
         this.tableName = tableName;
-        this.base = base;
+        this.isBase = base;
         this.columnsToRead = columnsToRead;
         this.storageInfo = storageInfo;
     }
@@ -68,31 +71,34 @@ public abstract class TableInfo
 
     public boolean isBase()
     {
-        return base;
+        return isBase;
     }
 
     public void setBase(boolean base)
     {
-        this.base = base;
+        isBase = base;
     }
 
-    public String[] getColumnsToRead()
-    {
+    public String[] getColumnsToRead() {
         return columnsToRead;
     }
 
-    public void setColumnsToRead(String[] columnsToRead)
-    {
+    public void setColumnsToRead(String[] columnsToRead) {
         this.columnsToRead = columnsToRead;
     }
 
-    public StorageInfo getStorageInfo()
-    {
-        return storageInfo;
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TableInfo tableInfo = (TableInfo) o;
+        return isBase == tableInfo.isBase && tableName.equals(tableInfo.tableName) && Arrays.equals(columnsToRead, tableInfo.columnsToRead);
     }
 
-    public void setStorageInfo(StorageInfo storageInfo)
-    {
-        this.storageInfo = storageInfo;
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(tableName, isBase);
+        result = 31 * result + Arrays.hashCode(columnsToRead);
+        return result;
     }
 }
