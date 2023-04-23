@@ -25,8 +25,8 @@ import io.pixelsdb.pixels.common.physical.scheduler.SortMergeScheduler;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
- * Created at: 9/10/21
- * Author: hank
+ * @create 2021-09-10
+ * @author hank
  */
 public class SchedulerFactory
 {

@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.common.turbo;
 /**
  * The base class for the input of a cloud function.
  * @author hank
- * @date 6/28/22
+ * @create 2022-06-28
  */
 public class Input
 {

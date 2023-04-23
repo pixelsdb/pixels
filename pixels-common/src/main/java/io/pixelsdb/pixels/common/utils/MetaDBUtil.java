@@ -39,7 +39,7 @@ public class MetaDBUtil
     }
 
     private Connection connection = null;
-    private static Logger log = LogManager.getLogger(MetaDBUtil.class);
+    private static final Logger log = LogManager.getLogger(MetaDBUtil.class);
 
     private String url;
     private String user;
@@ -60,7 +60,7 @@ public class MetaDBUtil
         }
         catch (Exception e)
         {
-            log.error("Connection error: " + e.getMessage());
+            log.error("Connection error: ", e);
         }
     }
 

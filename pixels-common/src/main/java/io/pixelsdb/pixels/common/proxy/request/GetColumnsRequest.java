@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.proxy.request;
 
 /**
- * Created at: 3/14/23
- * Author: hank
+ * @create 2023-03-14
+ * @author hank
  */
 public class GetColumnsRequest
 {

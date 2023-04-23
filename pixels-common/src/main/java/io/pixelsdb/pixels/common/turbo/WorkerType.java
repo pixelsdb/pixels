@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.common.turbo;
 
 /**
  * @author hank
- * @date 6/28/22
+ * @create 2022-06-28
  */
 public enum WorkerType
 {

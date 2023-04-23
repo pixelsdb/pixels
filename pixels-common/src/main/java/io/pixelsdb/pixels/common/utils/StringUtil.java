@@ -20,7 +20,8 @@
 package io.pixelsdb.pixels.common.utils;
 
 /**
- * @author guodong, hank
+ * @author guodong
+ * @author hank
  */
 public class StringUtil
 {

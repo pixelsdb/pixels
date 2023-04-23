@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.proxy.request;
 
 /**
- * Created at: 3/17/23
- * Author: hank
+ * @create 2023-03-17
+ * @author hank
  */
 public class ExecuteQueryRequest
 {

@@ -27,8 +27,8 @@ import java.util.Map;
 import java.util.Properties;
 
 /**
- * Created at: 3/18/23
- * Author: hank
+ * @create 2023-03-28
+ * @author hank
  */
 public class QueryEngineConns
 {

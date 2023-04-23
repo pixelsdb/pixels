@@ -26,8 +26,8 @@ package io.pixelsdb.pixels.common.turbo;
  * In Pixels, there should be at most one set of invoker implementations compatible with each cloud
  * function service. Each implementation corresponds to one type of serverless worker.
  * <br/>
- * Created at: 4/6/23
- * Author: hank
+ * @create 2023-04-06
+ * @author hank
  */
 public interface InvokerProvider
 {

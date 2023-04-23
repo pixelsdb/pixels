@@ -29,8 +29,8 @@ import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created at: 20/02/2022
- * Author: hank
+ * @create 2022-02-20
+ * @author hank
  */
 public class TransService
 {

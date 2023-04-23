@@ -29,8 +29,8 @@ import java.util.concurrent.CompletableFuture;
  * The interface for the reading request schedulers.
  * From each thread, call the addRequest() method to add read
  * requests, and then execute them in a
- * Created at: 9/10/21
- * Author: hank
+ * @create 2021-09-10
+ * @author hank
  */
 public interface Scheduler
 {

@@ -30,8 +30,8 @@ import java.util.List;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Created at: 20/08/2021
- * Author: hank
+ * @create 2021-08-20
+ * @author  hank
  */
 public interface Storage
 {

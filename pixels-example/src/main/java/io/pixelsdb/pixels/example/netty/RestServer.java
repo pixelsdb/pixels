@@ -28,7 +28,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -46,6 +45,7 @@ public class RestServer implements Server
     private static final Logger log = LogManager.getLogger(RestServer.class);
 
     private boolean running = false;
+    private boolean enableSsl = true;
 
     private final EventLoopGroup bossGroup;
     private final EventLoopGroup workerGroup;
@@ -59,8 +59,6 @@ public class RestServer implements Server
         try
         {
             SslContext sslContext = null;
-            boolean enableSsl = Boolean.parseBoolean(ConfigFactory.Instance()
-                    .getProperty("rest.server.enable.ssl"));
             if (enableSsl)
             {
                 SelfSignedCertificate ssc = new SelfSignedCertificate();
