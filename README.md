@@ -53,8 +53,9 @@ Enter `SRC_BASE/pixels`, use `mvn install` to build and install it to the local 
 > JDK 17.0.3+ is required by Trino. To run Pixels in Presto or other query engines, please build Pixels and the corresponding connector
 > using the Java version required by the query engine. Pixels by itself is compatible with Java 8 or above.
 
-It may take a couple of minutes to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons. 
-It will be used in the installation.
+It may take a couple of minutes to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons.
+Also find `pixels-cli-*-full.jar` in `pixels-cli/target`, which is the jar of Pixels command line tool.
+They will be used in the installation progress.
 
 Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
 However, for simplicity, we use Trino as an example to illustrate how Pixels works with query engines in the data lakes.
@@ -180,6 +181,7 @@ mkdir var
 ```
 Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` and `PIXELS_HOME/sbin` respectively.
 Put `pixels-daemon-*-full.jar` into `PIXELS_HOME`.
+Put `pixels-cli-*-full.jar` into `PIXELS_HOME/sbin`
 Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
 Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
 Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
@@ -429,7 +431,6 @@ During data loading, Pixels will automatically create the folders in the bucket 
 ### Load Data
 
 We use `pixels-cli` to load data into Pixels tables.
-After building Pixels, find `pixels-cli-*-full.jar` in `target` and put it into `PIXELS_HOME/sbin`.
 
 Under `PIXELS_HOME`, run pixels-cli:
 ```bash
