@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
- * Created at: 20/02/2022
- * Author: hank
+ * @create 2022-02-20
+ * @author hank
  */
 public class QueryTransInfo
 {

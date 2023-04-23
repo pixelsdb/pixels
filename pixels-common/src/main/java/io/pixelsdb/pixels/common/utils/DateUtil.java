@@ -25,8 +25,8 @@ import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * @author: Tao
- * @date: Create in 2017-07-28 7:11
+ * @author Tao
+ * @create 2017-07-28 7:11
  **/
 public class DateUtil
 {

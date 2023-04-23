@@ -23,8 +23,8 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * The interface for the invokers of cloud function worker.
- * Created at: 4/6/23
- * Author: hank
+ * @create 2023-04-06
+ * @author hank
  */
 public interface Invoker
 {

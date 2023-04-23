@@ -38,8 +38,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Created at: 18-10-14
- * Author: hank
+ * @create 2018-10-14
+ * @author hank
  */
 public class EtcdUtil
 {

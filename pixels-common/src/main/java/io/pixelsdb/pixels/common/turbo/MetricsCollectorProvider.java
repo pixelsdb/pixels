@@ -24,9 +24,9 @@ package io.pixelsdb.pixels.common.turbo;
  * In pixels.properties, set scaling.machine.service to the virtual machine service that the metrics collector
  * implementation is compatible with.
  * In Pixels, there should be at most one metrics collector implementation compatible with each virtual machine service.
- * <br/>
- * Created at: 2023-04-10
- * Author: hank
+ *
+ * @create 2023-04-10
+ * @author hank
  */
 public interface MetricsCollectorProvider
 {

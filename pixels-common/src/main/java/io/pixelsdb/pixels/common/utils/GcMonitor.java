@@ -24,7 +24,7 @@ import java.lang.management.ManagementFactory;
 
 /**
  * @author hank
- * @date 04/08/2022
+ * @create 2022-08-04
  */
 public class GcMonitor
 {

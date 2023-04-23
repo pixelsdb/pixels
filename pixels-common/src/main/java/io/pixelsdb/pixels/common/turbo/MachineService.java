@@ -22,9 +22,9 @@ package io.pixelsdb.pixels.common.turbo;
 /**
  * The virtual machine services we support.
  * Modify this enum if we add new virtual machine service support.
- * <br/>
- * Created at: 2023-04-10
- * Author: hank
+ *
+ * @create 2023-04-10
+ * @author hank
  */
 public enum MachineService
 {

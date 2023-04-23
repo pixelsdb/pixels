@@ -57,6 +57,8 @@ fi
 
 echo "Installing pixels-daemons..."
 cp -v ./pixels-daemon/target/pixels-daemon-*-full.jar $PIXELS_HOME
+echo "Installing pixels-cli..."
+cp -v ./pixels-cli/target/pixels-cli-*-full.jar $PIXELS_HOME/sbin
 
 if [ -z "$(ls -A $PIXELS_HOME/lib)" ]; then
   echo "$(
@@ -88,7 +90,4 @@ echo "$(
   tput setaf 1
   tput setab 7
 )See the README of pixels-presto/trino/hive to install a query engine.$(tput sgr 0)"
-  echo "$(
-    tput setaf 1
-    tput setab 7
-  )See the README of pixels-sink to build and install the data ingestion tool for Pixels.$(tput sgr 0)"
+
