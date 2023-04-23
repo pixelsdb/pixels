@@ -1,21 +1,14 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import com.alibaba.fastjson.JSON;
-import com.google.common.primitives.Booleans;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
-import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
-import io.pixelsdb.pixels.planner.plan.physical.domain.ScanTableInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
