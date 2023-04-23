@@ -440,6 +440,11 @@
                 <artifactId>protobuf-java</artifactId>
                 <version>${dep.protobuf.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java-util</artifactId>
+                <version>${dep.protobuf.version}</version>
+            </dependency>
 
             <!-- grpc -->
             <dependency>
