@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.planner.plan.physical.output;
 /**
  * The output format for aggregation.
  * @author hank
- * Created at: 06/07/2022
+ * @create 2022-07-06
  */
 public class AggregationOutput extends NonPartitionOutput
 {
