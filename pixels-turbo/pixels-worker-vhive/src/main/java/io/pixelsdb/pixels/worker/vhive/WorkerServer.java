@@ -1,7 +1,6 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import io.grpc.ServerBuilder;
-import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -33,7 +32,6 @@ public class WorkerServer implements Server {
         } catch (InterruptedException e) {
             log.error("Interrupted when shutdown rpc server.", e);
         }
-        MetaDBUtil.Instance().close();
     }
 
     @Override
