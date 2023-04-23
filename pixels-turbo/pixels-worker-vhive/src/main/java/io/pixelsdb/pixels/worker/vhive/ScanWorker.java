@@ -1,11 +1,5 @@
 package io.pixelsdb.pixels.worker.vhive;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
@@ -16,22 +10,30 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.aggregation.Aggregator;
+import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.executor.scan.Scanner;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
-import io.pixelsdb.pixels.executor.scan.Scanner;
-
+import io.pixelsdb.pixels.worker.common.WorkerCommon;
+import io.pixelsdb.pixels.worker.common.WorkerException;
+import io.pixelsdb.pixels.worker.common.WorkerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.util.Objects.requireNonNull;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
+import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The response is a list of files read and then written to s3.
@@ -43,7 +45,7 @@ import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
 public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
-    private final MetricsCollector metricsCollector = new MetricsCollector();
+    private final WorkerMetrics metricsCollector = new WorkerMetrics();
 
     @Override
     public ScanOutput handleRequest(ScanInput event)
@@ -92,7 +94,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 }
             } catch (Exception e)
             {
-                throw new PixelsWorkerException("failed to initialize Minio storage", e);
+                throw new WorkerException("failed to initialize Minio storage", e);
             }
             String[] includeCols = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
@@ -142,7 +144,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     }
                     catch (Exception e)
                     {
-                        throw new PixelsWorkerException("error during scan", e);
+                        throw new WorkerException("error during scan", e);
                     }
                 });
             }
@@ -152,14 +154,14 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                throw new PixelsWorkerException("interrupted while waiting for the termination of scan", e);
+                throw new WorkerException("interrupted while waiting for the termination of scan", e);
             }
 
             logger.info("start write aggregation result");
             if (partialAggregationPresent)
             {
                 String outputPath = event.getOutput().getPath();
-                MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
+                WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
                 PixelsWriter pixelsWriter = WorkerCommon.getWriter(aggregator.getOutputSchema(),
                         WorkerCommon.getStorage(storageInfo.getScheme()), outputPath, encoding,
                         aggregator.isPartition(), aggregator.getGroupKeyColumnIdsInResult());
@@ -209,27 +211,22 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      */
     private int scanFile(long queryId, List<InputInfo> scanInputs, String[] columnsToRead,
                          boolean[] scanProjection, TableScanFilter filter, String outputPath, boolean encoding,
-                         Storage.Scheme outputScheme, boolean partialAggregate, Aggregator aggregator)
-    {
+                         Storage.Scheme outputScheme, boolean partialAggregate, Aggregator aggregator) {
         PixelsWriter pixelsWriter = null;
         Scanner scanner = null;
-        if (partialAggregate)
-        {
+        if (partialAggregate) {
             requireNonNull(aggregator, "aggregator is null whereas partialAggregate is true");
         }
-        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
-        MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer();
-        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
+        WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer();
+        WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
         long readBytes = 0L;
         int numReadRequests = 0;
-        for (InputInfo inputInfo : scanInputs)
-        {
+        for (InputInfo inputInfo : scanInputs) {
             readCostTimer.start();
-            try (PixelsReader pixelsReader = WorkerCommon.getReader(inputInfo.getPath(), WorkerCommon.s3))
-            {
+            try (PixelsReader pixelsReader = WorkerCommon.getReader(inputInfo.getPath(), WorkerCommon.s3)) {
                 readCostTimer.stop();
-                if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
-                {
+                if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum()) {
                     continue;
                 }
                 if (inputInfo.getRgStart() + inputInfo.getRgLength() >= pixelsReader.getRowGroupNum())
@@ -276,7 +273,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 numReadRequests += recordReader.getNumReadRequests();
             } catch (Exception e)
             {
-                throw new PixelsWorkerException("failed to scan the file '" +
+                throw new WorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the result", e);
             }
         }
@@ -314,7 +311,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             return numRowGroup;
         } catch (Exception e)
         {
-            throw new PixelsWorkerException(
+            throw new WorkerException(
                     "failed finish writing and close the output file '" + outputPath + "'", e);
         }
     }
