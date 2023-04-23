@@ -8,7 +8,7 @@ option java_package = "io.pixelsdb.pixels.worker.vhive";
 option java_outer_classname = "WorkerProto";
 
 service WorkerService {
-    rpc Scan (ScanInput) returns (ScanOutput);
+    rpc Scan (ScanRequest) returns (ScanResponse);
     rpc Hello (HelloRequest) returns (HelloResponse);
 
     // rpc Aggregation (AggregationRequest) return (AggregationResponse);
@@ -19,113 +19,121 @@ service WorkerService {
     // rpc PartitionJoin (PartitionedJoinInput, Context) return (JoinOutput);
 }
 
-// follow the definition from io.pixelsdb.pixels.planner.plan.physical.input
-message Input {}
-
-message TableInfo {
-    string tableName = 1;
-    bool base = 2;
-    repeated string columnsToRead = 3;
-}
-
-message InputInfo {
-    string path = 1;
-    uint32 rgStart = 2;
-    uint32 rgLength = 3;
-}
-
-message InputSplit {
-    repeated InputInfo inputInfos = 1;
-}
-
-message ScanTableInfo {
-    string tableName = 1;
-    bool base = 2;
-    repeated string columnsToRead = 3;
-    repeated InputSplit inputSplits = 4;
-    string filter = 5;
-}
-
-enum FunctionType {
-    UNKNOWN = 0;
-    SUM = 1;
-    MIN = 2;
-    MAX = 3;
-    COUNT = 4;
-}
-
-message PartialAggregationInfo {
-    repeated string groupKeyColumnAlias = 1;
-    repeated string resultColumnAlias = 2;
-    repeated string resultColumnTypes = 3;
-    repeated uint32 groupKeyColumnIds = 4;
-    repeated uint32 aggregateColumnIds = 5;
-    repeated FunctionType functionTypes = 6;
-    bool partition = 7;
-    uint32 numPartition = 8;
-}
-
-enum Scheme {
-    hdfs = 0;
-    file = 1;
-    s3 = 2;
-    minio = 3;
-    redis = 4;
-    gcs = 5;
-    mock = 6;
-}
-
-message StorageInfo {
-    Scheme scheme = 1;
-    string endpoint = 2;
-    string accessKey = 3;
-    string secretKey = 4;
-}
-
-message OutputInfo {
-    string path = 1;
-    bool randomFileName = 2;
-    StorageInfo storageInfo = 3;
-    bool encoding = 4;
-}
-
-message Output {
-    string requestId = 1;
-    bool successful = 2;
-    string errorMessage = 3;
-    uint64 startTimeMs = 4;
-    uint32 durationMs = 5;
-    uint32 memoryMB = 6;
-    uint32 cumulativeInputCostMs = 7;
-    uint32 cumulativeComputeCostMs = 8;
-    uint32 cumulativeOutputCostMs = 9;
-    uint32 numReadRequests = 10;
-    uint32 numWriteRequests = 11;
-    uint64 totalReadBytes = 12;
-    uint64 totalWriteBytes = 13;
-}
-
-message NonPartitionOutput {
-    Output base = 1;
-    repeated string outputs = 2;
-    repeated uint32 rowGroupNums = 3;
-}
+//// follow the definition from io.pixelsdb.pixels.planner.plan.physical.input
+//message Input {}
+//
+//message TableInfo {
+//    string tableName = 1;
+//    bool base = 2;
+//    repeated string columnsToRead = 3;
+//}
+//
+//message InputInfo {
+//    string path = 1;
+//    uint32 rgStart = 2;
+//    uint32 rgLength = 3;
+//}
+//
+//message InputSplit {
+//    repeated InputInfo inputInfos = 1;
+//}
+//
+//message ScanTableInfo {
+//    string tableName = 1;
+//    bool base = 2;
+//    repeated string columnsToRead = 3;
+//    repeated InputSplit inputSplits = 4;
+//    string filter = 5;
+//}
+//
+//enum FunctionType {
+//    UNKNOWN = 0;
+//    SUM = 1;
+//    MIN = 2;
+//    MAX = 3;
+//    COUNT = 4;
+//}
+//
+//message PartialAggregationInfo {
+//    repeated string groupKeyColumnAlias = 1;
+//    repeated string resultColumnAlias = 2;
+//    repeated string resultColumnTypes = 3;
+//    repeated uint32 groupKeyColumnIds = 4;
+//    repeated uint32 aggregateColumnIds = 5;
+//    repeated FunctionType functionTypes = 6;
+//    bool partition = 7;
+//    uint32 numPartition = 8;
+//}
+//
+//enum Scheme {
+//    hdfs = 0;
+//    file = 1;
+//    s3 = 2;
+//    minio = 3;
+//    redis = 4;
+//    gcs = 5;
+//    mock = 6;
+//}
+//
+//message StorageInfo {
+//    Scheme scheme = 1;
+//    string endpoint = 2;
+//    string accessKey = 3;
+//    string secretKey = 4;
+//}
+//
+//message OutputInfo {
+//    string path = 1;
+//    bool randomFileName = 2;
+//    StorageInfo storageInfo = 3;
+//    bool encoding = 4;
+//}
+//
+//message Output {
+//    string requestId = 1;
+//    bool successful = 2;
+//    string errorMessage = 3;
+//    uint64 startTimeMs = 4;
+//    uint32 durationMs = 5;
+//    uint32 memoryMB = 6;
+//    uint32 cumulativeInputCostMs = 7;
+//    uint32 cumulativeComputeCostMs = 8;
+//    uint32 cumulativeOutputCostMs = 9;
+//    uint32 numReadRequests = 10;
+//    uint32 numWriteRequests = 11;
+//    uint64 totalReadBytes = 12;
+//    uint64 totalWriteBytes = 13;
+//}
+//
+//message NonPartitionOutput {
+//    Output base = 1;
+//    repeated string outputs = 2;
+//    repeated uint32 rowGroupNums = 3;
+//}
 
 // equals to io.pixelsdb.pixels.planner.plan.physical.input.ScanInput
-message ScanInput {
-    uint64 queryId = 1;
-    ScanTableInfo scanTableInfo = 2;
-    repeated bool scanProjection = 3;
-    bool partialAggregationPresent = 4;
-    PartialAggregationInfo partialAggregationInfo = 5;
-    OutputInfo output = 6;
-}
+//message ScanInput {
+//    uint64 queryId = 1;
+//    ScanTableInfo scanTableInfo = 2;
+//    repeated bool scanProjection = 3;
+//    bool partialAggregationPresent = 4;
+//    PartialAggregationInfo partialAggregationInfo = 5;
+//    OutputInfo output = 6;
+//}
 
 // equals to io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput
-message ScanOutput {
-    Output base = 1;
-    repeated string outputs = 2;
-    repeated uint32 rowGroupNums = 3;
+//message ScanOutput {
+//    Output base = 1;
+//    repeated string outputs = 2;
+//    repeated uint32 rowGroupNums = 3;
+//}
+
+message ScanRequest {
+    string json = 1;
+}
+
+message ScanResponse {
+    string json = 1;
 }
 
 message HelloRequest {

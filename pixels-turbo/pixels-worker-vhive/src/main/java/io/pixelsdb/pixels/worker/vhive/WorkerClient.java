@@ -1,13 +1,11 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import com.alibaba.fastjson.JSON;
-import com.google.protobuf.util.JsonFormat;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -39,17 +37,14 @@ public class WorkerClient {
     }
 
 
-    public ScanOutput scan(ScanInput input) throws IOException {
-        String inputJSON = JSON.toJSONString(input);
-        WorkerProto.ScanInput.Builder builder = WorkerProto.ScanInput.newBuilder();
-        JsonFormat.parser().merge(inputJSON, builder);
-        WorkerProto.ScanInput request = builder.build();
+    public ScanOutput scan(ScanInput input) {
+        WorkerProto.ScanRequest request = WorkerProto.ScanRequest.newBuilder()
+                .setJson(JSON.toJSONString(input))
+                .build();
 
+        WorkerProto.ScanResponse response = this.stub.scan(request);
 
-        WorkerProto.ScanOutput response = this.stub.scan(request);
-
-        String outputJSON = JsonFormat.printer().print(response);
-        ScanOutput output = JSON.parseObject(outputJSON, ScanOutput.class);
+        ScanOutput output = JSON.parseObject(response.getJson(), ScanOutput.class);
         return output;
     }
 
