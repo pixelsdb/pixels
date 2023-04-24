@@ -11,6 +11,9 @@ Run it using the command:
 ```bash
 java -jar pixels-server-*.jar
 ```
+The default REST service port is 18890, and the default RPC service port is 18892.
+A simple web UI is also provided on http://localhost:18890.
+
 Optionally, you can use an external configuration file (i.e., `application.properties`) like this:
 ```bash
 java -jar --spring.config.location=file:///[path-to-application.properties] pixels-server-*.jar
