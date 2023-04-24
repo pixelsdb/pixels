@@ -18,7 +18,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-// grpc protocol of pixels transaction.
+// grpc protocol for pixels transaction.
 
 syntax = "proto3";
 
@@ -26,7 +26,7 @@ option java_multiple_files = false;
 option java_package = "io.pixelsdb.pixels.daemon";
 option java_outer_classname = "TransProto";
 
-package metadata.proto;
+package transaction.proto;
 
 // The transaction services definition.
 service TransService {

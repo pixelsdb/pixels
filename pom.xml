@@ -42,7 +42,7 @@
         <module>pixels-example</module>
         <module>pixels-executor</module>
         <module>pixels-planner</module>
-        <module>pixels-proxy</module>
+        <module>pixels-server</module>
         <module>pixels-storage/pixels-storage-s3</module>
         <module>pixels-storage/pixels-storage-hdfs</module>
         <module>pixels-storage/pixels-storage-gcs</module>

@@ -18,7 +18,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-// grpc protocol of pixels metadata.
+// grpc protocol for pixels metadata.
 
 syntax = "proto3";
 
