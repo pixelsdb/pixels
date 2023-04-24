@@ -1,4 +1,4 @@
-# pixels-storage
+# Pixels Storage
 
 This folder contains the providers of the file/object storage systems.
 Each storage provider provides the adapters and I/O methods for a type of underlying

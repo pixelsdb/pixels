@@ -1,4 +1,4 @@
-# pixels-executor
+# Pixels Executor
 
 This is the executor to be embedded in a process or serverless worker.
 It is responsible for executing the relational operations, such as projection, filtering,
