@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>pixels-cli</artifactId>
-    <name>Pixels Cli</name>
+    <name>pixels-cli</name>
     <description>The command line tool of Pixels that provides data manipulations support.</description>
 
     <properties>

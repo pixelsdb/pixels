@@ -11,7 +11,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>pixels-daemon</artifactId>
-    <name>Pixels Daemon</name>
+    <name>pixels-daemon</name>
     <description>The daemon of Pixels that provides internal services.</description>
 
     <properties>
