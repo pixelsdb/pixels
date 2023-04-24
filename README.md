@@ -310,6 +310,12 @@ This feature can be turned on by setting `lambda.switch` to `auto` (adaptively e
 `output.folder` to the directory of the intermediate files, `output.endpoint` to the endpoint of the intermediate storage,
 and `output.access/secret.key` to the access/secret key of the intermediate storage.
 
+Append the following two lines into `etc/jvm.config`:
+```config
+--add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+--add-opens=java.base/java.nio=ALL-UNNAMED
+```
+Thus, pixels can reflect internal or low-level classes to improve performance. This is only needed for Java 9+.
 
 Some scripts in Trino may require python:
 ```bash
@@ -337,7 +343,7 @@ export NODE_EXPORTER_HOME=$HOME/opt/node_exporter
 export PATH=$PATH:$PROMETHEUS_HOME:$NODE_EXPORTER_HOME
 ```
 
-Enter the `etc` directory under the home of Trino-server. Append this line to `jvm.config`:
+Enter the home of Trino-server. Append this line to `etc/jvm.config`:
 ```bash
 -javaagent:/home/ubuntu/opt/jmx_exporter/jmx_prometheus_javaagent-0.18.0.jar=9101:/home/ubuntu/opt/jmx_exporter/pixels-jmx.yml
 ```
