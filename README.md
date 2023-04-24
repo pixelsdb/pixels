@@ -60,9 +60,9 @@ setting up a *Remote JVM Debug*.
 > written into.
 
 
-## Install and Evaluate Pixels
+## Deploy and Evaluate Pixels
 
-You can follow the [Installation](docs/INSTALL.md) instructions to install Pixels,
+You can follow the [Installation](docs/INSTALL.md) instructions to deploy Pixels in a cluster,
 and learn how to use Pixels and evaluate its performance following [TPC-H Evaluation](docs/TPC-H.md).
 
 
