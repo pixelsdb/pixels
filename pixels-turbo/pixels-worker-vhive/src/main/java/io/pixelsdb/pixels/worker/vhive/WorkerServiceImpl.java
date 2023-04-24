@@ -1,30 +1,117 @@
 package io.pixelsdb.pixels.worker.vhive;
 
-import com.alibaba.fastjson.JSON;
 import io.grpc.stub.StreamObserver;
-import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
+import io.pixelsdb.pixels.planner.plan.physical.input.*;
+import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
+import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
+import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import io.pixelsdb.pixels.worker.common.WorkerContext;
+import io.pixelsdb.pixels.worker.common.WorkerMetrics;
+import org.slf4j.LoggerFactory;
 
 public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
-    private static Logger log = LogManager.getLogger(WorkerServiceImpl.class);
+    private final AggregationWorker aggregationWorker;
+    private final BroadcastChainJoinWorker broadcastChainJoinWorker;
+    private final BroadcastJoinWorker broadcastJoinWorker;
+    private final PartitionedChainJoinWorker partitionedChainJoinWorker;
+    private final PartitionedJoinWorker partitionedJoinWorker;
+    private final PartitionWorker partitionWorker;
     private final ScanWorker scanWorker;
 
     public WorkerServiceImpl() {
-        this.scanWorker = new ScanWorker();
+        this.aggregationWorker = new AggregationWorker(
+                new WorkerContext(
+                        LoggerFactory.getLogger(AggregationWorker.class),
+                        new WorkerMetrics(),
+                        "id_AggregationWorker"
+                )
+        );
+        this.broadcastChainJoinWorker = new BroadcastChainJoinWorker(
+                new WorkerContext(
+                        LoggerFactory.getLogger(BroadcastChainJoinWorker.class),
+                        new WorkerMetrics(),
+                        "id_BroadcastChainJoinWorker"
+                )
+        );
+        this.broadcastJoinWorker = new BroadcastJoinWorker(
+                new WorkerContext(
+                        LoggerFactory.getLogger(BroadcastJoinWorker.class),
+                        new WorkerMetrics(),
+                        "id_BroadcastJoinWorker"
+                )
+        );
+        this.partitionedChainJoinWorker = new PartitionedChainJoinWorker(
+                new WorkerContext(
+                        LoggerFactory.getLogger(PartitionedChainJoinWorker.class),
+                        new WorkerMetrics(),
+                        "id_PartitionedChainJoinWorker"
+                )
+        );
+        this.partitionedJoinWorker = new PartitionedJoinWorker(
+                new WorkerContext(
+                        LoggerFactory.getLogger(PartitionedJoinWorker.class),
+                        new WorkerMetrics(),
+                        "id_PartitionedJoinWorker"
+                )
+        );
+        this.partitionWorker = new PartitionWorker(
+                new WorkerContext(
+                        LoggerFactory.getLogger(PartitionWorker.class),
+                        new WorkerMetrics(),
+                        "id_PartitionWorker"
+                )
+        );
+        this.scanWorker = new ScanWorker(
+                new WorkerContext(
+                        LoggerFactory.getLogger(ScanWorker.class),
+                        new WorkerMetrics(),
+                        "id_ScanWorker"
+                )
+        );
     }
 
     @Override
-    public void scan(WorkerProto.ScanRequest request, StreamObserver<WorkerProto.ScanResponse> responseObserver) {
-        ScanInput input = JSON.parseObject(request.getJson(), ScanInput.class);
-        ScanOutput output = this.scanWorker.handleRequest(input);
+    public void aggregation(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
+        ServiceImpl<AggregationInput, AggregationOutput> service = new ServiceImpl<>(this.aggregationWorker, AggregationInput.class);
+        service.execute(request, responseObserver);
+    }
 
-        WorkerProto.ScanResponse response = WorkerProto.ScanResponse.newBuilder()
-                .setJson(JSON.toJSONString(output))
-                .build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+    @Override
+    public void broadcastChainJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
+        ServiceImpl<BroadcastChainJoinInput, JoinOutput> service = new ServiceImpl<>(this.broadcastChainJoinWorker, BroadcastChainJoinInput.class);
+        service.execute(request, responseObserver);
+    }
+
+    @Override
+    public void broadcastJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
+        ServiceImpl<BroadcastJoinInput, JoinOutput> service = new ServiceImpl<>(this.broadcastJoinWorker, BroadcastJoinInput.class);
+        service.execute(request, responseObserver);
+    }
+
+    @Override
+    public void partitionChainJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
+        ServiceImpl<PartitionedChainJoinInput, JoinOutput> service = new ServiceImpl<>(this.partitionedChainJoinWorker, PartitionedChainJoinInput.class);
+        service.execute(request, responseObserver);
+    }
+
+    @Override
+    public void partitionJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
+        ServiceImpl<PartitionedJoinInput, JoinOutput> service = new ServiceImpl<>(this.partitionedJoinWorker, PartitionedJoinInput.class);
+        service.execute(request, responseObserver);
+    }
+
+    @Override
+    public void partition(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
+        ServiceImpl<PartitionInput, PartitionOutput> service = new ServiceImpl<>(this.partitionWorker, PartitionInput.class);
+        service.execute(request, responseObserver);
+    }
+
+
+    @Override
+    public void scan(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
+        ServiceImpl<ScanInput, ScanOutput> service = new ServiceImpl<>(this.scanWorker, ScanInput.class);
+        service.execute(request, responseObserver);
     }
 
     @Override
@@ -36,111 +123,5 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
         responseObserver.onCompleted();
     }
 
-//    private ScanInput protoToPhysical(WorkerProto.ScanInput request) {
-//        return ScanInput.newBuilder()
-//                .setQueryId(request.getQueryId())
-//                .setScanTableInfo(protoToPhysical(request.getScanTableInfo()))
-//                .setScanProjection(Booleans.toArray(request.getScanProjectionList()))
-//                .setPartialAggregationPresent(request.getPartialAggregationPresent())
-//                .setPartialAggregationInfo(protoToPhysical(request.getPartialAggregationInfo()))
-//                .setOutput(protoToPhysical(request.getOutput()))
-//                .build();
-//    }
-//
-//    private ScanTableInfo protoToPhysical(WorkerProto.ScanTableInfo request) {
-//        return ScanTableInfo.newBuilder()
-//                .setTableName(request.getTableName())
-//                .setBase(request.getBase())
-//                .setColumnsToRead(request.getColumnsToReadList().toArray(new String[0]))
-//                .setInputSplits(
-//                        request.getInputSplitsList().stream()
-//                                .map(this::protoToPhysical)
-//                                .collect(Collectors.toList())
-//                )
-//                .setFilter(request.getFilter())
-//                .build();
-//    }
 
-//    private InputSplit protoToPhysical(WorkerProto.InputSplit request) {
-//        return new InputSplit(request.getInputInfosList().stream()
-//                .map(this::protoToPhysical)
-//                .collect(Collectors.toList()));
-//    }
-//
-//    private InputInfo protoToPhysical(WorkerProto.InputInfo request) {
-//        return InputInfo.newBuilder()
-//                .setPath(request.getPath())
-//                .setRgStart(request.getRgStart())
-//                .setRgLength(request.getRgLength())
-//                .build();
-//    }
-//
-//    private PartialAggregationInfo protoToPhysical(WorkerProto.PartialAggregationInfo request) {
-//        return PartialAggregationInfo.newBuilder()
-//                .setGroupKeyColumnAlias(request.getGroupKeyColumnAliasList().toArray(new String[0]))
-//                .setResultColumnAlias(request.getResultColumnAliasList().toArray(new String[0]))
-//                .setResultColumnTypes(request.getResultColumnTypesList().toArray(new String[0]))
-//                .setGroupKeyColumnIds(Ints.toArray(request.getGroupKeyColumnIdsList()))
-//                .setAggregateColumnIds(Ints.toArray(request.getAggregateColumnIdsList()))
-//                .setFunctionTypes(
-//                        request.getFunctionTypesList().stream()
-//                        .map(this::protoToPhysical)
-//                        .toArray(FunctionType[]::new)
-//                )
-//                .setPartition(request.getPartition())
-//                .setNumPartition(request.getNumPartition())
-//                .build();
-//    }
-//
-//    private FunctionType protoToPhysical(WorkerProto.FunctionType request) {
-//        return FunctionType.fromNumber(request.getNumber());
-//    }
-//
-//    private OutputInfo protoToPhysical(WorkerProto.OutputInfo request) {
-//        return OutputInfo.newBuilder()
-//                .setPath(request.getPath())
-//                .setRandomFileName(request.getRandomFileName())
-//                .setStorageInfo(protoToPhysical(request.getStorageInfo()))
-//                .setEncoding(request.getEncoding())
-//                .build();
-//    }
-//
-//    private StorageInfo protoToPhysical(WorkerProto.StorageInfo request) {
-//        return StorageInfo.newBuilder()
-//                .setScheme(protoToPhysical(request.getScheme()))
-//                .setEndpoint(request.getEndpoint())
-//                .setAccessKey(request.getAccessKey())
-//                .setSecretKey(request.getSecretKey())
-//                .build();
-//    }
-//
-//    private Storage.Scheme protoToPhysical(WorkerProto.Scheme request) {
-//        return Storage.Scheme.fromNumber(request.getNumber());
-//    }
-//
-//    private WorkerProto.ScanOutput physicalToProto(ScanOutput response) {
-//        return WorkerProto.ScanOutput.newBuilder()
-//                .setBase(physicalToProto((Output)response))
-//                .addAllOutputs(response.getOutputs())
-//                .addAllRowGroupNums(response.getRowGroupNums())
-//                .build();
-//    }
-//
-//    private WorkerProto.Output physicalToProto(Output response) {
-//        return WorkerProto.Output.newBuilder()
-//                .setRequestId(response.getRequestId())
-//                .setSuccessful(response.isSuccessful())
-//                .setErrorMessage(response.getErrorMessage())
-//                .setStartTimeMs(response.getStartTimeMs())
-//                .setDurationMs(response.getDurationMs())
-//                .setMemoryMB(response.getMemoryMB())
-//                .setCumulativeInputCostMs(response.getCumulativeInputCostMs())
-//                .setCumulativeComputeCostMs(response.getCumulativeComputeCostMs())
-//                .setCumulativeOutputCostMs(response.getCumulativeOutputCostMs())
-//                .setNumReadRequests(response.getNumReadRequests())
-//                .setNumWriteRequests(response.getNumWriteRequests())
-//                .setTotalReadBytes(response.getTotalReadBytes())
-//                .setTotalWriteBytes(response.getTotalWriteBytes())
-//                .build();
-//    }
 }
