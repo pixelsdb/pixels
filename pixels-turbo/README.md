@@ -1,4 +1,4 @@
-# pixels-turbo
+# Pixels Turbo
 
 `Pixels-Turbo` is the query engine in Pixels that aims at improving the elasticity, performance, and cost-efficiency of
 query processing. 
@@ -28,7 +28,7 @@ consumed by the scaling manager (e.g., AWS EC2 Autoscaling Group) in the cloud p
 
 ## Usage
 
-Deploy `pixels-trino` following the instructions [here](https://github.com/pixelsdb/pixels#installation-in-aws).
+Install `Pixels + Trino` following the instructions [HERE](../docs/INSTALL.md).
 Then, deploy the serverless workers following the instructions in the README.md of `pixels-worker-[service]`.
 Currently, we only support AWS Lambda. So `pixels-worker-lambda` is the only option. More platform integrations
 will be provided in the future.

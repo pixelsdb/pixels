@@ -1,4 +1,4 @@
-# pixels-server
+# Pixels Server
 
 `pixels-server` provides the REST and RPC APIs for external clients and modules to access the services in Pixels.
 All the internal components in Pixels are deployed in an isolated network for security, and only the authorized 

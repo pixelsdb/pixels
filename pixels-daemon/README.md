@@ -1,4 +1,4 @@
-# pixels-daemon
+# Pixels Daemon
 
 In the Pixels cluster, there is one `Coordinator` process and one or more `DataNode` processes.
 The `Coordinator` is generally deployed on the same node of the query engine's master
