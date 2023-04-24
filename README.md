@@ -28,35 +28,36 @@ Enter `SRC_BASE/pixels`, use `mvn install` to build and install it to the local 
 > JDK 17.0.3+ is required by Trino. To run Pixels in Presto or other query engines, please build Pixels and the corresponding connector
 > using the Java version required by the query engine. Pixels by itself is compatible with Java 8 or above.
 
-It may take a couple of minutes to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons.
-Also find `pixels-cli-*-full.jar` in `pixels-cli/target`, which is the jar of Pixels command line tool.
-They will be used in the installation progress.
+It may take a couple of minutes to complete. After that, find jar files:
+* `pixels-daemon-*-full.jar` in `pixels-daemon/target`,this is the jar to run Pixels daemons.
+* `pixels-cli-*-full.jar` in `pixels-cli/target`, this is the jar of Pixels command line tool.
+
+They will be used in the installation of Pixels.
 
 Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
-However, for simplicity, we use Trino as an example to illustrate how Pixels works with query engines in the data lakes.
+The query engine integrations can be easily built using maven.
+For example, to build the Trino integration for Pixels, just git clone [pixels-trino](https://github.com/pixelsdb/pixels-trino), 
+and build it using `mvn package` in the local git repository.
 
-To use Pixels in Trino, download [pixels-trino](https://github.com/pixelsdb/pixels-trino), 
-and build it using `mvn package`.
-
-Find the following zip files in the build target directories:
+After building `pixels-trino`, find the following zip files in the build target directories:
 * `pixels-trino-listener-*.zip`, this is the event listener plugin for Trino.
 * `pixels-trino-connector-*.zip`, this is the connector for Trino.
 
-They will be used in the installation.
+They will be used in the installation of the integration.
 
 
-## Development Environment
+## Develop Pixels in IntelliJ
 
 If you want to develop Pixels in Intellij, open `SRC_BASE/pixels` as a maven project.
 When the project is fully indexed and the dependencies are successfully downloaded, 
-you can build Pixels using the maven plugin, run and debug unit tests, and debug Pixels by
+you can build Pixels using the maven plugin (as an alternative of `mvn package`), run and debug unit tests, and debug Pixels by
 setting up a *Remote JVM Debug*.
 
-> If you want to run the unit tests or the main classes in Intellij for debugging purpose, set the `PIXELS_HOME` environment
+> To run or debug the unit tests or the main classes of Pixels in Intellij, set the `PIXELS_HOME` environment
 > variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
 > Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](docs/INSTALL.md#install-pixels) to put
 > the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
-> written.
+> written into.
 
 
 ## Install and Evaluate Pixels
