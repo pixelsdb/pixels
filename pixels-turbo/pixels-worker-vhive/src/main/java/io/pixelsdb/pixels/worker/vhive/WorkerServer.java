@@ -10,13 +10,20 @@ import java.util.concurrent.TimeUnit;
 import static com.google.common.base.Preconditions.checkArgument;
 
 public class WorkerServer implements Server {
+    private static final int PORT = 50051;
     private static Logger log = LogManager.getLogger(WorkerServer.class);
-    private boolean running = false;
     private final io.grpc.Server rpcServer;
+    private boolean running = false;
 
     public WorkerServer(int port) {
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
         this.rpcServer = ServerBuilder.forPort(port).addService(new WorkerServiceImpl()).build();
+    }
+
+    public static void main(String[] args) {
+        WorkerServer server = new WorkerServer(PORT);
+        System.out.println("Server start running");
+        server.run();
     }
 
     @Override

@@ -155,7 +155,7 @@
                             <archive>
                                 <manifest>
                                     <mainClass>
-                                        io.pixelsdb.pixels.worker.vhive.Main
+                                        io.pixelsdb.pixels.worker.vhive.WorkerServer
                                     </mainClass>
                                 </manifest>
                                 <manifestEntries>
