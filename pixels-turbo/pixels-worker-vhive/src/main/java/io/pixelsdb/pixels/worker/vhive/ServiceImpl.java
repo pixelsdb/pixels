@@ -2,6 +2,7 @@ package io.pixelsdb.pixels.worker.vhive;
 
 import com.alibaba.fastjson.JSON;
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.worker.common.WorkerProto;
 
 public class ServiceImpl <I, O> {
     final RequestHandler<I, O> handler;

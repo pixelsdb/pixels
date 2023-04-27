@@ -4,7 +4,7 @@ syntax = "proto3";
 package pixels.proto;
 
 option java_multiple_files = false;
-option java_package = "io.pixelsdb.pixels.worker.vhive";
+option java_package = "io.pixelsdb.pixels.worker.common";
 option java_outer_classname = "WorkerProto";
 
 service WorkerService {
