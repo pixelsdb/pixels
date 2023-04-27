@@ -74,9 +74,9 @@ The hostnames, ports, paths, usernames, and passwords in these properties are to
 > to specify a different location of `pixels.properties`. This can be a http or https URL
 > to a remote location.
 
-Optionally, to install it step-by-step, please see the guidance below.
+Optionally, to install Pixels step-by-step, please see the guidance below.
 
-## Install Step-by-Step*
+### Install Step-by-Step*
 
 Here, we install Pixels and other binary packages into the `~/opt` directory:
 ```bash
@@ -228,8 +228,9 @@ output.secret.key=password
 `pixels.config` is used to specify the config file for Pixels, and has a higher priority than the config file under `PIXELS_HOME`.
 **Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
 The other properties are related to serverless execution.
-In Trino, Pixels can projection, selection, join, and aggregation into AWS Lambda
-This feature can be turned on by setting `lambda.switch` to `auto` (adaptively enabled) or `on` (always enabled), `output.scheme` to the storage scheme of the intermediate files (e.g. s3),
+In Trino, Pixels can push projections, filters, joins, and aggregations into serverless computing services (e.g., AWS Lambda).
+This feature is named `Pixels Turbo` and can be turned on by setting `lambda.switch` to `auto` (adaptively enabled) or `on` (always enabled), 
+`output.scheme` to the storage scheme of the intermediate files (e.g. s3),
 `output.folder` to the directory of the intermediate files, `output.endpoint` to the endpoint of the intermediate storage,
 and `output.access/secret.key` to the access/secret key of the intermediate storage.
 
