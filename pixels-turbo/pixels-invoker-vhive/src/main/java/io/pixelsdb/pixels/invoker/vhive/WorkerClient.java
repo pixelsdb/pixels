@@ -4,13 +4,14 @@ import com.alibaba.fastjson.JSON;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.pixelsdb.pixels.planner.plan.physical.input.*;
 import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import org.apache.commons.cli.*;
+import io.pixelsdb.pixels.worker.common.WorkerProto;
+import io.pixelsdb.pixels.worker.common.WorkerServiceGrpc;
 
-import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -29,64 +30,6 @@ public class WorkerClient {
         this.stub = WorkerServiceGrpc.newBlockingStub(channel);
     }
 
-    public static void main(String[] args) {
-        Options options = new Options();
-        options.addOption(Option.builder("i")
-                .longOpt("interactionId")
-                .hasArg(true)
-                .desc("interaction id ([REQUIRED] or use --clientId)")
-                .required(false)
-                .build());
-        options.addOption(Option.builder("c")
-                .longOpt("clientId")
-                .hasArg(true)
-                .desc("client id ([REQUIRED] or use --interactionId)")
-                .required(false)
-                .build());
-        options.addOption(Option.builder("f")
-                .longOpt("file")
-                .hasArg(true)
-                .desc("[REQUIRED] one log-file or list of many log-files as input for log-parser")
-                .numberOfArgs(Option.UNLIMITED_VALUES)
-                .required()
-                .build());
-
-        CommandLineParser parser = new DefaultParser();
-        CommandLine cmd = null;
-        try {
-            cmd = parser.parse(options, args);
-
-            if (cmd.hasOption("c")) {
-                String clientId = cmd.getOptionValue("c");
-                System.out.println("We have --clientId option = " + clientId);
-                if (cmd.hasOption("i")) {
-                    System.out.println("( --interactionId option is omitted because --clientId option is defined)");
-                }
-            } else if (cmd.hasOption("i")) {
-                String interactionId = cmd.getOptionValue("i");
-                System.out.println("We have --interactionId option " + interactionId);
-                if (cmd.hasOption("c")) {
-                    System.out.println("( --clientId option is omitted because --interactionId option is defined)");
-                }
-            } else {
-                System.out.println("please specify one of the command line options: "
-                        + " -c,--c <arg>             client id\n"
-                        + "OR\n"
-                        + " -i,--interaction <arg>   interaction id");
-            }
-            if (cmd.hasOption("f")) {
-                String[] files = cmd.getOptionValues("f");
-                System.out.println("Number of files: " + files.length);
-                System.out.println("FileName(s): " + String.join(", ", Arrays.asList(files)));
-            }
-        } catch (ParseException pe) {
-            System.out.println("Error parsing command-line arguments!");
-            System.out.println("Please, follow the instructions below:");
-            HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("Log messages to sequence diagrams converter", options);
-            System.exit(1);
-        }
-    }
 
     public void shutdown() throws InterruptedException {
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
