@@ -61,6 +61,12 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>aws-crt-client</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

@@ -128,9 +128,15 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
 
             WorkerCommon.initStorage(storageInfo);
 
-            TypeDescription inputSchema = WorkerCommon.getFileSchemaFromPaths(WorkerCommon.s3, inputFiles);
-            checkArgument(inputSchema.getChildren().size() == columnsToRead.length,
+            TypeDescription fileSchema = WorkerCommon.getFileSchemaFromPaths(WorkerCommon.s3, inputFiles);
+            /*
+             * Issue #450:
+             * For the partial aggregate files, the file schema is equal to the columns to read in normal cases.
+             * However, it is safer to turn file schema into result schema here.
+             */
+            checkArgument(fileSchema.getChildren().size() == columnsToRead.length,
                     "input file does not contain the correct number of columns");
+            TypeDescription inputSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
 
             // start aggregation.
             for (int i = 0; i < functionTypes.length; ++i)

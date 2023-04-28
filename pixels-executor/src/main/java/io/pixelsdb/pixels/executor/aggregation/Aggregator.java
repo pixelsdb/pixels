@@ -197,7 +197,6 @@ public class Aggregator
         {
             for (int hash = 0; hash < this.numPartitions; ++hash)
             {
-
                 for (int i = hash; i < this.numAggrTables; i += this.numPartitions)
                 {
                     Map<AggrTuple, AggrTuple> aggrTable = this.aggrTables.get(i);

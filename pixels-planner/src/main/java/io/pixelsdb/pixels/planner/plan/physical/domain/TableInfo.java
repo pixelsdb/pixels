@@ -67,7 +67,7 @@ public class TableInfo
 
     public void setBase(boolean base)
     {
-        base = base;
+        this.base = base;
     }
 
     public String[] getColumnsToRead()

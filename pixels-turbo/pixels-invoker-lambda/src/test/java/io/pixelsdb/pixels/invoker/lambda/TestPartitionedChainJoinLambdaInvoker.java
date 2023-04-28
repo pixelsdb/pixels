@@ -27,7 +27,6 @@ import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.*;
@@ -35,7 +34,7 @@ import java.util.concurrent.ExecutionException;
 
 /**
  * @author hank
- * @date 14/05/2022
+ * @create 2022-05-14
  */
 public class TestPartitionedChainJoinLambdaInvoker
 {
@@ -58,7 +57,7 @@ public class TestPartitionedChainJoinLambdaInvoker
         region.setTableName("region");
         region.setBase(true);
         region.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20220313093112_0.pxl", 0, 4)))));
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20230416153117_0.pxl", 0, 4)))));
         region.setFilter(regionFilter);
         chainTables.add(region);
 
@@ -68,7 +67,7 @@ public class TestPartitionedChainJoinLambdaInvoker
         nation.setTableName("nation");
         nation.setBase(true);
         nation.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20220313080937_0.pxl", 0, 4)))));
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20230416135645_0.pxl", 0, 4)))));
         nation.setFilter(nationFilter);
         chainTables.add(nation);
 
@@ -88,9 +87,7 @@ public class TestPartitionedChainJoinLambdaInvoker
         supplier.setTableName("supplier");
         supplier.setBase(true);
         supplier.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo(
-                        "pixels-tpch/supplier/v-0-compact/20220313101902_0.compact.pxl",
-                        0, 4)))));
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20230416155327_0_compact.pxl", 0, 4)))));
         supplier.setFilter(supplierFilter);
         chainTables.add(supplier);
 
@@ -116,14 +113,14 @@ public class TestPartitionedChainJoinLambdaInvoker
                 {"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
         leftTableInfo.setKeyColumnIds(new int[]{0});
         leftTableInfo.setInputFiles(Arrays.asList(
-                "pixels-lambda-test/orders_part_0",
-                "pixels-lambda-test/orders_part_1",
-                "pixels-lambda-test/orders_part_2",
-                "pixels-lambda-test/orders_part_3",
-                "pixels-lambda-test/orders_part_4",
-                "pixels-lambda-test/orders_part_5",
-                "pixels-lambda-test/orders_part_6",
-                "pixels-lambda-test/orders_part_7"));
+                "pixels-lambda-test/unit_tests/orders_part_0",
+                "pixels-lambda-test/unit_tests/orders_part_1",
+                "pixels-lambda-test/unit_tests/orders_part_2",
+                "pixels-lambda-test/unit_tests/orders_part_3",
+                "pixels-lambda-test/unit_tests/orders_part_4",
+                "pixels-lambda-test/unit_tests/orders_part_5",
+                "pixels-lambda-test/unit_tests/orders_part_6",
+                "pixels-lambda-test/unit_tests/orders_part_7"));
         leftTableInfo.setParallelism(8);
         joinInput.setSmallTable(leftTableInfo);
 
@@ -133,8 +130,8 @@ public class TestPartitionedChainJoinLambdaInvoker
                 {"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
         rightTableInfo.setKeyColumnIds(new int[]{0});
         rightTableInfo.setInputFiles(Arrays.asList(
-                "pixels-lambda-test/lineitem_part_0",
-                "pixels-lambda-test/lineitem_part_1"));
+                "pixels-lambda-test/unit_tests/lineitem_part_0",
+                "pixels-lambda-test/unit_tests/lineitem_part_1"));
         rightTableInfo.setParallelism(2);
         joinInput.setLargeTable(rightTableInfo);
 
@@ -164,9 +161,9 @@ public class TestPartitionedChainJoinLambdaInvoker
         joinInput.setChainTables(chainTables);
         joinInput.setChainJoinInfos(chainJoinInfos);
 
-        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/",
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/unit_tests/",
                 new StorageInfo(Storage.Scheme.s3, null, null, null),
-                true, Arrays.asList("partitioned-chain-join-0", "partitioned-chain-join-1")));
+                true, Arrays.asList("partitioned_chain_join_0")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = (JoinOutput) InvokerFactory.Instance()

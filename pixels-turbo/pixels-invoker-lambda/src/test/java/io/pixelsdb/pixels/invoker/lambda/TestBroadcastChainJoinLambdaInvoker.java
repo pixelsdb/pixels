@@ -27,7 +27,6 @@ import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -37,7 +36,7 @@ import java.util.concurrent.ExecutionException;
 
 /**
  * @author hank
- * @date 15/05/2022
+ * @create 2022-05-15
  */
 public class TestBroadcastChainJoinLambdaInvoker
 {
@@ -61,7 +60,7 @@ public class TestBroadcastChainJoinLambdaInvoker
         region.setTableName("region");
         region.setBase(true);
         region.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20220313093112_0.pxl", 0, 4)))));
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20230416153117_0.pxl", 0, 4)))));
         region.setFilter(regionFilter);
         leftTables.add(region);
 
@@ -71,7 +70,7 @@ public class TestBroadcastChainJoinLambdaInvoker
         nation.setTableName("nation");
         nation.setBase(true);
         nation.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20220313080937_0.pxl", 0, 4)))));
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20230416135645_0.pxl", 0, 4)))));
         nation.setFilter(nationFilter);
         leftTables.add(nation);
 
@@ -91,7 +90,7 @@ public class TestBroadcastChainJoinLambdaInvoker
         supplier.setTableName("supplier");
         supplier.setBase(true);
         supplier.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20220313101902_0.compact.pxl", 0, 4)))));
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20230416155327_0_compact.pxl", 0, 4)))));
         supplier.setFilter(supplierFilter);
         leftTables.add(supplier);
 
@@ -114,14 +113,14 @@ public class TestBroadcastChainJoinLambdaInvoker
         lineitem.setTableName("lineitem");
         lineitem.setBase(true);
         lineitem.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 8, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 12, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 16, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 20, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4)))));
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 0, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 4, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 8, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 12, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 16, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 20, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 24, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 28, 4)))));
         lineitem.setFilter(lineitemFilter);
         joinInput.setLargeTable(lineitem);
 
@@ -135,11 +134,9 @@ public class TestBroadcastChainJoinLambdaInvoker
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {3}, 100));
         joinInput.setJoinInfo(joinInfo);
 
-        joinInput.setOutput(new MultiOutputInfo("pixels-lambda/",
-                new StorageInfo(Storage.Scheme.minio, "http://172.31.32.193:9000",
-                        "lambda", "password"), true,
-                Arrays.asList("chain-join-0","chain-join-1","chain-join-2","chain-join-3",
-                        "chain-join-4","chain-join-5","chain-join-6","chain-join-7")));
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/unit_tests/",
+                new StorageInfo(Storage.Scheme.s3, null, null, null), true,
+                Arrays.asList("broadcast_chain_join_0")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = (JoinOutput) InvokerFactory.Instance()

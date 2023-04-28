@@ -97,7 +97,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
             int leftParallelism = event.getSmallTable().getParallelism();
             checkArgument(leftParallelism > 0, "leftParallelism is not positive");
-            String[] leftCols = event.getSmallTable().getColumnsToRead();
+            String[] leftColumnsToRead = event.getSmallTable().getColumnsToRead();
             int[] leftKeyColumnIds = event.getSmallTable().getKeyColumnIds();
 
             List<String> rightPartitioned = event.getLargeTable().getInputFiles();
@@ -105,7 +105,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
             int rightParallelism = event.getLargeTable().getParallelism();
             checkArgument(rightParallelism > 0, "rightParallelism is not positive");
-            String[] rightCols = event.getLargeTable().getColumnsToRead();
+            String[] rightColumnsToRead = event.getLargeTable().getColumnsToRead();
             int[] rightKeyColumnIds = event.getLargeTable().getKeyColumnIds();
 
             String[] leftColAlias = event.getJoinInfo().getSmallColumnAlias();
@@ -147,9 +147,14 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             WorkerCommon.getFileSchemaFromPaths(threadPool, WorkerCommon.s3, leftSchema, rightSchema, leftPartitioned, rightPartitioned);
+            /*
+             * Issue #450:
+             * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
+             * However, it is safer to turn file schema into result schema here.
+             */
             Joiner partitionJoiner = new Joiner(joinType,
-                    leftSchema.get(), leftColAlias, leftProjection, leftKeyColumnIds,
-                    rightSchema.get(), rightColAlias, rightProjection, rightKeyColumnIds);
+                    WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead), leftColAlias, leftProjection, leftKeyColumnIds,
+                    WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead), rightColAlias, rightProjection, rightKeyColumnIds);
             // build the chain joiner.
             Joiner chainJoiner = buildChainJoiner(queryId, threadPool, chainTables, chainJoinInfos,
                     partitionJoiner.getJoinedSchema(), workerMetrics);
@@ -188,7 +193,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     leftFutures.add(threadPool.submit(() -> {
                         try
                         {
-                            BasePartitionedJoinWorker.buildHashTable(queryId, partitionJoiner, parts, leftCols, hashValues, numPartition, workerMetrics);
+                            BasePartitionedJoinWorker.buildHashTable(queryId, partitionJoiner, parts, leftColumnsToRead, hashValues, numPartition, workerMetrics);
                         } catch (Exception e)
                         {
                             throw new WorkerException("error during hash table construction", e);
@@ -223,9 +228,9 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                             {
                                 int numJoinedRows = partitionOutput ?
                                         joinWithRightTableAndPartition(
-                                                queryId, partitionJoiner, chainJoiner, parts, rightCols, hashValues,
+                                                queryId, partitionJoiner, chainJoiner, parts, rightColumnsToRead, hashValues,
                                                 numPartition, outputPartitionInfo, result, workerMetrics) :
-                                        joinWithRightTable(queryId, partitionJoiner, chainJoiner, parts, rightCols,
+                                        joinWithRightTable(queryId, partitionJoiner, chainJoiner, parts, rightColumnsToRead,
                                                 hashValues, numPartition, result.get(0), workerMetrics);
                             } catch (Exception e)
                             {

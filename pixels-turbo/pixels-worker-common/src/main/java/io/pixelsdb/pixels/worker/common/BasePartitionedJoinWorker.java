@@ -86,7 +86,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
             int leftParallelism = event.getSmallTable().getParallelism();
             checkArgument(leftParallelism > 0, "leftParallelism is not positive");
-            String[] leftCols = event.getSmallTable().getColumnsToRead();
+            String[] leftColumnsToRead = event.getSmallTable().getColumnsToRead();
             int[] leftKeyColumnIds = event.getSmallTable().getKeyColumnIds();
 
             List<String> rightPartitioned = event.getLargeTable().getInputFiles();
@@ -94,7 +94,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
             int rightParallelism = event.getLargeTable().getParallelism();
             checkArgument(rightParallelism > 0, "rightParallelism is not positive");
-            String[] rightCols = event.getLargeTable().getColumnsToRead();
+            String[] rightColumnsToRead = event.getLargeTable().getColumnsToRead();
             int[] rightKeyColumnIds = event.getLargeTable().getKeyColumnIds();
 
             String[] leftColAlias = event.getJoinInfo().getSmallColumnAlias();
@@ -140,9 +140,14 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             WorkerCommon.getFileSchemaFromPaths(threadPool, WorkerCommon.s3, leftSchema, rightSchema, leftPartitioned, rightPartitioned);
+            /*
+             * Issue #450:
+             * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
+             * However, it is safer to turn file schema into result schema here.
+             */
             Joiner joiner = new Joiner(joinType,
-                    leftSchema.get(), leftColAlias, leftProjection, leftKeyColumnIds,
-                    rightSchema.get(), rightColAlias, rightProjection, rightKeyColumnIds);
+                    WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead), leftColAlias, leftProjection, leftKeyColumnIds,
+                    WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead), rightColAlias, rightProjection, rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
             int leftSplitSize = leftPartitioned.size() / leftParallelism;
@@ -160,7 +165,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, parts, leftCols, hashValues, numPartition, workerMetrics);
+                        buildHashTable(queryId, joiner, parts, leftColumnsToRead, hashValues, numPartition, workerMetrics);
                     }
                     catch (Exception e)
                     {
@@ -209,9 +214,9 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                         {
                             int numJoinedRows = partitionOutput ?
                                     joinWithRightTableAndPartition(
-                                            queryId, joiner, parts, rightCols, hashValues,
+                                            queryId, joiner, parts, rightColumnsToRead, hashValues,
                                             numPartition, outputPartitionInfo, result, workerMetrics) :
-                                    joinWithRightTable(queryId, joiner, parts, rightCols,
+                                    joinWithRightTable(queryId, joiner, parts, rightColumnsToRead,
                                             hashValues, numPartition, result.get(0), workerMetrics);
                         } catch (Exception e)
                         {

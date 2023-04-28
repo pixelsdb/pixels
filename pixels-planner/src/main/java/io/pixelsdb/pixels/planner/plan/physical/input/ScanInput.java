@@ -67,6 +67,7 @@ public class ScanInput extends Input
     {
         this.queryId = queryId;
         this.tableInfo = tableInfo;
+        this.scanProjection = scanProjection;
         this.partialAggregationPresent = partialAggregationPresent;
         this.partialAggregationInfo = partialAggregationInfo;
         this.output = output;
