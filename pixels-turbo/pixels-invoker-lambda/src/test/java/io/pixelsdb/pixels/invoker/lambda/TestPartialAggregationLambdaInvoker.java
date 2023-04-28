@@ -35,48 +35,52 @@ import java.util.concurrent.ExecutionException;
 
 /**
  * @author hank
- * @date 08/07/2022
+ * @create 2022-07-08
  */
 public class TestPartialAggregationLambdaInvoker
 {
     @Test
     public void testScanPartialAggregation() throws ExecutionException, InterruptedException
     {
-        String filter =
-                "{\"schemaName\":\"tpch\",\"tableName\":\"orders\",\"columnFilters\":{}}";
-        ScanInput scanInput = new ScanInput();
-        scanInput.setQueryId(123456);
-        ScanTableInfo tableInfo = new ScanTableInfo();
-        tableInfo.setTableName("orders");
-        tableInfo.setColumnsToRead(new String[] {"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
-        tableInfo.setFilter(filter);
-        tableInfo.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 0, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 4, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 8, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 12, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 16, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 20, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 24, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 28, 4)))));
-        scanInput.setTableInfo(tableInfo);
-        scanInput.setPartialAggregationPresent(true);
-        PartialAggregationInfo aggregationInfo = new PartialAggregationInfo();
-        aggregationInfo.setGroupKeyColumnAlias(new String[] {"o_orderstatus_2", "o_orderdate_3"});
-        aggregationInfo.setGroupKeyColumnIds(new int[] {2, 3});
-        aggregationInfo.setAggregateColumnIds(new int[] {0});
-        aggregationInfo.setResultColumnAlias(new String[] {"sum_o_orderkey_0"});
-        aggregationInfo.setResultColumnTypes(new String[] {"bigint"});
-        aggregationInfo.setFunctionTypes(new FunctionType[] {FunctionType.SUM});
-        scanInput.setPartialAggregationInfo(aggregationInfo);
-        scanInput.setOutput(new OutputInfo("pixels-lambda-test/orders_partial_aggr_7", false,
-                new StorageInfo(Storage.Scheme.s3, null, null, null), true));
+        for (int i = 0; i < 8; ++i)
+        {
+            String filter =
+                    "{\"schemaName\":\"tpch\",\"tableName\":\"orders\",\"columnFilters\":{}}";
+            ScanInput scanInput = new ScanInput();
+            scanInput.setQueryId(123456);
+            ScanTableInfo tableInfo = new ScanTableInfo();
+            tableInfo.setTableName("orders");
+            tableInfo.setColumnsToRead(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
+            tableInfo.setFilter(filter);
+            tableInfo.setInputSplits(Arrays.asList(
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 0, 4))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 4, 4))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 8, 4))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 12, 4))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 16, 4))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 20, 4))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 24, 4))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 28, 4)))));
+            scanInput.setTableInfo(tableInfo);
+            scanInput.setScanProjection(new boolean[]{true, true, true, true});
+            scanInput.setPartialAggregationPresent(true);
+            PartialAggregationInfo aggregationInfo = new PartialAggregationInfo();
+            aggregationInfo.setGroupKeyColumnAlias(new String[]{"o_orderstatus_2", "o_orderdate_3"});
+            aggregationInfo.setGroupKeyColumnIds(new int[]{2, 3});
+            aggregationInfo.setAggregateColumnIds(new int[]{0});
+            aggregationInfo.setResultColumnAlias(new String[]{"sum_o_orderkey_0"});
+            aggregationInfo.setResultColumnTypes(new String[]{"bigint"});
+            aggregationInfo.setFunctionTypes(new FunctionType[]{FunctionType.SUM});
+            scanInput.setPartialAggregationInfo(aggregationInfo);
+            scanInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_partial_aggr_" + i, false,
+                    new StorageInfo(Storage.Scheme.s3, null, null, null), true));
 
-        System.out.println(JSON.toJSONString(scanInput));
+            System.out.println(JSON.toJSONString(scanInput));
 
-        ScanOutput output = (ScanOutput) InvokerFactory.Instance()
-                .getInvoker(WorkerType.SCAN).invoke(scanInput).get();
-        System.out.println(Joiner.on(",").join(output.getOutputs()));
-        System.out.println(Joiner.on(",").join(output.getRowGroupNums()));
+            ScanOutput output = (ScanOutput) InvokerFactory.Instance()
+                    .getInvoker(WorkerType.SCAN).invoke(scanInput).get();
+            System.out.println(Joiner.on(",").join(output.getOutputs()));
+            System.out.println(Joiner.on(",").join(output.getRowGroupNums()));
+        }
     }
 }

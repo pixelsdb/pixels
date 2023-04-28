@@ -20,10 +20,10 @@
 package io.pixelsdb.pixels.executor.predicate;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.annotation.JSONCreator;
 import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
-import com.google.common.reflect.TypeToken;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.stats.RangeStats;
@@ -95,23 +95,23 @@ public class ColumnFilter<T extends Comparable<T>>
         Type filterType;
         if (columnJavaType == byte.class)
         {
-            filterType = new TypeToken<Filter<Byte>>(){}.getType();
+            filterType = new TypeReference<Filter<Byte>>(){}.getType();
         }
         else if (columnJavaType == int.class)
         {
-            filterType = new TypeToken<Filter<Integer>>(){}.getType();
+            filterType = new TypeReference<Filter<Integer>>(){}.getType();
         }
         else if (columnJavaType == long.class)
         {
-            filterType = new TypeToken<Filter<Long>>(){}.getType();
+            filterType = new TypeReference<Filter<Long>>(){}.getType();
         }
         else if (columnJavaType == byte[].class)
         {
-            filterType = new TypeToken<Filter<String>>(){}.getType();
+            filterType = new TypeReference<Filter<String>>(){}.getType();
         }
         else if (columnJavaType == Decimal.class)
         {
-            filterType = new TypeToken<Filter<Long>>(){}.getType();
+            filterType = new TypeReference<Filter<Long>>(){}.getType();
         }
         else
         {

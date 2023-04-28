@@ -52,11 +52,11 @@ public class AggregationInput extends Input
      */
     private String[] columnsToRead;
     /**
-     * The column ids of the group-key columns in the input files.
+     * The column ids of the group-key columns in {@link #columnsToRead}.
      */
     private int[] groupKeyColumnIds;
     /**
-     * The column ids of the aggregate columns in the input files.
+     * The column ids of the aggregate columns in {@link #columnsToRead}.
      */
     private int[] aggregateColumnIds;
     /**
@@ -65,7 +65,7 @@ public class AggregationInput extends Input
     private String[] groupKeyColumnNames;
     /**
      * If a group-key column appears in the aggregation output,
-     * the corresponding element in this array would be true, and vice versa.
+     * the corresponding element in this array should be true, and vice versa.
      */
     private boolean[] groupKeyColumnProjection;
     /**
