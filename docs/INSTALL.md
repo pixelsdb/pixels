@@ -219,20 +219,39 @@ pixels.config=/home/ubuntu/opt/pixels/pixels.properties
 lambda.switch=auto
 local.scan.concurrency=40
 clean.local.result=true
-output.scheme=output-scheme-dummy
-output.folder=output-folder-dummy
-output.endpoint=output-endpoint-dummy
-output.access.key=lambda
-output.secret.key=password
 ```
 `pixels.config` is used to specify the config file for Pixels, and has a higher priority than the config file under `PIXELS_HOME`.
 **Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
 The other properties are related to serverless execution.
 In Trino, Pixels can push projections, filters, joins, and aggregations into serverless computing services (e.g., AWS Lambda).
-This feature is named `Pixels Turbo` and can be turned on by setting `lambda.switch` to `auto` (adaptively enabled) or `on` (always enabled), 
-`output.scheme` to the storage scheme of the intermediate files (e.g. s3),
-`output.folder` to the directory of the intermediate files, `output.endpoint` to the endpoint of the intermediate storage,
-and `output.access/secret.key` to the access/secret key of the intermediate storage.
+This feature is named `Pixels Turbo` and can be turned on by setting `lambda.switch` to `auto` (adaptively enabled) or `on` (always enabled).
+
+If Pixels Turbo is enabled, we also need to set the following settings in `PIXELS_HOME/pixels.properties`:
+```properties
+executor.input.storage.scheme=s3
+executor.input.storage.endpoint=input-endpoint-dummy
+executor.input.storage.access.key=input-ak-dummy
+executor.input.storage.secret.key=input-sk-dummy
+executor.intermediate.storage.scheme=s3
+executor.intermediate.storage.endpoint=intermediate-endpoint-dummy
+executor.intermediate.storage.access.key=intermediate-ak-dummy
+executor.intermediate.storage.secret.key=intermediate-sk-dummy
+executor.intermediate.folder=/pixels-lambda-test/
+executor.output.storage.scheme=s3
+executor.output.storage.endpoint=output-endpoint-dummy
+executor.output.storage.access.key=output-ak-dummy
+executor.output.storage.secret.key=output-sk-dummy
+executor.output.folder=/pixels-lambda-test/
+```
+Those storage schemes, endpoints, and access and secret keys are used to access the input data 
+(the data of the base tables defined by `CREATE TABLE` statements), the intermediate data (intermediate
+results generated during query execution), and the output data (the result of the sub-plan executed in
+the serverless workers), respectively.
+Ensure that they are valid so that the serverless workers can access the corresponding storage systems.
+Especially, the `executor.input.storage.scheme` must be consistent with the storage scheme of the base
+tables. This is checked during query-planning for Pixels Turbo.
+In addition, the `executor.intermediate.folder` and `executor.output.folder` are the base path where the intermediate
+and output data are stored. They also need to be valid and accessible by the serverless workers.
 
 Append the following two lines into `etc/jvm.config`:
 ```config
