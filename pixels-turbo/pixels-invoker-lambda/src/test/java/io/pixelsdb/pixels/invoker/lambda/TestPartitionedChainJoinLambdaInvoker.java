@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.invoker.lambda;
 
 import com.alibaba.fastjson.JSON;
+import com.google.common.base.Joiner;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
@@ -59,6 +60,7 @@ public class TestPartitionedChainJoinLambdaInvoker
         region.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20230416153117_0.pxl", 0, 4)))));
         region.setFilter(regionFilter);
+        region.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         chainTables.add(region);
 
         BroadcastTableInfo nation = new BroadcastTableInfo();
@@ -69,6 +71,7 @@ public class TestPartitionedChainJoinLambdaInvoker
         nation.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20230416135645_0.pxl", 0, 4)))));
         nation.setFilter(nationFilter);
+        nation.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         chainTables.add(nation);
 
         ChainJoinInfo chainJoinInfo0 = new ChainJoinInfo();
@@ -89,6 +92,7 @@ public class TestPartitionedChainJoinLambdaInvoker
         supplier.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20230416155327_0_compact.pxl", 0, 4)))));
         supplier.setFilter(supplierFilter);
+        supplier.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         chainTables.add(supplier);
 
         ChainJoinInfo chainJoinInfo1 = new ChainJoinInfo();
@@ -122,6 +126,8 @@ public class TestPartitionedChainJoinLambdaInvoker
                 "pixels-lambda-test/unit_tests/orders_part_6",
                 "pixels-lambda-test/unit_tests/orders_part_7"));
         leftTableInfo.setParallelism(8);
+        leftTableInfo.setBase(false);
+        leftTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         joinInput.setSmallTable(leftTableInfo);
 
         PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
@@ -133,6 +139,8 @@ public class TestPartitionedChainJoinLambdaInvoker
                 "pixels-lambda-test/unit_tests/lineitem_part_0",
                 "pixels-lambda-test/unit_tests/lineitem_part_1"));
         rightTableInfo.setParallelism(2);
+        rightTableInfo.setBase(false);
+        rightTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         joinInput.setLargeTable(rightTableInfo);
 
         PartitionedJoinInfo joinInfo = new PartitionedJoinInfo();
@@ -169,11 +177,7 @@ public class TestPartitionedChainJoinLambdaInvoker
         JoinOutput output = (JoinOutput) InvokerFactory.Instance()
                 .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN).invoke(joinInput).get();
         System.out.println(output.getOutputs().size());
-        for (int i = 0; i < output.getOutputs().size(); ++i)
-        {
-            System.out.println(output.getOutputs().get(i));
-            System.out.println(output.getRowGroupNums().get(i));
-            System.out.println();
-        }
+        System.out.println(Joiner.on(",").join(output.getOutputs()));
+        System.out.println(Joiner.on(",").join(output.getRowGroupNums()));
     }
 }

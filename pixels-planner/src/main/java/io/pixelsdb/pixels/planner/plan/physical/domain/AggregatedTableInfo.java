@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,41 +19,35 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical.domain;
 
+import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
+
 import java.util.List;
 
 /**
+ * The partial aggregates are seen as a table (i.e., materialized view). This is the
+ * information of the partial aggregates.
  * @author hank
- * @create 2022-06-02
+ * @create 2023-04-29 (move fields from {@link AggregationInput} to here)
  */
-public class PartitionedTableInfo extends TableInfo
+public class AggregatedTableInfo extends TableInfo
 {
     /**
-     * The partitioned file paths of the table.
+     * The paths of the partial aggregated files.
      */
     private List<String> inputFiles;
     /**
-     * The number of threads used to process the table.
+     * The number of threads to scan and aggregate the input files.
      */
     private int parallelism;
 
-    /**
-     * The ids of the join-key columns of the table.
-     */
-    private int[] keyColumnIds;
+    public AggregatedTableInfo() { }
 
-    /**
-     * Default constructor for Jackson.
-     */
-    public PartitionedTableInfo() { }
-
-    public PartitionedTableInfo(String tableName, boolean base, String[] columnsToRead,
-                                StorageInfo storageInfo, List<String> inputFiles,
-                                int parallelism, int[] keyColumnIds)
+    public AggregatedTableInfo(String tableName, boolean base, String[] columnsToRead,
+                               StorageInfo storageInfo, List<String> inputFiles, int parallelism)
     {
         super(tableName, base, columnsToRead, storageInfo);
         this.inputFiles = inputFiles;
         this.parallelism = parallelism;
-        this.keyColumnIds = keyColumnIds;
     }
 
     public List<String> getInputFiles()
@@ -76,13 +70,4 @@ public class PartitionedTableInfo extends TableInfo
         this.parallelism = parallelism;
     }
 
-    public int[] getKeyColumnIds()
-    {
-        return keyColumnIds;
-    }
-
-    public void setKeyColumnIds(int[] keyColumnIds)
-    {
-        this.keyColumnIds = keyColumnIds;
-    }
 }

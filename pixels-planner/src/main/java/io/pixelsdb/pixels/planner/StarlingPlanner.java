@@ -33,6 +33,7 @@ import io.pixelsdb.pixels.common.metadata.domain.Projections;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
@@ -55,14 +56,14 @@ import static java.util.Objects.requireNonNull;
  * The serverless executor of join and aggregation.
  *
  * @author hank
- * @date 15/08/2022
+ * @create 2022-08-15
  */
 public class StarlingPlanner
 {
     private static final Logger logger = LogManager.getLogger(StarlingPlanner.class);
     private static final boolean enablePartitionProjection = false;
-    private static final Storage.Scheme InputStorage;
-    private static final Storage.Scheme IntermediateStorage;
+    private static final StorageInfo InputStorageInfo;
+    private static final StorageInfo IntermediateStorageInfo;
     private static final String IntermediateFolder;
     private static final int IntraWorkerParallelism;
 
@@ -78,16 +79,24 @@ public class StarlingPlanner
 
     static
     {
-        String storageScheme = ConfigFactory.Instance().getProperty("executor.input.storage");
-        InputStorage = Storage.Scheme.from(storageScheme);
-        storageScheme = ConfigFactory.Instance().getProperty("executor.intermediate.storage");
-        IntermediateStorage = Storage.Scheme.from(storageScheme);
-        String storageFolder = ConfigFactory.Instance().getProperty("executor.intermediate.folder");
-        if (!storageFolder.endsWith("/"))
+        String inputStorageScheme = ConfigFactory.Instance().getProperty("executor.input.storage.scheme");
+        String inputStorageEndpoint = ConfigFactory.Instance().getProperty("executor.input.storage.endpoint");
+        String inputStorageAccessKey = ConfigFactory.Instance().getProperty("executor.input.storage.access.key");
+        String inputStorageSecretKey = ConfigFactory.Instance().getProperty("executor.input.storage.secret.key");
+        InputStorageInfo = new StorageInfo(Storage.Scheme.from(inputStorageScheme),
+                inputStorageEndpoint, inputStorageAccessKey, inputStorageSecretKey);
+        String interStorageScheme = ConfigFactory.Instance().getProperty("executor.intermediate.storage.scheme");
+        String interStorageEndpoint = ConfigFactory.Instance().getProperty("executor.intermediate.storage.endpoint");
+        String interStorageAccessKey = ConfigFactory.Instance().getProperty("executor.intermediate.storage.access.key");
+        String interStorageSecretKey = ConfigFactory.Instance().getProperty("executor.intermediate.storage.secret.key");
+        IntermediateStorageInfo = new StorageInfo(Storage.Scheme.from(interStorageScheme),
+                interStorageEndpoint, interStorageAccessKey, interStorageSecretKey);
+        String interStorageFolder = ConfigFactory.Instance().getProperty("executor.intermediate.folder");
+        if (!interStorageFolder.endsWith("/"))
         {
-            storageFolder += "/";
+            interStorageFolder += "/";
         }
-        IntermediateFolder = storageFolder;
+        IntermediateFolder = interStorageFolder;
         IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance()
                 .getProperty("executor.intra.worker.parallelism"));
     }
@@ -122,7 +131,7 @@ public class StarlingPlanner
         this.projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
         this.orderedPathEnabled = orderedPathEnabled;
         this.compactPathEnabled = compactPathEnabled;
-        this.storage = StorageFactory.Instance().getStorage(InputStorage);
+        this.storage = StorageFactory.Instance().getStorage(InputStorageInfo.getScheme());
     }
 
     public Operator getRootOperator() throws IOException, MetadataException
@@ -194,12 +203,14 @@ public class StarlingPlanner
                 tableInfo.setColumnsToRead(originTable.getColumnNames());
                 tableInfo.setTableName(originTable.getTableName());
                 tableInfo.setFilter(JSON.toJSONString(((BaseTable) originTable).getFilter()));
+                tableInfo.setBase(true);
+                tableInfo.setStorageInfo(InputStorageInfo);
                 partitionInput.setTableInfo(tableInfo);
                 partitionInput.setProjection(scanProjection);
                 partitionInput.setPartitionInfo(partitionInfo);
                 String fileName = intermediateBase + (outputId++) + "/part";
-                StorageInfo storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
-                partitionInput.setOutput(new OutputInfo(fileName, false, storageInfo, true));
+                partitionInput.setOutput(new OutputInfo(fileName, false,
+                        IntermediateStorageInfo, true));
                 partitionInputsBuilder.add(partitionInput);
                 AggrInputFilesBuilder.add(fileName);
             }
@@ -216,8 +227,7 @@ public class StarlingPlanner
                 joinInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = "partial_aggr_" + outputId++;
                 MultiOutputInfo outputInfo = joinInput.getOutput();
-                StorageInfo storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
-                outputInfo.setStorageInfo(storageInfo);
+                outputInfo.setStorageInfo(IntermediateStorageInfo);
                 outputInfo.setPath(intermediateBase);
                 outputInfo.setFileNames(ImmutableList.of(fileName));
                 AggrInputFilesBuilder.add(intermediateBase + fileName);
@@ -234,23 +244,28 @@ public class StarlingPlanner
         {
             AggregationInput finalAggrInput = new AggregationInput();
             finalAggrInput.setQueryId(queryId);
-            finalAggrInput.setInputPartitioned(numPartitions > 1);
-            finalAggrInput.setHashValues(ImmutableList.of(hash));
-            finalAggrInput.setNumPartition(numPartitions);
-            finalAggrInput.setInputFiles(aggrInputFiles);
-            finalAggrInput.setColumnsToRead(originTable.getColumnNames());
-            finalAggrInput.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
-            finalAggrInput.setAggregateColumnIds(aggregation.getAggregateColumnIds());
-            finalAggrInput.setGroupKeyColumnNames(aggregation.getGroupKeyColumnAlias());
-            finalAggrInput.setGroupKeyColumnProjection(aggregation.getGroupKeyColumnProjection());
-            finalAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
-            finalAggrInput.setResultColumnTypes(aggregation.getResultColumnTypes());
-            finalAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
-            finalAggrInput.setInputStorage(new StorageInfo(IntermediateStorage, null, null, null));
-            StorageInfo outputStorageInfo = new StorageInfo(IntermediateStorage, null, null, null);
-            finalAggrInput.setParallelism(IntraWorkerParallelism);
+            AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
+            aggregatedTableInfo.setTableName(aggregatedTable.getTableName());
+            aggregatedTableInfo.setBase(false);
+            aggregatedTableInfo.setInputFiles(aggrInputFiles);
+            aggregatedTableInfo.setColumnsToRead(originTable.getColumnNames());
+            aggregatedTableInfo.setStorageInfo(IntermediateStorageInfo);
+            aggregatedTableInfo.setParallelism(IntraWorkerParallelism);
+            finalAggrInput.setAggregatedTableInfo(aggregatedTableInfo);
+            AggregationInfo aggregationInfo = new AggregationInfo();
+            aggregationInfo.setInputPartitioned(numPartitions > 1);
+            aggregationInfo.setHashValues(ImmutableList.of(hash));
+            aggregationInfo.setNumPartition(numPartitions);
+            aggregationInfo.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
+            aggregationInfo.setAggregateColumnIds(aggregation.getAggregateColumnIds());
+            aggregationInfo.setGroupKeyColumnNames(aggregation.getGroupKeyColumnAlias());
+            aggregationInfo.setGroupKeyColumnProjection(aggregation.getGroupKeyColumnProjection());
+            aggregationInfo.setResultColumnNames(aggregation.getResultColumnAlias());
+            aggregationInfo.setResultColumnTypes(aggregation.getResultColumnTypes());
+            aggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
+            finalAggrInput.setAggregationInfo(aggregationInfo);
             String fileName = intermediateBase + (hash) + "/final_aggr";
-            finalAggrInput.setOutput(new OutputInfo(fileName, false, outputStorageInfo, true));
+            finalAggrInput.setOutput(new OutputInfo(fileName, false, IntermediateStorageInfo, true));
             finalAggrInputsBuilder.add(finalAggrInput);
         }
 
@@ -330,9 +345,7 @@ public class StarlingPlanner
 
                 String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
                         joinedTable.getTableName() + "/";
-                MultiOutputInfo output = new MultiOutputInfo(path,
-                        new StorageInfo(IntermediateStorage, null, null, null),
-                        true, outputs);
+                MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                 BroadcastJoinInput joinInput = new BroadcastJoinInput(queryId, leftTableInfo, rightTableInfo,
                         joinInfo, false, null, output);
@@ -353,14 +366,16 @@ public class StarlingPlanner
             List<String> leftPartitionedFiles = getPartitionedFiles(leftJoinInputs);
             List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
             List<String> rightPartitionedFiles = getPartitionedFiles(rightJoinInputs);
+            boolean leftIsBase = leftTable.getTableType() == Table.TableType.BASE;
             PartitionedTableInfo leftTableInfo = new PartitionedTableInfo(
-                    leftTable.getTableName(), leftTable.getTableType() == Table.TableType.BASE,
-                    leftPartitionedFiles, IntraWorkerParallelism,
-                    leftTable.getColumnNames(), leftKeyColumnIds);
+                    leftTable.getTableName(), leftIsBase, leftTable.getColumnNames(),
+                    leftIsBase ? InputStorageInfo : IntermediateStorageInfo,
+                    leftPartitionedFiles, IntraWorkerParallelism, leftKeyColumnIds);
+            boolean rightIsBase = rightTable.getTableType() == Table.TableType.BASE;
             PartitionedTableInfo rightTableInfo = new PartitionedTableInfo(
-                    rightTable.getTableName(), rightTable.getTableType() == Table.TableType.BASE,
-                    rightPartitionedFiles, IntraWorkerParallelism,
-                    rightTable.getColumnNames(), rightKeyColumnIds);
+                    rightTable.getTableName(), rightIsBase, rightTable.getColumnNames(),
+                    rightIsBase ? InputStorageInfo : IntermediateStorageInfo,
+                    rightPartitionedFiles, IntraWorkerParallelism, rightKeyColumnIds);
 
             int numPartition = PlanOptimizer.Instance().getJoinNumPartition(leftTable, rightTable, join.getJoinEndian());
             List<JoinInput> joinInputs = getPartitionedJoinInputs(
@@ -398,19 +413,23 @@ public class StarlingPlanner
         Join join = requireNonNull(joinedTable.getJoin(), "joinTable.join is null");
         requireNonNull(join.getLeftTable(), "join.leftTable is null");
         requireNonNull(join.getRightTable(), "join.rightTable is null");
-        checkArgument(join.getLeftTable().getTableType() == Table.TableType.BASE || join.getLeftTable().getTableType() == Table.TableType.JOINED,
+        checkArgument(join.getLeftTable().getTableType() == Table.TableType.BASE ||
+                        join.getLeftTable().getTableType() == Table.TableType.JOINED,
                 "join.leftTable is not base or joined table");
-        checkArgument(join.getRightTable().getTableType() == Table.TableType.BASE || join.getRightTable().getTableType() == Table.TableType.JOINED,
+        checkArgument(join.getRightTable().getTableType() == Table.TableType.BASE ||
+                        join.getRightTable().getTableType() == Table.TableType.JOINED,
                 "join.rightTable is not base or joined table");
 
-        if (join.getLeftTable().getTableType() == Table.TableType.JOINED && join.getRightTable().getTableType() == Table.TableType.JOINED)
+        if (join.getLeftTable().getTableType() == Table.TableType.JOINED &&
+                join.getRightTable().getTableType() == Table.TableType.JOINED)
         {
             // Process multi-pipeline join.
             return getMultiPipelineJoinOperator(joinedTable, parent);
         }
 
         Table leftTable = join.getLeftTable();
-        checkArgument(join.getRightTable().getTableType() == Table.TableType.BASE, "join.rightTable is not base table");
+        checkArgument(join.getRightTable().getTableType() == Table.TableType.BASE,
+                "join.rightTable is not base table");
         BaseTable rightTable = (BaseTable) join.getRightTable();
         int[] leftKeyColumnIds = requireNonNull(join.getLeftKeyColumnIds(),
                 "join.leftKeyColumnIds is null");
@@ -536,9 +555,7 @@ public class StarlingPlanner
 
                     String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
-                    MultiOutputInfo output = new MultiOutputInfo(path,
-                            new StorageInfo(IntermediateStorage, null, null, null),
-                            true, outputs);
+                    MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
                             queryId, leftTableInfo, rightTableInfo, joinInfo,
@@ -586,9 +603,7 @@ public class StarlingPlanner
 
                     String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
-                    MultiOutputInfo output = new MultiOutputInfo(path,
-                            new StorageInfo(IntermediateStorage, null, null, null),
-                            true, outputs);
+                    MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
                             queryId, rightTableInfo, leftTableInfo, joinInfo,
@@ -617,10 +632,11 @@ public class StarlingPlanner
             if (childOperator != null)
             {
                 // left side is post partitioned, thus we only partition the right table.
+                boolean leftIsBase = leftTable.getTableType() == Table.TableType.BASE;
                 PartitionedTableInfo leftTableInfo = new PartitionedTableInfo(
-                        leftTable.getTableName(), leftTable.getTableType() == Table.TableType.BASE,
-                        leftPartitionedFiles, IntraWorkerParallelism,
-                        leftTable.getColumnNames(), leftKeyColumnIds);
+                        leftTable.getTableName(), leftIsBase, leftTable.getColumnNames(),
+                        leftIsBase ? InputStorageInfo : IntermediateStorageInfo,
+                        leftPartitionedFiles, IntraWorkerParallelism, leftKeyColumnIds);
 
                 boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
 
@@ -750,17 +766,20 @@ public class StarlingPlanner
     {
         BroadcastTableInfo tableInfo = new BroadcastTableInfo();
         tableInfo.setTableName(table.getTableName());
-        tableInfo.setBase(table.getTableType() == Table.TableType.BASE);
         tableInfo.setInputSplits(inputSplits);
         tableInfo.setColumnsToRead(table.getColumnNames());
         if (table.getTableType() == Table.TableType.BASE)
         {
             tableInfo.setFilter(JSON.toJSONString(((BaseTable) table).getFilter()));
+            tableInfo.setBase(true);
+            tableInfo.setStorageInfo(InputStorageInfo);
         }
         else
         {
             tableInfo.setFilter(JSON.toJSONString(
                     TableScanFilter.empty(table.getSchemaName(), table.getTableName())));
+            tableInfo.setBase(false);
+            tableInfo.setStorageInfo(IntermediateStorageInfo);
         }
         tableInfo.setKeyColumnIds(keyColumnIds);
         return tableInfo;
@@ -924,8 +943,17 @@ public class StarlingPlanner
         int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
         String[] newColumnsToRead = rewriteColumnsToReadForPartitionedJoin(table.getColumnNames(), partitionProjection);
 
-        return new PartitionedTableInfo(table.getTableName(), table.getTableType() == Table.TableType.BASE,
-                rightPartitionedFiles.build(), IntraWorkerParallelism, newColumnsToRead, newKeyColumnIds);
+        if (table.getTableType() == Table.TableType.BASE)
+        {
+            return new PartitionedTableInfo(table.getTableName(), true,
+                    newColumnsToRead, InputStorageInfo, rightPartitionedFiles.build(),
+                    IntraWorkerParallelism, newKeyColumnIds);
+        } else
+        {
+            return new PartitionedTableInfo(table.getTableName(), false,
+                    newColumnsToRead, IntermediateStorageInfo, rightPartitionedFiles.build(),
+                    IntraWorkerParallelism, newKeyColumnIds);
+        }
     }
 
     private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits, int[] keyColumnIds,
@@ -951,16 +979,20 @@ public class StarlingPlanner
             if (inputTable.getTableType() == Table.TableType.BASE)
             {
                 tableInfo.setFilter(JSON.toJSONString(((BaseTable) inputTable).getFilter()));
+                tableInfo.setBase(true);
+                tableInfo.setStorageInfo(InputStorageInfo);
             }
             else
             {
                 tableInfo.setFilter(JSON.toJSONString(
                         TableScanFilter.empty(inputTable.getSchemaName(), inputTable.getTableName())));
+                tableInfo.setBase(false);
+                tableInfo.setStorageInfo(IntermediateStorageInfo);
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setProjection(partitionProjection);
-            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", false,
-                    new StorageInfo(InputStorage, null, null, null), true));
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part",
+                    false, InputStorageInfo, true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);
@@ -1023,9 +1055,7 @@ public class StarlingPlanner
 
             String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
                     joinedTable.getTableName() + "/";
-            MultiOutputInfo output = new MultiOutputInfo(path,
-                    new StorageInfo(IntermediateStorage, null, null, null),
-                    true, outputFileNames.build());
+            MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
 
             boolean[] leftProjection = leftPartitionProjection == null ? joinedTable.getJoin().getLeftProjection() :
                     rewriteProjectionForPartitionedJoin(joinedTable.getJoin().getLeftProjection(), leftPartitionProjection);
@@ -1130,6 +1160,11 @@ public class StarlingPlanner
         checkArgument(table.getTableType() == Table.TableType.BASE, "this is not a base table");
         ImmutableList.Builder<InputSplit> splitsBuilder = ImmutableList.builder();
         int splitSize = 0;
+        Storage.Scheme tableStorageScheme = Storage.Scheme.from(
+                metadataService.getTable(table.getSchemaName(), table.getTableName()).getStorageScheme());
+        checkArgument(tableStorageScheme.equals(this.storage.getScheme()), String.format(
+                "the storage scheme of table '%s.%s' is not consistent with the input storage scheme for Pixels Turbo",
+                table.getSchemaName(), table.getTableName()));
         List<Layout> layouts = metadataService.getLayouts(table.getSchemaName(), table.getTableName());
         for (Layout layout : layouts)
         {

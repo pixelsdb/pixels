@@ -68,6 +68,8 @@ public class TestPartitionLambdaInvoker
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 28, 4)))));
             tableInfo.setColumnsToRead(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
             tableInfo.setFilter(filter);
+            tableInfo.setBase(true);
+            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
             input.setTableInfo(tableInfo);
             input.setProjection(new boolean[]{true, true, true, true});
             PartitionInfo partitionInfo = new PartitionInfo();
@@ -107,7 +109,9 @@ public class TestPartitionLambdaInvoker
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_" + i + "_compact.pxl", 24, 4))),
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_" + i + "_compact.pxl", 28, 4)))));
             tableInfo.setFilter(filter);
+            tableInfo.setBase(true);
             tableInfo.setColumnsToRead(new String[]{"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
+            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
             input.setTableInfo(tableInfo);
             input.setProjection(new boolean[]{true, true, true, true});
             PartitionInfo partitionInfo = new PartitionInfo();

@@ -24,7 +24,7 @@ package io.pixelsdb.pixels.common.turbo;
  * @author hank
  * @create 2022-06-28
  */
-public class Output
+public abstract class Output
 {
     private String requestId;
     private boolean successful;

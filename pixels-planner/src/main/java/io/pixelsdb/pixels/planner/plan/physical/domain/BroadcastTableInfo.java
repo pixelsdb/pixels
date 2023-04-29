@@ -23,7 +23,7 @@ import java.util.List;
 
 /**
  * @author hank
- * @date 02/06/2022
+ * @dacreatete 2022-06-02
  */
 public class BroadcastTableInfo extends ScanTableInfo
 {
@@ -37,10 +37,11 @@ public class BroadcastTableInfo extends ScanTableInfo
      */
     public BroadcastTableInfo() { }
 
-    public BroadcastTableInfo(String tableName, boolean base, List<InputSplit> inputs,
-                              String[] cols, String filter, int[] keyColumnIds)
+    public BroadcastTableInfo(String tableName, boolean base, String[] columnsToRead,
+                              StorageInfo storageInfo, List<InputSplit> inputSplits,
+                              String filter, int[] keyColumnIds)
     {
-        super(tableName, base, inputs, cols, filter);
+        super(tableName, base, columnsToRead, storageInfo, inputSplits, filter);
         this.keyColumnIds = keyColumnIds;
     }
 

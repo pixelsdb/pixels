@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 /**
  * The information of the storage endpoint, such as S3 or Minio.
  * @author hank
- * @date 06/07/2022
+ * @create 2022-07-06
  */
 public class StorageInfo
 {

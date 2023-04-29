@@ -24,6 +24,25 @@ package io.pixelsdb.pixels.common.turbo;
  * @author hank
  * @create 2022-06-28
  */
-public class Input
+public abstract class Input
 {
+    /**
+     * The unique id of the query.
+     */
+    private long queryId;
+
+    public Input(long queryId)
+    {
+        this.queryId = queryId;
+    }
+
+    public long getQueryId()
+    {
+        return queryId;
+    }
+
+    public void setQueryId(long queryId)
+    {
+        this.queryId = queryId;
+    }
 }

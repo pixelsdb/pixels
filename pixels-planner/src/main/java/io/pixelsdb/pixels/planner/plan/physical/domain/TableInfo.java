@@ -21,9 +21,9 @@ package io.pixelsdb.pixels.planner.plan.physical.domain;
 
 /**
  * @author hank
- * @date 02/06/2022
+ * @create 2022-06-02
  */
-public class TableInfo
+public abstract class TableInfo
 {
     private String tableName;
 
@@ -39,15 +39,21 @@ public class TableInfo
     private String[] columnsToRead;
 
     /**
+     * The information of the storage endpoint.
+     */
+    private StorageInfo storageInfo;
+
+    /**
      * Default constructor for Jackson.
      */
     public TableInfo() { }
 
-    public TableInfo(String tableName, boolean base, String[] columnsToRead)
+    public TableInfo(String tableName, boolean base, String[] columnsToRead, StorageInfo storageInfo)
     {
         this.tableName = tableName;
         this.base = base;
         this.columnsToRead = columnsToRead;
+        this.storageInfo = storageInfo;
     }
 
     public String getTableName()
@@ -78,5 +84,15 @@ public class TableInfo
     public void setColumnsToRead(String[] columnsToRead)
     {
         this.columnsToRead = columnsToRead;
+    }
+
+    public StorageInfo getStorageInfo()
+    {
+        return storageInfo;
+    }
+
+    public void setStorageInfo(StorageInfo storageInfo)
+    {
+        this.storageInfo = storageInfo;
     }
 }

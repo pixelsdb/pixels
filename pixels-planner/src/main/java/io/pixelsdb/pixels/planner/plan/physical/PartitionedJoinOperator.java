@@ -40,7 +40,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * The executor of a partitioned join.
  *
  * @author hank
- * @date 04/06/2022
+ * @create 2022-06-04
  */
 public class PartitionedJoinOperator extends SingleStageJoinOperator
 {

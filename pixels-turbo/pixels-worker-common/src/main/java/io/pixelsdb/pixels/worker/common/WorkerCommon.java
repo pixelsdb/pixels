@@ -56,9 +56,9 @@ public class WorkerCommon
     private static final Logger logger = LoggerFactory.getLogger(WorkerCommon.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
-    public static Storage s3;
-    public static Storage minio;
-    public static Storage redis;
+    private static Storage s3;
+    private static Storage minio;
+    private static Storage redis;
     public static final int rowBatchSize;
     private static final int pixelStride;
     private static final int rowGroupSize;
@@ -68,20 +68,17 @@ public class WorkerCommon
         rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
         pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
-        try
-        {
-            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-        } catch (Exception e)
-        {
-            logger.error("failed to initialize AWS S3 storage", e);
-        }
     }
 
     public static void initStorage(StorageInfo storageInfo)
     {
         try
         {
-            if (WorkerCommon.minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
+            if (WorkerCommon.s3 == null && storageInfo.getScheme() == Storage.Scheme.s3)
+            {
+                WorkerCommon.s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+            }
+            else if (WorkerCommon.minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
             {
                 ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                 WorkerCommon.minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
@@ -93,7 +90,7 @@ public class WorkerCommon
             }
         } catch (Exception e)
         {
-            throw new WorkerException("failed to initialize Minio storage", e);
+            throw new WorkerException("failed to initialize the storage of scheme " + storageInfo.getScheme(), e);
         }
     }
 
@@ -116,19 +113,22 @@ public class WorkerCommon
      * to reduce the latency of the schema reading.
      *
      * @param executor the executor, a.k.a., the thread pool.
-     * @param storage the storage instance
+     * @param leftStorage the storage instance of the left table
+     * @param rightStorage the storage instance of the right table
      * @param leftSchema the atomic reference to return the schema of the left table
      * @param rightSchema the atomic reference to return the schema of the right table
      * @param leftInputSplits the input splits of the left table
      * @param rightInputSplits the input splits of the right table
      */
-    public static void getFileSchemaFromSplits(ExecutorService executor, Storage storage,
-                                     AtomicReference<TypeDescription> leftSchema,
-                                     AtomicReference<TypeDescription> rightSchema,
-                                     List<InputSplit> leftInputSplits, List<InputSplit> rightInputSplits)
+    public static void getFileSchemaFromSplits(ExecutorService executor,
+                                               Storage leftStorage, Storage rightStorage,
+                                               AtomicReference<TypeDescription> leftSchema,
+                                               AtomicReference<TypeDescription> rightSchema,
+                                               List<InputSplit> leftInputSplits, List<InputSplit> rightInputSplits)
     {
         requireNonNull(executor, "executor is null");
-        requireNonNull(storage, "storage is null");
+        requireNonNull(leftStorage, "leftStorage is null");
+        requireNonNull(rightStorage, "rightStorage is null");
         requireNonNull(leftSchema, "leftSchema is null");
         requireNonNull(rightSchema, "rightSchema is null");
         requireNonNull(leftInputSplits, "leftInputSplits is null");
@@ -136,7 +136,7 @@ public class WorkerCommon
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
-                leftSchema.set(getFileSchemaFromSplits(storage, leftInputSplits));
+                leftSchema.set(getFileSchemaFromSplits(leftStorage, leftInputSplits));
             } catch (IOException | InterruptedException e)
             {
                 logger.error("failed to read the file schema for the left table", e);
@@ -145,7 +145,7 @@ public class WorkerCommon
         Future<?> rightFuture = executor.submit(() -> {
             try
             {
-                rightSchema.set(getFileSchemaFromSplits(storage, rightInputSplits));
+                rightSchema.set(getFileSchemaFromSplits(rightStorage, rightInputSplits));
             } catch (IOException | InterruptedException e)
             {
                 logger.error("failed to read the file schema for the right table", e);
@@ -165,20 +165,23 @@ public class WorkerCommon
      * Read the schemas of the two joined tables, concurrently using the executor, thus
      * to reduce the latency of the schema reading.
      *
-     * @param executor the executor, a.k.a., the thread pool.
-     * @param storage the storage instance
+     * @param executor the executor, a.k.a., the thread pool
+     * @param leftStorage the storage instance of the left table
+     * @param rightStorage the storage instance of the right table
      * @param leftSchema the atomic reference to return the schema of the left table
      * @param rightSchema the atomic reference to return the schema of the right table
      * @param leftPaths the paths of the input files of the left table
      * @param rightPaths the paths of the input files of the right table
      */
-    public static void getFileSchemaFromPaths(ExecutorService executor, Storage storage,
+    public static void getFileSchemaFromPaths(ExecutorService executor,
+                                              Storage leftStorage, Storage rightStorage,
                                               AtomicReference<TypeDescription> leftSchema,
                                               AtomicReference<TypeDescription> rightSchema,
                                               List<String> leftPaths, List<String> rightPaths)
     {
         requireNonNull(executor, "executor is null");
-        requireNonNull(storage, "storage is null");
+        requireNonNull(leftStorage, "leftStorage is null");
+        requireNonNull(rightStorage, "rightStorage is null");
         requireNonNull(leftSchema, "leftSchema is null");
         requireNonNull(rightSchema, "rightSchema is null");
         requireNonNull(leftPaths, "leftPaths is null");
@@ -186,7 +189,7 @@ public class WorkerCommon
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
-                leftSchema.set(getFileSchemaFromPaths(storage, leftPaths));
+                leftSchema.set(getFileSchemaFromPaths(leftStorage, leftPaths));
             } catch (IOException | InterruptedException e)
             {
                 logger.error("failed to read the file schema for the left table", e);
@@ -195,7 +198,7 @@ public class WorkerCommon
         Future<?> rightFuture = executor.submit(() -> {
             try
             {
-                rightSchema.set(getFileSchemaFromPaths(storage, rightPaths));
+                rightSchema.set(getFileSchemaFromPaths(rightStorage, rightPaths));
             } catch (IOException | InterruptedException e)
             {
                 logger.error("failed to read the file schema for the right table", e);

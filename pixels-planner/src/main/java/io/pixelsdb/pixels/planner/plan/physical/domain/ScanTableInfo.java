@@ -23,7 +23,7 @@ import java.util.List;
 
 /**
  * @author hank
- * @date 02/06/2022
+ * @create 2022-06-02
  */
 public class ScanTableInfo extends TableInfo
 {
@@ -41,10 +41,10 @@ public class ScanTableInfo extends TableInfo
      */
     public ScanTableInfo() { }
 
-    public ScanTableInfo(String tableName, boolean base, List<InputSplit> inputSplits,
-                         String[] columnsToRead, String filter)
+    public ScanTableInfo(String tableName, boolean base, String[] columnsToRead,
+                         StorageInfo storageInfo, List<InputSplit> inputSplits, String filter)
     {
-        super(tableName, base, columnsToRead);
+        super(tableName, base, columnsToRead, storageInfo);
         this.inputSplits = inputSplits;
         this.filter = filter;
     }

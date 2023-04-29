@@ -87,12 +87,14 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
             requireNonNull(chainTables, "chainTables is null");
             requireNonNull(chainJoinInfos, "chainJoinInfos is null");
-            checkArgument(chainTables.size() == chainJoinInfos.size()+1,
+            checkArgument(chainTables.size() == chainJoinInfos.size() + 1,
                     "left table num is not consistent with (chain-join info num + 1).");
             checkArgument(chainTables.size() > 1, "there should be at least two chain tables");
 
-            BroadcastTableInfo rightTable = event.getLargeTable();
-            List<InputSplit> rightInputs = rightTable.getInputSplits();
+            BroadcastTableInfo rightTable = requireNonNull(event.getLargeTable(), "rightTable is null");
+            StorageInfo rightInputStorageInfo = requireNonNull(rightTable.getStorageInfo(),
+                    "rightInputStorageInto is null");
+            List<InputSplit> rightInputs = requireNonNull(rightTable.getInputSplits(), "rightInputs is null");
             checkArgument(rightInputs.size() > 0, "rightPartitioned is empty");
             String[] rightCols = rightTable.getColumnsToRead();
             TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
@@ -103,7 +105,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                     "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join");
 
             MultiOutputInfo outputInfo = event.getOutput();
-            StorageInfo storageInfo = outputInfo.getStorageInfo();
+            StorageInfo outputStorageInfo = outputInfo.getStorageInfo();
             checkArgument(outputInfo.getFileNames().size() == 1,
                     "it is incorrect to have more than one output files");
             String outputFolder = outputInfo.getPath();
@@ -115,7 +117,12 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
 
             logger.info("large table: " + event.getLargeTable().getTableName());
 
-            WorkerCommon.initStorage(storageInfo);
+            for (TableInfo tableInfo : chainTables)
+            {
+                WorkerCommon.initStorage(tableInfo.getStorageInfo());
+            }
+            WorkerCommon.initStorage(rightInputStorageInfo);
+            WorkerCommon.initStorage(outputStorageInfo);
 
             boolean partitionOutput = event.getJoinInfo().isPostPartition();
             PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
@@ -154,9 +161,11 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                         {
                             int numJoinedRows = partitionOutput ?
                                     BaseBroadcastJoinWorker.joinWithRightTableAndPartition(
-                                            queryId, joiner, inputs, !rightTable.isBase(), rightCols, rightFilter,
+                                            queryId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            !rightTable.isBase(), rightCols, rightFilter,
                                             outputPartitionInfo, result, workerMetrics) :
-                                    BaseBroadcastJoinWorker.joinWithRightTable(queryId, joiner, inputs, !rightTable.isBase(), rightCols,
+                                    BaseBroadcastJoinWorker.joinWithRightTable(queryId, joiner, inputs,
+                                            rightInputStorageInfo.getScheme(), !rightTable.isBase(), rightCols,
                                             rightFilter, result.get(0), workerMetrics);
                         } catch (Exception e)
                         {
@@ -182,7 +191,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                 if (partitionOutput)
                 {
                     pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(storageInfo.getScheme()), outputPath,
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                             encoding, true, Arrays.stream(
                                     outputPartitionInfo.getKeyColumnIds()).boxed().
                                     collect(Collectors.toList()));
@@ -201,7 +210,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                 else
                 {
                     pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(storageInfo.getScheme()), outputPath,
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                             encoding, false, null);
                     ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
                     for (VectorizedRowBatch rowBatch : rowBatches)
@@ -211,9 +220,9 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                 }
                 pixelsWriter.close();
                 joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
-                if (storageInfo.getScheme() == Storage.Scheme.minio)
+                if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    while (!WorkerCommon.minio.exists(outputPath))
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
                     {
                         // Wait for 10ms and see if the output file is visible.
                         TimeUnit.MILLISECONDS.sleep(10);
@@ -268,7 +277,8 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                 BroadcastTableInfo currRightTable = leftTables.get(i);
                 BroadcastTableInfo nextTable = leftTables.get(i+1);
                 readCostTimer.start();
-                TypeDescription nextTableSchema = WorkerCommon.getFileSchemaFromSplits(WorkerCommon.s3, nextTable.getInputSplits());
+                TypeDescription nextTableSchema = WorkerCommon.getFileSchemaFromSplits(
+                        WorkerCommon.getStorage(nextTable.getStorageInfo().getScheme()), nextTable.getInputSplits());
                 ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
                 ChainJoinInfo nextJoinInfo = chainJoinInfos.get(i);
                 TypeDescription nextResultSchema = WorkerCommon.getResultSchema(nextTableSchema, nextTable.getColumnsToRead());
@@ -283,7 +293,8 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             }
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
             BroadcastTableInfo lastLeftTable = leftTables.get(leftTables.size()-1);
-            TypeDescription rightTableSchema = WorkerCommon.getFileSchemaFromSplits(WorkerCommon.s3, rightTable.getInputSplits());
+            TypeDescription rightTableSchema = WorkerCommon.getFileSchemaFromSplits(
+                    WorkerCommon.getStorage(rightTable.getStorageInfo().getScheme()), rightTable.getInputSplits());
             TypeDescription rightResultSchema = WorkerCommon.getResultSchema(rightTableSchema, rightTable.getColumnsToRead());
             Joiner finalJoiner = new Joiner(lastJoinInfo.getJoinType(),
                     currJoiner.getJoinedSchema(), lastJoinInfo.getSmallColumnAlias(),
@@ -318,7 +329,10 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
         AtomicReference<TypeDescription> t1Schema = new AtomicReference<>();
         AtomicReference<TypeDescription> t2Schema = new AtomicReference<>();
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer().start();
-        WorkerCommon.getFileSchemaFromSplits(executor, WorkerCommon.s3, t1Schema, t2Schema, t1.getInputSplits(), t2.getInputSplits());
+        WorkerCommon.getFileSchemaFromSplits(executor,
+                WorkerCommon.getStorage(t1.getStorageInfo().getScheme()),
+                WorkerCommon.getStorage(t2.getStorageInfo().getScheme()),
+                t1Schema, t2Schema, t1.getInputSplits(), t2.getInputSplits());
         Joiner joiner = new Joiner(joinInfo.getJoinType(),
                 WorkerCommon.getResultSchema(t1Schema.get(), t1.getColumnsToRead()), joinInfo.getSmallColumnAlias(),
                 joinInfo.getSmallProjection(), t1.getKeyColumnIds(),
@@ -333,7 +347,8 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             leftFutures.add(executor.submit(() -> {
                 try
                 {
-                    BaseBroadcastJoinWorker.buildHashTable(queryId, joiner, inputs, !t1.isBase(), t1.getColumnsToRead(), t1Filter, workerMetrics);
+                    BaseBroadcastJoinWorker.buildHashTable(queryId, joiner, inputs, t1.getStorageInfo().getScheme(),
+                            !t1.isBase(), t1.getColumnsToRead(), t1Filter, workerMetrics);
                 }
                 catch (Exception e)
                 {
@@ -372,7 +387,8 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             rightFutures.add(executor.submit(() -> {
                 try
                 {
-                    chainJoinSplit(queryId, currJoiner, nextJoiner, inputs, !currRightTable.isBase(),
+                    chainJoinSplit(queryId, currJoiner, nextJoiner, inputs,
+                            currRightTable.getStorageInfo().getScheme(), !currRightTable.isBase(),
                             currRightTable.getColumnsToRead(), currRightFilter, workerMetrics);
                 }
                 catch (Exception e)
@@ -394,14 +410,16 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * @param nextJoiner the joiner of the next join
      * @param rightInputs the information of the input files in the split of the right one
      *                   of the two left tables
+     * @param rightScheme the storage scheme of the right table
      * @param checkExistence whether check the existence of the input files
      * @param rightCols the column names of the right one of the two left tables
      * @param rightFilter the filter of the right one of the two left tables
      * @param workerMetrics the collector of the performance metrics
      */
     private static void chainJoinSplit(
-            long queryId, Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs, boolean checkExistence,
-            String[] rightCols, TableScanFilter rightFilter, WorkerMetrics workerMetrics)
+            long queryId, Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
+            Storage.Scheme rightScheme, boolean checkExistence, String[] rightCols,
+            TableScanFilter rightFilter, WorkerMetrics workerMetrics)
     {
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
         WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
@@ -413,7 +431,8 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             {
                 InputInfo input = it.next();
                 readCostTimer.start();
-                try (PixelsReader pixelsReader = WorkerCommon.getReader(input.getPath(), WorkerCommon.s3))
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        input.getPath(), WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())

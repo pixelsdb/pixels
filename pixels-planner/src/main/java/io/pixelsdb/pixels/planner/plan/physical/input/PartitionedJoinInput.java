@@ -26,14 +26,10 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionedTableInfo;
 
 /**
  * @author hank
- * @date 07/05/2022
+ * @create 2022-05-07
  */
 public class PartitionedJoinInput extends JoinInput
 {
-    /**
-     * The unique id of the query.
-     */
-    private long queryId;
     /**
      * The information of the small partitioned table.
      */
@@ -52,27 +48,14 @@ public class PartitionedJoinInput extends JoinInput
      */
     public PartitionedJoinInput() { }
 
-    public PartitionedJoinInput(long queryId, PartitionedTableInfo smallTable,
-                                PartitionedTableInfo largeTable, PartitionedJoinInfo joinInfo,
-                                boolean partialAggregationPresent,
-                                PartialAggregationInfo partialAggregationInfo,
-                                MultiOutputInfo output)
+    public PartitionedJoinInput(long queryId, PartitionedTableInfo smallTable, PartitionedTableInfo largeTable,
+                                PartitionedJoinInfo joinInfo, boolean partialAggregationPresent,
+                                PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
     {
-        super(partialAggregationPresent, partialAggregationInfo, output);
-        this.queryId = queryId;
+        super(queryId, partialAggregationPresent, partialAggregationInfo, output);
         this.smallTable = smallTable;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;
-    }
-
-    public long getQueryId()
-    {
-        return queryId;
-    }
-
-    public void setQueryId(long queryId)
-    {
-        this.queryId = queryId;
     }
 
     public PartitionedTableInfo getSmallTable()
