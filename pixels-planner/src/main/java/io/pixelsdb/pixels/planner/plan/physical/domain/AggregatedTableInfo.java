@@ -69,5 +69,4 @@ public class AggregatedTableInfo extends TableInfo
     {
         this.parallelism = parallelism;
     }
-
 }

@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.invoker.lambda;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Invoker;
 import io.pixelsdb.pixels.common.turbo.Output;
@@ -56,7 +57,13 @@ public abstract class LambdaInvoker implements Invoker
 
     public final CompletableFuture<Output> invoke(Input input)
     {
-        String inputJson = JSON.toJSONString(input);
+        /*
+         * Issue #452:
+         * We must disable circular reference optimization here, otherwise the serialized json string
+         * may contain references such as "$ref:...". Such references may not be parsed correctly by
+         * the json deserializer in AWS Lambda.
+         */
+        String inputJson = JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect);
         SdkBytes payload = SdkBytes.fromUtf8String(inputJson);
 
         InvokeRequest request = InvokeRequest.builder()
