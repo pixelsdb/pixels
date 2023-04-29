@@ -59,10 +59,10 @@ public class Main {
                     output = client.partitionJoin(Utils.genPartitionedJoinInput());
                     break;
                 case "Partition":
-                    output = client.partition(Utils.genPartitionInput("order"));
+                    output = client.partition(Utils.genPartitionInput("order").apply(0));
                     break;
                 case "Scan":
-                    output = client.scan(Utils.genScanInput());
+                    output = client.scan(Utils.genScanInput(0));
                     break;
                 case "Hello":
                     System.out.println(client.hello("zhaoshihan"));
