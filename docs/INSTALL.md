@@ -251,7 +251,7 @@ Ensure that they are valid so that the serverless workers can access the corresp
 Especially, the `executor.input.storage.scheme` must be consistent with the storage scheme of the base
 tables. This is checked during query-planning for Pixels Turbo.
 In addition, the `executor.intermediate.folder` and `executor.output.folder` are the base path where the intermediate
-and output data are stored. They also need to be valid and accessible by the serverless workers.
+and output data are stored. They also need to be valid and accessible for the serverless workers.
 
 Append the following two lines into `etc/jvm.config`:
 ```config
