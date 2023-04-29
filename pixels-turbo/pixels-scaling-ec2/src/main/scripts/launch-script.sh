@@ -25,13 +25,13 @@ sed -i "s/instance-id-dummy/$instance_id/g" /home/ubuntu/opt/trino-server/etc/no
 
 # ~/opt/trino-server-375/etc/catalog/pixels.properties replace output-endpoint-dummy with the local minio endpoint
 private_ip=$(get_private_ip)
-sed -i "s+output-endpoint-dummy+http://$private_ip:9000/+" /home/ubuntu/opt/trino-server/etc/catalog/pixels.properties
+sed -i "s+output-endpoint-dummy+http://$private_ip:9000/+" /home/ubuntu/opt/pixels/pixels.properties
 
 # ~/opt/trino-server-375/etc/catalog/pixels.properties replace output-folder-dummy with the local minio folder
-sed -i "s+output-folder-dummy+pixels-lambda/output+" /home/ubuntu/opt/trino-server/etc/catalog/pixels.properties
+sed -i "s+output-folder-dummy+pixels-lambda/output+" /home/ubuntu/opt/pixels/pixels.properties
 
 # ~/opt/trino-server-375/etc/catalog/pixels.properties set output.scheme to minio
-sed -i "s/output-scheme-dummy/minio/g" /home/ubuntu/opt/trino-server/etc/catalog/pixels.properties
+sed -i "s/output-scheme-dummy/minio/g" /home/ubuntu/opt/pixels/pixels.properties
 
 echo "start trino"
 su ubuntu -c "/home/ubuntu/opt/trino-server/bin/launcher start"

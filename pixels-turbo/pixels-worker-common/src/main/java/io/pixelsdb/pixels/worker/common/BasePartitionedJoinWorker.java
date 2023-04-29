@@ -81,6 +81,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
             long queryId = event.getQueryId();
+            requireNonNull(event.getSmallTable(), "event.smallTable is null");
+            StorageInfo leftInputStorageInfo = event.getSmallTable().getStorageInfo();
             List<String> leftPartitioned = event.getSmallTable().getInputFiles();
             requireNonNull(leftPartitioned, "leftPartitioned is null");
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
@@ -89,6 +91,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             String[] leftColumnsToRead = event.getSmallTable().getColumnsToRead();
             int[] leftKeyColumnIds = event.getSmallTable().getKeyColumnIds();
 
+            requireNonNull(event.getLargeTable(), "event.largeTable is null");
+            StorageInfo rightInputStorageInfo = event.getLargeTable().getStorageInfo();
             List<String> rightPartitioned = event.getLargeTable().getInputFiles();
             requireNonNull(rightPartitioned, "rightPartitioned is null");
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
@@ -109,7 +113,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     ", number of partitions (" + numPartition + ")");
 
             MultiOutputInfo outputInfo = event.getOutput();
-            StorageInfo storageInfo = outputInfo.getStorageInfo();
+            StorageInfo outputStorageInfo = outputInfo.getStorageInfo();
             if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
             {
                 checkArgument(outputInfo.getFileNames().size() == 2,
@@ -134,20 +138,27 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
             }
 
-            WorkerCommon.initStorage(storageInfo);
+            WorkerCommon.initStorage(leftInputStorageInfo);
+            WorkerCommon.initStorage(rightInputStorageInfo);
+            WorkerCommon.initStorage(outputStorageInfo);
 
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            WorkerCommon.getFileSchemaFromPaths(threadPool, WorkerCommon.s3, leftSchema, rightSchema, leftPartitioned, rightPartitioned);
+            WorkerCommon.getFileSchemaFromPaths(threadPool,
+                    WorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
+                    WorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
+                    leftSchema, rightSchema, leftPartitioned, rightPartitioned);
             /*
              * Issue #450:
              * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
              * However, it is safer to turn file schema into result schema here.
              */
             Joiner joiner = new Joiner(joinType,
-                    WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead), leftColAlias, leftProjection, leftKeyColumnIds,
-                    WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead), rightColAlias, rightProjection, rightKeyColumnIds);
+                    WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead),
+                    leftColAlias, leftProjection, leftKeyColumnIds,
+                    WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead),
+                    rightColAlias, rightProjection, rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
             int leftSplitSize = leftPartitioned.size() / leftParallelism;
@@ -165,7 +176,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, parts, leftColumnsToRead, hashValues, numPartition, workerMetrics);
+                        buildHashTable(queryId, joiner, parts, leftColumnsToRead, leftInputStorageInfo.getScheme(),
+                                hashValues, numPartition, workerMetrics);
                     }
                     catch (Exception e)
                     {
@@ -214,10 +226,12 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                         {
                             int numJoinedRows = partitionOutput ?
                                     joinWithRightTableAndPartition(
-                                            queryId, joiner, parts, rightColumnsToRead, hashValues,
+                                            queryId, joiner, parts, rightColumnsToRead,
+                                            rightInputStorageInfo.getScheme(), hashValues,
                                             numPartition, outputPartitionInfo, result, workerMetrics) :
                                     joinWithRightTable(queryId, joiner, parts, rightColumnsToRead,
-                                            hashValues, numPartition, result.get(0), workerMetrics);
+                                            rightInputStorageInfo.getScheme(), hashValues, numPartition,
+                                            result.get(0), workerMetrics);
                         } catch (Exception e)
                         {
                             throw new WorkerException("error during hash join", e);
@@ -242,7 +256,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 if (partitionOutput)
                 {
                     pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(storageInfo.getScheme()), outputPath,
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                             encoding, true, Arrays.stream(
                                             outputPartitionInfo.getKeyColumnIds()).boxed().
                                     collect(Collectors.toList()));
@@ -261,7 +275,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 else
                 {
                     pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(storageInfo.getScheme()), outputPath,
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                             encoding, false, null);
                     ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
                     for (VectorizedRowBatch rowBatch : rowBatches)
@@ -273,9 +287,9 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
                 workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
                 joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
-                if (storageInfo.getScheme() == Storage.Scheme.minio)
+                if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    while (!WorkerCommon.minio.exists(outputPath))
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
                     {
                         // Wait for 10ms and see if the output file is visible.
                         TimeUnit.MILLISECONDS.sleep(10);
@@ -290,7 +304,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     {
                         requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
                         pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                                WorkerCommon.getStorage(storageInfo.getScheme()), outputPath,
+                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                                 encoding, true, Arrays.stream(
                                         outputPartitionInfo.getKeyColumnIds()).boxed().
                                         collect(Collectors.toList()));
@@ -300,7 +314,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     else
                     {
                         pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                                WorkerCommon.getStorage(storageInfo.getScheme()), outputPath,
+                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                                 encoding, false, null);
                         joiner.writeLeftOuter(pixelsWriter, WorkerCommon.rowBatchSize);
                     }
@@ -308,9 +322,9 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
                     workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
                     joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
-                    if (storageInfo.getScheme() == Storage.Scheme.minio)
+                    if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
                     {
-                        while (!WorkerCommon.minio.exists(outputPath))
+                        while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
                         {
                             // Wait for 10ms and see if the output file is visible.
                             TimeUnit.MILLISECONDS.sleep(10);
@@ -344,12 +358,14 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
      * @param joiner the joiner for which the hash table is built
      * @param leftParts the information of partitioned files of the left table
      * @param leftCols the column names of the left table
+     * @param leftScheme the storage scheme of the left table
      * @param hashValues the hash values that are processed by this join worker
      * @param numPartition the total number of partitions
      * @param workerMetrics the collector of the performance metrics
      */
     protected static void buildHashTable(long queryId, Joiner joiner, List<String> leftParts, String[] leftCols,
-                                         List<Integer> hashValues, int numPartition, WorkerMetrics workerMetrics)
+                                         Storage.Scheme leftScheme, List<Integer> hashValues, int numPartition,
+                                         WorkerMetrics workerMetrics)
     {
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
         WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
@@ -361,7 +377,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             {
                 String leftPartitioned = it.next();
                 readCostTimer.start();
-                try (PixelsReader pixelsReader = WorkerCommon.getReader(leftPartitioned, WorkerCommon.s3))
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        leftPartitioned, WorkerCommon.getStorage(leftScheme)))
                 {
                     readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -432,6 +449,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
      * @param joiner the joiner for the partitioned join
      * @param rightParts the information of partitioned files of the right table
      * @param rightCols the column names of the right table
+     * @param rightScheme the storage scheme of the right table
      * @param hashValues the hash values that are processed by this join worker
      * @param numPartition the total number of partitions
      * @param joinResult the container of the join result
@@ -439,8 +457,9 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
      * @return the number of joined rows produced in this split
      */
     protected static int joinWithRightTable(
-            long queryId, Joiner joiner, List<String> rightParts, String[] rightCols, List<Integer> hashValues,
-            int numPartition, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult, WorkerMetrics workerMetrics)
+            long queryId, Joiner joiner, List<String> rightParts, String[] rightCols, Storage.Scheme rightScheme,
+            List<Integer> hashValues, int numPartition, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult,
+            WorkerMetrics workerMetrics)
     {
         int joinedRows = 0;
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
@@ -453,7 +472,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             {
                 String rightPartitioned = it.next();
                 readCostTimer.start();
-                try (PixelsReader pixelsReader = WorkerCommon.getReader(rightPartitioned, WorkerCommon.s3))
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        rightPartitioned, WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -533,6 +553,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
      * @param joiner the joiner for the partitioned join
      * @param rightParts the information of partitioned files of the right table
      * @param rightCols the column names of the right table
+     * @param rightScheme the storage scheme of the right table
      * @param hashValues the hash values that are processed by this join worker
      * @param numPartition the total number of partitions
      * @param postPartitionInfo the partition information of post partitioning
@@ -541,8 +562,9 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
      * @return the number of joined rows produced in this split
      */
     protected static int joinWithRightTableAndPartition(
-            long queryId, Joiner joiner, List<String> rightParts, String[] rightCols, List<Integer> hashValues, int numPartition,
-            PartitionInfo postPartitionInfo, List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics)
+            long queryId, Joiner joiner, List<String> rightParts, String[] rightCols, Storage.Scheme rightScheme,
+            List<Integer> hashValues, int numPartition, PartitionInfo postPartitionInfo,
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics)
     {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
         Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
@@ -558,7 +580,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             {
                 String rightPartitioned = it.next();
                 readCostTimer.start();
-                try (PixelsReader pixelsReader = WorkerCommon.getReader(rightPartitioned, WorkerCommon.s3))
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        rightPartitioned, WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");

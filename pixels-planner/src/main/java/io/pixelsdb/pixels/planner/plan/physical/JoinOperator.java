@@ -28,7 +28,7 @@ import java.util.concurrent.ExecutionException;
 
 /**
  * @author hank
- * @date 05/06/2022
+ * @create 2022-06-05
  */
 public abstract class JoinOperator extends Operator
 {

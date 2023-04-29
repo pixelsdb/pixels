@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.invoker.lambda;
 
 import com.alibaba.fastjson.JSON;
+import com.google.common.base.Joiner;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
@@ -74,6 +75,7 @@ public class TestBroadcastJoinLambdaInvoker
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20230416155202_0_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20230416155202_0_compact.pxl", 28, 4)))));
         leftTable.setFilter(leftFilter);
+        leftTable.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         joinInput.setSmallTable(leftTable);
 
         BroadcastTableInfo rightTable = new BroadcastTableInfo();
@@ -91,6 +93,7 @@ public class TestBroadcastJoinLambdaInvoker
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 28, 4)))));
         rightTable.setFilter(rightFilter);
+        rightTable.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         joinInput.setLargeTable(rightTable);
 
         JoinInfo joinInfo = new JoinInfo();
@@ -110,12 +113,8 @@ public class TestBroadcastJoinLambdaInvoker
         JoinOutput output = (JoinOutput) InvokerFactory.Instance()
                 .getInvoker(WorkerType.BROADCAST_JOIN).invoke(joinInput).get();
         System.out.println(output.getOutputs().size());
-        for (int i = 0; i < output.getOutputs().size(); ++i)
-        {
-            System.out.println(output.getOutputs().get(i));
-            System.out.println(output.getRowGroupNums().get(i));
-            System.out.println();
-        }
+        System.out.println(Joiner.on(",").join(output.getOutputs()));
+        System.out.println(Joiner.on(",").join(output.getRowGroupNums()));
     }
 
     @Test

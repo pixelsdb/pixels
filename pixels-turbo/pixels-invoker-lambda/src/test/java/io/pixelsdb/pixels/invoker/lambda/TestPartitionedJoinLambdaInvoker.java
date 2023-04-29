@@ -66,6 +66,8 @@ public class TestPartitionedJoinLambdaInvoker
                 "pixels-lambda-test/unit_tests/orders_part_6",
                 "pixels-lambda-test/unit_tests/orders_part_7"));
         leftTableInfo.setParallelism(8);
+        leftTableInfo.setBase(false);
+        leftTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         joinInput.setSmallTable(leftTableInfo);
 
         PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
@@ -76,6 +78,8 @@ public class TestPartitionedJoinLambdaInvoker
                 "pixels-lambda-test/unit_tests/lineitem_part_0",
                 "pixels-lambda-test/unit_tests/lineitem_part_1"));
         rightTableInfo.setParallelism(2);
+        rightTableInfo.setBase(false);
+        rightTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
         joinInput.setLargeTable(rightTableInfo);
 
         PartitionedJoinInfo joinInfo = new PartitionedJoinInfo();

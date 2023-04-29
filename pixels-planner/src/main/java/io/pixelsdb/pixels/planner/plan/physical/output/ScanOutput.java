@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.planner.plan.physical.output;
 /**
  * The output format for table scan.
  * @author hank
- * Created at: 11/04/2022
+ * @create 2022-04-11
  */
 public class ScanOutput extends NonPartitionOutput
 {

@@ -30,6 +30,8 @@ import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.aggregation.Aggregator;
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
+import io.pixelsdb.pixels.planner.plan.physical.domain.AggregatedTableInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.AggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
@@ -80,55 +82,62 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
             long queryId = event.getQueryId();
-            boolean inputPartitioned = event.isInputPartitioned();
+            AggregationInfo aggregationInfo = requireNonNull(event.getAggregationInfo(),
+                    "event.aggregationInfo is null");
+            boolean inputPartitioned = aggregationInfo.isInputPartitioned();
             List<Integer> hashValues;
-            int numPartition = event.getNumPartition();
+            int numPartition = aggregationInfo.getNumPartition();
             if (inputPartitioned)
             {
-                hashValues = requireNonNull(event.getHashValues(), "event.hashValues is null");
-                checkArgument(!hashValues.isEmpty(), "event.hashValues is empty");
+                hashValues = requireNonNull(aggregationInfo.getHashValues(),
+                        "aggregationInfo.hashValues is null");
+                checkArgument(!hashValues.isEmpty(), "aggregationInfo.hashValues is empty");
             }
             else
             {
                 hashValues = ImmutableList.of();
             }
-            List<String> inputFiles = requireNonNull(event.getInputFiles(), "event.inputFiles is null");
-            StorageInfo inputStorage = requireNonNull(event.getInputStorage(), "event.inputStorage is null");
-            checkArgument(inputStorage.getScheme() == Storage.Scheme.s3,
-                    "input storage must be s3");
+            AggregatedTableInfo aggregatedTableInfo = requireNonNull(event.getAggregatedTableInfo(),
+                    "event.aggregatedTableInfo is null");
+            List<String> inputFiles = requireNonNull(aggregatedTableInfo.getInputFiles(),
+                    "aggregatedTableInfo.inputFiles is null");
+            StorageInfo inputStorageInfo = requireNonNull(aggregatedTableInfo.getStorageInfo(),
+                    "aggregatedTableInfo.storageInfo is null");
 
-            FunctionType[] functionTypes = requireNonNull(event.getFunctionTypes(),
-                    "event.functionTypes is null");
-            String[] columnsToRead = requireNonNull(event.getColumnsToRead(),
-                    "event.columnsToRead is null");
-            int[] groupKeyColumnIds = requireNonNull(event.getGroupKeyColumnIds(),
-                    "event.groupKeyColumnIds is null");
-            int[] aggrColumnIds = requireNonNull(event.getAggregateColumnIds(),
-                    "event.aggregateColumnIds is null");
-            String[] groupKeyColumnNames = requireNonNull(event.getGroupKeyColumnNames(),
-                    "event.groupKeyColumnIds is null");
-            String[] resultColumnNames = requireNonNull(event.getResultColumnNames(),
-                    "event.resultColumnNames is null");
-            String[] resultColumnTypes = requireNonNull(event.getResultColumnTypes(),
-                    "event.resultColumnTypes is null");
-            boolean[] groupKeyColumnProj = requireNonNull(event.getGroupKeyColumnProjection(),
-                    "event.groupKeyColumnProjection is null");
+            FunctionType[] functionTypes = requireNonNull(aggregationInfo.getFunctionTypes(),
+                    "aggregationInfo.functionTypes is null");
+            String[] columnsToRead = requireNonNull(aggregatedTableInfo.getColumnsToRead(),
+                    "aggregatedTableInfo.columnsToRead is null");
+            int[] groupKeyColumnIds = requireNonNull(aggregationInfo.getGroupKeyColumnIds(),
+                    "aggregationInfo.groupKeyColumnIds is null");
+            int[] aggrColumnIds = requireNonNull(aggregationInfo.getAggregateColumnIds(),
+                    "aggregationInfo.aggregateColumnIds is null");
+            String[] groupKeyColumnNames = requireNonNull(aggregationInfo.getGroupKeyColumnNames(),
+                    "aggregationInfo.groupKeyColumnIds is null");
+            String[] resultColumnNames = requireNonNull(aggregationInfo.getResultColumnNames(),
+                    "aggregationInfo.resultColumnNames is null");
+            String[] resultColumnTypes = requireNonNull(aggregationInfo.getResultColumnTypes(),
+                    "aggregationInfo.resultColumnTypes is null");
+            boolean[] groupKeyColumnProj = requireNonNull(aggregationInfo.getGroupKeyColumnProjection(),
+                    "aggregationInfo.groupKeyColumnProjection is null");
             checkArgument(groupKeyColumnProj.length == groupKeyColumnNames.length,
                     "group key column names and group key column projection are not of the same length");
             checkArgument(resultColumnNames.length == resultColumnTypes.length,
                     "result column names and result column types are not of the same length");
-            int parallelism = event.getParallelism();
+            int parallelism = aggregatedTableInfo.getParallelism();
 
             OutputInfo outputInfo = requireNonNull(event.getOutput(), "event.output is null");
             String outputPath = outputInfo.getPath();
             checkArgument(!outputInfo.isRandomFileName(), "output should not be random file");
-            StorageInfo storageInfo = requireNonNull(outputInfo.getStorageInfo(),
+            StorageInfo outputStorageInfo = requireNonNull(outputInfo.getStorageInfo(),
                     "event.output.storageInfo is null");
             boolean encoding = outputInfo.isEncoding();
 
-            WorkerCommon.initStorage(storageInfo);
+            WorkerCommon.initStorage(inputStorageInfo);
+            WorkerCommon.initStorage(outputStorageInfo);
 
-            TypeDescription fileSchema = WorkerCommon.getFileSchemaFromPaths(WorkerCommon.s3, inputFiles);
+            TypeDescription fileSchema = WorkerCommon.getFileSchemaFromPaths(
+                    WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputFiles);
             /*
              * Issue #450:
              * For the partial aggregate files, the file schema is equal to the columns to read in normal cases.
@@ -160,7 +169,8 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                 threadPool.execute(() -> {
                     try
                     {
-                        aggregate(queryId, files, columnsToRead, hashValues, numPartition, aggregator, workerMetrics);
+                        aggregate(queryId, files, columnsToRead, inputStorageInfo.getScheme(),
+                                hashValues, numPartition, aggregator, workerMetrics);
                     }
                     catch (Exception e)
                     {
@@ -179,13 +189,13 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
 
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
             PixelsWriter pixelsWriter = WorkerCommon.getWriter(aggregator.getOutputSchema(),
-                    WorkerCommon.getStorage(storageInfo.getScheme()),
+                    WorkerCommon.getStorage(outputStorageInfo.getScheme()),
                     outputPath, encoding, false, null);
             aggregator.writeAggrOutput(pixelsWriter);
             pixelsWriter.close();
-            if (storageInfo.getScheme() == Storage.Scheme.minio)
+            if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
             {
-                while (!WorkerCommon.minio.exists(outputPath))
+                while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
                 {
                     // Wait for 10ms and see if the output file is visible.
                     TimeUnit.MILLISECONDS.sleep(10);
@@ -214,6 +224,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
      * @param queryId the query id used by I/O scheduler
      * @param inputFiles the paths of the files to read and aggregate
      * @param columnsToRead the columns to read from the input files
+     * @param inputScheme the storage scheme of the input files
      * @param hashValues the hashValues of the partitions to be read from the input files,
      *                   empty if input files are not partitioned
      * @param numPartition the number of partitions for the input files
@@ -221,7 +232,8 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
      * @param workerMetrics the collector of the performance metrics
      * @return the number of rows that are read from input files
      */
-    private int aggregate(long queryId, List<String> inputFiles, String[] columnsToRead, List<Integer> hashValues,
+    private int aggregate(long queryId, List<String> inputFiles, String[] columnsToRead,
+                          Storage.Scheme inputScheme, List<Integer> hashValues,
                           int numPartition, Aggregator aggregator, WorkerMetrics workerMetrics)
     {
         requireNonNull(aggregator, "aggregator is null whereas partialAggregate is true");
@@ -236,7 +248,8 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
             {
                 String inputFile = it.next();
                 readCostTimer.start();
-                try (PixelsReader pixelsReader = WorkerCommon.getReader(inputFile, WorkerCommon.s3))
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        inputFile, WorkerCommon.getStorage(inputScheme)))
                 {
                     readCostTimer.stop();
                     if (pixelsReader.getRowGroupNum() == 0)

@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutionException;
  * The executor of a single-stage join.
  *
  * @author hank
- * @date 04/06/2022
+ * @create 2022-06-04
  */
 public class SingleStageJoinOperator extends JoinOperator
 {

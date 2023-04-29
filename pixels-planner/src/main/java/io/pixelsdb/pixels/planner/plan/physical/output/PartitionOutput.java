@@ -26,7 +26,7 @@ import java.util.Set;
 /**
  * The output format of the hash partitioning.
  * @author hank
- * @date 07/05/2022
+ * @create 2022-05-07
  */
 public class PartitionOutput extends Output
 {

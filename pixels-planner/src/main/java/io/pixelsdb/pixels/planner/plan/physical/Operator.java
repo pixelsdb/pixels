@@ -28,7 +28,7 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
- * @date 05/07/2022
+ * @create 2022-07-05
  */
 public abstract class Operator
 {

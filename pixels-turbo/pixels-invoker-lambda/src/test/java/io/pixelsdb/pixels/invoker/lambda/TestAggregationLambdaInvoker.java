@@ -25,6 +25,8 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
+import io.pixelsdb.pixels.planner.plan.physical.domain.AggregatedTableInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.AggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
@@ -45,9 +47,10 @@ public class TestAggregationLambdaInvoker
     {
         AggregationInput aggregationInput = new AggregationInput();
         aggregationInput.setQueryId(123456);
-        aggregationInput.setParallelism(8);
-        aggregationInput.setInputStorage(new StorageInfo(Storage.Scheme.s3, null, null, null));
-        aggregationInput.setInputFiles(Arrays.asList(
+        AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
+        aggregatedTableInfo.setParallelism(8);
+        aggregatedTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        aggregatedTableInfo.setInputFiles(Arrays.asList(
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_0",
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_1",
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_2",
@@ -56,14 +59,19 @@ public class TestAggregationLambdaInvoker
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_5",
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_6",
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_7"));
-        aggregationInput.setColumnsToRead(new String[] {"sum_o_orderkey_0", "o_orderstatus_2", "o_orderdate_3"});
-        aggregationInput.setGroupKeyColumnIds(new int[] {1, 2});
-        aggregationInput.setAggregateColumnIds(new int[] {0});
-        aggregationInput.setGroupKeyColumnNames(new String[] {"o_orderstatus", "o_orderdate"});
-        aggregationInput.setGroupKeyColumnProjection(new boolean[] {true, true});
-        aggregationInput.setResultColumnNames(new String[] {"sum_o_orderkey"});
-        aggregationInput.setResultColumnTypes(new String[] {"bigint"});
-        aggregationInput.setFunctionTypes(new FunctionType[] {FunctionType.SUM});
+        aggregatedTableInfo.setColumnsToRead(new String[] {"sum_o_orderkey_0", "o_orderstatus_2", "o_orderdate_3"});
+        aggregatedTableInfo.setBase(false);
+        aggregatedTableInfo.setTableName("aggregate_orders");
+        aggregationInput.setAggregatedTableInfo(aggregatedTableInfo);
+        AggregationInfo aggregationInfo = new AggregationInfo();
+        aggregationInfo.setGroupKeyColumnIds(new int[] {1, 2});
+        aggregationInfo.setAggregateColumnIds(new int[] {0});
+        aggregationInfo.setGroupKeyColumnNames(new String[] {"o_orderstatus", "o_orderdate"});
+        aggregationInfo.setGroupKeyColumnProjection(new boolean[] {true, true});
+        aggregationInfo.setResultColumnNames(new String[] {"sum_o_orderkey"});
+        aggregationInfo.setResultColumnTypes(new String[] {"bigint"});
+        aggregationInfo.setFunctionTypes(new FunctionType[] {FunctionType.SUM});
+        aggregationInput.setAggregationInfo(aggregationInfo);
         aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_final_aggr", false,
                 new StorageInfo(Storage.Scheme.s3, null, null, null), true));
 

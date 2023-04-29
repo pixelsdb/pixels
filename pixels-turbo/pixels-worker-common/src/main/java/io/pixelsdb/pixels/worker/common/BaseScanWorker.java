@@ -87,6 +87,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
 
             long queryId = event.getQueryId();
             requireNonNull(event.getTableInfo(), "even.tableInfo is null");
+            StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
             boolean[] scanProjection = requireNonNull(event.getScanProjection(),
                     "event.scanProjection is null");
@@ -94,14 +95,15 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             checkArgument(partialAggregationPresent != event.getOutput().isRandomFileName(),
                     "partial aggregation and random output file name should not equal");
             String outputFolder = event.getOutput().getPath();
-            StorageInfo storageInfo = event.getOutput().getStorageInfo();
+            StorageInfo outputStorageInfo = event.getOutput().getStorageInfo();
             if (!outputFolder.endsWith("/"))
             {
                 outputFolder += "/";
             }
             boolean encoding = event.getOutput().isEncoding();
 
-            WorkerCommon.initStorage(storageInfo);
+            WorkerCommon.initStorage(inputStorageInfo);
+            WorkerCommon.initStorage(outputStorageInfo);
 
             String[] includeCols = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
@@ -110,7 +112,8 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             if (partialAggregationPresent)
             {
                 logger.info("start get output schema");
-                TypeDescription inputSchema = WorkerCommon.getFileSchemaFromSplits(WorkerCommon.s3, inputSplits);
+                TypeDescription inputSchema = WorkerCommon.getFileSchemaFromSplits(
+                        WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
                 inputSchema = WorkerCommon.getResultSchema(inputSchema, includeCols);
                 PartialAggregationInfo partialAggregationInfo = event.getPartialAggregationInfo();
                 requireNonNull(partialAggregationInfo, "event.partialAggregationInfo is null");
@@ -141,8 +144,9 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = scanFile(queryId, scanInputs, includeCols, scanProjection, filter,
-                                outputPath, encoding, storageInfo.getScheme(), partialAggregationPresent, aggregator);
+                        int rowGroupNum = scanFile(queryId, scanInputs, includeCols, inputStorageInfo.getScheme(),
+                                scanProjection, filter, outputPath, encoding, outputStorageInfo.getScheme(),
+                                partialAggregationPresent, aggregator);
                         if (rowGroupNum > 0)
                         {
                             scanOutput.addOutput(outputPath, rowGroupNum);
@@ -169,13 +173,13 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 String outputPath = event.getOutput().getPath();
                 WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
                 PixelsWriter pixelsWriter = WorkerCommon.getWriter(aggregator.getOutputSchema(),
-                        WorkerCommon.getStorage(storageInfo.getScheme()), outputPath, encoding,
+                        WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
                         aggregator.isPartition(), aggregator.getGroupKeyColumnIdsInResult());
                 aggregator.writeAggrOutput(pixelsWriter);
                 pixelsWriter.close();
-                if (storageInfo.getScheme() == Storage.Scheme.minio)
+                if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    while (!WorkerCommon.minio.exists(outputPath))
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
                     {
                         // Wait for 10ms and see if the output file is visible.
                         TimeUnit.MILLISECONDS.sleep(10);
@@ -206,6 +210,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
      * @param queryId the query id used by I/O scheduler
      * @param scanInputs the information of the files to scan
      * @param columnsToRead the included columns
+     * @param inputScheme the storage scheme of the input files
      * @param scanProjection whether the column in columnsToRead is included in the scan output
      * @param filter the filter for the scan
      * @param outputPath fileName for the scan results
@@ -215,7 +220,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
      * @param aggregator the aggregator for the partial aggregation
      * @return the number of row groups that have been written into the output.
      */
-    private int scanFile(long queryId, List<InputInfo> scanInputs, String[] columnsToRead,
+    private int scanFile(long queryId, List<InputInfo> scanInputs, String[] columnsToRead, Storage.Scheme inputScheme,
                          boolean[] scanProjection, TableScanFilter filter, String outputPath, boolean encoding,
                          Storage.Scheme outputScheme, boolean partialAggregate, Aggregator aggregator)
     {
@@ -233,7 +238,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
         for (InputInfo inputInfo : scanInputs)
         {
             readCostTimer.start();
-            try (PixelsReader pixelsReader = WorkerCommon.getReader(inputInfo.getPath(), WorkerCommon.s3))
+            try (PixelsReader pixelsReader = WorkerCommon.getReader(inputInfo.getPath(), WorkerCommon.getStorage(inputScheme)))
             {
                 readCostTimer.stop();
                 if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -256,8 +261,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 if (pixelsWriter == null && !partialAggregate)
                 {
                     writeCostTimer.start();
-                    pixelsWriter = WorkerCommon.getWriter(scanner.getOutputSchema(),
-                            outputScheme == Storage.Scheme.minio ? WorkerCommon.minio : WorkerCommon.s3,
+                    pixelsWriter = WorkerCommon.getWriter(scanner.getOutputSchema(), WorkerCommon.getStorage(outputScheme),
                             outputPath, encoding, false, null);
                     writeCostTimer.stop();
                 }
@@ -300,7 +304,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 pixelsWriter.close();
                 if (outputScheme == Storage.Scheme.minio)
                 {
-                    while (!WorkerCommon.minio.exists(outputPath))
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
                     {
                         // Wait for 10ms and see if the output file is visible.
                         TimeUnit.MILLISECONDS.sleep(10);

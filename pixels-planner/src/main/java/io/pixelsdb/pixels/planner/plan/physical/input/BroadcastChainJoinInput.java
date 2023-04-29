@@ -27,11 +27,10 @@ import java.util.List;
  * The input format of the chained broadcast join.
  *
  * @author hank
- * @date 03/06/2022
+ * @create 2022-06-03
  */
 public class BroadcastChainJoinInput extends JoinInput
 {
-    private long queryId;
     /**
      * The information of the chain tables that are broadcast in the chain join.
      */
@@ -68,19 +67,13 @@ public class BroadcastChainJoinInput extends JoinInput
      */
     public BroadcastChainJoinInput() { }
 
-    public BroadcastChainJoinInput(long queryId,
-                                   List<BroadcastTableInfo> chainTables,
-                                   List<ChainJoinInfo> chainJoinInfos,
-                                   BroadcastTableInfo largeTable,
-                                   JoinInfo joinInfo, boolean postChainJoinsPresent,
-                                   List<BroadcastTableInfo> postSmallTables,
-                                   List<ChainJoinInfo> postChainJoinInfos,
-                                   boolean partialAggregationPresent,
-                                   PartialAggregationInfo partialAggregationInfo,
+    public BroadcastChainJoinInput(long queryId, List<BroadcastTableInfo> chainTables, List<ChainJoinInfo> chainJoinInfos,
+                                   BroadcastTableInfo largeTable, JoinInfo joinInfo, boolean postChainJoinsPresent,
+                                   List<BroadcastTableInfo> postSmallTables, List<ChainJoinInfo> postChainJoinInfos,
+                                   boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo,
                                    MultiOutputInfo output)
     {
-        super(partialAggregationPresent, partialAggregationInfo, output);
-        this.queryId = queryId;
+        super(queryId, partialAggregationPresent, partialAggregationInfo, output);
         this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
         this.largeTable = largeTable;
@@ -89,17 +82,6 @@ public class BroadcastChainJoinInput extends JoinInput
         this.postSmallTables = postSmallTables;
         this.postChainJoinInfos = postChainJoinInfos;
     }
-
-    public long getQueryId()
-    {
-        return queryId;
-    }
-
-    public void setQueryId(long queryId)
-    {
-        this.queryId = queryId;
-    }
-
     public List<BroadcastTableInfo> getChainTables()
     {
         return chainTables;
@@ -182,11 +164,9 @@ public class BroadcastChainJoinInput extends JoinInput
         private Builder(BroadcastChainJoinInput instance)
         {
             this.builderInstance = new BroadcastChainJoinInput(
-                    instance.queryId, instance.chainTables, instance.chainJoinInfos,
-                    instance.largeTable, instance.joinInfo, instance.postChainJoinsPresent,
-                    instance.postSmallTables, instance.postChainJoinInfos,
-                    instance.isPartialAggregationPresent(), instance.getPartialAggregationInfo(),
-                    instance.getOutput());
+                    instance.getQueryId(), instance.chainTables, instance.chainJoinInfos, instance.largeTable,
+                    instance.joinInfo, instance.postChainJoinsPresent, instance.postSmallTables, instance.postChainJoinInfos,
+                    instance.isPartialAggregationPresent(), instance.getPartialAggregationInfo(), instance.getOutput());
         }
 
         public Builder setLargeTable(BroadcastTableInfo largeTable)

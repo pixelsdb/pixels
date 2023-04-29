@@ -52,6 +52,7 @@ public class TestPartialAggregationLambdaInvoker
             tableInfo.setTableName("orders");
             tableInfo.setColumnsToRead(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
             tableInfo.setFilter(filter);
+            tableInfo.setBase(true);
             tableInfo.setInputSplits(Arrays.asList(
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 0, 4))),
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 4, 4))),
@@ -61,6 +62,7 @@ public class TestPartialAggregationLambdaInvoker
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 20, 4))),
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 24, 4))),
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 28, 4)))));
+            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
             scanInput.setTableInfo(tableInfo);
             scanInput.setScanProjection(new boolean[]{true, true, true, true});
             scanInput.setPartialAggregationPresent(true);

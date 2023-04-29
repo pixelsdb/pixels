@@ -23,7 +23,7 @@ package io.pixelsdb.pixels.planner.plan.physical.output;
  * The output format for both broadcast and hash partitioned join.
  *
  * @author hank
- * @date 07/05/2022
+ * @create 2022-05-07
  */
 public class JoinOutput extends NonPartitionOutput
 {

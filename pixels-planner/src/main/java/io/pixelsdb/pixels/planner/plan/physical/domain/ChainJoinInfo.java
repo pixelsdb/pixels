@@ -25,7 +25,7 @@ import java.util.Arrays;
 
 /**
  * @author hank
- * @date 03/06/2022
+ * @create 2022-06-03
  */
 public class ChainJoinInfo extends JoinInfo
 {

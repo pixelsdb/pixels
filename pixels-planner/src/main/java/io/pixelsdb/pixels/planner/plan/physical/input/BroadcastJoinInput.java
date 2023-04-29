@@ -26,15 +26,10 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 
 /**
  * @author hank
- * @date 07/05/2022
+ * @create 2022-05-07
  */
 public class BroadcastJoinInput extends JoinInput
 {
-    /**
-     * The unique id of the query.
-     */
-    private long queryId;
-
     /**
      * The small (i.e., broadcast) table.
      */
@@ -53,27 +48,14 @@ public class BroadcastJoinInput extends JoinInput
      */
     public BroadcastJoinInput() { }
 
-    public BroadcastJoinInput(long queryId, BroadcastTableInfo smallTable,
-                              BroadcastTableInfo largeTable, JoinInfo joinInfo,
-                              boolean partialAggregationPresent,
-                              PartialAggregationInfo partialAggregationInfo,
-                              MultiOutputInfo output)
+    public BroadcastJoinInput(long queryId, BroadcastTableInfo smallTable, BroadcastTableInfo largeTable,
+                              JoinInfo joinInfo, boolean partialAggregationPresent,
+                              PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
     {
-        super(partialAggregationPresent, partialAggregationInfo, output);
-        this.queryId = queryId;
+        super(queryId, partialAggregationPresent, partialAggregationInfo, output);
         this.smallTable = smallTable;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;
-    }
-
-    public long getQueryId()
-    {
-        return queryId;
-    }
-
-    public void setQueryId(long queryId)
-    {
-        this.queryId = queryId;
     }
 
     public BroadcastTableInfo getSmallTable()
