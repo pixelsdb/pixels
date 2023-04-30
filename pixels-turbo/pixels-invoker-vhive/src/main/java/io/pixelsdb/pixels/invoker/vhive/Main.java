@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.invoker.vhive;
 
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.Output;
 import org.apache.commons.cli.*;
 
@@ -43,26 +44,26 @@ public class Main {
             WorkerClient client = new WorkerClient(host, Integer.parseInt(port));
             Output output = null;
             switch (function) {
-                case "Aggregation":
-                    output = client.aggregation(Utils.genAggregationInput());
-                    break;
-                case "BroadcastChainJoin":
-                    output = client.broadcastChainJoin(Utils.genBroadcastChainJoinInput());
-                    break;
-                case "BroadcastJoin":
-                    output = client.broadcastJoin(Utils.genBroadcastJoinInput());
-                    break;
-                case "PartitionChainJoin":
-                    output = client.partitionChainJoin(Utils.genPartitionedChainJoinInput());
-                    break;
-                case "PartitionJoin":
-                    output = client.partitionJoin(Utils.genPartitionedJoinInput());
-                    break;
-                case "Partition":
-                    output = client.partition(Utils.genPartitionInput("order").apply(0));
-                    break;
+//                case "Aggregation":
+//                    output = client.aggregation(Utils.genAggregationInput());
+//                    break;
+//                case "BroadcastChainJoin":
+//                    output = client.broadcastChainJoin(Utils.genBroadcastChainJoinInput());
+//                    break;
+//                case "BroadcastJoin":
+//                    output = client.broadcastJoin(Utils.genBroadcastJoinInput());
+//                    break;
+//                case "PartitionChainJoin":
+//                    output = client.partitionChainJoin(Utils.genPartitionedChainJoinInput());
+//                    break;
+//                case "PartitionJoin":
+//                    output = client.partitionJoin(Utils.genPartitionedJoinInput());
+//                    break;
+//                case "Partition":
+//                    output = client.partition(Utils.genPartitionInput("order").apply(0));
+//                    break;
                 case "Scan":
-                    output = client.scan(Utils.genScanInput(0));
+                    output = client.scan(Utils.genScanInput(Storage.Scheme.minio, 0));
                     break;
                 case "Hello":
                     System.out.println(client.hello("zhaoshihan"));
