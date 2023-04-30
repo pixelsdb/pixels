@@ -75,13 +75,20 @@ public class ScanInput extends Input
         this.output = output;
     }
 
-    public ScanTableInfo getTableInfo()
-    {
+    public ScanInput(Builder builder) {
+        super(builder.queryId);
+        this.tableInfo = builder.tableInfo;
+        this.scanProjection = builder.scanProjection;
+        this.partialAggregationPresent = builder.partialAggregationPresent;
+        this.partialAggregationInfo = builder.partialAggregationInfo;
+        this.output = builder.output;
+    }
+
+    public ScanTableInfo getTableInfo() {
         return tableInfo;
     }
 
-    public void setTableInfo(ScanTableInfo tableInfo)
-    {
+    public void setTableInfo(ScanTableInfo tableInfo) {
         this.tableInfo = tableInfo;
     }
 

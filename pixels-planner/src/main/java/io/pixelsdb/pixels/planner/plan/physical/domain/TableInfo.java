@@ -87,6 +87,14 @@ public abstract class TableInfo
         this.columnsToRead = columnsToRead;
     }
 
+    public StorageInfo getStorageInfo() {
+        return this.storageInfo;
+    }
+
+    public void setStorageInfo(StorageInfo storageInfo) {
+        this.storageInfo = storageInfo;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
