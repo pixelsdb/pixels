@@ -30,7 +30,6 @@ package amphi.proto;
 
 // The service definitions for pixels-amphi.
 service AmphiService {
-  rpc SayHello (HelloRequest) returns (HelloResponse);
   rpc TranspileSql (TranspileSqlRequest) returns (TranspileSqlResponse);
 }
 
@@ -46,14 +45,6 @@ message ResponseHeader {
 }
 
 // begin request/response definition for rpc services
-
-message HelloRequest {
-  string name = 1;
-}
-
-message HelloResponse {
-  string msg = 1;
-}
 
 message TranspileSqlRequest {
   RequestHeader header = 1;

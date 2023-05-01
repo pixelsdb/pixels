@@ -44,16 +44,6 @@ public class TestAmphiAPI
 
     @Test
     @DirtiesContext
-    public void testSayHello()
-    {
-        AmphiProto.HelloRequest request = AmphiProto.HelloRequest.newBuilder().setName("pixels-amphi").build();
-        AmphiProto.HelloResponse response = amphiService.sayHello(request);
-        assertNotNull(response);
-        assertEquals("hello pixels-amphi", response.getMsg());
-    }
-
-    @Test
-    @DirtiesContext
     public void testTranspileSqlSimple()
     {
         AmphiProto.TranspileSqlRequest request = AmphiProto.TranspileSqlRequest.newBuilder()

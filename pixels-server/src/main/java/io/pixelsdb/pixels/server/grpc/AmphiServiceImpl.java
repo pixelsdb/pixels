@@ -34,15 +34,6 @@ import java.io.IOException;
 public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
 {
     @Override
-    public void sayHello(AmphiProto.HelloRequest request, StreamObserver<AmphiProto.HelloResponse> responseObserver)
-    {
-        String msg = "hello " + request.getName();
-        AmphiProto.HelloResponse response = AmphiProto.HelloResponse.newBuilder().setMsg(msg).build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
     public void transpileSql(AmphiProto.TranspileSqlRequest request, StreamObserver<AmphiProto.TranspileSqlResponse> responseObserver)
     {
         SqlglotExecutor executor = new SqlglotExecutor();
