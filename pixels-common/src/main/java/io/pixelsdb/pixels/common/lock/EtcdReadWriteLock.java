@@ -22,9 +22,9 @@ package io.pixelsdb.pixels.common.lock;
 import io.etcd.jetcd.Client;
 
 /**
- * @author: tao
+ * @author tao
  * @author hank
- * @date: Create in 2018-10-27 14:29
+ * @create 2018-10-27 14:29
  **/
 public class EtcdReadWriteLock
 {
@@ -106,5 +106,4 @@ public class EtcdReadWriteLock
             return this.lockData;
         }
     }
-
 }

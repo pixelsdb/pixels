@@ -29,9 +29,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * @author: tao
+ * @author tao
  * @author hank
- * @date: Create in 2018-10-27 14:33
+ * @create 2018-10-27 14:33
  **/
 public class EtcdMutex implements InterProcessLock
 {
