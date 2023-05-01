@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.server.AmphiProto;
 import io.pixelsdb.pixels.server.AmphiServiceGrpc;
 import net.devh.boot.grpc.server.service.GrpcService;
 
+import java.io.IOException;
+
 /**
  * @author hank
  * @create 2023-04-24
@@ -36,6 +38,24 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
     {
         String msg = "hello " + request.getName();
         AmphiProto.HelloResponse response = AmphiProto.HelloResponse.newBuilder().setMsg(msg).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void transpileSql(AmphiProto.TranspileSqlRequest request, StreamObserver<AmphiProto.TranspileSqlResponse> responseObserver)
+    {
+        SqlglotExecutor executor = new SqlglotExecutor();
+        String sqlTranspiled = null;
+
+        try {
+            sqlTranspiled = executor.transpileSql(request.getSqlStatement(), request.getFromDialect(), request.getToDialect());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        AmphiProto.TranspileSqlResponse response = AmphiProto.TranspileSqlResponse.newBuilder().setSqlTranspiled(sqlTranspiled).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
