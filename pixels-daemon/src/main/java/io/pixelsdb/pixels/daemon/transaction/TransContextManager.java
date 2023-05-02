@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.daemon.transaction;
 
-import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.daemon.TransProto;
 
@@ -54,7 +53,7 @@ public class TransContextManager
 
     private TransContextManager() { }
 
-    public synchronized void addTrans(TransContext context)
+    public synchronized void addTransContext(TransContext context)
     {
         requireNonNull(context, "transaction context is null");
         this.transIdToContext.put(context.getTransId(), context);
@@ -64,7 +63,7 @@ public class TransContextManager
         }
     }
 
-    public synchronized void setTransCommit(long transId)
+    public synchronized boolean setTransCommit(long transId)
     {
         TransContext context = this.transIdToContext.remove(transId);
         if (context != null)
@@ -79,10 +78,12 @@ public class TransContextManager
             {
                 this.traceIdToTransId.remove(traceId);
             }
+            return true;
         }
+        return false;
     }
 
-    public synchronized void setTransRollback(long transId)
+    public synchronized boolean setTransRollback(long transId)
     {
         TransContext context = this.transIdToContext.remove(transId);
         if (context != null)
@@ -97,7 +98,9 @@ public class TransContextManager
             {
                 this.traceIdToTransId.remove(traceId);
             }
+            return true;
         }
+        return false;
     }
 
     public synchronized TransContext getTransContext(long transId)
@@ -115,14 +118,15 @@ public class TransContextManager
         return null;
     }
 
-    public synchronized void bindExternalTraceId(long transId, String externalTraceId) throws TransException
+    public synchronized boolean bindExternalTraceId(long transId, String externalTraceId)
     {
         if (this.transIdToContext.containsKey(transId))
         {
             this.transIdToTraceId.put(transId, externalTraceId);
             this.traceIdToTransId.put(externalTraceId, transId);
+            return true;
         }
-        throw new TransException(String.format("transaction of id %d does not exist", transId));
+        return false;
     }
 
     /**

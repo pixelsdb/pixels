@@ -24,8 +24,8 @@ import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 /**
  * The interface of messages that can be write/read into/from
  * our message queue.
- * Created at: 3/19/21 (at DIAS EPFL)
- * Author: bian
+ * @create 2021-03-19 (at DIAS EPFL)
+ * @author hank
  */
 public interface Message
 {

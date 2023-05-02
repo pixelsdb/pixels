@@ -59,20 +59,91 @@ public class TransService
      */
     public TransContext beginTrans(boolean readOnly) throws TransException
     {
-        TransProto.BeginTransRequest request = TransProto.BeginTransRequest.newBuilder().setReadOnly(readOnly).build();
-        try
+        TransProto.BeginTransRequest request = TransProto.BeginTransRequest.newBuilder()
+                .setReadOnly(readOnly).build();
+        TransProto.BeginTransResponse response = this.stub.beginTrans(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            TransProto.BeginTransResponse response = this.stub.beginTrans(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new TransException("failed to get query transaction info, error code=" + response.getErrorCode());
-            }
-            return new TransContext(response.getTransId(), response.getTimestamp(), readOnly);
+            throw new TransException("failed to begin transaction, error code=" + response.getErrorCode());
         }
-        catch (Exception e)
+        TransContext context = new TransContext(response.getTransId(), response.getTimestamp(), readOnly);
+        TransContextCache.Instance().addTransContext(context);
+        return context;
+    }
+
+    public boolean commitTrans(long transId) throws TransException
+    {
+        TransProto.CommitTransRequest request = TransProto.CommitTransRequest.newBuilder()
+                .setTransId(transId).build();
+        TransProto.CommitTransResponse response = this.stub.commitTrans(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new TransException("failed to begin transaction", e);
+            throw new TransException("failed to commit transaction, error code=" + response.getErrorCode());
         }
+        TransContextCache.Instance().setTransCommit(transId);
+        return true;
+    }
+
+    public boolean rollbackTrans(long transId) throws TransException
+    {
+        TransProto.RollbackTransRequest request = TransProto.RollbackTransRequest.newBuilder()
+                .setTransId(transId).build();
+        TransProto.RollbackTransResponse response = this.stub.rollbackTrans(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to rollback transaction, error code=" + response.getErrorCode());
+        }
+        TransContextCache.Instance().setTransRollback(transId);
+        return true;
+    }
+
+    public TransContext getTransContext(long transId) throws TransException
+    {
+        TransProto.GetTransContextRequest request = TransProto.GetTransContextRequest.newBuilder()
+                .setTransId(transId).build();
+        TransProto.GetTransContextResponse response = this.stub.getTransContext(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to get transaction context, error code=" + response.getErrorCode());
+        }
+        return new TransContext(response.getTransContext());
+    }
+
+    public TransContext getTransContext(String externalTraceId) throws TransException
+    {
+        TransProto.GetTransContextRequest request = TransProto.GetTransContextRequest.newBuilder()
+                .setExternalTraceId(externalTraceId).build();
+        TransProto.GetTransContextResponse response = this.stub.getTransContext(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to get transaction context, error code=" + response.getErrorCode());
+        }
+        return new TransContext(response.getTransContext());
+    }
+
+    public int getTransConcurrency(boolean readOnly) throws TransException
+    {
+        TransProto.GetTransConcurrencyRequest request = TransProto.GetTransConcurrencyRequest.newBuilder()
+                .setReadOnly(readOnly).build();
+        TransProto.GetTransConcurrencyResponse response = this.stub.getTransConcurrency(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to get transaction concurrency, error code=" + response.getErrorCode());
+        }
+        return response.getConcurrency();
+    }
+
+    public boolean bindExternalTraceId(long transId, String externalTraceId) throws TransException
+    {
+        TransProto.BindExternalTraceIdRequest request = TransProto.BindExternalTraceIdRequest.newBuilder()
+                .setTransId(transId).setExternalTraceId(externalTraceId).build();
+        TransProto.BindExternalTraceIdResponse response = this.stub.bindExternalTraceId(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to bind transaction id and external trace id, error code="
+                    + response.getErrorCode());
+        }
+        return true;
     }
 
     public int pushLowWatermark(long queryTimestamp) throws TransException

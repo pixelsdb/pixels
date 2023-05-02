@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.daemon.transaction;
 
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.daemon.TransProto;
 import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -29,7 +30,8 @@ import org.apache.logging.log4j.Logger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * @create 20/02/2022
+ * @create 2022-02-20
+ * @update 2022-05-02 update protocol to support transaction context operations
  * @author hank
  */
 public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
@@ -51,37 +53,86 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     public void beginTrans(TransProto.BeginTransRequest request,
                            StreamObserver<TransProto.BeginTransResponse> responseObserver)
     {
+        long transId = TransId.getAndIncrement(); // incremental transaction id
+        long timestamp = HighWatermark.get();
         TransProto.BeginTransResponse response = TransProto.BeginTransResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS)
-                .setTransId(TransId.getAndIncrement()) // incremental transaction id
-                .setTimestamp(HighWatermark.get()).build();
+                .setTransId(transId)
+                .setTimestamp(timestamp).build();
+        TransContext context = new TransContext(transId, timestamp, request.getReadOnly());
+        TransContextManager.Instance().addTransContext(context);
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
     @Override
-    public void commitTrans(TransProto.CommitTransRequest request, StreamObserver<TransProto.CommitTransResponse> responseObserver) {
-        super.commitTrans(request, responseObserver);
+    public void commitTrans(TransProto.CommitTransRequest request,
+                            StreamObserver<TransProto.CommitTransResponse> responseObserver)
+    {
+        boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
+        TransProto.CommitTransResponse response = TransProto.CommitTransResponse.newBuilder()
+                .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
-    public void rollbackTrans(TransProto.RollbackTransRequest request, StreamObserver<TransProto.RollbackTransResponse> responseObserver) {
-        super.rollbackTrans(request, responseObserver);
+    public void rollbackTrans(TransProto.RollbackTransRequest request,
+                              StreamObserver<TransProto.RollbackTransResponse> responseObserver)
+    {
+        boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
+        TransProto.RollbackTransResponse response = TransProto.RollbackTransResponse.newBuilder()
+                .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
-    public void getTransContext(TransProto.GetTransContextRequest request, StreamObserver<TransProto.GetTransContextResponse> responseObserver) {
-        super.getTransContext(request, responseObserver);
+    public void getTransContext(TransProto.GetTransContextRequest request,
+                                StreamObserver<TransProto.GetTransContextResponse> responseObserver)
+    {
+        TransContext context = null;
+        if (request.hasTransId())
+        {
+            context = TransContextManager.Instance().getTransContext(request.getTransId());
+        }
+        else if (request.hasExternalTraceId())
+        {
+            context = TransContextManager.Instance().getTransContext(request.getExternalTraceId());
+
+        }
+        TransProto.GetTransContextResponse.Builder builder = TransProto.GetTransContextResponse.newBuilder();
+        if (context != null)
+        {
+            builder.setErrorCode(ErrorCode.SUCCESS).setTransContext(context.toProtobuf());
+        }
+        else
+        {
+            builder.setErrorCode(ErrorCode.TRANS_BAD_GET_CONTEXT_REQUEST);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
-    public void getTransConcurrency(TransProto.GetTransConcurrencyRequest request, StreamObserver<TransProto.GetTransConcurrencyResponse> responseObserver) {
-        super.getTransConcurrency(request, responseObserver);
+    public void getTransConcurrency(TransProto.GetTransConcurrencyRequest request,
+                                    StreamObserver<TransProto.GetTransConcurrencyResponse> responseObserver) {
+        int concurrency = TransContextManager.Instance().getQueryConcurrency(request.getReadOnly());
+        TransProto.GetTransConcurrencyResponse response = TransProto.GetTransConcurrencyResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS).setConcurrency(concurrency).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
-    public void bindExternalTraceId(TransProto.BindExternalTraceIdRequest request, StreamObserver<TransProto.BindExternalTraceIdResponse> responseObserver) {
-        super.bindExternalTraceId(request, responseObserver);
+    public void bindExternalTraceId(TransProto.BindExternalTraceIdRequest request,
+                                    StreamObserver<TransProto.BindExternalTraceIdResponse> responseObserver) {
+        boolean success = TransContextManager.Instance().bindExternalTraceId(
+                request.getTransId(), request.getExternalTraceId());
+        TransProto.BindExternalTraceIdResponse response = TransProto.BindExternalTraceIdResponse.newBuilder()
+                .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override

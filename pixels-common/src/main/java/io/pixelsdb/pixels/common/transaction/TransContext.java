@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.transaction;
 
 import io.pixelsdb.pixels.daemon.TransProto;
 
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -45,6 +46,16 @@ public class TransContext
         this.readOnly = readOnly;
         this.status = new AtomicReference<>(TransProto.TransStatus.PENDING);
         this.properties = new Properties();
+    }
+
+    public TransContext(TransProto.TransContext contextPb)
+    {
+        this.transId = contextPb.getTransId();
+        this.timestamp = contextPb.getTimestamp();
+        this.readOnly = contextPb.getReadOnly();
+        this.status = new AtomicReference<>(contextPb.getStatus());
+        this.properties = new Properties();
+        this.properties.putAll(contextPb.getPropertiesMap());
     }
 
     public long getTransId()
@@ -85,5 +96,17 @@ public class TransContext
                 .add("timestamp", timestamp)
                 .add("status", status.get())
                 .toString();
+    }
+
+    public TransProto.TransContext toProtobuf()
+    {
+        TransProto.TransContext.Builder builder = TransProto.TransContext.newBuilder()
+                .setTransId(this.transId).setTimestamp(this.timestamp)
+                .setReadOnly(this.readOnly).setStatus(this.status.get());
+        for (Map.Entry<Object, Object> entry : this.properties.entrySet())
+        {
+            builder.putProperties((String) entry.getKey(), (String) entry.getValue());
+        }
+        return builder.build();
     }
 }

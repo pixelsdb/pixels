@@ -53,7 +53,7 @@ public class TransContextCache
 
     private TransContextCache() { }
 
-    public synchronized void addTrans(TransContext context)
+    protected synchronized void addTransContext(TransContext context)
     {
         requireNonNull(context, "transaction context is null");
         this.transIdToContext.put(context.getTransId(), context);
@@ -63,7 +63,7 @@ public class TransContextCache
         }
     }
 
-    public synchronized void setTransCommit(long transId)
+    protected synchronized void setTransCommit(long transId)
     {
         TransContext context = this.transIdToContext.remove(transId);
         if (context != null)
@@ -76,7 +76,7 @@ public class TransContextCache
         }
     }
 
-    public synchronized void setTransRollback(long transId)
+    protected synchronized void setTransRollback(long transId)
     {
         TransContext context = this.transIdToContext.remove(transId);
         if (context != null)
@@ -87,11 +87,6 @@ public class TransContextCache
                 this.readOnlyConcurrency--;
             }
         }
-    }
-
-    public synchronized TransContext getTransContext(long transId)
-    {
-        return this.transIdToContext.get(transId);
     }
 
     public synchronized boolean isTerminated(long transId)
