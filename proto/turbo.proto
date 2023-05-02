@@ -18,41 +18,31 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-// grpc protocol for pixels-amphi.
+// grpc protocol for pixels-turbo.
 
 syntax = "proto3";
 
 option java_multiple_files = false;
-option java_package = "io.pixelsdb.pixels.amphi";
-option java_outer_classname = "AmphiProto";
+option java_package = "io.pixelsdb.pixels.turbo";
+option java_outer_classname = "TurboProto";
 
-package amphi.proto;
+package turbo.proto;
 
-// The service definitions for pixels-amphi.
-service AmphiService {
-  rpc TranspileSql (TranspileSqlRequest) returns (TranspileSqlResponse);
+// The service definitions for pixels-turbo.
+service TurboFrameworkService {
+  rpc SayHello (HelloRequest) returns (HelloResponse);
 }
 
-// header
-message RequestHeader {
-  string token = 1;
-}
-
-message ResponseHeader {
-  string token = 1;
-  int32 errorCode = 2; // errorCode == 0 means success
-  string errorMsg = 3; // empty if errorCode == 0
+service TurboKnWorkerService {
+  rpc SayHello (HelloRequest) returns (HelloResponse);
 }
 
 // begin request/response definition for rpc services
-message TranspileSqlRequest {
-  RequestHeader header = 1;
-  string sqlStatement = 2;
-  string fromDialect = 3;
-  string toDialect = 4;
+
+message HelloRequest {
+  string name = 1;
 }
 
-message TranspileSqlResponse {
-  ResponseHeader header = 1;
-  string sqlTranspiled = 2;
+message HelloResponse {
+  string msg = 1;
 }

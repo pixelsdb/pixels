@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {
-    private static Logger log = LogManager.getLogger(TransServiceImpl.class);
+    private static final Logger log = LogManager.getLogger(TransServiceImpl.class);
 
     public static final AtomicLong TransId = new AtomicLong(0);
     /**
