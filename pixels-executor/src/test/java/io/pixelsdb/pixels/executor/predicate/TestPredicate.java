@@ -150,7 +150,7 @@ public class TestPredicate
                 .setPixelsFooterCache(new PixelsFooterCache())
                 .setPath("file:///home/hank/20220312072707_0.pxl").build();
         PixelsReaderOption readerOption = new PixelsReaderOption();
-        readerOption.queryId(1);
+        readerOption.transId(1);
         readerOption.rgRange(0, 1);
         readerOption.includeCols(new String[] {"o_custkey", "o_orderkey", "o_orderdate", "o_orderstatus"});
         PixelsRecordReader recordReader = pixelsReader.read(readerOption);

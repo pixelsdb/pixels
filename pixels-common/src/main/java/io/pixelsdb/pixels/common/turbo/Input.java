@@ -27,22 +27,22 @@ package io.pixelsdb.pixels.common.turbo;
 public abstract class Input
 {
     /**
-     * The unique id of the query.
+     * The unique id of the transaction.
      */
-    private long queryId;
+    private long transId;
 
-    public Input(long queryId)
+    public Input(long transId)
     {
-        this.queryId = queryId;
+        this.transId = transId;
     }
 
-    public long getQueryId()
+    public long getTransId()
     {
-        return queryId;
+        return transId;
     }
 
-    public void setQueryId(long queryId)
+    public void setTransId(long transId)
     {
-        this.queryId = queryId;
+        this.transId = transId;
     }
 }

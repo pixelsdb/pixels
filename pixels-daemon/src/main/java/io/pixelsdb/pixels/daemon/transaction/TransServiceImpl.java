@@ -29,41 +29,68 @@ import org.apache.logging.log4j.Logger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Created at: 20/02/2022
- * Author: hank
+ * @create 20/02/2022
+ * @author hank
  */
 public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {
     private static Logger log = LogManager.getLogger(TransServiceImpl.class);
 
-    public static AtomicLong QueryId = new AtomicLong(0);
+    public static final AtomicLong TransId = new AtomicLong(0);
     /**
      * Issue #174:
      * In this issue, we have not fully implemented the logic related to the watermarks.
      * So we use two atomic longs to simulate the watermarks.
      */
-    public static AtomicLong LowWatermark = new AtomicLong(0);
-    public static AtomicLong HighWatermark = new AtomicLong(0);
+    public static final AtomicLong LowWatermark = new AtomicLong(0);
+    public static final AtomicLong HighWatermark = new AtomicLong(0);
 
     public TransServiceImpl () { }
 
     @Override
-    public void getQueryTransInfo(TransProto.GetQueryTransInfoRequest request, StreamObserver<TransProto.GetQueryTransInfoResponse> responseObserver)
+    public void beginTrans(TransProto.BeginTransRequest request,
+                           StreamObserver<TransProto.BeginTransResponse> responseObserver)
     {
-        TransProto.GetQueryTransInfoResponse response = TransProto.GetQueryTransInfoResponse.newBuilder()
+        TransProto.BeginTransResponse response = TransProto.BeginTransResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS)
-                .setQueryId(QueryId.getAndIncrement()) // incremental query id
-                .setQueryTimestamp(HighWatermark.get()).build();
+                .setTransId(TransId.getAndIncrement()) // incremental transaction id
+                .setTimestamp(HighWatermark.get()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
     @Override
-    public void pushLowWatermark(TransProto.PushLowWatermarkRequest request, StreamObserver<TransProto.PushLowWatermarkResponse> responseObserver)
+    public void commitTrans(TransProto.CommitTransRequest request, StreamObserver<TransProto.CommitTransResponse> responseObserver) {
+        super.commitTrans(request, responseObserver);
+    }
+
+    @Override
+    public void rollbackTrans(TransProto.RollbackTransRequest request, StreamObserver<TransProto.RollbackTransResponse> responseObserver) {
+        super.rollbackTrans(request, responseObserver);
+    }
+
+    @Override
+    public void getTransContext(TransProto.GetTransContextRequest request, StreamObserver<TransProto.GetTransContextResponse> responseObserver) {
+        super.getTransContext(request, responseObserver);
+    }
+
+    @Override
+    public void getTransConcurrency(TransProto.GetTransConcurrencyRequest request, StreamObserver<TransProto.GetTransConcurrencyResponse> responseObserver) {
+        super.getTransConcurrency(request, responseObserver);
+    }
+
+    @Override
+    public void bindExternalTraceId(TransProto.BindExternalTraceIdRequest request, StreamObserver<TransProto.BindExternalTraceIdResponse> responseObserver) {
+        super.bindExternalTraceId(request, responseObserver);
+    }
+
+    @Override
+    public void pushLowWatermark(TransProto.PushLowWatermarkRequest request,
+                                 StreamObserver<TransProto.PushLowWatermarkResponse> responseObserver)
     {
         long value = LowWatermark.get();
         int error = ErrorCode.SUCCESS;
-        long queryTimestamp = request.getQueryTimestamp();
+        long queryTimestamp = request.getQueryTransTimestamp();
         if (queryTimestamp >= value)
         {
             while(LowWatermark.compareAndSet(value, queryTimestamp))

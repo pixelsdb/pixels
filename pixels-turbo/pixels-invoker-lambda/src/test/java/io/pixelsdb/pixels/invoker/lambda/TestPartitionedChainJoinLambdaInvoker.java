@@ -47,7 +47,7 @@ public class TestPartitionedChainJoinLambdaInvoker
         String supplierFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"supplier\",\"columnFilters\":{}}";
 
         PartitionedChainJoinInput joinInput = new PartitionedChainJoinInput();
-        joinInput.setQueryId(123456);
+        joinInput.setTransId(123456);
 
         List<BroadcastTableInfo> chainTables = new ArrayList<>();
         List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();

@@ -75,7 +75,7 @@ public class StarlingPlanner
     private final boolean orderedPathEnabled;
     private final boolean compactPathEnabled;
     private final Storage storage;
-    private final long queryId;
+    private final long transId;
 
     static
     {
@@ -107,19 +107,19 @@ public class StarlingPlanner
      * joins have joined table on the left. There is no requirement for the end-point joins of
      * table base tables.
      *
-     * @param queryId the query id
+     * @param transId the transaction id
      * @param rootTable the join plan
      * @param orderedPathEnabled whether ordered path is enabled
      * @param compactPathEnabled whether compact path is enabled
      * @param metadataService the metadata service to access Pixels metadata
      * @throws IOException
      */
-    public StarlingPlanner(long queryId, Table rootTable,
+    public StarlingPlanner(long transId, Table rootTable,
                            boolean orderedPathEnabled,
                            boolean compactPathEnabled,
                            Optional<MetadataService> metadataService) throws IOException
     {
-        this.queryId = queryId;
+        this.transId = transId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
         checkArgument(rootTable.getTableType() == Table.TableType.JOINED || rootTable.getTableType() == Table.TableType.AGGREGATED,
                 "currently, StarlingPlanner only supports join and aggregation");
@@ -173,7 +173,7 @@ public class StarlingPlanner
 
         PartitionInfo partitionInfo = new PartitionInfo(aggregation.getGroupKeyColumnIds(), 16);
 
-        final String intermediateBase = IntermediateFolder + queryId + "/" +
+        final String intermediateBase = IntermediateFolder + transId + "/" +
                 aggregatedTable.getSchemaName() + "/" + aggregatedTable.getTableName() + "/";
 
         ImmutableList.Builder<String> AggrInputFilesBuilder = ImmutableList.builder();
@@ -190,7 +190,7 @@ public class StarlingPlanner
             for (int i = 0; i < inputSplits.size(); )
             {
                 PartitionInput partitionInput = new PartitionInput();
-                partitionInput.setQueryId(queryId);
+                partitionInput.setTransId(transId);
                 ScanTableInfo tableInfo = new ScanTableInfo();
                 ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                         .builderWithExpectedSize(IntraWorkerParallelism);
@@ -243,7 +243,7 @@ public class StarlingPlanner
         for (int hash = 0; hash < numPartitions; ++hash)
         {
             AggregationInput finalAggrInput = new AggregationInput();
-            finalAggrInput.setQueryId(queryId);
+            finalAggrInput.setTransId(transId);
             AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
             aggregatedTableInfo.setTableName(aggregatedTable.getTableName());
             aggregatedTableInfo.setBase(false);
@@ -343,11 +343,11 @@ public class StarlingPlanner
                 BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                         rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
 
-                String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                         joinedTable.getTableName() + "/";
                 MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
-                BroadcastJoinInput joinInput = new BroadcastJoinInput(queryId, leftTableInfo, rightTableInfo,
+                BroadcastJoinInput joinInput = new BroadcastJoinInput(transId, leftTableInfo, rightTableInfo,
                         joinInfo, false, null, output);
                 joinInputs.add(joinInput);
             }
@@ -553,12 +553,12 @@ public class StarlingPlanner
                     BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                    String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                    String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
-                            queryId, leftTableInfo, rightTableInfo, joinInfo,
+                            transId, leftTableInfo, rightTableInfo, joinInfo,
                             false, null, output);
 
                     joinInputs.add(joinInput);
@@ -601,12 +601,12 @@ public class StarlingPlanner
                     BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
 
-                    String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                    String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
-                            queryId, rightTableInfo, leftTableInfo, joinInfo,
+                            transId, rightTableInfo, leftTableInfo, joinInfo,
                             false, null, output);
 
                     joinInputs.add(joinInput);
@@ -642,7 +642,7 @@ public class StarlingPlanner
 
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
-                        IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
@@ -671,7 +671,7 @@ public class StarlingPlanner
                 boolean[] leftPartitionProjection = getPartitionProjection(leftTable, join.getLeftProjection());
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
                         leftTable, leftInputSplits, leftKeyColumnIds, leftPartitionProjection, numPartition,
-                        IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs, leftPartitionProjection);
@@ -679,7 +679,7 @@ public class StarlingPlanner
                 boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
-                        IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
@@ -964,7 +964,7 @@ public class StarlingPlanner
         for (int i = 0; i < inputSplits.size();)
         {
             PartitionInput partitionInput = new PartitionInput();
-            partitionInput.setQueryId(queryId);
+            partitionInput.setTransId(transId);
             ScanTableInfo tableInfo = new ScanTableInfo();
             ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                     .builderWithExpectedSize(IntraWorkerParallelism);
@@ -1053,7 +1053,7 @@ public class StarlingPlanner
                 outputFileNames.add(i + "/join_left");
             }
 
-            String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+            String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                     joinedTable.getTableName() + "/";
             MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
 
@@ -1068,7 +1068,7 @@ public class StarlingPlanner
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
                         joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
                         leftProjection, rightProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
-                 joinInput = new PartitionedJoinInput(queryId, leftTableInfo, rightTableInfo, joinInfo,
+                 joinInput = new PartitionedJoinInput(transId, leftTableInfo, rightTableInfo, joinInfo,
                          false, null, output);
             }
             else
@@ -1076,7 +1076,7 @@ public class StarlingPlanner
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
                         rightProjection, leftProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
-                joinInput = new PartitionedJoinInput(queryId, rightTableInfo, leftTableInfo, joinInfo,
+                joinInput = new PartitionedJoinInput(transId, rightTableInfo, leftTableInfo, joinInfo,
                         false, null, output);
             }
 

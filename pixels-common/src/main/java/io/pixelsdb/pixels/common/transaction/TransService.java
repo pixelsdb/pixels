@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * @create 2022-02-20
+ * @update 2023-05-02 merge transaction context management into trans service.
  * @author hank
  */
 public class TransService
@@ -51,28 +52,33 @@ public class TransService
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
 
-    public QueryTransInfo getQueryTransInfo() throws TransException
+    /**
+     * @param readOnly true if the transaction is determined to be read only, false otherwise.
+     * @return the initialized context of the transaction, containing the allocated trans id and timestamp.
+     * @throws TransException
+     */
+    public TransContext beginTrans(boolean readOnly) throws TransException
     {
-        TransProto.GetQueryTransInfoRequest request = TransProto.GetQueryTransInfoRequest.newBuilder().build();
+        TransProto.BeginTransRequest request = TransProto.BeginTransRequest.newBuilder().setReadOnly(readOnly).build();
         try
         {
-            TransProto.GetQueryTransInfoResponse response = this.stub.getQueryTransInfo(request);
+            TransProto.BeginTransResponse response = this.stub.beginTrans(request);
             if (response.getErrorCode() != ErrorCode.SUCCESS)
             {
                 throw new TransException("failed to get query transaction info, error code=" + response.getErrorCode());
             }
-            return new QueryTransInfo(response.getQueryId(), response.getQueryTimestamp());
+            return new TransContext(response.getTransId(), response.getTimestamp(), readOnly);
         }
         catch (Exception e)
         {
-            throw new TransException("failed to get query transaction info", e);
+            throw new TransException("failed to begin transaction", e);
         }
     }
 
     public int pushLowWatermark(long queryTimestamp) throws TransException
     {
         TransProto.PushLowWatermarkRequest request = TransProto.PushLowWatermarkRequest.newBuilder()
-                .setQueryTimestamp(queryTimestamp).build();
+                .setQueryTransTimestamp(queryTimestamp).build();
         try
         {
             TransProto.PushLowWatermarkResponse response = this.stub.pushLowWatermark(request);

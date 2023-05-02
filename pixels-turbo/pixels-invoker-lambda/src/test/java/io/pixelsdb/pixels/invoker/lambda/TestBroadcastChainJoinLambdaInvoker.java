@@ -50,7 +50,7 @@ public class TestBroadcastChainJoinLambdaInvoker
         String lineitemFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
 
         BroadcastChainJoinInput joinInput = new BroadcastChainJoinInput();
-        joinInput.setQueryId(123456);
+        joinInput.setTransId(123456);
 
         List<BroadcastTableInfo> leftTables = new ArrayList<>();
         List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();

@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.scaling.ec2;
 
 import io.pixelsdb.pixels.common.metrics.NamedCount;
-import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.transaction.TransContextCache;
 import io.pixelsdb.pixels.common.turbo.MetricsCollector;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class Ec2MetricsCollector extends MetricsCollector
 {
-    private final TransContext transContext;
+    private final TransContextCache transContextCache;
     private final CloudWatchMetrics cloudWatchMetrics;
     private final String metricsName;
     private final int period;
@@ -43,7 +43,7 @@ public class Ec2MetricsCollector extends MetricsCollector
     protected Ec2MetricsCollector()
     {
         // Starting a background thread to report query concurrency periodically.
-        this.transContext = TransContext.Instance();
+        this.transContextCache = TransContextCache.Instance();
         this.cloudWatchMetrics = new CloudWatchMetrics();
         this.metricsName = ConfigFactory.Instance().getProperty("query.concurrency.metrics.name");
         this.metricsReporter = Executors.newScheduledThreadPool(1);
@@ -54,7 +54,7 @@ public class Ec2MetricsCollector extends MetricsCollector
     public void startAutoReport()
     {
         this.metricsReporter.scheduleAtFixedRate(() -> {
-            NamedCount count = new NamedCount(metricsName, transContext.getTransConcurrency());
+            NamedCount count = new NamedCount(metricsName, transContextCache.getQueryConcurrency());
             cloudWatchMetrics.putCount(count);
         }, 0, period, TimeUnit.SECONDS);
     }
@@ -62,7 +62,7 @@ public class Ec2MetricsCollector extends MetricsCollector
     @Override
     public void report()
     {
-        int concurrency = this.transContext.getTransConcurrency();
+        int concurrency = this.transContextCache.getQueryConcurrency();
         NamedCount count = new NamedCount(this.metricsName, concurrency);
         this.cloudWatchMetrics.putCount(count);
     }

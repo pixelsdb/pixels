@@ -97,7 +97,7 @@ public class TestPixelsReaderBasic
             option.enableEncodedColumnVector(true);
             option.includeCols(new String[]{"o_orderpriority"});
             option.rgRange(0, 1);
-            option.queryId(1);
+            option.transId(1);
             PixelsRecordReader recordReader = reader.read(option);
             VectorizedRowBatch rowBatch = recordReader.readBatch(1000);
             DictionaryColumnVector vector = (DictionaryColumnVector) rowBatch.cols[0];
