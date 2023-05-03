@@ -49,7 +49,7 @@ import static io.pixelsdb.pixels.planner.plan.logical.Table.TableType.JOINED;
  * The optimizer for serverless query plan.
  *
  * @author hank
- * @date 6/20/22
+ * @create 2022-06-20
  */
 public class PlanOptimizer
 {

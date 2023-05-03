@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.executor.join.JoinType;
 
 /**
  * @author hank
- * @date 02/06/2022
+ * @create 2022-06-02
  */
 public class JoinInfo
 {

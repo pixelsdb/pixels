@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.planner.plan.physical.domain;
 
 /**
  * @author hank
- * @date 02/06/2022
+ * @create 2022-06-02
  */
 public class InputInfo
 {

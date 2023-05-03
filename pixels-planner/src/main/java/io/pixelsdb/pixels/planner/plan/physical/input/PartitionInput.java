@@ -30,14 +30,10 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.ScanTableInfo;
  * hash partitioning input shares some fields with the scan input.
  *
  * @author hank
- * @date 07/05/2022
+ * @create 2022-05-07
  */
 public class PartitionInput extends Input
 {
-    /**
-     * The unique id of the query.
-     */
-    private long queryId;
     /**
      * The information of the table to scan and partition.
      */
@@ -59,26 +55,19 @@ public class PartitionInput extends Input
     /**
      * Default constructor for Jackson.
      */
-    public PartitionInput() { }
+    public PartitionInput()
+    {
+        super(-1);
+    }
 
     public PartitionInput(long queryId, ScanTableInfo tableInfo, boolean[] projection,
                           OutputInfo output, PartitionInfo partitionInfo)
     {
-        this.queryId = queryId;
+        super(queryId);
         this.tableInfo = tableInfo;
         this.projection = projection;
         this.output = output;
         this.partitionInfo = partitionInfo;
-    }
-
-    public long getQueryId()
-    {
-        return queryId;
-    }
-
-    public void setQueryId(long queryId)
-    {
-        this.queryId = queryId;
     }
 
     public ScanTableInfo getTableInfo()

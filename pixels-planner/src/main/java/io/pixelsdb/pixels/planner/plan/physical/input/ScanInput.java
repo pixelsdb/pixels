@@ -27,14 +27,10 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.ScanTableInfo;
 /**
  * The input format for table scan.
  * @author hank
- * Created at: 11/04/2022
+ * @create 2022-04-11
  */
 public class ScanInput extends Input
 {
-    /**
-     * The unique id of the query.
-     */
-    private long queryId;
     /**
      * The information of the table to scan.
      */
@@ -60,26 +56,20 @@ public class ScanInput extends Input
     /**
      * Default constructor for Jackson.
      */
-    public ScanInput() { }
+    public ScanInput()
+    {
+        super(-1);
+    }
 
     public ScanInput(long queryId, ScanTableInfo tableInfo, boolean[] scanProjection,
                      boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo, OutputInfo output)
     {
-        this.queryId = queryId;
+        super(queryId);
         this.tableInfo = tableInfo;
+        this.scanProjection = scanProjection;
         this.partialAggregationPresent = partialAggregationPresent;
         this.partialAggregationInfo = partialAggregationInfo;
         this.output = output;
-    }
-
-    public long getQueryId()
-    {
-        return queryId;
-    }
-
-    public void setQueryId(long queryId)
-    {
-        this.queryId = queryId;
     }
 
     public ScanTableInfo getTableInfo()

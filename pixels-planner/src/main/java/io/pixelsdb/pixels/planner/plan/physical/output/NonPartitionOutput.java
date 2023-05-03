@@ -26,9 +26,9 @@ import java.util.ArrayList;
 /**
  * The output format for serverless operators.
  * @author hank
- * Created at: 11/04/2022
+ * @create 2022-04-11
  */
-public class NonPartitionOutput extends Output
+public abstract class NonPartitionOutput extends Output
 {
     /**
      * The path of the result files. No need to contain endpoint information.

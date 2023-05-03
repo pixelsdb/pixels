@@ -81,17 +81,17 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
             long queryId = event.getQueryId();
-            BroadcastTableInfo leftTable = event.getSmallTable();
-            List<InputSplit> leftInputs = leftTable.getInputSplits();
-            requireNonNull(leftInputs, "leftInputs is null");
+            BroadcastTableInfo leftTable = requireNonNull(event.getSmallTable(), "leftTable is null");
+            StorageInfo leftInputStorageInfo = requireNonNull(leftTable.getStorageInfo(), "leftStorageInfo is null");
+            List<InputSplit> leftInputs = requireNonNull(leftTable.getInputSplits(), "leftInputs is null");
             checkArgument(leftInputs.size() > 0, "left table is empty");
             String[] leftCols = leftTable.getColumnsToRead();
             int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
             TableScanFilter leftFilter = JSON.parseObject(leftTable.getFilter(), TableScanFilter.class);
 
-            BroadcastTableInfo rightTable = event.getLargeTable();
-            List<InputSplit> rightInputs = rightTable.getInputSplits();
-            requireNonNull(rightInputs, "rightInputs is null");
+            BroadcastTableInfo rightTable = requireNonNull(event.getLargeTable(), "rightTable is null");
+            StorageInfo rightInputStorageInfo = requireNonNull(rightTable.getStorageInfo(), "rightStorageInfo is null");
+            List<InputSplit> rightInputs = requireNonNull(rightTable.getInputSplits(), "rightInputs is null");
             checkArgument(rightInputs.size() > 0, "right table is empty");
             String[] rightCols = rightTable.getColumnsToRead();
             int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
@@ -106,7 +106,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join");
 
             MultiOutputInfo outputInfo = event.getOutput();
-            StorageInfo storageInfo = outputInfo.getStorageInfo();
+            StorageInfo outputStorageInfo = outputInfo.getStorageInfo();
             checkArgument(outputInfo.getFileNames().size() == 1,
                     "it is incorrect to have more than one output files");
             String outputFolder = outputInfo.getPath();
@@ -119,7 +119,9 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             logger.info("small table: " + event.getSmallTable().getTableName() +
                     "', large table: " + event.getLargeTable().getTableName());
 
-            WorkerCommon.initStorage(storageInfo);
+            WorkerCommon.initStorage(leftInputStorageInfo);
+            WorkerCommon.initStorage(rightInputStorageInfo);
+            WorkerCommon.initStorage(outputStorageInfo);
 
             boolean partitionOutput = event.getJoinInfo().isPostPartition();
             PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
@@ -131,7 +133,10 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            WorkerCommon.getFileSchemaFromSplits(threadPool, WorkerCommon.s3, leftSchema, rightSchema, leftInputs, rightInputs);
+            WorkerCommon.getFileSchemaFromSplits(threadPool,
+                    WorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
+                    WorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
+                    leftSchema, rightSchema, leftInputs, rightInputs);
             Joiner joiner = new Joiner(joinType,
                     WorkerCommon.getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftProjection, leftKeyColumnIds,
                     WorkerCommon.getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightProjection, rightKeyColumnIds);
@@ -143,7 +148,8 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, inputs, !leftTable.isBase(), leftCols, leftFilter, workerMetrics);
+                        buildHashTable(queryId, joiner, inputs, leftInputStorageInfo.getScheme(),
+                                !leftTable.isBase(), leftCols, leftFilter, workerMetrics);
                     }
                     catch (Exception e)
                     {
@@ -182,10 +188,11 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                         {
                             int numJoinedRows = partitionOutput ?
                                     joinWithRightTableAndPartition(
-                                            queryId, joiner, inputs, !rightTable.isBase(), rightCols, rightFilter,
+                                            queryId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            !rightTable.isBase(), rightCols, rightFilter,
                                             outputPartitionInfo, result, workerMetrics) :
-                                    joinWithRightTable(queryId, joiner, inputs, !rightTable.isBase(), rightCols,
-                                            rightFilter, result.get(0), workerMetrics);
+                                    joinWithRightTable(queryId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            !rightTable.isBase(), rightCols, rightFilter, result.get(0), workerMetrics);
                         } catch (Exception e)
                         {
                             throw new WorkerException("error during broadcast join", e);
@@ -210,7 +217,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 if (partitionOutput)
                 {
                     pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(storageInfo.getScheme()), outputPath,
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                             encoding, true, Arrays.stream(
                                     outputPartitionInfo.getKeyColumnIds()).boxed().
                                     collect(Collectors.toList()));
@@ -229,7 +236,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 else
                 {
                     pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(storageInfo.getScheme()), outputPath,
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                             encoding, false, null);
                     ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
                     for (VectorizedRowBatch rowBatch : rowBatches)
@@ -239,9 +246,9 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 }
                 pixelsWriter.close();
                 joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
-                if (storageInfo.getScheme() == Storage.Scheme.minio)
+                if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    while (!WorkerCommon.minio.exists(outputPath))
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
                     {
                         // Wait for 10ms and see if the output file is visible.
                         TimeUnit.MILLISECONDS.sleep(10);
@@ -276,13 +283,15 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @param joiner the joiner for which the hash table is built
      * @param leftInputs the information of input files of the left table,
      *                   the list <b>must be mutable</b>
+     * @param leftScheme the storage scheme of the left table
      * @param checkExistence whether check the existence of the input files
      * @param leftCols the column names of the left table
      * @param leftFilter the table scan filter on the left table
      * @param workerMetrics the collector of the performance metrics
      */
-    public static void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs, boolean checkExistence,
-                                      String[] leftCols, TableScanFilter leftFilter, WorkerMetrics workerMetrics)
+    public static void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs,
+                                      Storage.Scheme leftScheme, boolean checkExistence, String[] leftCols,
+                                      TableScanFilter leftFilter, WorkerMetrics workerMetrics)
     {
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
         WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
@@ -294,7 +303,8 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             {
                 InputInfo input = it.next();
                 readCostTimer.start();
-                try (PixelsReader pixelsReader = WorkerCommon.getReader(input.getPath(), WorkerCommon.s3))
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        input.getPath(), WorkerCommon.getStorage(leftScheme)))
                 {
                     readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -365,6 +375,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @param joiner the joiner for the broadcast join
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
+     * @param rightScheme the storage scheme of the right table
      * @param checkExistence whether check the existence of the input files
      * @param rightCols the column names of the right table
      * @param rightFilter the table scan filter on the right table
@@ -373,8 +384,9 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @return the number of joined rows produced in this split
      */
     public static int joinWithRightTable(
-            long queryId, Joiner joiner, List<InputInfo> rightInputs, boolean checkExistence, String[] rightCols,
-            TableScanFilter rightFilter, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult, WorkerMetrics workerMetrics)
+            long queryId, Joiner joiner, List<InputInfo> rightInputs, Storage.Scheme rightScheme,
+            boolean checkExistence, String[] rightCols, TableScanFilter rightFilter,
+            ConcurrentLinkedQueue<VectorizedRowBatch> joinResult, WorkerMetrics workerMetrics)
     {
         int joinedRows = 0;
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
@@ -387,7 +399,8 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             {
                 InputInfo input = it.next();
                 readCostTimer.start();
-                try (PixelsReader pixelsReader = WorkerCommon.getReader(input.getPath(), WorkerCommon.s3))
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        input.getPath(), WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -466,6 +479,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @param joiner the joiner for the broadcast join
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
+     * @param rightScheme the storage scheme of the right table
      * @param checkExistence whether check the existence of the input files
      * @param rightCols the column names of the right table
      * @param rightFilter the table scan filter on the right table
@@ -475,8 +489,8 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @return the number of joined rows produced in this split
      */
     public static int joinWithRightTableAndPartition(
-            long queryId, Joiner joiner, List<InputInfo> rightInputs, boolean checkExistence,
-            String[] rightCols, TableScanFilter rightFilter, PartitionInfo postPartitionInfo,
+            long queryId, Joiner joiner, List<InputInfo> rightInputs, Storage.Scheme rightScheme,
+            boolean checkExistence, String[] rightCols, TableScanFilter rightFilter, PartitionInfo postPartitionInfo,
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics)
     {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
@@ -493,7 +507,8 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             {
                 InputInfo input = it.next();
                 readCostTimer.start();
-                try (PixelsReader pixelsReader = WorkerCommon.getReader(input.getPath(), WorkerCommon.s3))
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        input.getPath(), WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())

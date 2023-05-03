@@ -26,14 +26,10 @@ import java.util.List;
 /**
  * The input format of the chained partitioned join.
  * @author hank
- * @date 25/06/2022
+ * @create 2022-06-25
  */
 public class PartitionedChainJoinInput extends JoinInput
 {
-    /**
-     * The unique id of the query.
-     */
-    private long queryId;
     /**
      * The information of the chain tables that are broadcast in the chain join.
      */
@@ -72,33 +68,17 @@ public class PartitionedChainJoinInput extends JoinInput
      */
     public PartitionedChainJoinInput() { }
 
-    public PartitionedChainJoinInput(long queryId,
-                                     List<BroadcastTableInfo> chainTables,
-                                     List<ChainJoinInfo> chainJoinInfos,
-                                     PartitionedTableInfo smallTable,
-                                     PartitionedTableInfo largeTable,
-                                     PartitionedJoinInfo joinInfo,
-                                     boolean partialAggregationPresent,
-                                     PartialAggregationInfo partialAggregationInfo,
-                                     MultiOutputInfo output)
+    public PartitionedChainJoinInput(long queryId, List<BroadcastTableInfo> chainTables, List<ChainJoinInfo> chainJoinInfos,
+                                     PartitionedTableInfo smallTable, PartitionedTableInfo largeTable,
+                                     PartitionedJoinInfo joinInfo, boolean partialAggregationPresent,
+                                     PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
     {
-        super(partialAggregationPresent, partialAggregationInfo, output);
-        this.queryId = queryId;
+        super(queryId, partialAggregationPresent, partialAggregationInfo, output);
         this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
         this.smallTable = smallTable;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;
-    }
-
-    public long getQueryId()
-    {
-        return queryId;
-    }
-
-    public void setQueryId(long queryId)
-    {
-        this.queryId = queryId;
     }
 
     public List<BroadcastTableInfo> getChainTables()
@@ -163,10 +143,9 @@ public class PartitionedChainJoinInput extends JoinInput
         private Builder(PartitionedChainJoinInput instance)
         {
             this.builderInstance = new PartitionedChainJoinInput(
-                    instance.queryId, instance.chainTables, instance.chainJoinInfos,
-                    instance.smallTable, instance.largeTable, instance.joinInfo,
-                    instance.isPartialAggregationPresent(), instance.getPartialAggregationInfo(),
-                    instance.getOutput());
+                    instance.getQueryId(), instance.chainTables, instance.chainJoinInfos, instance.smallTable,
+                    instance.largeTable, instance.joinInfo, instance.isPartialAggregationPresent(),
+                    instance.getPartialAggregationInfo(), instance.getOutput());
         }
 
         public Builder setLargeTable(PartitionedTableInfo largeTable)

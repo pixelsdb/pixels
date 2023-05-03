@@ -32,6 +32,7 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.executor.scan.Scanner;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
+import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import org.slf4j.Logger;
@@ -44,7 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -81,16 +82,23 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
             long queryId = event.getQueryId();
+            requireNonNull(event.getTableInfo(), "event.tableInfo is null");
+            StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
+            requireNonNull(event.getPartitionInfo(), "event.partitionInfo is null");
             int numPartition = event.getPartitionInfo().getNumPartition();
             logger.info("table '" + event.getTableInfo().getTableName() +
                     "', number of partitions (" + numPartition + ")");
             int[] keyColumnIds = event.getPartitionInfo().getKeyColumnIds();
             boolean[] projection = event.getProjection();
-            checkArgument(event.getOutput().getStorageInfo().getScheme() == Storage.Scheme.s3,
-                    "the storage scheme for the partition result must be s3");
+            requireNonNull(event.getOutput(), "event.output is null");
+            StorageInfo outputStorageInfo = requireNonNull(event.getOutput().getStorageInfo(),
+                    "output.storageInfo is null");
             String outputPath = event.getOutput().getPath();
             boolean encoding = event.getOutput().isEncoding();
+
+            WorkerCommon.initStorage(inputStorageInfo);
+            WorkerCommon.initStorage(outputStorageInfo);
 
             String[] columnsToRead = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
@@ -108,8 +116,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 threadPool.execute(() -> {
                     try
                     {
-                        partitionFile(queryId, scanInputs, columnsToRead, filter,
-                                keyColumnIds, projection, partitioned, writerSchema);
+                        partitionFile(queryId, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
+                                filter, keyColumnIds, projection, partitioned, writerSchema);
                     }
                     catch (Exception e)
                     {
@@ -129,11 +137,13 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
             if (writerSchema.get() == null)
             {
-                TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(WorkerCommon.s3, inputSplits);
+                TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(
+                        WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
                 TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
                 writerSchema.set(resultSchema);
             }
-            PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema.get(), WorkerCommon.s3, outputPath, encoding,
+            PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema.get(),
+                    WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
                     true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
             Set<Integer> hashValues = new HashSet<>(numPartition);
             for (int hash = 0; hash < numPartition; ++hash)
@@ -176,6 +186,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
      * @param queryId the query id used by I/O scheduler
      * @param scanInputs the information of the files to scan
      * @param columnsToRead the columns to be read from the input files
+     * @param inputScheme the storage scheme of the input files
      * @param filter the filer for the scan
      * @param keyColumnIds the ids of the partition key columns
      * @param projection the projection for the partition
@@ -183,8 +194,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
      * @param writerSchema the schema to be used for the partition result writer
      */
     private void partitionFile(long queryId, List<InputInfo> scanInputs,
-                               String[] columnsToRead, TableScanFilter filter,
-                               int[] keyColumnIds, boolean[] projection,
+                               String[] columnsToRead, Storage.Scheme inputScheme,
+                               TableScanFilter filter, int[] keyColumnIds, boolean[] projection,
                                List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
                                AtomicReference<TypeDescription> writerSchema)
     {
@@ -197,7 +208,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         for (InputInfo inputInfo : scanInputs)
         {
             readCostTimer.start();
-            try (PixelsReader pixelsReader = WorkerCommon.getReader(inputInfo.getPath(), WorkerCommon.s3))
+            try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                    inputInfo.getPath(), WorkerCommon.getStorage(inputScheme)))
             {
                 readCostTimer.stop();
                 if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())

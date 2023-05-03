@@ -25,6 +25,8 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
+import io.pixelsdb.pixels.planner.plan.physical.domain.AggregatedTableInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.AggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
@@ -36,7 +38,7 @@ import java.util.concurrent.ExecutionException;
 
 /**
  * @author hank
- * @date 08/07/2022
+ * @create 2022-07-08
  */
 public class TestAggregationLambdaInvoker
 {
@@ -45,23 +47,32 @@ public class TestAggregationLambdaInvoker
     {
         AggregationInput aggregationInput = new AggregationInput();
         aggregationInput.setQueryId(123456);
-        aggregationInput.setParallelism(8);
-        aggregationInput.setInputStorage(new StorageInfo(Storage.Scheme.s3, null, null, null));
-        aggregationInput.setInputFiles(Arrays.asList(
-                "pixels-lambda-test/orders_partial_aggr_0",
-                "pixels-lambda-test/orders_partial_aggr_1",
-                "pixels-lambda-test/orders_partial_aggr_2",
-                "pixels-lambda-test/orders_partial_aggr_3",
-                "pixels-lambda-test/orders_partial_aggr_4",
-                "pixels-lambda-test/orders_partial_aggr_5",
-                "pixels-lambda-test/orders_partial_aggr_6",
-                "pixels-lambda-test/orders_partial_aggr_7"));
-        aggregationInput.setGroupKeyColumnNames(new String[] {"o_orderstatus_2", "o_orderdate_3"});
-        aggregationInput.setGroupKeyColumnProjection(new boolean[] {true, true});
-        aggregationInput.setResultColumnNames(new String[] {"sum_o_orderkey_0"});
-        aggregationInput.setResultColumnTypes(new String[] {"bigint"});
-        aggregationInput.setFunctionTypes(new FunctionType[] {FunctionType.SUM});
-        aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/orders_final_aggr", false,
+        AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
+        aggregatedTableInfo.setParallelism(8);
+        aggregatedTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        aggregatedTableInfo.setInputFiles(Arrays.asList(
+                "pixels-lambda-test/unit_tests/orders_partial_aggr_0",
+                "pixels-lambda-test/unit_tests/orders_partial_aggr_1",
+                "pixels-lambda-test/unit_tests/orders_partial_aggr_2",
+                "pixels-lambda-test/unit_tests/orders_partial_aggr_3",
+                "pixels-lambda-test/unit_tests/orders_partial_aggr_4",
+                "pixels-lambda-test/unit_tests/orders_partial_aggr_5",
+                "pixels-lambda-test/unit_tests/orders_partial_aggr_6",
+                "pixels-lambda-test/unit_tests/orders_partial_aggr_7"));
+        aggregatedTableInfo.setColumnsToRead(new String[] {"sum_o_orderkey_0", "o_orderstatus_2", "o_orderdate_3"});
+        aggregatedTableInfo.setBase(false);
+        aggregatedTableInfo.setTableName("aggregate_orders");
+        aggregationInput.setAggregatedTableInfo(aggregatedTableInfo);
+        AggregationInfo aggregationInfo = new AggregationInfo();
+        aggregationInfo.setGroupKeyColumnIds(new int[] {1, 2});
+        aggregationInfo.setAggregateColumnIds(new int[] {0});
+        aggregationInfo.setGroupKeyColumnNames(new String[] {"o_orderstatus", "o_orderdate"});
+        aggregationInfo.setGroupKeyColumnProjection(new boolean[] {true, true});
+        aggregationInfo.setResultColumnNames(new String[] {"sum_o_orderkey"});
+        aggregationInfo.setResultColumnTypes(new String[] {"bigint"});
+        aggregationInfo.setFunctionTypes(new FunctionType[] {FunctionType.SUM});
+        aggregationInput.setAggregationInfo(aggregationInfo);
+        aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_final_aggr", false,
                 new StorageInfo(Storage.Scheme.s3, null, null, null), true));
 
         System.out.println(JSON.toJSONString(aggregationInput));

@@ -25,9 +25,9 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 
 /**
  * @author hank
- * @date 22/05/2022
+ * @create 2022-05-22
  */
-public class JoinInput extends Input
+public abstract class JoinInput extends Input
 {
     /**
      * Whether the partial aggregation exists.
@@ -48,10 +48,15 @@ public class JoinInput extends Input
     /**
      * Default constructor for Jackson.
      */
-    public JoinInput() {}
-
-    public JoinInput(boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
+    public JoinInput()
     {
+        super(-1);
+    }
+
+    public JoinInput(long queryId, boolean partialAggregationPresent,
+                     PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
+    {
+        super(queryId);
         this.partialAggregationPresent = partialAggregationPresent;
         this.partialAggregationInfo = partialAggregationInfo;
         this.output = output;
