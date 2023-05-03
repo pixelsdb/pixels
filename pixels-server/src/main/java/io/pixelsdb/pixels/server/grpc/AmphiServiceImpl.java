@@ -20,9 +20,11 @@
 package io.pixelsdb.pixels.server.grpc;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.exception.AmphiException;
 import io.pixelsdb.pixels.server.AmphiProto;
 import io.pixelsdb.pixels.server.AmphiServiceGrpc;
 import net.devh.boot.grpc.server.service.GrpcService;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 
@@ -33,20 +35,39 @@ import java.io.IOException;
 @GrpcService
 public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
 {
+    @Autowired
+    private AmphiExceptionAdvice amphiExceptionAdvice;
+
     @Override
     public void transpileSql(AmphiProto.TranspileSqlRequest request, StreamObserver<AmphiProto.TranspileSqlResponse> responseObserver)
     {
         SqlglotExecutor executor = new SqlglotExecutor();
         String sqlTranspiled = null;
+        String errorMessage = null;
+        int errorCode = 0;
 
         try {
             sqlTranspiled = executor.transpileSql(request.getSqlStatement(), request.getFromDialect(), request.getToDialect());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        } catch (AmphiException e) {
+            errorMessage = amphiExceptionAdvice.handleAmphiException(e).getMessage();
+            errorCode = 1;
+        } catch (IOException | InterruptedException e) {
+            errorMessage = e.getMessage();
+            errorCode = 1;
         }
-        AmphiProto.TranspileSqlResponse response = AmphiProto.TranspileSqlResponse.newBuilder().setSqlTranspiled(sqlTranspiled).build();
+
+        AmphiProto.ResponseHeader.Builder headerBuilder = AmphiProto.ResponseHeader.newBuilder()
+                .setErrorCode(errorCode)
+                .setErrorMsg(errorMessage != null ? errorMessage : "");
+        AmphiProto.TranspileSqlResponse.Builder responseBuilder = AmphiProto.TranspileSqlResponse.newBuilder();
+
+        if (errorMessage != null) {
+            responseBuilder.setHeader(headerBuilder);
+        } else {
+            responseBuilder.setSqlTranspiled(sqlTranspiled);
+        }
+
+        AmphiProto.TranspileSqlResponse response = responseBuilder.build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

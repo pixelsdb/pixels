@@ -45,7 +45,6 @@ message ResponseHeader {
 }
 
 // begin request/response definition for rpc services
-
 message TranspileSqlRequest {
   RequestHeader header = 1;
   string sqlStatement = 2;

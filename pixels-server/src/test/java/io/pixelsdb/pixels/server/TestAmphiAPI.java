@@ -74,4 +74,23 @@ public class TestAmphiAPI
         assertNotNull(response);
         assertEquals(tpchDuckdbQuery22, response.getSqlTranspiled());
     }
+
+    @Test
+    @DirtiesContext
+    public void testTranspileSqlParseError()
+    {
+        String invalidQuery = "SELECT * FROM";
+
+        AmphiProto.TranspileSqlRequest request = AmphiProto.TranspileSqlRequest.newBuilder()
+                .setSqlStatement(invalidQuery)
+                .setFromDialect("trino")
+                .setToDialect("duckdb")
+                .build();
+        AmphiProto.TranspileSqlResponse response = amphiService.transpileSql(request);
+
+        assertNotNull(response);
+        assertEquals(1, response.getHeader().getErrorCode());
+        assertEquals("INVALID_ARGUMENT: SQLglot parsing error: Expected table name but got None. Line 1, Col: 10.",
+                response.getHeader().getErrorMsg());
+    }
 }

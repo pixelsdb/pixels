@@ -1,5 +1,7 @@
 package io.pixelsdb.pixels.server.grpc;
 
+import io.pixelsdb.pixels.common.exception.AmphiException;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,20 +13,31 @@ import java.nio.file.StandardCopyOption;
 public class SqlglotExecutor
 {
     public String transpileSql(String sqlStatement, String fromDialect, String toDialect)
-            throws IOException, InterruptedException
+            throws IOException, InterruptedException, AmphiException
     {
         InputStream scriptInputStream = SqlglotExecutor.class.getResourceAsStream("/scripts/sqlglot_transpile.py");
         Path scriptPath = Files.createTempFile("sqlglot_transpile", ".py");
 
         Files.copy(scriptInputStream, scriptPath, StandardCopyOption.REPLACE_EXISTING);
 
-        Process pythonProcess = new ProcessBuilder("python3", scriptPath.toString(),
+        Process sqlglotProcess = new ProcessBuilder("python3", scriptPath.toString(),
                 sqlStatement, fromDialect, toDialect)
                 .redirectOutput(ProcessBuilder.Redirect.PIPE)
                 .start();
-        pythonProcess.waitFor();
 
-        String output = getProcessOutput(pythonProcess.getInputStream());
+        int exitCode = sqlglotProcess.waitFor();
+        String output = getProcessOutput(sqlglotProcess.getInputStream());
+        String errorMsg = getProcessOutput(sqlglotProcess.getErrorStream());
+
+        switch (exitCode)
+        {
+            case 0:
+                break;
+            case 1:
+                throw new AmphiException(errorMsg);
+            default:
+                throw new RuntimeException("Unknown error occurred with exit code " + exitCode + ": " + errorMsg);
+        }
 
         return output;
     }
