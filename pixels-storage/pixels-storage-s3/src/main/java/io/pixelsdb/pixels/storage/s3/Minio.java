@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.storage.s3;
 import io.pixelsdb.pixels.common.exception.StorageException;
 import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -50,19 +51,16 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @create 2022-09-04
  */
-public final class Minio extends AbstractS3
-{
+public final class Minio extends AbstractS3 {
     // private static Logger logger = LogManager.getLogger(Minio.class);
     private static final String SchemePrefix = Scheme.minio.name() + "://";
 
-    private static String minIOEndpoint = null;
-    private static String minIOAccessKey = null;
-    private static String minIOSecretKey = null;
+    private static String minIOEndpoint = ConfigFactory.Instance().getProperty("minio.endpoint");
+    private static String minIOAccessKey = ConfigFactory.Instance().getProperty("minio.accesskey");
+    private static String minIOSecretKey = ConfigFactory.Instance().getProperty("minio.secretkey");
 
-    static
-    {
-        if (EnableCache)
-        {
+    static {
+        if (EnableCache) {
             /**
              * Issue #222:
              * The etcd file id is only used for cache coordination.
@@ -70,6 +68,10 @@ public final class Minio extends AbstractS3
              */
             InitId(MINIO_ID_KEY);
         }
+    }
+
+    public Minio() {
+        connect();
     }
 
     /**
@@ -100,11 +102,6 @@ public final class Minio extends AbstractS3
             minIOSecretKey = secretKey;
             StorageFactory.Instance().reload(Scheme.minio);
         }
-    }
-
-    public Minio()
-    {
-        connect();
     }
 
     private void connect()
