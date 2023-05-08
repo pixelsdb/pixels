@@ -69,9 +69,54 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     public void commitTrans(TransProto.CommitTransRequest request,
                             StreamObserver<TransProto.CommitTransResponse> responseObserver)
     {
+        int error = ErrorCode.SUCCESS;
         boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
-        TransProto.CommitTransResponse response = TransProto.CommitTransResponse.newBuilder()
-                .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
+        if (!success)
+        {
+            error = ErrorCode.TRANS_ID_NOT_EXIST;
+        }
+        boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
+        long timestamp = request.getTimestamp();
+        if (readOnly)
+        {
+            long value = LowWatermark.get();
+            if (timestamp >= value)
+            {
+                while(LowWatermark.compareAndSet(value, timestamp))
+                {
+                    value = LowWatermark.get();
+                    if (timestamp < value)
+                    {
+                        error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
+                        break;
+                    }
+                }
+            } else
+            {
+                error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
+            }
+        }
+        else
+        {
+            long value = HighWatermark.get();
+            if (timestamp >= value)
+            {
+                while(HighWatermark.compareAndSet(value, timestamp))
+                {
+                    value = HighWatermark.get();
+                    if (timestamp < value)
+                    {
+                        error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
+                        break;
+                    }
+                }
+            } else
+            {
+                error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
+            }
+        }
+        TransProto.CommitTransResponse response =
+                TransProto.CommitTransResponse.newBuilder().setErrorCode(error).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -131,61 +176,6 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 request.getTransId(), request.getExternalTraceId());
         TransProto.BindExternalTraceIdResponse response = TransProto.BindExternalTraceIdResponse.newBuilder()
                 .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void pushLowWatermark(TransProto.PushLowWatermarkRequest request,
-                                 StreamObserver<TransProto.PushLowWatermarkResponse> responseObserver)
-    {
-        long value = LowWatermark.get();
-        int error = ErrorCode.SUCCESS;
-        long queryTimestamp = request.getQueryTransTimestamp();
-        if (queryTimestamp >= value)
-        {
-            while(LowWatermark.compareAndSet(value, queryTimestamp))
-            {
-                value = LowWatermark.get();
-                if (queryTimestamp < value)
-                {
-                    error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
-                    break;
-                }
-            }
-        } else
-        {
-            error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
-        }
-        TransProto.PushLowWatermarkResponse response = TransProto.PushLowWatermarkResponse.newBuilder()
-                .setErrorCode(error).build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void pushHighWatermark(TransProto.PushHighWatermarkRequest request, StreamObserver<TransProto.PushHighWatermarkResponse> responseObserver)
-    {
-        long value = HighWatermark.get();
-        int error = ErrorCode.SUCCESS;
-        long writeTransTimestamp = request.getWriteTransTimestamp();
-        if (writeTransTimestamp >= value)
-        {
-            while(HighWatermark.compareAndSet(value, writeTransTimestamp))
-            {
-                value = HighWatermark.get();
-                if (writeTransTimestamp < value)
-                {
-                    error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
-                    break;
-                }
-            }
-        } else
-        {
-            error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
-        }
-        TransProto.PushHighWatermarkResponse response = TransProto.PushHighWatermarkResponse.newBuilder()
-                .setErrorCode(error).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

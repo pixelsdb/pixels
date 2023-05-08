@@ -36,8 +36,6 @@ service TransService {
     rpc GetTransContext (GetTransContextRequest) returns (GetTransContextResponse);
     rpc GetTransConcurrency (GetTransConcurrencyRequest) returns (GetTransConcurrencyResponse);
     rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
-    rpc PushLowWatermark (PushLowWatermarkRequest) returns (PushLowWatermarkResponse);
-    rpc PushHighWatermark (PushHighWatermarkRequest) returns (PushHighWatermarkResponse);
 }
 
 // begin request/response definition for rpc services
@@ -71,6 +69,7 @@ message BeginTransResponse {
 
 message CommitTransRequest {
     uint64 transId = 1;
+    uint64 timestamp = 2;
 }
 
 message CommitTransResponse {
@@ -114,24 +113,6 @@ message BindExternalTraceIdRequest {
 }
 
 message BindExternalTraceIdResponse {
-    int32 errorCode = 1;
-}
-
-message PushLowWatermarkRequest {
-    // The timestamp of the terminated (finished or aborted) query.
-    uint64 queryTransTimestamp = 1;
-}
-
-message PushLowWatermarkResponse {
-    int32 errorCode = 1;
-}
-
-message PushHighWatermarkRequest {
-    // The commit ts of write transaction.
-    uint64 writeTransTimestamp = 1;
-}
-
-message PushHighWatermarkResponse {
     int32 errorCode = 1;
 }
 

@@ -345,6 +345,7 @@ public class SharedMQ
         }
         return ERROR_MQ_WRITER_IS_RUNNING;
     }
+
     /**
      * Read the message from message queue.
      * @param message the message to read to.
@@ -399,6 +400,7 @@ public class SharedMQ
         }
         return ERROR_MQ_WRITER_IS_RUNNING;
     }
+
     /**
      * Write the given massage into message queue.
      * @param message the given message.

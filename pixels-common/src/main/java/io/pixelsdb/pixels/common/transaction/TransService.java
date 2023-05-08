@@ -71,10 +71,10 @@ public class TransService
         return context;
     }
 
-    public boolean commitTrans(long transId) throws TransException
+    public boolean commitTrans(long transId, long timestamp) throws TransException
     {
         TransProto.CommitTransRequest request = TransProto.CommitTransRequest.newBuilder()
-                .setTransId(transId).build();
+                .setTransId(transId).setTimestamp(timestamp).build();
         TransProto.CommitTransResponse response = this.stub.commitTrans(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
@@ -144,35 +144,5 @@ public class TransService
                     + response.getErrorCode());
         }
         return true;
-    }
-
-    public int pushLowWatermark(long queryTimestamp) throws TransException
-    {
-        TransProto.PushLowWatermarkRequest request = TransProto.PushLowWatermarkRequest.newBuilder()
-                .setQueryTransTimestamp(queryTimestamp).build();
-        try
-        {
-            TransProto.PushLowWatermarkResponse response = this.stub.pushLowWatermark(request);
-            return response.getErrorCode();
-        }
-        catch (Exception e)
-        {
-            throw new TransException("failed to push low watermark", e);
-        }
-    }
-
-    public int pushHighWatermark(long writeTransTimestamp) throws TransException
-    {
-        TransProto.PushHighWatermarkRequest request = TransProto.PushHighWatermarkRequest.newBuilder()
-                .setWriteTransTimestamp(writeTransTimestamp).build();
-        try
-        {
-            TransProto.PushHighWatermarkResponse response = this.stub.pushHighWatermark(request);
-            return response.getErrorCode();
-        }
-        catch (Exception e)
-        {
-            throw new TransException("failed to push high watermark", e);
-        }
     }
 }
