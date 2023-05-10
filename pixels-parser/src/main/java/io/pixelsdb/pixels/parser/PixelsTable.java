@@ -63,14 +63,18 @@ public class PixelsTable extends AbstractQueryableTable
     }
 
 
-    /**
-     * TODO: Precision and scale specification not supported for some SqlTypeName.
-     */
     private RelDataType pixelsType(Column column, RelDataTypeFactory typeFactory) throws IllegalArgumentException
     {
         String typeStr = column.getType();
         TypeDescription typeDesc = TypeDescription.fromString(typeStr);
-        RelDataType sqlType = typeFactory.createSqlType(toSqlTypeName(typeDesc.getCategory()));
+        TypeDescription.Category category = typeDesc.getCategory();
+
+        SqlTypeName typeName= toSqlTypeName(category);
+        RelDataType sqlType = typeName.allowsPrecScale(true, true)
+                ? typeFactory.createSqlType(typeName, typeDesc.getPrecision(), typeDesc.getScale())
+                : typeName.allowsPrecScale(true, false)
+                ? typeFactory.createSqlType(typeName, typeDesc.getPrecision())
+                : typeFactory.createSqlType(typeName);
 
         return sqlType;
     }

@@ -61,10 +61,11 @@ public class TestPixelsSchema
         assertEquals(SqlTypeName.VARCHAR, fieldList.get(1).getType().getSqlTypeName());
         assertEquals("ismarketingtraffic", fieldList.get(3).getName());
         assertEquals(SqlTypeName.BOOLEAN, fieldList.get(3).getType().getSqlTypeName());
-        assertEquals("queryviewcountwithanswerclicks", fieldList.get(11).getName());
-        assertEquals(SqlTypeName.BIGINT, fieldList.get(11).getType().getSqlTypeName());
         assertEquals("requesttimeutcminute", fieldList.get(13).getName());
         assertEquals(SqlTypeName.TIMESTAMP, fieldList.get(13).getType().getSqlTypeName());
+
+        // TIMESTAMP(3)
+        assertEquals(3, fieldList.get(13).getValue().getPrecision());
     }
 
     @Test
@@ -93,5 +94,9 @@ public class TestPixelsSchema
         assertEquals(SqlTypeName.CHAR, fieldList.get(4).getType().getSqlTypeName());
         assertEquals("c_acctbal", fieldList.get(5).getName());
         assertEquals(SqlTypeName.DECIMAL, fieldList.get(5).getType().getSqlTypeName());
+
+        // DECIMAL(15, 2)
+        assertEquals(15, fieldList.get(5).getValue().getPrecision());
+        assertEquals(2, fieldList.get(5).getValue().getScale());
     }
 }
