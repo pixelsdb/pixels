@@ -2,13 +2,12 @@ package io.pixelsdb.pixels.parser;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.metadata.domain.*;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
-
 import org.apache.calcite.sql.type.SqlTypeName;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
