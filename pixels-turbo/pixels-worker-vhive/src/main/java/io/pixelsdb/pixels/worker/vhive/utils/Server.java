@@ -1,4 +1,4 @@
-package io.pixelsdb.pixels.worker.vhive;
+package io.pixelsdb.pixels.worker.vhive.utils;
 
 public interface Server extends Runnable
 {

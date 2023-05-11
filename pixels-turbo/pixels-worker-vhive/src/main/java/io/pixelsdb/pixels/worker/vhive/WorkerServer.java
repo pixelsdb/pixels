@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import io.grpc.ServerBuilder;
+import io.pixelsdb.pixels.worker.vhive.utils.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

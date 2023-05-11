@@ -1,4 +1,4 @@
-package io.pixelsdb.pixels.worker.vhive;
+package io.pixelsdb.pixels.worker.vhive.utils;
 
 import com.alibaba.fastjson.JSON;
 import io.grpc.stub.StreamObserver;

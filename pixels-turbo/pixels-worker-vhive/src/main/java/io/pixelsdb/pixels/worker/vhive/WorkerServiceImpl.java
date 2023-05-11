@@ -6,10 +6,8 @@ import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import io.pixelsdb.pixels.worker.common.WorkerContext;
-import io.pixelsdb.pixels.worker.common.WorkerMetrics;
-import io.pixelsdb.pixels.worker.common.WorkerProto;
-import io.pixelsdb.pixels.worker.common.WorkerServiceGrpc;
+import io.pixelsdb.pixels.worker.common.*;
+import io.pixelsdb.pixels.worker.vhive.utils.ServiceImpl;
 import org.slf4j.LoggerFactory;
 
 public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
