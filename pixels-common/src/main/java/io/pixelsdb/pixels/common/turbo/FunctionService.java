@@ -29,6 +29,7 @@ package io.pixelsdb.pixels.common.turbo;
 public enum FunctionService
 {
     lambda,  // AWS Lambda
+    vhive,   // vhive
     ;
 
     /**
