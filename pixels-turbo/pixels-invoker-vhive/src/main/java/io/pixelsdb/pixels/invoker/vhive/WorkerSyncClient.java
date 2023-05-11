@@ -16,11 +16,11 @@ import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-public class WorkerClient {
+public class WorkerSyncClient {
     private final ManagedChannel channel;
     private final WorkerServiceGrpc.WorkerServiceBlockingStub stub;
 
-    public WorkerClient(String host, int port) {
+    public WorkerSyncClient(String host, int port) {
         checkArgument(host != null, "illegal rpc host");
         ;
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");

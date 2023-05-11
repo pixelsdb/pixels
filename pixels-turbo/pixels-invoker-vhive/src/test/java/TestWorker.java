@@ -1,7 +1,7 @@
 import com.google.common.base.Joiner;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.invoker.vhive.Utils;
-import io.pixelsdb.pixels.invoker.vhive.WorkerClient;
+import io.pixelsdb.pixels.invoker.vhive.WorkerSyncClient;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 import org.junit.Test;
 
@@ -10,7 +10,7 @@ import static org.junit.Assert.assertEquals;
 public class TestWorker {
     private static final String HOST = "localhost";
     private static final int PORT = 50051;
-    private final WorkerClient client = new WorkerClient(HOST, PORT);
+    private final WorkerSyncClient client = new WorkerSyncClient(HOST, PORT);
 
     @Test
     public void testHello() {

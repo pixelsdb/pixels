@@ -41,7 +41,7 @@ public class Main {
             String port = cmd.getOptionValue("port", Integer.toString(PORT));
             String function = cmd.getOptionValue("function", FUNC);
 
-            WorkerClient client = new WorkerClient(host, Integer.parseInt(port));
+            WorkerSyncClient client = new WorkerSyncClient(host, Integer.parseInt(port));
             Output output = null;
             switch (function) {
 //                case "Aggregation":
