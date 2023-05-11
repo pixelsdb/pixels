@@ -123,4 +123,14 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     }
 
 
+    @Override
+    public void getMemory(WorkerProto.GetMemoryRequest request, StreamObserver<WorkerProto.GetMemoryResponse> responseObserver) {
+        // return the MB(1024 * 1024) size
+        int dataSize = 1024 * 1024;
+        WorkerProto.GetMemoryResponse response = WorkerProto.GetMemoryResponse.newBuilder()
+                .setMemoryMB(Runtime.getRuntime().totalMemory() / dataSize)
+                .build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
 }

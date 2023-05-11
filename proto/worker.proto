@@ -16,6 +16,7 @@ service WorkerService {
     rpc Partition (WorkerRequest) returns (WorkerResponse);
     rpc Scan (WorkerRequest) returns (WorkerResponse);
     rpc Hello (HelloRequest) returns (HelloResponse);
+    rpc GetMemory (GetMemoryRequest) returns (GetMemoryResponse);
 }
 
 message WorkerRequest {
@@ -26,68 +27,20 @@ message WorkerResponse {
     string json = 1;
 }
 
-//message AggregationRequest {
-//    string json = 1;
-//}
-//
-//message AggregationResponse {
-//    string json = 1;
-//}
-//
-//message BroadcastChainJoinRequest {
-//    string json = 1;
-//}
-//
-//message BroadcastChainJoinResponse {
-//    string json = 1;
-//}
-//
-//message BroadcastJoinRequest {
-//    string json = 1;
-//}
-//
-//message BroadcastJoinResponse {
-//    string json = 1;
-//}
-//
-//message PartitionChainJoinRequest {
-//    string json = 1;
-//}
-//
-//message PartitionChainJoinResponse {
-//    string json = 1;
-//}
-//
-//message PartitionJoinRequest {
-//    string json = 1;
-//}
-//
-//message PartitionJoinResponse {
-//    string json = 1;
-//}
-//
-//message PartitionRequest {
-//    string json = 1;
-//}
-//
-//message PartitionResponse {
-//    string json = 1;
-//}
-//
-//message ScanRequest {
-//    string json = 1;
-//}
-//
-//message ScanResponse {
-//    string json = 1;
-//}
-
 message HelloRequest {
     string name = 1;
 }
 
 message HelloResponse {
     string output = 1;
+}
+
+message GetMemoryRequest {
+
+}
+
+message GetMemoryResponse {
+    uint64 memoryMB = 1;
 }
 
 
