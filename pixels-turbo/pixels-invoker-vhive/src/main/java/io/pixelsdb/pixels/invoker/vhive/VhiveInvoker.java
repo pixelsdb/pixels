@@ -1,11 +1,15 @@
 package io.pixelsdb.pixels.invoker.vhive;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.spotify.futures.ListenableFuturesExtra;
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.worker.common.WorkerProto;
 import io.pixelsdb.pixels.common.turbo.Invoker;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 public abstract class VhiveInvoker implements Invoker {
@@ -13,10 +17,16 @@ public abstract class VhiveInvoker implements Invoker {
     private final String functionName;
     private final int memoryMB;
 
-    protected VhiveInvoker(String functionName) throws ExecutionException, InterruptedException {
+    protected VhiveInvoker(String functionName) {
         this.functionName = functionName;
-        WorkerProto.GetMemoryResponse response = Vhive.Instance().getAsyncClient().getMemory().get();
-        this.memoryMB = (int)response.getMemoryMB();
+        int memoryMB = 0;
+        try {
+            WorkerProto.GetMemoryResponse response = Vhive.Instance().getAsyncClient().getMemory().get();
+            memoryMB = (int)response.getMemoryMB();
+        } catch (Exception e) {
+            logger.warn("failed to get memory: " + e);
+        }
+        this.memoryMB = memoryMB;
     }
 
     @Override
@@ -27,5 +37,27 @@ public abstract class VhiveInvoker implements Invoker {
     @Override
     public int getMemoryMB() {
         return memoryMB;
+    }
+
+    public CompletableFuture<Output> genCompletableFuture(ListenableFuture<WorkerProto.WorkerResponse> listenableFuture) {
+        CompletableFuture<WorkerProto.WorkerResponse> completableFuture = ListenableFuturesExtra.toCompletableFuture(listenableFuture);
+        return completableFuture.handle((response, err) -> {
+            if (err == null) {
+                String outputJson = response.getJson();
+                Output output = this.parseOutput(outputJson);
+                if (output != null) {
+                    output.setMemoryMB(this.memoryMB);
+                    return output;
+                } else {
+                    throw new RuntimeException("failed to parse response payload, JSON = " +
+                            response.getJson());
+                }
+            } else {
+                throw new RuntimeException("failed to execute the request, function: " +
+                        this.getFunctionName() +
+                        " with error: " +
+                        err);
+            }
+        });
     }
 }

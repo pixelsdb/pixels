@@ -66,6 +66,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!--futures-extra-->
+        <dependency>
+            <groupId>com.spotify</groupId>
+            <artifactId>futures-extra</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- alibaba -->
         <dependency>
             <groupId>com.alibaba</groupId>
