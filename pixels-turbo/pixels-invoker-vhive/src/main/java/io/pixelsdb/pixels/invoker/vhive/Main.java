@@ -46,24 +46,25 @@ public class Main {
             StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
             Output output = null;
             switch (function) {
-//                case "Aggregation":
-//                    output = client.aggregation(Utils.genAggregationInput());
-//                    break;
-//                case "BroadcastChainJoin":
-//                    output = client.broadcastChainJoin(Utils.genBroadcastChainJoinInput());
-//                    break;
-//                case "BroadcastJoin":
-//                    output = client.broadcastJoin(Utils.genBroadcastJoinInput());
-//                    break;
-//                case "PartitionChainJoin":
-//                    output = client.partitionChainJoin(Utils.genPartitionedChainJoinInput());
-//                    break;
-//                case "PartitionJoin":
-//                    output = client.partitionJoin(Utils.genPartitionedJoinInput());
-//                    break;
-//                case "Partition":
-//                    output = client.partition(Utils.genPartitionInput("order").apply(0));
-//                    break;
+                case "Aggregation":
+                    output = client.aggregation(Utils.genAggregationInput(storageInfo));
+                    break;
+                case "BroadcastChainJoin":
+                    output = client.broadcastChainJoin(Utils.genBroadcastChainJoinInput(storageInfo));
+                    break;
+                case "BroadcastJoin":
+                    output = client.broadcastJoin(Utils.genBroadcastJoinInput(storageInfo));
+                    break;
+                case "PartitionChainJoin":
+                    output = client.partitionChainJoin(Utils.genPartitionedChainJoinInput(storageInfo));
+                    break;
+                case "PartitionJoin":
+                    output = client.partitionJoin(Utils.genPartitionedJoinInput(storageInfo));
+                    break;
+                case "Partition":
+                    assert Utils.genPartitionInput("order") != null;
+                    output = client.partition(Utils.genPartitionInput("order").apply(storageInfo, 0));
+                    break;
                 case "Scan":
                     output = client.scan(Utils.genScanInput(storageInfo, 0));
                     break;
