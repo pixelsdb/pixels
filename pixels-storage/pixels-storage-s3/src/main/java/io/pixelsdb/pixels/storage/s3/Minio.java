@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.storage.s3;
 import io.pixelsdb.pixels.common.exception.StorageException;
 import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -55,9 +54,9 @@ public final class Minio extends AbstractS3 {
     // private static Logger logger = LogManager.getLogger(Minio.class);
     private static final String SchemePrefix = Scheme.minio.name() + "://";
 
-    private static String minIOEndpoint = ConfigFactory.Instance().getProperty("minio.endpoint");
-    private static String minIOAccessKey = ConfigFactory.Instance().getProperty("minio.accesskey");
-    private static String minIOSecretKey = ConfigFactory.Instance().getProperty("minio.secretkey");
+    private static String minIOEndpoint = System.getenv("MINIO_ENDPOINT");
+    private static String minIOAccessKey = System.getenv("MINIO_ACCESS_KEY");
+    private static String minIOSecretKey = System.getenv("MINIO_SECRET_KEY");
 
     static {
         if (EnableCache) {
