@@ -1,6 +1,5 @@
 package io.pixelsdb.pixels.invoker.vhive;
 
-import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
@@ -10,12 +9,12 @@ import java.util.*;
 import java.util.function.BiFunction;
 
 public class Utils {
-    public static AggregationInput genAggregationInput(Storage.Scheme scheme) {
+    public static AggregationInput genAggregationInput(StorageInfo storageInfo) {
         AggregationInput aggregationInput = new AggregationInput();
         aggregationInput.setQueryId(123456);
         AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
         aggregatedTableInfo.setParallelism(8);
-        aggregatedTableInfo.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        aggregatedTableInfo.setStorageInfo(storageInfo);
         aggregatedTableInfo.setInputFiles(Arrays.asList(
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_0",
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_1",
@@ -39,11 +38,11 @@ public class Utils {
         aggregationInfo.setFunctionTypes(new FunctionType[]{FunctionType.SUM});
         aggregationInput.setAggregationInfo(aggregationInfo);
         aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_final_aggr", false,
-                new StorageInfo(scheme, null, null, null), true));
+                storageInfo, true));
         return aggregationInput;
     }
 
-    public static BroadcastChainJoinInput genBroadcastChainJoinInput(Storage.Scheme scheme) {
+    public static BroadcastChainJoinInput genBroadcastChainJoinInput(StorageInfo storageInfo) {
         String regionFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"region\",\"columnFilters\":{}}";
         String nationFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"nation\",\"columnFilters\":{}}";
         String supplierFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"supplier\",\"columnFilters\":{}}";
@@ -63,7 +62,7 @@ public class Utils {
         region.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20230416153117_0.pxl", 0, 4)))));
         region.setFilter(regionFilter);
-        region.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        region.setStorageInfo(storageInfo);
         leftTables.add(region);
 
         BroadcastTableInfo nation = new BroadcastTableInfo();
@@ -74,7 +73,7 @@ public class Utils {
         nation.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20230416135645_0.pxl", 0, 4)))));
         nation.setFilter(nationFilter);
-        nation.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        nation.setStorageInfo(storageInfo);
         leftTables.add(nation);
 
         ChainJoinInfo chainJoinInfo0 = new ChainJoinInfo();
@@ -95,7 +94,7 @@ public class Utils {
         supplier.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20230416155327_0_compact.pxl", 0, 4)))));
         supplier.setFilter(supplierFilter);
-        supplier.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        supplier.setStorageInfo(storageInfo);
         leftTables.add(supplier);
 
         ChainJoinInfo chainJoinInfo1 = new ChainJoinInfo();
@@ -126,7 +125,7 @@ public class Utils {
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 28, 4)))));
         lineitem.setFilter(lineitemFilter);
-        lineitem.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        lineitem.setStorageInfo(storageInfo);
         joinInput.setLargeTable(lineitem);
 
         JoinInfo joinInfo = new JoinInfo();
@@ -140,12 +139,12 @@ public class Utils {
         joinInput.setJoinInfo(joinInfo);
 
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/unit_tests/",
-                new StorageInfo(scheme, null, null, null), true,
+                storageInfo, true,
                 Arrays.asList("broadcast_chain_join_0")));
         return joinInput;
     }
 
-    public static BroadcastJoinInput genBroadcastJoinInput(Storage.Scheme scheme) {
+    public static BroadcastJoinInput genBroadcastJoinInput(StorageInfo storageInfo) {
         String leftFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{2:{\"columnName\":\"p_size\",\"columnType\":\"INT\",\"filterJson\":\"{\\\"javaType\\\":\\\"long\\\",\\\"isAll\\\":false,\\\"isNone\\\":false,\\\"allowNull\\\":false,\\\"onlyNull\\\":false,\\\"ranges\\\":[],\\\"discreteValues\\\":[{\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":49},{\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":14},{\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":23},{\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":45},{\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":19},{\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":3},{\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":36},{\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":9}]}\"}}}";
 
         // leftFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"part\",\"columnFilters\":{}}";
@@ -169,7 +168,7 @@ public class Utils {
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20230416155202_0_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20230416155202_0_compact.pxl", 28, 4)))));
         leftTable.setFilter(leftFilter);
-        leftTable.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        leftTable.setStorageInfo(storageInfo);
         joinInput.setSmallTable(leftTable);
 
         BroadcastTableInfo rightTable = new BroadcastTableInfo();
@@ -187,7 +186,7 @@ public class Utils {
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 28, 4)))));
         rightTable.setFilter(rightFilter);
-        rightTable.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        rightTable.setStorageInfo(storageInfo);
         joinInput.setLargeTable(rightTable);
 
         JoinInfo joinInfo = new JoinInfo();
@@ -200,12 +199,12 @@ public class Utils {
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[]{2}, 100));
         joinInput.setJoinInfo(joinInfo);
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/unit_tests/",
-                new StorageInfo(scheme, null, null, null), true,
+                storageInfo, true,
                 Arrays.asList("broadcast_join_lineitem_part_0")));
         return joinInput;
     }
 
-    public static ScanInput genScanInput(Storage.Scheme scheme, int i) {
+    public static ScanInput genScanInput(StorageInfo storageInfo, int i) {
         String filter =
                 "{\"schemaName\":\"tpch\",\"tableName\":\"orders\",\"columnFilters\":{}}";
         ScanInput scanInput = new ScanInput();
@@ -224,7 +223,7 @@ public class Utils {
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 20, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 28, 4)))));
-        tableInfo.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        tableInfo.setStorageInfo(storageInfo);
         scanInput.setTableInfo(tableInfo);
         scanInput.setScanProjection(new boolean[]{true, true, true, true});
         scanInput.setPartialAggregationPresent(true);
@@ -237,11 +236,11 @@ public class Utils {
         aggregationInfo.setFunctionTypes(new FunctionType[]{FunctionType.SUM});
         scanInput.setPartialAggregationInfo(aggregationInfo);
         scanInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_partial_aggr_" + i, false,
-                new StorageInfo(scheme, null, null, null), true));
+                storageInfo, true));
         return scanInput;
     }
 
-    public static PartitionedChainJoinInput genPartitionedChainJoinInput(Storage.Scheme scheme) {
+    public static PartitionedChainJoinInput genPartitionedChainJoinInput(StorageInfo storageInfo) {
         String regionFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"region\",\"columnFilters\":{}}";
         String nationFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"nation\",\"columnFilters\":{}}";
         String supplierFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"supplier\",\"columnFilters\":{}}";
@@ -260,7 +259,7 @@ public class Utils {
         region.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20230416153117_0.pxl", 0, 4)))));
         region.setFilter(regionFilter);
-        region.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        region.setStorageInfo(storageInfo);
         chainTables.add(region);
 
         BroadcastTableInfo nation = new BroadcastTableInfo();
@@ -271,7 +270,7 @@ public class Utils {
         nation.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20230416135645_0.pxl", 0, 4)))));
         nation.setFilter(nationFilter);
-        nation.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        nation.setStorageInfo(storageInfo);
         chainTables.add(nation);
 
         ChainJoinInfo chainJoinInfo0 = new ChainJoinInfo();
@@ -292,7 +291,7 @@ public class Utils {
         supplier.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20230416155327_0_compact.pxl", 0, 4)))));
         supplier.setFilter(supplierFilter);
-        supplier.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        supplier.setStorageInfo(storageInfo);
         chainTables.add(supplier);
 
         ChainJoinInfo chainJoinInfo1 = new ChainJoinInfo();
@@ -327,7 +326,7 @@ public class Utils {
                 "pixels-lambda-test/unit_tests/orders_part_7"));
         leftTableInfo.setParallelism(8);
         leftTableInfo.setBase(false);
-        leftTableInfo.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        leftTableInfo.setStorageInfo(storageInfo);
         joinInput.setSmallTable(leftTableInfo);
 
         PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
@@ -340,7 +339,7 @@ public class Utils {
                 "pixels-lambda-test/unit_tests/lineitem_part_1"));
         rightTableInfo.setParallelism(2);
         rightTableInfo.setBase(false);
-        rightTableInfo.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        rightTableInfo.setStorageInfo(storageInfo);
         joinInput.setLargeTable(rightTableInfo);
 
         PartitionedJoinInfo joinInfo = new PartitionedJoinInfo();
@@ -370,12 +369,12 @@ public class Utils {
         joinInput.setChainJoinInfos(chainJoinInfos);
 
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/unit_tests/",
-                new StorageInfo(scheme, null, null, null),
+                storageInfo,
                 true, Arrays.asList("partitioned_chain_join_0")));
         return joinInput;
     }
 
-    public static PartitionedJoinInput genPartitionedJoinInput(Storage.Scheme scheme) {
+    public static PartitionedJoinInput genPartitionedJoinInput(StorageInfo storageInfo) {
         Set<Integer> hashValues = new HashSet<>(40);
         for (int i = 0; i < 40; ++i) {
             hashValues.add(i);
@@ -398,7 +397,7 @@ public class Utils {
                 "pixels-lambda-test/unit_tests/orders_part_7"));
         leftTableInfo.setParallelism(8);
         leftTableInfo.setBase(false);
-        leftTableInfo.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        leftTableInfo.setStorageInfo(storageInfo);
         joinInput.setSmallTable(leftTableInfo);
 
         PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
@@ -410,7 +409,7 @@ public class Utils {
                 "pixels-lambda-test/unit_tests/lineitem_part_1"));
         rightTableInfo.setParallelism(2);
         rightTableInfo.setBase(false);
-        rightTableInfo.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        rightTableInfo.setStorageInfo(storageInfo);
         joinInput.setLargeTable(rightTableInfo);
 
         PartitionedJoinInfo joinInfo = new PartitionedJoinInfo();
@@ -426,12 +425,12 @@ public class Utils {
         joinInput.setJoinInfo(joinInfo);
 
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/unit_tests/",
-                new StorageInfo(scheme, null, null, null),
+                storageInfo,
                 true, Arrays.asList("partitioned_join_lineitem_orders_0"))); // force one file currently
         return joinInput;
     }
 
-    public static PartitionInput genPartitionInputOrder(Storage.Scheme scheme, int i) {
+    public static PartitionInput genPartitionInputOrder(StorageInfo storageInfo, int i) {
         String filter =
                 "{\"schemaName\":\"tpch\",\"tableName\":\"orders\"," +
                         "\"columnFilters\":{1:{\"columnName\":\"o_custkey\",\"columnType\":\"LONG\"," +
@@ -458,7 +457,7 @@ public class Utils {
         tableInfo.setColumnsToRead(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
         tableInfo.setFilter(filter);
         tableInfo.setBase(true);
-        tableInfo.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        tableInfo.setStorageInfo(storageInfo);
         input.setTableInfo(tableInfo);
         input.setProjection(new boolean[]{true, true, true, true});
         PartitionInfo partitionInfo = new PartitionInfo();
@@ -466,11 +465,11 @@ public class Utils {
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
         input.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_part_" + i, false,
-                new StorageInfo(scheme, null, null, null), true));
+                storageInfo, true));
         return input;
     }
 
-    public static PartitionInput genPartitionInputLineitem(Storage.Scheme scheme, int i) {
+    public static PartitionInput genPartitionInputLineitem(StorageInfo storageInfo, int i) {
         String filter =
                 "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
         PartitionInput input = new PartitionInput();
@@ -489,7 +488,7 @@ public class Utils {
         tableInfo.setFilter(filter);
         tableInfo.setBase(true);
         tableInfo.setColumnsToRead(new String[]{"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
-        tableInfo.setStorageInfo(new StorageInfo(scheme, null, null, null));
+        tableInfo.setStorageInfo(storageInfo);
         input.setTableInfo(tableInfo);
         input.setProjection(new boolean[]{true, true, true, true});
         PartitionInfo partitionInfo = new PartitionInfo();
@@ -497,11 +496,11 @@ public class Utils {
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
         input.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/lineitem_part_" + i, false,
-                new StorageInfo(scheme, null, null, null), true));
+                storageInfo, true));
         return input;
     }
 
-    public static BiFunction<Storage.Scheme, Integer, PartitionInput> genPartitionInput(String param) {
+    public static BiFunction<StorageInfo, Integer, PartitionInput> genPartitionInput(String param) {
         switch (param) {
             case "order":
                 return Utils::genPartitionInputOrder;

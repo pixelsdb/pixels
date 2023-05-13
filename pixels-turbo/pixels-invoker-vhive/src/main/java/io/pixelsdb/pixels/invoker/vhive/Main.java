@@ -3,6 +3,7 @@ package io.pixelsdb.pixels.invoker.vhive;
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import org.apache.commons.cli.*;
 
 public class Main {
@@ -42,6 +43,7 @@ public class Main {
             String function = cmd.getOptionValue("function", FUNC);
 
             WorkerSyncClient client = new WorkerSyncClient(host, Integer.parseInt(port));
+            StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
             Output output = null;
             switch (function) {
 //                case "Aggregation":
@@ -63,7 +65,7 @@ public class Main {
 //                    output = client.partition(Utils.genPartitionInput("order").apply(0));
 //                    break;
                 case "Scan":
-                    output = client.scan(Utils.genScanInput(Storage.Scheme.minio, 0));
+                    output = client.scan(Utils.genScanInput(storageInfo, 0));
                     break;
                 case "Hello":
                     System.out.println(client.hello("zhaoshihan"));
