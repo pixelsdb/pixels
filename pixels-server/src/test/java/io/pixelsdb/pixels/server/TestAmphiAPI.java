@@ -44,11 +44,53 @@ public class TestAmphiAPI
 
     @Test
     @DirtiesContext
-    public void testSayHello()
+    public void testTranspileSqlSimple()
     {
-        AmphiProto.HelloRequest request = AmphiProto.HelloRequest.newBuilder().setName("pixels-amphi").build();
-        AmphiProto.HelloResponse response = amphiService.sayHello(request);
+        AmphiProto.TranspileSqlRequest request = AmphiProto.TranspileSqlRequest.newBuilder()
+                .setSqlStatement("SELECT EPOCH_MS(1618088028295)")
+                .setFromDialect("duckdb")
+                .setToDialect("hive")
+                .build();
+        AmphiProto.TranspileSqlResponse response = amphiService.transpileSql(request);
+
         assertNotNull(response);
-        assertEquals("hello pixels-amphi", response.getMsg());
+        assertEquals("SELECT FROM_UNIXTIME(1618088028295 / 1000)", response.getSqlTranspiled());
+    }
+
+    @Test
+    @DirtiesContext
+    public void testTranspileSqlTpch()
+    {
+        String tpchTrinoQuery22 = "SELECT cntrycode, COUNT(*) AS numcust, SUM(c_acctbal) AS totacctbal FROM (SELECT SUBSTRING(c_phone, 1, 2) AS cntrycode, c_acctbal FROM CUSTOMER WHERE SUBSTRING(c_phone, 1, 2) IN ('20', '40', '22', '30', '39', '42', '21') AND c_acctbal > (SELECT AVG(c_acctbal) FROM CUSTOMER WHERE c_acctbal > 0.00 AND SUBSTRING(c_phone, 1, 2) IN ('20', '40', '22', '30', '39', '42', '21')) AND NOT EXISTS(SELECT * FROM ORDERS WHERE o_custkey = c_custkey)) AS custsale GROUP BY cntrycode ORDER BY cntrycode NULLS FIRST";
+        String tpchDuckdbQuery22 = "SELECT cntrycode, COUNT(*) AS numcust, SUM(c_acctbal) AS totacctbal FROM (SELECT SUBSTRING(c_phone, 1, 2) AS cntrycode, c_acctbal FROM CUSTOMER WHERE SUBSTRING(c_phone, 1, 2) IN ('20', '40', '22', '30', '39', '42', '21') AND c_acctbal > (SELECT AVG(c_acctbal) FROM CUSTOMER WHERE c_acctbal > 0.00 AND SUBSTRING(c_phone, 1, 2) IN ('20', '40', '22', '30', '39', '42', '21')) AND NOT EXISTS(SELECT * FROM ORDERS WHERE o_custkey = c_custkey)) AS custsale GROUP BY cntrycode ORDER BY cntrycode";
+
+        AmphiProto.TranspileSqlRequest request = AmphiProto.TranspileSqlRequest.newBuilder()
+                .setSqlStatement(tpchTrinoQuery22)
+                .setFromDialect("trino")
+                .setToDialect("duckdb")
+                .build();
+        AmphiProto.TranspileSqlResponse response = amphiService.transpileSql(request);
+
+        assertNotNull(response);
+        assertEquals(tpchDuckdbQuery22, response.getSqlTranspiled());
+    }
+
+    @Test
+    @DirtiesContext
+    public void testTranspileSqlParseError()
+    {
+        String invalidQuery = "SELECT * FROM";
+
+        AmphiProto.TranspileSqlRequest request = AmphiProto.TranspileSqlRequest.newBuilder()
+                .setSqlStatement(invalidQuery)
+                .setFromDialect("trino")
+                .setToDialect("duckdb")
+                .build();
+        AmphiProto.TranspileSqlResponse response = amphiService.transpileSql(request);
+
+        assertNotNull(response);
+        assertEquals(1, response.getHeader().getErrorCode());
+        assertEquals("INVALID_ARGUMENT: SQLglot parsing error: Expected table name but got None. Line 1, Col: 10.",
+                response.getHeader().getErrorMsg());
     }
 }
