@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
@@ -57,6 +58,7 @@ public final class Minio extends AbstractS3 {
     private static String minIOEndpoint = System.getenv("MINIO_ENDPOINT");
     private static String minIOAccessKey = System.getenv("MINIO_ACCESS_KEY");
     private static String minIOSecretKey = System.getenv("MINIO_SECRET_KEY");
+    private static String minIORegion = System.getenv("MINIO_REGION");
 
     static {
         if (EnableCache) {
@@ -115,6 +117,7 @@ public final class Minio extends AbstractS3 {
                         .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                         .maxConnections(MaxRequestConcurrency))
                 .endpointOverride(URI.create(minIOEndpoint))
+                .region(Region.of(minIORegion))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(minIOAccessKey, minIOSecretKey))).build();
     }
