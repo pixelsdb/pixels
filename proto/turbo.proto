@@ -30,7 +30,7 @@ package turbo.proto;
 
 // The service definitions for pixels-turbo framework.
 service TurboFrameworkService {
-  rpc EstimateQueryCost (EstimateQueryCostRequest) returns (EstimateQueryCostResponse);
+  rpc EstimateQueryCost (EstimateQueryRequest) returns (EstimateQueryResponse);
   rpc SubmitQuery (SubmitQueryRequest) returns (SubmitQueryResponse);
 }
 
@@ -48,9 +48,16 @@ enum ExecutionHint {
   SCHEDULED = 3;
 }
 
-message EstimateQueryCostRequest {
+message EstimateQueryRequest {
   string query = 1;
   ExecutionHint hint = 2;
+}
+
+message EstimateQueryResponse {
+  int32 errorCode = 1;
+  string errorMsg = 2;
+  double latencyMs = 3;
+  double costCent = 4;
 }
 
 message SubmitQueryRequest {
