@@ -28,16 +28,44 @@ option java_outer_classname = "TurboProto";
 
 package turbo.proto;
 
-// The service definitions for pixels-turbo.
+// The service definitions for pixels-turbo framework.
 service TurboFrameworkService {
+  rpc EstimateQueryCost (EstimateQueryCostRequest) returns (EstimateQueryCostResponse);
+  rpc SubmitQuery (SubmitQueryRequest) returns (SubmitQueryResponse);
+}
+
+// The service definitions for the serverless workers in vHive.
+service TurboWorkerService {
   rpc SayHello (HelloRequest) returns (HelloResponse);
 }
 
-service TurboKnWorkerService {
-  rpc SayHello (HelloRequest) returns (HelloResponse);
+// begin request/response definition for pixels-turbo framework services
+
+enum ExecutionHint {
+  LOW_COST = 0;
+  IMMEDIATE = 1;
+  ADAPTIVE = 2;
+  SCHEDULED = 3;
 }
 
-// begin request/response definition for rpc services
+message EstimateQueryCostRequest {
+  string query = 1;
+  ExecutionHint hint = 2;
+}
+
+message SubmitQueryRequest {
+  string query = 1;
+  ExecutionHint hint = 2;
+  optional uint64 startTime = 3;
+}
+
+message SubmitQueryResponse {
+  int32 errorCode = 1;
+  string errorMsg = 2;
+  optional string callbackToken = 3;
+}
+
+// begin request/response definition for vHive worker services
 
 message HelloRequest {
   string name = 1;
@@ -46,3 +74,5 @@ message HelloRequest {
 message HelloResponse {
   string msg = 1;
 }
+
+
