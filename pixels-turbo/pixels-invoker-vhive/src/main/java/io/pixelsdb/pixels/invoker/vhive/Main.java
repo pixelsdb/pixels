@@ -2,34 +2,46 @@ package io.pixelsdb.pixels.invoker.vhive;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import org.apache.commons.cli.*;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public class Main {
     // here are the default values if not specified in args
     private static final String HOST = "localhost";
     private static final int PORT = 50051;
     private static final String FUNC = "Hello";
+    private static final int NUMBER = 1;
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
         Options options = new Options();
         options.addOption(Option.builder("h")
                 .longOpt("host")
                 .hasArg(true)
-                .desc("GRPC host ([REQUIRED] or use --host)")
+                .desc("GRPC host (or use --host)")
                 .required(false)
                 .build());
         options.addOption(Option.builder("p")
                 .longOpt("port")
                 .hasArg(true)
-                .desc("GRPC port ([REQUIRED] or use --port)")
+                .desc("GRPC port (or use --port)")
                 .required(false)
                 .build());
         options.addOption(Option.builder("f")
                 .longOpt("function")
                 .hasArg(true)
-                .desc("GRPC function ([REQUIRED] or use --function)")
+                .desc("GRPC function (or use --function)")
+                .required(false)
+                .build());
+        options.addOption(Option.builder("n")
+                .longOpt("number")
+                .hasArg(true)
+                .desc("GRPC same request number (or use --number)")
                 .required(false)
                 .build());
 
@@ -41,40 +53,60 @@ public class Main {
             String host = cmd.getOptionValue("host", HOST);
             String port = cmd.getOptionValue("port", Integer.toString(PORT));
             String function = cmd.getOptionValue("function", FUNC);
+            String number = cmd.getOptionValue("number", Integer.toString(NUMBER));
 
-            WorkerSyncClient client = new WorkerSyncClient(host, Integer.parseInt(port));
             StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
-            Output output = null;
-            switch (function) {
-                case "Aggregation":
-                    output = client.aggregation(Utils.genAggregationInput(storageInfo));
-                    break;
-                case "BroadcastChainJoin":
-                    output = client.broadcastChainJoin(Utils.genBroadcastChainJoinInput(storageInfo));
-                    break;
-                case "BroadcastJoin":
-                    output = client.broadcastJoin(Utils.genBroadcastJoinInput(storageInfo));
-                    break;
-                case "PartitionChainJoin":
-                    output = client.partitionChainJoin(Utils.genPartitionedChainJoinInput(storageInfo));
-                    break;
-                case "PartitionJoin":
-                    output = client.partitionJoin(Utils.genPartitionedJoinInput(storageInfo));
-                    break;
-                case "Partition":
-                    assert Utils.genPartitionInput("order") != null;
-                    output = client.partition(Utils.genPartitionInput("order").apply(storageInfo, 0));
-                    break;
-                case "Scan":
-                    output = client.scan(Utils.genScanInput(storageInfo, 0));
-                    break;
-                case "Hello":
-                    System.out.println(client.hello("zhaoshihan"));
-                    break;
-                default:
-                    throw new ParseException("invalid function name");
+            InvokerFactory factory = InvokerFactory.Instance();
+//            WorkerAsyncClient client = new WorkerAsyncClient(host, Integer.parseInt(port));
+
+            for (int i = 0; i < Integer.parseInt(number); ++i) {
+                final CompletableFuture<Output> completableFuture;
+                long startTime = System.nanoTime();
+                switch (function) {
+                    case "Aggregation":
+                        completableFuture = factory.getInvoker(WorkerType.AGGREGATION).invoke(Utils.genAggregationInput(storageInfo));
+                        break;
+                    case "BroadcastChainJoin":
+                        completableFuture = factory.getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(Utils.genBroadcastChainJoinInput(storageInfo));
+                        break;
+                    case "BroadcastJoin":
+                        completableFuture = factory.getInvoker(WorkerType.BROADCAST_JOIN).invoke(Utils.genBroadcastJoinInput(storageInfo));
+                        break;
+                    case "PartitionChainJoin":
+                        completableFuture = factory.getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN).invoke(Utils.genPartitionedChainJoinInput(storageInfo));
+                        break;
+                    case "PartitionJoin":
+                        completableFuture = factory.getInvoker(WorkerType.PARTITIONED_JOIN).invoke(Utils.genPartitionedJoinInput(storageInfo));
+                        break;
+                    case "Partition":
+                        assert Utils.genPartitionInput("order") != null;
+                        completableFuture = factory.getInvoker(WorkerType.PARTITION).invoke(Utils.genPartitionInput("order").apply(storageInfo, 0));
+                        break;
+                    case "Scan":
+                        completableFuture = factory.getInvoker(WorkerType.SCAN).invoke(Utils.genScanInput(storageInfo, 0));
+                        break;
+                    default:
+                        throw new ParseException("invalid function name");
+                }
+                if (completableFuture != null) {
+                    Thread futureThread = new Thread(() -> {
+                        try {
+                            Output output = completableFuture.get();
+                            long endTime = System.nanoTime();
+                            synchronized (System.out) {
+                                System.out.println(JSON.toJSONString(output));
+                                System.out.println("Entire round trip time: " + (endTime - startTime) / 1000000);
+                                System.out.println();
+                            }
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        } catch (ExecutionException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                    futureThread.start();
+                }
             }
-            System.out.println(JSON.toJSONString(output));
         } catch (ParseException pe) {
             System.out.println("Error parsing command-line arguments!");
             System.out.println("Please, follow the instructions below:");
