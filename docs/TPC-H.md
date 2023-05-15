@@ -39,7 +39,15 @@ Under `PIXELS_HOME`, run pixels-cli:
 java -jar ./sbin/pixels-cli-*-full.jar
 ```
 
+If your loading data is too big, then please use `screen` to avoid ssh connection broken during the loading process:
+
+```bash
+screen -dmS pixels-cli bash -c "java -jar ./sbin/pixels-cli-*-full.jar"
+screen -rd pixels-cli
+```
+
 Then use the following commands in pixels-cli to load data for the TPC-H tables:
+
 ```bash
 LOAD -o file:///data/tpch/100g/customer -s tpch -t customer -n 319150 -r \| -c 1
 LOAD -o file:///data/tpch/100g/lineitem -s tpch -t lineitem -n 600040 -r \| -c 1

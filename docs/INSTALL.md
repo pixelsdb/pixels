@@ -30,6 +30,32 @@ sudo update-java-alternatives --set /path/to/jdk-17.0
 ```
 Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 
+## Install Maven
+
+For lower Ubuntu version like 20.04, the default apt installation doesn't support a available maven version for Java 17. Therefore, you need to install maven manually.
+
+Here is one of the installation steps,  all the following commands are executed under `~/opt` by default:
+
+```bash
+wget https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz
+tar -xvf apache-maven-3.8.8-bin.tar.gz
+ln -s ~/opt/apache-maven-3.8.8 maven
+```
+
+Then add these command to the user profile file(e.g. .bash_profile) to set the environment variables:
+
+```bash
+M2_HOME=$HOME/opt/maven
+export PATH=$PATH:$M2_HOME/bin
+```
+
+Verify the maven is installed correctly:
+
+```bash
+source ~/.bash_profile
+mvn -version
+```
+
 ## Setup AWS Credentials*
 
 If we use S3 as the underlying storage system, we have to configure the AWS credentials.
@@ -131,7 +157,17 @@ sudo apt update
 sudo apt install mysql-server
 sudo mysql_secure_installation
 ```
+If your mysql `root` user didn't have password before, you need to first give `root` a password, then execute `sudo mysql_secure_installation`
+
+```bash
+sudo mysql
+mysql> ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'SetRootPasswordHere';
+mysql> exit
+sudo mysql_secure_installation
+```
+
 Login MySQL and create a user and a metadata database for Pixels:
+
 ```mysql
 CREATE USER 'pixels'@'%' IDENTIFIED BY 'password';
 CREATE DATABASE pixels_metadata;
@@ -159,12 +195,17 @@ export PATH=$PATH:$ETCD
 ```
 All the following commands are executed under `~/opt` by default.
 Create the link and start etcd:
+
 ```bash
 ln -s etcd-v3.3.4-linux-amd64-bin etcd
 cd etcd
 ./start-etcd.sh
 ```
-You can use `screen` or `nohup` to run it in the background.
+You can use `screen` or `nohup` to run it in the background:
+
+```bash
+screen -dmS etcd bash -c "./start-etcd.sh"
+```
 
 ## Install Hadoop*
 Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
@@ -196,6 +237,7 @@ Decompress `pixels-trino-listener-*.zip` and `pixels-trino-connector-*.zip` into
 The `etc` directory contains the configuration files of Trino.
 In addition to the configurations mentioned in the official docs, add the following configurations
 for Pixels:
+
 * Create the listener config file named `event-listener.properties` in the `etc` directory, with the following content:
 ```properties
 event-listener.name=pixels-event-listener
