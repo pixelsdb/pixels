@@ -8,7 +8,11 @@ import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import org.apache.commons.cli.*;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.LongSummaryStatistics;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 public class Main {
@@ -18,7 +22,7 @@ public class Main {
     private static final String FUNC = "Hello";
     private static final int NUMBER = 1;
 
-    public static void main(String[] args) throws ExecutionException, InterruptedException {
+    public static void main(String[] args) throws InterruptedException {
         Options options = new Options();
         options.addOption(Option.builder("h")
                 .longOpt("host")
@@ -57,6 +61,9 @@ public class Main {
 
             StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
             InvokerFactory factory = InvokerFactory.Instance();
+
+            CountDownLatch countDownLatch = new CountDownLatch(Integer.parseInt(number));
+            List<Long> times = new ArrayList<>();
 //            WorkerAsyncClient client = new WorkerAsyncClient(host, Integer.parseInt(port));
 
             for (int i = 0; i < Integer.parseInt(number); ++i) {
@@ -95,9 +102,12 @@ public class Main {
                             long endTime = System.nanoTime();
                             synchronized (System.out) {
                                 System.out.println(JSON.toJSONString(output));
-                                System.out.println("Entire round trip time: " + (endTime - startTime) / 1000000);
+                                System.out.println("Entire round trip time(MS): " + (endTime - startTime) / 1000000);
                                 System.out.println();
+
+                                times.add((endTime - startTime) / 1000000);
                             }
+                            countDownLatch.countDown();
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         } catch (ExecutionException e) {
@@ -107,6 +117,9 @@ public class Main {
                     futureThread.start();
                 }
             }
+            countDownLatch.await();
+            LongSummaryStatistics statistics = times.stream().mapToLong((x) -> x).summaryStatistics();
+            System.out.println(statistics);
         } catch (ParseException pe) {
             System.out.println("Error parsing command-line arguments!");
             System.out.println("Please, follow the instructions below:");
