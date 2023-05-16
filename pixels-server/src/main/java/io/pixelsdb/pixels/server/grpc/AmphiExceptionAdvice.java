@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.server.grpc;
 
 import io.grpc.Status;
-import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import io.pixelsdb.pixels.common.exception.AmphiException;
 import net.devh.boot.grpc.server.advice.GrpcAdvice;
 import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;
@@ -33,9 +33,9 @@ import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;
 public class AmphiExceptionAdvice
 {
     @GrpcExceptionHandler(AmphiException.class)
-    public StatusException handleAmphiException(AmphiException e)
+    public StatusRuntimeException handleAmphiException(AmphiException e)
     {
-        Status status = Status.fromThrowable(e);
-        return status.asException();
+        Status status = Status.INVALID_ARGUMENT.withDescription(e.getMessage()).withCause(e);
+        return status.asRuntimeException();
     }
 }

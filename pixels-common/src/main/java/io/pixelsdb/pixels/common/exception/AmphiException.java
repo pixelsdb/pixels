@@ -25,4 +25,8 @@ package io.pixelsdb.pixels.common.exception;
  */
 public class AmphiException extends Exception
 {
+    public AmphiException(String msg)
+    {
+        super(msg);
+    }
 }
