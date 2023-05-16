@@ -8,4 +8,4 @@ clean:
 main:
 	mkdir -p build
 	cd build && cmake .. && make
-	build/example
+	build/pixels_worker_amphi

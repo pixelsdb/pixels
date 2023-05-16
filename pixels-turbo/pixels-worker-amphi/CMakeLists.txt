@@ -1,50 +1,29 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.10)
 project(pixels_worker_amphi)
 
 set(CMAKE_CXX_STANDARD 17)
-set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl@3")
-set(PROTOBUF_ROOT_DIR "/opt/homebrew/opt/protobuf")
-set(BUILD_FILES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build")
-set(PROTO_FILES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../proto")
 
+# find dependencies
+find_package(Protobuf REQUIRED)
 find_package(gRPC REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(duckdb REQUIRED)
 
-if(APPLE)
-    find_library(PROTOBUF_LIBRARY protobuf
-            HINTS ${PROTOBUF_ROOT_DIR}
-            PATH_SUFFIXES lib)
-else()
-    find_library(PROTOBUF_LIBRARY protobuf)
-endif()
+# protobuf configuration
+set(PROTO_FILES_PATH "../../proto")
+file(COPY ${PROTO_FILES_PATH} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(GLOB_RECURSE PROTO_FILES "${CMAKE_CURRENT_BINARY_DIR}/proto/*.proto")
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
 
-find_path(DUCKDB_INCLUDE_DIR duckdb.hpp
-        HINTS ${DUCKDB_ROOT_DIR}
-        PATH_SUFFIXES include)
-find_library(DUCKDB_LIBRARY duckdb
-        HINTS ${DUCKDB_ROOT_DIR}
-        PATH_SUFFIXES lib)
+add_subdirectory(worker)
 
+# add header directories
+include_directories(${Protobuf_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${PROTO_GEN_PATH})
+include_directories(${duckdb_INCLUDE_DIRS})
+include_directories(${gRPC_INCLUDE_DIRS})
 
-file(GLOB PROTO_FILES ${PROTO_FILES_DIR}/*.proto)
+add_executable(${PROJECT_NAME} main.cpp ${PROTO_SRCS})
 
-add_executable(example main.cpp)
-
-protobuf_generate(
-        LANGUAGE cpp
-        TARGET example
-        PROTOS ${PROTO_FILES}
-        OUT_VAR PROTO_CPP_FILES
-        IMPORT_DIRS ${PROTO_FILES_DIR}
-        GENERATE_EXTENSIONS ${BUILD_FILES_DIR}
-)
-
-target_sources(example PRIVATE ${PROTO_CPP_FILES})
-target_include_directories(example PRIVATE ${DUCKDB_INCLUDE_DIR} ${Protobuf_INCLUDE_DIRS})
-target_link_libraries(example
-        PRIVATE
-        ${DUCKDB_LIBRARY}
-        gRPC::grpc++
-        gRPC::grpc
-        ${PROTOBUF_LIBRARY}
-        )
+target_link_libraries(${PROJECT_NAME} ${Protobuf_LIBRARIES} duckdb gRPC::grpc++)
