@@ -14,6 +14,7 @@ import java.util.LongSummaryStatistics;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
     // here are the default values if not specified in args
@@ -117,7 +118,7 @@ public class Main {
                     futureThread.start();
                 }
             }
-            countDownLatch.await();
+            countDownLatch.await(200, TimeUnit.SECONDS);
             LongSummaryStatistics statistics = times.stream().mapToLong((x) -> x).summaryStatistics();
             System.out.println(statistics);
         } catch (ParseException pe) {
