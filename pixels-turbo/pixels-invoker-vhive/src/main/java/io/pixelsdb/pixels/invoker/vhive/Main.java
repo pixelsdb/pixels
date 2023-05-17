@@ -64,7 +64,8 @@ public class Main {
             InvokerFactory factory = InvokerFactory.Instance();
 
             CountDownLatch countDownLatch = new CountDownLatch(Integer.parseInt(number));
-            List<Long> times = new ArrayList<>();
+            List<Long> invokeTimes = new ArrayList<>();
+            List<Long> rtts = new ArrayList<>();
 //            WorkerAsyncClient client = new WorkerAsyncClient(host, Integer.parseInt(port));
 
             for (int i = 0; i < Integer.parseInt(number); ++i) {
@@ -97,16 +98,19 @@ public class Main {
                         throw new ParseException("invalid function name");
                 }
                 if (completableFuture != null) {
+                    long invokeEnd = System.nanoTime();
                     Thread futureThread = new Thread(() -> {
                         try {
                             Output output = completableFuture.get();
                             long endTime = System.nanoTime();
                             synchronized (System.out) {
                                 System.out.println(JSON.toJSONString(output));
+                                System.out.println("Invoke time(MS): " + (invokeEnd - startTime) / 1000000);
                                 System.out.println("Entire round trip time(MS): " + (endTime - startTime) / 1000000);
                                 System.out.println();
 
-                                times.add((endTime - startTime) / 1000000);
+                                invokeTimes.add((invokeEnd - startTime) / 1000000);
+                                rtts.add((endTime - startTime) / 1000000);
                             }
                             countDownLatch.countDown();
                         } catch (InterruptedException e) {
@@ -119,8 +123,10 @@ public class Main {
                 }
             }
             countDownLatch.await(200, TimeUnit.SECONDS);
-            LongSummaryStatistics statistics = times.stream().mapToLong((x) -> x).summaryStatistics();
-            System.out.println(statistics);
+            LongSummaryStatistics invokeStat = invokeTimes.stream().mapToLong((x) -> x).summaryStatistics();
+            LongSummaryStatistics rttStat = rtts.stream().mapToLong((x) -> x).summaryStatistics();
+            System.out.println("Invoke summary: " + invokeStat);
+            System.out.println("RTT summary: " + rttStat);
         } catch (ParseException pe) {
             System.out.println("Error parsing command-line arguments!");
             System.out.println("Please, follow the instructions below:");
