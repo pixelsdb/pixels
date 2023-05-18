@@ -18,5 +18,5 @@ it synchronizes the catalog with the coordinator.
 
 ## Dependencies
 
-- `gRPC` and `protobuf` for communication with `pixels-server`
+- `gRPC-1.54.0` and `protobuf` for communication with `pixels-server`
 - `DuckDB` for on-premise in-process database
