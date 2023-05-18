@@ -1,0 +1,263 @@
+/*
+ * Copyright 2017-2018 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+// File format definition of Pixels
+
+syntax = "proto2";
+
+package pixels.proto;
+
+option java_package = "io.pixelsdb.pixels.core";
+option java_outer_classname = "PixelsProto";
+
+// Row Group: A logical horizontal partitioning of the data into rows. There is no physical
+//            structure that is guaranteed for a row group. A row group consists of a column
+//            chunk for each column in the dataset.
+// Column Chunk: A chunk of the data for a particular column. These live in a particular row group and is guaranteed to
+//               be contiguous in the file.
+// Pixel: A column chunk is divided into several pixels. A pixel is conceptually an smallest indivisible unit in terms
+//        of indexing. Each pixel contains a fixed num (e.g., 10000) of values inside.
+
+// The contents of the file tail that must be serialized.
+message FileTail {
+    optional Footer footer = 1;
+    optional PostScript postscript = 2;
+    optional uint32 footerLength = 3;
+    optional uint32 postscriptLength = 4;
+}
+
+// PostScript
+// version: pixels file version
+// contentLength: file content length (everything except FileTail)
+// number of rows: number of rows in the file
+// compression: compression kind. currently USELESS
+// compressionBlockSize: compression block size. currently USELESS
+// pixelStride: the maximum number of rows in a pixel
+// magic: "PIXELS"
+message PostScript {
+    optional uint32 version = 1;
+    optional uint64 contentLength = 2;
+    optional uint32 numberOfRows = 3;
+    optional CompressionKind compression = 4;
+    optional uint32 compressionBlockSize = 5;
+    optional uint32 pixelStride = 6;
+    optional string writerTimezone = 7;
+    // Leave this last in the record
+    optional string magic = 8000;
+}
+
+enum CompressionKind {
+    NONE = 0;
+    ZLIB = 1;
+    SNAPPY = 2;
+    LZO = 3;
+    LZ4 = 4;
+    ZSTD = 5;
+}
+
+// Footer
+// types: file schema
+// columnStats: file level column statistics
+// rowGroupInfos: row group information
+// rowGroupStats: row group statistics
+// partitioned: whether this is a hash partitioned file
+message Footer {
+    // schema
+    repeated Type types = 1;
+    // file level column statistics
+    repeated ColumnStatistic columnStats = 2;
+    repeated RowGroupInformation rowGroupInfos = 3;
+    repeated RowGroupStatistic rowGroupStats = 4;
+    // if the file is hash partitioned, then each row group is a hash partition.
+    optional bool partitioned = 5;
+}
+
+message Type {
+    enum Kind {
+        BOOLEAN = 0;
+        BYTE = 1;
+        SHORT = 2;
+        INT = 3;
+        LONG = 4;
+        FLOAT = 5;
+        DOUBLE = 6;
+        STRING = 7;
+        BINARY = 8;
+        TIMESTAMP = 9;
+        ARRAY = 10;
+        MAP = 11;
+        STRUCT = 12;
+        VARBINARY = 13;
+        DECIMAL = 14;
+        DATE = 15;
+        VARCHAR = 16;
+        CHAR = 17;
+        TIME = 18;
+    }
+    optional Kind kind = 1;
+    optional string name = 2;
+    repeated uint32 subtypes = 3 [packed=true];
+    optional uint32 maximumLength = 4;
+    optional uint32 precision = 5;
+    optional uint32 scale = 6;
+}
+
+// The information about a data hash partition.
+// Each row group can be used to store a hash partition of the data in the file.
+// columnIds: the id (index in Footer.types) of the columns that are used as the partition key.
+// hashValue: the hash value of the partition keys in this partition.
+message PartitionInformation {
+    repeated uint32 columnIds = 1;
+    optional int32 hashValue = 2;
+}
+
+// Row group information.
+// offset: row group start offset
+// dataLength: row group serialized content length
+// footerLength: serialized RowGroupFooter length
+// numberOfRows: number of rows in this row group
+// partitionInfo: the information of the hash partition, if Footer.partitioned is true.
+message RowGroupInformation {
+    optional uint64 footerOffset = 1;
+    optional uint32 dataLength = 2;
+    optional uint32 footerLength = 3;
+    optional uint64 numberOfRows = 4;
+    optional PartitionInformation partitionInfo = 5;
+}
+
+// Row group statistic
+// columnChunkStats: statistic for each column chunk.
+// for example, min/max for col0 in this row group
+// this can be used to filter row groups.
+message RowGroupStatistic {
+    repeated ColumnStatistic columnChunkStats = 1;
+}
+
+message IntegerStatistic  {
+    optional sint64 minimum = 1;
+    optional sint64 maximum = 2;
+    optional sint64 sum = 3;
+}
+
+message Integer128Statistic  {
+    // high stores the highest 64 bits whereas low stores the lowest 64 bits
+    optional uint64 minimum_high = 1;
+    optional uint64 minimum_low = 2;
+    optional sint64 maximum_high = 3;
+    optional sint64 maximum_low = 4;
+}
+
+message DoubleStatistic {
+    optional double minimum = 1;
+    optional double maximum = 2;
+    optional double sum = 3;
+}
+
+message StringStatistic {
+    optional string minimum = 1;
+    optional string maximum = 2;
+    // sum will store the total length of all strings in a stripe
+    optional sint64 sum = 3;
+}
+
+message BucketStatistic {
+    repeated uint64 count = 1 [packed=true];
+}
+
+message TimestampStatistic {
+    // min,max values saved as milliseconds since epoch
+    optional sint64 minimum = 1;
+    optional sint64 maximum = 2;
+}
+
+message DateStatistic {
+    // min,max values saved as milliseconds since epoch
+    optional sint32 minimum = 1;
+    optional sint32 maximum = 2;
+}
+
+message TimeStatistic {
+    // min,max values saved as milliseconds since epoch
+    optional sint32 minimum = 1;
+    optional sint32 maximum = 2;
+}
+
+message BinaryStatistic {
+    // sum will store the total binary blob length in a stripe
+    optional sint64 sum = 1;
+}
+
+message ColumnStatistic {
+    optional uint64 numberOfValues = 1;
+    optional IntegerStatistic intStatistics = 2;
+    optional DoubleStatistic doubleStatistics = 3;
+    optional StringStatistic stringStatistics = 4;
+    optional BucketStatistic bucketStatistics = 5;
+    optional BinaryStatistic binaryStatistics = 6;
+    optional TimestampStatistic timestampStatistics = 7;
+    // Date and Time types are added in Issue #94,
+    // use field number 9 and 10 for compatibility.
+    optional DateStatistic dateStatistics = 9;
+    optional TimeStatistic timeStatistics = 10;
+    // Integer128 is added for long decimal in Issue #203.
+    optional Integer128Statistic int128Statistics = 11;
+    optional bool hasNull = 8;
+}
+
+// Pixel statistic
+// statistic: statistic for this pixel
+message PixelStatistic {
+    optional ColumnStatistic statistic = 1;
+}
+
+// ColumnChunk index
+// pixelPositions: starting offsets of each pixel in this column chunk
+message ColumnChunkIndex {
+//    optional ColumnStatistic columnStatistic = 1;
+    optional uint64 chunkOffset = 1;
+    optional uint64 chunkLength = 2;
+    optional uint64 isNullOffset = 3;
+    repeated uint64 pixelPositions = 4 [packed=true];
+    repeated PixelStatistic pixelStatistics = 5;
+}
+
+message RowGroupIndex {
+    repeated ColumnChunkIndex columnChunkIndexEntries = 1;
+}
+
+message RowGroupEncoding {
+    repeated ColumnEncoding columnChunkEncodings = 1;
+}
+
+message RowGroupFooter {
+    optional RowGroupIndex rowGroupIndexEntry = 1;
+    optional RowGroupEncoding rowGroupEncoding = 2;
+}
+
+message ColumnEncoding {
+    enum Kind {
+        NONE = 0;
+        RUNLENGTH = 1;
+        DICTIONARY = 2;
+    }
+
+    required Kind kind = 1;
+    optional uint32 dictionarySize = 2;
+}
