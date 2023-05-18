@@ -9,6 +9,7 @@ find_package(Protobuf REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(DuckDB REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 add_subdirectory(worker)
 
@@ -27,4 +28,5 @@ target_link_libraries(${PROJECT_NAME}
         ${Protobuf_LIBRARIES}
         duckdb
         gRPC::grpc++
+        yaml-cpp
 )
