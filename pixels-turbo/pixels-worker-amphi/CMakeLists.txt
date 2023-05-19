@@ -11,11 +11,12 @@ find_package(OpenSSL REQUIRED)
 find_package(DuckDB REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(cli REQUIRED)
 
 add_subdirectory(worker)
 add_subdirectory(tests)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} worker_cli.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${Protobuf_INCLUDE_DIRS}
@@ -32,4 +33,5 @@ target_link_libraries(${PROJECT_NAME}
         gRPC::grpc++
         yaml-cpp
         spdlog::spdlog
+        cli::cli
 )
