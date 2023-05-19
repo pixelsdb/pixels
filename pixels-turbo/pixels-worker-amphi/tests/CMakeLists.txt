@@ -27,5 +27,5 @@ target_link_libraries(
         worker
         duckdb
         yaml-cpp
-
+        spdlog::spdlog
 )

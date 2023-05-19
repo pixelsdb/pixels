@@ -10,6 +10,7 @@ find_package(gRPC CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(DuckDB REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(spdlog REQUIRED)
 
 add_subdirectory(worker)
 add_subdirectory(tests)
@@ -30,4 +31,5 @@ target_link_libraries(${PROJECT_NAME}
         duckdb
         gRPC::grpc++
         yaml-cpp
+        spdlog::spdlog
 )
