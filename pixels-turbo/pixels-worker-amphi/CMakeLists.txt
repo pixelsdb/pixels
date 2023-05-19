@@ -12,6 +12,7 @@ find_package(DuckDB REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 add_subdirectory(worker)
+add_subdirectory(tests)
 
 add_executable(${PROJECT_NAME} main.cpp)
 
@@ -20,7 +21,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         "${CMAKE_CURRENT_BINARY_DIR}/worker/generated"
         ${DuckDB_INCLUDE_DIRS}
         ${gRPC_INCLUDE_DIRS}
-        worker
+        worker/include
 )
 
 target_link_libraries(${PROJECT_NAME}

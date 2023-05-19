@@ -4,7 +4,7 @@
 #include "duckdb.hpp"
 #include "yaml-cpp/yaml.h"
 
-#include "worker/include/grpc/transpile_sql_client.h"
+#include "grpc/transpile_sql_client.h"
 
 int main() {
     YAML::Node config = YAML::LoadFile("config.yaml");
