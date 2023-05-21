@@ -6,6 +6,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -17,7 +18,11 @@ public class WorkerServer implements Server {
 
     public WorkerServer(int port) {
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
-        this.rpcServer = ServerBuilder.forPort(port).addService(new WorkerServiceImpl()).build();
+        this.rpcServer = ServerBuilder
+                .forPort(port)
+                .addService(new WorkerServiceImpl())
+                .executor(Executors.newSingleThreadExecutor(Executors.defaultThreadFactory()))
+                .build();
     }
 
     @Override
