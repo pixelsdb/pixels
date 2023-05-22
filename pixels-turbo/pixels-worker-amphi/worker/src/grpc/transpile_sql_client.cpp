@@ -1,4 +1,7 @@
 #include "grpc/transpile_sql_client.h"
+#include "exception/grpc_exception.h"
+#include "exception/grpc_transpile_exception.h"
+#include "exception/grpc_unavailable_exception.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -27,10 +30,15 @@ std::string TranspileSqlClient::TranspileSql(const std::string& token, const std
     Status status = stub_->TranspileSql(&context, request, &response);
 
     if (status.ok()) {
-        return response.sqltranspiled();
+        if (response.header().errorcode() == 0) {
+            return response.sqltranspiled();
+        } else {
+            throw GrpcTranspileException(response.header().errormsg());
+        }
+    } else if (status.error_code() == grpc::StatusCode::UNAVAILABLE) {
+        throw GrpcUnavailableException(status.error_message());
     } else {
-        std::cout << "TranspileSql failed: " << status.error_message() << std::endl;
-        return "";
+        throw GrpcException(status.error_message());
     }
 }
 

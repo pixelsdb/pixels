@@ -4,6 +4,9 @@ find_package(gRPC CONFIG REQUIRED)
 
 set(worker_cxx
         src/grpc/transpile_sql_client.cpp
+        src/exception/grpc_exception.cpp
+        src/exception/grpc_transpile_exception.cpp
+        src/exception/grpc_unavailable_exception.cpp
         src/utils/constants.cpp)
 
 set(PROTO_FILES_DIR "${CMAKE_CURRENT_LIST_DIR}/../proto")
