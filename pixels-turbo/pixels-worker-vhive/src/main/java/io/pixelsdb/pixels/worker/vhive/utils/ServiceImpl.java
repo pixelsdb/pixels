@@ -7,10 +7,13 @@ import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.worker.common.WorkerProto;
 import one.profiler.AsyncProfiler;
 import org.apache.commons.net.ftp.FTPClient;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.FileInputStream;
 
 public class ServiceImpl<I extends Input, O extends Output> {
+    private static final Logger log = LogManager.getLogger(ServiceImpl.class);
     private static final AsyncProfiler profiler = AsyncProfiler.getInstance();
     final RequestHandler<I, O> handler;
     final Class<I> typeParameterClass;
@@ -31,11 +34,12 @@ public class ServiceImpl<I extends Input, O extends Output> {
         boolean isProfile = Boolean.parseBoolean(System.getenv("PROFILING_ENABLED"));
         try {
             if (isProfile) {
+                log.info("enable profile to execute input: %s", JSON.toJSONString(input));
                 String fileName = String.format("%s.jfr", input.getQueryId());
                 String event = System.getenv("PROFILING_EVENT");
+
                 profiler.execute(String.format("start,jfr,threads,event=%s,file=%s", event, fileName));
                 output = handler.handleRequest(input);
-//            Thread.sleep(60 * 1000);
                 profiler.execute(String.format("stop,file=%s", fileName));
 
                 // store the JFR profiling file to FTP server
@@ -46,10 +50,14 @@ public class ServiceImpl<I extends Input, O extends Output> {
                 String username = System.getenv("FTP_USERNAME");
                 String password = System.getenv("FTP_PASSWORD");
                 ftpClient.login(username, password);
+                log.info("connect to FTP server successfully");
                 FileInputStream inputStream = new FileInputStream(fileName);
                 ftpClient.storeFile("experiments/" + fileName, inputStream);
+                log.info("store profiling file to FTP server successfully");
+                inputStream.close();
                 ftpClient.logout();
             } else {
+                log.info(String.format("disable profile to execute input: %s"), JSON.toJSONString(input));
                 output = handler.handleRequest(input);
             }
         } catch (Exception e) {
