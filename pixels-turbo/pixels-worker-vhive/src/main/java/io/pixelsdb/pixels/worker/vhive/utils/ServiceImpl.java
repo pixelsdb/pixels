@@ -6,6 +6,7 @@ import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.worker.common.WorkerProto;
 import one.profiler.AsyncProfiler;
+import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -50,7 +51,9 @@ public class ServiceImpl<I extends Input, O extends Output> {
                 String username = System.getenv("FTP_USERNAME");
                 String password = System.getenv("FTP_PASSWORD");
                 ftpClient.login(username, password);
-                log.info("connect to FTP server successfully");
+                ftpClient.enterLocalPassiveMode();
+                ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+//                log.info("connect to FTP server successfully");
                 FileInputStream inputStream = new FileInputStream(fileName);
                 ftpClient.storeFile("experiments/" + fileName, inputStream);
                 log.info("store profiling file to FTP server successfully");
