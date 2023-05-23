@@ -6,4 +6,4 @@ if [ -z "$PIXELS_HOME" ]; then
 fi
 
 echo "Starting vmtouch..."
-$PIXELS_HOME/bin/start-vmtouch.sh"
+$PIXELS_HOME/bin/start-vmtouch.sh
