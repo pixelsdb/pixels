@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import static com.google.common.base.Preconditions.checkArgument;
 
 public class WorkerServer implements Server {
-    private static Logger log = LogManager.getLogger(WorkerServer.class);
+    private static final Logger log = LogManager.getLogger(WorkerServer.class);
     private final io.grpc.Server rpcServer;
     private boolean running = false;
 
@@ -35,6 +35,7 @@ public class WorkerServer implements Server {
         this.running = false;
         try {
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            log.info("rpc server close successfully");
         } catch (InterruptedException e) {
             log.error("Interrupted when shutdown rpc server.", e);
         }
@@ -45,6 +46,7 @@ public class WorkerServer implements Server {
         try {
             this.rpcServer.start();
             this.running = true;
+            log.info("rpc server run successfully");
             this.rpcServer.awaitTermination();
         } catch (IOException e) {
             log.error("I/O error when running.", e);

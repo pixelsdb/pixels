@@ -34,7 +34,7 @@ public class ServiceImpl<I extends Input, O extends Output> {
         boolean isProfile = Boolean.parseBoolean(System.getenv("PROFILING_ENABLED"));
         try {
             if (isProfile) {
-                log.info("enable profile to execute input: %s", JSON.toJSONString(input));
+                log.info(String.format("enable profile to execute input: %s", JSON.toJSONString(input)));
                 String fileName = String.format("%s.jfr", input.getQueryId());
                 String event = System.getenv("PROFILING_EVENT");
 
