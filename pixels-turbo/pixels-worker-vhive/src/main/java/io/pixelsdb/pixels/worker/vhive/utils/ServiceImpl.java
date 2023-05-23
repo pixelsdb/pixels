@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSON;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.worker.common.WorkerProto;
 import one.profiler.AsyncProfiler;
 import org.apache.commons.net.ftp.FTPClient;
@@ -12,7 +11,6 @@ import org.apache.commons.net.ftp.FTPClient;
 import java.io.FileInputStream;
 
 public class ServiceImpl<I extends Input, O extends Output> {
-    private static final ConfigFactory config = ConfigFactory.Instance();
     private static final AsyncProfiler profiler = AsyncProfiler.getInstance();
     final RequestHandler<I, O> handler;
     final Class<I> typeParameterClass;
@@ -30,22 +28,23 @@ public class ServiceImpl<I extends Input, O extends Output> {
         I input = JSON.parseObject(request.getJson(), typeParameterClass);
         O output;
 
-        boolean isProfile = Boolean.parseBoolean(config.getProperty("vhive.profiling.enabled"));
+        boolean isProfile = Boolean.parseBoolean(System.getenv("PROFILING_ENABLED"));
         try {
             if (isProfile) {
-                String fileName = "myprofile.jfr";
-                profiler.execute(String.format("start,jfr,threads,event=wall,file=%s", fileName));
+                String fileName = String.format("%s.jfr", input.getQueryId());
+                String event = System.getenv("PROFILING_EVENT");
+                profiler.execute(String.format("start,jfr,threads,event=%s,file=%s", event, fileName));
                 output = handler.handleRequest(input);
 //            Thread.sleep(60 * 1000);
                 profiler.execute(String.format("stop,file=%s", fileName));
 
                 // store the JFR profiling file to FTP server
-                String hostname = config.getProperty("vhive.profiling.ftp.hostname");
-                int port = Integer.parseInt(config.getProperty("vhive.profiling.ftp.port"));
+                String hostname = System.getenv("FTP_HOST");
+                int port = Integer.parseInt(System.getenv("FTP_PORT"));
                 FTPClient ftpClient = new FTPClient();
                 ftpClient.connect(hostname, port);
-                String username = config.getProperty("vhive.profiling.ftp.username");
-                String password = config.getProperty("vhive.profiling.ftp.password");
+                String username = System.getenv("FTP_USERNAME");
+                String password = System.getenv("FTP_PASSWORD");
                 ftpClient.login(username, password);
                 FileInputStream inputStream = new FileInputStream(fileName);
                 ftpClient.storeFile("experiments/" + fileName, inputStream);
