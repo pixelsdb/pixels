@@ -92,6 +92,10 @@
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
         <dep.apache-calcite.version>1.32.0</dep.apache-calcite.version>
 
+        <!--profiling-->
+        <dep.async-profiler.version>2.9</dep.async-profiler.version>
+        <dep.commons-net.version>3.9.0</dep.commons-net.version>
+
         <!-- logging -->
         <dep.log4j.version>2.17.1</dep.log4j.version>
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
@@ -544,6 +548,18 @@
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-slf4j18-impl</artifactId>
                 <version>${dep.log4j.version}</version>
+            </dependency>
+
+            <!--profiling-->
+            <dependency>
+                <groupId>tools.profiler</groupId>
+                <artifactId>async-profiler</artifactId>
+                <version>${dep.async-profiler.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-net</groupId>
+                <artifactId>commons-net</artifactId>
+                <version>${dep.commons-net.version}</version>
             </dependency>
 
             <!-- testing -->
