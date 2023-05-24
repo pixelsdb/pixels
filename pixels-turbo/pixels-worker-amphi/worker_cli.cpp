@@ -14,8 +14,12 @@ using namespace cli;
 int main() {
     YAML::Node config = YAML::LoadFile("config.yaml");
 
-//    DuckDBManager db_manager(":memory:");
-//    db_manager.importSqlFile("./resources/tpch_schem.sql");
+    // Init an in-memory DuckDB instance
+    // TODO: specify disk store
+    DuckDBManager db_manager(":memory:");
+    db_manager.importSqlFile("./resources/tpch_schema.sql");
+    db_manager.importSqlFile("./resources/tpch_sample.sql");
+
 //    auto result = db_manager.executeQuery("SELECT * FROM duckdb_tables();");
 //    db_manager.executeQuery("SELECT * FROM table;");
 //    result->Print();
