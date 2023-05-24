@@ -1,26 +1,23 @@
 #include <iostream>
 #include <string>
 
-#include "duckdb.hpp"
 #include "cli/cli.h"
 #include "cli/clifilesession.h"
 #include "yaml-cpp/yaml.h"
 #include "spdlog/spdlog.h"
 
 #include "grpc/transpile_sql_client.h"
+#include "db/duckdb_manager.h"
 
 using namespace cli;
-using namespace std;
 
 int main() {
     YAML::Node config = YAML::LoadFile("config.yaml");
 
-//    // DuckDB example
-//    duckdb::DuckDB db(nullptr);
-//    duckdb::Connection con(db);
-//    con.Query("CREATE TABLE integers(i INTEGER)");
-//    con.Query("INSERT INTO integers VALUES (3)");
-//    auto result = con.Query("SELECT * FROM integers");
+//    DuckDBManager db_manager(":memory:");
+//    db_manager.importSqlFile("./resources/tpch_schem.sql");
+//    auto result = db_manager.executeQuery("SELECT * FROM duckdb_tables();");
+//    db_manager.executeQuery("SELECT * FROM table;");
 //    result->Print();
 
     std::string host_addr = config["server_address"].as<std::string>();
@@ -33,7 +30,7 @@ int main() {
     std::string to_dialect = "hive";
 
     // start the interactive cli menu
-    auto rootMenu = make_unique<Menu>("worker-cli");
+    auto rootMenu = std::make_unique<Menu>("worker-cli");
     rootMenu -> Insert(
             "hello",
             [](std::ostream& out){
@@ -66,7 +63,7 @@ int main() {
                 },
             "Disable colors in the cli");
 
-    auto duckdbMenu = make_unique<Menu>("duckdb");
+    auto duckdbMenu = std::make_unique<Menu>("duckdb");
     duckdbMenu->Insert(
             "hello",
             [](std::ostream& out){
