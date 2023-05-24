@@ -17,30 +17,16 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+package io.pixelsdb.pixels.common.server.rest.request;
 
-// grpc protocol for pixels-turbo.
-
-syntax = "proto3";
-
-option java_multiple_files = false;
-option java_package = "io.pixelsdb.pixels.turbo";
-option java_outer_classname = "TurboProto";
-
-package turbo.proto;
-
-// The service definitions for the serverless workers in vHive.
-service TurboWorkerService {
-  rpc SayHello (HelloRequest) returns (HelloResponse);
+/**
+ * @author hank
+ * @create 2023-05-24
+ */
+public enum ExecutionHint
+{
+    LOW_COST, // prefer lower monetary cost
+    IMMEDIATE, // execute the query immediately
+    ADAPTIVE, // execute the query apatively using Pixel-Turbo
+    SCHEDULED // schedule the query to be executed at a start time
 }
-
-// begin request/response definition for vHive worker services
-
-message HelloRequest {
-  string name = 1;
-}
-
-message HelloResponse {
-  string msg = 1;
-}
-
-
