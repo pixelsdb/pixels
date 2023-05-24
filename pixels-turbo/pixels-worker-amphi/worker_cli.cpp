@@ -18,11 +18,6 @@ int main() {
     // TODO: specify disk store
     DuckDBManager db_manager(":memory:");
     db_manager.importSqlFile("./resources/tpch_schema.sql");
-    db_manager.importSqlFile("./resources/tpch_sample.sql");
-
-//    auto result = db_manager.executeQuery("SELECT * FROM duckdb_tables();");
-//    db_manager.executeQuery("SELECT * FROM table;");
-//    result->Print();
 
     std::string host_addr = config["server_address"].as<std::string>();
     std::string port = config["server_port"].as<std::string>();
@@ -74,6 +69,19 @@ int main() {
                 out << "Here is DuckDB CLI. You can run SQL queries in the local DuckDB." << std::endl;
                 },
             "Print the DuckDB menu functionality");
+    duckdbMenu->Insert(
+            "run",
+            [&db_manager](std::ostream& out, std::string query){
+                auto result = db_manager.executeQuery(query);
+                result->Print();
+            },
+            "Execute single query in DuckDB instance");
+    duckdbMenu->Insert(
+            "import",
+            [&db_manager](std::ostream& out, std::string file_path){
+                db_manager.importSqlFile(file_path);
+            },
+            "Import SQL file in DuckDB instance");
 
     rootMenu->Insert(std::move(duckdbMenu));
 
