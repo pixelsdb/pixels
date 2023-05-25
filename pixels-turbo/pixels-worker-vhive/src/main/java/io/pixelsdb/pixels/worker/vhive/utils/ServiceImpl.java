@@ -60,7 +60,7 @@ public class ServiceImpl<I extends Input, O extends Output> {
                 inputStream.close();
                 ftpClient.logout();
             } else {
-                log.info(String.format("disable profile to execute input: %s"), JSON.toJSONString(input));
+                log.info(String.format("disable profile to execute input: %s", JSON.toJSONString(input)));
                 output = handler.handleRequest(input);
             }
         } catch (Exception e) {
