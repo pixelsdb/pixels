@@ -1,16 +1,14 @@
 package io.pixelsdb.pixels.invoker.vhive;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import com.spotify.futures.ListenableFuturesExtra;
-import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.worker.common.WorkerProto;
 import io.pixelsdb.pixels.common.turbo.Invoker;
-
+import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.invoker.vhive.utils.ListenableFutureAdapter;
+import io.pixelsdb.pixels.worker.common.WorkerProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 public abstract class VhiveInvoker implements Invoker {
     private static  final Logger logger = LogManager.getLogger(VhiveInvoker.class);
@@ -40,7 +38,7 @@ public abstract class VhiveInvoker implements Invoker {
     }
 
     public CompletableFuture<Output> genCompletableFuture(ListenableFuture<WorkerProto.WorkerResponse> listenableFuture) {
-        CompletableFuture<WorkerProto.WorkerResponse> completableFuture = ListenableFuturesExtra.toCompletableFuture(listenableFuture);
+        CompletableFuture<WorkerProto.WorkerResponse> completableFuture = ListenableFutureAdapter.toCompletable(listenableFuture);
         return completableFuture.handle((response, err) -> {
             if (err == null) {
                 String outputJson = response.getJson();

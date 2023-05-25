@@ -85,7 +85,6 @@
         <dep.guava.version>29.0-jre</dep.guava.version>
         <dep.protobuf.version>3.21.7</dep.protobuf.version>
         <dep.grpc.version>1.49.1</dep.grpc.version>
-        <dep.futures-extra.version>4.3.1</dep.futures-extra.version>
         <dep.jetcd.version>0.5.0</dep.jetcd.version>
         <dep.jna.version>5.13.0</dep.jna.version>
         <dep.javax.annotation.version>1.3.2</dep.javax.annotation.version>
@@ -468,12 +467,6 @@
                 <groupId>io.grpc</groupId>
                 <artifactId>grpc-stub</artifactId>
                 <version>${dep.grpc.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.spotify</groupId>
-                <artifactId>futures-extra</artifactId>
-                <version>${dep.futures-extra.version}</version>
             </dependency>
 
             <!-- fastjson -->
