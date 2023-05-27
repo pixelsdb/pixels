@@ -63,10 +63,11 @@ public class ServiceImpl<I extends Input, O extends Output> {
                 log.info(String.format("disable profile to execute input: %s", JSON.toJSONString(input)));
                 output = handler.handleRequest(input);
             }
+            log.info(String.format("get output successfully: %s", JSON.toJSONString(output)));
         } catch (Exception e) {
+            log.warn(String.format("Exception during process: %s", e));
             throw new RuntimeException("Exception during process: ", e);
         }
-
         WorkerProto.WorkerResponse response = WorkerProto.WorkerResponse.newBuilder()
                 .setJson(JSON.toJSONString(output))
                 .build();
