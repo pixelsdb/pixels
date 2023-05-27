@@ -35,7 +35,7 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.BroadcastJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.*;
@@ -591,5 +591,217 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
         workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
         workerMetrics.addComputeCostNs(computeCostTimer.getElapsedNs());
         return joinedRows;
+    }
+
+    @Override
+    public JoinOutput process(BroadcastJoinInput event)
+    {
+        JoinOutput joinOutput = new JoinOutput();
+        long startTime = System.currentTimeMillis();
+        joinOutput.setStartTimeMs(startTime);
+        joinOutput.setRequestId(context.getRequestId());
+        joinOutput.setSuccessful(true);
+        joinOutput.setErrorMessage("");
+
+        try
+        {
+            int cores = Runtime.getRuntime().availableProcessors();
+            logger.info("Number of cores available: " + cores);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
+
+            long queryId = event.getQueryId();
+            BroadcastTableInfo leftTable = requireNonNull(event.getSmallTable(), "leftTable is null");
+            StorageInfo leftInputStorageInfo = requireNonNull(leftTable.getStorageInfo(), "leftStorageInfo is null");
+            List<InputSplit> leftInputs = requireNonNull(leftTable.getInputSplits(), "leftInputs is null");
+            checkArgument(leftInputs.size() > 0, "left table is empty");
+            String[] leftCols = leftTable.getColumnsToRead();
+            int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
+            TableScanFilter leftFilter = JSON.parseObject(leftTable.getFilter(), TableScanFilter.class);
+
+            BroadcastTableInfo rightTable = requireNonNull(event.getLargeTable(), "rightTable is null");
+            StorageInfo rightInputStorageInfo = requireNonNull(rightTable.getStorageInfo(), "rightStorageInfo is null");
+            List<InputSplit> rightInputs = requireNonNull(rightTable.getInputSplits(), "rightInputs is null");
+            checkArgument(rightInputs.size() > 0, "right table is empty");
+            String[] rightCols = rightTable.getColumnsToRead();
+            int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
+            TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
+
+            String[] leftColAlias = event.getJoinInfo().getSmallColumnAlias();
+            String[] rightColAlias = event.getJoinInfo().getLargeColumnAlias();
+            boolean[] leftProjection = event.getJoinInfo().getSmallProjection();
+            boolean[] rightProjection = event.getJoinInfo().getLargeProjection();
+            JoinType joinType = event.getJoinInfo().getJoinType();
+            checkArgument(joinType != JoinType.EQUI_LEFT && joinType != JoinType.EQUI_FULL,
+                    "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join");
+
+            MultiOutputInfo outputInfo = event.getOutput();
+            StorageInfo outputStorageInfo = outputInfo.getStorageInfo();
+            checkArgument(outputInfo.getFileNames().size() == 1,
+                    "it is incorrect to have more than one output files");
+            String outputFolder = outputInfo.getPath();
+            if (!outputFolder.endsWith("/"))
+            {
+                outputFolder += "/";
+            }
+            boolean encoding = outputInfo.isEncoding();
+
+            logger.info("small table: " + event.getSmallTable().getTableName() +
+                    "', large table: " + event.getLargeTable().getTableName());
+
+            WorkerCommon.initStorage(leftInputStorageInfo);
+            WorkerCommon.initStorage(rightInputStorageInfo);
+            WorkerCommon.initStorage(outputStorageInfo);
+
+            boolean partitionOutput = event.getJoinInfo().isPostPartition();
+            PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
+            if (partitionOutput)
+            {
+                requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
+            }
+
+            // build the joiner.
+            AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
+            AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
+            WorkerCommon.getFileSchemaFromSplits(threadPool,
+                    WorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
+                    WorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
+                    leftSchema, rightSchema, leftInputs, rightInputs);
+            Joiner joiner = new Joiner(joinType,
+                    WorkerCommon.getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftProjection, leftKeyColumnIds,
+                    WorkerCommon.getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightProjection, rightKeyColumnIds);
+            // build the hash table for the left table.
+            List<Future> leftFutures = new ArrayList<>();
+            for (InputSplit inputSplit : leftInputs)
+            {
+                List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
+                leftFutures.add(threadPool.submit(() -> {
+                    try
+                    {
+                        buildHashTable(queryId, joiner, inputs, leftInputStorageInfo.getScheme(),
+                                !leftTable.isBase(), leftCols, leftFilter, workerMetrics);
+                    }
+                    catch (Exception e)
+                    {
+                        throw new WorkerException("error during hash table construction", e);
+                    }
+                }));
+            }
+            for (Future future : leftFutures)
+            {
+                future.get();
+            }
+            logger.info("hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
+                    (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
+
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
+            if (partitionOutput)
+            {
+                for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
+                {
+                    result.add(new ConcurrentLinkedQueue<>());
+                }
+            }
+            else
+            {
+                result.add(new ConcurrentLinkedQueue<>());
+            }
+
+            // scan the right table and do the join.
+            if (joiner.getSmallTableSize() > 0)
+            {
+                for (InputSplit inputSplit : rightInputs)
+                {
+                    List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
+                    threadPool.execute(() -> {
+                        try
+                        {
+                            int numJoinedRows = partitionOutput ?
+                                    joinWithRightTableAndPartition(
+                                            queryId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            !rightTable.isBase(), rightCols, rightFilter,
+                                            outputPartitionInfo, result, workerMetrics) :
+                                    joinWithRightTable(queryId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            !rightTable.isBase(), rightCols, rightFilter, result.get(0), workerMetrics);
+                        } catch (Exception e)
+                        {
+                            throw new WorkerException("error during broadcast join", e);
+                        }
+                    });
+                }
+                threadPool.shutdown();
+                try
+                {
+                    while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                } catch (InterruptedException e)
+                {
+                    throw new WorkerException("interrupted while waiting for the termination of join", e);
+                }
+            }
+
+            String outputPath = outputFolder + outputInfo.getFileNames().get(0);
+            try
+            {
+                PixelsWriter pixelsWriter;
+                WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
+                if (partitionOutput)
+                {
+                    pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
+                            encoding, true, Arrays.stream(
+                                    outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    collect(Collectors.toList()));
+                    for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+                    {
+                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
+                        if (!batches.isEmpty())
+                        {
+                            for (VectorizedRowBatch batch : batches)
+                            {
+                                pixelsWriter.addRowBatch(batch, hash);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
+                            encoding, false, null);
+                    ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
+                    for (VectorizedRowBatch rowBatch : rowBatches)
+                    {
+                        pixelsWriter.addRowBatch(rowBatch);
+                    }
+                }
+                pixelsWriter.close();
+                joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
+                if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
+                {
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
+                }
+                workerMetrics.addOutputCostNs(writeCostTimer.stop());
+                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+            } catch (Exception e)
+            {
+                throw new WorkerException(
+                        "failed to finish writing and close the join result file '" + outputPath + "'", e);
+            }
+
+            joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            WorkerCommon.setPerfMetrics(joinOutput, workerMetrics);
+            return joinOutput;
+        } catch (Exception e)
+        {
+            logger.error("error during join", e);
+            joinOutput.setSuccessful(false);
+            joinOutput.setErrorMessage(e.getMessage());
+            joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            return joinOutput;
+        }
     }
 }

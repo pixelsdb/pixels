@@ -65,7 +65,6 @@ public class ServiceImpl<I extends Input, O extends Output> {
             }
             log.info(String.format("get output successfully: %s", JSON.toJSONString(output)));
         } catch (Exception e) {
-            log.warn(String.format("Exception during process: %s", e));
             throw new RuntimeException("Exception during process: ", e);
         }
         WorkerProto.WorkerResponse response = WorkerProto.WorkerResponse.newBuilder()

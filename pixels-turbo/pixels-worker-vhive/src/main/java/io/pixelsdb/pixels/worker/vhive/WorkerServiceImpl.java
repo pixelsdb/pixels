@@ -11,7 +11,7 @@ import io.pixelsdb.pixels.worker.common.WorkerMetrics;
 import io.pixelsdb.pixels.worker.common.WorkerProto;
 import io.pixelsdb.pixels.worker.common.WorkerServiceGrpc;
 import io.pixelsdb.pixels.worker.vhive.utils.ServiceImpl;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
 
 public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public WorkerServiceImpl() {
@@ -21,7 +21,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public void aggregation(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
         AggregationWorker aggregationWorker = new AggregationWorker(
                 new WorkerContext(
-                        LoggerFactory.getLogger(AggregationWorker.class),
+                        LogManager.getLogger(AggregationWorker.class),
                         new WorkerMetrics(),
                         request.getRequestID()
                 )
@@ -35,7 +35,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public void broadcastChainJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
         BroadcastChainJoinWorker broadcastChainJoinWorker = new BroadcastChainJoinWorker(
                 new WorkerContext(
-                        LoggerFactory.getLogger(BroadcastChainJoinWorker.class),
+                        LogManager.getLogger(BroadcastChainJoinWorker.class),
                         new WorkerMetrics(),
                         request.getRequestID()
                 )
@@ -49,7 +49,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public void broadcastJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
         BroadcastJoinWorker broadcastJoinWorker = new BroadcastJoinWorker(
                 new WorkerContext(
-                        LoggerFactory.getLogger(BroadcastJoinWorker.class),
+                        LogManager.getLogger(BroadcastJoinWorker.class),
                         new WorkerMetrics(),
                         request.getRequestID()
                 )
@@ -63,7 +63,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public void partitionChainJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
         PartitionedChainJoinWorker partitionedChainJoinWorker = new PartitionedChainJoinWorker(
                 new WorkerContext(
-                        LoggerFactory.getLogger(PartitionedChainJoinWorker.class),
+                        LogManager.getLogger(PartitionedChainJoinWorker.class),
                         new WorkerMetrics(),
                         request.getRequestID()
                 )
@@ -77,7 +77,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public void partitionJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
         PartitionedJoinWorker partitionedJoinWorker = new PartitionedJoinWorker(
                 new WorkerContext(
-                        LoggerFactory.getLogger(PartitionedJoinWorker.class),
+                        LogManager.getLogger(PartitionedJoinWorker.class),
                         new WorkerMetrics(),
                         request.getRequestID()
                 )
@@ -91,7 +91,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public void partition(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
         PartitionWorker partitionWorker = new PartitionWorker(
                 new WorkerContext(
-                        LoggerFactory.getLogger(PartitionWorker.class),
+                        LogManager.getLogger(PartitionWorker.class),
                         new WorkerMetrics(),
                         request.getRequestID()
                 )
@@ -106,7 +106,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public void scan(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
         ScanWorker scanWorker = new ScanWorker(
                 new WorkerContext(
-                        LoggerFactory.getLogger(ScanWorker.class),
+                        LogManager.getLogger(ScanWorker.class),
                         new WorkerMetrics(),
                         request.getRequestID()
                 )

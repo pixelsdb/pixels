@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.worker.common;
 
-import org.slf4j.Logger;
+import org.apache.logging.log4j.Logger;
 
 /**
  * @author hank
