@@ -6,4 +6,6 @@ package io.pixelsdb.pixels.worker.vhive.utils;
 
 public interface RequestHandler<I, O> {
     O handleRequest(I input);
+
+    String getRequestId();
 }

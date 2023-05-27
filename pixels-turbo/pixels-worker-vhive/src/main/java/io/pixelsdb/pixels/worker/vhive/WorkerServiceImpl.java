@@ -6,12 +6,9 @@ import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import io.pixelsdb.pixels.worker.common.WorkerContext;
-import io.pixelsdb.pixels.worker.common.WorkerMetrics;
 import io.pixelsdb.pixels.worker.common.WorkerProto;
 import io.pixelsdb.pixels.worker.common.WorkerServiceGrpc;
 import io.pixelsdb.pixels.worker.vhive.utils.ServiceImpl;
-import org.apache.logging.log4j.LogManager;
 
 public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     public WorkerServiceImpl() {
@@ -19,100 +16,44 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
 
     @Override
     public void aggregation(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
-        AggregationWorker aggregationWorker = new AggregationWorker(
-                new WorkerContext(
-                        LogManager.getLogger(AggregationWorker.class),
-                        new WorkerMetrics(),
-                        request.getRequestID()
-                )
-        );
-
-        ServiceImpl<AggregationInput, AggregationOutput> service = new ServiceImpl<>(aggregationWorker, AggregationInput.class);
+        ServiceImpl<AggregationWorker, AggregationInput, AggregationOutput> service = new ServiceImpl<>(AggregationWorker.class, AggregationInput.class);
         service.execute(request, responseObserver);
     }
 
     @Override
     public void broadcastChainJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
-        BroadcastChainJoinWorker broadcastChainJoinWorker = new BroadcastChainJoinWorker(
-                new WorkerContext(
-                        LogManager.getLogger(BroadcastChainJoinWorker.class),
-                        new WorkerMetrics(),
-                        request.getRequestID()
-                )
-        );
-
-        ServiceImpl<BroadcastChainJoinInput, JoinOutput> service = new ServiceImpl<>(broadcastChainJoinWorker, BroadcastChainJoinInput.class);
+        ServiceImpl<BroadcastChainJoinWorker, BroadcastChainJoinInput, JoinOutput> service = new ServiceImpl<>(BroadcastChainJoinWorker.class, BroadcastChainJoinInput.class);
         service.execute(request, responseObserver);
     }
 
     @Override
     public void broadcastJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
-        BroadcastJoinWorker broadcastJoinWorker = new BroadcastJoinWorker(
-                new WorkerContext(
-                        LogManager.getLogger(BroadcastJoinWorker.class),
-                        new WorkerMetrics(),
-                        request.getRequestID()
-                )
-        );
-
-        ServiceImpl<BroadcastJoinInput, JoinOutput> service = new ServiceImpl<>(broadcastJoinWorker, BroadcastJoinInput.class);
+        ServiceImpl<BroadcastJoinWorker, BroadcastJoinInput, JoinOutput> service = new ServiceImpl<>(BroadcastJoinWorker.class, BroadcastJoinInput.class);
         service.execute(request, responseObserver);
     }
 
     @Override
     public void partitionChainJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
-        PartitionedChainJoinWorker partitionedChainJoinWorker = new PartitionedChainJoinWorker(
-                new WorkerContext(
-                        LogManager.getLogger(PartitionedChainJoinWorker.class),
-                        new WorkerMetrics(),
-                        request.getRequestID()
-                )
-        );
-
-        ServiceImpl<PartitionedChainJoinInput, JoinOutput> service = new ServiceImpl<>(partitionedChainJoinWorker, PartitionedChainJoinInput.class);
+        ServiceImpl<PartitionedChainJoinWorker, PartitionedChainJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedChainJoinWorker.class, PartitionedChainJoinInput.class);
         service.execute(request, responseObserver);
     }
 
     @Override
     public void partitionJoin(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
-        PartitionedJoinWorker partitionedJoinWorker = new PartitionedJoinWorker(
-                new WorkerContext(
-                        LogManager.getLogger(PartitionedJoinWorker.class),
-                        new WorkerMetrics(),
-                        request.getRequestID()
-                )
-        );
-
-        ServiceImpl<PartitionedJoinInput, JoinOutput> service = new ServiceImpl<>(partitionedJoinWorker, PartitionedJoinInput.class);
+        ServiceImpl<PartitionedJoinWorker, PartitionedJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedJoinWorker.class, PartitionedJoinInput.class);
         service.execute(request, responseObserver);
     }
 
     @Override
     public void partition(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
-        PartitionWorker partitionWorker = new PartitionWorker(
-                new WorkerContext(
-                        LogManager.getLogger(PartitionWorker.class),
-                        new WorkerMetrics(),
-                        request.getRequestID()
-                )
-        );
-
-        ServiceImpl<PartitionInput, PartitionOutput> service = new ServiceImpl<>(partitionWorker, PartitionInput.class);
+        ServiceImpl<PartitionWorker, PartitionInput, PartitionOutput> service = new ServiceImpl<>(PartitionWorker.class, PartitionInput.class);
         service.execute(request, responseObserver);
     }
 
 
     @Override
     public void scan(WorkerProto.WorkerRequest request, StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
-        ScanWorker scanWorker = new ScanWorker(
-                new WorkerContext(
-                        LogManager.getLogger(ScanWorker.class),
-                        new WorkerMetrics(),
-                        request.getRequestID()
-                )
-        );
-
-        ServiceImpl<ScanInput, ScanOutput> service = new ServiceImpl<>(scanWorker, ScanInput.class);
+        ServiceImpl<ScanWorker, ScanInput, ScanOutput> service = new ServiceImpl<>(ScanWorker.class, ScanInput.class);
         service.execute(request, responseObserver);
     }
 

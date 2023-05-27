@@ -15,4 +15,9 @@ public class AggregationWorker extends BaseAggregationWorker implements RequestH
     public AggregationOutput handleRequest(AggregationInput input) {
         return process(input);
     }
+
+    @Override
+    public String getRequestId() {
+        return this.context.getRequestId();
+    }
 }

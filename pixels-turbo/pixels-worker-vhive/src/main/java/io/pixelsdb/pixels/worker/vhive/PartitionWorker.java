@@ -15,4 +15,9 @@ public class PartitionWorker extends BasePartitionWorker implements RequestHandl
     public PartitionOutput handleRequest(PartitionInput input) {
         return process(input);
     }
+
+    @Override
+    public String getRequestId() {
+        return this.context.getRequestId();
+    }
 }

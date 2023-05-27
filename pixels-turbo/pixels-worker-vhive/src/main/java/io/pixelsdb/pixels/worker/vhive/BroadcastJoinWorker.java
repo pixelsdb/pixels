@@ -16,4 +16,9 @@ public class BroadcastJoinWorker extends BaseBroadcastJoinWorker implements Requ
     public JoinOutput handleRequest(BroadcastJoinInput input) {
         return process(input);
     }
+
+    @Override
+    public String getRequestId() {
+        return this.context.getRequestId();
+    }
 }

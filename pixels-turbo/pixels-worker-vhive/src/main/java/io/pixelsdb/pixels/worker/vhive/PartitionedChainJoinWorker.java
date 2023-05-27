@@ -15,4 +15,9 @@ public class PartitionedChainJoinWorker extends BasePartitionedChainJoinWorker i
     public JoinOutput handleRequest(PartitionedChainJoinInput input) {
         return process(input);
     }
+
+    @Override
+    public String getRequestId() {
+        return this.context.getRequestId();
+    }
 }

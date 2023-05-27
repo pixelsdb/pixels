@@ -15,4 +15,9 @@ public class BroadcastChainJoinWorker extends BaseBroadcastChainJoinWorker imple
     public JoinOutput handleRequest(BroadcastChainJoinInput input) {
         return process(input);
     }
+
+    @Override
+    public String getRequestId() {
+        return this.context.getRequestId();
+    }
 }

@@ -4,6 +4,8 @@ import com.alibaba.fastjson.JSON;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.worker.common.WorkerContext;
+import io.pixelsdb.pixels.worker.common.WorkerMetrics;
 import io.pixelsdb.pixels.worker.common.WorkerProto;
 import one.profiler.AsyncProfiler;
 import org.apache.commons.net.ftp.FTP;
@@ -12,18 +14,18 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.FileInputStream;
+import java.util.UUID;
 
-public class ServiceImpl<I extends Input, O extends Output> {
+public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O extends Output> {
     private static final Logger log = LogManager.getLogger(ServiceImpl.class);
     private static final AsyncProfiler profiler = AsyncProfiler.getInstance();
-    final RequestHandler<I, O> handler;
+    final Class<T> handlerClass;
     final Class<I> typeParameterClass;
 
-
     public ServiceImpl(
-            RequestHandler<I, O> handler,
+            Class<T> handlerClass,
             Class<I> typeParameterClass) {
-        this.handler = handler;
+        this.handlerClass = handlerClass;
         this.typeParameterClass = typeParameterClass;
     }
 
@@ -34,9 +36,13 @@ public class ServiceImpl<I extends Input, O extends Output> {
 
         boolean isProfile = Boolean.parseBoolean(System.getenv("PROFILING_ENABLED"));
         try {
+            String requestId = String.format("%d_%s", input.getQueryId(), UUID.randomUUID());
+            WorkerContext context = new WorkerContext(LogManager.getLogger(handlerClass), new WorkerMetrics(), requestId);
+            RequestHandler<I, O> handler = handlerClass.getConstructor(WorkerContext.class).newInstance(context);
+
             if (isProfile) {
                 log.info(String.format("enable profile to execute input: %s", JSON.toJSONString(input)));
-                String fileName = String.format("%s.jfr", input.getQueryId());
+                String fileName = String.format("%s.jfr", handler.getRequestId());
                 String event = System.getenv("PROFILING_EVENT");
 
                 profiler.execute(String.format("start,jfr,threads,event=%s,file=%s", event, fileName));

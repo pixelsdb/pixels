@@ -15,4 +15,9 @@ public class ScanWorker extends BaseScanWorker implements RequestHandler<ScanInp
     public ScanOutput handleRequest(ScanInput event) {
         return process(event);
     }
+
+    @Override
+    public String getRequestId() {
+        return this.context.getRequestId();
+    }
 }

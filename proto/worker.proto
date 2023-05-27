@@ -20,13 +20,11 @@ service WorkerService {
 }
 
 message WorkerRequest {
-    string requestID = 1;
-    string json = 2;
+    string json = 1;
 }
 
 message WorkerResponse {
-    string requestID = 1;
-    string json = 2;
+    string json = 1;
 }
 
 message HelloRequest {

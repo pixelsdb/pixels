@@ -15,4 +15,9 @@ public class PartitionedJoinWorker extends BasePartitionedJoinWorker implements 
     public JoinOutput handleRequest(PartitionedJoinInput input) {
         return process(input);
     }
+
+    @Override
+    public String getRequestId() {
+        return this.context.getRequestId();
+    }
 }
