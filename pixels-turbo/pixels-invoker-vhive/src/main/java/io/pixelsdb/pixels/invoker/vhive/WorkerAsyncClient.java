@@ -9,7 +9,6 @@ import io.pixelsdb.pixels.planner.plan.physical.input.*;
 import io.pixelsdb.pixels.worker.common.WorkerProto;
 import io.pixelsdb.pixels.worker.common.WorkerServiceGrpc;
 
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -51,6 +50,7 @@ public class WorkerAsyncClient {
 
     public ListenableFuture<WorkerProto.WorkerResponse> aggregation(AggregationInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+                .setRequestID(Long.toString(input.getQueryId()))
                 .setJson(JSON.toJSONString(input))
                 .build();
         return this.stub.aggregation(request);
@@ -58,6 +58,7 @@ public class WorkerAsyncClient {
 
     public ListenableFuture<WorkerProto.WorkerResponse> broadcastChainJoin(BroadcastChainJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+                .setRequestID(Long.toString(input.getQueryId()))
                 .setJson(JSON.toJSONString(input))
                 .build();
         return this.stub.broadcastChainJoin(request);
@@ -65,6 +66,7 @@ public class WorkerAsyncClient {
 
     public ListenableFuture<WorkerProto.WorkerResponse> broadcastJoin(BroadcastJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+                .setRequestID(Long.toString(input.getQueryId()))
                 .setJson(JSON.toJSONString(input))
                 .build();
         return this.stub.broadcastJoin(request);
@@ -72,6 +74,7 @@ public class WorkerAsyncClient {
 
     public ListenableFuture<WorkerProto.WorkerResponse> partitionChainJoin(PartitionedChainJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+                .setRequestID(Long.toString(input.getQueryId()))
                 .setJson(JSON.toJSONString(input))
                 .build();
         return this.stub.partitionChainJoin(request);
@@ -79,6 +82,7 @@ public class WorkerAsyncClient {
 
     public ListenableFuture<WorkerProto.WorkerResponse> partitionJoin(PartitionedJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+                .setRequestID(Long.toString(input.getQueryId()))
                 .setJson(JSON.toJSONString(input))
                 .build();
         return this.stub.partitionJoin(request);
@@ -86,6 +90,7 @@ public class WorkerAsyncClient {
 
     public ListenableFuture<WorkerProto.WorkerResponse> partition(PartitionInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+                .setRequestID(Long.toString(input.getQueryId()))
                 .setJson(JSON.toJSONString(input))
                 .build();
         return this.stub.partition(request);
@@ -93,9 +98,9 @@ public class WorkerAsyncClient {
 
     public ListenableFuture<WorkerProto.WorkerResponse> scan(ScanInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+                .setRequestID(Long.toString(input.getQueryId()))
                 .setJson(JSON.toJSONString(input))
                 .build();
-
         return this.stub.scan(request);
     }
 }
