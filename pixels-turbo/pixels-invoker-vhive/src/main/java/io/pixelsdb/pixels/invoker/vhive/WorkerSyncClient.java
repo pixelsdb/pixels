@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.invoker.vhive;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -50,7 +51,7 @@ public class WorkerSyncClient {
 
     public AggregationOutput aggregation(AggregationInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         WorkerProto.WorkerResponse response = this.stub.aggregation(request);
         AggregationOutput output = JSON.parseObject(response.getJson(), AggregationOutput.class);
@@ -59,7 +60,7 @@ public class WorkerSyncClient {
 
     public JoinOutput broadcastChainJoin(BroadcastChainJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         WorkerProto.WorkerResponse response = this.stub.broadcastChainJoin(request);
         JoinOutput output = JSON.parseObject(response.getJson(), JoinOutput.class);
@@ -68,7 +69,7 @@ public class WorkerSyncClient {
 
     public JoinOutput broadcastJoin(BroadcastJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         WorkerProto.WorkerResponse response = this.stub.broadcastJoin(request);
         JoinOutput output = JSON.parseObject(response.getJson(), JoinOutput.class);
@@ -77,7 +78,7 @@ public class WorkerSyncClient {
 
     public JoinOutput partitionChainJoin(PartitionedChainJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         WorkerProto.WorkerResponse response = this.stub.partitionChainJoin(request);
         JoinOutput output = JSON.parseObject(response.getJson(), JoinOutput.class);
@@ -86,7 +87,7 @@ public class WorkerSyncClient {
 
     public JoinOutput partitionJoin(PartitionedJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         WorkerProto.WorkerResponse response = this.stub.partitionJoin(request);
         JoinOutput output = JSON.parseObject(response.getJson(), JoinOutput.class);
@@ -95,7 +96,7 @@ public class WorkerSyncClient {
 
     public PartitionOutput partition(PartitionInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         WorkerProto.WorkerResponse response = this.stub.partition(request);
         PartitionOutput output = JSON.parseObject(response.getJson(), PartitionOutput.class);
@@ -104,7 +105,7 @@ public class WorkerSyncClient {
 
     public ScanOutput scan(ScanInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
 
         WorkerProto.WorkerResponse response = this.stub.scan(request);

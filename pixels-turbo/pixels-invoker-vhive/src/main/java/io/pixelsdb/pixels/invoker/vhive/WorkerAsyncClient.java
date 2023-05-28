@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.invoker.vhive;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
@@ -50,49 +51,49 @@ public class WorkerAsyncClient {
 
     public ListenableFuture<WorkerProto.WorkerResponse> aggregation(AggregationInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.aggregation(request);
     }
 
     public ListenableFuture<WorkerProto.WorkerResponse> broadcastChainJoin(BroadcastChainJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.broadcastChainJoin(request);
     }
 
     public ListenableFuture<WorkerProto.WorkerResponse> broadcastJoin(BroadcastJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.broadcastJoin(request);
     }
 
     public ListenableFuture<WorkerProto.WorkerResponse> partitionChainJoin(PartitionedChainJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.partitionChainJoin(request);
     }
 
     public ListenableFuture<WorkerProto.WorkerResponse> partitionJoin(PartitionedJoinInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.partitionJoin(request);
     }
 
     public ListenableFuture<WorkerProto.WorkerResponse> partition(PartitionInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.partition(request);
     }
 
     public ListenableFuture<WorkerProto.WorkerResponse> scan(ScanInput input) {
         WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
-                .setJson(JSON.toJSONString(input))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.scan(request);
     }
