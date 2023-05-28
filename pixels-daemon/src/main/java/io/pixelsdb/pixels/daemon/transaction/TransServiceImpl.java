@@ -70,30 +70,28 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                             StreamObserver<TransProto.CommitTransResponse> responseObserver)
     {
         int error = ErrorCode.SUCCESS;
+        // must get transaction context before setTransCommit()
+        boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
         boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
         if (!success)
         {
             error = ErrorCode.TRANS_ID_NOT_EXIST;
         }
-        boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
         long timestamp = request.getTimestamp();
         if (readOnly)
         {
             long value = LowWatermark.get();
             if (timestamp >= value)
             {
-                while(LowWatermark.compareAndSet(value, timestamp))
+                while(!LowWatermark.compareAndSet(value, timestamp))
                 {
                     value = LowWatermark.get();
                     if (timestamp < value)
                     {
-                        error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
+                        // it is not an error if there is no need to push the low watermark
                         break;
                     }
                 }
-            } else
-            {
-                error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
             }
         }
         else
@@ -101,18 +99,15 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             long value = HighWatermark.get();
             if (timestamp >= value)
             {
-                while(HighWatermark.compareAndSet(value, timestamp))
+                while(!HighWatermark.compareAndSet(value, timestamp))
                 {
                     value = HighWatermark.get();
                     if (timestamp < value)
                     {
-                        error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
+                        // it is not an error if there is no need to push the high watermark
                         break;
                     }
                 }
-            } else
-            {
-                error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
             }
         }
         TransProto.CommitTransResponse response =
