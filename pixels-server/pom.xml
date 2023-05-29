@@ -49,6 +49,12 @@
             <artifactId>pixels-common</artifactId>
         </dependency>
 
+        <!-- trino-jdbc -->
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-jdbc</artifactId>
+        </dependency>
+
         <!-- protobuf -->
         <dependency>
             <groupId>com.google.protobuf</groupId>

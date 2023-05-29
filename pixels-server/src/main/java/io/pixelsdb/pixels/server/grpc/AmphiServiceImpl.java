@@ -27,6 +27,7 @@ import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
+import java.sql.*;
 
 /**
  * @author hank
@@ -71,4 +72,76 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
+
+    @Override
+    public void trinoQuery(AmphiProto.TrinoQueryRequest request, StreamObserver<AmphiProto.TrinoQueryResponse> responseObserver) {
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        String rsStr = "";
+
+        String errorMessage = null;
+        int errorCode = 0;
+
+        try {
+            Class.forName("io.trino.jdbc.TrinoDriver");
+            String trinoEndpoint = String.format("jdbc:trino://%s:%d/%s/%s",
+                    request.getTrinoUrl(),
+                    request.getTrinoPort(),
+                    request.getCatalog(),
+                    request.getSchema());
+            conn = DriverManager.getConnection( trinoEndpoint, "pixels", "");
+
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery(request.getSqlQuery());
+            rsStr = resultSetToString(rs);
+        } catch(Exception e) {
+            errorMessage = e.getMessage();
+            errorCode = 1;
+        } finally {
+            try {
+                if(rs != null) rs.close();
+                if(stmt != null) stmt.close();
+                if(conn != null) conn.close();
+            } catch(Exception e) {
+                errorMessage = errorMessage + e.getMessage();
+            }
+        }
+
+        AmphiProto.ResponseHeader.Builder headerBuilder = AmphiProto.ResponseHeader.newBuilder()
+                .setErrorCode(errorCode)
+                .setErrorMsg(errorMessage != null ? errorMessage : "");
+        AmphiProto.TrinoQueryResponse.Builder responseBuilder = AmphiProto.TrinoQueryResponse.newBuilder();
+
+        if (errorMessage != null) {
+            responseBuilder.setHeader(headerBuilder);
+        } else {
+            responseBuilder.setQueryResult(rsStr);
+        }
+
+        AmphiProto.TrinoQueryResponse response = responseBuilder.build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    public String resultSetToString(ResultSet resultSet) throws SQLException
+    {
+        StringBuilder sb = new StringBuilder();
+        ResultSetMetaData metaData = resultSet.getMetaData();
+        int columnCount = metaData.getColumnCount();
+
+        while (resultSet.next()) {
+            for (int i = 1; i <= columnCount; i++) {
+                if (i > 1) sb.append(", ");
+                String columnName = metaData.getColumnName(i);
+                String value = resultSet.getString(i);
+
+                sb.append(columnName).append(": ").append(value);
+            }
+            sb.append("\n");
+        }
+
+        return sb.toString();
+    }
+
 }

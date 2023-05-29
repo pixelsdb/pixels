@@ -15,7 +15,6 @@ int main() {
     YAML::Node config = YAML::LoadFile("config.yaml");
 
     // Init an in-memory DuckDB instance
-    // TODO: specify disk store
     DuckDBManager db_manager(":memory:");
     db_manager.importSqlFile("./resources/tpch_schema.sql");
 

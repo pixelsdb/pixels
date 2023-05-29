@@ -51,6 +51,7 @@ public class TestAmphiAPI
                 .setFromDialect("duckdb")
                 .setToDialect("hive")
                 .build();
+
         AmphiProto.TranspileSqlResponse response = amphiService.transpileSql(request);
 
         assertNotNull(response);
@@ -69,6 +70,7 @@ public class TestAmphiAPI
                 .setFromDialect("trino")
                 .setToDialect("duckdb")
                 .build();
+
         AmphiProto.TranspileSqlResponse response = amphiService.transpileSql(request);
 
         assertNotNull(response);
@@ -86,11 +88,32 @@ public class TestAmphiAPI
                 .setFromDialect("trino")
                 .setToDialect("duckdb")
                 .build();
+
         AmphiProto.TranspileSqlResponse response = amphiService.transpileSql(request);
 
         assertNotNull(response);
         assertEquals(1, response.getHeader().getErrorCode());
         assertEquals("INVALID_ARGUMENT: SQLglot parsing error: Expected table name but got None. Line 1, Col: 10.",
                 response.getHeader().getErrorMsg());
+    }
+
+    @Test
+    @DirtiesContext
+    public void testTrinoQuerySimple()
+    {
+        String aggregateQuery = "SELECT COUNT(*) FROM LINEITEM";
+
+        AmphiProto.TrinoQueryRequest request = AmphiProto.TrinoQueryRequest.newBuilder()
+                .setTrinoUrl("ec2-18-218-128-203.us-east-2.compute.amazonaws.com")
+                .setTrinoPort(8080)
+                .setCatalog("pixels")
+                .setSchema("tpch_1g")
+                .setSqlQuery(aggregateQuery)
+                .build();
+
+        AmphiProto.TrinoQueryResponse response = amphiService.trinoQuery(request);
+
+        assertNotNull(response);
+        System.out.println(response.getQueryResult());
     }
 }
