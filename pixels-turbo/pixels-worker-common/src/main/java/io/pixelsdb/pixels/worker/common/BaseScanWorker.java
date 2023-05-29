@@ -85,7 +85,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
             String requestId = context.getRequestId();
 
-            long queryId = event.getQueryId();
+            long transId = event.getTransId();
             requireNonNull(event.getTableInfo(), "even.tableInfo is null");
             StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
@@ -144,7 +144,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = scanFile(queryId, scanInputs, includeCols, inputStorageInfo.getScheme(),
+                        int rowGroupNum = scanFile(transId, scanInputs, includeCols, inputStorageInfo.getScheme(),
                                 scanProjection, filter, outputPath, encoding, outputStorageInfo.getScheme(),
                                 partialAggregationPresent, aggregator);
                         if (rowGroupNum > 0)
@@ -207,7 +207,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
     /**
      * Scan the files in a query split, apply projection and filters, and output the
      * results to the given path.
-     * @param queryId the query id used by I/O scheduler
+     * @param transId the transaction id used by I/O scheduler
      * @param scanInputs the information of the files to scan
      * @param columnsToRead the included columns
      * @param inputScheme the storage scheme of the input files
@@ -220,7 +220,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
      * @param aggregator the aggregator for the partial aggregation
      * @return the number of row groups that have been written into the output.
      */
-    private int scanFile(long queryId, List<InputInfo> scanInputs, String[] columnsToRead, Storage.Scheme inputScheme,
+    private int scanFile(long transId, List<InputInfo> scanInputs, String[] columnsToRead, Storage.Scheme inputScheme,
                          boolean[] scanProjection, TableScanFilter filter, String outputPath, boolean encoding,
                          Storage.Scheme outputScheme, boolean partialAggregate, Aggregator aggregator)
     {
@@ -249,7 +249,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 {
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
-                PixelsReaderOption option = WorkerCommon.getReaderOption(queryId, columnsToRead, inputInfo);
+                PixelsReaderOption option = WorkerCommon.getReaderOption(transId, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,32 +17,30 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.turbo;
 
-/**
- * The base class for the input of a cloud function.
- * @author hank
- * @create 2022-06-28
- */
-public abstract class Input
-{
-    /**
-     * The unique id of the transaction.
-     */
-    private long transId;
+// grpc protocol for pixels-turbo.
 
-    public Input(long transId)
-    {
-        this.transId = transId;
-    }
+syntax = "proto3";
 
-    public long getTransId()
-    {
-        return transId;
-    }
+option java_multiple_files = false;
+option java_package = "io.pixelsdb.pixels.turbo";
+option java_outer_classname = "TurboProto";
 
-    public void setTransId(long transId)
-    {
-        this.transId = transId;
-    }
+package turbo.proto;
+
+// The service definitions for the serverless workers in vHive.
+service TurboWorkerService {
+  rpc SayHello (HelloRequest) returns (HelloResponse);
 }
+
+// begin request/response definition for vHive worker services
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloResponse {
+  string msg = 1;
+}
+
+

@@ -38,9 +38,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * @author: tao
+ * @author tao
  * @author hank
- * @date: Create in 2018-10-27 18:31
+ * @create 2018-10-27 18:31
  **/
 public class LockInternals
 {
@@ -369,5 +369,4 @@ public class LockInternals
             leaseClient.keepAliveOnce(leaseId);
         }
     }
-
 }

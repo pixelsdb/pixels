@@ -67,5 +67,7 @@ public class ErrorCode
     private static final int ERROR_TRANS = ERROR_BASE + 200;
     public static final int TRANS_LOW_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 1);
     public static final int TRANS_HIGH_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 2);
+    public static final int TRANS_ID_NOT_EXIST = (ERROR_TRANS + 3);
+    public static final int TRANS_BAD_GET_CONTEXT_REQUEST = (ERROR_TRANS + 4);
     // end error code for transactions
 }

@@ -46,7 +46,7 @@ public class TestAggregationLambdaInvoker
     public void testOrders() throws ExecutionException, InterruptedException
     {
         AggregationInput aggregationInput = new AggregationInput();
-        aggregationInput.setQueryId(123456);
+        aggregationInput.setTransId(123456);
         AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
         aggregatedTableInfo.setParallelism(8);
         aggregatedTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));

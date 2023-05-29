@@ -28,12 +28,12 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created at: 20/02/2022
- * Author: hank
+ * @create 2022-02-20
+ * @author hank
  */
 public class TransServer implements Server
 {
-    private static Logger log = LogManager.getLogger(TransServer.class);
+    private static final Logger log = LogManager.getLogger(TransServer.class);
 
     private boolean running = false;
     private final io.grpc.Server rpcServer;

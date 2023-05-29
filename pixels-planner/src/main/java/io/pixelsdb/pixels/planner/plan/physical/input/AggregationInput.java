@@ -54,10 +54,10 @@ public class AggregationInput extends Input
         super(-1);
     }
 
-    public AggregationInput(long queryId, AggregatedTableInfo aggregatedTableInfo,
+    public AggregationInput(long transId, AggregatedTableInfo aggregatedTableInfo,
                             AggregationInfo aggregationInfo, OutputInfo output)
     {
-        super(queryId);
+        super(transId);
         this.aggregatedTableInfo = aggregatedTableInfo;
         this.aggregationInfo = aggregationInfo;
         this.output = output;

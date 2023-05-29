@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.common.physical.scheduler;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
-import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.transaction.TransContextCache;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -77,16 +77,16 @@ public class SortMergeScheduler implements Scheduler
     /**
      * Sort the requests in the batch by their start offsets, and try to merge them.
      * @param batch the request batch.
-     * @param queryId the query id.
+     * @param transId the transaction id.
      * @return the merged requests.
      */
-    protected List<MergedRequest> sortMerge(RequestBatch batch, long queryId)
+    protected List<MergedRequest> sortMerge(RequestBatch batch, long transId)
     {
         /**
          * Issue #175:
          * It has been proved that per-query scheduling, i.e., gradually increase
          * the maximum size of merged requests does not provide any performance gain.
-         * On the opposite, it decrease the performance of TPC-H (SF=100) by 5-10%.
+         * On the opposite, it decreases the performance of TPC-H (SF=100) by 5-10%.
          * Tuning the split size of Presto can solve the slow-starting issue of
          * compact layout of TPC-H.
          */
@@ -117,14 +117,14 @@ public class SortMergeScheduler implements Scheduler
     }
 
     @Override
-    public void executeBatch(PhysicalReader reader, RequestBatch batch, long queryId) throws IOException
+    public void executeBatch(PhysicalReader reader, RequestBatch batch, long transId) throws IOException
     {
         if (batch.size() <= 0)
         {
             return;
         }
 
-        List<MergedRequest> mergedRequests = sortMerge(batch, queryId);
+        List<MergedRequest> mergedRequests = sortMerge(batch, transId);
 
         if (reader.supportsAsync())
         {
@@ -182,7 +182,7 @@ public class SortMergeScheduler implements Scheduler
 
     protected static class MergedRequest
     {
-        private final long queryId;
+        private final long transId;
         private final long start;
         private long end;
         private int length; // the length of merged request.
@@ -203,7 +203,7 @@ public class SortMergeScheduler implements Scheduler
 
         public MergedRequest(RequestFuture first)
         {
-            this.queryId = first.request.queryId;
+            this.transId = first.request.transId;
             this.start = first.request.start;
             this.end = first.request.start + first.request.length;
             this.offsets = new ArrayList<>();
@@ -222,7 +222,7 @@ public class SortMergeScheduler implements Scheduler
             {
                 throw new IllegalArgumentException("Can not merge backward request.");
             }
-            if (curr.request.queryId != this.queryId)
+            if (curr.request.transId != this.transId)
             {
                 throw new IllegalArgumentException("Can not merge requests from different queries (transactions).");
             }
@@ -240,9 +240,9 @@ public class SortMergeScheduler implements Scheduler
             return new MergedRequest(curr);
         }
 
-        public long getQueryId()
+        public long getTransId()
         {
-            return queryId;
+            return transId;
         }
 
         public long getStart()
@@ -334,7 +334,7 @@ public class SortMergeScheduler implements Scheduler
         @Override
         public boolean execute()
         {
-            if (TransContext.Instance().isTerminated(request.queryId))
+            if (TransContextCache.Instance().isTerminated(request.transId))
             {
                 /**
                  * Issue #139:

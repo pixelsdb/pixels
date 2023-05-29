@@ -61,10 +61,10 @@ public class ScanInput extends Input
         super(-1);
     }
 
-    public ScanInput(long queryId, ScanTableInfo tableInfo, boolean[] scanProjection,
+    public ScanInput(long transId, ScanTableInfo tableInfo, boolean[] scanProjection,
                      boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo, OutputInfo output)
     {
-        super(queryId);
+        super(transId);
         this.tableInfo = tableInfo;
         this.scanProjection = scanProjection;
         this.partialAggregationPresent = partialAggregationPresent;

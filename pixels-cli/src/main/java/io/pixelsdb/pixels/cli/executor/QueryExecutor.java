@@ -104,7 +104,6 @@ public class QueryExecutor implements CommandExecutor
                             timeWriter.flush();
                             System.out.println(i);
                         }
-
                     }
                 }
                 timeWriter.flush();

@@ -54,7 +54,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
-    private final long queryId;
+    private final long transId;
     private final int RGStart;
     private int RGLen;
     private final boolean enableMetrics;
@@ -136,7 +136,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
-        this.queryId = option.getQueryId();
+        this.transId = option.getTransId();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
@@ -150,8 +150,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.fileName = this.physicalReader.getName();
         this.includedColumnTypes = new ArrayList<>();
         // Issue #175: this check is currently not necessary.
-        // requireNonNull(TransContext.Instance().getQueryTransInfo(this.queryId),
-        //         "The transaction context does not contain query (trans) id '" + this.queryId + "'");
+        // requireNonNull(TransContextCache.Instance().getQueryTransInfo(this.transId),
+        //         "The transaction context does not contain query (trans) id '" + this.transId + "'");
         checkBeforeRead();
     }
 
@@ -461,7 +461,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 long footerOffset = rowGroupInformation.getFooterOffset();
                 long footerLength = rowGroupInformation.getFooterLength();
                 int fi = i;
-                actionFutures.add(requestBatch.add(queryId, footerOffset, (int) footerLength).thenAccept(resp ->
+                actionFutures.add(requestBatch.add(transId, footerOffset, (int) footerLength).thenAccept(resp ->
                 {
                     if (resp != null)
                     {
@@ -486,7 +486,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
         try
         {
-            scheduler.executeBatch(physicalReader, requestBatch, queryId);
+            scheduler.executeBatch(physicalReader, requestBatch, transId);
             requestBatch.completeAll(actionFutures).join();
             requestBatch.clear();
             actionFutures.clear();
@@ -722,7 +722,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                  * readCost.setMs(readTimeMs);
                  * readPerfMetrics.addSeqRead(readCost);
                  */
-                actionFutures.add(requestBatch.add(queryId, chunk.offset, (int)chunk.length)
+                actionFutures.add(requestBatch.add(transId, chunk.offset, (int)chunk.length)
                         .thenAccept(resp ->
                 {
                     if (resp != null)
@@ -738,7 +738,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
             try
             {
-                scheduler.executeBatch(physicalReader, requestBatch, queryId);
+                scheduler.executeBatch(physicalReader, requestBatch, transId);
                 requestBatch.completeAll(actionFutures).join();
                 requestBatch.clear();
                 actionFutures.clear();

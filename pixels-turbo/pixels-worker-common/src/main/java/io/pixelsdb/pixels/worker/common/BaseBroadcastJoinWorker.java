@@ -80,7 +80,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
-            long queryId = event.getQueryId();
+            long transId = event.getTransId();
             BroadcastTableInfo leftTable = requireNonNull(event.getSmallTable(), "leftTable is null");
             StorageInfo leftInputStorageInfo = requireNonNull(leftTable.getStorageInfo(), "leftStorageInfo is null");
             List<InputSplit> leftInputs = requireNonNull(leftTable.getInputSplits(), "leftInputs is null");
@@ -148,7 +148,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, inputs, leftInputStorageInfo.getScheme(),
+                        buildHashTable(transId, joiner, inputs, leftInputStorageInfo.getScheme(),
                                 !leftTable.isBase(), leftCols, leftFilter, workerMetrics);
                     }
                     catch (Exception e)
@@ -188,10 +188,10 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                         {
                             int numJoinedRows = partitionOutput ?
                                     joinWithRightTableAndPartition(
-                                            queryId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            transId, joiner, inputs, rightInputStorageInfo.getScheme(),
                                             !rightTable.isBase(), rightCols, rightFilter,
                                             outputPartitionInfo, result, workerMetrics) :
-                                    joinWithRightTable(queryId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                    joinWithRightTable(transId, joiner, inputs, rightInputStorageInfo.getScheme(),
                                             !rightTable.isBase(), rightCols, rightFilter, result.get(0), workerMetrics);
                         } catch (Exception e)
                         {
@@ -279,7 +279,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
     /**
      * Scan the input files of the left table and populate the hash table for the join.
      *
-     * @param queryId the query id used by I/O scheduler
+     * @param transId the transaction id used by I/O scheduler
      * @param joiner the joiner for which the hash table is built
      * @param leftInputs the information of input files of the left table,
      *                   the list <b>must be mutable</b>
@@ -289,7 +289,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @param leftFilter the table scan filter on the left table
      * @param workerMetrics the collector of the performance metrics
      */
-    public static void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs,
+    public static void buildHashTable(long transId, Joiner joiner, List<InputInfo> leftInputs,
                                       Storage.Scheme leftScheme, boolean checkExistence, String[] leftCols,
                                       TableScanFilter leftFilter, WorkerMetrics workerMetrics)
     {
@@ -317,7 +317,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     {
                         input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
                     }
-                    PixelsReaderOption option = WorkerCommon.getReaderOption(queryId, leftCols, input);
+                    PixelsReaderOption option = WorkerCommon.getReaderOption(transId, leftCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     checkArgument(recordReader.isValid(), "failed to get record reader");
@@ -371,7 +371,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
     /**
      * Scan the input files of the right table and do the join.
      *
-     * @param queryId the query id used by I/O scheduler
+     * @param transId the transaction id used by I/O scheduler
      * @param joiner the joiner for the broadcast join
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
@@ -384,7 +384,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @return the number of joined rows produced in this split
      */
     public static int joinWithRightTable(
-            long queryId, Joiner joiner, List<InputInfo> rightInputs, Storage.Scheme rightScheme,
+            long transId, Joiner joiner, List<InputInfo> rightInputs, Storage.Scheme rightScheme,
             boolean checkExistence, String[] rightCols, TableScanFilter rightFilter,
             ConcurrentLinkedQueue<VectorizedRowBatch> joinResult, WorkerMetrics workerMetrics)
     {
@@ -412,7 +412,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     {
                         input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
                     }
-                    PixelsReaderOption option = WorkerCommon.getReaderOption(queryId, rightCols, input);
+                    PixelsReaderOption option = WorkerCommon.getReaderOption(transId, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     checkArgument(recordReader.isValid(), "failed to get record reader");
@@ -475,7 +475,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
     /**
      * Scan the input files of the right table, do the join, and partition the result.
      *
-     * @param queryId the query id used by I/O scheduler
+     * @param transId the transaction id used by I/O scheduler
      * @param joiner the joiner for the broadcast join
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
@@ -489,7 +489,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @return the number of joined rows produced in this split
      */
     public static int joinWithRightTableAndPartition(
-            long queryId, Joiner joiner, List<InputInfo> rightInputs, Storage.Scheme rightScheme,
+            long transId, Joiner joiner, List<InputInfo> rightInputs, Storage.Scheme rightScheme,
             boolean checkExistence, String[] rightCols, TableScanFilter rightFilter, PartitionInfo postPartitionInfo,
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics)
     {
@@ -520,7 +520,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     {
                         input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
                     }
-                    PixelsReaderOption option = WorkerCommon.getReaderOption(queryId, rightCols, input);
+                    PixelsReaderOption option = WorkerCommon.getReaderOption(transId, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     checkArgument(recordReader.isValid(), "failed to get record reader");

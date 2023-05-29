@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,32 +17,45 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.turbo;
+package io.pixelsdb.pixels.common.server.rest.request;
 
 /**
- * The base class for the input of a cloud function.
  * @author hank
- * @create 2022-06-28
+ * @create 2023-05-24
  */
-public abstract class Input
+public class EstimateCostRequest
 {
+    private String query;
+    private ExecutionHint executionHint;
+
     /**
-     * The unique id of the transaction.
+     * Default constructor for Jackson.
      */
-    private long transId;
+    public EstimateCostRequest() { }
 
-    public Input(long transId)
+    public EstimateCostRequest(String query, ExecutionHint executionHint)
     {
-        this.transId = transId;
+        this.query = query;
+        this.executionHint = executionHint;
     }
 
-    public long getTransId()
+    public String getQuery()
     {
-        return transId;
+        return query;
     }
 
-    public void setTransId(long transId)
+    public void setQuery(String query)
     {
-        this.transId = transId;
+        this.query = query;
+    }
+
+    public ExecutionHint getExecutionHint()
+    {
+        return executionHint;
+    }
+
+    public void setExecutionHint(ExecutionHint executionHint)
+    {
+        this.executionHint = executionHint;
     }
 }

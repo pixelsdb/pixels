@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,32 +17,16 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.turbo;
+package io.pixelsdb.pixels.common.server.rest.request;
 
 /**
- * The base class for the input of a cloud function.
  * @author hank
- * @create 2022-06-28
+ * @create 2023-05-24
  */
-public abstract class Input
+public enum ExecutionHint
 {
-    /**
-     * The unique id of the transaction.
-     */
-    private long transId;
-
-    public Input(long transId)
-    {
-        this.transId = transId;
-    }
-
-    public long getTransId()
-    {
-        return transId;
-    }
-
-    public void setTransId(long transId)
-    {
-        this.transId = transId;
-    }
+    LOW_COST, // prefer lower monetary cost
+    IMMEDIATE, // execute the query immediately
+    ADAPTIVE, // execute the query apatively using Pixel-Turbo
+    SCHEDULED // schedule the query to be executed at a start time
 }

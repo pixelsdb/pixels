@@ -74,7 +74,7 @@ public class PixelsPlanner
     private final boolean orderedPathEnabled;
     private final boolean compactPathEnabled;
     private final Storage storage;
-    private final long queryId;
+    private final long transId;
 
     static
     {
@@ -106,19 +106,19 @@ public class PixelsPlanner
      * joins have joined table on the left. There is no requirement for the end-point joins of
      * table base tables.
      *
-     * @param queryId the query id
+     * @param transId the transaction id
      * @param rootTable the join plan
      * @param orderedPathEnabled whether ordered path is enabled
      * @param compactPathEnabled whether compact path is enabled
      * @param metadataService the metadata service to access Pixels metadata
      * @throws IOException
      */
-    public PixelsPlanner(long queryId, Table rootTable,
+    public PixelsPlanner(long transId, Table rootTable,
                          boolean orderedPathEnabled,
                          boolean compactPathEnabled,
                          Optional<MetadataService> metadataService) throws IOException
     {
-        this.queryId = queryId;
+        this.transId = transId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
         checkArgument(rootTable.getTableType() == Table.TableType.JOINED || rootTable.getTableType() == Table.TableType.AGGREGATED,
                 "currently, PixelsPlanner only supports join and aggregation");
@@ -170,7 +170,7 @@ public class PixelsPlanner
         partialAggregationInfo.setPartition(numPartitions > 1);
         partialAggregationInfo.setNumPartition(numPartitions);
 
-        final String intermediateBase = IntermediateFolder + queryId + "/" +
+        final String intermediateBase = IntermediateFolder + transId + "/" +
                 aggregatedTable.getSchemaName() + "/" + aggregatedTable.getTableName() + "/";
 
         ImmutableList.Builder<String> aggrInputFilesBuilder = ImmutableList.builder();
@@ -187,7 +187,7 @@ public class PixelsPlanner
             for (int i = 0; i < inputSplits.size(); )
             {
                 ScanInput scanInput = new ScanInput();
-                scanInput.setQueryId(queryId);
+                scanInput.setTransId(transId);
                 ScanTableInfo tableInfo = new ScanTableInfo();
                 ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                         .builderWithExpectedSize(IntraWorkerParallelism);
@@ -253,7 +253,7 @@ public class PixelsPlanner
         for (int hash = 0; hash < numPartitions; ++hash)
         {
             AggregationInput finalAggrInput = new AggregationInput();
-            finalAggrInput.setQueryId(queryId);
+            finalAggrInput.setTransId(transId);
             AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
             aggregatedTableInfo.setTableName(aggregatedTable.getTableName());
             aggregatedTableInfo.setBase(false);
@@ -365,7 +365,7 @@ public class PixelsPlanner
                         BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
 
-                        String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/";
                         MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -406,7 +406,7 @@ public class PixelsPlanner
                     {
                         PartitionedJoinInput rightJoinInput = (PartitionedJoinInput) joinInput;
                         PartitionedChainJoinInput chainJoinInput = new PartitionedChainJoinInput();
-                        chainJoinInput.setQueryId(queryId);
+                        chainJoinInput.setTransId(transId);
                         chainJoinInput.setJoinInfo(rightJoinInput.getJoinInfo());
                         chainJoinInput.setOutput(rightJoinInput.getOutput());
                         chainJoinInput.setSmallTable(rightJoinInput.getSmallTable());
@@ -571,7 +571,7 @@ public class PixelsPlanner
                 }
 
                 BroadcastChainJoinInput broadcastChainJoinInput = new BroadcastChainJoinInput();
-                broadcastChainJoinInput.setQueryId(queryId);
+                broadcastChainJoinInput.setTransId(transId);
                 broadcastChainJoinInput.setChainTables(chainTableInfos);
                 List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
                 chainJoinInfos.add(chainJoinInfo);
@@ -666,7 +666,7 @@ public class PixelsPlanner
                         BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                        String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/";
                         MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -777,12 +777,12 @@ public class PixelsPlanner
                     BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                    String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                    String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
-                            queryId, leftTableInfo, rightTableInfo, joinInfo,
+                            transId, leftTableInfo, rightTableInfo, joinInfo,
                             false, null, output);
 
                     joinInputs.add(joinInput);
@@ -825,12 +825,12 @@ public class PixelsPlanner
                     BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
 
-                    String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                    String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
-                            queryId, rightTableInfo, leftTableInfo, joinInfo,
+                            transId, rightTableInfo, leftTableInfo, joinInfo,
                             false, null, output);
 
                     joinInputs.add(joinInput);
@@ -866,7 +866,7 @@ public class PixelsPlanner
 
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
-                        IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
@@ -895,7 +895,7 @@ public class PixelsPlanner
                 boolean[] leftPartitionProjection = getPartitionProjection(leftTable, join.getLeftProjection());
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
                         leftTable, leftInputSplits, leftKeyColumnIds, leftPartitionProjection, numPartition,
-                        IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs, leftPartitionProjection);
@@ -903,7 +903,7 @@ public class PixelsPlanner
                 boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
-                        IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
@@ -1168,7 +1168,7 @@ public class PixelsPlanner
         for (int i = 0; i < inputSplits.size();)
         {
             PartitionInput partitionInput = new PartitionInput();
-            partitionInput.setQueryId(queryId);
+            partitionInput.setTransId(transId);
             ScanTableInfo tableInfo = new ScanTableInfo();
             ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                     .builderWithExpectedSize(IntraWorkerParallelism);
@@ -1257,7 +1257,7 @@ public class PixelsPlanner
                 outputFileNames.add(i + "/join_left");
             }
 
-            String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+            String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
                     joinedTable.getTableName() + "/";
             MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
 
@@ -1272,7 +1272,7 @@ public class PixelsPlanner
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
                         joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
                         leftProjection, rightProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
-                 joinInput = new PartitionedJoinInput(queryId, leftTableInfo, rightTableInfo, joinInfo,
+                 joinInput = new PartitionedJoinInput(transId, leftTableInfo, rightTableInfo, joinInfo,
                          false, null, output);
             }
             else
@@ -1280,7 +1280,7 @@ public class PixelsPlanner
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
                         rightProjection, leftProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
-                joinInput = new PartitionedJoinInput(queryId, rightTableInfo, leftTableInfo, joinInfo,
+                joinInput = new PartitionedJoinInput(transId, rightTableInfo, leftTableInfo, joinInfo,
                         false, null, output);
             }
 

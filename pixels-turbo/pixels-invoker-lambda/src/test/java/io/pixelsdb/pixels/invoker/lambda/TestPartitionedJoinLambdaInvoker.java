@@ -51,7 +51,7 @@ public class TestPartitionedJoinLambdaInvoker
         }
 
         PartitionedJoinInput joinInput = new PartitionedJoinInput();
-        joinInput.setQueryId(123456);
+        joinInput.setTransId(123456);
         PartitionedTableInfo leftTableInfo = new PartitionedTableInfo();
         leftTableInfo.setTableName("orders");
         leftTableInfo.setColumnsToRead(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});

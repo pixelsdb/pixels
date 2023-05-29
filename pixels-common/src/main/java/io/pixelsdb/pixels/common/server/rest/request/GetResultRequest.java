@@ -20,54 +20,30 @@
 package io.pixelsdb.pixels.common.server.rest.request;
 
 /**
- * @create 2023-03-17
  * @author hank
+ * @create 2023-05-24
  */
-public class ExecuteQueryRequest
+public class GetResultRequest
 {
-    private String connName;
-    private String sql;
-    private int previewCount;
+    private String callbackToken;
 
     /**
      * Default constructor for Jackson.
      */
-    public ExecuteQueryRequest() {}
+    public GetResultRequest() { }
 
-    public ExecuteQueryRequest(String connName, String sql, int previewCount)
+    public GetResultRequest(String callbackToken)
     {
-        this.connName = connName;
-        this.sql = sql;
-        this.previewCount = previewCount;
+        this.callbackToken = callbackToken;
     }
 
-    public String getConnName()
+    public String getCallbackToken()
     {
-        return connName;
+        return callbackToken;
     }
 
-    public void setConnName(String connName)
+    public void setCallbackToken(String callbackToken)
     {
-        this.connName = connName;
-    }
-
-    public String getSql()
-    {
-        return sql;
-    }
-
-    public void setSql(String sql)
-    {
-        this.sql = sql;
-    }
-
-    public int getPreviewCount()
-    {
-        return previewCount;
-    }
-
-    public void setPreviewCount(int previewCount)
-    {
-        this.previewCount = previewCount;
+        this.callbackToken = callbackToken;
     }
 }

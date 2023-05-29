@@ -48,7 +48,7 @@ public class TestPartitioner
                 .setPath("/home/hank/Desktop/20220313083127_0.compact.pxl")
                 .setStorage(storage).setPixelsFooterCache(new PixelsFooterCache()).setEnableCache(false).build();
         PixelsReaderOption option = new PixelsReaderOption();
-        option.queryId(123456);
+        option.transId(123456);
         option.includeCols(new String[] {"c_custkey", "c_name", "c_address",
                 "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"});
         option.rgRange(4, 4);
@@ -171,7 +171,7 @@ public class TestPartitioner
                 .setPath("/home/hank/Desktop/part-0")
                 .setStorage(storage).setPixelsFooterCache(new PixelsFooterCache()).setEnableCache(false).build();
         PixelsReaderOption option1 = new PixelsReaderOption();
-        option1.queryId(123456);
+        option1.transId(123456);
         option1.includeCols(new String[] {"c_custkey", "c_name", "c_address",
                 "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"});
         option1.rgRange(0, -1);
@@ -215,7 +215,7 @@ public class TestPartitioner
                 .setPath("/home/hank/Desktop/20220313083127_0.compact.pxl")
                 .setStorage(storage).setPixelsFooterCache(new PixelsFooterCache()).setEnableCache(false).build();
         PixelsReaderOption option = new PixelsReaderOption();
-        option.queryId(123456);
+        option.transId(123456);
         option.includeCols(new String[] {"c_custkey", "c_name", "c_address",
                 "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"});
         option.rgRange(4, 4);
@@ -335,7 +335,7 @@ public class TestPartitioner
                 .setPath("/home/hank/Desktop/part-0")
                 .setStorage(storage).setPixelsFooterCache(new PixelsFooterCache()).setEnableCache(false).build();
         PixelsReaderOption option1 = new PixelsReaderOption();
-        option1.queryId(123456);
+        option1.transId(123456);
         option1.includeCols(new String[] {"c_custkey", "c_name", "c_address",
                 "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"});
         option1.rgRange(0, -1);

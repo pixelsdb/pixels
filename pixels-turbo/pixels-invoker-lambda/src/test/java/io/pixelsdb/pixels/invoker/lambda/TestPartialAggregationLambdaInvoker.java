@@ -47,7 +47,7 @@ public class TestPartialAggregationLambdaInvoker
             String filter =
                     "{\"schemaName\":\"tpch\",\"tableName\":\"orders\",\"columnFilters\":{}}";
             ScanInput scanInput = new ScanInput();
-            scanInput.setQueryId(123456);
+            scanInput.setTransId(123456);
             ScanTableInfo tableInfo = new ScanTableInfo();
             tableInfo.setTableName("orders");
             tableInfo.setColumnsToRead(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
