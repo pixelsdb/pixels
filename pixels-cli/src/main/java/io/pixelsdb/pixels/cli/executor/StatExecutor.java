@@ -169,6 +169,8 @@ public class StatExecutor implements CommandExecutor
             column.getRecordStats().reset();
         }
 
+        metadataService.updateRowCount(schemaName, tableName, rowCount);
+
         /* Set cardinality and null_fraction after the chunk size and column size,
          * because chunk size and column size must exist in the metadata when calculating
          * the cardinality and null_fraction using SQL queries.
