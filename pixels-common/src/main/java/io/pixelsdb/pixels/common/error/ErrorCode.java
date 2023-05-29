@@ -61,7 +61,7 @@ public class ErrorCode
     public static final int ERROR_MQ_WRITER_IS_RUNNING = (ERROR_BASE_MQ + 4);
     public static final int ERROR_MQ_READER_IS_ROLLBACK = (ERROR_BASE_MQ + 5);
     public static final int ERROR_MQ_READER_IS_RUNNING = (ERROR_BASE_MQ + 6);
-    public static final int ERROR_MQ_READER_INVALID_MESSAGE_LENGTH = (ERROR_BASE_MQ + 6);
+    public static final int ERROR_MQ_READER_INVALID_MESSAGE_LENGTH = (ERROR_BASE_MQ + 7);
     // end error code for shared memory message queue
 
     // begin error code for transactions
@@ -70,5 +70,7 @@ public class ErrorCode
     public static final int TRANS_HIGH_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 2);
     public static final int TRANS_ID_NOT_EXIST = (ERROR_TRANS + 3);
     public static final int TRANS_BAD_GET_CONTEXT_REQUEST = (ERROR_TRANS + 4);
+    public static final int TRANS_COMMIT_FAILED = (ERROR_TRANS + 5);
+
     // end error code for transactions
 }

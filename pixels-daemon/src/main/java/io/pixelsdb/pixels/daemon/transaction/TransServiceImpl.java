@@ -71,45 +71,53 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     {
         int error = ErrorCode.SUCCESS;
         // must get transaction context before setTransCommit()
-        boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
-        boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
-        if (!success)
+        if (TransContextManager.Instance().isTransExist(request.getTransId()))
         {
-            error = ErrorCode.TRANS_ID_NOT_EXIST;
-        }
-        long timestamp = request.getTimestamp();
-        if (readOnly)
-        {
-            long value = LowWatermark.get();
-            if (timestamp >= value)
+            boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
+            boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
+            if (!success)
             {
-                while(!LowWatermark.compareAndSet(value, timestamp))
+                error = ErrorCode.TRANS_COMMIT_FAILED;
+            }
+            long timestamp = request.getTimestamp();
+            if (readOnly)
+            {
+                long value = LowWatermark.get();
+                if (timestamp >= value)
                 {
-                    value = LowWatermark.get();
-                    if (timestamp < value)
+                    while (!LowWatermark.compareAndSet(value, timestamp))
                     {
-                        // it is not an error if there is no need to push the low watermark
-                        break;
+                        value = LowWatermark.get();
+                        if (timestamp < value)
+                        {
+                            // it is not an error if there is no need to push the low watermark
+                            break;
+                        }
+                    }
+                }
+            } else
+            {
+                long value = HighWatermark.get();
+                if (timestamp >= value)
+                {
+                    while (!HighWatermark.compareAndSet(value, timestamp))
+                    {
+                        value = HighWatermark.get();
+                        if (timestamp < value)
+                        {
+                            // it is not an error if there is no need to push the high watermark
+                            break;
+                        }
                     }
                 }
             }
         }
         else
         {
-            long value = HighWatermark.get();
-            if (timestamp >= value)
-            {
-                while(!HighWatermark.compareAndSet(value, timestamp))
-                {
-                    value = HighWatermark.get();
-                    if (timestamp < value)
-                    {
-                        // it is not an error if there is no need to push the high watermark
-                        break;
-                    }
-                }
-            }
+            log.error(String.format("transaction id %d does not exist in the context manager", request.getTransId()));
+            error = ErrorCode.TRANS_ID_NOT_EXIST;
         }
+
         TransProto.CommitTransResponse response =
                 TransProto.CommitTransResponse.newBuilder().setErrorCode(error).build();
         responseObserver.onNext(response);

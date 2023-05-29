@@ -29,18 +29,13 @@ import java.util.concurrent.ArrayBlockingQueue;
  */
 public class QueryQueues
 {
-    public enum ExecutorType
-    {
-        Cluster, Lambda, None // None means the query should wait for execution.
-    }
-
-    private final ArrayBlockingQueue<Long> clusterQueue;
-    private final ArrayBlockingQueue<Long> lambdaQueue;
+    private final ArrayBlockingQueue<Long> mppQueue;
+    private final ArrayBlockingQueue<Long> cfQueue;
 
     private QueryQueues(int clusterQueueCapacity, int lambdaQueueCapacity)
     {
-        this.clusterQueue = new ArrayBlockingQueue<>(clusterQueueCapacity);
-        this.lambdaQueue = new ArrayBlockingQueue<>(lambdaQueueCapacity);
+        this.mppQueue = new ArrayBlockingQueue<>(clusterQueueCapacity);
+        this.cfQueue = new ArrayBlockingQueue<>(lambdaQueueCapacity);
     }
 
     private static QueryQueues instance = null;
@@ -50,9 +45,9 @@ public class QueryQueues
         if (instance == null)
         {
             int clusterQueueCapacity = Integer.parseInt(
-                    ConfigFactory.Instance().getProperty("scaling.cluster.queue.capacity"));
+                    ConfigFactory.Instance().getProperty("scaling.mpp.queue.capacity"));
             int lambdaQueueCapacity = Integer.parseInt(
-                    ConfigFactory.Instance().getProperty("scaling.serverless.queue.capacity"));
+                    ConfigFactory.Instance().getProperty("scaling.cf.queue.capacity"));
             instance = new QueryQueues(clusterQueueCapacity, lambdaQueueCapacity);
         }
         return instance;
@@ -60,26 +55,26 @@ public class QueryQueues
 
     public synchronized ExecutorType Enqueue(long transId)
     {
-        if (this.clusterQueue.offer(transId))
+        if (this.mppQueue.offer(transId))
         {
-            return ExecutorType.Cluster;
+            return ExecutorType.MPP;
         }
-        if (this.lambdaQueue.offer(transId))
+        if (this.cfQueue.offer(transId))
         {
-            return ExecutorType.Lambda;
+            return ExecutorType.CF;
         }
-        return ExecutorType.None;
+        return ExecutorType.PENDING;
     }
 
     public boolean Dequeue(long transId, ExecutorType executorType)
     {
-        if (executorType == ExecutorType.Cluster)
+        if (executorType == ExecutorType.MPP)
         {
-            return this.clusterQueue.remove(transId);
+            return this.mppQueue.remove(transId);
         }
-        if (executorType == ExecutorType.Lambda)
+        if (executorType == ExecutorType.CF)
         {
-            return this.lambdaQueue.remove(transId);
+            return this.cfQueue.remove(transId);
         }
         return false;
     }

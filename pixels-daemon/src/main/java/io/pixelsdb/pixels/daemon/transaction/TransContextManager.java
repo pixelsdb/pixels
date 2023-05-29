@@ -108,6 +108,11 @@ public class TransContextManager
         return this.transIdToContext.get(transId);
     }
 
+    public synchronized boolean isTransExist(long transId)
+    {
+        return this.transIdToContext.containsKey(transId);
+    }
+
     public synchronized TransContext getTransContext(String externalTraceId)
     {
         Long transId = this.traceIdToTransId.get(externalTraceId);
