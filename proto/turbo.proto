@@ -29,7 +29,7 @@ option java_outer_classname = "TurboProto";
 package turbo.proto;
 
 // The service definitions for the serverless workers in vHive.
-service TurboWorkerService {
+service vHiveWorkerService {
   rpc SayHello (HelloRequest) returns (HelloResponse);
 }
 

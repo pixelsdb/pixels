@@ -38,6 +38,7 @@ service MetadataService {
     rpc ExistTable (ExistTableRequest) returns (ExistTableResponse);
     rpc GetTable (GetTableRequest) returns (GetTableResponse);
     rpc GetTables (GetTablesRequest) returns (GetTablesResponse);
+    rpc UpdateRowCount (UpdateRowCountRequest) returns (UpdateRowCountResponse);
     rpc DropTable (DropTableRequest) returns (DropTableResponse);
     rpc AddLayout (AddLayoutRequest) returns (AddLayoutResponse);
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
@@ -204,6 +205,17 @@ message CreateTableRequest {
 }
 
 message CreateTableResponse {
+    ResponseHeader header = 1;
+}
+
+message UpdateRowCountRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+    uint64 rowCount = 4;
+}
+
+message UpdateRowCountResponse {
     ResponseHeader header = 1;
 }
 

@@ -121,6 +121,48 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
+    @Override
+    public void updateRowCount(MetadataProto.UpdateRowCountRequest request, StreamObserver<MetadataProto.UpdateRowCountResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.ResponseHeader header;
+        MetadataProto.UpdateRowCountResponse response;
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        MetadataProto.Table table;
+
+        if(schema != null)
+        {
+            table = tableDao.getByNameAndSchema(request.getTableName(), schema);
+            if (table == null)
+            {
+                header = headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND)
+                        .setErrorMsg("table not found").build();
+            }
+            else
+            {
+                table = table.toBuilder().setRowCount(request.getRowCount()).build();
+                if (tableDao.update(table))
+                {
+                    header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+                }
+                else
+                {
+                    header = headerBuilder.setErrorCode(METADATA_UPDATE_TABLE_FAILED)
+                            .setErrorMsg("metadata service failed to update table row count").build();
+                }
+            }
+        }
+        else
+        {
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' not found").build();
+        }
+        response = MetadataProto.UpdateRowCountResponse.newBuilder().setHeader(header).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
     /**
      * @param request
      * @param responseObserver

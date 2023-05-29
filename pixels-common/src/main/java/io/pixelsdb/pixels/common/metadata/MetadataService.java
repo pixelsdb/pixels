@@ -113,6 +113,32 @@ public class MetadataService
         return table;
     }
 
+    public boolean updateRowCount(String schemaName, String tableName, long rowCount) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.UpdateRowCountRequest request = MetadataProto.UpdateRowCountRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).setRowCount(rowCount).build();
+        try
+        {
+            MetadataProto.UpdateRowCountResponse response = this.stub.updateRowCount(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update table row count", e);
+        }
+        return true;
+    }
+
     public List<Table> getTables(String schemaName) throws MetadataException
     {
         List<Table> tables = new ArrayList<>();
