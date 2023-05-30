@@ -2,8 +2,11 @@ package io.pixelsdb.pixels.worker.vhive;
 
 import io.grpc.ServerBuilder;
 import io.pixelsdb.pixels.worker.vhive.utils.Server;
+import io.pixelsdb.pixels.worker.vhive.utils.Utils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.RollingFileAppender;
 
 import java.io.IOException;
 import java.util.concurrent.Executors;
@@ -34,10 +37,15 @@ public class WorkerServer implements Server {
     public void shutdown() {
         this.running = false;
         try {
+            RollingFileAppender appender = (RollingFileAppender) LoggerContext.getContext().getConfiguration().getAppenders().get("log");
+            String logFilename = appender.getFileName();
+            Utils.append(logFilename, "experiments/" + logFilename);
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
             log.info("rpc server close successfully");
         } catch (InterruptedException e) {
             log.error("Interrupted when shutdown rpc server.", e);
+        } catch (IOException e) {
+            log.error("Append log failed when shutdown rpc server.", e);
         }
     }
 
