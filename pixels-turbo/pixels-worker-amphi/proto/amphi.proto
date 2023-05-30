@@ -31,6 +31,7 @@ package amphi.proto;
 // The service definitions for pixels-amphi.
 service AmphiService {
   rpc TranspileSql (TranspileSqlRequest) returns (TranspileSqlResponse);
+  rpc TrinoQuery (TrinoQueryRequest) returns (TrinoQueryResponse);
 }
 
 // header
@@ -55,4 +56,18 @@ message TranspileSqlRequest {
 message TranspileSqlResponse {
   ResponseHeader header = 1;
   string sqlTranspiled = 2;
+}
+
+message TrinoQueryRequest {
+  RequestHeader header = 1;
+  string trinoUrl = 2;
+  int32 trinoPort = 3;
+  string catalog = 4;
+  string schema = 5;
+  string sqlQuery = 6;
+}
+
+message TrinoQueryResponse {
+  ResponseHeader header = 1;
+  string queryResult = 2;
 }

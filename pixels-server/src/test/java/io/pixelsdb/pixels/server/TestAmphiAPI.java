@@ -101,7 +101,7 @@ public class TestAmphiAPI
     @DirtiesContext
     public void testTrinoQuerySimple()
     {
-        String aggregateQuery = "SELECT COUNT(*) FROM LINEITEM";
+        String aggregateQuery = "SELECT COUNT(*) AS item_count FROM LINEITEM";
 
         AmphiProto.TrinoQueryRequest request = AmphiProto.TrinoQueryRequest.newBuilder()
                 .setTrinoUrl("ec2-18-218-128-203.us-east-2.compute.amazonaws.com")
@@ -114,6 +114,28 @@ public class TestAmphiAPI
         AmphiProto.TrinoQueryResponse response = amphiService.trinoQuery(request);
 
         assertNotNull(response);
+        assertEquals("item_count: 6001215\n", response.getQueryResult());
+    }
+
+    @Test
+    @DirtiesContext
+    public void testTrinoQueryTpch()
+    {
+        String tpchQuery6 = "select sum(l_extendedprice * l_discount) as revenue from LINEITEM where l_shipdate >= date '1994-01-01' and l_shipdate < date '1994-01-01' + interval '1' year and l_discount between 0.06 - 0.01 and 0.06 + 0.01 and l_quantity < 24";
+
+        AmphiProto.TrinoQueryRequest request = AmphiProto.TrinoQueryRequest.newBuilder()
+                .setTrinoUrl("ec2-18-218-128-203.us-east-2.compute.amazonaws.com")
+                .setTrinoPort(8080)
+                .setCatalog("pixels")
+                .setSchema("tpch_1g")
+                .setSqlQuery(tpchQuery6)
+                .build();
+
+        AmphiProto.TrinoQueryResponse response = amphiService.trinoQuery(request);
+
+        assertNotNull(response);
         System.out.println(response.getQueryResult());
+        assertEquals("revenue: 123141078.2283\n", response.getQueryResult());
     }
 }
+
