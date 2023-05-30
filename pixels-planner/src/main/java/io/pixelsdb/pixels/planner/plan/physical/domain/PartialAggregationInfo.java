@@ -21,9 +21,6 @@ package io.pixelsdb.pixels.planner.plan.physical.domain;
 
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
 
-import java.util.Arrays;
-import java.util.Objects;
-
 /**
  * @author hank
  * @create 2022-07-05
@@ -95,10 +92,6 @@ public class PartialAggregationInfo
                 builder.functionTypes,
                 builder.partition,
                 builder.numPartition);
-    }
-
-    public static Builder newBuilder() {
-        return new Builder();
     }
 
     public String[] getGroupKeyColumnAlias()
@@ -181,24 +174,8 @@ public class PartialAggregationInfo
         this.numPartition = numPartition;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PartialAggregationInfo that = (PartialAggregationInfo) o;
-        return partition == that.partition && numPartition == that.numPartition && Arrays.equals(groupKeyColumnAlias, that.groupKeyColumnAlias) && Arrays.equals(resultColumnAlias, that.resultColumnAlias) && Arrays.equals(resultColumnTypes, that.resultColumnTypes) && Arrays.equals(groupKeyColumnIds, that.groupKeyColumnIds) && Arrays.equals(aggregateColumnIds, that.aggregateColumnIds) && Arrays.equals(functionTypes, that.functionTypes);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = Objects.hash(partition, numPartition);
-        result = 31 * result + Arrays.hashCode(groupKeyColumnAlias);
-        result = 31 * result + Arrays.hashCode(resultColumnAlias);
-        result = 31 * result + Arrays.hashCode(resultColumnTypes);
-        result = 31 * result + Arrays.hashCode(groupKeyColumnIds);
-        result = 31 * result + Arrays.hashCode(aggregateColumnIds);
-        result = 31 * result + Arrays.hashCode(functionTypes);
-        return result;
+    public static Builder newBuilder() {
+        return new Builder();
     }
 
     public static final class Builder {

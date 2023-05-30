@@ -19,13 +19,12 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical.domain;
 
-import java.util.Objects;
-
 /**
  * @author hank
  * @create 2022-06-02
  */
-public class OutputInfo {
+public class OutputInfo
+{
     /**
      * The path that the output file is written into.
      */
@@ -59,10 +58,6 @@ public class OutputInfo {
 
     private OutputInfo(Builder builder) {
         this(builder.path, builder.randomFileName, builder.storageInfo, builder.encoding);
-    }
-
-    public static Builder newBuilder() {
-        return new Builder();
     }
 
     public String getPath()
@@ -105,17 +100,8 @@ public class OutputInfo {
         this.encoding = encoding;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        OutputInfo that = (OutputInfo) o;
-        return randomFileName == that.randomFileName && encoding == that.encoding && path.equals(that.path) && storageInfo.equals(that.storageInfo);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(path, randomFileName, storageInfo, encoding);
+    public static Builder newBuilder() {
+        return new Builder();
     }
 
     public static final class Builder {

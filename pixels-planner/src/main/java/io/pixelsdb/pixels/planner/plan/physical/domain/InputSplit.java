@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.planner.plan.physical.domain;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
  * @author hank
@@ -40,24 +39,13 @@ public class InputSplit
         this.inputInfos = inputInfos;
     }
 
-    public List<InputInfo> getInputInfos() {
+    public List<InputInfo> getInputInfos()
+    {
         return inputInfos;
     }
 
-    public void setInputInfos(List<InputInfo> inputInfos) {
+    public void setInputInfos(List<InputInfo> inputInfos)
+    {
         this.inputInfos = inputInfos;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        InputSplit that = (InputSplit) o;
-        return inputInfos.equals(that.inputInfos);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(inputInfos);
     }
 }

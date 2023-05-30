@@ -21,8 +21,6 @@ package io.pixelsdb.pixels.planner.plan.physical.domain;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 
-import java.util.Objects;
-
 /**
  * The information of the storage endpoint, such as S3 or Minio.
  * @author hank
@@ -62,10 +60,6 @@ public class StorageInfo
 
     private StorageInfo(Builder builder) {
         this(builder.scheme, builder.endpoint, builder.accessKey, builder.secretKey);
-    }
-
-    public static Builder newBuilder() {
-        return new Builder();
     }
 
     public Storage.Scheme getScheme()
@@ -108,17 +102,8 @@ public class StorageInfo
         this.secretKey = secretKey;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        StorageInfo that = (StorageInfo) o;
-        return scheme == that.scheme && endpoint.equals(that.endpoint) && accessKey.equals(that.accessKey) && secretKey.equals(that.secretKey);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(scheme, endpoint, accessKey, secretKey);
+    public static Builder newBuilder() {
+        return new Builder();
     }
 
     public static final class Builder {
