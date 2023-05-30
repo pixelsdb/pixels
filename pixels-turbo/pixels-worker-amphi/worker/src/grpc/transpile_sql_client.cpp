@@ -14,8 +14,12 @@ using amphi::proto::RequestHeader;
 TranspileSqlClient::TranspileSqlClient(std::shared_ptr<Channel> channel)
         : stub_(AmphiService::NewStub(channel)) {}
 
-std::string TranspileSqlClient::TranspileSql(const std::string& token, const std::string& sql_statement,
-                                             const std::string& from_dialect, const std::string& to_dialect) {
+std::string TranspileSqlClient::TranspileSql(
+        const std::string& token,
+        const std::string& sql_statement,
+        const std::string& from_dialect,
+        const std::string& to_dialect){
+
     // Prepare the request
     TranspileSqlRequest request;
     request.mutable_header()->set_token(token);

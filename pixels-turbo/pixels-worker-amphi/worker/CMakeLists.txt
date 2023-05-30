@@ -5,8 +5,10 @@ find_package(gRPC CONFIG REQUIRED)
 set(worker_cxx
         src/db/duckdb_manager.cpp
         src/grpc/transpile_sql_client.cpp
+        src/grpc/trino_query_client.cpp
         src/exception/grpc_exception.cpp
         src/exception/grpc_transpile_exception.cpp
+        src/exception/grpc_trino_query_exception.cpp
         src/exception/grpc_unavailable_exception.cpp
         src/utils/constants.cpp)
 

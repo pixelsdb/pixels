@@ -7,6 +7,7 @@
 #include "spdlog/spdlog.h"
 
 #include "grpc/transpile_sql_client.h"
+#include "grpc/trino_query_client.h"
 #include "db/duckdb_manager.h"
 
 using namespace cli;
@@ -18,14 +19,26 @@ int main() {
     DuckDBManager db_manager(":memory:");
     db_manager.importSqlFile("./resources/tpch_schema.sql");
 
+    // Connect to pixels-server
     std::string host_addr = config["server_address"].as<std::string>();
     std::string port = config["server_port"].as<std::string>();
-    TranspileSqlClient client(grpc::CreateChannel(host_addr + ":" + port, grpc::InsecureChannelCredentials()));
+    TranspileSqlClient transpileSqlClient(grpc::CreateChannel(host_addr + ":" + port, grpc::InsecureChannelCredentials()));
     spdlog::info("Connected to server: {}", host_addr + ":" + port);
 
+    // Configure transpile request
     std::string token = "";
     std::string from_dialect = "duckdb";
     std::string to_dialect = "hive";
+    spdlog::info("Configured the SQL dialect transpile as {} -> {}", from_dialect, to_dialect);
+
+    // Configure trino endpoint
+    std::string trino_url = config["trino_url"].as<std::string>();
+    int trino_port = config["trino_port"].as<int>();
+    std::string trino_default_catalog = config["trino_default_catalog"].as<std::string>();
+    std::string trino_default_schema = config["trino_default_schema"].as<std::string>();
+    TrinoQueryClient trinoQueryClient(grpc::CreateChannel(host_addr + ":" + port, grpc::InsecureChannelCredentials()));
+    spdlog::info("Configured the trino query endpoint: {}:{}/{}/{}",
+                 trino_url, trino_port, trino_default_catalog, trino_default_schema);
 
     // start the interactive cli menu
     auto rootMenu = std::make_unique<Menu>("worker-cli");
@@ -39,7 +52,7 @@ int main() {
             "transpile",
             [&](std::ostream& out, std::string query){
                 try {
-                    std::string transpiled_result = client.TranspileSql(token, query, from_dialect, to_dialect);
+                    std::string transpiled_result = transpileSqlClient.TranspileSql(token, query, from_dialect, to_dialect);
                     out << "Transpiled SQL query is: " << transpiled_result << std::endl;
                 } catch (const std::exception& e) {
                     std::cerr << "Caught exception: " << e.what() << std::endl;
@@ -47,6 +60,19 @@ int main() {
                 }
             },
             "Call TranspileSQL Service");
+    rootMenu->Insert(
+            "trino",
+            [&](std::ostream& out, std::string query){
+                try {
+                    std::string query_result = trinoQueryClient.TrinoQuery(token, trino_url, trino_port,
+                                                                 trino_default_catalog, trino_default_schema, query);
+                    out << "Trino query result: \n" << query_result << std::endl;
+                } catch (const std::exception& e) {
+                    std::cerr << "Caught exception: " << e.what() << std::endl;
+                    spdlog::error("Caught trino query exception: {}", e.what());
+                }
+            },
+            "Send SQL query to trino endpoint");
 
     rootMenu->Insert(
             "color",
@@ -88,7 +114,7 @@ int main() {
 
     // global exit action
     cli.ExitAction([](auto& out){
-        out << "Exit worker-cli and disconnected with Pixels." << std::endl;
+        out << "bye~" << std::endl;
     });
 
     CliFileSession input(cli);
