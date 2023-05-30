@@ -5,13 +5,11 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.turbo.TurboProto;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.common.WorkerMetrics;
-import io.pixelsdb.pixels.worker.common.WorkerProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import java.util.UUID;
 
 public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O extends Output> {
     private static final Logger log = LogManager.getLogger(ServiceImpl.class);
@@ -26,14 +24,14 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
         this.typeParameterClass = typeParameterClass;
     }
 
-    public void execute(WorkerProto.WorkerRequest request,
-                        StreamObserver<WorkerProto.WorkerResponse> responseObserver) {
+    public void execute(TurboProto.WorkerRequest request,
+                        StreamObserver<TurboProto.WorkerResponse> responseObserver) {
         I input = JSON.parseObject(request.getJson(), typeParameterClass);
         O output;
 
         boolean isProfile = Boolean.parseBoolean(System.getenv("PROFILING_ENABLED"));
         try {
-            String requestId = String.format("%d_%s", input.getQueryId(), UUID.randomUUID());
+            String requestId = String.format("%d", input.getTransId());
             WorkerContext context = new WorkerContext(LogManager.getLogger(handlerClass), new WorkerMetrics(), requestId);
             RequestHandler<I, O> handler = handlerClass.getConstructor(WorkerContext.class).newInstance(context);
 
@@ -58,7 +56,7 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
         } catch (Exception e) {
             throw new RuntimeException("Exception during process: ", e);
         }
-        WorkerProto.WorkerResponse response = WorkerProto.WorkerResponse.newBuilder()
+        TurboProto.WorkerResponse response = TurboProto.WorkerResponse.newBuilder()
                 .setJson(JSON.toJSONString(output))
                 .build();
         responseObserver.onNext(response);
