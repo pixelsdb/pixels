@@ -44,17 +44,18 @@ public class Utils {
         inputStream.close();
         ftpClient.logout();
     }
+
     public static void dump(String filename, String content) throws IOException {
         FileOutputStream outputStream = new FileOutputStream(filename);
         outputStream.write(content.getBytes(StandardCharsets.UTF_8));
         outputStream.close();
     }
 
-    public static void startProfile(String event, String filename) throws IOException {
-        profiler.execute(String.format("start,jfr,threads,event=%s,file=%s", event, filename));
+    public static void startProfile(String filename) throws IOException {
+        PROFILER.execute(String.format("start,jfr,threads,event=%s,file=%s", EVENT, filename));
     }
 
     public static void stopProfile(String filename) throws IOException {
-        profiler.execute(String.format("stop,file=%s", filename));
+        PROFILER.execute(String.format("stop,file=%s", filename));
     }
 }

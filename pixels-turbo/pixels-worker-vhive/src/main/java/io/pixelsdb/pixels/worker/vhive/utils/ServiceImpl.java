@@ -42,9 +42,7 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
                 log.info(String.format("enable profile to execute input: %s", JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
 
                 String JFRFilename = String.format("%s.jfr", handler.getRequestId());
-                String event = System.getenv("PROFILING_EVENT");
-
-                Utils.startProfile(event, JFRFilename);
+                Utils.startProfile(JFRFilename);
                 output = handler.handleRequest(input);
                 Utils.stopProfile(JFRFilename);
 
@@ -66,6 +64,4 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
-
-
 }
