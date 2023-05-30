@@ -4,7 +4,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.pixelsdb.pixels.common.turbo.Invoker;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.invoker.vhive.utils.ListenableFutureAdapter;
-import io.pixelsdb.pixels.worker.common.WorkerProto;
+import io.pixelsdb.pixels.turbo.TurboProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -19,7 +19,7 @@ public abstract class VhiveInvoker implements Invoker {
         this.functionName = functionName;
         int memoryMB = 0;
         try {
-            WorkerProto.GetMemoryResponse response = Vhive.Instance().getAsyncClient().getMemory().get();
+            TurboProto.GetMemoryResponse response = Vhive.Instance().getAsyncClient().getMemory().get();
             memoryMB = (int)response.getMemoryMB();
         } catch (Exception e) {
             logger.warn("failed to get memory: " + e);
@@ -37,8 +37,8 @@ public abstract class VhiveInvoker implements Invoker {
         return memoryMB;
     }
 
-    public CompletableFuture<Output> genCompletableFuture(ListenableFuture<WorkerProto.WorkerResponse> listenableFuture) {
-        CompletableFuture<WorkerProto.WorkerResponse> completableFuture = ListenableFutureAdapter.toCompletable(listenableFuture);
+    public CompletableFuture<Output> genCompletableFuture(ListenableFuture<TurboProto.WorkerResponse> listenableFuture) {
+        CompletableFuture<TurboProto.WorkerResponse> completableFuture = ListenableFutureAdapter.toCompletable(listenableFuture);
         return completableFuture.handle((response, err) -> {
             if (err == null) {
                 String outputJson = response.getJson();

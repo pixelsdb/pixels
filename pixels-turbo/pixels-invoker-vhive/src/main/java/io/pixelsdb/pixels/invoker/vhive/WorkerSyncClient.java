@@ -5,13 +5,14 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.input.*;
 import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import io.pixelsdb.pixels.worker.common.WorkerProto;
-import io.pixelsdb.pixels.worker.common.WorkerServiceGrpc;
+import io.pixelsdb.pixels.turbo.TurboProto;
+import io.pixelsdb.pixels.turbo.vHiveWorkerServiceGrpc;
 
 import java.util.concurrent.TimeUnit;
 
@@ -19,7 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 public class WorkerSyncClient {
     private final ManagedChannel channel;
-    private final WorkerServiceGrpc.WorkerServiceBlockingStub stub;
+    private final vHiveWorkerServiceGrpc.vHiveWorkerServiceBlockingStub stub;
 
     public WorkerSyncClient(String host, int port) {
         checkArgument(host != null, "illegal rpc host");
@@ -28,7 +29,7 @@ public class WorkerSyncClient {
 
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
-        this.stub = WorkerServiceGrpc.newBlockingStub(channel);
+        this.stub = vHiveWorkerServiceGrpc.newBlockingStub(channel);
     }
 
 
@@ -40,75 +41,73 @@ public class WorkerSyncClient {
         return this.channel.getState(true);
     }
 
-    public String hello(String username) {
-        WorkerProto.HelloRequest request = WorkerProto.HelloRequest.newBuilder()
-                .setName(username)
-                .build();
-
-        WorkerProto.HelloResponse response = this.stub.hello(request);
-        return response.getOutput();
-    }
-
     public AggregationOutput aggregation(AggregationInput input) {
-        WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.AGGREGATION))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
-        WorkerProto.WorkerResponse response = this.stub.aggregation(request);
+        TurboProto.WorkerResponse response = this.stub.process(request);
         AggregationOutput output = JSON.parseObject(response.getJson(), AggregationOutput.class);
         return output;
     }
 
     public JoinOutput broadcastChainJoin(BroadcastChainJoinInput input) {
-        WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.BROADCAST_CHAIN_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
-        WorkerProto.WorkerResponse response = this.stub.broadcastChainJoin(request);
+        TurboProto.WorkerResponse response = this.stub.process(request);
         JoinOutput output = JSON.parseObject(response.getJson(), JoinOutput.class);
         return output;
     }
 
     public JoinOutput broadcastJoin(BroadcastJoinInput input) {
-        WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.BROADCAST_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
-        WorkerProto.WorkerResponse response = this.stub.broadcastJoin(request);
+        TurboProto.WorkerResponse response = this.stub.process(request);
         JoinOutput output = JSON.parseObject(response.getJson(), JoinOutput.class);
         return output;
     }
 
     public JoinOutput partitionChainJoin(PartitionedChainJoinInput input) {
-        WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.PARTITIONED_CHAIN_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
-        WorkerProto.WorkerResponse response = this.stub.partitionChainJoin(request);
+        TurboProto.WorkerResponse response = this.stub.process(request);
         JoinOutput output = JSON.parseObject(response.getJson(), JoinOutput.class);
         return output;
     }
 
     public JoinOutput partitionJoin(PartitionedJoinInput input) {
-        WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.PARTITIONED_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
-        WorkerProto.WorkerResponse response = this.stub.partitionJoin(request);
+        TurboProto.WorkerResponse response = this.stub.process(request);
         JoinOutput output = JSON.parseObject(response.getJson(), JoinOutput.class);
         return output;
     }
 
     public PartitionOutput partition(PartitionInput input) {
-        WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.PARTITION))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
-        WorkerProto.WorkerResponse response = this.stub.partition(request);
+        TurboProto.WorkerResponse response = this.stub.process(request);
         PartitionOutput output = JSON.parseObject(response.getJson(), PartitionOutput.class);
         return output;
     }
 
     public ScanOutput scan(ScanInput input) {
-        WorkerProto.WorkerRequest request = WorkerProto.WorkerRequest.newBuilder()
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.SCAN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
 
-        WorkerProto.WorkerResponse response = this.stub.scan(request);
+        TurboProto.WorkerResponse response = this.stub.process(request);
         ScanOutput output = JSON.parseObject(response.getJson(), ScanOutput.class);
         return output;
     }

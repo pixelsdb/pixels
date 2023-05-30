@@ -7,7 +7,7 @@ import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import io.pixelsdb.pixels.worker.common.WorkerProto;
+import io.pixelsdb.pixels.turbo.TurboProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,7 +27,7 @@ public class PartitionChainJoinInvoker extends VhiveInvoker {
     @Override
     public CompletableFuture<Output> invoke(Input input) {
         log.info(String.format("invoke PartitionedChainJoinInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
-        ListenableFuture<WorkerProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().partitionChainJoin((PartitionedChainJoinInput) input);
+        ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().partitionChainJoin((PartitionedChainJoinInput) input);
         return genCompletableFuture(future);
     }
 }

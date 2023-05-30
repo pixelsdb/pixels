@@ -23,14 +23,37 @@ package io.pixelsdb.pixels.common.turbo;
  * @author hank
  * @create 2022-06-28
  */
-public enum WorkerType
-{
-    UNKNOWN, // The first enum value is the default value.
-    SCAN,
-    PARTITION,
-    BROADCAST_JOIN,
-    BROADCAST_CHAIN_JOIN,
-    PARTITIONED_JOIN,
-    PARTITIONED_CHAIN_JOIN,
-    AGGREGATION
+public enum WorkerType {
+    UNKNOWN("UNKNOWN"), // The first enum value is the default value.
+    SCAN("SCAN"),
+    PARTITION("PARTITION"),
+    BROADCAST_JOIN("BROADCAST_JOIN"),
+    BROADCAST_CHAIN_JOIN("BROADCAST_CHAIN_JOIN"),
+    PARTITIONED_JOIN("PARTITIONED_JOIN"),
+    PARTITIONED_CHAIN_JOIN("PARTITIONED_CHAIN_JOIN"),
+    AGGREGATION("AGGREGATION");
+
+    private final String value;
+
+    WorkerType(String value) {
+        this.value = value;
+    }
+
+    public static WorkerType from(String value) {
+        return valueOf(value.toUpperCase());
+    }
+
+    public boolean equals(String other) {
+        return this.toString().equalsIgnoreCase(other);
+    }
+
+    public boolean equals(WorkerType other) {
+        // enums in Java can be compared using '=='.
+        return this == other;
+    }
+
+    @Override
+    public String toString() {
+        return value;
+    }
 }
