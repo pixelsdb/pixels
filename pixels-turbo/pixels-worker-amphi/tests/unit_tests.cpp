@@ -4,6 +4,7 @@
 #include "duckdb.hpp"
 #include "db/duckdb_manager.h"
 #include "grpc/transpile_sql_client.h"
+#include "grpc/trino_query_client.h"
 #include "exception/grpc_transpile_exception.h"
 #include "yaml-cpp/yaml.h"
 #include "spdlog/spdlog.h"
@@ -42,6 +43,41 @@ TEST(grpc, transpileExceptionTest) {
 
     EXPECT_THROW(client.TranspileSql(token, sql_statement, from_dialect, to_dialect), GrpcTranspileException);
     spdlog::info("Expected to throw GrpcTranspileException");
+}
+
+TEST(grpc, trinoQueryTest) {
+    std::string host_addr = config["server_address"].as<std::string>();
+    std::string port = config["server_port"].as<std::string>();
+
+    std::string trino_url = config["trino_url"].as<std::string>();
+    int trino_port = config["trino_port"].as<int>();
+    std::string trino_default_catalog = config["trino_default_catalog"].as<std::string>();
+    std::string trino_default_schema = config["trino_default_schema"].as<std::string>();
+    TrinoQueryClient trinoQueryClient(grpc::CreateChannel(host_addr + ":" + port, grpc::InsecureChannelCredentials()));
+    spdlog::info("Configured the trino query endpoint: {}:{}/{}/{}",
+        trino_url, trino_port, trino_default_catalog, trino_default_schema);
+
+    std::string token = "";
+    std::string aggregate_query = "SELECT COUNT(*) AS item_count FROM LINEITEM";
+    spdlog::info("Sending Trino query: {}", aggregate_query);
+
+    std::string aggregate_query_result = trinoQueryClient.TrinoQuery(token, trino_url, trino_port,
+                                                           trino_default_catalog, trino_default_schema, aggregate_query);
+    if (trino_default_schema == "tpch_1g") {
+        EXPECT_EQ(aggregate_query_result, "item_count: 6001215\n");
+        spdlog::info("Get expected query result: {}", aggregate_query_result);
+    }
+
+    std::string tpch_query_22 = "select cntrycode, count(*) as numcust, sum(c_acctbal) as totacctbal from ( select substring( c_phone from 1 for 2 ) as cntrycode, c_acctbal from CUSTOMER where substring( c_phone from 1 for 2 ) in ('20', '40', '22', '30', '39', '42', '21') and c_acctbal > ( select avg(c_acctbal) from CUSTOMER where c_acctbal > 0.00 and substring( c_phone from 1 for 2 ) in ('20', '40', '22', '30', '39', '42', '21') ) and not exists ( select * from ORDERS where o_custkey = c_custkey ) ) as custsale group by cntrycode order by cntrycode";
+    std::string tpch_query_result = trinoQueryClient.TrinoQuery(token, trino_url, trino_port,
+                                                                 trino_default_catalog, trino_default_schema, tpch_query_22);
+    if (trino_default_schema == "tpch_1g") {
+        EXPECT_EQ(tpch_query_result, "cntrycode: 20, numcust: 916, totacctbal: 6824676.02\n"
+                                     "cntrycode: 21, numcust: 955, totacctbal: 7235832.66\n"
+                                     "cntrycode: 22, numcust: 893, totacctbal: 6631741.43\n"
+                                     "cntrycode: 30, numcust: 910, totacctbal: 6813438.36\n");
+        spdlog::info("Get expected query result: {}", tpch_query_result);
+    }
 }
 
 TEST(DuckDBManager, importTpchSchemaTest) {
