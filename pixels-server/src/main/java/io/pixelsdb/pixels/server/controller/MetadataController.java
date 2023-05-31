@@ -30,6 +30,7 @@ import io.pixelsdb.pixels.common.server.rest.response.GetSchemasResponse;
 import io.pixelsdb.pixels.common.server.rest.response.GetTablesResponse;
 import io.pixelsdb.pixels.common.server.rest.response.GetViewsResponse;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.server.constant.RestUrlPath;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,7 +54,7 @@ public class MetadataController
         metadataService = new MetadataService(host, port);
     }
 
-    @PostMapping(value = "/api/metadata/get-schemas",
+    @PostMapping(value = RestUrlPath.GET_SCHEMAS,
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public GetSchemasResponse getSchemas(@RequestBody GetSchemasRequest request)
@@ -68,7 +69,7 @@ public class MetadataController
         }
     }
 
-    @PostMapping(value = "/api/metadata/get-tables",
+    @PostMapping(value = RestUrlPath.GET_TABLES,
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public GetTablesResponse getTables(@RequestBody GetTablesRequest request)
@@ -83,7 +84,7 @@ public class MetadataController
         }
     }
 
-    @PostMapping(value = "/api/metadata/get-columns",
+    @PostMapping(value = RestUrlPath.GET_COLUMNS,
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public GetColumnsResponse getColumns(@RequestBody GetColumnsRequest request)
@@ -100,7 +101,7 @@ public class MetadataController
         }
     }
 
-    @PostMapping(value = "/api/metadata/get-views",
+    @PostMapping(value = RestUrlPath.GET_VIEWS,
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public GetViewsResponse getViews(@RequestBody GetViewsRequest request)

@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import java.util.concurrent.ArrayBlockingQueue;
 
 /**
+ * This is only used by pixels-turbo (i.e., the AUTO mode of cloud.function.switch in pixels-trino)
+ * to queue the running queries and choose the query executor.
  * @author hank
  * @create 2022-10-24
  */
