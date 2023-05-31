@@ -11,6 +11,8 @@ import io.pixelsdb.pixels.worker.common.WorkerMetrics;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.UUID;
+
 public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O extends Output> {
     private static final Logger log = LogManager.getLogger(ServiceImpl.class);
 
@@ -31,26 +33,26 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
 
         boolean isProfile = Boolean.parseBoolean(System.getenv("PROFILING_ENABLED"));
         try {
-            String requestId = String.format("%d", input.getTransId());
+            String requestId = String.valueOf(UUID.randomUUID());
             WorkerContext context = new WorkerContext(LogManager.getLogger(handlerClass), new WorkerMetrics(), requestId);
             RequestHandler<I, O> handler = handlerClass.getConstructor(WorkerContext.class).newInstance(context);
 
-            String JSONFilename = String.format("%s.json", handler.getRequestId());
+            String JSONFilename = String.format("%s_%s.json", handler.getWorkerType(), handler.getRequestId());
             if (isProfile) {
                 log.info(String.format("enable profile to execute input: %s", JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
 
-                String JFRFilename = String.format("%s.jfr", handler.getRequestId());
+                String JFRFilename = String.format("%s_%s.jfr", handler.getWorkerType(), handler.getRequestId());
                 Utils.startProfile(JFRFilename);
                 output = handler.handleRequest(input);
                 Utils.stopProfile(JFRFilename);
 
-                Utils.upload(JFRFilename, "experiments/" + JFRFilename);
+                Utils.upload(JFRFilename, String.format("experiments/%s/%s", input.getTransId(), JFRFilename));
             } else {
                 log.info(String.format("disable profile to execute input: %s", JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
                 output = handler.handleRequest(input);
             }
             Utils.dump(JSONFilename, JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect));
-            Utils.upload(JSONFilename, "experiments/" + JSONFilename);
+            Utils.upload(JSONFilename, String.format("experiments/%s/%s", input.getTransId(), JSONFilename));
 
             log.info(String.format("get output successfully: %s", JSON.toJSONString(output)));
         } catch (Exception e) {
