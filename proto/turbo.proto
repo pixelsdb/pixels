@@ -61,8 +61,8 @@ message GetQuerySlotsRequest {
 
 message GetQuerySlotsResponse {
   int32 errorCode = 1;
-  uint32 MppRunningSlots = 2;
-  uint32 CfRunningSlots = 3;
+  uint32 MppSlots = 2;
+  uint32 CfSlots = 3;
 }
 
 // The service definitions for the serverless workers in vHive.
