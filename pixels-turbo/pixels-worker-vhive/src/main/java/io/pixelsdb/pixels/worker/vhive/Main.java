@@ -20,9 +20,9 @@ public class Main {
         CommandLine cmd = null;
         try {
             cmd = parser.parse(options, args);
-
             String port = cmd.getOptionValue("port", Integer.toString(PORT));
-            WorkerServer server = new WorkerServer(Integer.parseInt(port));
+            final WorkerServer server = new WorkerServer(Integer.parseInt(port));
+            Runtime.getRuntime().addShutdownHook(new Thread(server::shutdown));
             server.run();
         } catch (ParseException pe) {
             System.out.println("Error parsing command-line arguments!");
@@ -31,5 +31,6 @@ public class Main {
             formatter.printHelp("Log messages to sequence diagrams converter", options);
             System.exit(1);
         }
+
     }
 }
