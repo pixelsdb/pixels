@@ -1,5 +1,6 @@
 package io.pixelsdb.pixels.worker.vhive;
 
+import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 import io.pixelsdb.pixels.worker.common.BaseScanWorker;
@@ -19,5 +20,10 @@ public class ScanWorker extends BaseScanWorker implements RequestHandler<ScanInp
     @Override
     public String getRequestId() {
         return this.context.getRequestId();
+    }
+
+    @Override
+    public WorkerType getWorkerType() {
+        return WorkerType.SCAN;
     }
 }

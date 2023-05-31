@@ -1,5 +1,6 @@
 package io.pixelsdb.pixels.worker.vhive;
 
+import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.worker.common.BasePartitionWorker;
@@ -19,5 +20,10 @@ public class PartitionWorker extends BasePartitionWorker implements RequestHandl
     @Override
     public String getRequestId() {
         return this.context.getRequestId();
+    }
+
+    @Override
+    public WorkerType getWorkerType() {
+        return WorkerType.PARTITION;
     }
 }
