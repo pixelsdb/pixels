@@ -58,7 +58,7 @@ public class TestBroadcastJoinLambdaInvoker
         String rightFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
 
         BroadcastJoinInput joinInput = new BroadcastJoinInput();
-        joinInput.setQueryId(123456);
+        joinInput.setTransId(123456);
 
         BroadcastTableInfo leftTable = new BroadcastTableInfo();
         leftTable.setColumnsToRead(new String[]{"p_partkey", "p_name", "p_size"});

@@ -21,8 +21,8 @@ package io.pixelsdb.pixels.server.grpc;
 
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.AmphiException;
-import io.pixelsdb.pixels.server.AmphiProto;
-import io.pixelsdb.pixels.server.AmphiServiceGrpc;
+import io.pixelsdb.pixels.amphi.AmphiProto;
+import io.pixelsdb.pixels.amphi.AmphiServiceGrpc;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.beans.factory.annotation.Autowired;
 

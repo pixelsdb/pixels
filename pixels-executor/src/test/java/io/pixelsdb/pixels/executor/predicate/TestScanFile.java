@@ -78,7 +78,7 @@ public class TestScanFile
             PixelsReaderOption option = new PixelsReaderOption();
             option.skipCorruptRecords(true);
             option.tolerantSchemaEvolution(true);
-            option.queryId(123456);
+            option.transId(123456);
             option.includeCols(new String[] {"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
             option.rgRange(0, 40);
             PixelsRecordReader recordReader = reader.read(option);

@@ -54,7 +54,7 @@ public class TestPartitionLambdaInvoker
                             "\\\"upperBound\\\":{\\\"type\\\":\\\"UNBOUNDED\\\"}}]," +
                             "\\\"discreteValues\\\":[]}\"}}}";
             PartitionInput input = new PartitionInput();
-            input.setQueryId(123456);
+            input.setTransId(123456);
             ScanTableInfo tableInfo = new ScanTableInfo();
             tableInfo.setTableName("orders");
             tableInfo.setInputSplits(Arrays.asList(
@@ -96,7 +96,7 @@ public class TestPartitionLambdaInvoker
             String filter =
                     "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
             PartitionInput input = new PartitionInput();
-            input.setQueryId(123456);
+            input.setTransId(123456);
             ScanTableInfo tableInfo = new ScanTableInfo();
             tableInfo.setTableName("lineitem");
             tableInfo.setInputSplits(Arrays.asList(

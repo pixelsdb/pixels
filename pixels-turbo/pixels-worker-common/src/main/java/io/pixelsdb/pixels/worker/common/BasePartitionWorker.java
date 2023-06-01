@@ -81,7 +81,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
-            long queryId = event.getQueryId();
+            long transId = event.getTransId();
             requireNonNull(event.getTableInfo(), "event.tableInfo is null");
             StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
@@ -116,7 +116,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 threadPool.execute(() -> {
                     try
                     {
-                        partitionFile(queryId, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
+                        partitionFile(transId, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
                                 filter, keyColumnIds, projection, partitioned, writerSchema);
                     }
                     catch (Exception e)
@@ -183,7 +183,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
     /**
      * Scan and partition the files in a query split.
      *
-     * @param queryId the query id used by I/O scheduler
+     * @param transId the transaction id used by I/O scheduler
      * @param scanInputs the information of the files to scan
      * @param columnsToRead the columns to be read from the input files
      * @param inputScheme the storage scheme of the input files
@@ -193,7 +193,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
      * @param partitionResult the partition result
      * @param writerSchema the schema to be used for the partition result writer
      */
-    private void partitionFile(long queryId, List<InputInfo> scanInputs,
+    private void partitionFile(long transId, List<InputInfo> scanInputs,
                                String[] columnsToRead, Storage.Scheme inputScheme,
                                TableScanFilter filter, int[] keyColumnIds, boolean[] projection,
                                List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
@@ -220,7 +220,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 {
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
-                PixelsReaderOption option = WorkerCommon.getReaderOption(queryId, columnsToRead, inputInfo);
+                PixelsReaderOption option = WorkerCommon.getReaderOption(transId, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.daemon.transaction;
 
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.daemon.TransProto;
 import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -29,85 +30,147 @@ import org.apache.logging.log4j.Logger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Created at: 20/02/2022
- * Author: hank
+ * @create 2022-02-20
+ * @update 2022-05-02 update protocol to support transaction context operations
+ * @author hank
  */
 public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {
-    private static Logger log = LogManager.getLogger(TransServiceImpl.class);
+    private static final Logger log = LogManager.getLogger(TransServiceImpl.class);
 
-    public static AtomicLong QueryId = new AtomicLong(0);
+    public static final AtomicLong TransId = new AtomicLong(0);
     /**
      * Issue #174:
      * In this issue, we have not fully implemented the logic related to the watermarks.
      * So we use two atomic longs to simulate the watermarks.
      */
-    public static AtomicLong LowWatermark = new AtomicLong(0);
-    public static AtomicLong HighWatermark = new AtomicLong(0);
+    public static final AtomicLong LowWatermark = new AtomicLong(0);
+    public static final AtomicLong HighWatermark = new AtomicLong(0);
 
     public TransServiceImpl () { }
 
     @Override
-    public void getQueryTransInfo(TransProto.GetQueryTransInfoRequest request, StreamObserver<TransProto.GetQueryTransInfoResponse> responseObserver)
+    public void beginTrans(TransProto.BeginTransRequest request,
+                           StreamObserver<TransProto.BeginTransResponse> responseObserver)
     {
-        TransProto.GetQueryTransInfoResponse response = TransProto.GetQueryTransInfoResponse.newBuilder()
+        long transId = TransId.getAndIncrement(); // incremental transaction id
+        long timestamp = HighWatermark.get();
+        TransProto.BeginTransResponse response = TransProto.BeginTransResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS)
-                .setQueryId(QueryId.getAndIncrement()) // incremental query id
-                .setQueryTimestamp(HighWatermark.get()).build();
+                .setTransId(transId)
+                .setTimestamp(timestamp).build();
+        TransContext context = new TransContext(transId, timestamp, request.getReadOnly());
+        TransContextManager.Instance().addTransContext(context);
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
     @Override
-    public void pushLowWatermark(TransProto.PushLowWatermarkRequest request, StreamObserver<TransProto.PushLowWatermarkResponse> responseObserver)
+    public void commitTrans(TransProto.CommitTransRequest request,
+                            StreamObserver<TransProto.CommitTransResponse> responseObserver)
     {
-        long value = LowWatermark.get();
         int error = ErrorCode.SUCCESS;
-        long queryTimestamp = request.getQueryTimestamp();
-        if (queryTimestamp >= value)
+        // must get transaction context before setTransCommit()
+        boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
+        boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
+        if (!success)
         {
-            while(LowWatermark.compareAndSet(value, queryTimestamp))
+            error = ErrorCode.TRANS_ID_NOT_EXIST;
+        }
+        long timestamp = request.getTimestamp();
+        if (readOnly)
+        {
+            long value = LowWatermark.get();
+            if (timestamp >= value)
             {
-                value = LowWatermark.get();
-                if (queryTimestamp < value)
+                while(!LowWatermark.compareAndSet(value, timestamp))
                 {
-                    error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
-                    break;
+                    value = LowWatermark.get();
+                    if (timestamp < value)
+                    {
+                        // it is not an error if there is no need to push the low watermark
+                        break;
+                    }
                 }
             }
-        } else
-        {
-            error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
         }
-        TransProto.PushLowWatermarkResponse response = TransProto.PushLowWatermarkResponse.newBuilder()
-                .setErrorCode(error).build();
+        else
+        {
+            long value = HighWatermark.get();
+            if (timestamp >= value)
+            {
+                while(!HighWatermark.compareAndSet(value, timestamp))
+                {
+                    value = HighWatermark.get();
+                    if (timestamp < value)
+                    {
+                        // it is not an error if there is no need to push the high watermark
+                        break;
+                    }
+                }
+            }
+        }
+        TransProto.CommitTransResponse response =
+                TransProto.CommitTransResponse.newBuilder().setErrorCode(error).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
     @Override
-    public void pushHighWatermark(TransProto.PushHighWatermarkRequest request, StreamObserver<TransProto.PushHighWatermarkResponse> responseObserver)
+    public void rollbackTrans(TransProto.RollbackTransRequest request,
+                              StreamObserver<TransProto.RollbackTransResponse> responseObserver)
     {
-        long value = HighWatermark.get();
-        int error = ErrorCode.SUCCESS;
-        long writeTransTimestamp = request.getWriteTransTimestamp();
-        if (writeTransTimestamp >= value)
+        boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
+        TransProto.RollbackTransResponse response = TransProto.RollbackTransResponse.newBuilder()
+                .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getTransContext(TransProto.GetTransContextRequest request,
+                                StreamObserver<TransProto.GetTransContextResponse> responseObserver)
+    {
+        TransContext context = null;
+        if (request.hasTransId())
         {
-            while(HighWatermark.compareAndSet(value, writeTransTimestamp))
-            {
-                value = HighWatermark.get();
-                if (writeTransTimestamp < value)
-                {
-                    error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
-                    break;
-                }
-            }
-        } else
-        {
-            error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
+            context = TransContextManager.Instance().getTransContext(request.getTransId());
         }
-        TransProto.PushHighWatermarkResponse response = TransProto.PushHighWatermarkResponse.newBuilder()
-                .setErrorCode(error).build();
+        else if (request.hasExternalTraceId())
+        {
+            context = TransContextManager.Instance().getTransContext(request.getExternalTraceId());
+
+        }
+        TransProto.GetTransContextResponse.Builder builder = TransProto.GetTransContextResponse.newBuilder();
+        if (context != null)
+        {
+            builder.setErrorCode(ErrorCode.SUCCESS).setTransContext(context.toProtobuf());
+        }
+        else
+        {
+            builder.setErrorCode(ErrorCode.TRANS_BAD_GET_CONTEXT_REQUEST);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getTransConcurrency(TransProto.GetTransConcurrencyRequest request,
+                                    StreamObserver<TransProto.GetTransConcurrencyResponse> responseObserver) {
+        int concurrency = TransContextManager.Instance().getQueryConcurrency(request.getReadOnly());
+        TransProto.GetTransConcurrencyResponse response = TransProto.GetTransConcurrencyResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS).setConcurrency(concurrency).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void bindExternalTraceId(TransProto.BindExternalTraceIdRequest request,
+                                    StreamObserver<TransProto.BindExternalTraceIdResponse> responseObserver) {
+        boolean success = TransContextManager.Instance().bindExternalTraceId(
+                request.getTransId(), request.getExternalTraceId());
+        TransProto.BindExternalTraceIdResponse response = TransProto.BindExternalTraceIdResponse.newBuilder()
+                .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

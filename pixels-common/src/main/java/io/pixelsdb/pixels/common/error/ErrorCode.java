@@ -50,6 +50,7 @@ public class ErrorCode
     public static final int METADATA_ADD_VIEW_FAILED = (ERROR_BASE_METADATA + 18);
     public static final int METADATA_DELETE_VIEW_FAILED = (ERROR_BASE_METADATA + 19);
     public static final int METADATA_UNKNOWN_DATA_TYPE = (ERROR_BASE_METADATA + 20);
+    public static final int METADATA_UPDATE_TABLE_FAILED = (ERROR_BASE_METADATA + 21);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue
@@ -67,5 +68,7 @@ public class ErrorCode
     private static final int ERROR_TRANS = ERROR_BASE + 200;
     public static final int TRANS_LOW_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 1);
     public static final int TRANS_HIGH_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 2);
+    public static final int TRANS_ID_NOT_EXIST = (ERROR_TRANS + 3);
+    public static final int TRANS_BAD_GET_CONTEXT_REQUEST = (ERROR_TRANS + 4);
     // end error code for transactions
 }

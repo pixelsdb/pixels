@@ -215,8 +215,8 @@ connector.name=pixels
 pixels.config=/home/ubuntu/opt/pixels/pixels.properties
 
 # serverless config
-# lambda.switch can be on, off, auto
-lambda.switch=auto
+# it can be on, off, auto
+cloud.function.switch=auto
 local.scan.concurrency=40
 clean.local.result=true
 ```
@@ -224,7 +224,7 @@ clean.local.result=true
 **Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
 The other properties are related to serverless execution.
 In Trino, Pixels can push projections, filters, joins, and aggregations into serverless computing services (e.g., AWS Lambda).
-This feature is named `Pixels Turbo` and can be turned on by setting `lambda.switch` to `auto` (adaptively enabled) or `on` (always enabled).
+This feature is named `Pixels Turbo` and can be turned on by setting `cloud.function.switch` to `auto` (adaptively enabled) or `on` (always enabled).
 
 If Pixels Turbo is enabled, we also need to set the following settings in `PIXELS_HOME/pixels.properties`:
 ```properties

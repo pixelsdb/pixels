@@ -39,21 +39,21 @@ public interface Scheduler
      * all the requests.
      * @param reader
      * @param batch
-     * @param queryId
+     * @param transId
      * @throws IOException
      */
-    void executeBatch(PhysicalReader reader, RequestBatch batch, long queryId)
+    void executeBatch(PhysicalReader reader, RequestBatch batch, long transId)
             throws IOException;
 
     class Request implements Comparable<Request>
     {
-        public final long queryId;
+        public final long transId;
         public final long start;
         public final int length;
 
-        public Request(long queryId, long start, int length)
+        public Request(long transId, long start, int length)
         {
-            this.queryId = queryId;
+            this.transId = transId;
             this.start = start;
             this.length = length;
         }
@@ -107,9 +107,9 @@ public interface Scheduler
             this.size = 0;
         }
 
-        public CompletableFuture<ByteBuffer> add(long queryId, long start, int length)
+        public CompletableFuture<ByteBuffer> add(long transId, long start, int length)
         {
-            Request request = new Request(queryId, start, length);
+            Request request = new Request(transId, start, length);
             CompletableFuture<ByteBuffer> future = new CompletableFuture<>();
             requests.add(request);
             futures.add(future);

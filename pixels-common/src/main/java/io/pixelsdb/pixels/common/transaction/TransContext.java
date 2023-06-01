@@ -19,82 +19,94 @@
  */
 package io.pixelsdb.pixels.common.transaction;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import io.pixelsdb.pixels.daemon.TransProto;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static java.util.Objects.requireNonNull;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
- * <P>
- *     The context of the transactions in Pixels.
- * </P>
- *
  * @create 2022-02-20
  * @author hank
  */
 public class TransContext
 {
-    private static TransContext instance;
+    private final long transId;
+    private final long timestamp;
+    private final boolean readOnly;
+    private final AtomicReference<TransProto.TransStatus> status;
+    private final Properties properties;
 
-    public static TransContext Instance()
+    public TransContext(long transId, long timestamp, boolean readOnly)
     {
-        if (instance == null)
+        this.transId = transId;
+        this.timestamp = timestamp;
+        this.readOnly = readOnly;
+        this.status = new AtomicReference<>(TransProto.TransStatus.PENDING);
+        this.properties = new Properties();
+    }
+
+    public TransContext(TransProto.TransContext contextPb)
+    {
+        this.transId = contextPb.getTransId();
+        this.timestamp = contextPb.getTimestamp();
+        this.readOnly = contextPb.getReadOnly();
+        this.status = new AtomicReference<>(contextPb.getStatus());
+        this.properties = new Properties();
+        this.properties.putAll(contextPb.getPropertiesMap());
+    }
+
+    public long getTransId()
+    {
+        return transId;
+    }
+
+    public long getTimestamp()
+    {
+        return timestamp;
+    }
+
+    public TransProto.TransStatus getStatus()
+    {
+        return status.get();
+    }
+
+    public boolean isReadOnly()
+    {
+        return readOnly;
+    }
+
+    public void setStatus(TransProto.TransStatus status)
+    {
+        this.status.set(status);
+    }
+
+    public Properties getProperties()
+    {
+        return this.properties;
+    }
+
+    @Override
+    public String toString()
+    {
+        return toStringHelper(this)
+                .add("transId", transId)
+                .add("timestamp", timestamp)
+                .add("status", status.get())
+                .toString();
+    }
+
+    public TransProto.TransContext toProtobuf()
+    {
+        TransProto.TransContext.Builder builder = TransProto.TransContext.newBuilder()
+                .setTransId(this.transId).setTimestamp(this.timestamp)
+                .setReadOnly(this.readOnly).setStatus(this.status.get());
+        for (Map.Entry<Object, Object> entry : this.properties.entrySet())
         {
-            instance = new TransContext();
+            builder.putProperties((String) entry.getKey(), (String) entry.getValue());
         }
-        return instance;
-    }
-
-    private final Map<Long, QueryTransInfo> queryTransContext;
-
-    private TransContext()
-    {
-        this.queryTransContext = new ConcurrentHashMap<>();
-    }
-
-    public synchronized void beginQuery(QueryTransInfo info)
-    {
-        requireNonNull(info, "query transaction info is null");
-        checkArgument(info.getQueryStatus() == QueryTransInfo.Status.PENDING);
-        this.queryTransContext.put(info.getQueryId(), info);
-    }
-
-    public synchronized void commitQuery(long queryId)
-    {
-        QueryTransInfo info = this.queryTransContext.remove(queryId);
-        if (info != null)
-        {
-            info.setQueryStatus(QueryTransInfo.Status.COMMIT);
-        }
-    }
-
-    public synchronized void rollbackQuery(long queryId)
-    {
-        QueryTransInfo info = this.queryTransContext.remove(queryId);
-        if (info != null)
-        {
-            info.setQueryStatus(QueryTransInfo.Status.ROLLBACK);
-        }
-    }
-
-    public synchronized QueryTransInfo getQueryTransInfo(long queryId)
-    {
-        return this.queryTransContext.get(queryId);
-    }
-
-    public synchronized boolean isTerminated(long queryId)
-    {
-        QueryTransInfo info =  this.queryTransContext.get(queryId);
-        return info == null || info.getQueryStatus() == QueryTransInfo.Status.COMMIT ||
-                info.getQueryStatus() == QueryTransInfo.Status.ROLLBACK;
-    }
-
-    /**
-     * @return the number of concurrent queries at this moment.
-     */
-    public synchronized int getTransConcurrency()
-    {
-        return this.queryTransContext.size();
+        return builder.build();
     }
 }

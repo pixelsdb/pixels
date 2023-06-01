@@ -30,9 +30,12 @@ package transaction.proto;
 
 // The transaction services definition.
 service TransService {
-    rpc GetQueryTransInfo (GetQueryTransInfoRequest) returns (GetQueryTransInfoResponse);
-    rpc PushLowWatermark (PushLowWatermarkRequest) returns (PushLowWatermarkResponse);
-    rpc PushHighWatermark (PushHighWatermarkRequest) returns (PushHighWatermarkResponse);
+    rpc BeginTrans (BeginTransRequest) returns (BeginTransResponse);
+    rpc CommitTrans (CommitTransRequest) returns (CommitTransResponse);
+    rpc RollbackTrans (RollbackTransRequest) returns (RollbackTransResponse);
+    rpc GetTransContext (GetTransContextRequest) returns (GetTransContextResponse);
+    rpc GetTransConcurrency (GetTransConcurrencyRequest) returns (GetTransConcurrencyResponse);
+    rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
 }
 
 // begin request/response definition for rpc services
@@ -40,30 +43,76 @@ service TransService {
 // For performance considerations, we do not add header and error message to the
 // requests and responses.
 
-message GetQueryTransInfoRequest {
+enum TransStatus {
+    PENDING = 0;
+    COMMIT = 1;
+    ROLLBACK = 2;
 }
 
-message GetQueryTransInfoResponse {
+message TransContext {
+    uint64 transId = 1;
+    uint64 timestamp = 2;
+    bool readOnly = 3;
+    TransStatus status = 4;
+    map<string, string> properties = 5;
+}
+
+message BeginTransRequest {
+    bool readOnly = 1;
+}
+
+message BeginTransResponse {
     int32 errorCode = 1;
-    uint64 queryId = 2;
-    uint64 queryTimestamp = 3;
+    uint64 transId = 2;
+    uint64 timestamp = 3;
 }
 
-message PushLowWatermarkRequest {
-    // The timestamp of the terminated (finished or aborted) query.
-    uint64 queryTimestamp = 1;
+message CommitTransRequest {
+    uint64 transId = 1;
+    uint64 timestamp = 2;
 }
 
-message PushLowWatermarkResponse {
+message CommitTransResponse {
     int32 errorCode = 1;
 }
 
-message PushHighWatermarkRequest {
-    // The commit ts of write transaction.
-    uint64 writeTransTimestamp = 1;
+message RollbackTransRequest {
+    uint64 transId = 1;
 }
 
-message PushHighWatermarkResponse {
+message RollbackTransResponse {
+    int32 errorCode = 1;
+}
+
+message GetTransContextRequest {
+    oneof lookupKey {
+        string externalTraceId = 1;
+        uint64 transId = 2;
+    }
+}
+
+message GetTransContextResponse {
+    int32 errorCode = 1;
+    TransContext transContext = 2;
+}
+
+message GetTransConcurrencyRequest {
+    // true to lookup the concurrency of read only transactions;
+    // false to lookup the concurrency of write transactions.
+    bool readOnly = 1;
+}
+
+message GetTransConcurrencyResponse {
+    int32 errorCode = 1;
+    int32 concurrency = 2;
+}
+
+message BindExternalTraceIdRequest {
+    uint64 transId = 1;
+    string externalTraceId = 2;
+}
+
+message BindExternalTraceIdResponse {
     int32 errorCode = 1;
 }
 

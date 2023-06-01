@@ -58,28 +58,28 @@ public class QueryQueues
         return instance;
     }
 
-    public synchronized ExecutorType Enqueue(long queryId)
+    public synchronized ExecutorType Enqueue(long transId)
     {
-        if (this.clusterQueue.offer(queryId))
+        if (this.clusterQueue.offer(transId))
         {
             return ExecutorType.Cluster;
         }
-        if (this.lambdaQueue.offer(queryId))
+        if (this.lambdaQueue.offer(transId))
         {
             return ExecutorType.Lambda;
         }
         return ExecutorType.None;
     }
 
-    public boolean Dequeue(long queryId, ExecutorType executorType)
+    public boolean Dequeue(long transId, ExecutorType executorType)
     {
         if (executorType == ExecutorType.Cluster)
         {
-            return this.clusterQueue.remove(queryId);
+            return this.clusterQueue.remove(transId);
         }
         if (executorType == ExecutorType.Lambda)
         {
-            return this.lambdaQueue.remove(queryId);
+            return this.lambdaQueue.remove(transId);
         }
         return false;
     }

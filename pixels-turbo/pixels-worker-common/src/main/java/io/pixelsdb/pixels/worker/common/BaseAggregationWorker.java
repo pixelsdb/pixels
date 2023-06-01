@@ -81,7 +81,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
-            long queryId = event.getQueryId();
+            long transId = event.getTransId();
             AggregationInfo aggregationInfo = requireNonNull(event.getAggregationInfo(),
                     "event.aggregationInfo is null");
             boolean inputPartitioned = aggregationInfo.isInputPartitioned();
@@ -169,7 +169,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                 threadPool.execute(() -> {
                     try
                     {
-                        aggregate(queryId, files, columnsToRead, inputStorageInfo.getScheme(),
+                        aggregate(transId, files, columnsToRead, inputStorageInfo.getScheme(),
                                 hashValues, numPartition, aggregator, workerMetrics);
                     }
                     catch (Exception e)
@@ -221,7 +221,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
     /**
      * Scan the files in a query split, apply projection and filters, and output the
      * results to the given path.
-     * @param queryId the query id used by I/O scheduler
+     * @param transId the transaction id used by I/O scheduler
      * @param inputFiles the paths of the files to read and aggregate
      * @param columnsToRead the columns to read from the input files
      * @param inputScheme the storage scheme of the input files
@@ -232,7 +232,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
      * @param workerMetrics the collector of the performance metrics
      * @return the number of rows that are read from input files
      */
-    private int aggregate(long queryId, List<String> inputFiles, String[] columnsToRead,
+    private int aggregate(long transId, List<String> inputFiles, String[] columnsToRead,
                           Storage.Scheme inputScheme, List<Integer> hashValues,
                           int numPartition, Aggregator aggregator, WorkerMetrics workerMetrics)
     {
@@ -260,7 +260,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                     if (hashValues.isEmpty())
                     {
                         PixelsReaderOption option = new PixelsReaderOption();
-                        option.queryId(queryId);
+                        option.transId(transId);
                         option.includeCols(columnsToRead);
                         option.rgRange(0, -1);
                         option.skipCorruptRecords(true);
@@ -298,7 +298,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                             {
                                 continue;
                             }
-                            PixelsReaderOption option = WorkerCommon.getReaderOption(queryId, columnsToRead, pixelsReader,
+                            PixelsReaderOption option = WorkerCommon.getReaderOption(transId, columnsToRead, pixelsReader,
                                     hashValue, numPartition);
                             PixelsRecordReader recordReader = pixelsReader.read(option);
                             VectorizedRowBatch rowBatch;

@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.server;
 
+import io.pixelsdb.pixels.amphi.AmphiProto;
+import io.pixelsdb.pixels.amphi.AmphiServiceGrpc;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

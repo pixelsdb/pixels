@@ -32,12 +32,12 @@ import static java.util.Objects.requireNonNull;
  *
  * <p>The maximum message size supported by this message queue is 2GB.</p>
  *
- * Created at: 3/19/21 (at DIAS EPFL)
- * Author: bian
+ * @create 2021-03-19 (at DIAS EPFL)
+ * @author hank
  */
 public class SharedMQ
 {
-    public static class TransactionStatus
+    public static class TransStatus
     {
         public static final byte CLEAR = 0;
         public static final byte RUNNING = 1;
@@ -48,7 +48,7 @@ public class SharedMQ
     public static final long SHARED_MQ_STRUCT_READ_LIMIT = 0L;
     public static final long SHARED_MQ_STRUCT_WRITE_LIMIT = 8L;
     public static final long SHARED_MQ_STRUCT_INIT_FLAG = 16L;
-    // although only use 17 bytes are used for metadata, we use 24 bytes for word alignment.
+    // although we only use 17 bytes are used for metadata, we use 24 bytes for word alignment.
     public static final long SHARED_MQ_STRUCT_DATA = 24L;
     public static final long SHARED_MQ_LIMIT_FLAG = 0x4000000000000000L;
     public static final long SHARED_MQ_LIMIT_MASK = 0x3FFFFFFFFFFFFFFFL;
@@ -317,20 +317,20 @@ public class SharedMQ
             }
         }
         byte writerStatus = _sharedMemory.getByte(_readLimit);
-        if (writerStatus == TransactionStatus.COMMIT)
+        if (writerStatus == TransStatus.COMMIT)
         {
             _readStartTime = 0;
-            _sharedMemory.setByte(_readLimit, TransactionStatus.CLEAR);
-            _sharedMemory.setByte(_readLimit + SHARED_MQ_LENGTH_MESSAGE_STATUS, TransactionStatus.RUNNING);
+            _sharedMemory.setByte(_readLimit, TransStatus.CLEAR);
+            _sharedMemory.setByte(_readLimit + SHARED_MQ_LENGTH_MESSAGE_STATUS, TransStatus.RUNNING);
             return SUCCESS;
         }
-        if (writerStatus == TransactionStatus.ROLLBACK)
+        if (writerStatus == TransStatus.ROLLBACK)
         {
             _readStartTime = 0;
             _readLimitPushed = false;
             return ERROR_MQ_WRITER_IS_ROLLBACK;
         }
-        // writerStatus == TransactionStatus::RUNNING
+        // writerStatus == TransStatus::RUNNING
         if (_readStartTime == 0)
         {
             _readStartTime = System.currentTimeMillis();
@@ -338,13 +338,14 @@ public class SharedMQ
         }
         else if (System.currentTimeMillis() - _readStartTime >= _timeout)
         {
-            _sharedMemory.setByte(_readLimit, TransactionStatus.ROLLBACK);
+            _sharedMemory.setByte(_readLimit, TransStatus.ROLLBACK);
             _readLimitPushed = false;
             _readStartTime = 0;
             return ERROR_MQ_WRITER_IS_ROLLBACK;
         }
         return ERROR_MQ_WRITER_IS_RUNNING;
     }
+
     /**
      * Read the message from message queue.
      * @param message the message to read to.
@@ -353,7 +354,7 @@ public class SharedMQ
     {
         requireNonNull(message, "message is null");
         message.read(_sharedMemory, _readLimit + SHARED_MQ_LENGTH_MESSAGE_HEADER);
-        _sharedMemory.setByte(_readLimit + SHARED_MQ_LENGTH_MESSAGE_STATUS, TransactionStatus.COMMIT);
+        _sharedMemory.setByte(_readLimit + SHARED_MQ_LENGTH_MESSAGE_STATUS, TransStatus.COMMIT);
         _readLimitPushed = false;
     }
 
@@ -374,16 +375,16 @@ public class SharedMQ
         }
         // check the status of the allocated entry.
         byte readerStatus = _sharedMemory.getByte(_writeLimit + SHARED_MQ_LENGTH_MESSAGE_STATUS);
-        if (readerStatus == TransactionStatus.COMMIT ||
-                readerStatus == TransactionStatus.ROLLBACK ||
-                readerStatus == TransactionStatus.CLEAR)
+        if (readerStatus == TransStatus.COMMIT ||
+                readerStatus == TransStatus.ROLLBACK ||
+                readerStatus == TransStatus.CLEAR)
         {
             _writeStartTime = 0;
-            _sharedMemory.setByte(_writeLimit + SHARED_MQ_LENGTH_MESSAGE_STATUS, TransactionStatus.RUNNING);
-            _sharedMemory.setByte(_writeLimit, TransactionStatus.RUNNING);
+            _sharedMemory.setByte(_writeLimit + SHARED_MQ_LENGTH_MESSAGE_STATUS, TransStatus.RUNNING);
+            _sharedMemory.setByte(_writeLimit, TransStatus.RUNNING);
             return SUCCESS;
         }
-        // readerStatus == TransactionStatus::RUNNING
+        // readerStatus == TransStatus::RUNNING
         if (_writeStartTime == 0)
         {
             _writeStartTime = System.currentTimeMillis();
@@ -392,13 +393,14 @@ public class SharedMQ
         else if (System.currentTimeMillis() - _writeStartTime >= _timeout)
         {
             _sharedMemory.setByte(_writeLimit + SHARED_MQ_LENGTH_MESSAGE_STATUS,
-                    TransactionStatus.ROLLBACK);
+                    TransStatus.ROLLBACK);
             _writeStartTime = 0;
-            _sharedMemory.setByte(_writeLimit, TransactionStatus.RUNNING);
+            _sharedMemory.setByte(_writeLimit, TransStatus.RUNNING);
             return SUCCESS;
         }
         return ERROR_MQ_WRITER_IS_RUNNING;
     }
+
     /**
      * Write the given massage into message queue.
      * @param message the given message.
@@ -407,7 +409,7 @@ public class SharedMQ
     {
         requireNonNull(message, "message is null");
         message.write(_sharedMemory, _writeLimit + SHARED_MQ_LENGTH_MESSAGE_HEADER);
-        _sharedMemory.setByte(_writeLimit, TransactionStatus.COMMIT);
+        _sharedMemory.setByte(_writeLimit, TransStatus.COMMIT);
         _writeLimitPushed = false;
     }
 
