@@ -21,7 +21,10 @@ package io.pixelsdb.pixels.common.turbo;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.exception.QueryScheduleException;
 import io.pixelsdb.pixels.turbo.QueryScheduleServiceGrpc;
+import io.pixelsdb.pixels.turbo.TurboProto;
 
 import java.util.concurrent.TimeUnit;
 
@@ -36,8 +39,14 @@ public class QueryScheduleService
 
     public static class QuerySlots
     {
-        public int MppSlots = 0;
-        public int CfSlots = 0;
+        public final int MppSlots;
+        public final int CfSlots;
+
+        public QuerySlots(int mppSlots, int cfSlots)
+        {
+            MppSlots = mppSlots;
+            CfSlots = cfSlots;
+        }
     }
 
     public QueryScheduleService(String host, int port)
@@ -54,18 +63,34 @@ public class QueryScheduleService
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
 
-    public ExecutorType scheduleQuery(long transId, boolean forceMpp)
+    public ExecutorType scheduleQuery(long transId, boolean forceMpp) throws QueryScheduleException
     {
-        return null;
+        TurboProto.ScheduleQueryRequest request = TurboProto.ScheduleQueryRequest.newBuilder()
+                .setTransId(transId).setForceMpp(forceMpp).build();
+        TurboProto.ScheduleQueryResponse response = this.stub.scheduleQuery(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new QueryScheduleException("failed to schedule query, error code=" + response.getErrorCode());
+        }
+        return ExecutorType.valueOf(response.getExecutorType());
     }
 
     public boolean finishQuery(long transId, ExecutorType executorType)
     {
-        return false;
+        TurboProto.FinishQueryRequest request = TurboProto.FinishQueryRequest.newBuilder()
+                .setTransId(transId).setExecutorType(executorType.name()).build();
+        TurboProto.FinishQueryResponse response = this.stub.finishQuery(request);
+        return response.getErrorCode() == ErrorCode.SUCCESS;
     }
 
-    public QuerySlots getQuerySlots()
+    public QuerySlots getQuerySlots() throws QueryScheduleException
     {
-        return null;
+        TurboProto.GetQuerySlotsRequest request = TurboProto.GetQuerySlotsRequest.newBuilder().build();
+        TurboProto.GetQuerySlotsResponse response = this.stub.getQuerySlots(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new QueryScheduleException("failed to get query slots, error code=" + response.getErrorCode());
+        }
+        return new QuerySlots(response.getMppSlots(), response.getCfSlots());
     }
 }

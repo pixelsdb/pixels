@@ -72,5 +72,9 @@ public class ErrorCode
     public static final int TRANS_BAD_GET_CONTEXT_REQUEST = (ERROR_TRANS + 4);
     public static final int TRANS_COMMIT_FAILED = (ERROR_TRANS + 5);
 
+    // begin error code for query schedule
+    private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;
+    public static final int QUERY_SCHEDULE_DEQUEUE_FAILED = (ERROR_QUERY_SCHEDULE + 1);
+
     // end error code for transactions
 }

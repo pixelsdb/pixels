@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.daemon.turbo;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.turbo.ExecutorType;
 import io.pixelsdb.pixels.turbo.QueryScheduleServiceGrpc;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import org.apache.logging.log4j.LogManager;
@@ -37,20 +39,62 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
     public void scheduleQuery(TurboProto.ScheduleQueryRequest request,
                               StreamObserver<TurboProto.ScheduleQueryResponse> responseObserver)
     {
-        super.scheduleQuery(request, responseObserver);
+        long transId = request.getTransId();
+        boolean forceMpp = request.getForceMpp();
+        ExecutorType executorType;
+        if (forceMpp)
+        {
+            while (!QueryQueues.Instance().EnqueueMpp(transId))
+            {
+                try
+                {
+                    Thread.sleep(10);
+                } catch (InterruptedException e)
+                {
+                    log.error("interrupted while waiting for retrying enqueue mpp");
+                }
+            }
+            executorType = ExecutorType.MPP;
+        }
+        else
+        {
+            executorType = QueryQueues.Instance().Enqueue(transId);
+        }
+        TurboProto.ScheduleQueryResponse response = TurboProto.ScheduleQueryResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS).setExecutorType(executorType.name()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void finishQuery(TurboProto.FinishQueryRequest request,
                             StreamObserver<TurboProto.FinishQueryResponse> responseObserver)
     {
-        super.finishQuery(request, responseObserver);
+        long transId = request.getTransId();
+        ExecutorType executorType = ExecutorType.valueOf(request.getExecutorType());
+        boolean success = QueryQueues.Instance().Dequeue(transId, executorType);
+        TurboProto.FinishQueryResponse.Builder builder = TurboProto.FinishQueryResponse.newBuilder();
+        if (success)
+        {
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        else
+        {
+            builder.setErrorCode(ErrorCode.QUERY_SCHEDULE_DEQUEUE_FAILED);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void getQuerySlots(TurboProto.GetQuerySlotsRequest request,
                               StreamObserver<TurboProto.GetQuerySlotsResponse> responseObserver)
     {
-        super.getQuerySlots(request, responseObserver);
+        int mppSlots = QueryQueues.Instance().getMppSlots();
+        int cfSlots = QueryQueues.Instance().getCfSlots();
+        TurboProto.GetQuerySlotsResponse response = TurboProto.GetQuerySlotsResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS).setMppSlots(mppSlots).setCfSlots(cfSlots).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 }

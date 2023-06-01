@@ -17,15 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.turbo;
+package io.pixelsdb.pixels.daemon.turbo;
 
+import io.pixelsdb.pixels.common.turbo.ExecutorType;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.util.concurrent.ArrayBlockingQueue;
 
 /**
- * This is only used by pixels-turbo (i.e., the AUTO mode of cloud.function.switch in pixels-trino)
- * to queue the running queries and choose the query executor.
+ * This is only used by pixels-turbo to queue the running queries and choose the query executor.
  * @author hank
  * @create 2022-10-24
  */
@@ -34,28 +34,34 @@ public class QueryQueues
     private final ArrayBlockingQueue<Long> mppQueue;
     private final ArrayBlockingQueue<Long> cfQueue;
 
-    private QueryQueues(int clusterQueueCapacity, int lambdaQueueCapacity)
+    private QueryQueues(int mppQueueCapacity, int cfQueueCapacity)
     {
-        this.mppQueue = new ArrayBlockingQueue<>(clusterQueueCapacity);
-        this.cfQueue = new ArrayBlockingQueue<>(lambdaQueueCapacity);
+        this.mppQueue = new ArrayBlockingQueue<>(mppQueueCapacity);
+        this.cfQueue = new ArrayBlockingQueue<>(cfQueueCapacity);
     }
 
-    private static QueryQueues instance = null;
+    private static final QueryQueues instance;
 
-    public synchronized static QueryQueues Instance()
+    static
     {
-        if (instance == null)
-        {
-            int clusterQueueCapacity = Integer.parseInt(
-                    ConfigFactory.Instance().getProperty("scaling.mpp.queue.capacity"));
-            int lambdaQueueCapacity = Integer.parseInt(
-                    ConfigFactory.Instance().getProperty("scaling.cf.queue.capacity"));
-            instance = new QueryQueues(clusterQueueCapacity, lambdaQueueCapacity);
-        }
+        int mppQueueCapacity = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("scaling.mpp.queue.capacity"));
+        int cfQueueCapacity = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("scaling.cf.queue.capacity"));
+        instance = new QueryQueues(mppQueueCapacity, cfQueueCapacity);
+    }
+
+    public static QueryQueues Instance()
+    {
         return instance;
     }
 
-    public synchronized ExecutorType Enqueue(long transId)
+    public boolean EnqueueMpp(long transId)
+    {
+        return this.mppQueue.offer(transId);
+    }
+
+    public ExecutorType Enqueue(long transId)
     {
         if (this.mppQueue.offer(transId))
         {
@@ -79,5 +85,15 @@ public class QueryQueues
             return this.cfQueue.remove(transId);
         }
         return false;
+    }
+
+    public int getMppSlots()
+    {
+        return this.mppQueue.remainingCapacity();
+    }
+
+    public int getCfSlots()
+    {
+        return this.cfQueue.remainingCapacity();
     }
 }
