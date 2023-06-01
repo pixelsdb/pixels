@@ -46,7 +46,7 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
         ExecutorType executorType;
         if (forceMpp)
         {
-            while (!QueryQueues.Instance().EnqueueMpp(transId))
+            while (!QueryScheduleQueues.Instance().EnqueueMpp(transId))
             {
                 try
                 {
@@ -60,7 +60,7 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
         }
         else
         {
-            while ((executorType = QueryQueues.Instance().Enqueue(transId)) == ExecutorType.PENDING)
+            while ((executorType = QueryScheduleQueues.Instance().Enqueue(transId)) == ExecutorType.PENDING)
             {
                 try
                 {
@@ -83,7 +83,7 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
     {
         long transId = request.getTransId();
         ExecutorType executorType = ExecutorType.valueOf(request.getExecutorType());
-        boolean success = QueryQueues.Instance().Dequeue(transId, executorType);
+        boolean success = QueryScheduleQueues.Instance().Dequeue(transId, executorType);
         TurboProto.FinishQueryResponse.Builder builder = TurboProto.FinishQueryResponse.newBuilder();
         if (success)
         {
@@ -101,8 +101,8 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
     public void getQuerySlots(TurboProto.GetQuerySlotsRequest request,
                               StreamObserver<TurboProto.GetQuerySlotsResponse> responseObserver)
     {
-        int mppSlots = QueryQueues.Instance().getMppSlots();
-        int cfSlots = QueryQueues.Instance().getCfSlots();
+        int mppSlots = QueryScheduleQueues.Instance().getMppSlots();
+        int cfSlots = QueryScheduleQueues.Instance().getCfSlots();
         TurboProto.GetQuerySlotsResponse response = TurboProto.GetQuerySlotsResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS).setMppSlots(mppSlots).setCfSlots(cfSlots).build();
         responseObserver.onNext(response);

@@ -19,6 +19,16 @@
  */
 package io.pixelsdb.pixels.server.controller;
 
+import io.pixelsdb.pixels.common.server.rest.request.EstimateCostRequest;
+import io.pixelsdb.pixels.common.server.rest.request.GetResultRequest;
+import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
+import io.pixelsdb.pixels.common.server.rest.response.EstimateCostResponse;
+import io.pixelsdb.pixels.common.server.rest.response.GetResultResponse;
+import io.pixelsdb.pixels.common.server.rest.response.SubmitQueryResponse;
+import io.pixelsdb.pixels.server.constant.RestUrlPath;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -29,5 +39,30 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class QueryController
 {
+    @PostMapping(value = RestUrlPath.ESTIMATE_COST,
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public EstimateCostResponse estimateCost(@RequestBody EstimateCostRequest request)
+    {
+        // TODO: check username.
+        return null;
+    }
 
+    @PostMapping(value = RestUrlPath.SUBMIT_QUERY,
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public SubmitQueryResponse submitQuery(@RequestBody SubmitQueryRequest request)
+    {
+        // TODO: check username.
+        return null;
+    }
+
+    @PostMapping(value = RestUrlPath.GET_RESULT,
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public GetResultResponse getResult(@RequestBody GetResultRequest request)
+    {
+        // TODO: check username.
+        return null;
+    }
 }

@@ -17,16 +17,31 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.server.rest.request;
+package io.pixelsdb.pixels.common.exception;
 
 /**
  * @author hank
- * @create 2023-05-24
+ * @create 2023-06-01
  */
-public enum ExecutionHint
+public class QueryServerException extends RuntimeException
 {
-    LOW_COST, // prefer lower monetary cost
-    IMMEDIATE, // execute the query immediately
-    ADAPTIVE, // execute the query apatively using Pixel-Turbo
-    SCHEDULED // schedule the query to be executed at a start time
+    public QueryServerException()
+    {
+        super();
+    }
+
+    public QueryServerException(String message)
+    {
+        super(message);
+    }
+
+    public QueryServerException(Throwable cause)
+    {
+        super(cause);
+    }
+
+    public QueryServerException(String message, Throwable cause)
+    {
+        super(message, cause);
+    }
 }

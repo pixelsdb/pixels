@@ -29,18 +29,18 @@ import java.util.concurrent.ArrayBlockingQueue;
  * @author hank
  * @create 2022-10-24
  */
-public class QueryQueues
+public class QueryScheduleQueues
 {
     private final ArrayBlockingQueue<Long> mppQueue;
     private final ArrayBlockingQueue<Long> cfQueue;
 
-    private QueryQueues(int mppQueueCapacity, int cfQueueCapacity)
+    private QueryScheduleQueues(int mppQueueCapacity, int cfQueueCapacity)
     {
         this.mppQueue = new ArrayBlockingQueue<>(mppQueueCapacity);
         this.cfQueue = new ArrayBlockingQueue<>(cfQueueCapacity);
     }
 
-    private static final QueryQueues instance;
+    private static final QueryScheduleQueues instance;
 
     static
     {
@@ -48,10 +48,10 @@ public class QueryQueues
                 ConfigFactory.Instance().getProperty("scaling.mpp.queue.capacity"));
         int cfQueueCapacity = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("scaling.cf.queue.capacity"));
-        instance = new QueryQueues(mppQueueCapacity, cfQueueCapacity);
+        instance = new QueryScheduleQueues(mppQueueCapacity, cfQueueCapacity);
     }
 
-    protected static QueryQueues Instance()
+    protected static QueryScheduleQueues Instance()
     {
         return instance;
     }
