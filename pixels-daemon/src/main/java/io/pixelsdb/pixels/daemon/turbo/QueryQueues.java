@@ -51,7 +51,7 @@ public class QueryQueues
         instance = new QueryQueues(mppQueueCapacity, cfQueueCapacity);
     }
 
-    public static QueryQueues Instance()
+    protected static QueryQueues Instance()
     {
         return instance;
     }

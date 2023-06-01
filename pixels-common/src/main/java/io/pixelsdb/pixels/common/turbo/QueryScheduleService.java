@@ -23,9 +23,11 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.QueryScheduleException;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.turbo.QueryScheduleServiceGrpc;
 import io.pixelsdb.pixels.turbo.TurboProto;
 
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -36,6 +38,8 @@ public class QueryScheduleService
 {
     private final ManagedChannel channel;
     private final QueryScheduleServiceGrpc.QueryScheduleServiceBlockingStub stub;
+    private final boolean scalingEnabled;
+    private final MetricsCollector metricsCollector;
 
     public static class QuerySlots
     {
@@ -49,18 +53,37 @@ public class QueryScheduleService
         }
     }
 
-    public QueryScheduleService(String host, int port)
+    public QueryScheduleService(String host, int port) throws QueryScheduleException
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
         this.stub = QueryScheduleServiceGrpc.newBlockingStub(channel);
+        this.scalingEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("scaling.enabled"));
+        if (this.scalingEnabled)
+        {
+            Optional<MetricsCollector> collector = MetricsCollector.Instance();
+            if (collector.isPresent())
+            {
+                this.metricsCollector = collector.get();
+                this.metricsCollector.startAutoReport();
+            }
+            throw new QueryScheduleException("query schedule service: no implementation for metrics collector");
+        }
+        else
+        {
+            this.metricsCollector = null;
+        }
     }
 
     public void shutdown() throws InterruptedException
     {
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        if (this.scalingEnabled)
+        {
+            this.metricsCollector.stopAutoReport();
+        }
     }
 
     public ExecutorType scheduleQuery(long transId, boolean forceMpp) throws QueryScheduleException
@@ -71,6 +94,10 @@ public class QueryScheduleService
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new QueryScheduleException("failed to schedule query, error code=" + response.getErrorCode());
+        }
+        if (this.scalingEnabled)
+        {
+            this.metricsCollector.report();
         }
         return ExecutorType.valueOf(response.getExecutorType());
     }

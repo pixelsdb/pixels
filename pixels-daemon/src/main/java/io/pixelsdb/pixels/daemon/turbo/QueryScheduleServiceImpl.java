@@ -27,6 +27,8 @@ import io.pixelsdb.pixels.turbo.TurboProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * @author hank
  * @create 2023-05-31
@@ -48,7 +50,7 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
             {
                 try
                 {
-                    Thread.sleep(10);
+                    TimeUnit.MILLISECONDS.sleep(10);
                 } catch (InterruptedException e)
                 {
                     log.error("interrupted while waiting for retrying enqueue mpp");
@@ -58,7 +60,16 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
         }
         else
         {
-            executorType = QueryQueues.Instance().Enqueue(transId);
+            while ((executorType = QueryQueues.Instance().Enqueue(transId)) == ExecutorType.PENDING)
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(10);
+                } catch (InterruptedException e)
+                {
+                    log.error("interrupted while waiting for enqueue adaptively.");
+                }
+            }
         }
         TurboProto.ScheduleQueryResponse response = TurboProto.ScheduleQueryResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS).setExecutorType(executorType.name()).build();
