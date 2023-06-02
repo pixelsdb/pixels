@@ -5,19 +5,28 @@
 #include "cli/clifilesession.h"
 #include "yaml-cpp/yaml.h"
 #include "spdlog/spdlog.h"
+#include "aws/core/Aws.h"
 
 #include "grpc/transpile_sql_client.h"
 #include "grpc/trino_query_client.h"
 #include "db/duckdb_manager.h"
+#include "utils/aws_utils.h"
 
 using namespace cli;
 
 int main() {
+
+    // Load configuration file
     YAML::Node config = YAML::LoadFile("config.yaml");
 
     // Init an in-memory DuckDB instance
     DuckDBManager db_manager(":memory:");
     db_manager.importSqlFile("./resources/tpch_schema.sql");
+
+    // Configure aws sdk
+    Aws::SDKOptions options;
+    Aws::InitAPI(options);
+    Aws::Client::ClientConfiguration clientConfig;
 
     // Connect to pixels-server
     std::string host_addr = config["server_address"].as<std::string>();
@@ -40,7 +49,7 @@ int main() {
     spdlog::info("Configured the trino query endpoint: {}:{}/{}/{}",
                  trino_url, trino_port, trino_default_catalog, trino_default_schema);
 
-    // start the interactive cli menu
+    // Start the interactive cli menu
     auto rootMenu = std::make_unique<Menu>("worker-cli");
     rootMenu -> Insert(
             "hello",
@@ -87,6 +96,23 @@ int main() {
                 },
             "Disable colors in the cli");
 
+    // AWS CLI
+    auto awsMenu = std::make_unique<Menu>("aws");
+    awsMenu->Insert(
+            "buckets",
+            [&clientConfig](std::ostream& out){
+                awsutils::ListBuckets(clientConfig);
+            },
+            "List accessible S3 buckets.");
+    awsMenu->Insert(
+            "objects",
+            [&clientConfig](std::ostream& out, std::string bucket_name){
+                awsutils::ListObjects(bucket_name, clientConfig);
+            },
+            "List objects of the selected bucket.");
+
+
+    // DuckDB CLI
     auto duckdbMenu = std::make_unique<Menu>("duckdb");
     duckdbMenu->Insert(
             "hello",
@@ -109,11 +135,13 @@ int main() {
             "Import SQL file in DuckDB instance");
 
     rootMenu->Insert(std::move(duckdbMenu));
+    rootMenu->Insert(std::move(awsMenu));
 
     Cli cli(std::move(rootMenu));
 
-    // global exit action
-    cli.ExitAction([](auto& out){
+    // Global exit action
+    cli.ExitAction([&options](auto& out){
+        Aws::ShutdownAPI(options);
         out << "bye~" << std::endl;
     });
 

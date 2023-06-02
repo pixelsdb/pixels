@@ -12,6 +12,7 @@ find_package(DuckDB REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(cli REQUIRED)
+find_package(AWSSDK REQUIRED COMPONENTS s3)
 
 add_subdirectory(worker)
 add_subdirectory(tests)
@@ -34,4 +35,5 @@ target_link_libraries(${PROJECT_NAME}
         yaml-cpp
         spdlog::spdlog
         cli::cli
+        ${AWSSDK_LINK_LIBRARIES}
 )

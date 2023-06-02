@@ -10,7 +10,8 @@ set(worker_cxx
         src/exception/grpc_transpile_exception.cpp
         src/exception/grpc_trino_query_exception.cpp
         src/exception/grpc_unavailable_exception.cpp
-        src/utils/constants.cpp)
+        src/utils/constants.cpp
+        src/utils/aws_utils.cpp)
 
 set(PROTO_FILES_DIR "${CMAKE_CURRENT_LIST_DIR}/../proto")
 set(PROTO_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
