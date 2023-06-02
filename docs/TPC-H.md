@@ -6,7 +6,8 @@ After the installation of [Pixels + Trino](INSTALL.md), we can evaluate the perf
 
 Attach a volume that is larger than the scale factor (e.g., 150GB for SF100) to the EC2 instance.
 Mount the attached volume to a local path (e.g., `/data/tpch`).
-Download tpch-dbgen to the instance, build it, and generate the dataset and queries into the attached volume.
+Download `tpch-dbgen` to the instance, build it, and generate the dataset and queries into the attached volume.
+You can follow [this article](https://docs.deistercloud.com/content/Databases.30/TPCH%20Benchmark.90/Data%20generation%20tool.30.xml?embedded=true) to correctly use `tpch-dbgen` for dataset generation.
 Here, we put the dataset in `/data/tpch/100g/`.
 The file(s) of each table are stored in a separate directory named by the table name.
 
@@ -29,6 +30,33 @@ Create the container to store the tables in S3. The container name is the same a
 Change the bucket name if it already exists.
 
 During data loading, Pixels will automatically create the folders in the bucket to store the files in each table.
+
+## Install MinIO*
+
+MinIO is an alternative to the AWS S3 storage. 
+It provides the similar functionality as AWS S3 storage and supports [single node deployment](https://min.io/docs/minio/linux/index.html) as well as [multiple nodes deployment](https://min.io/docs/minio/linux/operations/install-deploy-manage/deploy-minio-multi-node-multi-drive.html).
+
+Follow the documentation, you can establish the installation. 
+After login to the administrative website, create your own access key and secret key for `pixels-tpch` and `pixels-lambda-test` (defined as `executor.intermediate.folder` and `executor.output.folder` in `pixels.properties`) buckets.
+You can follow the read-write policy to give this access key the read-write policy to `pixels-tpch` and `pixels-lambda-test` bucket as follows:
+
+```properties
+{
+ "Version": "2012-10-17",
+ "Statement": [
+  {
+   "Effect": "Allow",
+   "Action": [
+    "s3:*"
+   ],
+   "Resource": [
+    "arn:aws:s3:::pixels-lambda-test/*",
+    "arn:aws:s3:::pixels-tpch/*"
+   ]
+  }
+ ]
+}
+```
 
 ## Load Data
 

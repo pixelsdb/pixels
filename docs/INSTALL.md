@@ -76,7 +76,7 @@ export PIXELS_HOME=$HOME/opt/pixels/
 ```
 
 But you still need to:
-- Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
+- Put the [jdbc connector of MySQL](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib`.
 - Modify `pixels.properties` to ensure the following properties are valid:
 ```properties
 pixels.var.dir=/home/pixels/opt/pixels/var/
@@ -201,6 +201,20 @@ ln -s etcd-v3.3.4-linux-amd64-bin etcd
 cd etcd
 ./start-etcd.sh
 ```
+You should modify the `conf.yml` to fit the current condition, especially for the `data-dir` and `*-urls` in the configuration:
+
+```properties
+name: 'etcd0'
+data-dir: "/home/ubuntu/opt/etcd-v3.3.4-linux-amd64-bin/data"
+listen-peer-urls: http://localhost:2380
+listen-client-urls: http://localhost:2379
+initial-advertise-peer-urls: http://localhost:2380
+advertise-client-urls: http://localhost:2379
+initial-cluster: "etcd0=http://localhost:2380"
+initial-cluster-token: 'pixels-etcd-cluster'
+initial-cluster-state: 'new'
+```
+
 You can use `screen` or `nohup` to run it in the background:
 
 ```bash
@@ -230,6 +244,7 @@ Here, we install Trino to `~/opt/trino-server-405` and create a link for it:
 ln -s trino-server-405 trino-server
 ```
 Then download [trino-cli](https://trinodb.github.io/docs.trino.io/405/client/cli.html) into `~/opt/trino-server/bin/`
+
 and give executable permission to it.
 
 There are two important directories in the home of trino-server: `etc` and `plugin`.
@@ -354,10 +369,12 @@ If pixels-cache is enabled, set up the cache before starting Pixels:
 sudo ./sbin/pin-cache.sh
 ```
 `reset-cache.sh` is only needed for the first time of using pixels-cache.
-It initializes some states in etcd for the cache.
+It initializes some states in etcd for the cache. 
+If you modify the `etcd` urls, then you need to also change the `ENDPOINTS` property in `reset-cache.sh` as well.
 
 Even if pixels-cache is disabled, `reset-cache.sh` is needed for the first time of starting Pixels.
 Then, start the daemons of Pixels using:
+
 ```bash
 ./sbin/start-pixels.sh
 ```
