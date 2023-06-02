@@ -190,6 +190,11 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-invoker-vhive</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-worker-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
