@@ -54,6 +54,7 @@
         <module>pixels-turbo/pixels-worker-lambda</module>
         <module>pixels-turbo/pixels-invoker-lambda</module>
         <module>pixels-turbo/pixels-scaling-ec2</module>
+        <module>pixels-turbo/pixels-amphi</module>
     </modules>
 
     <properties>

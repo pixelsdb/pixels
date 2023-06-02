@@ -63,10 +63,10 @@ public class PixelsParser
     private final SqlValidatorWithHints validator;
     private final VolcanoPlanner planner;
 
-    PixelsParser(MetadataService ms,
-                 String schemaName,
-                 SqlParser.Config parserConfig,
-                 Properties calciteConfig)
+    public PixelsParser(MetadataService ms,
+                        String schemaName,
+                        SqlParser.Config parserConfig,
+                        Properties calciteConfig)
     {
         this.metadataService = ms;
         this.parserConfig = parserConfig;
