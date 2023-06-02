@@ -62,15 +62,22 @@ bool awsutils::GetObject(const Aws::String &objectKey,
         const Aws::S3::S3Error &err = outcome.GetError();
         std::cerr << "Error: GetObject: " <<
                   err.GetExceptionName() << ": " << err.GetMessage() << std::endl;
+        return false;
     }
     else {
+        std::filesystem::path dir_path(store_fp + "/" + fromBucket.c_str());
+        std::filesystem::path object_path(objectKey.c_str());
+        std::filesystem::path full_path = dir_path / object_path;
+
+        std::filesystem::create_directories(full_path.parent_path());
+
         Aws::OFStream local_file;
-        local_file.open(store_fp, std::ios::out | std::ios::binary);
+        local_file.open(full_path, std::ios::out | std::ios::binary);
         local_file << outcome.GetResult().GetBody().rdbuf();
 
         std::cout << "Successfully retrieved '" << objectKey << "' from '"
-                  << fromBucket << "'." << std::endl;
+                  << fromBucket << "' and stored to '" << full_path << "'." << std::endl;
     }
 
-    return outcome.IsSuccess();
+    return true;
 }

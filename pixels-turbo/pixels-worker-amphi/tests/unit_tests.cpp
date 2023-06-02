@@ -6,7 +6,10 @@
 #include "grpc/transpile_sql_client.h"
 #include "grpc/trino_query_client.h"
 #include "exception/grpc_transpile_exception.h"
+#include "utils/aws_utils.h"
+
 #include "yaml-cpp/yaml.h"
+#include "aws/core/Aws.h"
 #include "spdlog/spdlog.h"
 
 YAML::Node config = YAML::LoadFile("../../config.yaml");
@@ -129,4 +132,18 @@ TEST(DuckDBManager, executeQueryTpchSampleTest) {
     EXPECT_EQ(nation_conditional_query->RowCount(), 1);
     EXPECT_EQ(nation_conditional_query->GetValue(1, 0), "ARGENTINA");
     spdlog::info("Conditional query should result in ARGENTINA in n_name.");
+}
+
+TEST(aws, s3UtilTest) {
+    Aws::SDKOptions options;
+    Aws::InitAPI(options);
+    Aws::Client::ClientConfiguration clientConfig;
+
+    awsutils::ListBuckets(clientConfig);
+    awsutils::ListObjects("pixels-tpch1g", clientConfig);
+
+    awsutils::GetObject("nation/v-0-order/20230529201449_12.pxl", "pixels-tpch1g", "./data", clientConfig);
+    spdlog::info("Get object of nation pxl file from s3.");
+
+    Aws::ShutdownAPI(options);
 }

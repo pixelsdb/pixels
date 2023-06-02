@@ -10,6 +10,9 @@ trino_port: 8080
 trino_default_catalog: pixels
 trino_default_schema: tpch_1g
 
+# cache configuration
+cache_dir_path: ./data
+
 # database configuration
 local_engine: duckdb
 remote_engine: hive

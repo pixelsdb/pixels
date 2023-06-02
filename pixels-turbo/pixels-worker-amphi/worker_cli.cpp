@@ -15,7 +15,6 @@
 using namespace cli;
 
 int main() {
-
     // Load configuration file
     YAML::Node config = YAML::LoadFile("config.yaml");
 
@@ -27,6 +26,10 @@ int main() {
     Aws::SDKOptions options;
     Aws::InitAPI(options);
     Aws::Client::ClientConfiguration clientConfig;
+
+    // Configure disk cache
+    std::string cache_dir = config["cache_dir_path"].as<std::string>();
+    spdlog::info("Cached data will be stored in: {}", cache_dir);
 
     // Connect to pixels-server
     std::string host_addr = config["server_address"].as<std::string>();
@@ -112,8 +115,8 @@ int main() {
             "List objects of the selected bucket.");
     awsMenu->Insert(
             "download",
-            [&clientConfig](std::ostream& out, std::string bucket_name, std::string object_name){
-                awsutils::GetObject(object_name, bucket_name, "./data/test.pxl", clientConfig);
+            [&clientConfig, &cache_dir](std::ostream& out, std::string bucket_name, std::string object_name){
+                awsutils::GetObject(object_name, bucket_name, cache_dir, clientConfig);
             },
             "Download an object from s3, specified with bucket name & object name.");
 

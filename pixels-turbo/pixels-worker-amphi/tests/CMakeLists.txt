@@ -28,4 +28,5 @@ target_link_libraries(
         duckdb
         yaml-cpp
         spdlog::spdlog
+        ${AWSSDK_LINK_LIBRARIES}
 )
