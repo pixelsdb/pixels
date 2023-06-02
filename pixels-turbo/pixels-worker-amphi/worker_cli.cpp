@@ -110,7 +110,12 @@ int main() {
                 awsutils::ListObjects(bucket_name, clientConfig);
             },
             "List objects of the selected bucket.");
-
+    awsMenu->Insert(
+            "download",
+            [&clientConfig](std::ostream& out, std::string bucket_name, std::string object_name){
+                awsutils::GetObject(object_name, bucket_name, "./data/test.pxl", clientConfig);
+            },
+            "Download an object from s3, specified with bucket name & object name.");
 
     // DuckDB CLI
     auto duckdbMenu = std::make_unique<Menu>("duckdb");

@@ -44,3 +44,33 @@ bool awsutils::ListObjects(const Aws::String &bucketName,
 
     return outcome.IsSuccess();
 }
+
+bool awsutils::GetObject(const Aws::String &objectKey,
+                         const Aws::String &fromBucket,
+                         const std::string &store_fp,
+                         const Aws::Client::ClientConfiguration &clientConfig) {
+    Aws::S3::S3Client client(clientConfig);
+
+    Aws::S3::Model::GetObjectRequest request;
+    request.SetBucket(fromBucket);
+    request.SetKey(objectKey);
+
+    Aws::S3::Model::GetObjectOutcome outcome =
+            client.GetObject(request);
+
+    if (!outcome.IsSuccess()) {
+        const Aws::S3::S3Error &err = outcome.GetError();
+        std::cerr << "Error: GetObject: " <<
+                  err.GetExceptionName() << ": " << err.GetMessage() << std::endl;
+    }
+    else {
+        Aws::OFStream local_file;
+        local_file.open(store_fp, std::ios::out | std::ios::binary);
+        local_file << outcome.GetResult().GetBody().rdbuf();
+
+        std::cout << "Successfully retrieved '" << objectKey << "' from '"
+                  << fromBucket << "'." << std::endl;
+    }
+
+    return outcome.IsSuccess();
+}
