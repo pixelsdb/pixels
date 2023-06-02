@@ -46,13 +46,15 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
                 output = handler.handleRequest(input);
                 Utils.stopProfile(JFRFilename);
 
-                Utils.upload(JFRFilename, String.format("experiments/%s/%s", input.getTransId(), JFRFilename));
+                Utils.upload(JFRFilename, String.format("%s/%s", input.getTransId(), JFRFilename));
+                log.info(String.format("upload JFR file to experiments/%s/%s successfully", input.getTransId(), JFRFilename));
             } else {
                 log.info(String.format("disable profile to execute input: %s", JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
                 output = handler.handleRequest(input);
             }
             Utils.dump(JSONFilename, JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect));
-            Utils.upload(JSONFilename, String.format("experiments/%s/%s", input.getTransId(), JSONFilename));
+            Utils.upload(JSONFilename, String.format("%s/%s", input.getTransId(), JSONFilename));
+            log.info(String.format("upload JSON file to experiments/%s/%s successfully", input.getTransId(), JSONFilename));
 
             log.info(String.format("get output successfully: %s", JSON.toJSONString(output)));
         } catch (Exception e) {

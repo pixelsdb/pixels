@@ -16,6 +16,25 @@ public class Utils {
     private static final String FTP_PORT = System.getenv("FTP_PORT");
     private static final String FTP_USERNAME = System.getenv("FTP_USERNAME");
     private static final String FTP_PASSWORD = System.getenv("FTP_PASSWORD");
+    private static void createDirectoryTree(FTPClient client, String dirTree) throws IOException {
+        if (dirTree.startsWith(client.printWorkingDirectory())) {
+            dirTree = dirTree.substring(client.printWorkingDirectory().length());
+        }
+        //tokenize the string and attempt to change into each directory level.  If you cannot, then start creating.
+        String[] directories = dirTree.split("/");
+        for (String dir : directories) {
+            if (!dir.isEmpty()) {
+                if (!client.changeWorkingDirectory(dir)) {
+                    if (!client.makeDirectory(dir)) {
+                        throw new IOException("Unable to create remote directory '" + dir + "'.  error='" + client.getReplyString() + "'");
+                    }
+                    if (!client.changeWorkingDirectory(dir)) {
+                        throw new IOException("Unable to change into newly created remote directory '" + dir + "'.  error='" + client.getReplyString() + "'");
+                    }
+                }
+            }
+        }
+    }
 
     public static void append(String src, String dest) throws IOException {
         // append the log file to FTP server
@@ -24,6 +43,10 @@ public class Utils {
         ftpClient.login(FTP_USERNAME, FTP_PASSWORD);
         ftpClient.enterLocalPassiveMode();
         ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+
+        dest = String.format("%s/%s", FTP_WORKDIR, dest);
+        String dir = dest.substring(0, dest.lastIndexOf("/"));
+        createDirectoryTree(ftpClient, dir);
 
         FileInputStream inputStream = new FileInputStream(src);
         ftpClient.appendFile(dest, inputStream);
@@ -38,6 +61,10 @@ public class Utils {
         ftpClient.login(FTP_USERNAME, FTP_PASSWORD);
         ftpClient.enterLocalPassiveMode();
         ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+
+        dest = String.format("%s/%s", FTP_WORKDIR, dest);
+        String dir = dest.substring(0, dest.lastIndexOf("/"));
+        createDirectoryTree(ftpClient, dir);
 
         FileInputStream inputStream = new FileInputStream(src);
         ftpClient.storeFile(dest, inputStream);

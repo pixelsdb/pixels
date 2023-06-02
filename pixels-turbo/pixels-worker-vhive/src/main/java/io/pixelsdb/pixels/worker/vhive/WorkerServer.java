@@ -40,8 +40,7 @@ public class WorkerServer implements Server {
             log.info("rpc server is trying to shutdown");
             FileAppender appender = LoggerContext.getContext().getConfiguration().getAppender("log");
             String logFilename = appender.getFileName();
-            Utils.append(logFilename, "experiments/" + logFilename);
-            log.info(String.format("logfile %s append successfully", logFilename));
+            Utils.append(logFilename, logFilename);
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
             log.info("rpc server close successfully");
         } catch (InterruptedException e) {
