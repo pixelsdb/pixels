@@ -1,7 +1,6 @@
 package io.pixelsdb.pixels.invoker.vhive;
 
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
@@ -26,7 +25,7 @@ public class ScanInvoker extends VhiveInvoker {
 
     @Override
     public CompletableFuture<Output> invoke(Input input) {
-        log.info(String.format("invoke ScanInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
+//        log.info(String.format("invoke ScanInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
         ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().scan((ScanInput) input);
         return genCompletableFuture(future);
     }
