@@ -52,7 +52,7 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
                 log.info(String.format("disable profile to execute input: %s", JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
                 output = handler.handleRequest(input);
             }
-            Utils.dump(JSONFilename, JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect));
+            Utils.dump(JSONFilename, input, output);
             Utils.upload(JSONFilename, String.format("%s/%s", input.getTransId(), JSONFilename));
             log.info(String.format("upload JSON file to experiments/%s/%s successfully", input.getTransId(), JSONFilename));
 

@@ -1,5 +1,7 @@
 package io.pixelsdb.pixels.worker.vhive.utils;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import one.profiler.AsyncProfiler;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
@@ -8,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 public class Utils {
     private static final AsyncProfiler PROFILER = AsyncProfiler.getInstance();
@@ -74,9 +77,12 @@ public class Utils {
         ftpClient.logout();
     }
 
-    public static void dump(String filename, String content) throws IOException {
+    public static void dump(String filename, Object ...contents) throws IOException {
         FileOutputStream outputStream = new FileOutputStream(filename);
-        outputStream.write(content.getBytes(StandardCharsets.UTF_8));
+        JSONArray jsonArray = new JSONArray();
+        jsonArray.addAll(Arrays.asList(contents));
+        String output = jsonArray.toString(SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect);
+        outputStream.write(output.getBytes(StandardCharsets.UTF_8));
         outputStream.close();
     }
 
