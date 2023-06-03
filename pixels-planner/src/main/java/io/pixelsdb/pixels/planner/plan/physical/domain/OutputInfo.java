@@ -56,10 +56,6 @@ public class OutputInfo
         this.encoding = encoding;
     }
 
-    private OutputInfo(Builder builder) {
-        this(builder.path, builder.randomFileName, builder.storageInfo, builder.encoding);
-    }
-
     public String getPath()
     {
         return path;
@@ -98,42 +94,5 @@ public class OutputInfo
     public void setEncoding(boolean encoding)
     {
         this.encoding = encoding;
-    }
-
-    public static Builder newBuilder() {
-        return new Builder();
-    }
-
-    public static final class Builder {
-        private String path;
-        private boolean randomFileName;
-        private StorageInfo storageInfo;
-        private boolean encoding;
-
-        private Builder() {}
-
-        public Builder setPath(String path) {
-            this.path = path;
-            return this;
-        }
-
-        public Builder setRandomFileName(boolean randomFileName) {
-            this.randomFileName = randomFileName;
-            return this;
-        }
-
-        public Builder setStorageInfo(StorageInfo storageInfo) {
-            this.storageInfo = storageInfo;
-            return this;
-        }
-
-        public Builder setEncoding(boolean encoding) {
-            this.encoding = encoding;
-            return this;
-        }
-
-        public OutputInfo build() {
-            return new OutputInfo(this);
-        }
     }
 }

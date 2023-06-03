@@ -72,20 +72,13 @@ public class ScanInput extends Input
         this.output = output;
     }
 
-    public ScanInput(Builder builder) {
-        super(builder.queryId);
-        this.tableInfo = builder.tableInfo;
-        this.scanProjection = builder.scanProjection;
-        this.partialAggregationPresent = builder.partialAggregationPresent;
-        this.partialAggregationInfo = builder.partialAggregationInfo;
-        this.output = builder.output;
-    }
-
-    public ScanTableInfo getTableInfo() {
+    public ScanTableInfo getTableInfo()
+    {
         return tableInfo;
     }
 
-    public void setTableInfo(ScanTableInfo tableInfo) {
+    public void setTableInfo(ScanTableInfo tableInfo)
+    {
         this.tableInfo = tableInfo;
     }
 
@@ -127,54 +120,5 @@ public class ScanInput extends Input
     public void setOutput(OutputInfo output)
     {
         this.output = output;
-    }
-
-    public static Builder newBuilder() {
-        return new Builder();
-    }
-
-    public static final class Builder {
-        private long queryId;
-        private ScanTableInfo tableInfo;
-        private boolean[] scanProjection;
-        private boolean partialAggregationPresent = false;
-        private PartialAggregationInfo partialAggregationInfo;
-        private OutputInfo output;
-
-        private Builder() {}
-
-        public Builder setQueryId(long queryId) {
-            this.queryId = queryId;
-            return this;
-        }
-
-        public Builder setScanTableInfo(ScanTableInfo tableInfo) {
-            this.tableInfo = tableInfo;
-            return this;
-        }
-
-        public Builder setScanProjection(boolean[] scanProjection) {
-            this.scanProjection = scanProjection;
-            return this;
-        }
-
-        public Builder setPartialAggregationPresent(boolean partialAggregationPresent) {
-            this.partialAggregationPresent = partialAggregationPresent;
-            return this;
-        }
-
-        public Builder setPartialAggregationInfo(PartialAggregationInfo partialAggregationInfo) {
-            this.partialAggregationInfo = partialAggregationInfo;
-            return this;
-        }
-
-        public Builder setOutput(OutputInfo output) {
-            this.output = output;
-            return this;
-        }
-
-        public ScanInput build() {
-            return new ScanInput(this);
-        }
     }
 }

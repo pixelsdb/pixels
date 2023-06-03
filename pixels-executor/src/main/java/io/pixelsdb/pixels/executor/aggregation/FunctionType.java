@@ -29,11 +29,11 @@ import java.util.Set;
  */
 public enum FunctionType
 {
-    UNKNOWN(0), // The first enum value is the default value.
-    SUM(1),
-    MIN(2),
-    MAX(3),
-    COUNT(4);
+    UNKNOWN, // The first enum value is the default value.
+    SUM,
+    MIN,
+    MAX,
+    COUNT;
 
     private static final Set<String> supported;
 
@@ -51,31 +51,8 @@ public enum FunctionType
         return valueOf(name.toUpperCase());
     }
 
-    public static FunctionType fromNumber(int number) {
-        switch (number) {
-            case 0:
-                return UNKNOWN;
-            case 1:
-                return SUM;
-            case 2:
-                return MIN;
-            case 3:
-                return MAX;
-            case 4:
-                return COUNT;
-            default:
-                return null;
-        }
-    }
-
     public static boolean isSupported(String name)
     {
         return supported.contains(name.toUpperCase());
-    }
-
-    public final int number;
-
-    FunctionType(int number) {
-        this.number = number;
     }
 }

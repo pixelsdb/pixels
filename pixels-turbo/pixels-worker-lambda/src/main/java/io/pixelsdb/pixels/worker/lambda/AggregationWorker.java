@@ -34,7 +34,8 @@ import org.apache.logging.log4j.Logger;
  * @author hank
  * @create 2023-04-23
  */
-public class AggregationWorker implements RequestHandler<AggregationInput, AggregationOutput> {
+public class AggregationWorker implements RequestHandler<AggregationInput, AggregationOutput>
+{
     private static final Logger logger = LogManager.getLogger(AggregationWorker.class);
     private final WorkerMetrics workerMetrics = new WorkerMetrics();
 

@@ -52,10 +52,6 @@ public class InputInfo
         this.rgLength = rgLength;
     }
 
-    private InputInfo(Builder builder) {
-        this(builder.path, builder.rgStart, builder.rgLength);
-    }
-
     public String getPath()
     {
         return path;
@@ -84,36 +80,5 @@ public class InputInfo
     public void setRgLength(int rgLength)
     {
         this.rgLength = rgLength;
-    }
-
-    public static Builder newBuilder() {
-        return new Builder();
-    }
-
-    public static final class Builder {
-        private String path;
-        private int rgStart;
-        private int rgLength;
-
-        private Builder() {}
-
-        public Builder setPath(String path) {
-            this.path = path;
-            return this;
-        }
-
-        public Builder setRgStart(int rgStart) {
-            this.rgStart = rgStart;
-            return this;
-        }
-
-        public Builder setRgLength(int rgLength) {
-            this.rgLength = rgLength;
-            return this;
-        }
-
-        public InputInfo build() {
-            return new InputInfo(this);
-        }
     }
 }

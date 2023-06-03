@@ -51,17 +51,20 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @create 2022-09-04
  */
-public final class Minio extends AbstractS3 {
+public final class Minio extends AbstractS3
+{
     // private static Logger logger = LogManager.getLogger(Minio.class);
     private static final String SchemePrefix = Scheme.minio.name() + "://";
 
-    private static String minIOEndpoint = System.getenv("MINIO_ENDPOINT");
-    private static String minIOAccessKey = System.getenv("MINIO_ACCESS_KEY");
-    private static String minIOSecretKey = System.getenv("MINIO_SECRET_KEY");
-    private static String minIORegion = System.getenv("MINIO_REGION");
+    private static String minIORegion = "eu-central-2";
+    private static String minIOEndpoint = null;
+    private static String minIOAccessKey = null;
+    private static String minIOSecretKey = null;
 
-    static {
-        if (EnableCache) {
+    static
+    {
+        if (EnableCache)
+        {
             /**
              * Issue #222:
              * The etcd file id is only used for cache coordination.
@@ -69,10 +72,6 @@ public final class Minio extends AbstractS3 {
              */
             InitId(MINIO_ID_KEY);
         }
-    }
-
-    public Minio() {
-        connect();
     }
 
     /**
@@ -103,6 +102,11 @@ public final class Minio extends AbstractS3 {
             minIOSecretKey = secretKey;
             StorageFactory.Instance().reload(Scheme.minio);
         }
+    }
+
+    public Minio()
+    {
+        connect();
     }
 
     private void connect()

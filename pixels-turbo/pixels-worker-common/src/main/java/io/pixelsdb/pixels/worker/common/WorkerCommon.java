@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
+import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -52,15 +53,15 @@ import static java.util.Objects.requireNonNull;
  */
 public class WorkerCommon
 {
-    public static final int rowBatchSize;
     private static final Logger logger = LogManager.getLogger(WorkerCommon.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
-    private static final int pixelStride;
-    private static final int rowGroupSize;
     private static Storage s3;
     private static Storage minio;
     private static Storage redis;
+    public static final int rowBatchSize;
+    private static final int pixelStride;
+    private static final int rowGroupSize;
 
     static
     {
@@ -79,7 +80,7 @@ public class WorkerCommon
             }
             else if (WorkerCommon.minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
             {
-//                ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
+                ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                 WorkerCommon.minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
             }
             else if (WorkerCommon.redis == null && storageInfo.getScheme() == Storage.Scheme.redis)
@@ -256,7 +257,7 @@ public class WorkerCommon
             TimeUnit.MILLISECONDS.sleep(200);
         }
     }
-
+    
     /**
      * Read the schemas of the table.
      *
