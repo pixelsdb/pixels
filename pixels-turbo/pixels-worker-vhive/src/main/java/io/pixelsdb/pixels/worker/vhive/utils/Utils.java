@@ -16,6 +16,8 @@ public class Utils {
     private static final String FTP_PORT = System.getenv("FTP_PORT");
     private static final String FTP_USERNAME = System.getenv("FTP_USERNAME");
     private static final String FTP_PASSWORD = System.getenv("FTP_PASSWORD");
+    private static final String FTP_WORKDIR = System.getenv("FTP_WORKDIR");
+
     private static void createDirectoryTree(FTPClient client, String dirTree) throws IOException {
         if (dirTree.startsWith(client.printWorkingDirectory())) {
             dirTree = dirTree.substring(client.printWorkingDirectory().length());
