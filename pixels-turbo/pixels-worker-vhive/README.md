@@ -1,10 +1,9 @@
 # Pixels-Worker-Vhive
 
-This module is created as the docker image for vHive function deployment. 
+This module is created as the docker image for vHive function deployment.
 Run `mvn package` to generate the executable JAR file in `target/pixels-worker-vhive-jar-with-dependencies.jar`.
 
 ## Docker Build
-
 
 After `docker` installation, use the `Dockerfile` under the root directory to build the docker image:
 
@@ -30,10 +29,12 @@ FTP_USERNAME=<your-ftp-username>
 FTP_PASSWORD=<your-ftp-password>
 ```
 
-For `MINIO_REGION`, it corresponds to the `AWS_DEFAULT_REGION` in AWS S3. 
-All the available regions values can be seen in the [AWS documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html).
+For `MINIO_REGION`, it corresponds to the `AWS_DEFAULT_REGION` in AWS S3.
+All the available regions values can be seen in
+the [AWS documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html).
 
-If you try to run the docker image locally, then you must provide these environement variables by `--env` to correctly start gRPC server. 
+If you try to run the docker image locally, then you must provide these environement variables by `--env` to correctly
+start gRPC server.
 The entire docker command to test the docker image is:
 
 ```bash
@@ -51,11 +52,14 @@ docker run -p 50051:50051 --rm --network=bridge \
 <your-docker-username>/<your-docker-image-name>
 ```
 
-As for vhive function deployment, these environment variables are specify in the `configs/knative_workload/worker.yaml`([vHive project directory](https://github.com/pixelsdb/vHive)), modify them as the real value.
+As for vhive function deployment, these environment variables are specify in
+the `configs/knative_workload/worker.yaml`([vHive project directory](https://github.com/pixelsdb/vHive)), modify them as
+the real value.
 
 ## Docker Push
 
-After you ensure the function image can correctly run inside the local docker container, you can push it to your own registery for the vHive worker's `containerd` to pull.
+After you ensure the function image can correctly run inside the local docker container, you can push it to your own
+registery for the vHive worker's `containerd` to pull.
 Here we assume you choose the docker hub by default:
 
 ```bash
@@ -65,9 +69,12 @@ docker push <your-docker-username>/<your-docker-image-name>:latest
 ## FTP Service
 
 As you can see, we have FTP related enviroment variables in the configuration.
-This is because the image will generate the logging file and profiling file during the execution, and the function image running inside the Firecracker microVM is temporary. 
+This is because the image will generate the logging file and profiling file during the execution, and the function image
+running inside the Firecracker microVM is temporary.
 Therefore, we need a permenant location to store such files for analysis.
 
-Now our module use FTP service as a solution. 
-You can follow the [this tutorial](https://ubuntu.com/server/docs/service-ftp) and [this one](https://www.digitalocean.com/community/tutorials/how-to-set-up-vsftpd-for-a-user-s-directory-on-ubuntu-20-04) to setup a FTP server easily.
+Now our module use FTP service as a solution.
+You can follow the [this tutorial](https://ubuntu.com/server/docs/service-ftp)
+and [this one](https://www.digitalocean.com/community/tutorials/how-to-set-up-vsftpd-for-a-user-s-directory-on-ubuntu-20-04)
+to setup a FTP server easily.
 

@@ -13,7 +13,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.UUID;
 
-public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O extends Output> {
+public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O extends Output>
+{
     private static final Logger log = LogManager.getLogger(ServiceImpl.class);
 
     final Class<T> handlerClass;
@@ -21,24 +22,28 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
 
     public ServiceImpl(
             Class<T> handlerClass,
-            Class<I> typeParameterClass) {
+            Class<I> typeParameterClass)
+    {
         this.handlerClass = handlerClass;
         this.typeParameterClass = typeParameterClass;
     }
 
     public void execute(TurboProto.WorkerRequest request,
-                        StreamObserver<TurboProto.WorkerResponse> responseObserver) {
+                        StreamObserver<TurboProto.WorkerResponse> responseObserver)
+    {
         I input = JSON.parseObject(request.getJson(), typeParameterClass);
         O output;
 
         boolean isProfile = Boolean.parseBoolean(System.getenv("PROFILING_ENABLED"));
-        try {
+        try
+        {
             String requestId = String.valueOf(UUID.randomUUID());
             WorkerContext context = new WorkerContext(LogManager.getLogger(handlerClass), new WorkerMetrics(), requestId);
             RequestHandler<I, O> handler = handlerClass.getConstructor(WorkerContext.class).newInstance(context);
 
             String JSONFilename = String.format("%s_%s.json", handler.getWorkerType(), handler.getRequestId());
-            if (isProfile) {
+            if (isProfile)
+            {
                 log.info(String.format("enable profile to execute input: %s", JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
 
                 String JFRFilename = String.format("%s_%s.jfr", handler.getWorkerType(), handler.getRequestId());
@@ -48,7 +53,8 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
 
                 Utils.upload(JFRFilename, String.format("%s/%s", input.getTransId(), JFRFilename));
                 log.info(String.format("upload JFR file to experiments/%s/%s successfully", input.getTransId(), JFRFilename));
-            } else {
+            } else
+            {
                 log.info(String.format("disable profile to execute input: %s", JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
                 output = handler.handleRequest(input);
             }
@@ -57,7 +63,8 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
             log.info(String.format("upload JSON file to experiments/%s/%s successfully", input.getTransId(), JSONFilename));
 
             log.info(String.format("get output successfully: %s", JSON.toJSONString(output)));
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             throw new RuntimeException("Exception during process: ", e);
         }
         TurboProto.WorkerResponse response = TurboProto.WorkerResponse.newBuilder()

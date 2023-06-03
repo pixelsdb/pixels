@@ -9,9 +9,11 @@ import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
 
-public class TestPartitionedJoinVhiveInvoker {
+public class TestPartitionedJoinVhiveInvoker
+{
     @Test
-    public void testPartitionJoin() throws ExecutionException, InterruptedException {
+    public void testPartitionJoin() throws ExecutionException, InterruptedException
+    {
         StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
 
         JoinOutput output = (JoinOutput) InvokerFactory.Instance()

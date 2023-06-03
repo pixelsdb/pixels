@@ -9,9 +9,11 @@ import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
 
-public class TestBroadcastChainJoinVhiveInvoker {
+public class TestBroadcastChainJoinVhiveInvoker
+{
     @Test
-    public void testBroadcastChainJoin() throws ExecutionException, InterruptedException {
+    public void testBroadcastChainJoin() throws ExecutionException, InterruptedException
+    {
         StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
 
         JoinOutput output = (JoinOutput) InvokerFactory.Instance()

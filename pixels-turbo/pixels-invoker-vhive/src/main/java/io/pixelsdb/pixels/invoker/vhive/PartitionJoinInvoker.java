@@ -12,19 +12,24 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
 
-public class PartitionJoinInvoker extends VhiveInvoker {
+public class PartitionJoinInvoker extends VhiveInvoker
+{
     private final Logger log = LogManager.getLogger(PartitionJoinInvoker.class);
-    protected PartitionJoinInvoker(String functionName) {
+
+    protected PartitionJoinInvoker(String functionName)
+    {
         super(functionName);
     }
 
     @Override
-    public Output parseOutput(String outputJson) {
+    public Output parseOutput(String outputJson)
+    {
         return JSON.parseObject(outputJson, JoinOutput.class);
     }
 
     @Override
-    public CompletableFuture<Output> invoke(Input input) {
+    public CompletableFuture<Output> invoke(Input input)
+    {
 //        log.info(String.format("invoke PartitionedJoinInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
         ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().partitionJoin((PartitionedJoinInput) input);
         return genCompletableFuture(future);

@@ -9,9 +9,11 @@ import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
 
-public class TestScanVhiveInvoker {
+public class TestScanVhiveInvoker
+{
     @Test
-    public void testScan() throws ExecutionException, InterruptedException {
+    public void testScan() throws ExecutionException, InterruptedException
+    {
         StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
 
         ScanOutput output = (ScanOutput) InvokerFactory.Instance()

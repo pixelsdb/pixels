@@ -18,11 +18,13 @@ import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-public class WorkerSyncClient {
+public class WorkerSyncClient
+{
     private final ManagedChannel channel;
     private final vHiveWorkerServiceGrpc.vHiveWorkerServiceBlockingStub stub;
 
-    public WorkerSyncClient(String host, int port) {
+    public WorkerSyncClient(String host, int port)
+    {
         checkArgument(host != null, "illegal rpc host");
         ;
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
@@ -33,15 +35,18 @@ public class WorkerSyncClient {
     }
 
 
-    public void shutdown() throws InterruptedException {
+    public void shutdown() throws InterruptedException
+    {
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
 
-    public ConnectivityState getState() throws InterruptedException {
+    public ConnectivityState getState() throws InterruptedException
+    {
         return this.channel.getState(true);
     }
 
-    public AggregationOutput aggregation(AggregationInput input) {
+    public AggregationOutput aggregation(AggregationInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.AGGREGATION))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -51,7 +56,8 @@ public class WorkerSyncClient {
         return output;
     }
 
-    public JoinOutput broadcastChainJoin(BroadcastChainJoinInput input) {
+    public JoinOutput broadcastChainJoin(BroadcastChainJoinInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.BROADCAST_CHAIN_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -61,7 +67,8 @@ public class WorkerSyncClient {
         return output;
     }
 
-    public JoinOutput broadcastJoin(BroadcastJoinInput input) {
+    public JoinOutput broadcastJoin(BroadcastJoinInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.BROADCAST_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -71,7 +78,8 @@ public class WorkerSyncClient {
         return output;
     }
 
-    public JoinOutput partitionChainJoin(PartitionedChainJoinInput input) {
+    public JoinOutput partitionChainJoin(PartitionedChainJoinInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.PARTITIONED_CHAIN_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -81,7 +89,8 @@ public class WorkerSyncClient {
         return output;
     }
 
-    public JoinOutput partitionJoin(PartitionedJoinInput input) {
+    public JoinOutput partitionJoin(PartitionedJoinInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.PARTITIONED_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -91,7 +100,8 @@ public class WorkerSyncClient {
         return output;
     }
 
-    public PartitionOutput partition(PartitionInput input) {
+    public PartitionOutput partition(PartitionInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.PARTITION))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -101,7 +111,8 @@ public class WorkerSyncClient {
         return output;
     }
 
-    public ScanOutput scan(ScanInput input) {
+    public ScanOutput scan(ScanInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.SCAN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))

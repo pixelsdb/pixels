@@ -7,23 +7,28 @@ import io.pixelsdb.pixels.worker.common.BasePartitionedChainJoinWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
 
-public class PartitionedChainJoinWorker extends BasePartitionedChainJoinWorker implements RequestHandler<PartitionedChainJoinInput, JoinOutput> {
-    public PartitionedChainJoinWorker(WorkerContext context) {
+public class PartitionedChainJoinWorker extends BasePartitionedChainJoinWorker implements RequestHandler<PartitionedChainJoinInput, JoinOutput>
+{
+    public PartitionedChainJoinWorker(WorkerContext context)
+    {
         super(context);
     }
 
     @Override
-    public JoinOutput handleRequest(PartitionedChainJoinInput input) {
+    public JoinOutput handleRequest(PartitionedChainJoinInput input)
+    {
         return process(input);
     }
 
     @Override
-    public String getRequestId() {
+    public String getRequestId()
+    {
         return this.context.getRequestId();
     }
 
     @Override
-    public WorkerType getWorkerType() {
+    public WorkerType getWorkerType()
+    {
         return WorkerType.PARTITIONED_CHAIN_JOIN;
     }
 }

@@ -12,19 +12,24 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
 
-public class ScanInvoker extends VhiveInvoker {
+public class ScanInvoker extends VhiveInvoker
+{
     private final Logger log = LogManager.getLogger(ScanInvoker.class);
-    protected ScanInvoker(String functionName) {
+
+    protected ScanInvoker(String functionName)
+    {
         super(functionName);
     }
 
     @Override
-    public Output parseOutput(String outputJson) {
+    public Output parseOutput(String outputJson)
+    {
         return JSON.parseObject(outputJson, ScanOutput.class);
     }
 
     @Override
-    public CompletableFuture<Output> invoke(Input input) {
+    public CompletableFuture<Output> invoke(Input input)
+    {
 //        log.info(String.format("invoke ScanInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
         ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().scan((ScanInput) input);
         return genCompletableFuture(future);

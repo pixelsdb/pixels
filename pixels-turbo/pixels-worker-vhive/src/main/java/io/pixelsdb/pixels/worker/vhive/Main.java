@@ -2,11 +2,13 @@ package io.pixelsdb.pixels.worker.vhive;
 
 import org.apache.commons.cli.*;
 
-public class Main {
+public class Main
+{
     // here are the default values if not specified in args
     private static final int PORT = 50051;
 
-    public static void main(String[] args) {
+    public static void main(String[] args)
+    {
         Options options = new Options();
 
         options.addOption(Option.builder("p")
@@ -18,13 +20,15 @@ public class Main {
 
         CommandLineParser parser = new DefaultParser();
         CommandLine cmd = null;
-        try {
+        try
+        {
             cmd = parser.parse(options, args);
             String port = cmd.getOptionValue("port", Integer.toString(PORT));
             final WorkerServer server = new WorkerServer(Integer.parseInt(port));
             Runtime.getRuntime().addShutdownHook(new Thread(server::shutdown));
             server.run();
-        } catch (ParseException pe) {
+        } catch (ParseException pe)
+        {
             System.out.println("Error parsing command-line arguments!");
             System.out.println("Please, follow the instructions below:");
             HelpFormatter formatter = new HelpFormatter();

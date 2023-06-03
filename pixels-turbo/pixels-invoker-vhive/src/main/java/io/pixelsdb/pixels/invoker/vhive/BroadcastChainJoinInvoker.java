@@ -12,19 +12,24 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
 
-public class BroadcastChainJoinInvoker extends VhiveInvoker {
+public class BroadcastChainJoinInvoker extends VhiveInvoker
+{
     private final Logger log = LogManager.getLogger(BroadcastChainJoinInvoker.class);
-    protected BroadcastChainJoinInvoker(String functionName) {
+
+    protected BroadcastChainJoinInvoker(String functionName)
+    {
         super(functionName);
     }
 
     @Override
-    public Output parseOutput(String outputJson) {
+    public Output parseOutput(String outputJson)
+    {
         return JSON.parseObject(outputJson, JoinOutput.class);
     }
 
     @Override
-    public CompletableFuture<Output> invoke(Input input) {
+    public CompletableFuture<Output> invoke(Input input)
+    {
 //        log.info(String.format("invoke BroadcastChainJoinInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
         ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().broadcastChainJoin((BroadcastChainJoinInput) input);
         return genCompletableFuture(future);

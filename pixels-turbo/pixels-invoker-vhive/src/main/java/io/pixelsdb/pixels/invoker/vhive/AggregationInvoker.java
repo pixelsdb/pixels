@@ -12,19 +12,24 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
 
-public class AggregationInvoker extends VhiveInvoker {
+public class AggregationInvoker extends VhiveInvoker
+{
     private final Logger log = LogManager.getLogger(AggregationInvoker.class);
-    protected AggregationInvoker(String functionName) {
+
+    protected AggregationInvoker(String functionName)
+    {
         super(functionName);
     }
 
     @Override
-    public Output parseOutput(String outputJson) {
+    public Output parseOutput(String outputJson)
+    {
         return JSON.parseObject(outputJson, AggregationOutput.class);
     }
 
     @Override
-    public CompletableFuture<Output> invoke(Input input) {
+    public CompletableFuture<Output> invoke(Input input)
+    {
 //        log.info(String.format("invoke AggregationInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
         ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().aggregation((AggregationInput) input);
         return genCompletableFuture(future);

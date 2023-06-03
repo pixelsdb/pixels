@@ -7,30 +7,36 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.Collections;
 
-public class TestConverter {
-    private InputInfo genInputInfo() {
+public class TestConverter
+{
+    private InputInfo genInputInfo()
+    {
         return new InputInfo("mypath", 0, 100);
     }
 
     @Test
-    public void testInputInfo() {
+    public void testInputInfo()
+    {
         Converter<InputInfo> converter = new Converter<>(InputInfo.class);
         converter.executeTest(genInputInfo());
     }
 
-    private InputSplit genInputSplit() {
+    private InputSplit genInputSplit()
+    {
         InputInfo info1 = new InputInfo("mypath1", 0, 100);
         InputInfo info2 = new InputInfo("mypath2", 100, 200);
         return new InputSplit(Arrays.asList(info1, info2));
     }
 
     @Test
-    public void testInputSplit() {
+    public void testInputSplit()
+    {
         Converter<InputSplit> converter = new Converter<>(InputSplit.class);
         converter.executeTest(genInputSplit());
     }
 
-    private ScanTableInfo genScanTableInfo() {
+    private ScanTableInfo genScanTableInfo()
+    {
         return new ScanTableInfo(
                 "mytable",
                 true,
@@ -41,13 +47,15 @@ public class TestConverter {
     }
 
     @Test
-    public void testScanTableInfo() {
+    public void testScanTableInfo()
+    {
         Converter<ScanTableInfo> converter = new Converter<>(ScanTableInfo.class);
         converter.executeTest(genScanTableInfo());
     }
 
     @Test
-    public void testFunctionType() {
+    public void testFunctionType()
+    {
         Converter<FunctionType> converter = new Converter<>(FunctionType.class);
         converter.executeTest(FunctionType.UNKNOWN);
         converter.executeTest(FunctionType.SUM);
@@ -55,7 +63,8 @@ public class TestConverter {
         converter.executeTest(FunctionType.MAX);
     }
 
-    private PartialAggregationInfo genPartialAggregationInfo() {
+    private PartialAggregationInfo genPartialAggregationInfo()
+    {
         return new PartialAggregationInfo(
                 new String[]{"alias1", "alias2"},
                 new String[]{"alias3", "alias4", "alias5"},
@@ -69,13 +78,15 @@ public class TestConverter {
     }
 
     @Test
-    public void testPartialAggregationInfo() {
+    public void testPartialAggregationInfo()
+    {
         Converter<PartialAggregationInfo> converter = new Converter<>(PartialAggregationInfo.class);
         converter.executeTest(genPartialAggregationInfo());
     }
 
     @Test
-    public void testScheme() {
+    public void testScheme()
+    {
         Converter<Storage.Scheme> converter = new Converter<>(Storage.Scheme.class);
         converter.executeTest(Storage.Scheme.hdfs);
         converter.executeTest(Storage.Scheme.file);
@@ -86,17 +97,20 @@ public class TestConverter {
         converter.executeTest(Storage.Scheme.mock);
     }
 
-    private StorageInfo genStorageInfo() {
+    private StorageInfo genStorageInfo()
+    {
         return new StorageInfo(Storage.Scheme.gcs, "endpoint", "accesskey", "secretkey");
     }
 
     @Test
-    public void testStorageInfo() {
+    public void testStorageInfo()
+    {
         Converter<StorageInfo> converter = new Converter<>(StorageInfo.class);
         converter.executeTest(genStorageInfo());
     }
 
-    private OutputInfo genOutputInfo() {
+    private OutputInfo genOutputInfo()
+    {
         return new OutputInfo(
                 "mypath",
                 true,
@@ -106,12 +120,14 @@ public class TestConverter {
     }
 
     @Test
-    public void testOutputInfo() {
+    public void testOutputInfo()
+    {
         Converter<OutputInfo> converter = new Converter<>(OutputInfo.class);
         converter.executeTest(genOutputInfo());
     }
 
-    private ScanInput genScanInput() {
+    private ScanInput genScanInput()
+    {
         return new ScanInput(
                 100,
                 genScanTableInfo(),
@@ -123,7 +139,8 @@ public class TestConverter {
     }
 
     @Test
-    public void testScanInput() {
+    public void testScanInput()
+    {
         Converter<ScanInput> converter = new Converter<>(ScanInput.class);
         converter.executeTest(genScanInput());
     }

@@ -12,7 +12,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-public class Utils {
+public class Utils
+{
     private static final AsyncProfiler PROFILER = AsyncProfiler.getInstance();
     private static final String EVENT = System.getenv("PROFILING_EVENT");
     private static final String FTP_HOST = System.getenv("FTP_HOST");
@@ -21,19 +22,26 @@ public class Utils {
     private static final String FTP_PASSWORD = System.getenv("FTP_PASSWORD");
     private static final String FTP_WORKDIR = System.getenv("FTP_WORKDIR");
 
-    private static void createDirectoryTree(FTPClient client, String dirTree) throws IOException {
-        if (dirTree.startsWith(client.printWorkingDirectory())) {
+    private static void createDirectoryTree(FTPClient client, String dirTree) throws IOException
+    {
+        if (dirTree.startsWith(client.printWorkingDirectory()))
+        {
             dirTree = dirTree.substring(client.printWorkingDirectory().length());
         }
         //tokenize the string and attempt to change into each directory level.  If you cannot, then start creating.
         String[] directories = dirTree.split("/");
-        for (String dir : directories) {
-            if (!dir.isEmpty()) {
-                if (!client.changeWorkingDirectory(dir)) {
-                    if (!client.makeDirectory(dir)) {
+        for (String dir : directories)
+        {
+            if (!dir.isEmpty())
+            {
+                if (!client.changeWorkingDirectory(dir))
+                {
+                    if (!client.makeDirectory(dir))
+                    {
                         throw new IOException("Unable to create remote directory '" + dir + "'.  error='" + client.getReplyString() + "'");
                     }
-                    if (!client.changeWorkingDirectory(dir)) {
+                    if (!client.changeWorkingDirectory(dir))
+                    {
                         throw new IOException("Unable to change into newly created remote directory '" + dir + "'.  error='" + client.getReplyString() + "'");
                     }
                 }
@@ -41,7 +49,8 @@ public class Utils {
         }
     }
 
-    public static void append(String src, String dest) throws IOException {
+    public static void append(String src, String dest) throws IOException
+    {
         // append the log file to FTP server
         FTPClient ftpClient = new FTPClient();
         ftpClient.connect(FTP_HOST, Integer.parseInt(FTP_PORT));
@@ -59,7 +68,8 @@ public class Utils {
         ftpClient.logout();
     }
 
-    public static void upload(String src, String dest) throws IOException {
+    public static void upload(String src, String dest) throws IOException
+    {
         // store the JFR profiling file to FTP server
         FTPClient ftpClient = new FTPClient();
         ftpClient.connect(FTP_HOST, Integer.parseInt(FTP_PORT));
@@ -77,7 +87,8 @@ public class Utils {
         ftpClient.logout();
     }
 
-    public static void dump(String filename, Object ...contents) throws IOException {
+    public static void dump(String filename, Object... contents) throws IOException
+    {
         FileOutputStream outputStream = new FileOutputStream(filename);
         JSONArray jsonArray = new JSONArray();
         jsonArray.addAll(Arrays.asList(contents));
@@ -86,11 +97,13 @@ public class Utils {
         outputStream.close();
     }
 
-    public static void startProfile(String filename) throws IOException {
+    public static void startProfile(String filename) throws IOException
+    {
         PROFILER.execute(String.format("start,jfr,threads,event=%s,file=%s", EVENT, filename));
     }
 
-    public static void stopProfile(String filename) throws IOException {
+    public static void stopProfile(String filename) throws IOException
+    {
         PROFILER.execute(String.format("stop,file=%s", filename));
     }
 }

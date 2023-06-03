@@ -2,9 +2,11 @@ import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import org.junit.Test;
 
-public class TestVhiveInvoker {
+public class TestVhiveInvoker
+{
     @Test
-    public void testVhive() {
+    public void testVhive()
+    {
         int memorySize = InvokerFactory.Instance().getInvoker(WorkerType.SCAN).getMemoryMB();
         System.out.println(memorySize);
     }

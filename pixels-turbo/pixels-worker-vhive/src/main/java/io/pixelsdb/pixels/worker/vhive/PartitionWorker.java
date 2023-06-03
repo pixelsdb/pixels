@@ -7,23 +7,28 @@ import io.pixelsdb.pixels.worker.common.BasePartitionWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
 
-public class PartitionWorker extends BasePartitionWorker implements RequestHandler<PartitionInput, PartitionOutput> {
-    public PartitionWorker(WorkerContext context) {
+public class PartitionWorker extends BasePartitionWorker implements RequestHandler<PartitionInput, PartitionOutput>
+{
+    public PartitionWorker(WorkerContext context)
+    {
         super(context);
     }
 
     @Override
-    public PartitionOutput handleRequest(PartitionInput input) {
+    public PartitionOutput handleRequest(PartitionInput input)
+    {
         return process(input);
     }
 
     @Override
-    public String getRequestId() {
+    public String getRequestId()
+    {
         return this.context.getRequestId();
     }
 
     @Override
-    public WorkerType getWorkerType() {
+    public WorkerType getWorkerType()
+    {
         return WorkerType.PARTITION;
     }
 }

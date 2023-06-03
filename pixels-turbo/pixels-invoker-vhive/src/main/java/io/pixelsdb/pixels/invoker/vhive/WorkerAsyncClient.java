@@ -15,11 +15,13 @@ import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-public class WorkerAsyncClient {
+public class WorkerAsyncClient
+{
     private final ManagedChannel channel;
     private final vHiveWorkerServiceGrpc.vHiveWorkerServiceFutureStub stub;
 
-    public WorkerAsyncClient(String host, int port) {
+    public WorkerAsyncClient(String host, int port)
+    {
         checkArgument(host != null, "illegal rpc host");
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
 
@@ -28,21 +30,25 @@ public class WorkerAsyncClient {
         this.stub = vHiveWorkerServiceGrpc.newFutureStub(channel);
     }
 
-    public void shutdown() throws InterruptedException {
+    public void shutdown() throws InterruptedException
+    {
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
 
-    public ConnectivityState getState() throws InterruptedException {
+    public ConnectivityState getState() throws InterruptedException
+    {
         return this.channel.getState(true);
     }
 
-    public ListenableFuture<TurboProto.GetMemoryResponse> getMemory() {
+    public ListenableFuture<TurboProto.GetMemoryResponse> getMemory()
+    {
         TurboProto.GetMemoryRequest request = TurboProto.GetMemoryRequest.newBuilder()
                 .build();
         return this.stub.getMemory(request);
     }
 
-    public ListenableFuture<TurboProto.WorkerResponse> aggregation(AggregationInput input) {
+    public ListenableFuture<TurboProto.WorkerResponse> aggregation(AggregationInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.AGGREGATION))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -50,7 +56,8 @@ public class WorkerAsyncClient {
         return this.stub.process(request);
     }
 
-    public ListenableFuture<TurboProto.WorkerResponse> broadcastChainJoin(BroadcastChainJoinInput input) {
+    public ListenableFuture<TurboProto.WorkerResponse> broadcastChainJoin(BroadcastChainJoinInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.BROADCAST_CHAIN_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -58,7 +65,8 @@ public class WorkerAsyncClient {
         return this.stub.process(request);
     }
 
-    public ListenableFuture<TurboProto.WorkerResponse> broadcastJoin(BroadcastJoinInput input) {
+    public ListenableFuture<TurboProto.WorkerResponse> broadcastJoin(BroadcastJoinInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.BROADCAST_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -66,7 +74,8 @@ public class WorkerAsyncClient {
         return this.stub.process(request);
     }
 
-    public ListenableFuture<TurboProto.WorkerResponse> partitionChainJoin(PartitionedChainJoinInput input) {
+    public ListenableFuture<TurboProto.WorkerResponse> partitionChainJoin(PartitionedChainJoinInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.PARTITIONED_CHAIN_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -74,7 +83,8 @@ public class WorkerAsyncClient {
         return this.stub.process(request);
     }
 
-    public ListenableFuture<TurboProto.WorkerResponse> partitionJoin(PartitionedJoinInput input) {
+    public ListenableFuture<TurboProto.WorkerResponse> partitionJoin(PartitionedJoinInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.PARTITIONED_JOIN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -82,7 +92,8 @@ public class WorkerAsyncClient {
         return this.stub.process(request);
     }
 
-    public ListenableFuture<TurboProto.WorkerResponse> partition(PartitionInput input) {
+    public ListenableFuture<TurboProto.WorkerResponse> partition(PartitionInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.PARTITION))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
@@ -90,7 +101,8 @@ public class WorkerAsyncClient {
         return this.stub.process(request);
     }
 
-    public ListenableFuture<TurboProto.WorkerResponse> scan(ScanInput input) {
+    public ListenableFuture<TurboProto.WorkerResponse> scan(ScanInput input)
+    {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.SCAN))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))

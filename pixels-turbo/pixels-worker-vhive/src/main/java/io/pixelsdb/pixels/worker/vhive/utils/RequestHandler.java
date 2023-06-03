@@ -6,7 +6,8 @@ package io.pixelsdb.pixels.worker.vhive.utils;
 
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 
-public interface RequestHandler<I, O> {
+public interface RequestHandler<I, O>
+{
     O handleRequest(I input);
 
     String getRequestId();

@@ -9,9 +9,11 @@ import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
 
-public class TestPartitionVhiveInvoker {
+public class TestPartitionVhiveInvoker
+{
     @Test
-    public void testOrder() throws ExecutionException, InterruptedException {
+    public void testOrder() throws ExecutionException, InterruptedException
+    {
         StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
 
         assert Utils.genPartitionInput("order") != null;
@@ -21,7 +23,8 @@ public class TestPartitionVhiveInvoker {
     }
 
     @Test
-    public void testLineitem() throws ExecutionException, InterruptedException {
+    public void testLineitem() throws ExecutionException, InterruptedException
+    {
         StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
 
         assert Utils.genPartitionInput("lineitem") != null;

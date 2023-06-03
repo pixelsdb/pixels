@@ -7,24 +7,29 @@ import io.pixelsdb.pixels.worker.common.BaseBroadcastJoinWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
 
-public class BroadcastJoinWorker extends BaseBroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, JoinOutput> {
+public class BroadcastJoinWorker extends BaseBroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, JoinOutput>
+{
 
-    public BroadcastJoinWorker(WorkerContext context) {
+    public BroadcastJoinWorker(WorkerContext context)
+    {
         super(context);
     }
 
     @Override
-    public JoinOutput handleRequest(BroadcastJoinInput input) {
+    public JoinOutput handleRequest(BroadcastJoinInput input)
+    {
         return process(input);
     }
 
     @Override
-    public String getRequestId() {
+    public String getRequestId()
+    {
         return this.context.getRequestId();
     }
 
     @Override
-    public WorkerType getWorkerType() {
+    public WorkerType getWorkerType()
+    {
         return WorkerType.BROADCAST_JOIN;
     }
 }

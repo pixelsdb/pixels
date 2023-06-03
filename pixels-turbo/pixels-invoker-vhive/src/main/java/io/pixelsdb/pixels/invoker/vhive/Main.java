@@ -16,14 +16,16 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-public class Main {
+public class Main
+{
     // here are the default values if not specified in args
     private static final String HOST = "localhost";
     private static final int PORT = 50051;
     private static final String FUNC = "Hello";
     private static final int NUMBER = 1;
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException
+    {
         Options options = new Options();
         options.addOption(Option.builder("h")
                 .longOpt("host")
@@ -52,7 +54,8 @@ public class Main {
 
         CommandLineParser parser = new DefaultParser();
         CommandLine cmd = null;
-        try {
+        try
+        {
             cmd = parser.parse(options, args);
 
             String host = cmd.getOptionValue("host", HOST);
@@ -68,10 +71,12 @@ public class Main {
             List<Long> rtts = new ArrayList<>();
 //            WorkerAsyncClient client = new WorkerAsyncClient(host, Integer.parseInt(port));
 
-            for (int i = 0; i < Integer.parseInt(number); ++i) {
+            for (int i = 0; i < Integer.parseInt(number); ++i)
+            {
                 final CompletableFuture<Output> completableFuture;
                 long startTime = System.nanoTime();
-                switch (function) {
+                switch (function)
+                {
                     case "Aggregation":
                         completableFuture = factory.getInvoker(WorkerType.AGGREGATION).invoke(Utils.genAggregationInput(storageInfo));
                         break;
@@ -97,13 +102,16 @@ public class Main {
                     default:
                         throw new ParseException("invalid function name");
                 }
-                if (completableFuture != null) {
+                if (completableFuture != null)
+                {
                     long invokeEnd = System.nanoTime();
                     Thread futureThread = new Thread(() -> {
-                        try {
+                        try
+                        {
                             Output output = completableFuture.get();
                             long endTime = System.nanoTime();
-                            synchronized (System.out) {
+                            synchronized (System.out)
+                            {
                                 System.out.println(JSON.toJSONString(output));
                                 System.out.println("Invoke time(MS): " + (invokeEnd - startTime) / 1000000);
                                 System.out.println("Entire round trip time(MS): " + (endTime - startTime) / 1000000);
@@ -113,9 +121,11 @@ public class Main {
                                 rtts.add((endTime - startTime) / 1000000);
                             }
                             countDownLatch.countDown();
-                        } catch (InterruptedException e) {
+                        } catch (InterruptedException e)
+                        {
                             throw new RuntimeException(e);
-                        } catch (ExecutionException e) {
+                        } catch (ExecutionException e)
+                        {
                             throw new RuntimeException(e);
                         }
                     });
@@ -127,7 +137,8 @@ public class Main {
             LongSummaryStatistics rttStat = rtts.stream().mapToLong((x) -> x).summaryStatistics();
             System.out.println("Invoke summary: " + invokeStat);
             System.out.println("RTT summary: " + rttStat);
-        } catch (ParseException pe) {
+        } catch (ParseException pe)
+        {
             System.out.println("Error parsing command-line arguments!");
             System.out.println("Please, follow the instructions below:");
             HelpFormatter formatter = new HelpFormatter();

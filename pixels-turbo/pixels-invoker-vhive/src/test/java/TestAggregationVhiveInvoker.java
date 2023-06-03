@@ -9,9 +9,11 @@ import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
 
-public class TestAggregationVhiveInvoker {
+public class TestAggregationVhiveInvoker
+{
     @Test
-    public void testAggregation() throws ExecutionException, InterruptedException {
+    public void testAggregation() throws ExecutionException, InterruptedException
+    {
         StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
 
         AggregationOutput output = (AggregationOutput) InvokerFactory.Instance()
