@@ -1,11 +1,8 @@
-package io.pixelsdb.pixels.invoker.vhive;
-
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
-import io.pixelsdb.pixels.invoker.vhive.utils.Utils;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import org.apache.commons.cli.*;
 

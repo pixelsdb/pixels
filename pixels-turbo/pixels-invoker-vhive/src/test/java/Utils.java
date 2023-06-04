@@ -1,5 +1,3 @@
-package io.pixelsdb.pixels.invoker.vhive.utils;
-
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
 import io.pixelsdb.pixels.executor.join.JoinType;
