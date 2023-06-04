@@ -26,8 +26,8 @@ import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 import io.pixelsdb.pixels.worker.common.BaseScanWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.common.WorkerMetrics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * @author hank
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
+    private static final Logger logger = LogManager.getLogger(ScanWorker.class);
     private final WorkerMetrics workerMetrics = new WorkerMetrics();
 
     @Override

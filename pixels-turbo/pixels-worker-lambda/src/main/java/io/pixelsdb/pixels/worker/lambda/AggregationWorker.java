@@ -26,8 +26,9 @@ import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import io.pixelsdb.pixels.worker.common.BaseAggregationWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.common.WorkerMetrics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 
 /**
  * @author hank
@@ -35,7 +36,7 @@ import org.slf4j.LoggerFactory;
  */
 public class AggregationWorker implements RequestHandler<AggregationInput, AggregationOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(AggregationWorker.class);
+    private static final Logger logger = LogManager.getLogger(AggregationWorker.class);
     private final WorkerMetrics workerMetrics = new WorkerMetrics();
 
     @Override

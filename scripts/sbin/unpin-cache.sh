@@ -6,4 +6,4 @@ if [ -z "$PIXELS_HOME" ]; then
 fi
 
 echo "Stopping vmtouch..."
-$PIXELS_HOME/bin/stop-vmtouch.sh"
+$PIXELS_HOME/bin/stop-vmtouch.sh

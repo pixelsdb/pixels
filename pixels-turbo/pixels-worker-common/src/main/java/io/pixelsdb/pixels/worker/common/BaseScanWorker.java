@@ -36,7 +36,7 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Arrays;
 import java.util.List;

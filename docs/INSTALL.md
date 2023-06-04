@@ -30,6 +30,32 @@ sudo update-java-alternatives --set /path/to/jdk-17.0
 ```
 Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 
+## Install Maven
+
+For lower Ubuntu version like 20.04, the default apt installation doesn't support a available maven version for Java 17. Therefore, you need to install maven manually.
+
+Here is one of the installation steps,  all the following commands are executed under `~/opt` by default:
+
+```bash
+wget https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz
+tar -xvf apache-maven-3.8.8-bin.tar.gz
+ln -s ~/opt/apache-maven-3.8.8 maven
+```
+
+Then add these command to the user profile file(e.g. .bash_profile) to set the environment variables:
+
+```bash
+M2_HOME=$HOME/opt/maven
+export PATH=$PATH:$M2_HOME/bin
+```
+
+Verify the maven is installed correctly:
+
+```bash
+source ~/.bash_profile
+mvn -version
+```
+
 ## Setup AWS Credentials*
 
 If we use S3 as the underlying storage system, we have to configure the AWS credentials.
@@ -50,7 +76,7 @@ export PIXELS_HOME=$HOME/opt/pixels/
 ```
 
 But you still need to:
-- Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
+- Put the [jdbc connector of MySQL](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib`.
 - Modify `pixels.properties` to ensure the following properties are valid:
 ```properties
 pixels.var.dir=/home/pixels/opt/pixels/var/
@@ -131,7 +157,17 @@ sudo apt update
 sudo apt install mysql-server
 sudo mysql_secure_installation
 ```
+If your mysql `root` user didn't have password before, you need to first give `root` a password, then execute `sudo mysql_secure_installation`
+
+```bash
+sudo mysql
+mysql> ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'SetRootPasswordHere';
+mysql> exit
+sudo mysql_secure_installation
+```
+
 Login MySQL and create a user and a metadata database for Pixels:
+
 ```mysql
 CREATE USER 'pixels'@'%' IDENTIFIED BY 'password';
 CREATE DATABASE pixels_metadata;
@@ -159,12 +195,31 @@ export PATH=$PATH:$ETCD
 ```
 All the following commands are executed under `~/opt` by default.
 Create the link and start etcd:
+
 ```bash
 ln -s etcd-v3.3.4-linux-amd64-bin etcd
 cd etcd
 ./start-etcd.sh
 ```
-You can use `screen` or `nohup` to run it in the background.
+You should modify the `conf.yml` to fit the current condition, especially for the `data-dir` and `*-urls` in the configuration:
+
+```properties
+name: 'etcd0'
+data-dir: "/home/ubuntu/opt/etcd-v3.3.4-linux-amd64-bin/data"
+listen-peer-urls: http://localhost:2380
+listen-client-urls: http://localhost:2379
+initial-advertise-peer-urls: http://localhost:2380
+advertise-client-urls: http://localhost:2379
+initial-cluster: "etcd0=http://localhost:2380"
+initial-cluster-token: 'pixels-etcd-cluster'
+initial-cluster-state: 'new'
+```
+
+You can use `screen` or `nohup` to run it in the background:
+
+```bash
+screen -dmS etcd bash -c "./start-etcd.sh"
+```
 
 ## Install Hadoop*
 Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
@@ -189,6 +244,7 @@ Here, we install Trino to `~/opt/trino-server-405` and create a link for it:
 ln -s trino-server-405 trino-server
 ```
 Then download [trino-cli](https://trinodb.github.io/docs.trino.io/405/client/cli.html) into `~/opt/trino-server/bin/`
+
 and give executable permission to it.
 
 There are two important directories in the home of trino-server: `etc` and `plugin`.
@@ -196,6 +252,7 @@ Decompress `pixels-trino-listener-*.zip` and `pixels-trino-connector-*.zip` into
 The `etc` directory contains the configuration files of Trino.
 In addition to the configurations mentioned in the official docs, add the following configurations
 for Pixels:
+
 * Create the listener config file named `event-listener.properties` in the `etc` directory, with the following content:
 ```properties
 event-listener.name=pixels-event-listener
@@ -312,10 +369,12 @@ If pixels-cache is enabled, set up the cache before starting Pixels:
 sudo ./sbin/pin-cache.sh
 ```
 `reset-cache.sh` is only needed for the first time of using pixels-cache.
-It initializes some states in etcd for the cache.
+It initializes some states in etcd for the cache. 
+If you modify the `etcd` urls, then you need to also change the `ENDPOINTS` property in `reset-cache.sh` as well.
 
 Even if pixels-cache is disabled, `reset-cache.sh` is needed for the first time of starting Pixels.
 Then, start the daemons of Pixels using:
+
 ```bash
 ./sbin/start-pixels.sh
 ```
