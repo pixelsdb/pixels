@@ -19,15 +19,21 @@
  */
 package io.pixelsdb.pixels.server.controller;
 
+import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.QueryScheduleException;
 import io.pixelsdb.pixels.common.exception.QueryServerException;
 import io.pixelsdb.pixels.common.server.ExecutionHint;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
 import io.pixelsdb.pixels.common.server.rest.response.GetResultResponse;
-import io.pixelsdb.pixels.common.turbo.ExecutorType;
+import io.pixelsdb.pixels.common.server.rest.response.SubmitQueryResponse;
 import io.pixelsdb.pixels.common.turbo.QueryScheduleService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+import java.sql.*;
+import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -38,6 +44,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class QueryManager
 {
+    private static final Logger log = LogManager.getLogger(QueryManager.class);
     private static final QueryManager instance;
 
     static
@@ -50,55 +57,37 @@ public class QueryManager
         return instance;
     }
 
-    public static class RunningQuery
+    private static class ReceivedQuery
     {
-        private final long transId;
-        private final String query;
-        private final ExecutorType executorType;
-        private final int limit;
-        private final String callbackToken;
+        private final String traceToken;
+        private final SubmitQueryRequest request;
 
-        public RunningQuery(long transId, String query, ExecutorType executorType, int limit, String callbackToken)
+        public ReceivedQuery(String traceToken, SubmitQueryRequest request)
         {
-            this.transId = transId;
-            this.query = query;
-            this.executorType = executorType;
-            this.limit = limit;
-            this.callbackToken = callbackToken;
+            this.traceToken = traceToken;
+            this.request = request;
         }
 
-        public long getTransId()
+        public String getTraceToken()
         {
-            return transId;
+            return traceToken;
         }
 
-        public String getQuery()
+        public SubmitQueryRequest getRequest()
         {
-            return query;
-        }
-
-        public ExecutorType getExecutorType()
-        {
-            return executorType;
-        }
-
-        public int getLimit()
-        {
-            return limit;
-        }
-
-        public String getCallbackToken()
-        {
-            return callbackToken;
+            return request;
         }
     }
 
-    private final ArrayBlockingQueue<SubmitQueryRequest> pendingQueue = new ArrayBlockingQueue<>(1024);
-    private final ConcurrentHashMap<String, RunningQuery> runningQueries = new ConcurrentHashMap<>();
+    private final ArrayBlockingQueue<ReceivedQuery> pendingQueue = new ArrayBlockingQueue<>(1024);
+    private final ConcurrentHashMap<String, ReceivedQuery> runningQueries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, GetResultResponse> queryResults = new ConcurrentHashMap<>();
     private final ExecutorService submitService = Executors.newSingleThreadExecutor();
     private final ExecutorService executeService = Executors.newCachedThreadPool();
     private final QueryScheduleService queryScheduleService;
+    private final String jdbcUrl;
+    private final Properties costEffectiveConnProp;
+    private final Properties immediateConnProp;
     private boolean running;
 
     private QueryManager() throws QueryServerException
@@ -112,32 +101,49 @@ public class QueryManager
         {
             throw new QueryServerException("failed to initialize query schedule service", e);
         }
+
+        this.jdbcUrl = ConfigFactory.Instance().getProperty("presto.pixels.jdbc.url");
+        boolean orderEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.order.layout.enabled"));
+        boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
+        this.costEffectiveConnProp = new Properties();
+        this.costEffectiveConnProp.setProperty("user", ConfigFactory.Instance().getProperty("presto.user"));
+        this.costEffectiveConnProp.setProperty("SSL", ConfigFactory.Instance().getProperty("presto.ssl"));
+        String sessionPropertiesBase = "pixels.ordered_path_enabled:" + orderEnabled + ";" +
+                "pixels.compact_path_enabled:" + compactEnabled + ";";
+        this.costEffectiveConnProp.setProperty("sessionProperties", sessionPropertiesBase + "pixels.cloud_function_enabled:false");
+
+        this.immediateConnProp = new Properties();
+        this.immediateConnProp.setProperty("user", ConfigFactory.Instance().getProperty("presto.user"));
+        this.immediateConnProp.setProperty("SSL", ConfigFactory.Instance().getProperty("presto.ssl"));
+        this.immediateConnProp.setProperty("sessionProperties", sessionPropertiesBase + "pixels.cloud_function_enabled:true");
+
         this.running = true;
         this.submitService.submit(() -> {
             while (running)
             {
                 try
                 {
-                    SubmitQueryRequest request = pendingQueue.poll(1000, TimeUnit.MILLISECONDS);
-                    if (request != null)
+                    ReceivedQuery query = pendingQueue.poll(1000, TimeUnit.MILLISECONDS);
+                    if (query != null)
                     {
                         // only
-                        checkArgument(request.getExecutionHint() == ExecutionHint.COST_EFFECTIVE,
+                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.COST_EFFECTIVE,
                                 "pending queue should only contain cost-effective queries");
                         QueryScheduleService.QuerySlots querySlots = queryScheduleService.getQuerySlots();
                         if (querySlots.MppSlots > 0)
                         {
-                            submit(request);
+                            submit(query);
                         }
                         else
                         {
                             // no available slots, put the request back to the pending queue
-                            pendingQueue.put(request);
+                            pendingQueue.put(query);
                             TimeUnit.MILLISECONDS.sleep(10);
                         }
                     }
                 } catch (InterruptedException | QueryScheduleException e)
                 {
+                    log.error("failed to submit query", e);
                     throw new QueryServerException("failed to submit query", e);
                 }
             }
@@ -148,42 +154,141 @@ public class QueryManager
     /**
      * Add the request into the pending queue. The request is going to be submitted later.
      * @param request the query submit request
+     * @return the trace token
      * @throws QueryServerException
      */
-    public void pending(SubmitQueryRequest request) throws QueryServerException
+    public SubmitQueryResponse submitQuery(SubmitQueryRequest request) throws QueryServerException
     {
-        try
+        if (request.getExecutionHint() == ExecutionHint.COST_EFFECTIVE)
         {
-            this.pendingQueue.put(request);
-        } catch (InterruptedException e)
+            try
+            {
+                String traceToken = UUID.randomUUID().toString();
+                this.pendingQueue.put(new ReceivedQuery(traceToken, request));
+                return new SubmitQueryResponse(ErrorCode.SUCCESS, "", traceToken);
+            } catch (InterruptedException e)
+            {
+                return new SubmitQueryResponse(ErrorCode.QUERY_SERVER_PENDING_INTERRUPTED,
+                        "failed to add query to the pending queue", null);
+            }
+        }
+        else if (request.getExecutionHint() == ExecutionHint.IMMEDIATE)
         {
-            throw new QueryServerException("failed to add query to the pending queue", e);
+            try
+            {
+                String traceToken = UUID.randomUUID().toString();
+                this.submit(new ReceivedQuery(traceToken, request));
+                return new SubmitQueryResponse(ErrorCode.SUCCESS, "", traceToken);
+            } catch (Throwable e)
+            {
+                return new SubmitQueryResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED, e.getMessage(), null);
+            }
+        }
+        else
+        {
+            return new SubmitQueryResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED,
+                    "unknown query execution hint " + request.getExecutionHint(), null);
         }
     }
 
     /**
      * Immediately submit the request and add the submitted query into running queue.
-     * @param request
+     * @param query the query to submit
      */
-    public void submit(SubmitQueryRequest request)
+    private void submit(ReceivedQuery query)
     {
+        Properties properties;
+        SubmitQueryRequest request = query.getRequest();
         if (request.getExecutionHint() == ExecutionHint.COST_EFFECTIVE)
         {
             // submit it to the mpp connection
+            properties = this.costEffectiveConnProp;
         }
         else if (request.getExecutionHint() == ExecutionHint.IMMEDIATE)
         {
             // submit it to the pixels-turbo connection
+            properties = this.immediateConnProp;
         }
         else
         {
             throw new QueryServerException("unknown query execution hint " + request.getExecutionHint());
         }
+
+        String traceToken = query.getTraceToken();
+        this.executeService.submit(() -> {
+            properties.setProperty("traceToken", traceToken);
+            try (Connection connection = DriverManager.getConnection(this.jdbcUrl, properties))
+            {
+                Statement statement = connection.createStatement();
+                this.runningQueries.put(traceToken, query);
+                long start = System.currentTimeMillis();
+                ResultSet resultSet = statement.executeQuery(request.getQuery());
+                long latencyMs = System.currentTimeMillis() - start;
+                int columnCount = resultSet.getMetaData().getColumnCount();
+                int[] columnPrintSizes = new int[columnCount];
+                String[] columnNames = new String[columnCount];
+                for (int i = 1; i <= columnCount; ++i)
+                {
+                    columnPrintSizes[i-1] = resultSet.getMetaData().getColumnDisplaySize(i);
+                    columnNames[i-1] = resultSet.getMetaData().getColumnLabel(i);
+                }
+                String[][] rows = new String[request.getLimitRows()][];
+                for (int i = 0; i < request.getLimitRows() && resultSet.next(); ++i)
+                {
+                    String[] row = new String[columnCount];
+                    for (int j = 1; j <= columnCount; ++j)
+                    {
+                        row[j-1] = resultSet.getString(j);
+                    }
+                    rows[i] = row;
+                }
+
+                // TODO: support get cost from trans service.
+                GetResultResponse result = new GetResultResponse(ErrorCode.SUCCESS, "",
+                        columnPrintSizes, columnNames, rows, latencyMs, 0);
+                this.runningQueries.remove(traceToken);
+                this.queryResults.put(traceToken, result);
+            } catch (SQLException e)
+            {
+                GetResultResponse result = new GetResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED, e.getMessage(),
+                        null, null, null, 0, 0);
+                this.runningQueries.remove(traceToken);
+                this.queryResults.put(traceToken, result);
+                log.error("failed to execute query with trac token " + traceToken, e);
+                throw new QueryServerException("failed to execute query with trac token " + traceToken, e);
+            }
+        });
     }
 
     public void shutdown()
     {
         this.running = false;
         this.submitService.shutdownNow();
+        this.executeService.shutdownNow();
+    }
+
+    public int getNumPendingQueries()
+    {
+        return this.pendingQueue.size();
+    }
+
+    public int getNumRunningQueries()
+    {
+        return this.runningQueries.size();
+    }
+
+    public boolean isQueryRunning(String traceId)
+    {
+        return this.runningQueries.containsKey(traceId);
+    }
+
+    public boolean isQueryFinished(String traceId)
+    {
+        return this.queryResults.containsKey(traceId);
+    }
+
+    public GetResultResponse popQueryResult(String traceId)
+    {
+        return this.queryResults.remove(traceId);
     }
 }

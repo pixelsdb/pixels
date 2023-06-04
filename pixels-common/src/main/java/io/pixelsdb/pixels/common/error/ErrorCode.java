@@ -69,12 +69,19 @@ public class ErrorCode
     public static final int TRANS_LOW_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 1);
     public static final int TRANS_HIGH_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 2);
     public static final int TRANS_ID_NOT_EXIST = (ERROR_TRANS + 3);
-    public static final int TRANS_BAD_GET_CONTEXT_REQUEST = (ERROR_TRANS + 4);
+    public static final int TRANS_CONTEXT_NOT_FOUND = (ERROR_TRANS + 4);
     public static final int TRANS_COMMIT_FAILED = (ERROR_TRANS + 5);
+    public static final int TRANS_ROLLBACK_FAILED = (ERROR_TRANS + 6);
 
     // begin error code for query schedule
     private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;
     public static final int QUERY_SCHEDULE_DEQUEUE_FAILED = (ERROR_QUERY_SCHEDULE + 1);
+
+    // begin error code for query server
+    private static final int ERROR_QUERY_SERVER = ERROR_BASE + 400;
+    public static final int QUERY_SERVER_PENDING_INTERRUPTED = (ERROR_QUERY_SERVER + 2);
+    public static final int QUERY_SERVER_EXECUTE_FAILED = (ERROR_QUERY_SERVER + 1);
+    public static final int QUERY_SERVER_NOT_SUPPORTED = (ERROR_QUERY_SERVER + 2);
 
     // end error code for transactions
 }

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.server.controller;
 
+import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.server.rest.request.EstimateCostRequest;
 import io.pixelsdb.pixels.common.server.rest.request.GetResultRequest;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
@@ -44,8 +45,9 @@ public class QueryController
             produces = MediaType.APPLICATION_JSON_VALUE)
     public EstimateCostResponse estimateCost(@RequestBody EstimateCostRequest request)
     {
-        // TODO: check username.
-        return null;
+        // TODO: implement estimate cost.
+        return new EstimateCostResponse(ErrorCode.QUERY_SERVER_NOT_SUPPORTED,
+                "estimate cost is not supported", 0, 0);
     }
 
     @PostMapping(value = RestUrlPath.SUBMIT_QUERY,
@@ -53,8 +55,7 @@ public class QueryController
             produces = MediaType.APPLICATION_JSON_VALUE)
     public SubmitQueryResponse submitQuery(@RequestBody SubmitQueryRequest request)
     {
-        // TODO: check username.
-        return null;
+        return QueryManager.Instance().submitQuery(request);
     }
 
     @PostMapping(value = RestUrlPath.GET_RESULT,
@@ -62,7 +63,6 @@ public class QueryController
             produces = MediaType.APPLICATION_JSON_VALUE)
     public GetResultResponse getResult(@RequestBody GetResultRequest request)
     {
-        // TODO: check username.
-        return null;
+        return QueryManager.Instance().popQueryResult(request.getCallbackToken());
     }
 }

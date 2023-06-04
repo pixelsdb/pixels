@@ -70,9 +70,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                             StreamObserver<TransProto.CommitTransResponse> responseObserver)
     {
         int error = ErrorCode.SUCCESS;
-        // must get transaction context before setTransCommit()
         if (TransContextManager.Instance().isTransExist(request.getTransId()))
         {
+            // must get transaction context before setTransCommit()
             boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
             boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
             if (!success)
@@ -128,9 +128,22 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     public void rollbackTrans(TransProto.RollbackTransRequest request,
                               StreamObserver<TransProto.RollbackTransResponse> responseObserver)
     {
-        boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
-        TransProto.RollbackTransResponse response = TransProto.RollbackTransResponse.newBuilder()
-                .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
+        int error = ErrorCode.SUCCESS;
+        if (TransContextManager.Instance().isTransExist(request.getTransId()))
+        {
+            if (!TransContextManager.Instance().setTransRollback(request.getTransId()))
+            {
+                error = ErrorCode.TRANS_ROLLBACK_FAILED;
+            }
+        }
+        else
+        {
+            log.error(String.format("transaction id %d does not exist in the context manager", request.getTransId()));
+            error = ErrorCode.TRANS_ID_NOT_EXIST;
+        }
+
+        TransProto.RollbackTransResponse response =
+                TransProto.RollbackTransResponse.newBuilder().setErrorCode(error).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -156,7 +169,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
         else
         {
-            builder.setErrorCode(ErrorCode.TRANS_BAD_GET_CONTEXT_REQUEST);
+            builder.setErrorCode(ErrorCode.TRANS_CONTEXT_NOT_FOUND);
         }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
