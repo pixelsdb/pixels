@@ -23,7 +23,8 @@ package io.pixelsdb.pixels.common.turbo;
  * @author hank
  * @create 2022-06-28
  */
-public enum WorkerType {
+public enum WorkerType
+{
     UNKNOWN("UNKNOWN"), // The first enum value is the default value.
     SCAN("SCAN"),
     PARTITION("PARTITION"),
@@ -35,25 +36,30 @@ public enum WorkerType {
 
     private final String value;
 
-    WorkerType(String value) {
+    WorkerType(String value)
+    {
         this.value = value;
     }
 
-    public static WorkerType from(String value) {
+    public static WorkerType from(String value)
+    {
         return valueOf(value.toUpperCase());
     }
 
-    public boolean equals(String other) {
+    public boolean equals(String other)
+    {
         return this.toString().equalsIgnoreCase(other);
     }
 
-    public boolean equals(WorkerType other) {
+    public boolean equals(WorkerType other)
+    {
         // enums in Java can be compared using '=='.
         return this == other;
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         return value;
     }
 }
