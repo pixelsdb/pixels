@@ -126,7 +126,7 @@ public class QueryManager
                     ReceivedQuery query = pendingQueue.poll(1000, TimeUnit.MILLISECONDS);
                     if (query != null)
                     {
-                        // only
+                        // pending queue should only contain cost-effective queries.
                         checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.COST_EFFECTIVE,
                                 "pending queue should only contain cost-effective queries");
                         QueryScheduleService.QuerySlots querySlots = queryScheduleService.getQuerySlots();

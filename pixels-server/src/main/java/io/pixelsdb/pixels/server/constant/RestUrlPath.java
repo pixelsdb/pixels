@@ -31,6 +31,6 @@ public class RestUrlPath
     public static final String GET_VIEWS = "/api/metadata/get-views";
 
     public static final String ESTIMATE_COST = "/api/query/estimate-cost";
-    public static final String SUBMIT_QUERY = "api/query/submit-query";
-    public static final String GET_RESULT = "api/query/get-result";
+    public static final String SUBMIT_QUERY = "/api/query/submit-query";
+    public static final String GET_RESULT = "/api/query/get-result";
 }

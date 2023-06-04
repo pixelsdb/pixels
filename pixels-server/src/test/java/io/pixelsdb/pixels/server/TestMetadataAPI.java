@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.server;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.server.rest.request.GetSchemasRequest;
+import io.pixelsdb.pixels.server.constant.RestUrlPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -47,7 +48,7 @@ public class TestMetadataAPI
     public void testGetSchemas() throws Exception
     {
         this.mockMvc.perform(
-                post("/api/metadata/get-schemas").contentType(MediaType.APPLICATION_JSON).content(
+                post(RestUrlPath.GET_SCHEMAS).contentType(MediaType.APPLICATION_JSON).content(
                         JSON.toJSONString(new GetSchemasRequest("hank"))))
                 .andDo(print()).andExpect(status().isOk());
     }
