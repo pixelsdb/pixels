@@ -32,29 +32,9 @@ Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 
 ## Install Maven
 
-For lower Ubuntu version like 20.04, the default apt installation doesn't support a available maven version for Java 17. Therefore, you need to install maven manually.
-
-Here is one of the installation steps,  all the following commands are executed under `~/opt` by default:
-
-```bash
-wget https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz
-tar -xvf apache-maven-3.8.8-bin.tar.gz
-ln -s ~/opt/apache-maven-3.8.8 maven
-```
-
-Then add these command to the user profile file(e.g. .bash_profile) to set the environment variables:
-
-```bash
-M2_HOME=$HOME/opt/maven
-export PATH=$PATH:$M2_HOME/bin
-```
-
-Verify the maven is installed correctly:
-
-```bash
-source ~/.bash_profile
-mvn -version
-```
+Pixels requires maven 3 to build the source code. 
+On some old operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
+In this case, you need to install a later maven that is compatible with your JDK manually. 
 
 ## Setup AWS Credentials*
 
@@ -76,7 +56,7 @@ export PIXELS_HOME=$HOME/opt/pixels/
 ```
 
 But you still need to:
-- Put the [jdbc connector of MySQL](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib`.
+- Put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib`.
 - Modify `pixels.properties` to ensure the following properties are valid:
 ```properties
 pixels.var.dir=/home/pixels/opt/pixels/var/
@@ -88,6 +68,9 @@ metadata.server.port=18888
 metadata.server.host=localhost
 trans.server.port=18889
 trans.server.host=localhost
+# query scheduling server for pixels-turbo
+query.schedule.server.port=18893
+query.schedule.server.host=localhost
 etcd.hosts=localhost
 etcd.port=2379
 metrics.node.text.dir=/home/pixels/opt/node_exporter/text/
@@ -157,14 +140,14 @@ sudo apt update
 sudo apt install mysql-server
 sudo mysql_secure_installation
 ```
-If your mysql `root` user didn't have password before, you need to first give `root` a password, then execute `sudo mysql_secure_installation`
 
-```bash
-sudo mysql
-mysql> ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'SetRootPasswordHere';
-mysql> exit
-sudo mysql_secure_installation
-```
+> Not that for mysql 8+, you may need to set a native password for mysql `root` user before running `mysql_secure_installation`, for example:
+> ```bash
+> sudo mysql
+> mysql> ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your_root_password';
+> mysql> exit
+> sudo mysql_secure_installation
+> ```
 
 Login MySQL and create a user and a metadata database for Pixels:
 
@@ -201,25 +184,11 @@ ln -s etcd-v3.3.4-linux-amd64-bin etcd
 cd etcd
 ./start-etcd.sh
 ```
-You should modify the `conf.yml` to fit the current condition, especially for the `data-dir` and `*-urls` in the configuration:
+You can use `screen` or `nohup` to run it in the background.
 
-```properties
-name: 'etcd0'
-data-dir: "/home/ubuntu/opt/etcd-v3.3.4-linux-amd64-bin/data"
-listen-peer-urls: http://localhost:2380
-listen-client-urls: http://localhost:2379
-initial-advertise-peer-urls: http://localhost:2380
-advertise-client-urls: http://localhost:2379
-initial-cluster: "etcd0=http://localhost:2380"
-initial-cluster-token: 'pixels-etcd-cluster'
-initial-cluster-state: 'new'
-```
-
-You can use `screen` or `nohup` to run it in the background:
-
-```bash
-screen -dmS etcd bash -c "./start-etcd.sh"
-```
+The default `etcd/conf.yml` is good for the default Ubuntu user in AWS Ubuntu instances.
+If you are using your own OS installation or a different user, please modify the settings in `conf.yml` accordingly, 
+especially for the `data-dir` and `*-urls`.
 
 ## Install Hadoop*
 Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
@@ -244,7 +213,6 @@ Here, we install Trino to `~/opt/trino-server-405` and create a link for it:
 ln -s trino-server-405 trino-server
 ```
 Then download [trino-cli](https://trinodb.github.io/docs.trino.io/405/client/cli.html) into `~/opt/trino-server/bin/`
-
 and give executable permission to it.
 
 There are two important directories in the home of trino-server: `etc` and `plugin`.
@@ -370,7 +338,7 @@ sudo ./sbin/pin-cache.sh
 ```
 `reset-cache.sh` is only needed for the first time of using pixels-cache.
 It initializes some states in etcd for the cache. 
-If you modify the `etcd` urls, then you need to also change the `ENDPOINTS` property in `reset-cache.sh` as well.
+If you have modified the `etcd` urls, then you need to change the `ENDPOINTS` property in `reset-cache.sh` as well.
 
 Even if pixels-cache is disabled, `reset-cache.sh` is needed for the first time of starting Pixels.
 Then, start the daemons of Pixels using:

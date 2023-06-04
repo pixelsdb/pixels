@@ -17,11 +17,18 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.vhive.utils;
+package io.pixelsdb.pixels.invoker.vhive;
 
-public interface Server extends Runnable
+import io.pixelsdb.pixels.common.turbo.InvokerFactory;
+import io.pixelsdb.pixels.common.turbo.WorkerType;
+import org.junit.Test;
+
+public class TestVhiveInvoker
 {
-    public boolean isRunning();
-
-    public void shutdown();
+    @Test
+    public void testVhive()
+    {
+        int memorySize = InvokerFactory.Instance().getInvoker(WorkerType.SCAN).getMemoryMB();
+        System.out.println(memorySize);
+    }
 }
