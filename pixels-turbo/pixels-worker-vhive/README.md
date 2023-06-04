@@ -9,7 +9,7 @@ After `docker` installation, use the `Dockerfile` under the root directory to bu
 
 ```bash
 # run the following command under the root directory of pixels-worker-vhive module
-docker build -f ./Dockerfile -t <your-docker-username>/<your-docker-image-name> .
+docker build -f ./Dockerfile -t <your-docker-username>/<your-docker-image-name>:<your-image-tag> .
 ```
 
 ## Docker Run
@@ -17,10 +17,6 @@ docker build -f ./Dockerfile -t <your-docker-username>/<your-docker-image-name> 
 The docker image needs some environement variables to run successfully:
 
 ```properties
-MINIO_ENDPOINT=http://<your-minio-server-host>:<your-minio-server-port>
-MINIO_REGION=eu-central-2 
-MINIO_ACCESS_KEY=<your-minio-access-key> 
-MINIO_SECRET_KEY=<your-minio-secret-key> 
 PROFILING_ENABLED=true | false
 PROFILING_EVENT=wall | alloc
 FTP_HOST=<your-ftp-host>
@@ -29,27 +25,19 @@ FTP_USERNAME=<your-ftp-username>
 FTP_PASSWORD=<your-ftp-password>
 ```
 
-For `MINIO_REGION`, it corresponds to the `AWS_DEFAULT_REGION` in AWS S3.
-All the available regions values can be seen in
-the [AWS documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html).
-
 If you try to run the docker image locally, then you must provide these environement variables by `--env` to correctly
 start gRPC server.
 The entire docker command to test the docker image is:
 
 ```bash
 docker run -p 50051:50051 --rm --network=bridge \
---env MINIO_ENDPOINT=http://<your-minio-server-host>:<your-minio-server-port> \
---env MINIO_REGION=eu-central-2 \
---env MINIO_ACCESS_KEY=<your-minio-access-key> \
---env MINIO_SECRET_KEY=<your-minio-secret-key> \
 --env PROFILING_ENABLED=true \
 --env PROFILING_EVENT=wall \
 --env FTP_HOST=<your-ftp-host> \
 --env FTP_PORT=<your-ftp-port> \
 --env FTP_USERNAME=<your-ftp-username> \
 --env FTP_PASSWORD=<your-ftp-password> \
-<your-docker-username>/<your-docker-image-name>
+<your-docker-username>/<your-docker-image-name>:<your-iamge-tag>
 ```
 
 As for vhive function deployment, these environment variables are specify in
@@ -63,7 +51,7 @@ registery for the vHive worker's `containerd` to pull.
 Here we assume you choose the docker hub by default:
 
 ```bash
-docker push <your-docker-username>/<your-docker-image-name>:latest
+docker push <your-docker-username>/<your-docker-image-name>:<your-image-tag>
 ```
 
 ## FTP Service
