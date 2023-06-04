@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.common.server.rest.response;
 
-import java.util.List;
-
 /**
  * @author hank
  * @create 2023-05-24
@@ -29,8 +27,9 @@ public class GetResultResponse
 {
     private int errorCode;
     private String errorMessage;
-    private List<String> columnNames;
-    private List<String> csvRows;
+    private int[] columnPrintSizes;
+    private String[] columnNames;
+    private String[][] rows;
     private double latencyMs;
     private double costCents;
 
@@ -39,14 +38,14 @@ public class GetResultResponse
      */
     public GetResultResponse() { }
 
-    public GetResultResponse(int errorCode, String errorMessage,
-                             List<String> columnNames, List<String> csvRows,
-                             double latencyMs, double costCents)
+    public GetResultResponse(int errorCode, String errorMessage, int[] columnPrintSizes,
+                             String[] columnNames, String[][] rows, double latencyMs, double costCents)
     {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
+        this.columnPrintSizes = columnPrintSizes;
         this.columnNames = columnNames;
-        this.csvRows = csvRows;
+        this.rows = rows;
         this.latencyMs = latencyMs;
         this.costCents = costCents;
     }
@@ -71,24 +70,34 @@ public class GetResultResponse
         this.errorMessage = errorMessage;
     }
 
-    public List<String> getColumnNames()
+    public int[] getColumnPrintSizes()
+    {
+        return columnPrintSizes;
+    }
+
+    public void setColumnPrintSizes(int[] columnPrintSizes)
+    {
+        this.columnPrintSizes = columnPrintSizes;
+    }
+
+    public String[] getColumnNames()
     {
         return columnNames;
     }
 
-    public void setColumnNames(List<String> columnNames)
+    public void setColumnNames(String[] columnNames)
     {
         this.columnNames = columnNames;
     }
 
-    public List<String> getCsvRows()
+    public String[][] getRows()
     {
-        return csvRows;
+        return rows;
     }
 
-    public void setCsvRows(List<String> csvRows)
+    public void setRows(String[][] rows)
     {
-        this.csvRows = csvRows;
+        this.rows = rows;
     }
 
     public double getLatencyMs()

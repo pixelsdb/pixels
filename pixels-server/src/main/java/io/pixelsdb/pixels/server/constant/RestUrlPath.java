@@ -17,16 +17,20 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.server.rest.request;
+package io.pixelsdb.pixels.server.constant;
 
 /**
  * @author hank
- * @create 2023-05-24
+ * @create 2023-05-30
  */
-public enum ExecutionHint
+public class RestUrlPath
 {
-    LOW_COST, // prefer lower monetary cost
-    IMMEDIATE, // execute the query immediately
-    ADAPTIVE, // execute the query apatively using Pixel-Turbo
-    SCHEDULED // schedule the query to be executed at a start time
+    public static final String GET_SCHEMAS = "/api/metadata/get-schemas";
+    public static final String GET_TABLES = "/api/metadata/get-tables";
+    public static final String GET_COLUMNS = "/api/metadata/get-columns";
+    public static final String GET_VIEWS = "/api/metadata/get-views";
+
+    public static final String ESTIMATE_COST = "/api/query/estimate-cost";
+    public static final String SUBMIT_QUERY = "/api/query/submit-query";
+    public static final String GET_RESULT = "/api/query/get-result";
 }

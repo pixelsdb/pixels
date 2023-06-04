@@ -65,7 +65,7 @@ public class TransContextManager
 
     public synchronized boolean setTransCommit(long transId)
     {
-        TransContext context = this.transIdToContext.remove(transId);
+        TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
             context.setStatus(TransProto.TransStatus.COMMIT);
@@ -73,10 +73,15 @@ public class TransContextManager
             {
                 this.readOnlyConcurrency--;
             }
-            String traceId = this.transIdToTraceId.remove(transId);
-            if (traceId != null)
+            else
             {
-                this.traceIdToTransId.remove(traceId);
+                // only clear the context of write transactions
+                this.transIdToContext.remove(transId);
+                String traceId = this.transIdToTraceId.remove(transId);
+                if (traceId != null)
+                {
+                    this.traceIdToTransId.remove(traceId);
+                }
             }
             return true;
         }
@@ -85,7 +90,7 @@ public class TransContextManager
 
     public synchronized boolean setTransRollback(long transId)
     {
-        TransContext context = this.transIdToContext.remove(transId);
+        TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
             context.setStatus(TransProto.TransStatus.ROLLBACK);
@@ -93,10 +98,14 @@ public class TransContextManager
             {
                 this.readOnlyConcurrency--;
             }
-            String traceId = this.transIdToTraceId.remove(transId);
-            if (traceId != null)
+            else
             {
-                this.traceIdToTransId.remove(traceId);
+                // only clear the context of write transactions
+                String traceId = this.transIdToTraceId.remove(transId);
+                if (traceId != null)
+                {
+                    this.traceIdToTransId.remove(traceId);
+                }
             }
             return true;
         }
@@ -106,6 +115,11 @@ public class TransContextManager
     public synchronized TransContext getTransContext(long transId)
     {
         return this.transIdToContext.get(transId);
+    }
+
+    public synchronized boolean isTransExist(long transId)
+    {
+        return this.transIdToContext.containsKey(transId);
     }
 
     public synchronized TransContext getTransContext(String externalTraceId)

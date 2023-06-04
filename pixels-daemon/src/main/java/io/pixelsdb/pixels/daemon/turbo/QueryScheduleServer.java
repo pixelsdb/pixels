@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.transaction;
+package io.pixelsdb.pixels.daemon.turbo;
 
 import io.grpc.ServerBuilder;
 import io.pixelsdb.pixels.daemon.Server;
@@ -28,21 +28,21 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * @create 2022-02-20
  * @author hank
+ * @create 2023-05-31
  */
-public class TransServer implements Server
+public class QueryScheduleServer implements Server
 {
-    private static final Logger log = LogManager.getLogger(TransServer.class);
+    private static final Logger log = LogManager.getLogger(QueryScheduleServer.class);
 
     private boolean running = false;
     private final io.grpc.Server rpcServer;
 
-    public TransServer(int port)
+    public QueryScheduleServer(int port)
     {
         assert (port > 0 && port <= 65535);
         this.rpcServer = ServerBuilder.forPort(port)
-                .addService(new TransServiceImpl()).build();
+                .addService(new QueryScheduleServiceImpl()).build();
     }
 
     @Override

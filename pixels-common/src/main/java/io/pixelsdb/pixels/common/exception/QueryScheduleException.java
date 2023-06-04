@@ -17,47 +17,31 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.server.rest.request;
-
-import io.pixelsdb.pixels.common.server.ExecutionHint;
+package io.pixelsdb.pixels.common.exception;
 
 /**
  * @author hank
- * @create 2023-05-24
+ * @create 2023-06-01
  */
-public class EstimateCostRequest
+public class QueryScheduleException extends Exception
 {
-    private String query;
-    private ExecutionHint executionHint;
-
-    /**
-     * Default constructor for Jackson.
-     */
-    public EstimateCostRequest() { }
-
-    public EstimateCostRequest(String query, ExecutionHint executionHint)
+    public QueryScheduleException()
     {
-        this.query = query;
-        this.executionHint = executionHint;
+        super();
     }
 
-    public String getQuery()
+    public QueryScheduleException(String message)
     {
-        return query;
+        super(message);
     }
 
-    public void setQuery(String query)
+    public QueryScheduleException(Throwable cause)
     {
-        this.query = query;
+        super(cause);
     }
 
-    public ExecutionHint getExecutionHint()
+    public QueryScheduleException(String message, Throwable cause)
     {
-        return executionHint;
-    }
-
-    public void setExecutionHint(ExecutionHint executionHint)
-    {
-        this.executionHint = executionHint;
+        super(message, cause);
     }
 }
