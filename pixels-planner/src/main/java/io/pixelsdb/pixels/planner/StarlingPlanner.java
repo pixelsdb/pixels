@@ -79,18 +79,13 @@ public class StarlingPlanner
 
     static
     {
-        String inputStorageScheme = ConfigFactory.Instance().getProperty("executor.input.storage.scheme");
-        String inputStorageEndpoint = ConfigFactory.Instance().getProperty("executor.input.storage.endpoint");
-        String inputStorageAccessKey = ConfigFactory.Instance().getProperty("executor.input.storage.access.key");
-        String inputStorageSecretKey = ConfigFactory.Instance().getProperty("executor.input.storage.secret.key");
-        InputStorageInfo = new StorageInfo(Storage.Scheme.from(inputStorageScheme),
-                inputStorageEndpoint, inputStorageAccessKey, inputStorageSecretKey);
-        String interStorageScheme = ConfigFactory.Instance().getProperty("executor.intermediate.storage.scheme");
-        String interStorageEndpoint = ConfigFactory.Instance().getProperty("executor.intermediate.storage.endpoint");
-        String interStorageAccessKey = ConfigFactory.Instance().getProperty("executor.intermediate.storage.access.key");
-        String interStorageSecretKey = ConfigFactory.Instance().getProperty("executor.intermediate.storage.secret.key");
-        IntermediateStorageInfo = new StorageInfo(Storage.Scheme.from(interStorageScheme),
-                interStorageEndpoint, interStorageAccessKey, interStorageSecretKey);
+        Storage.Scheme inputStorageScheme = Storage.Scheme.from(
+                ConfigFactory.Instance().getProperty("executor.input.storage.scheme"));
+        InputStorageInfo = StorageInfoBuilder.BuildFromConfig(inputStorageScheme);
+
+        Storage.Scheme interStorageScheme = Storage.Scheme.from(
+                ConfigFactory.Instance().getProperty("executor.intermediate.storage.scheme"));
+        IntermediateStorageInfo = StorageInfoBuilder.BuildFromConfig(interStorageScheme);
         String interStorageFolder = ConfigFactory.Instance().getProperty("executor.intermediate.folder");
         if (!interStorageFolder.endsWith("/"))
         {

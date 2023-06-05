@@ -254,24 +254,25 @@ This feature is named `Pixels Turbo` and can be turned on by setting `cloud.func
 If Pixels Turbo is enabled, we also need to set the following settings in `PIXELS_HOME/pixels.properties`:
 ```properties
 executor.input.storage.scheme=s3
-executor.input.storage.endpoint=input-endpoint-dummy
-executor.input.storage.access.key=input-ak-dummy
-executor.input.storage.secret.key=input-sk-dummy
 executor.intermediate.storage.scheme=s3
-executor.intermediate.storage.endpoint=intermediate-endpoint-dummy
-executor.intermediate.storage.access.key=intermediate-ak-dummy
-executor.intermediate.storage.secret.key=intermediate-sk-dummy
-executor.intermediate.folder=/pixels-lambda-test/
+executor.intermediate.folder=/pixels-turbo/intermediate/
 executor.output.storage.scheme=s3
-executor.output.storage.endpoint=output-endpoint-dummy
-executor.output.storage.access.key=output-ak-dummy
-executor.output.storage.secret.key=output-sk-dummy
-executor.output.folder=/pixels-lambda-test/
+executor.output.folder=/pixels-turbo/output/
 ```
-Those storage schemes, endpoints, and access and secret keys are used to access the input data 
-(the data of the base tables defined by `CREATE TABLE` statements), the intermediate data (intermediate
-results generated during query execution), and the output data (the result of the sub-plan executed in
-the serverless workers), respectively.
+Those storage schemes are used to access the input data (the storage scheme of the base tables defined by 
+`CREATE TABLE` statements), the intermediate data (intermediate results generated during query execution), and the 
+output data (the result of the sub-plan executed in the serverless workers), respectively.
+If any of these storage schemes is `minio` or `redis`, we also need to set the other information, such as the endpoint
+and keys, of the storage:
+```properties
+minio.region=eu-central-2
+minio.endpoint=http://localhost:9000
+minio.access.key=minio-access-key-dummy
+minio.secret.key=minio-secret-key-dummy
+redis.endpoint=localhost:6379
+redis.access.key=redis-user-dummy
+redis.secret.key=redis-password-dummy
+```
 Ensure that they are valid so that the serverless workers can access the corresponding storage systems.
 Especially, the `executor.input.storage.scheme` must be consistent with the storage scheme of the base
 tables. This is checked during query-planning for Pixels Turbo.

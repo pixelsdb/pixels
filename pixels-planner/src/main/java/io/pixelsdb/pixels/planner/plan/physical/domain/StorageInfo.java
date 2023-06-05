@@ -29,19 +29,23 @@ import io.pixelsdb.pixels.common.physical.Storage;
 public class StorageInfo
 {
     /**
-     * The storage scheme of the output storage, e.g., s3, minio.
+     * The storage scheme of the storage, e.g., s3, minio.
      */
     private Storage.Scheme scheme;
     /**
-     * The endpoint of the output storage, e.g., http://hostname:port.
+     * The region of the storage, e.g., eu-central-2.
+     */
+    private String region;
+    /**
+     * The endpoint of the storage, e.g., http://hostname:port.
      */
     private String endpoint;
     /**
-     * The access key of the output storage.
+     * The access key of the storage.
      */
     private String accessKey;
     /**
-     * The secret key of the output storage.
+     * The secret key of the storage.
      */
     private String secretKey;
 
@@ -50,9 +54,11 @@ public class StorageInfo
      */
     public StorageInfo() { }
 
-    public StorageInfo(Storage.Scheme scheme, String endpoint, String accessKey, String secretKey)
+    public StorageInfo(Storage.Scheme scheme, String region,
+                       String endpoint, String accessKey, String secretKey)
     {
         this.scheme = scheme;
+        this.region = region;
         this.endpoint = endpoint;
         this.accessKey = accessKey;
         this.secretKey = secretKey;
@@ -66,6 +72,16 @@ public class StorageInfo
     public void setScheme(Storage.Scheme scheme)
     {
         this.scheme = scheme;
+    }
+
+    public String getRegion()
+    {
+        return region;
+    }
+
+    public void setRegion(String region)
+    {
+        this.region = region;
     }
 
     public String getEndpoint()

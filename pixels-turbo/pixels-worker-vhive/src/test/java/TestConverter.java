@@ -60,7 +60,7 @@ public class TestConverter
                 "mytable",
                 true,
                 new String[]{"col1", "col2", "col3"},
-                new StorageInfo(Storage.Scheme.s3, null, null, null),
+                new StorageInfo(Storage.Scheme.s3, null, null, null, null),
                 Collections.singletonList(genInputSplit()),
                 "predicates");
     }
@@ -118,7 +118,8 @@ public class TestConverter
 
     private StorageInfo genStorageInfo()
     {
-        return new StorageInfo(Storage.Scheme.gcs, "endpoint", "accesskey", "secretkey");
+        return new StorageInfo(Storage.Scheme.gcs,
+                "region", "endpoint", "accesskey", "secretkey");
     }
 
     @Test

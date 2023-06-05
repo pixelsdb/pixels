@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import org.apache.commons.cli.*;
 
@@ -82,7 +83,11 @@ public class Main
             String function = cmd.getOptionValue("function", FUNC);
             String number = cmd.getOptionValue("number", Integer.toString(NUMBER));
 
-            StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
+            StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio,
+                    ConfigFactory.Instance().getProperty("minio.region"),
+                    ConfigFactory.Instance().getProperty("minio.endpoint"),
+                    ConfigFactory.Instance().getProperty("minio.access.key"),
+                    ConfigFactory.Instance().getProperty("minio.secret.key"));
             InvokerFactory factory = InvokerFactory.Instance();
 
             CountDownLatch countDownLatch = new CountDownLatch(Integer.parseInt(number));

@@ -39,7 +39,7 @@ public class TestMinio
     @Test
     public void testReadWrite() throws IOException
     {
-        ConfigMinio("http://localhost:9000", "minio", "password");
+        ConfigMinio("en-central-2", "http://localhost:9000", "minio", "password");
         Storage minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
         List<String> files = minio.listPaths("test/");
         for (String file : files)

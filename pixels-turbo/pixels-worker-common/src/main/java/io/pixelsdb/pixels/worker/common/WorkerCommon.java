@@ -80,7 +80,8 @@ public class WorkerCommon
             }
             else if (WorkerCommon.minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
             {
-                ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
+                ConfigMinio(storageInfo.getRegion(), storageInfo.getEndpoint(),
+                        storageInfo.getAccessKey(), storageInfo.getSecretKey());
                 WorkerCommon.minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
             }
             else if (WorkerCommon.redis == null && storageInfo.getScheme() == Storage.Scheme.redis)
