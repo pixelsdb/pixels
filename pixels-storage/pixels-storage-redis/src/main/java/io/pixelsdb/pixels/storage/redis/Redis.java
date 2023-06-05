@@ -70,6 +70,20 @@ public class Redis implements Storage
              */
             InitId(REDIS_ID_KEY);
         }
+        String endpoint = ConfigFactory.Instance().getProperty("redis.endpoint");
+        userName = ConfigFactory.Instance().getProperty("redis.access.key");
+        password = ConfigFactory.Instance().getProperty("redis.secret.key");
+        if (endpoint.contains("://"))
+        {
+            endpoint = endpoint.substring(endpoint.indexOf("://") + 3);
+        }
+        String[] splits = endpoint.split(":");
+
+        if (!Objects.equals(hostName, splits[0]) || port != Integer.parseInt(splits[1]))
+        {
+            hostName = splits[0];
+            port = Integer.parseInt(splits[1]);
+        }
     }
 
     /**

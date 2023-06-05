@@ -23,6 +23,7 @@ import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import org.junit.Test;
@@ -34,7 +35,11 @@ public class TestAggregationVhiveInvoker
     @Test
     public void testAggregation() throws ExecutionException, InterruptedException
     {
-        StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio, null, null, null);
+        StorageInfo storageInfo = new StorageInfo(Storage.Scheme.minio,
+                ConfigFactory.Instance().getProperty("minio.region"),
+                ConfigFactory.Instance().getProperty("minio.endpoint"),
+                ConfigFactory.Instance().getProperty("minio.access.key"),
+                ConfigFactory.Instance().getProperty("minio.secret.key"));
 
         AggregationOutput output = (AggregationOutput) InvokerFactory.Instance()
                 .getInvoker(WorkerType.AGGREGATION).invoke(Utils.genAggregationInput(storageInfo)).get();

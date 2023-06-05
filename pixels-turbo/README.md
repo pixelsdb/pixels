@@ -30,8 +30,8 @@ consumed by the scaling manager (e.g., AWS EC2 Autoscaling Group) in the cloud p
 
 Install `Pixels + Trino` following the instructions [HERE](../docs/INSTALL.md).
 Then, deploy the serverless workers following the instructions in the README.md of `pixels-worker-[service]`.
-Currently, we only support AWS Lambda. So `pixels-worker-lambda` is the only option. More platform integrations
-will be provided in the future.
+Currently, we support AWS Lambda and vHive. So the worker service can be `pixels-worker-lambda` or `pixels-worker-vhive`.
+More platform integrations will be provided in the future.
 
 After that, start Trino and run queries. Pixels will automatically push the queries into the serverless workers when Trino 
 is too busy to process the new coming queries.

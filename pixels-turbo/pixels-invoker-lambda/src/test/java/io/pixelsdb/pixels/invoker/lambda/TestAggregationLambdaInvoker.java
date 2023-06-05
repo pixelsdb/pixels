@@ -49,7 +49,8 @@ public class TestAggregationLambdaInvoker
         aggregationInput.setTransId(123456);
         AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
         aggregatedTableInfo.setParallelism(8);
-        aggregatedTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        aggregatedTableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3,
+                null, null, null, null));
         aggregatedTableInfo.setInputFiles(Arrays.asList(
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_0",
                 "pixels-lambda-test/unit_tests/orders_partial_aggr_1",
@@ -73,7 +74,7 @@ public class TestAggregationLambdaInvoker
         aggregationInfo.setFunctionTypes(new FunctionType[] {FunctionType.SUM});
         aggregationInput.setAggregationInfo(aggregationInfo);
         aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_final_aggr", false,
-                new StorageInfo(Storage.Scheme.s3, null, null, null), true));
+                new StorageInfo(Storage.Scheme.s3, null, null, null, null), true));
 
         System.out.println(JSON.toJSONString(aggregationInput));
 

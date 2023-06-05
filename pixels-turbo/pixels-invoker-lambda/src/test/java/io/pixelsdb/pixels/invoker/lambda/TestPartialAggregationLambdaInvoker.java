@@ -62,7 +62,7 @@ public class TestPartialAggregationLambdaInvoker
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 20, 4))),
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 24, 4))),
                     new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-compact/20230416154127_" + i + "_compact.pxl", 28, 4)))));
-            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
             scanInput.setTableInfo(tableInfo);
             scanInput.setScanProjection(new boolean[]{true, true, true, true});
             scanInput.setPartialAggregationPresent(true);
@@ -75,7 +75,7 @@ public class TestPartialAggregationLambdaInvoker
             aggregationInfo.setFunctionTypes(new FunctionType[]{FunctionType.SUM});
             scanInput.setPartialAggregationInfo(aggregationInfo);
             scanInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_partial_aggr_" + i, false,
-                    new StorageInfo(Storage.Scheme.s3, null, null, null), true));
+                    new StorageInfo(Storage.Scheme.s3, null, null, null, null), true));
 
             System.out.println(JSON.toJSONString(scanInput));
 
