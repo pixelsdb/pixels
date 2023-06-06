@@ -84,9 +84,9 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
             }
             Utils.dump(JSONFilename, input, output);
             Utils.upload(JSONFilename, String.format("%s_%s/%s",
-                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "none"), JSONFilename));
+                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "default"), JSONFilename));
             log.info(String.format("upload JSON file to experiments/%s_%s/%s successfully",
-                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "none"), JSONFilename));
+                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "default"), JSONFilename));
 
             log.info(String.format("get output successfully: %s", JSON.toJSONString(output)));
         } catch (Exception e)
