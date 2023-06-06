@@ -68,7 +68,13 @@ Connect to trino-cli:
 cd ~/opt/trino-server
 ./bin/trino --server localhost:8080 --catalog pixels --schema tpch
 ```
-Execute the TPC-H queries in trino-cli.
+In trino-cli, select the ordered data layout by setting the two session properties:
+```sql
+set session pixels.ordered_path_enabled=true
+set session pixels.compact_path_enabled=false
+```
+By default, both paths are enabled. You can also enable the compact path and disable the ordered path when [data compaction](#data-compaction) is done.
+After selecting the data layout, execute the TPC-H queries in trino-cli.
 
 ## Data Compaction*
 This is optional. It is only needed if we want to test the query performance on the compact layout.
@@ -76,9 +82,11 @@ In pixels-cli, use the following commands to compact the files in the ordered pa
 ```bash
 COMPACT -s tpch -t customer -n no -c 2
 COMPACT -s tpch -t lineitem -n no -c 16
+COMPACT -s tpch -t nation -n no -c 1
 COMPACT -s tpch -t orders -n no -c 8
 COMPACT -s tpch -t part -n no -c 1
 COMPACT -s tpch -t partsupp -n no -c 8
+COMPACT -s tpch -t region -n no -c 1
 COMPACT -s tpch -t supplier -n no -c 1
 ```
 The tables `nation` and `region` are too small, no need to compact them.
