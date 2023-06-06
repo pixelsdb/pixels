@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.turbo;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * The base class for the input of a cloud function.
  * @author hank
@@ -31,9 +33,13 @@ public abstract class Input
      */
     private long transId;
 
+    private String operatorName;
+
     public Input(long transId)
     {
         this.transId = transId;
+        // Issue #468: operatorName is optional, it is to be set by the setter.
+        this.operatorName = null;
     }
 
     public long getTransId()
@@ -44,5 +50,19 @@ public abstract class Input
     public void setTransId(long transId)
     {
         this.transId = transId;
+    }
+
+    /**
+     * Operator name is optional, it might be null if not set.
+     * @return the operator name.
+     */
+    public String getOperatorName()
+    {
+        return operatorName;
+    }
+
+    public void setOperatorName(String operatorName)
+    {
+        this.operatorName = requireNonNull(operatorName, "operatorName is null");
     }
 }

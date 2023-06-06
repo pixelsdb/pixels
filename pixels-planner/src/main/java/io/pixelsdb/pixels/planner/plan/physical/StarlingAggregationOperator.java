@@ -123,6 +123,7 @@ public class StarlingAggregationOperator extends Operator
                 int i = 0;
                 for (AggregationInput preAggrInput : this.finalAggrInputs)
                 {
+                    preAggrInput.setOperatorName(this.getName());
                     this.finalAggrOutputs[i++] = InvokerFactory.Instance()
                             .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
                 }
@@ -157,6 +158,7 @@ public class StarlingAggregationOperator extends Operator
                     int i = 0;
                     for (PartitionInput partitionInput : this.partitionInputs)
                     {
+                        partitionInput.setOperatorName(this.getName());
                         this.partitionOutputs[i++] = InvokerFactory.Instance()
                                 .getInvoker(WorkerType.PARTITION).invoke(partitionInput);
                     }

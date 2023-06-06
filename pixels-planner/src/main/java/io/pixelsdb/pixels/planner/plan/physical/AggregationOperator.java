@@ -122,6 +122,7 @@ public class AggregationOperator extends Operator
                 int i = 0;
                 for (AggregationInput preAggrInput : this.finalAggrInputs)
                 {
+                    preAggrInput.setOperatorName(this.getName());
                     this.finalAggrOutputs[i++] = InvokerFactory.Instance()
                             .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
                 }
@@ -156,6 +157,7 @@ public class AggregationOperator extends Operator
                     int i = 0;
                     for (ScanInput scanInput : this.scanInputs)
                     {
+                        scanInput.setOperatorName(this.getName());
                         this.scanOutputs[i++] = InvokerFactory.Instance()
                                 .getInvoker(WorkerType.SCAN).invoke(scanInput);
                     }

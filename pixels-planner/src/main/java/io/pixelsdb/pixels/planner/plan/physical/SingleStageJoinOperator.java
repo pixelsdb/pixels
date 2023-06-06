@@ -115,15 +115,17 @@ public class SingleStageJoinOperator extends JoinOperator
             joinOutputs = new CompletableFuture[joinInputs.size()];
             for (int i = 0; i < joinInputs.size(); ++i)
             {
+                JoinInput joinInput = joinInputs.get(i);
+                joinInput.setOperatorName(this.getName());
                 if (joinAlgo == JoinAlgorithm.BROADCAST)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.BROADCAST_JOIN).invoke(joinInputs.get(i));
+                            .getInvoker(WorkerType.BROADCAST_JOIN).invoke(joinInput);
                 }
                 else if (joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(joinInputs.get(i));
+                            .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(joinInput);
                 }
                 else
                 {
