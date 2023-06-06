@@ -19,9 +19,12 @@
  */
 package io.pixelsdb.pixels.amphi;
 
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelVisitor;
-import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.core.*;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexNode;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -34,8 +37,14 @@ public class PlanAnalysis
     private final RelNode root;
     private int nodeCount = 0;
     private int maxDepth = 0;
+
     private Set<String> scannedTables = new HashSet<>();
     private Set<String> operatorTypes = new HashSet<>();
+
+    private List<Map<String, Object>> filterDetails = new ArrayList<>();
+    private List<Map<String, Object>> joinDetails = new ArrayList<>();
+    private List<Map<String, Object>> aggregateDetails = new ArrayList<>();
+    private List<Map<String, Object>> projectDetails = new ArrayList<>();
 
     public PlanAnalysis(RelNode root)
     {
@@ -60,6 +69,77 @@ public class PlanAnalysis
             maxDepth = Math.max(maxDepth, depth);
         };
 
+        Consumer<RelNode> filterDetailsCollector = (node) -> {
+            if (node instanceof Filter) {
+                Filter filter = (Filter) node;
+                Map<String, Object> filterInfo = new HashMap<>();
+                filterInfo.put("FilterCondition", filter.getCondition().toString());
+
+                if (filter.getInput() instanceof TableScan) {
+                    filterInfo.put("Table", ((TableScan) filter.getInput()).getTable().getQualifiedName().get(1));
+                }
+
+                filterDetails.add(filterInfo);
+            }
+        };
+
+        Consumer<RelNode> joinDetailsCollector = (node) -> {
+            if (node instanceof Join) {
+                Join join = (Join) node;
+                Map<String, Object> joinInfo = new HashMap<>();
+                joinInfo.put("JoinType", join.getJoinType());
+                joinInfo.put("JoinCondition", join.getCondition().toString());
+
+                if (join.getLeft() instanceof TableScan && join.getRight() instanceof TableScan) {
+                    joinInfo.put("LeftTable", ((TableScan) join.getLeft()).getTable().getQualifiedName().get(1));
+                    joinInfo.put("RightTable", ((TableScan) join.getRight()).getTable().getQualifiedName().get(1));
+                }
+
+                joinDetails.add(joinInfo);
+            }
+        };
+
+        Consumer<RelNode> aggregateDetailsCollector = (node) -> {
+            if (node instanceof Aggregate) {
+                Aggregate aggregate = (Aggregate) node;
+                Map<String, Object> aggregateInfo = new HashMap<>();
+                List<String> functions = new ArrayList<>();
+                for (AggregateCall call : aggregate.getAggCallList()) {
+                    functions.add(call.getAggregation().getKind().toString());
+                }
+                aggregateInfo.put("AggregateFunctions", functions);
+                aggregateInfo.put("GroupedFields", aggregate.getGroupSet().toList());
+
+                if (aggregate.getInput() instanceof TableScan) {
+                    aggregateInfo.put("Table", ((TableScan) aggregate.getInput()).getTable().getQualifiedName().get(1));
+                }
+
+                aggregateDetails.add(aggregateInfo);
+            }
+        };
+
+        Consumer<RelNode> projectDetailsCollector = (node) -> {
+            if (node instanceof Project) {
+                Project project = (Project) node;
+                Map<String, Object> projectInfo = new HashMap<>();
+                List<String> expressions = new ArrayList<>();
+                for (RexNode expr : project.getProjects()) {
+                    expressions.add(expr.toString());
+                }
+                projectInfo.put("Expressions", expressions);
+
+                // TODO: indirect retrieval
+                if (project.getInput() instanceof TableScan) {
+                    TableScan tableScan = (TableScan) project.getInput();
+                    projectInfo.put("Table", tableScan.getTable().getQualifiedName().get(1));
+                    List<String> fieldNames = tableScan.getRowType().getFieldNames();
+                    projectInfo.put("Fields", fieldNames);
+                }
+
+                projectDetails.add(projectInfo);
+            }
+        };
+
         Consumer<RelNode> scannedTableCollector = (node) -> {
             if (node instanceof TableScan) {
                 TableScan tableScan = (TableScan) node;
@@ -74,7 +154,11 @@ public class PlanAnalysis
                 nodeCounter,
                 depthCalculator,
                 scannedTableCollector,
-                operatorTypeCollector
+                operatorTypeCollector,
+                filterDetailsCollector,
+                joinDetailsCollector,
+                aggregateDetailsCollector,
+                projectDetailsCollector
         };
 
         RelVisitor visitor = new RelVisitor() {
@@ -120,5 +204,24 @@ public class PlanAnalysis
         return operatorTypes;
     }
 
+    public List<Map<String, Object>> getFilterDetails()
+    {
+        return this.filterDetails;
+    }
+
+    public List<Map<String, Object>> getJoinDetails()
+    {
+        return this.joinDetails;
+    }
+
+    public List<Map<String, Object>> getAggregateDetails()
+    {
+        return this.aggregateDetails;
+    }
+
+    public List<Map<String, Object>> getProjectDetails()
+    {
+        return this.projectDetails;
+    }
 
 }

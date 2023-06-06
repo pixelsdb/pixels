@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.parser.PixelsParser;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.externalize.RelJsonWriter;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -35,9 +36,7 @@ import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
-import java.util.HashSet;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 
 public class TestPlanAnalysis
 {
@@ -77,9 +76,9 @@ public class TestPlanAnalysis
 //            "order by o_year";
 
     @Test
-    public void testPlanAnalysisExample() throws SqlParseException
+    public void testPlanAnalysisSimple() throws SqlParseException
     {
-        String query = "select COUNT(*) from orders, customer";
+        String query = "select SUM(o_totalprice) from orders, customer";
 
         SqlNode parsedNode = this.tpchPixelsParser.parseQuery(query);
         System.out.println("Parsed SQL Query: \n" + parsedNode);
@@ -102,24 +101,49 @@ public class TestPlanAnalysis
         int scannedTablesCount = analysis.getScannedTableCount();
         Set<String> operatorTypes = analysis.getOperatorTypes();
         Set<String> scannedTables = analysis.getScannedTables();
+        List<Map<String, Object>> filterDetails = analysis.getFilterDetails();
+        List<Map<String, Object>> joinDetails = analysis.getJoinDetails();
+        List<Map<String, Object>> aggregateDetails = analysis.getAggregateDetails();
+        List<Map<String, Object>> projectDetails = analysis.getProjectDetails();
+
         System.out.println("Total number of nodes in plan: " + nodeCount);
         System.out.println("Maximum depth of the plan tree: " + maxDepth);
         System.out.println("Number of unique scanned tables: " + scannedTablesCount);
         System.out.println("Logical operators in plan: " + operatorTypes);
         System.out.println("Scanned tables in plan: " + scannedTables);
+        System.out.println("Filter operators in plan: " + filterDetails);
+        System.out.println("Join operators in plan: " + joinDetails);
+        System.out.println("Aggregate operators in plan: " + aggregateDetails);
+        System.out.println("Project operators in plan: " + projectDetails);
 
         // Validate the analysis
-        int expectedNodeCount = 4;
-        int expectedMaxDepth = 3;
+        int expectedNodeCount = 5;
+        int expectedMaxDepth = 4;
         int expectedScannedTablesCount = 2;
         Set<String> expectedOperators = new HashSet<String>() {{
             add("LogicalAggregate");
             add("LogicalJoin");
             add("LogicalTableScan");
+            add("LogicalProject");
         }};
         Set<String> expectedScannedTables = new HashSet<String>() {{
             add("orders");
             add("customer");
+        }};
+        List<Map<String, Object>> expectedFilterDetails = new ArrayList<>();
+        List<Map<String, Object>> expectedJoinDetails = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{
+                put("LeftTable", "orders");
+                put("JoinType", JoinRelType.INNER);
+                put("RightTable", "customer");
+                put("JoinCondition", "true");
+            }});
+        }};
+        List<Map<String, Object>> expectedAggregateDetails = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{
+                put("AggregateFunctions", Collections.singletonList("SUM"));
+                put("GroupedFields", Collections.emptyList());
+            }});
         }};
 
         assertEquals("4 RelNode in the logical plan", expectedNodeCount, nodeCount);
@@ -127,5 +151,8 @@ public class TestPlanAnalysis
         assertEquals("2 unique table scanned", expectedScannedTablesCount, scannedTablesCount);
         assertEquals("3 Logical operators included in plan.", expectedOperators, operatorTypes);
         assertEquals("table orders and customer scanned by the plan.", expectedScannedTables, scannedTables);
+        assertEquals("Filter operators in the plan have the expected details.", expectedFilterDetails, filterDetails);
+        assertEquals("Join operators in the plan have the expected details.", expectedJoinDetails, joinDetails);
+        assertEquals("Aggregate operators in the plan have the expected details.", expectedAggregateDetails, aggregateDetails);
     }
 }
