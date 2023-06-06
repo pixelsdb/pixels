@@ -29,6 +29,11 @@ public class StringUtil
     {
     }
 
+    public static String notNullOrElse(String nullable, String elseValue)
+    {
+        return nullable != null ? nullable : elseValue;
+    }
+
     public static String replaceAll(String text, String searchString, String replacement)
     {
         if (text.isEmpty() || searchString.isEmpty() || replacement.isEmpty())

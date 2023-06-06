@@ -32,6 +32,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.UUID;
 
+import static io.pixelsdb.pixels.common.utils.StringUtil.notNullOrElse;
+
 public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O extends Output>
 {
     private static final Logger log = LogManager.getLogger(ServiceImpl.class);
@@ -70,16 +72,21 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
                 output = handler.handleRequest(input);
                 Utils.stopProfile(JFRFilename);
 
-                Utils.upload(JFRFilename, String.format("%s/%s", input.getTransId(), JFRFilename));
-                log.info(String.format("upload JFR file to experiments/%s/%s successfully", input.getTransId(), JFRFilename));
+                Utils.upload(JFRFilename, String.format("%s_%s/%s",
+                        input.getTransId(), notNullOrElse(input.getOperatorName(), "default"), JFRFilename));
+                log.info(String.format("upload JFR file to experiments/%s_%s/%s successfully",
+                        input.getTransId(),  notNullOrElse(input.getOperatorName(), "default"), JFRFilename));
             } else
             {
-                log.info(String.format("disable profile to execute input: %s", JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
+                log.info(String.format("disable profile to execute input: %s",
+                        JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect)));
                 output = handler.handleRequest(input);
             }
             Utils.dump(JSONFilename, input, output);
-            Utils.upload(JSONFilename, String.format("%s/%s", input.getTransId(), JSONFilename));
-            log.info(String.format("upload JSON file to experiments/%s/%s successfully", input.getTransId(), JSONFilename));
+            Utils.upload(JSONFilename, String.format("%s_%s/%s",
+                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "none"), JSONFilename));
+            log.info(String.format("upload JSON file to experiments/%s_%s/%s successfully",
+                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "none"), JSONFilename));
 
             log.info(String.format("get output successfully: %s", JSON.toJSONString(output)));
         } catch (Exception e)
