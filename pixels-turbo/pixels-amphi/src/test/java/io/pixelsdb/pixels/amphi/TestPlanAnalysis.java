@@ -68,13 +68,13 @@ public class TestPlanAnalysis
         this.instance.shutdown();
     }
 
-    String query = "select o_year, sum( case when nation = 'INDIA' then volume else 0 end) / sum(volume) as mkt_share " +
-            "from( select extract( year from o_orderdate ) as o_year, l_extendedprice * (1 - l_discount) as volume, n2.n_name as nation " +
-            "from PART, SUPPLIER, LINEITEM, ORDERS, CUSTOMER, NATION n1, NATION n2, REGION " +
-            "where p_partkey = l_partkey and s_suppkey = l_suppkey and l_orderkey = o_orderkey and o_custkey = c_custkey and c_nationkey = n1.n_nationkey and n1.n_regionkey = r_regionkey and " +
-            "r_name = 'ASIA' and s_nationkey = n2.n_nationkey and o_orderdate between '1995-01-01' and '1996-12-31' and p_type = 'SMALL PLATED COPPER' ) as all_nations " +
-            "group by o_year " +
-            "order by o_year";
+//    String query = "select o_year, sum( case when nation = 'INDIA' then volume else 0 end) / sum(volume) as mkt_share " +
+//            "from( select extract( year from o_orderdate ) as o_year, l_extendedprice * (1 - l_discount) as volume, n2.n_name as nation " +
+//            "from PART, SUPPLIER, LINEITEM, ORDERS, CUSTOMER, NATION n1, NATION n2, REGION " +
+//            "where p_partkey = l_partkey and s_suppkey = l_suppkey and l_orderkey = o_orderkey and o_custkey = c_custkey and c_nationkey = n1.n_nationkey and n1.n_regionkey = r_regionkey and " +
+//            "r_name = 'ASIA' and s_nationkey = n2.n_nationkey and o_orderdate between '1995-01-01' and '1996-12-31' and p_type = 'SMALL PLATED COPPER' ) as all_nations " +
+//            "group by o_year " +
+//            "order by o_year";
 
     @Test
     public void testPlanAnalysisExample() throws SqlParseException
@@ -92,13 +92,26 @@ public class TestPlanAnalysis
         rel.explain(writer);
         System.out.println("Logical plan: \n" + writer.asString());
 
+        // Run one-time traversal to collect analysis
         PlanAnalysis analysis = new PlanAnalysis(rel);
         analysis.traversePlan();
 
+        // Get analyzed factors
+        int nodeCount = analysis.getNodeCount();
+        int maxDepth = analysis.getMaxDepth();
+        int scannedTablesCount = analysis.getScannedTableCount();
         Set<String> operatorTypes = analysis.getOperatorTypes();
         Set<String> scannedTables = analysis.getScannedTables();
+        System.out.println("Total number of nodes in plan: " + nodeCount);
+        System.out.println("Maximum depth of the plan tree: " + maxDepth);
+        System.out.println("Number of unique scanned tables: " + scannedTablesCount);
         System.out.println("Logical operators in plan: " + operatorTypes);
         System.out.println("Scanned tables in plan: " + scannedTables);
+
+        // Validate the analysis
+        int expectedNodeCount = 4;
+        int expectedMaxDepth = 3;
+        int expectedScannedTablesCount = 2;
         Set<String> expectedOperators = new HashSet<String>() {{
             add("LogicalAggregate");
             add("LogicalJoin");
@@ -109,7 +122,10 @@ public class TestPlanAnalysis
             add("customer");
         }};
 
+        assertEquals("4 RelNode in the logical plan", expectedNodeCount, nodeCount);
+        assertEquals("3 maximum depth of the tree structure", expectedMaxDepth, maxDepth);
+        assertEquals("2 unique table scanned", expectedScannedTablesCount, scannedTablesCount);
         assertEquals("3 Logical operators included in plan.", expectedOperators, operatorTypes);
-        assertEquals("2 tables scanned by the plan.", expectedScannedTables, scannedTables);
+        assertEquals("table orders and customer scanned by the plan.", expectedScannedTables, scannedTables);
     }
 }

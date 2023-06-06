@@ -32,16 +32,34 @@ import java.util.function.Consumer;
 public class PlanAnalysis
 {
     private final RelNode root;
+    private int nodeCount = 0;
+    private int maxDepth = 0;
     private Set<String> scannedTables = new HashSet<>();
     private Set<String> operatorTypes = new HashSet<>();
 
     public PlanAnalysis(RelNode root)
     {
         this.root = root;
-
     }
 
+    // One-time traversal to collect all the required analysis factors
     public void traversePlan() {
+        Consumer<RelNode> nodeCounter = (node) -> nodeCount++;
+
+        Consumer<RelNode> depthCalculator = (node) -> {
+            int depth = 0;
+            RelNode currentNode = node;
+            while (currentNode != null) {
+                depth++;
+                if (currentNode.getInputs().isEmpty()) {
+                    currentNode = null;
+                } else {
+                    currentNode = currentNode.getInput(0);
+                }
+            }
+            maxDepth = Math.max(maxDepth, depth);
+        };
+
         Consumer<RelNode> scannedTableCollector = (node) -> {
             if (node instanceof TableScan) {
                 TableScan tableScan = (TableScan) node;
@@ -52,7 +70,12 @@ public class PlanAnalysis
 
         Consumer<RelNode> operatorTypeCollector = (node) -> operatorTypes.add(node.getRelTypeName());
 
-        Consumer<RelNode>[] functions = new Consumer[]{scannedTableCollector, operatorTypeCollector};
+        Consumer<RelNode>[] functions = new Consumer[]{
+                nodeCounter,
+                depthCalculator,
+                scannedTableCollector,
+                operatorTypeCollector
+        };
 
         RelVisitor visitor = new RelVisitor() {
             @Override
@@ -72,11 +95,28 @@ public class PlanAnalysis
         return this.root;
     }
 
-    public Set<String> getScannedTables() {
+    public int getNodeCount()
+    {
+        return this.nodeCount;
+    }
+
+    public int getMaxDepth()
+    {
+        return this.maxDepth;
+    }
+
+    public Set<String> getScannedTables()
+    {
         return this.scannedTables;
     }
 
-    public Set<String> getOperatorTypes() {
+    public int getScannedTableCount()
+    {
+        return this.scannedTables.size();
+    }
+
+    public Set<String> getOperatorTypes()
+    {
         return operatorTypes;
     }
 
