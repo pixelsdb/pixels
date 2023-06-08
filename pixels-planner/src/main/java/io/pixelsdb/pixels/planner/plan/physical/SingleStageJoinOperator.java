@@ -51,6 +51,8 @@ public class SingleStageJoinOperator extends JoinOperator
     public SingleStageJoinOperator(String name, JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
         super(name);
+        // ImmutableList.of() add the reference of joinInput into the returned list
+        joinInput.setOperatorName(name);
         this.joinInputs = ImmutableList.of(joinInput);
         this.joinAlgo = joinAlgo;
     }
@@ -59,6 +61,10 @@ public class SingleStageJoinOperator extends JoinOperator
     {
         super(name);
         this.joinInputs = ImmutableList.copyOf(joinInputs);
+        for (JoinInput joinInput : this.joinInputs)
+        {
+            joinInput.setOperatorName(name);
+        }
         this.joinAlgo = joinAlgo;
     }
 
@@ -116,7 +122,6 @@ public class SingleStageJoinOperator extends JoinOperator
             for (int i = 0; i < joinInputs.size(); ++i)
             {
                 JoinInput joinInput = joinInputs.get(i);
-                joinInput.setOperatorName(this.getName());
                 if (joinAlgo == JoinAlgorithm.BROADCAST)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()

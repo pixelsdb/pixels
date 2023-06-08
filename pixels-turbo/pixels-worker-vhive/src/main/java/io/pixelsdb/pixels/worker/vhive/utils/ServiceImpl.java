@@ -72,9 +72,9 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
                 output = handler.handleRequest(input);
                 Utils.stopProfile(JFRFilename);
 
-                Utils.upload(JFRFilename, String.format("%s_%s/%s",
+                Utils.upload(JFRFilename, String.format("%s/%s/%s",
                         input.getTransId(), notNullOrElse(input.getOperatorName(), "default"), JFRFilename));
-                log.info(String.format("upload JFR file to experiments/%s_%s/%s successfully",
+                log.info(String.format("upload JFR file to experiments/%s/%s/%s successfully",
                         input.getTransId(),  notNullOrElse(input.getOperatorName(), "default"), JFRFilename));
             } else
             {
@@ -83,10 +83,10 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
                 output = handler.handleRequest(input);
             }
             Utils.dump(JSONFilename, input, output);
-            Utils.upload(JSONFilename, String.format("%s_%s/%s",
-                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "none"), JSONFilename));
-            log.info(String.format("upload JSON file to experiments/%s_%s/%s successfully",
-                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "none"), JSONFilename));
+            Utils.upload(JSONFilename, String.format("%s/%s/%s",
+                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "default"), JSONFilename));
+            log.info(String.format("upload JSON file to experiments/%s/%s/%s successfully",
+                    input.getTransId(),  notNullOrElse(input.getOperatorName(), "default"), JSONFilename));
 
             log.info(String.format("get output successfully: %s", JSON.toJSONString(output)));
         } catch (Exception e)
