@@ -154,6 +154,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                     }
                     catch (Exception e)
                     {
+                        logger.error(String.format("error during scan: %s", e));
                         throw new WorkerException("error during scan", e);
                     }
                 });
@@ -164,6 +165,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
+                logger.error(String.format("interrupted while waiting for the termination of scan: %s", e));
                 throw new WorkerException("interrupted while waiting for the termination of scan", e);
             }
 
@@ -288,6 +290,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 numReadRequests += recordReader.getNumReadRequests();
             } catch (Exception e)
             {
+                logger.error(String.format("failed to scan the file '%s' and output the result: %s", inputInfo.getPath(), e));
                 throw new WorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the result", e);
             }
@@ -326,6 +329,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             return numRowGroup;
         } catch (Exception e)
         {
+            logger.error(String.format("failed finish writing and close the output file '%s': %s", outputPath, e));
             throw new WorkerException(
                     "failed finish writing and close the output file '" + outputPath + "'", e);
         }

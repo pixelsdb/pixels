@@ -212,6 +212,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                                     leftInputStorageInfo.getScheme(), hashValues, numPartition, workerMetrics);
                         } catch (Exception e)
                         {
+                            logger.error(String.format("error during hash table construction: %s", e));
                             throw new WorkerException("error during hash table construction", e);
                         }
                     }));
@@ -252,6 +253,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                                                 result.get(0), workerMetrics);
                             } catch (Exception e)
                             {
+                                logger.error(String.format("error during hash join: %s", e));
                                 throw new WorkerException("error during hash join", e);
                             }
                         });
@@ -262,6 +264,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
                     } catch (InterruptedException e)
                     {
+                        logger.error(String.format("interrupted while waiting for the termination of join: %s", e));
                         throw new WorkerException("interrupted while waiting for the termination of join", e);
                     }
                 }
@@ -316,6 +319,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                 workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
             } catch (Exception e)
             {
+                logger.error(String.format("failed to scan the partitioned file '%s' and do the join: %s", rightPartitioned, e));
                 throw new WorkerException("failed to scan the partitioned file '" +
                         rightPartitioned + "' and do the join", e);
             }
