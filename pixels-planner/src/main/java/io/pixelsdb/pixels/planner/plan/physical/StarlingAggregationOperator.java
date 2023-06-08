@@ -71,6 +71,10 @@ public class StarlingAggregationOperator extends Operator
         requireNonNull(finalAggrInputs, "finalAggrInputs is null");
         checkArgument(!finalAggrInputs.isEmpty(), "finalAggrInputs is empty");
         this.finalAggrInputs = ImmutableList.copyOf(finalAggrInputs);
+        for (AggregationInput aggrInput : this.finalAggrInputs)
+        {
+            aggrInput.setOperatorName(name);
+        }
         if (partitionInputs == null || partitionInputs.isEmpty())
         {
             this.partitionInputs = ImmutableList.of();
@@ -78,6 +82,10 @@ public class StarlingAggregationOperator extends Operator
         else
         {
             this.partitionInputs = ImmutableList.copyOf(partitionInputs);
+            for (PartitionInput partitionInput : this.partitionInputs)
+            {
+                partitionInput.setOperatorName(name);
+            }
         }
     }
 
@@ -123,7 +131,6 @@ public class StarlingAggregationOperator extends Operator
                 int i = 0;
                 for (AggregationInput preAggrInput : this.finalAggrInputs)
                 {
-                    preAggrInput.setOperatorName(this.getName());
                     this.finalAggrOutputs[i++] = InvokerFactory.Instance()
                             .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
                 }
@@ -158,7 +165,6 @@ public class StarlingAggregationOperator extends Operator
                     int i = 0;
                     for (PartitionInput partitionInput : this.partitionInputs)
                     {
-                        partitionInput.setOperatorName(this.getName());
                         this.partitionOutputs[i++] = InvokerFactory.Instance()
                                 .getInvoker(WorkerType.PARTITION).invoke(partitionInput);
                     }
