@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Integer column writer.
@@ -38,8 +39,7 @@ import java.nio.ByteBuffer;
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
-    private final boolean isLong;                                       // current column type is long or int
-
+    private final boolean isLong;                                       // current column type is long or int     // if the current pixel is the first pixel
     public IntegerColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
         super(type, pixelStride, isEncoding);
@@ -113,8 +113,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
             ByteBuffer curVecPartitionBuffer;
             if (isLong)
             {
-                curVecPartitionBuffer = ByteBuffer.allocate((curPixelVectorIndex + 1) * Long.BYTES);
-                curVecPartitionBuffer.putLong(1);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
+                curVecPartitionBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
@@ -122,8 +122,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
             }
             else
             {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES + Long.BYTES);
-                curVecPartitionBuffer.putLong(0);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
+                curVecPartitionBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);

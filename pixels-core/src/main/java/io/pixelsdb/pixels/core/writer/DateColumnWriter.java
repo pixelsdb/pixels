@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.DateColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Date column writer.
@@ -110,6 +111,7 @@ public class DateColumnWriter extends BaseColumnWriter
         {
             ByteBuffer curVecPartitionBuffer =
                     ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
+            curVecPartitionBuffer.order(ByteOrder.LITTLE_ENDIAN);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 curVecPartitionBuffer.putInt(curPixelVector[i]);
