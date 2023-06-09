@@ -39,11 +39,11 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
 {
     private static Logger log = LogManager.getLogger(MetadataServiceImpl.class);
 
-    private SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
-    private TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
-    private ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
-    private LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
-    private ViewDao viewDao = DaoFactory.Instance().getViewDao("rdb");
+    private SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao();
+    private TableDao tableDao = DaoFactory.Instance().getTableDao();
+    private ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
+    private LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
+    private ViewDao viewDao = DaoFactory.Instance().getViewDao();
 
     public MetadataServiceImpl () { }
 

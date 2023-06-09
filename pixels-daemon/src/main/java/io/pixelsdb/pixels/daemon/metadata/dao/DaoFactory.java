@@ -2,9 +2,6 @@ package io.pixelsdb.pixels.daemon.metadata.dao;
 
 import io.pixelsdb.pixels.daemon.metadata.dao.impl.*;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Created at: 19-10-16
  * Author: hank
@@ -22,43 +19,43 @@ public class DaoFactory
         return instance;
     }
 
-    private Map<String, ColumnDao> columnDaoMap = new HashMap<>();
-    private Map<String, LayoutDao> layoutDaoMap = new HashMap<>();
-    private Map<String, SchemaDao> schemaDaoMap = new HashMap<>();
-    private Map<String, TableDao> tableDaoMap = new HashMap<>();
-    private Map<String, ViewDao> viewDaoMap = new HashMap<>();
+    private ColumnDao columnDao;
+    private LayoutDao layoutDao;
+    private SchemaDao schemaDao;
+    private TableDao tableDao;
+    private ViewDao viewDao;
 
     private DaoFactory ()
     {
-        this.columnDaoMap.put("rdb", new RdbColumnDao());
-        this.layoutDaoMap.put("rdb", new RdbLayoutDao());
-        this.schemaDaoMap.put("rdb", new RdbSchemaDao());
-        this.tableDaoMap.put("rdb", new RdbTableDao());
-        this.viewDaoMap.put("rdb", new RdbViewDao());
+        this.columnDao = new RdbColumnDao();
+        this.layoutDao = new RdbLayoutDao();
+        this.schemaDao = new RdbSchemaDao();
+        this.tableDao = new RdbTableDao();
+        this.viewDao = new RdbViewDao();
     }
 
-    public ColumnDao getColumnDao (String type)
+    public ColumnDao getColumnDao ()
     {
-        return this.columnDaoMap.get(type);
+        return this.columnDao;
     }
 
-    public LayoutDao getLayoutDao (String type)
+    public LayoutDao getLayoutDao ()
     {
-        return this.layoutDaoMap.get(type);
+        return this.layoutDao;
     }
 
-    public SchemaDao getSchemaDao (String type)
+    public SchemaDao getSchemaDao ()
     {
-        return this.schemaDaoMap.get(type);
+        return this.schemaDao;
     }
 
-    public TableDao getTableDao(String type)
+    public TableDao getTableDao()
     {
-        return this.tableDaoMap.get(type);
+        return this.tableDao;
     }
 
-    public ViewDao getViewDao(String type)
+    public ViewDao getViewDao()
     {
-        return this.viewDaoMap.get(type);
+        return this.viewDao;
     }
 }
