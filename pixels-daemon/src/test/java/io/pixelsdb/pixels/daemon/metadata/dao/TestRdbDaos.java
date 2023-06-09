@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.daemon.metadata.dao;
 
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Order;
+import io.pixelsdb.pixels.common.metadata.domain.Ordered;
 import org.junit.Test;
 
 import java.io.*;
@@ -106,7 +106,7 @@ public class TestRdbDaos
         }
 
         Layout layout1 = new Layout(layout);
-        List<String> columnOrder = layout1.getOrderObject().getColumnOrder();
+        List<String> columnOrder = layout1.getOrderedObject().getColumnOrder();
         int cacheBorder = layout1.getCompactObject().getCacheBorder();
         List<String> columnletOrder = layout1.getCompactObject().getColumnletOrder();
         Set<String> cachedColumns = new HashSet<>();
@@ -130,8 +130,8 @@ public class TestRdbDaos
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/Users/Jelly/Desktop/dbiir10-splits")));
         LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
         Layout layout = new Layout(layoutDao.getById(21));
-        Order order = layout.getOrderObject();
-        List<String> columnOrder = order.getColumnOrder();
+        Ordered ordered = layout.getOrdered();
+        List<String> columnOrder = ordered.getColumnOrder();
         for (String col : columnOrder)
         {
             writer.write(col);

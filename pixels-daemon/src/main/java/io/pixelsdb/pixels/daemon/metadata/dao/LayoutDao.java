@@ -33,20 +33,6 @@ public abstract class LayoutDao implements Dao<MetadataProto.Layout>
     @Override
     abstract public MetadataProto.Layout getById(long id);
 
-    protected MetadataProto.Layout.Permission convertPermission (short permission)
-    {
-        switch (permission)
-        {
-            case -1:
-                return MetadataProto.Layout.Permission.DISABLED;
-            case 0:
-                return MetadataProto.Layout.Permission.READ_ONLY;
-            case 1:
-                return MetadataProto.Layout.Permission.READ_WRITE;
-        }
-        return MetadataProto.Layout.Permission.DISABLED;
-    }
-
     @Override
     public List<MetadataProto.Layout> getAll()
     {
@@ -85,20 +71,6 @@ public abstract class LayoutDao implements Dao<MetadataProto.Layout>
     abstract public boolean exists (MetadataProto.Layout layout);
 
     abstract public boolean insert (MetadataProto.Layout layout);
-
-    protected short convertPermission (MetadataProto.Layout.Permission permission)
-    {
-        switch (permission)
-        {
-            case DISABLED:
-                return -1;
-            case READ_ONLY:
-                return 0;
-            case READ_WRITE:
-                return -1;
-        }
-        return -1;
-    }
 
     abstract public boolean update (MetadataProto.Layout layout);
 }

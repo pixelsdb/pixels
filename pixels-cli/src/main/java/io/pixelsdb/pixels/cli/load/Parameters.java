@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Order;
+import io.pixelsdb.pixels.common.metadata.domain.Ordered;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import javax.annotation.Nullable;
@@ -131,8 +131,8 @@ public class Parameters
             return false;
         }
         // get the column order of the latest writing layout
-        Order order = JSON.parseObject(writingLayout.getOrder(), Order.class);
-        List<String> layoutColumnOrder = order.getColumnOrder();
+        Ordered ordered = writingLayout.getOrdered();
+        List<String> layoutColumnOrder = ordered.getColumnOrder();
         // check size consistency
         if (layoutColumnOrder.size() != colSize)
         {
@@ -171,6 +171,7 @@ public class Parameters
         // get path of loading
         if(this.loadingPath == null)
         {
+            writingLayout.getOrderedPathIds();
             this.loadingPath = writingLayout.getOrderPath();
             validateOrderOrCompactPath(this.loadingPath);
         }

@@ -44,6 +44,8 @@ service MetadataService {
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
     rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
+    rpc GetPeerPaths (GetPeerPathsRequest) returns (GetPeerPathsResponse);
+    rpc GetPeer (GetPeerRequest) returns (GetPeerResponse);
     rpc GetColumns (GetColumnsRequest) returns (GetColumnsResponse);
     rpc UpdateColumn (UpdateColumnRequest) returns (UpdateColumnResponse);
     rpc CreateView (CreateViewRequest) returns (CreateViewResponse);
@@ -83,23 +85,73 @@ message Column {
     uint64 tableId = 9;
 }
 
+message Peer {
+    uint64 id = 1;
+    string name = 2;
+    string location = 3;
+    string host = 4;
+    int32 port = 5;
+    string storageScheme = 6;
+    repeated uint64 peerPathIds = 7;
+}
+
+message PeerPath {
+    uint64 id = 1;
+    string uri = 2;
+    string columns = 3;
+    uint64 pathId = 4;
+    uint64 peerId = 5;
+}
+
+message RangeIndex {
+    uint64 id = 1;
+    bytes indexStruct = 2;
+    uint64 tableId = 3;
+    uint64 keyColumnId = 4;
+}
+
+message Range {
+    uint64 id = 1;
+    bytes recordStats = 2;
+    uint64 parentId = 3;
+    uint64 rangeIndexId = 4;
+}
+
+message Path {
+    uint64 id = 1;
+    string uri = 2;
+    bool isCompact = 3;
+    uint64 layoutId = 4;
+    optional uint64 rangeId = 5;
+    repeated uint64 peerPathIds = 6;
+}
+
+message SchemaVersion {
+    uint64 id = 1;
+    string columns = 2;
+    uint64 timestamp = 3;
+    uint64 tableId = 4;
+}
+
+enum Permission {
+    DISABLED = 0;
+    READ_ONLY = 1;
+    READ_WRITE = 2;
+}
+
 message Layout {
     uint64 id = 1;
     uint32 version = 2;
     uint64 createAt = 3;
-    enum Permission {
-        DISABLED = 0;
-        READ_ONLY = 1;
-        READ_WRITE = 2;
-    }
     Permission permission = 4;
-    string order = 5;
-    string orderPath = 6;
+    string ordered = 5;
+    repeated uint64 orderedPathIds = 6;
     string compact = 7;
-    string compactPath = 8;
+    repeated uint64 compactPathIds = 8;
     string splits = 9;
     string projections = 10;
-    uint64 tableId = 11;
+    uint64 schemaVersionId = 11;
+    uint64 tableId = 12;
 }
 
 message View {
@@ -108,6 +160,19 @@ message View {
     string type = 3;
     string data = 4;
     uint64 schemaId = 5;
+}
+
+message User {
+    uint64 id = 1;
+    string name = 2;
+    string password = 3;
+    string email = 4;
+}
+
+message UserHasSchema {
+    uint64 userId = 1;
+    uint64 schemaId = 2;
+    Permission permission = 3;
 }
 // end domain objects definitions
 
@@ -297,6 +362,30 @@ message UpdateLayoutRequest {
 
 message UpdateLayoutResponse {
     ResponseHeader header = 1;
+}
+
+// peer
+message GetPeerPathsRequest {
+    RequestHeader header = 1;
+    repeated uint64 peerPathIds = 2;
+}
+
+message GetPeerPathsResponse {
+    ResponseHeader header = 1;
+    repeated PeerPath peerPaths = 2;
+}
+
+message GetPeerRequest {
+    RequestHeader header = 1;
+    oneof nameOrId {
+        uint64 id = 2;
+        string name = 3;
+    }
+}
+
+message GetPeerResponse {
+    ResponseHeader header = 1;
+    Peer peer = 2;
 }
 
 // view

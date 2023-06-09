@@ -29,6 +29,8 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermission;
+
 /**
  * @author hank
  */

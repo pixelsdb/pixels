@@ -22,34 +22,26 @@ package io.pixelsdb.pixels.common.metadata.domain;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import com.alibaba.fastjson.JSON;
 
+import java.util.List;
+
 public class Layout extends Base
 {
-    public enum Permission
-    {
-        DISABLED,
-        READ_ONLY,
-        READ_WRITE,
-        UNRECOGNIZED
-    }
-
     private int version;
     private long createAt;
     private Permission permission;
-    private String order;
-    private String orderPath;
-    private String compact;
-    private String compactPath;
-    private String splits;
-    private String projections;
+    private Ordered ordered;
+    private List<Long> orderedPathIds;
+    private Compact compact;
+    private List<Long> compactPathIds;
+    private Splits splits;
+    private Projections projections;
     private long tableId;
-    private Order orderObj = null;
-    private Compact compactObj = null;
-    private Splits splitsObj = null;
-    private Projections projectionsObj = null;
+    private String orderedJson;
+    private String compactJson;
+    private String splitsJson;
+    private String projectionsJson;
 
-    public Layout()
-    {
-    }
+    public Layout() { }
 
     public Layout(MetadataProto.Layout layout)
     {
@@ -71,12 +63,16 @@ public class Layout extends Base
                 this.permission = Permission.UNRECOGNIZED;
                 break;
         }
-        this.order = layout.getOrder();
-        this.orderPath = layout.getOrderPath();
-        this.compact = layout.getCompact();
-        this.compactPath = layout.getCompactPath();
-        this.splits = layout.getSplits();
-        this.projections = layout.getProjections();
+        this.orderedJson = layout.getOrdered();
+        this.ordered = JSON.parseObject(this.orderedJson, Ordered.class);
+        this.orderedPathIds = layout.getOrderedPathIdsList();
+        this.compactJson = layout.getCompact();
+        this.compact = JSON.parseObject(this.compactJson, Compact.class);
+        this.compactPathIds = layout.getCompactPathIdsList();
+        this.splitsJson = layout.getSplits();
+        this.splits = JSON.parseObject(this.splitsJson, Splits.class);
+        this.projectionsJson = layout.getProjections();
+        this.projections = JSON.parseObject(this.projectionsJson, Projections.class);
         this.tableId = layout.getTableId();
     }
 
@@ -121,100 +117,100 @@ public class Layout extends Base
         this.permission = permission;
     }
 
-    public String getOrder()
+    public Ordered getOrdered()
     {
-        return order;
-    }
-
-    public Order getOrderObject()
-    {
-        if (this.orderObj == null)
+        if (this.ordered == null)
         {
-            this.orderObj = JSON.parseObject(this.order, Order.class);
+            this.ordered = JSON.parseObject(this.orderedJson, Ordered.class);
         }
-        return this.orderObj;
+        return ordered;
     }
 
-    public void setOrder(String order)
+    public String getOrderedJson()
     {
-        this.order = order;
+        return orderedJson;
     }
 
-    public String getOrderPath()
+    public void setOrderedJson(String orderedJson)
     {
-        return orderPath;
+        this.orderedJson = orderedJson;
     }
 
-    public void setOrderPath(String orderPath)
+    public List<Long> getOrderedPathIds()
     {
-        this.orderPath = orderPath;
+        return orderedPathIds;
     }
 
-    public String getCompact()
+    public void setOrderedPathIds(List<Long> orderedPathIds)
     {
+        this.orderedPathIds = orderedPathIds;
+    }
+
+    public Compact getCompact()
+    {
+        if (this.compact == null)
+        {
+            JSON.parseObject(this.compactJson, Compact.class);
+        }
         return compact;
     }
 
-    public Compact getCompactObject()
+    public String getCompactJson()
     {
-        if (this.compactObj == null)
+        return compactJson;
+    }
+
+    public void setCompactJson(String compactJson)
+    {
+        this.compactJson = compactJson;
+    }
+
+    public List<Long> getCompactPathIds()
+    {
+        return compactPathIds;
+    }
+
+    public void setCompactPathIds(List<Long> compactPathIds)
+    {
+        this.compactPathIds = compactPathIds;
+    }
+
+    public Splits getSplits()
+    {
+        if (this.splits == null)
         {
-            this.compactObj = JSON.parseObject(this.compact, Compact.class);
+            JSON.parseObject(this.splitsJson, Splits.class);
         }
-        return this.compactObj;
-    }
-
-    public void setCompact(String compact)
-    {
-        this.compact = compact;
-    }
-
-    public String getCompactPath()
-    {
-        return compactPath;
-    }
-
-    public void setCompactPath(String compactPath)
-    {
-        this.compactPath = compactPath;
-    }
-
-    public String getSplits()
-    {
         return splits;
     }
 
-    public Splits getSplitsObject()
+    public String getSplitsJson()
     {
-        if (this.splitsObj == null)
+        return this.splitsJson;
+    }
+
+    public void setSplitsJson(String splitsJson)
+    {
+        this.splitsJson = splitsJson;
+    }
+
+    public Projections getProjections()
+    {
+        if (this.projections == null)
         {
-            this.splitsObj = JSON.parseObject(this.splits, Splits.class);
+            JSON.parseObject(this.projectionsJson, Projections.class);
         }
-        return this.splitsObj;
-    }
-
-    public void setSplits(String split)
-    {
-        this.splits = split;
-    }
-
-    public String getProjections()
-    {
         return projections;
     }
 
-    public Projections getProjectionsObject()
+    public String getProjectionsJson()
     {
-        if (this.projectionsObj == null)
-        {
-            this.projectionsObj = JSON.parseObject(this.projections, Projections.class);
-        }
-        return this.projectionsObj;
+        return this.projectionsJson;
     }
 
-    public void setProjections(String projections)
+    public void setProjectionsJson(String projectionsJson)
     {
-        this.projections = projections;
+        this.projectionsJson = projectionsJson;
     }
 
     public long getTableId()
@@ -234,13 +230,10 @@ public class Layout extends Base
                 "version=" + version +
                 ", createAt=" + createAt +
                 ", permission=" + permission + '\'' +
-                ", order='" + order + '\'' +
-                ", orderPath='" + orderPath + '\'' +
-                ", compact='" + compact + '\'' +
-                ", compactPath='" + compactPath + '\'' +
-                ", splits='" + splits + '\'' +
-                ", projections='" + projections + '\'' +
-                ", tableId=" + tableId +
-                '}';
+                ", ordered='" + orderedJson + '\'' +
+                ", compact='" + compactJson + '\'' +
+                ", splits='" + splitsJson + '\'' +
+                ", projections='" + projectionsJson + '\'' +
+                ", tableId=" + tableId + '}';
     }
 }

@@ -28,7 +28,7 @@ import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Order;
+import io.pixelsdb.pixels.common.metadata.domain.Ordered;
 import io.pixelsdb.pixels.common.metadata.domain.Projections;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -1155,8 +1155,8 @@ public class StarlingPlanner
         checkArgument(table.getTableType() == Table.TableType.BASE, "this is not a base table");
         ImmutableList.Builder<InputSplit> splitsBuilder = ImmutableList.builder();
         int splitSize = 0;
-        Storage.Scheme tableStorageScheme = Storage.Scheme.from(
-                metadataService.getTable(table.getSchemaName(), table.getTableName()).getStorageScheme());
+        Storage.Scheme tableStorageScheme =
+                metadataService.getTable(table.getSchemaName(), table.getTableName()).getStorageScheme();
         checkArgument(tableStorageScheme.equals(this.storage.getScheme()), String.format(
                 "the storage scheme of table '%s.%s' is not consistent with the input storage scheme for Pixels Turbo",
                 table.getSchemaName(), table.getTableName()));
@@ -1165,7 +1165,7 @@ public class StarlingPlanner
         {
             int version = layout.getVersion();
             SchemaTableName schemaTableName = new SchemaTableName(table.getSchemaName(), table.getTableName());
-            Order order = JSON.parseObject(layout.getOrder(), Order.class);
+            Ordered ordered = layout.getOrdered();
             ColumnSet columnSet = new ColumnSet();
             for (String column : table.getColumnNames())
             {
@@ -1173,7 +1173,7 @@ public class StarlingPlanner
             }
 
             // get split size
-            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
+            Splits splits = layout.getSplits();
             if (this.fixedSplitSize > 0)
             {
                 splitSize = this.fixedSplitSize;
@@ -1184,14 +1184,14 @@ public class StarlingPlanner
                 if (splitsIndex == null)
                 {
                     logger.debug("splits index not exist in factory, building index...");
-                    splitsIndex = buildSplitsIndex(order, splits, schemaTableName);
+                    splitsIndex = buildSplitsIndex(ordered, splits, schemaTableName);
                 } else
                 {
                     int indexVersion = splitsIndex.getVersion();
                     if (indexVersion < version)
                     {
                         logger.debug("splits index version is not up-to-date, updating index...");
-                        splitsIndex = buildSplitsIndex(order, splits, schemaTableName);
+                        splitsIndex = buildSplitsIndex(ordered, splits, schemaTableName);
                     }
                 }
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
@@ -1223,11 +1223,11 @@ public class StarlingPlanner
             if (projectionReadEnabled)
             {
                 ProjectionsIndex projectionsIndex = IndexFactory.Instance().getProjectionsIndex(schemaTableName);
-                Projections projections = JSON.parseObject(layout.getProjections(), Projections.class);
+                Projections projections = layout.getProjections();
                 if (projectionsIndex == null)
                 {
                     logger.debug("projections index not exist in factory, building index...");
-                    projectionsIndex = buildProjectionsIndex(order, projections, schemaTableName);
+                    projectionsIndex = buildProjectionsIndex(ordered, projections, schemaTableName);
                 }
                 else
                 {
@@ -1235,7 +1235,7 @@ public class StarlingPlanner
                     if (indexVersion < version)
                     {
                         logger.debug("projections index is not up-to-date, updating index...");
-                        projectionsIndex = buildProjectionsIndex(order, projections, schemaTableName);
+                        projectionsIndex = buildProjectionsIndex(ordered, projections, schemaTableName);
                     }
                 }
                 ProjectionPattern projectionPattern = projectionsIndex.search(columnSet);
@@ -1302,10 +1302,10 @@ public class StarlingPlanner
         return splitsBuilder.build();
     }
 
-    private SplitsIndex buildSplitsIndex(Order order, Splits splits, SchemaTableName schemaTableName)
+    private SplitsIndex buildSplitsIndex(Ordered ordered, Splits splits, SchemaTableName schemaTableName)
             throws MetadataException
     {
-        List<String> columnOrder = order.getColumnOrder();
+        List<String> columnOrder = ordered.getColumnOrder();
         SplitsIndex index;
         String indexTypeName = ConfigFactory.Instance().getProperty("splits.index.type");
         SplitsIndex.IndexType indexType = SplitsIndex.IndexType.valueOf(indexTypeName.toUpperCase());
@@ -1327,8 +1327,8 @@ public class StarlingPlanner
         return index;
     }
 
-    private ProjectionsIndex buildProjectionsIndex(Order order, Projections projections, SchemaTableName schemaTableName) {
-        List<String> columnOrder = order.getColumnOrder();
+    private ProjectionsIndex buildProjectionsIndex(Ordered ordered, Projections projections, SchemaTableName schemaTableName) {
+        List<String> columnOrder = ordered.getColumnOrder();
         ProjectionsIndex index;
         index = new InvertedProjectionsIndex(columnOrder, ProjectionPattern.buildPatterns(columnOrder, projections));
         IndexFactory.Instance().cacheProjectionsIndex(schemaTableName, index);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,25 +19,24 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class Order
+/**
+ * The set of columns belong to a schema version or peer path.
+ * @author hank
+ * @create 2023-06-09
+ */
+public class Columns
 {
-    private List<String> columnOrder = new ArrayList<>();
+    private List<Long> columnIds;
 
-    public List<String> getColumnOrder()
+    public List<Long> getColumnIds()
     {
-        return columnOrder;
+        return columnIds;
     }
 
-    public void setColumnOrder(List<String> columnOrder)
+    public void setColumnIds(List<Long> columnIds)
     {
-        this.columnOrder = columnOrder;
-    }
-
-    public void addColumnOrder(String column)
-    {
-        this.columnOrder.add(column);
+        this.columnIds = columnIds;
     }
 }

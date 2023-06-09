@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.annotation.JSONField;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.util.ArrayList;
@@ -29,7 +30,7 @@ public class Table extends Base
 {
     private String name;
     private String type;
-    private String storageScheme;
+    private Storage.Scheme storageScheme;
     private long rowCount;
     private long schemaId;
     private List<Long> columnIds = new ArrayList<>();
@@ -42,7 +43,7 @@ public class Table extends Base
     {
         this.name = table.getName();
         this.type = table.getType();
-        this.storageScheme = table.getStorageScheme();
+        this.storageScheme = Storage.Scheme.from(table.getStorageScheme());
         this.rowCount = table.getRowCount();
         this.schemaId = table.getSchemaId();
         this.columnIds.addAll(table.getColumnIdsList());
@@ -68,12 +69,12 @@ public class Table extends Base
         this.type = type;
     }
 
-    public String getStorageScheme()
+    public Storage.Scheme getStorageScheme()
     {
         return storageScheme;
     }
 
-    public void setStorageScheme(String storageScheme)
+    public void setStorageScheme(Storage.Scheme storageScheme)
     {
         this.storageScheme = storageScheme;
     }

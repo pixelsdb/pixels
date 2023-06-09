@@ -20,12 +20,12 @@
 package io.pixelsdb.pixels.common.metadata;
 
 import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_VIEW_NOT_FOUND;
+import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermission;
 
 /**
  * Created by hank on 18-6-17.
@@ -382,29 +383,20 @@ public class MetadataService
         return layout;
     }
 
-    private MetadataProto.Layout.Permission convertPermission(Layout.Permission permission)
-    {
-        switch (permission)
-        {
-            case DISABLED:
-                return MetadataProto.Layout.Permission.DISABLED;
-            case READ_ONLY:
-                return MetadataProto.Layout.Permission.READ_ONLY;
-            case READ_WRITE:
-                return MetadataProto.Layout.Permission.READ_WRITE;
-        }
-        return MetadataProto.Layout.Permission.UNRECOGNIZED;
-    }
-
+    /**
+     * The ordered and compact paths of the layout are not updated, they need to be added separately.
+     * @param layout the new layout
+     * @return true if success, false otherwise
+     * @throws MetadataException
+     */
     public boolean updateLayout(Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
                 .setId(layout.getId()).setPermission(convertPermission(layout.getPermission()))
-                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplits())
-                .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
-                .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
-                .setVersion(layout.getVersion()).setProjections(layout.getProjections())
+                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplitsJson())
+                .setOrdered(layout.getOrderedJson()).setCompact(layout.getCompactJson())
+                .setVersion(layout.getVersion()).setProjections(layout.getProjectionsJson())
                 .setTableId(layout.getTableId()).build();
         MetadataProto.UpdateLayoutRequest request = MetadataProto.UpdateLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -429,15 +421,20 @@ public class MetadataService
         return true;
     }
 
+    /**
+     * The ordered and compact paths of the layout are not added, they need to be added separately.
+     * @param layout the new layout
+     * @return true if success, false otherwise
+     * @throws MetadataException
+     */
     public boolean addLayout(Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
                 .setId(layout.getId()).setPermission(convertPermission(layout.getPermission()))
-                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplits())
-                .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
-                .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
-                .setVersion(layout.getVersion()).setProjections(layout.getProjections())
+                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplitsJson())
+                .setOrdered(layout.getOrderedJson()).setCompact(layout.getCompactJson())
+                .setVersion(layout.getVersion()).setProjections(layout.getProjectionsJson())
                 .setTableId(layout.getTableId()).build();
         MetadataProto.AddLayoutRequest request = MetadataProto.AddLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())

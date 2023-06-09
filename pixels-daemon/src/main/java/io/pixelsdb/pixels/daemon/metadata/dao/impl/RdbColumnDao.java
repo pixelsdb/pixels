@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
 import com.google.protobuf.ByteString;
-import io.pixelsdb.pixels.common.metadata.domain.Order;
+import io.pixelsdb.pixels.common.metadata.domain.Ordered;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.metadata.dao.ColumnDao;
@@ -140,9 +140,9 @@ public class RdbColumnDao extends ColumnDao
         return null;
     }
 
-    public Order getOrderByTable(MetadataProto.Table table)
+    public Ordered getOrderByTable(MetadataProto.Table table)
     {
-        Order columnOrder = new Order();
+        Ordered columnOrdered = new Ordered();
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
@@ -155,8 +155,8 @@ public class RdbColumnDao extends ColumnDao
                 colName = rs.getString("COL_NAME");
                 columns.add(colName);
             }
-            columnOrder.setColumnOrder(columns);
-            return columnOrder;
+            columnOrdered.setColumnOrder(columns);
+            return columnOrdered;
 
         } catch (SQLException e)
         {
