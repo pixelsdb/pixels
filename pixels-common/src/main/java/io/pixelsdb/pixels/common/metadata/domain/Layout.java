@@ -26,18 +26,20 @@ import java.util.List;
 
 public class Layout extends Base
 {
-    private int version;
+    private long version;
     private long createAt;
     private Permission permission;
     private Ordered ordered;
-    private List<Long> orderedPathIds;
+    private List<Path> orderedPaths;
     private Compact compact;
-    private List<Long> compactPathIds;
+    private List<Path> compactPaths;
     private Splits splits;
     private Projections projections;
     private long tableId;
     private String orderedJson;
+    private String[] orderedPathUris;
     private String compactJson;
+    private String[] compactPathUris;
     private String splitsJson;
     private String projectionsJson;
 
@@ -65,10 +67,20 @@ public class Layout extends Base
         }
         this.orderedJson = layout.getOrdered();
         this.ordered = JSON.parseObject(this.orderedJson, Ordered.class);
-        this.orderedPathIds = layout.getOrderedPathIdsList();
+        this.orderedPaths = Path.convertPaths(layout.getOrderedPathsList());
+        this.orderedPathUris = new String[this.orderedPaths.size()];
+        for (int i = 0; i < this.orderedPathUris.length; ++i)
+        {
+            this.orderedPathUris[i] = this.orderedPaths.get(i).getUri();
+        }
         this.compactJson = layout.getCompact();
         this.compact = JSON.parseObject(this.compactJson, Compact.class);
-        this.compactPathIds = layout.getCompactPathIdsList();
+        this.compactPaths = Path.convertPaths(layout.getCompactPathsList());
+        this.compactPathUris = new String[this.compactPaths.size()];
+        for (int i = 0; i < this.compactPathUris.length; ++i)
+        {
+            this.compactPathUris[i] = this.compactPaths.get(i).getUri();
+        }
         this.splitsJson = layout.getSplits();
         this.splits = JSON.parseObject(this.splitsJson, Splits.class);
         this.projectionsJson = layout.getProjections();
@@ -76,12 +88,12 @@ public class Layout extends Base
         this.tableId = layout.getTableId();
     }
 
-    public int getVersion()
+    public long getVersion()
     {
         return version;
     }
 
-    public void setVersion(int version)
+    public void setVersion(long version)
     {
         this.version = version;
     }
@@ -136,14 +148,27 @@ public class Layout extends Base
         this.orderedJson = orderedJson;
     }
 
-    public List<Long> getOrderedPathIds()
+    public List<Path> getOrderedPaths()
     {
-        return orderedPathIds;
+        return orderedPaths;
     }
 
-    public void setOrderedPathIds(List<Long> orderedPathIds)
+    public String[] getOrderedPathUris()
     {
-        this.orderedPathIds = orderedPathIds;
+        if (this.orderedPathUris == null)
+        {
+            this.orderedPathUris = new String[this.orderedPaths.size()];
+            for (int i = 0; i < this.orderedPathUris.length; ++i)
+            {
+                this.orderedPathUris[i] = this.orderedPaths.get(i).getUri();
+            }
+        }
+        return this.orderedPathUris;
+    }
+
+    public void setOrderedPaths(List<Path> orderedPaths)
+    {
+        this.orderedPaths = orderedPaths;
     }
 
     public Compact getCompact()
@@ -165,14 +190,27 @@ public class Layout extends Base
         this.compactJson = compactJson;
     }
 
-    public List<Long> getCompactPathIds()
+    public List<Path> getCompactPaths()
     {
-        return compactPathIds;
+        return compactPaths;
     }
 
-    public void setCompactPathIds(List<Long> compactPathIds)
+    public String[] getCompactPathUris()
     {
-        this.compactPathIds = compactPathIds;
+        if (this.compactPathUris == null)
+        {
+            this.compactPathUris = new String[this.compactPaths.size()];
+            for (int i = 0; i < this.compactPathUris.length; ++i)
+            {
+                this.compactPathUris[i] = this.compactPaths.get(i).getUri();
+            }
+        }
+        return this.compactPathUris;
+    }
+
+    public void setCompactPaths(List<Path> compactPaths)
+    {
+        this.compactPaths = compactPaths;
     }
 
     public Splits getSplits()

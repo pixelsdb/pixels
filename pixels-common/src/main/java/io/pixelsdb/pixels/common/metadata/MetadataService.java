@@ -331,7 +331,7 @@ public class MetadataService
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
-                .setVersion(version)
+                .setLayoutVersion(version)
                 .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.READABLE).build();
         return internalGetLayout(request);
     }
@@ -344,7 +344,7 @@ public class MetadataService
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
-                .setVersion(-1)
+                .setLayoutVersion(-1)
                 .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.ALL).build();
 
         return internalGetLayout(request);
@@ -457,6 +457,30 @@ public class MetadataService
             throw new MetadataException("failed to add layout into metadata", e);
         }
         return true;
+    }
+
+    public List<Path> getPaths(long layoutOrRangeId, boolean isLayoutId)
+    {
+        return null;
+        // TODO: implement.
+    }
+
+    public List<Path> getPeerPaths(List<Long> peerPathIds)
+    {
+        return null;
+        // TODO: implement.
+    }
+
+    public Peer getPeer(int peerId)
+    {
+        return null;
+        // TODO: implement.
+    }
+
+    public Peer getPeer(String name)
+    {
+        return null;
+        // TODO: implement.
     }
 
     public boolean createSchema(String schemaName) throws MetadataException

@@ -44,6 +44,7 @@ service MetadataService {
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
     rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
+    rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
     rpc GetPeerPaths (GetPeerPathsRequest) returns (GetPeerPathsResponse);
     rpc GetPeer (GetPeerRequest) returns (GetPeerResponse);
     rpc GetColumns (GetColumnsRequest) returns (GetColumnsResponse);
@@ -141,13 +142,13 @@ enum Permission {
 
 message Layout {
     uint64 id = 1;
-    uint32 version = 2;
+    uint64 version = 2;
     uint64 createAt = 3;
     Permission permission = 4;
     string ordered = 5;
-    repeated uint64 orderedPathIds = 6;
+    repeated Path orderedPaths = 6;
     string compact = 7;
-    repeated uint64 compactPathIds = 8;
+    repeated Path compactPaths = 8;
     string splits = 9;
     string projections = 10;
     uint64 schemaVersionId = 11;
@@ -332,7 +333,7 @@ message GetLayoutRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     string tableName = 3;
-    uint32 version = 4; // if version = -1, get the latest version
+    uint64 layoutVersion = 4; // if version = -1, get the latest version
     enum PermissionRange {
         ALL = 0;
         READABLE = 1;
@@ -362,6 +363,20 @@ message UpdateLayoutRequest {
 
 message UpdateLayoutResponse {
     ResponseHeader header = 1;
+}
+
+// path
+message GetPathsRequest {
+    RequestHeader header = 1;
+    oneof layoutOrRangeId {
+        uint64 layoutId = 2;
+        uint64 rangeId = 3;
+    }
+}
+
+message GetPathsResponse {
+    ResponseHeader header = 1;
+    repeated Path paths = 2;
 }
 
 // peer

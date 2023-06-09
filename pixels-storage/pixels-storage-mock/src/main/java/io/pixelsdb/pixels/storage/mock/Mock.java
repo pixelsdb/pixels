@@ -49,13 +49,13 @@ public class Mock implements Storage
     }
 
     @Override
-    public List<Status> listStatus(String path) throws IOException
+    public List<Status> listStatus(String... path) throws IOException
     {
         return null;
     }
 
     @Override
-    public List<String> listPaths(String path) throws IOException
+    public List<String> listPaths(String... path) throws IOException
     {
         return null;
     }

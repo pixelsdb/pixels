@@ -102,26 +102,24 @@ public interface Storage
     String ensureSchemePrefix(String path) throws IOException;
 
     /**
-     * Get the statuses of the files or subdirectories in the given path if it is
-     * a directory or multiple directories seperated by semicolon (;).
+     * Get the statuses of the files or subdirectories in the given path of one or more directories.
      * The path in the returned status does not start with the scheme name.
      * For local fs, path is considered as local.
-     * @param path the given path, may contain multiple directories that are seperated by semicolon.
+     * @param path the given path, may contain multiple directories.
      * @return the statuses of the files or subdirectories.
      * @throws IOException
      */
-    List<Status> listStatus(String path) throws IOException;
+    List<Status> listStatus(String... path) throws IOException;
 
     /**
-     * Get the paths of the files or subdirectories in the given path if it is
-     * a directory or multiple directories seperated by semicolon (;).
+     * Get the paths of the files or subdirectories in the given path of one or more directories.
      * The returned path does not start with the scheme name.
      * For local fs, path is considered as local.
-     * @param path the given path, may contain multiple directories that are seperated by semicolon.
+     * @param path the given path, may contain multiple directories.
      * @return the paths of the files or subdirectories.
      * @throws IOException
      */
-    List<String> listPaths(String path) throws IOException;
+    List<String> listPaths(String... path) throws IOException;
 
     /**
      * Get the status of this path if it is a file.

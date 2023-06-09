@@ -354,9 +354,9 @@ public class CacheCoordinator
     private String[] select(Layout layout)
             throws IOException
     {
-        String compactPath = layout.getCompactPath();
+        String[] compactPaths = layout.getCompactPathUris();
         List<String> files = new ArrayList<>();
-        List<Status> statuses = storage.listStatus(compactPath);
+        List<Status> statuses = storage.listStatus(compactPaths);
         if (statuses != null)
         {
             for (Status status : statuses)

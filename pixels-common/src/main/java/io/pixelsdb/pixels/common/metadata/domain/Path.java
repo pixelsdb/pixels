@@ -31,7 +31,7 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @create 2023-06-09
  */
-public class Path
+public class Path extends Base
 {
     private String uri;
     private boolean isCompact;
@@ -62,7 +62,7 @@ public class Path
         return pathsBuilder.build();
     }
 
-    private static List<MetadataProto.Path> revertPaths(List<Path> paths)
+    public static List<MetadataProto.Path> revertPaths(List<Path> paths)
     {
         requireNonNull(paths, "paths is null");
         ImmutableList.Builder<MetadataProto.Path> pathsBuilder =
@@ -127,7 +127,7 @@ public class Path
     private MetadataProto.Path toProto()
     {
         MetadataProto.Path.Builder builder = MetadataProto.Path.newBuilder()
-                .setUri(this.uri).setIsCompact(this.isCompact).setLayoutId(this.layoutId);
+                .setId(this.getId()).setUri(this.uri).setIsCompact(this.isCompact).setLayoutId(this.layoutId);
         if (this.rangeId != -1)
         {
             builder.setRangeId(this.rangeId);

@@ -52,7 +52,7 @@ public class TestPixelsCompactor
         List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = layouts.get(0);
-        Compact compact = layout.getCompactObject();
+        Compact compact = layout.getCompact();
         int rowGroupNum = compact.getNumRowGroupInBlock();
         int colNum = compact.getNumColumn();
         CompactLayout compactLayout = new CompactLayout(rowGroupNum, colNum);
@@ -123,7 +123,7 @@ public class TestPixelsCompactor
                 break;
             }
         }
-        Compact compact = layout.getCompactObject();
+        Compact compact = layout.getCompact();
         CompactLayout compactLayout = CompactLayout.fromCompact(compact);
 
         // get input file paths

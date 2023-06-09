@@ -278,7 +278,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                if (request.getVersion() < 0)
+                if (request.getLayoutVersion() < 0)
                 {
                     layout = layoutDao.getLatestByTable(table, request.getPermissionRange());
                     if (layout == null)
@@ -290,12 +290,12 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 }
                 else
                 {
-                    List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, request.getVersion(),
+                    List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, request.getLayoutVersion(),
                             request.getPermissionRange());
                     if (layouts == null || layouts.isEmpty())
                     {
                         headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout of version '" +
-                                request.getVersion() + "' for table '" +
+                                request.getLayoutVersion() + "' for table '" +
                                 request.getSchemaName() + "." + request.getTableName() + "' with permission '" +
                                 request.getPermissionRange().name() + "' not found");
                     } else if (layouts.size() != 1)

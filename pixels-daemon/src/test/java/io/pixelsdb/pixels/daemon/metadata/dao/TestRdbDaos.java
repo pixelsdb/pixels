@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao;
 
-import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Ordered;
+import io.pixelsdb.pixels.daemon.MetadataProto;
 import org.junit.Test;
 
 import java.io.*;
@@ -73,7 +73,11 @@ public class TestRdbDaos
 
         for (MetadataProto.Layout layout : layouts)
         {
-            System.out.println(layout.getOrderPath());
+            for (MetadataProto.Path path : layout.getOrderedPathsList())
+            {
+                System.out.print(path.getUri() + ";");
+            }
+            System.out.println();
         }
     }
 
@@ -106,9 +110,9 @@ public class TestRdbDaos
         }
 
         Layout layout1 = new Layout(layout);
-        List<String> columnOrder = layout1.getOrderedObject().getColumnOrder();
-        int cacheBorder = layout1.getCompactObject().getCacheBorder();
-        List<String> columnletOrder = layout1.getCompactObject().getColumnletOrder();
+        List<String> columnOrder = layout1.getOrdered().getColumnOrder();
+        int cacheBorder = layout1.getCompact().getCacheBorder();
+        List<String> columnletOrder = layout1.getCompact().getColumnletOrder();
         Set<String> cachedColumns = new HashSet<>();
         for (int i = 0; i < cacheBorder; ++i)
         {

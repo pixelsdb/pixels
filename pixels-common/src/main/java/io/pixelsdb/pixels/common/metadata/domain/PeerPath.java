@@ -26,7 +26,7 @@ import io.pixelsdb.pixels.daemon.MetadataProto;
  * @author hank
  * @create 2023-06-09
  */
-public class PeerPath
+public class PeerPath extends Base
 {
     private String uri;
     private Columns columns;

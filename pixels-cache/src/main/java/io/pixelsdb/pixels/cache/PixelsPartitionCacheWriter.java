@@ -373,7 +373,7 @@ public class PixelsPartitionCacheWriter {
             }
             String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
             String[] files = fileStr.split(";");
-            Compact compact = layout.getCompactObject();
+            Compact compact = layout.getCompact();
             int cacheBorder = compact.getCacheBorder();
             List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
             return internalUpdateAll(version, cacheColumnletOrders, files);
@@ -399,7 +399,7 @@ public class PixelsPartitionCacheWriter {
             }
             String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
             String[] files = fileStr.split(";");
-            Compact compact = layout.getCompactObject();
+            Compact compact = layout.getCompact();
             int cacheBorder = compact.getCacheBorder();
             List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
             return internalUpdateIncremental(version, cacheColumnletOrders, files);

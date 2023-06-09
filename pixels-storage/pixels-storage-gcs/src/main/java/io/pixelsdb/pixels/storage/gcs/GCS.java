@@ -128,10 +128,10 @@ public class GCS implements Storage
     }
 
     @Override
-    public List<Status> listStatus(String path) throws IOException
+    public List<Status> listStatus(String... path) throws IOException
     {
         List<Status> statuses = new ArrayList<>();
-        for (String eachPath : path.split(";"))
+        for (String eachPath : path)
         {
             ObjectPath p = new ObjectPath(eachPath);
             if (!p.valid)
@@ -168,7 +168,7 @@ public class GCS implements Storage
     }
 
     @Override
-    public List<String> listPaths(String path) throws IOException
+    public List<String> listPaths(String... path) throws IOException
     {
         return this.listStatus(path).stream().map(Status::getPath)
                 .collect(Collectors.toList());

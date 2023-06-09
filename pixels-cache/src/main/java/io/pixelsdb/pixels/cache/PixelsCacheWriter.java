@@ -177,7 +177,7 @@ public class PixelsCacheWriter
                         cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
                 Layout cachedLayout = metadataService.getLayout(
                         cacheConfig.getSchema(), cacheConfig.getTable(), cachedVersion);
-                Compact compact = cachedLayout.getCompactObject();
+                Compact compact = cachedLayout.getCompact();
                 int cacheBorder = compact.getCacheBorder();
                 cachedColumnlets.addAll(compact.getColumnletOrder().subList(0, cacheBorder));
                 metadataService.shutdown();
@@ -321,7 +321,7 @@ public class PixelsCacheWriter
     {
         int status = 0;
         // get the new caching layout
-        Compact compact = layout.getCompactObject();
+        Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
         List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
         // set rwFlag as write
@@ -429,7 +429,7 @@ public class PixelsCacheWriter
         /**
          * Get the new caching layout.
          */
-        Compact compact = layout.getCompactObject();
+        Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
         List<String> nextVersionCached = compact.getColumnletOrder().subList(0, cacheBorder);
         /**

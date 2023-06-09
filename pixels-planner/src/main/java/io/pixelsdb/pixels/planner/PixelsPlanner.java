@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner;
 
 import com.alibaba.fastjson.JSON;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ObjectArrays;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -1367,7 +1368,7 @@ public class PixelsPlanner
         List<Layout> layouts = metadataService.getLayouts(table.getSchemaName(), table.getTableName());
         for (Layout layout : layouts)
         {
-            int version = layout.getVersion();
+            long version = layout.getVersion();
             SchemaTableName schemaTableName = new SchemaTableName(table.getSchemaName(), table.getTableName());
             Ordered ordered = layout.getOrdered();
             ColumnSet columnSet = new ColumnSet();
@@ -1377,7 +1378,7 @@ public class PixelsPlanner
             }
 
             // get split size
-            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
+            Splits splits = layout.getSplits();
             if (this.fixedSplitSize > 0)
             {
                 splitSize = this.fixedSplitSize;
@@ -1423,11 +1424,11 @@ public class PixelsPlanner
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
             // get compact path
-            String compactPath;
+            String[] compactPaths;
             if (projectionReadEnabled)
             {
                 ProjectionsIndex projectionsIndex = IndexFactory.Instance().getProjectionsIndex(schemaTableName);
-                Projections projections = JSON.parseObject(layout.getProjections(), Projections.class);
+                Projections projections = layout.getProjections();
                 if (projectionsIndex == null)
                 {
                     logger.debug("projections index not exist in factory, building index...");
@@ -1446,18 +1447,18 @@ public class PixelsPlanner
                 if (projectionPattern != null)
                 {
                     logger.debug("suitable projection pattern is found, path='" + projectionPattern.getPath() + '\'');
-                    compactPath = projectionPattern.getPath();
+                    compactPaths = projectionPattern.getPath().split(";");
                 }
                 else
                 {
-                    compactPath = layout.getCompactPath();
+                    compactPaths = layout.getCompactPathUris();
                 }
             }
             else
             {
-                compactPath = layout.getCompactPath();
+                compactPaths = layout.getCompactPathUris();
             }
-            logger.debug("using compact path: " + compactPath);
+            logger.debug("using compact path: " + Joiner.on(";").join(compactPaths));
 
             // get the inputs from storage
             try
@@ -1465,7 +1466,7 @@ public class PixelsPlanner
                 // 1. add splits in orderedPath
                 if (orderedPathEnabled)
                 {
-                    List<String> orderedPaths = storage.listPaths(layout.getOrderPath());
+                    List<String> orderedPaths = storage.listPaths(layout.getOrderedPathUris());
 
                     for (int i = 0; i < orderedPaths.size();)
                     {
@@ -1482,10 +1483,10 @@ public class PixelsPlanner
                 // 2. add splits in compactPath
                 if (compactPathEnabled)
                 {
-                    List<String> compactPaths = storage.listPaths(compactPath);
+                    List<String> compactFilePaths = storage.listPaths(compactPaths);
 
                     int curFileRGIdx;
-                    for (String path : compactPaths)
+                    for (String path : compactFilePaths)
                     {
                         curFileRGIdx = 0;
                         while (curFileRGIdx < rowGroupNum)

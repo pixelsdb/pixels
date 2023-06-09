@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.cli.load;
 
-import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -39,14 +38,14 @@ public class Parameters
     private final String tableName;
     private final int maxRowNum;
     private final String regex;
-    private String loadingPath;
+    private String[] loadingPaths;
     private String schema;
     private int[] orderMapping;
     private final boolean enableEncoding;
 
-    public String getLoadingPath()
+    public String[] getLoadingPaths()
     {
-        return loadingPath;
+        return loadingPaths;
     }
 
     public String getSchema()
@@ -75,13 +74,13 @@ public class Parameters
     }
 
     public Parameters(String dbName, String tableName, int maxRowNum, String regex,
-                      boolean enableEncoding, @Nullable String loadingPath)
+                      boolean enableEncoding, @Nullable String[] loadingPaths)
     {
         this.dbName = dbName;
         this.tableName = tableName;
         this.maxRowNum = maxRowNum;
         this.regex = regex;
-        this.loadingPath = loadingPath;
+        this.loadingPaths = loadingPaths;
         this.enableEncoding = enableEncoding;
     }
 
@@ -113,7 +112,7 @@ public class Parameters
         // get the latest layout for writing
         List<Layout> layouts = metadataService.getLayouts(dbName, tableName);
         Layout writingLayout = null;
-        int writingLayoutVersion = -1;
+        long writingLayoutVersion = -1;
         for (Layout layout : layouts)
         {
             if (layout.isWritable())
@@ -169,11 +168,10 @@ public class Parameters
         schemaBuilder.replace(schemaBuilder.length() - 1, schemaBuilder.length(), ">");
 
         // get path of loading
-        if(this.loadingPath == null)
+        if(this.loadingPaths == null)
         {
-            writingLayout.getOrderedPathIds();
-            this.loadingPath = writingLayout.getOrderPath();
-            validateOrderOrCompactPath(this.loadingPath);
+            this.loadingPaths = writingLayout.getOrderedPathUris();
+            validateOrderOrCompactPath(this.loadingPaths);
         }
         // init the params
         this.schema = schemaBuilder.toString();

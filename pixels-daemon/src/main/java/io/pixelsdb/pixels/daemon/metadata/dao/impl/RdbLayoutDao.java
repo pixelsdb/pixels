@@ -53,16 +53,16 @@ public class RdbLayoutDao extends LayoutDao
             {
                 MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
                 .setId(id)
-                .setVersion(rs.getInt("LAYOUT_VERSION"))
+                .setVersion(rs.getLong("LAYOUT_VERSION"))
                 .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
                 .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
-                .setOrder(rs.getString("LAYOUT_ORDER"))
-                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                .setOrdered(rs.getString("LAYOUT_ORDERED"))
+                //.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
                 .setCompact(rs.getString("LAYOUT_COMPACT"))
-                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                //.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
                 .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
-                .setTableId(rs.getInt("TBLS_TBL_ID")).build();
+                .setTableId(rs.getLong("TBLS_TBL_ID")).build();
                 return layout;
             }
         } catch (SQLException e)
@@ -101,7 +101,7 @@ public class RdbLayoutDao extends LayoutDao
      * @param version < 0 to get all versions of layouts.
      * @return
      */
-    public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, int version,
+    public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, long version,
                                                           MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
         if(table == null)
@@ -129,14 +129,14 @@ public class RdbLayoutDao extends LayoutDao
             while (rs.next())
             {
                 MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
-                .setId(rs.getInt("LAYOUT_ID"))
-                .setVersion(rs.getInt("LAYOUT_VERSION"))
+                .setId(rs.getLong("LAYOUT_ID"))
+                .setVersion(rs.getLong("LAYOUT_VERSION"))
                 .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
                 .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
-                .setOrder(rs.getString("LAYOUT_ORDER"))
-                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                .setOrdered(rs.getString("LAYOUT_ORDERED"))
+                //.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
                 .setCompact(rs.getString("LAYOUT_COMPACT"))
-                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                //.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
                 .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
                 .setTableId(table.getId()).build();
@@ -185,13 +185,13 @@ public class RdbLayoutDao extends LayoutDao
                 "`TBLS_TBL_ID`) VALUES (?,?,?,?,?,?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setInt(1, layout.getVersion());
+            pst.setLong(1, layout.getVersion());
             pst.setLong(2, layout.getCreateAt());
             pst.setInt(3, convertPermission(layout.getPermission()));
-            pst.setString(4, layout.getOrder());
-            pst.setString(5, layout.getOrderPath());
+            pst.setString(4, layout.getOrdered());
+            //pst.setString(5, layout.getOrderPath());
             pst.setString(6, layout.getCompact());
-            pst.setString(7, layout.getCompactPath());
+            //pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
             pst.setString(9, layout.getProjections());
             pst.setLong(10, layout.getTableId());
@@ -220,13 +220,13 @@ public class RdbLayoutDao extends LayoutDao
                 "WHERE `LAYOUT_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setInt(1, layout.getVersion());
+            pst.setLong(1, layout.getVersion());
             pst.setLong(2, layout.getCreateAt());
             pst.setInt(3, convertPermission(layout.getPermission()));
-            pst.setString(4, layout.getOrder());
-            pst.setString(5, layout.getOrderPath());
+            pst.setString(4, layout.getOrdered());
+            //pst.setString(5, layout.getOrderPath());
             pst.setString(6, layout.getCompact());
-            pst.setString(7, layout.getCompactPath());
+            //pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
             pst.setString(9, layout.getProjections());
             pst.setLong(10, layout.getId());

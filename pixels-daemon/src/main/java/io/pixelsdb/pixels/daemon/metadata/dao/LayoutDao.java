@@ -53,7 +53,7 @@ public abstract class LayoutDao implements Dao<MetadataProto.Layout>
      * @param version < 0 to get all versions of layouts.
      * @return
      */
-    abstract public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, int version,
+    abstract public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, long version,
                                                           MetadataProto.GetLayoutRequest.PermissionRange permissionRange);
 
     public boolean save (MetadataProto.Layout layout)

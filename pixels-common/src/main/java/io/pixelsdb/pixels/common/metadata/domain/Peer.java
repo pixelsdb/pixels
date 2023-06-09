@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.daemon.MetadataProto;
  * @author hank
  * @create 2023-06-09
  */
-public class Peer
+public class Peer extends Base
 {
     private String name;
     private String location;
