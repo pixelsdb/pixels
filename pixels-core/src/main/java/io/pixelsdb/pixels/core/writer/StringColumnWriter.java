@@ -31,6 +31,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * String column writer.
@@ -232,6 +233,7 @@ public class StringColumnWriter extends BaseColumnWriter
         outputStream.write(encoder.encode(tmpLens));
 
         ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
+        offsetBuf.order(ByteOrder.LITTLE_ENDIAN);
         offsetBuf.putInt(lensFieldOffset);
         outputStream.write(offsetBuf.array());
     }
@@ -274,6 +276,7 @@ public class StringColumnWriter extends BaseColumnWriter
          */
 
         ByteBuffer offsetsBuf = ByteBuffer.allocate(2 * Integer.BYTES);
+        offsetsBuf.order(ByteOrder.LITTLE_ENDIAN);
         offsetsBuf.putInt(originsFieldOffset);
         offsetsBuf.putInt(startsFieldOffset);
         outputStream.write(offsetsBuf.array());
