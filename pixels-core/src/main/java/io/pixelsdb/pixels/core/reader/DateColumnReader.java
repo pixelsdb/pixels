@@ -30,6 +30,7 @@ import io.pixelsdb.pixels.core.vector.DateColumnVector;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * pixels date column reader
@@ -98,6 +99,7 @@ public class DateColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
+            this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             isNullOffset = inputBuffer.position() + (int) chunkIndex.getIsNullOffset();
