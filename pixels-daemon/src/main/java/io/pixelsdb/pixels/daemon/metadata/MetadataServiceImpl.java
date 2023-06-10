@@ -377,6 +377,24 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
+    @Override
+    public void getPaths(MetadataProto.GetPathsRequest request, StreamObserver<MetadataProto.GetPathsResponse> responseObserver)
+    {
+        super.getPaths(request, responseObserver);
+    }
+
+    @Override
+    public void getPeerPaths(MetadataProto.GetPeerPathsRequest request, StreamObserver<MetadataProto.GetPeerPathsResponse> responseObserver)
+    {
+        super.getPeerPaths(request, responseObserver);
+    }
+
+    @Override
+    public void getPeer(MetadataProto.GetPeerRequest request, StreamObserver<MetadataProto.GetPeerResponse> responseObserver)
+    {
+        super.getPeer(request, responseObserver);
+    }
+
     /**
      * @param request
      * @param responseObserver

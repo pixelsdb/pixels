@@ -19,11 +19,14 @@ public class DaoFactory
         return instance;
     }
 
-    private ColumnDao columnDao;
-    private LayoutDao layoutDao;
-    private SchemaDao schemaDao;
-    private TableDao tableDao;
-    private ViewDao viewDao;
+    private final ColumnDao columnDao;
+    private final LayoutDao layoutDao;
+    private final SchemaDao schemaDao;
+    private final TableDao tableDao;
+    private final ViewDao viewDao;
+    private final PathDao pathDao;
+    private final PeerDao peerDao;
+    private final PeerPathDao peerPathDao;
 
     private DaoFactory ()
     {
@@ -32,6 +35,9 @@ public class DaoFactory
         this.schemaDao = new RdbSchemaDao();
         this.tableDao = new RdbTableDao();
         this.viewDao = new RdbViewDao();
+        this.pathDao = new RdbPathDao();
+        this.peerDao = new RdbPeerDao();
+        this.peerPathDao = new RdbPeerPathDao();
     }
 
     public ColumnDao getColumnDao ()
@@ -57,5 +63,20 @@ public class DaoFactory
     public ViewDao getViewDao()
     {
         return this.viewDao;
+    }
+
+    public PathDao getPathDao()
+    {
+        return this.pathDao;
+    }
+
+    public PeerDao getPeerDao()
+    {
+        return this.peerDao;
+    }
+
+    public PeerPathDao getPeerPathDao()
+    {
+        return this.peerPathDao;
     }
 }

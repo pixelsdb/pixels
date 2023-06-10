@@ -21,7 +21,9 @@ package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
+import io.pixelsdb.pixels.daemon.metadata.dao.DaoFactory;
 import io.pixelsdb.pixels.daemon.metadata.dao.LayoutDao;
+import io.pixelsdb.pixels.daemon.metadata.dao.PathDao;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -42,6 +44,8 @@ public class RdbLayoutDao extends LayoutDao
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
 
+    private static final PathDao pathDao = DaoFactory.Instance().getPathDao();
+
     @Override
     public MetadataProto.Layout getById(long id)
     {
@@ -51,17 +55,21 @@ public class RdbLayoutDao extends LayoutDao
             ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE LAYOUT_ID=" + id);
             if (rs.next())
             {
+                List<MetadataProto.Path> orderedPaths = new ArrayList<>();
+                List<MetadataProto.Path> compactPaths = new ArrayList<>();
+                this.splitPaths(pathDao.getAllByLayoutId(id), orderedPaths, compactPaths);
                 MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
                 .setId(id)
                 .setVersion(rs.getLong("LAYOUT_VERSION"))
                 .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
                 .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
                 .setOrdered(rs.getString("LAYOUT_ORDERED"))
-                //.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                .addAllOrderedPaths(orderedPaths)
                 .setCompact(rs.getString("LAYOUT_COMPACT"))
-                //.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                .addAllCompactPaths(compactPaths)
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
                 .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
+                .setSchemaVersionId(rs.getLong("SVS_SV_ID"))
                 .setTableId(rs.getLong("TBLS_TBL_ID")).build();
                 return layout;
             }
@@ -71,6 +79,23 @@ public class RdbLayoutDao extends LayoutDao
         }
 
         return null;
+    }
+
+    private void splitPaths(List<MetadataProto.Path> sourcePaths,
+                                 List<MetadataProto.Path> orderedPaths,
+                                 List<MetadataProto.Path> compactPaths)
+    {
+        for (MetadataProto.Path path : sourcePaths)
+        {
+            if (path.getIsCompact())
+            {
+                compactPaths.add(path);
+            }
+            else
+            {
+                orderedPaths.add(path);
+            }
+        }
     }
 
     public MetadataProto.Layout getLatestByTable(MetadataProto.Table table,
@@ -128,17 +153,22 @@ public class RdbLayoutDao extends LayoutDao
             List<MetadataProto.Layout> layouts = new ArrayList<>();
             while (rs.next())
             {
+                long layoutId = rs.getLong("LAYOUT_ID");
+                List<MetadataProto.Path> orderedPaths = new ArrayList<>();
+                List<MetadataProto.Path> compactPaths = new ArrayList<>();
+                this.splitPaths(pathDao.getAllByLayoutId(layoutId), orderedPaths, compactPaths);
                 MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
-                .setId(rs.getLong("LAYOUT_ID"))
+                .setId(layoutId)
                 .setVersion(rs.getLong("LAYOUT_VERSION"))
                 .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
                 .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
                 .setOrdered(rs.getString("LAYOUT_ORDERED"))
-                //.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                .addAllOrderedPaths(orderedPaths)
                 .setCompact(rs.getString("LAYOUT_COMPACT"))
-                //.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                .addAllCompactPaths(compactPaths)
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
                 .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
+                .setSchemaVersionId(rs.getLong("SVS_SV_ID"))
                 .setTableId(table.getId()).build();
                 layouts.add(layout);
             }
@@ -176,25 +206,23 @@ public class RdbLayoutDao extends LayoutDao
                 "`LAYOUT_VERSION`," +
                 "`LAYOUT_CREATE_AT`," +
                 "`LAYOUT_PERMISSION`," +
-                "`LAYOUT_ORDER`," +
-                "`LAYOUT_ORDER_PATH`," +
+                "`LAYOUT_ORDERED`," +
                 "`LAYOUT_COMPACT`," +
-                "`LAYOUT_COMPACT_PATH`," +
                 "`LAYOUT_SPLITS`," +
                 "`LAYOUT_PROJECTIONS`," +
-                "`TBLS_TBL_ID`) VALUES (?,?,?,?,?,?,?,?,?,?)";
+                "`SVS_SV_ID`," +
+                "`TBLS_TBL_ID`) VALUES (?,?,?,?,?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setLong(1, layout.getVersion());
             pst.setLong(2, layout.getCreateAt());
             pst.setInt(3, convertPermission(layout.getPermission()));
             pst.setString(4, layout.getOrdered());
-            //pst.setString(5, layout.getOrderPath());
-            pst.setString(6, layout.getCompact());
-            //pst.setString(7, layout.getCompactPath());
-            pst.setString(8, layout.getSplits());
-            pst.setString(9, layout.getProjections());
-            pst.setLong(10, layout.getTableId());
+            pst.setString(5, layout.getCompact());
+            pst.setString(6, layout.getSplits());
+            pst.setString(7, layout.getProjections());
+            pst.setLong(8, layout.getSchemaVersionId());
+            pst.setLong(9, layout.getTableId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
@@ -211,12 +239,10 @@ public class RdbLayoutDao extends LayoutDao
                 "`LAYOUT_VERSION` = ?," +
                 "`LAYOUT_CREATE_AT` = ?," +
                 "`LAYOUT_PERMISSION` = ?," +
-                "`LAYOUT_ORDER` = ?," +
-                "`LAYOUT_ORDER_PATH` = ?," +
+                "`LAYOUT_ORDERED` = ?," +
                 "`LAYOUT_COMPACT` = ?," +
-                "`LAYOUT_COMPACT_PATH` = ?," +
-                "`LAYOUT_SPLITS` = ?\n" +
-                "`LAYOUT_PROJECTIONS = ?\n`" +
+                "`LAYOUT_SPLITS` = ?," +
+                "`LAYOUT_PROJECTIONS` = ?\n" +
                 "WHERE `LAYOUT_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
@@ -224,12 +250,10 @@ public class RdbLayoutDao extends LayoutDao
             pst.setLong(2, layout.getCreateAt());
             pst.setInt(3, convertPermission(layout.getPermission()));
             pst.setString(4, layout.getOrdered());
-            //pst.setString(5, layout.getOrderPath());
-            pst.setString(6, layout.getCompact());
-            //pst.setString(7, layout.getCompactPath());
-            pst.setString(8, layout.getSplits());
-            pst.setString(9, layout.getProjections());
-            pst.setLong(10, layout.getId());
+            pst.setString(5, layout.getCompact());
+            pst.setString(6, layout.getSplits());
+            pst.setString(7, layout.getProjections());
+            pst.setLong(8, layout.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
