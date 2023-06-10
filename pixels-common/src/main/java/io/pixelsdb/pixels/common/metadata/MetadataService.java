@@ -24,6 +24,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.domain.*;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 
@@ -459,16 +460,52 @@ public class MetadataService
         return true;
     }
 
+    public boolean createPath(String uri, boolean isCompact, Layout layout)
+    {
+        return false;
+    }
+
     public List<Path> getPaths(long layoutOrRangeId, boolean isLayoutId)
     {
         return null;
         // TODO: implement.
     }
 
+    public boolean updatePath(long pathId, String uri, boolean isCompact)
+    {
+        return false;
+    }
+
+    public boolean deletePath(long pathId)
+    {
+        return false;
+    }
+
+    public boolean CreatePeerPath(String uri, Columns columns, Path path, Peer peer)
+    {
+        return false;
+    }
+
     public List<Path> getPeerPaths(List<Long> peerPathIds)
     {
         return null;
         // TODO: implement.
+    }
+
+    public boolean updatePeerPath(long peerPathId, String uri, Columns columns)
+    {
+        return false;
+    }
+
+    public boolean deletePeerPath(long peerPathId)
+    {
+        return false;
+    }
+
+    public boolean createPeer(String name, String location,
+                              String host, int port, Storage.Scheme storageScheme)
+    {
+        return false;
     }
 
     public Peer getPeer(int peerId)
@@ -480,6 +517,23 @@ public class MetadataService
     public Peer getPeer(String name)
     {
         return null;
+        // TODO: implement.
+    }
+
+    public boolean updatePeer(Peer peer)
+    {
+        return false;
+    }
+
+    public boolean deletePeer(int peerId)
+    {
+        return false;
+        // TODO: implement.
+    }
+
+    public boolean deletePeer(String name)
+    {
+        return false;
         // TODO: implement.
     }
 

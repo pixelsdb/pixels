@@ -378,9 +378,33 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void createPath(MetadataProto.CreatePathRequest request, StreamObserver<MetadataProto.CreatePathResponse> responseObserver)
+    {
+        super.createPath(request, responseObserver);
+    }
+
+    @Override
     public void getPaths(MetadataProto.GetPathsRequest request, StreamObserver<MetadataProto.GetPathsResponse> responseObserver)
     {
         super.getPaths(request, responseObserver);
+    }
+
+    @Override
+    public void updatePath(MetadataProto.UpdatePathRequest request, StreamObserver<MetadataProto.UpdatePathResponse> responseObserver)
+    {
+        super.updatePath(request, responseObserver);
+    }
+
+    @Override
+    public void deletePaths(MetadataProto.DeletePathsRequest request, StreamObserver<MetadataProto.DeletePathsResponse> responseObserver)
+    {
+        super.deletePaths(request, responseObserver);
+    }
+
+    @Override
+    public void createPeerPath(MetadataProto.CreatePeerPathRequest request, StreamObserver<MetadataProto.CreatePeerPathResponse> responseObserver)
+    {
+        super.createPeerPath(request, responseObserver);
     }
 
     @Override
@@ -390,9 +414,39 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void updatePeerPath(MetadataProto.UpdatePeerPathRequest request, StreamObserver<MetadataProto.UpdatePeerPathResponse> responseObserver)
+    {
+        super.updatePeerPath(request, responseObserver);
+    }
+
+    @Override
+    public void deletePeerPaths(MetadataProto.DeletePeerPathsRequest request, StreamObserver<MetadataProto.DeletePeerPathsResponse> responseObserver)
+    {
+        super.deletePeerPaths(request, responseObserver);
+    }
+
+    @Override
+    public void createPeer(MetadataProto.CreatePeerRequest request, StreamObserver<MetadataProto.CreatePeerResponse> responseObserver)
+    {
+        super.createPeer(request, responseObserver);
+    }
+
+    @Override
     public void getPeer(MetadataProto.GetPeerRequest request, StreamObserver<MetadataProto.GetPeerResponse> responseObserver)
     {
         super.getPeer(request, responseObserver);
+    }
+
+    @Override
+    public void updatePeer(MetadataProto.UpdatePeerRequest request, StreamObserver<MetadataProto.UpdatePeerResponse> responseObserver)
+    {
+        super.updatePeer(request, responseObserver);
+    }
+
+    @Override
+    public void deletePeer(MetadataProto.DeletePeerRequest request, StreamObserver<MetadataProto.DeletePeerResponse> responseObserver)
+    {
+        super.deletePeer(request, responseObserver);
     }
 
     /**

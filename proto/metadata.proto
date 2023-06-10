@@ -44,9 +44,18 @@ service MetadataService {
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
     rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
+    rpc CreatePath (CreatePathRequest) returns (CreatePathResponse);
     rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
+    rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
+    rpc DeletePaths (DeletePathsRequest) returns (DeletePathsResponse);
+    rpc CreatePeerPath (CreatePeerPathRequest) returns (CreatePeerPathResponse);
     rpc GetPeerPaths (GetPeerPathsRequest) returns (GetPeerPathsResponse);
+    rpc UpdatePeerPath (UpdatePeerPathRequest) returns (UpdatePeerPathResponse);
+    rpc DeletePeerPaths (DeletePeerPathsRequest) returns (DeletePeerPathsResponse);
+    rpc CreatePeer (CreatePeerRequest) returns (CreatePeerResponse);
     rpc GetPeer (GetPeerRequest) returns (GetPeerResponse);
+    rpc UpdatePeer (UpdatePeerRequest) returns (UpdatePeerResponse);
+    rpc DeletePeer (DeletePeerRequest) returns (DeletePeerResponse);
     rpc GetColumns (GetColumnsRequest) returns (GetColumnsResponse);
     rpc UpdateColumn (UpdateColumnRequest) returns (UpdateColumnResponse);
     rpc CreateView (CreateViewRequest) returns (CreateViewResponse);
@@ -365,7 +374,63 @@ message UpdateLayoutResponse {
     ResponseHeader header = 1;
 }
 
+// peer
+message CreatePeerRequest {
+    RequestHeader header = 1;
+    Peer peer = 2;
+}
+
+message CreatePeerResponse {
+    ResponseHeader header = 1;
+}
+
+message GetPeerRequest {
+    RequestHeader header = 1;
+    oneof idOrName {
+        uint64 id = 2;
+        string name = 3;
+    }
+}
+
+message GetPeerResponse {
+    ResponseHeader header = 1;
+    Peer peer = 2;
+}
+
+message UpdatePeerRequest {
+    RequestHeader header = 1;
+    string location = 2;
+    string host = 3;
+    int32 port = 4;
+    string storageScheme = 5;
+}
+
+message UpdatePeerResponse {
+    ResponseHeader header = 1;
+}
+
+message DeletePeerRequest {
+    RequestHeader header = 1;
+    oneof idOrName {
+        uint64 id = 2;
+        string name = 3;
+    }
+}
+
+message DeletePeerResponse {
+    ResponseHeader header = 1;
+}
+
 // path
+message CreatePathRequest {
+    RequestHeader header = 1;
+    Path path = 2;
+}
+
+message CreatePathResponse {
+    ResponseHeader header = 1;
+}
+
 message GetPathsRequest {
     RequestHeader header = 1;
     oneof layoutOrRangeId {
@@ -379,7 +444,35 @@ message GetPathsResponse {
     repeated Path paths = 2;
 }
 
-// peer
+message UpdatePathRequest {
+    RequestHeader header = 1;
+    uint64 pathId = 2;
+    string uri = 3;
+    bool isCompact = 4;
+}
+
+message UpdatePathResponse {
+    ResponseHeader header = 1;
+}
+
+message DeletePathsRequest {
+    RequestHeader header = 1;
+    repeated uint64 pathIds = 2;
+}
+
+message DeletePathsResponse {
+    ResponseHeader header = 1;
+}
+
+message CreatePeerPathRequest {
+    RequestHeader header = 1;
+    PeerPath peerPath = 2;
+}
+
+message CreatePeerPathResponse {
+    ResponseHeader header = 1;
+}
+
 message GetPeerPathsRequest {
     RequestHeader header = 1;
     repeated uint64 peerPathIds = 2;
@@ -390,17 +483,24 @@ message GetPeerPathsResponse {
     repeated PeerPath peerPaths = 2;
 }
 
-message GetPeerRequest {
+message UpdatePeerPathRequest {
     RequestHeader header = 1;
-    oneof nameOrId {
-        uint64 id = 2;
-        string name = 3;
-    }
+    uint64 peerPathId = 2;
+    string uri = 3;
+    string columns = 4;
 }
 
-message GetPeerResponse {
+message UpdatePeerPathResponse {
     ResponseHeader header = 1;
-    Peer peer = 2;
+}
+
+message DeletePeerPathsRequest {
+    RequestHeader header = 1;
+    repeated uint64 peerPathIds = 2;
+}
+
+message DeletePeerPathsResponse {
+    ResponseHeader header = 1;
 }
 
 // view
