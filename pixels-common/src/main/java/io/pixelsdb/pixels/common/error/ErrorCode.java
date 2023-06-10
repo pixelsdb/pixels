@@ -51,6 +51,18 @@ public class ErrorCode
     public static final int METADATA_DELETE_VIEW_FAILED = (ERROR_BASE_METADATA + 19);
     public static final int METADATA_UNKNOWN_DATA_TYPE = (ERROR_BASE_METADATA + 20);
     public static final int METADATA_UPDATE_TABLE_FAILED = (ERROR_BASE_METADATA + 21);
+    public static final int METADATA_CREATE_PATH_FAILED = (ERROR_BASE_METADATA + 22);
+    public static final int METADATA_GET_PATHS_FAILED = (ERROR_BASE_METADATA + 23);
+    public static final int METADATA_UPDATE_PATH_FAILED = (ERROR_BASE_METADATA + 24);
+    public static final int METADATA_DELETE_PATHS_FAILED = (ERROR_BASE_METADATA + 25);
+    public static final int METADATA_CREATE_PEER_FAILED = (ERROR_BASE_METADATA + 26);
+    public static final int METADATA_GET_PEER_FAILED = (ERROR_BASE_METADATA + 27);
+    public static final int METADATA_UPDATE_PEER_FAILED = (ERROR_BASE_METADATA + 28);
+    public static final int METADATA_DELETE_PEER_FAILED = (ERROR_BASE_METADATA + 29);
+    public static final int METADATA_CREATE_PEER_PATH_FAILED = (ERROR_BASE_METADATA + 30);
+    public static final int METADATA_GET_PEER_PATHS_FAILED = (ERROR_BASE_METADATA + 31);
+    public static final int METADATA_UPDATE_PEER_PATH_FAILED = (ERROR_BASE_METADATA + 32);
+    public static final int METADATA_DELETE_PEER_PATHS_FAILED = (ERROR_BASE_METADATA + 33);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue

@@ -71,12 +71,12 @@ public class RdbPeerPathDao extends PeerPathDao
     }
 
     @Override
-    public List<MetadataProto.PeerPath> getAllByPath(MetadataProto.Path path)
+    public List<MetadataProto.PeerPath> getAllByPathId(long pathId)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT * FROM PEER_PATHS WHERE PATHS_PATH_ID=" + path.getId());
+            ResultSet rs = st.executeQuery("SELECT * FROM PEER_PATHS WHERE PATHS_PATH_ID=" + pathId);
             List<MetadataProto.PeerPath> peerPaths = new ArrayList<>();
             while (rs.next())
             {
@@ -84,7 +84,7 @@ public class RdbPeerPathDao extends PeerPathDao
                         .setId(rs.getLong("PEER_PATH_ID"))
                         .setUri(rs.getString("PEER_PATH_URI"))
                         .setColumns(rs.getString("PEER_PATH_COLUMNS"))
-                        .setPathId(path.getId())
+                        .setPathId(pathId)
                         .setPeerId(rs.getLong("PEERS_PEER_ID")).build();
                 peerPaths.add(peerPath);
             }
@@ -98,12 +98,12 @@ public class RdbPeerPathDao extends PeerPathDao
     }
 
     @Override
-    public List<MetadataProto.PeerPath> getAllByPeer(MetadataProto.Peer peer)
+    public List<MetadataProto.PeerPath> getAllByPeerId(long peerId)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT * FROM PEER_PATHS WHERE PEERS_PEER_ID=" + peer.getId());
+            ResultSet rs = st.executeQuery("SELECT * FROM PEER_PATHS WHERE PEERS_PEER_ID=" + peerId);
             List<MetadataProto.PeerPath> peerPaths = new ArrayList<>();
             while (rs.next())
             {
@@ -112,7 +112,7 @@ public class RdbPeerPathDao extends PeerPathDao
                         .setUri(rs.getString("PEER_PATH_URI"))
                         .setColumns(rs.getString("PEER_PATH_COLUMNS"))
                         .setPathId(rs.getLong("PATHS_PATH_ID"))
-                        .setPeerId(peer.getId()).build();
+                        .setPeerId(peerId).build();
                 peerPaths.add(peerPath);
             }
             return peerPaths;
@@ -192,14 +192,19 @@ public class RdbPeerPathDao extends PeerPathDao
     }
 
     @Override
-    public boolean deleteById(long id)
+    public boolean deleteByIds(List<Long> ids)
     {
         Connection conn = db.getConnection();
         String sql = "DELETE FROM PEER_PATHS WHERE PEER_PATH_ID=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setLong(1, id);
-            return pst.executeUpdate() == 1;
+            for (Long id : ids)
+            {
+                pst.setLong(1, id);
+                pst.addBatch();
+            }
+            pst.executeBatch();
+            return true;
         } catch (SQLException e)
         {
             log.error("deleteById in RdbPeerPathDao", e);

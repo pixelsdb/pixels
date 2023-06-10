@@ -38,9 +38,9 @@ public abstract class PeerPathDao implements Dao<MetadataProto.PeerPath>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public abstract List<MetadataProto.PeerPath> getAllByPath(MetadataProto.Path path);
+    public abstract List<MetadataProto.PeerPath> getAllByPathId(long pathId);
 
-    public abstract List<MetadataProto.PeerPath> getAllByPeer(MetadataProto.Peer peer);
+    public abstract List<MetadataProto.PeerPath> getAllByPeerId(long peerId);
 
     public boolean save (MetadataProto.PeerPath peerPath)
     {
@@ -60,5 +60,5 @@ public abstract class PeerPathDao implements Dao<MetadataProto.PeerPath>
 
     abstract public boolean update (MetadataProto.PeerPath peerPath);
 
-    abstract public boolean deleteById (long id);
+    abstract public boolean deleteByIds (List<Long> ids);
 }

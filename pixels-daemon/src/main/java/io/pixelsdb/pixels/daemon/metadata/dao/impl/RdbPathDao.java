@@ -98,12 +98,12 @@ public class RdbPathDao extends PathDao
     }
 
     @Override
-    public List<MetadataProto.Path> getAllByRange(MetadataProto.Range range)
+    public List<MetadataProto.Path> getAllByRangeId(long rangeId)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT * FROM PATHS WHERE RANGES_RANGE_ID=" + range.getId());
+            ResultSet rs = st.executeQuery("SELECT * FROM PATHS WHERE RANGES_RANGE_ID=" + rangeId);
             List<MetadataProto.Path> paths = new ArrayList<>();
             while (rs.next())
             {
@@ -112,7 +112,7 @@ public class RdbPathDao extends PathDao
                         .setUri(rs.getString("PATH_URI"))
                         .setIsCompact(rs.getBoolean("PATH_IS_COMPACT"))
                         .setLayoutId(rs.getLong("LAYOUTS_LAYOUT_ID"))
-                        .setRangeId(range.getId()).build();
+                        .setRangeId(rangeId).build();
                 paths.add(path);
             }
             return paths;
@@ -192,14 +192,19 @@ public class RdbPathDao extends PathDao
     }
 
     @Override
-    public boolean deleteById(long id)
+    public boolean deleteByIds(List<Long> ids)
     {
         Connection conn = db.getConnection();
         String sql = "DELETE FROM PATHS WHERE PATH_ID=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setLong(1, id);
-            return pst.executeUpdate() == 1;
+            for (Long id : ids)
+            {
+                pst.setLong(1, id);
+                pst.addBatch();
+            }
+            pst.executeBatch();
+            return true;
         } catch (SQLException e)
         {
             log.error("deleteById in RdbPathDao", e);

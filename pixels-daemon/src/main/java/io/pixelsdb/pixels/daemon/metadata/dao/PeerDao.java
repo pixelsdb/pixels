@@ -55,5 +55,7 @@ public abstract class PeerDao implements Dao<MetadataProto.Peer>
 
     abstract public boolean update (MetadataProto.Peer peer);
 
+    abstract public boolean deleteById (long id);
+
     abstract public boolean deleteByName (String name);
 }

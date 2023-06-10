@@ -40,7 +40,7 @@ public abstract class PathDao implements Dao<MetadataProto.Path>
 
     public abstract List<MetadataProto.Path> getAllByLayoutId(long layoutId);
 
-    public abstract List<MetadataProto.Path> getAllByRange(MetadataProto.Range range);
+    public abstract List<MetadataProto.Path> getAllByRangeId(long rangeId);
 
     public boolean save (MetadataProto.Path path)
     {
@@ -60,5 +60,5 @@ public abstract class PathDao implements Dao<MetadataProto.Path>
 
     abstract public boolean update (MetadataProto.Path path);
 
-    abstract public boolean deleteById (long id);
+    abstract public boolean deleteByIds (List<Long> ids);
 }

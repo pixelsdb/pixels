@@ -32,18 +32,22 @@ import java.util.List;
 import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
 /**
- * Created at: 19-4-16
- * Author: hank
+ * @author hank
+ * @create 2019-04-16
+ * @update 2023-06-10 add peer, path, and peerPath related methods.
  */
 public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImplBase
 {
-    private static Logger log = LogManager.getLogger(MetadataServiceImpl.class);
+    private static final Logger log = LogManager.getLogger(MetadataServiceImpl.class);
 
-    private SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao();
-    private TableDao tableDao = DaoFactory.Instance().getTableDao();
-    private ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
-    private LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
-    private ViewDao viewDao = DaoFactory.Instance().getViewDao();
+    private final SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao();
+    private final TableDao tableDao = DaoFactory.Instance().getTableDao();
+    private final ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
+    private final LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
+    private final ViewDao viewDao = DaoFactory.Instance().getViewDao();
+    private final PathDao pathDao = DaoFactory.Instance().getPathDao();
+    private final PeerDao peerDao = DaoFactory.Instance().getPeerDao();
+    private final PeerPathDao peerPathDao = DaoFactory.Instance().getPeerPathDao();
 
     public MetadataServiceImpl () { }
 
@@ -380,73 +384,347 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     @Override
     public void createPath(MetadataProto.CreatePathRequest request, StreamObserver<MetadataProto.CreatePathResponse> responseObserver)
     {
-        super.createPath(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.pathDao.insert(request.getPath()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_CREATE_PATH_FAILED).setErrorMsg("create path failed");
+        }
+
+        MetadataProto.CreatePathResponse response = MetadataProto.CreatePathResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void getPaths(MetadataProto.GetPathsRequest request, StreamObserver<MetadataProto.GetPathsResponse> responseObserver)
     {
-        super.getPaths(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetPathsResponse.Builder responseBuilder = MetadataProto.GetPathsResponse.newBuilder();
+        if (request.hasLayoutId())
+        {
+            List<MetadataProto.Path> paths = this.pathDao.getAllByLayoutId(request.getLayoutId());
+            if (paths != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.addAllPaths(paths).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PATHS_FAILED).setErrorMsg("get paths by layout id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else if (request.hasRangeId())
+        {
+            List<MetadataProto.Path> paths = this.pathDao.getAllByRangeId(request.getRangeId());
+            if (paths != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.addAllPaths(paths).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PATHS_FAILED).setErrorMsg("get paths by range id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_PATHS_FAILED).setErrorMsg("request does not have layout id or range id");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void updatePath(MetadataProto.UpdatePathRequest request, StreamObserver<MetadataProto.UpdatePathResponse> responseObserver)
     {
-        super.updatePath(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Path path = MetadataProto.Path.newBuilder()
+                .setId(request.getPathId()).setUri(request.getUri()).setIsCompact(request.getIsCompact()).build();
+        if (this.pathDao.update(path))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_PATH_FAILED).setErrorMsg("update path failed");
+        }
+
+        MetadataProto.UpdatePathResponse response = MetadataProto.UpdatePathResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void deletePaths(MetadataProto.DeletePathsRequest request, StreamObserver<MetadataProto.DeletePathsResponse> responseObserver)
     {
-        super.deletePaths(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.pathDao.deleteByIds(request.getPathIdsList()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_PATHS_FAILED).setErrorMsg("delete paths failed");
+        }
+
+        MetadataProto.DeletePathsResponse response = MetadataProto.DeletePathsResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void createPeerPath(MetadataProto.CreatePeerPathRequest request, StreamObserver<MetadataProto.CreatePeerPathResponse> responseObserver)
     {
-        super.createPeerPath(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.peerPathDao.insert(request.getPeerPath()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_CREATE_PEER_PATH_FAILED).setErrorMsg("create peer path failed");
+        }
+
+        MetadataProto.CreatePeerPathResponse response = MetadataProto.CreatePeerPathResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void getPeerPaths(MetadataProto.GetPeerPathsRequest request, StreamObserver<MetadataProto.GetPeerPathsResponse> responseObserver)
     {
-        super.getPeerPaths(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetPeerPathsResponse.Builder responseBuilder = MetadataProto.GetPeerPathsResponse.newBuilder();
+        if (request.hasPathId())
+        {
+            List<MetadataProto.PeerPath> peerPaths = this.peerPathDao.getAllByPathId(request.getPathId());
+            if (peerPaths != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.addAllPeerPaths(peerPaths).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PEER_PATHS_FAILED).setErrorMsg("get peer paths by path id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else if (request.hasPeerId())
+        {
+            List<MetadataProto.PeerPath> peerPaths = this.peerPathDao.getAllByPeerId(request.getPeerId());
+            if (peerPaths != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.addAllPeerPaths(peerPaths).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PEER_PATHS_FAILED).setErrorMsg("get peer paths by peer id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_PEER_PATHS_FAILED).setErrorMsg("request does not have path id or peer id");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void updatePeerPath(MetadataProto.UpdatePeerPathRequest request, StreamObserver<MetadataProto.UpdatePeerPathResponse> responseObserver)
     {
-        super.updatePeerPath(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.PeerPath peerPath = MetadataProto.PeerPath.newBuilder()
+                .setId(request.getPeerPathId()).setUri(request.getUri()).setColumns(request.getColumns()).build();
+        if (this.peerPathDao.update(peerPath))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_PEER_PATH_FAILED).setErrorMsg("update peer path failed");
+        }
+
+        MetadataProto.UpdatePeerPathResponse response = MetadataProto.UpdatePeerPathResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void deletePeerPaths(MetadataProto.DeletePeerPathsRequest request, StreamObserver<MetadataProto.DeletePeerPathsResponse> responseObserver)
     {
-        super.deletePeerPaths(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.peerPathDao.deleteByIds(request.getPeerPathIdsList()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_PEER_PATHS_FAILED).setErrorMsg("delete peer paths failed");
+        }
+
+        MetadataProto.DeletePeerPathsResponse response = MetadataProto.DeletePeerPathsResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void createPeer(MetadataProto.CreatePeerRequest request, StreamObserver<MetadataProto.CreatePeerResponse> responseObserver)
     {
-        super.createPeer(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.peerDao.insert(request.getPeer()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_CREATE_PEER_FAILED).setErrorMsg("create peer failed");
+        }
+
+        MetadataProto.CreatePeerResponse response = MetadataProto.CreatePeerResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void getPeer(MetadataProto.GetPeerRequest request, StreamObserver<MetadataProto.GetPeerResponse> responseObserver)
     {
-        super.getPeer(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetPeerResponse.Builder responseBuilder = MetadataProto.GetPeerResponse.newBuilder();
+        if (request.hasId())
+        {
+            MetadataProto.Peer peer = this.peerDao.getById(request.getId());
+            if (peer != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.setPeer(peer).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PEER_FAILED).setErrorMsg("get peer by id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else if (request.hasName())
+        {
+            MetadataProto.Peer peer = this.peerDao.getByName(request.getName());
+            if (peer != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.setPeer(peer).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PEER_FAILED).setErrorMsg("get peer by name failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_PEER_FAILED).setErrorMsg("request does not have id or name");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void updatePeer(MetadataProto.UpdatePeerRequest request, StreamObserver<MetadataProto.UpdatePeerResponse> responseObserver)
     {
-        super.updatePeer(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.peerDao.update(request.getPeer()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_PEER_FAILED).setErrorMsg("update peer failed");
+        }
+
+        MetadataProto.UpdatePeerResponse response = MetadataProto.UpdatePeerResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void deletePeer(MetadataProto.DeletePeerRequest request, StreamObserver<MetadataProto.DeletePeerResponse> responseObserver)
     {
-        super.deletePeer(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (request.hasId())
+        {
+            if (this.peerDao.deleteById(request.getId()))
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_DELETE_PEER_FAILED).setErrorMsg("delete peer by id failed");
+            }
+        }
+        else if (request.hasName())
+        {
+            if (this.peerDao.deleteByName(request.getName()))
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_DELETE_PEER_FAILED).setErrorMsg("delete peer by name failed");
+            }
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_PEER_FAILED).setErrorMsg("request does not have id or name");
+        }
+
+        MetadataProto.DeletePeerResponse response = MetadataProto.DeletePeerResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     /**

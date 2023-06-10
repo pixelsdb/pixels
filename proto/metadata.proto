@@ -399,10 +399,7 @@ message GetPeerResponse {
 
 message UpdatePeerRequest {
     RequestHeader header = 1;
-    string location = 2;
-    string host = 3;
-    int32 port = 4;
-    string storageScheme = 5;
+    Peer peer = 2;
 }
 
 message UpdatePeerResponse {
@@ -475,7 +472,10 @@ message CreatePeerPathResponse {
 
 message GetPeerPathsRequest {
     RequestHeader header = 1;
-    repeated uint64 peerPathIds = 2;
+    oneof pathIdOrPeerId {
+        uint64 pathId = 2;
+        uint64 peerId = 3;
+    }
 }
 
 message GetPeerPathsResponse {

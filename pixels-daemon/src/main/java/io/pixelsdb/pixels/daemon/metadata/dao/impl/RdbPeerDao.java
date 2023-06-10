@@ -178,24 +178,40 @@ public class RdbPeerDao extends PeerDao
         Connection conn = db.getConnection();
         String sql = "UPDATE PEERS\n" +
                 "SET\n" +
-                "`PEER_NAME` = ?," +
                 "`PEER_LOCATION` = ?," +
                 "`PEER_HOST` = ?," +
                 "`PEER_PORT` = ?," +
                 "`PEER_STORAGE_SCHEME` = ?\n" +
-                "WHERE `PEER_ID` = ?";
+                "WHERE `PEER_ID` = ? OR `PEER_NAME` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setString(1, peer.getName());
-            pst.setString(2, peer.getLocation());
-            pst.setString(3, peer.getHost());
-            pst.setInt(4, peer.getPort());
-            pst.setString(5, peer.getStorageScheme());
-            pst.setLong(6, peer.getId());
+            pst.setString(1, peer.getLocation());
+            pst.setString(2, peer.getHost());
+            pst.setInt(3, peer.getPort());
+            pst.setString(4, peer.getStorageScheme());
+            pst.setLong(5, peer.getId());
+            pst.setString(6, peer.getName());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("update in RdbPeerDao", e);
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean deleteById(long id)
+    {
+        Connection conn = db.getConnection();
+        String sql = "DELETE FROM PEERS WHERE PEER_ID=?";
+        try (PreparedStatement pst = conn.prepareStatement(sql))
+        {
+            pst.setLong(1, id);
+            return pst.executeUpdate() == 1;
+        } catch (SQLException e)
+        {
+            log.error("deleteById in RdbPeerDao", e);
         }
 
         return false;
