@@ -140,7 +140,7 @@ public class RdbColumnDao extends ColumnDao
         return null;
     }
 
-    public Ordered getOrderByTable(MetadataProto.Table table)
+    public Ordered getOrderedByTable(MetadataProto.Table table)
     {
         Ordered columnOrdered = new Ordered();
         Connection conn = db.getConnection();
@@ -160,7 +160,7 @@ public class RdbColumnDao extends ColumnDao
 
         } catch (SQLException e)
         {
-            log.error("getByTable in RdbColumnDao", e);
+            log.error("getOrderedByTable in RdbColumnDao", e);
         }
 
         return null;
@@ -193,7 +193,7 @@ public class RdbColumnDao extends ColumnDao
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
-            log.error("getByTable in RdbColumnDao", e);
+            log.error("update in RdbColumnDao", e);
         }
 
         return false;
@@ -217,6 +217,7 @@ public class RdbColumnDao extends ColumnDao
         {
             log.error("insertBatch in RdbColumnDao", e);
         }
+
         return 0;
     }
 
@@ -230,8 +231,9 @@ public class RdbColumnDao extends ColumnDao
             return pst.executeUpdate() > 0;
         } catch (SQLException e)
         {
-            log.error("delete in RdbColumnDao", e);
+            log.error("deleteByTable in RdbColumnDao", e);
         }
+
         return false;
     }
 }

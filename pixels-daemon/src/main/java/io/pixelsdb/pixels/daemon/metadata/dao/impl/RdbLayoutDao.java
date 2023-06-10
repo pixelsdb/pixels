@@ -69,7 +69,7 @@ public class RdbLayoutDao extends LayoutDao
                 .addAllCompactPaths(compactPaths)
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
                 .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
-                .setSchemaVersionId(rs.getLong("SVS_SV_ID"))
+                .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID"))
                 .setTableId(rs.getLong("TBLS_TBL_ID")).build();
                 return layout;
             }
@@ -168,7 +168,7 @@ public class RdbLayoutDao extends LayoutDao
                 .addAllCompactPaths(compactPaths)
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
                 .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
-                .setSchemaVersionId(rs.getLong("SVS_SV_ID"))
+                .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID"))
                 .setTableId(table.getId()).build();
                 layouts.add(layout);
             }
@@ -210,7 +210,7 @@ public class RdbLayoutDao extends LayoutDao
                 "`LAYOUT_COMPACT`," +
                 "`LAYOUT_SPLITS`," +
                 "`LAYOUT_PROJECTIONS`," +
-                "`SVS_SV_ID`," +
+                "`SCHEMA_VERSIONS_SV_ID`," +
                 "`TBLS_TBL_ID`) VALUES (?,?,?,?,?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
@@ -228,6 +228,7 @@ public class RdbLayoutDao extends LayoutDao
         {
             log.error("insert in RdbLayoutDao", e);
         }
+
         return false;
     }
 
@@ -257,8 +258,9 @@ public class RdbLayoutDao extends LayoutDao
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
-            log.error("insert in RdbLayoutDao", e);
+            log.error("update in RdbLayoutDao", e);
         }
+
         return false;
     }
 }

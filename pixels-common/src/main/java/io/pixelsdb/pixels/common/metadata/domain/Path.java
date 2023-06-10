@@ -36,7 +36,7 @@ public class Path extends Base
     private String uri;
     private boolean isCompact;
     private long layoutId;
-    private long rangeId = -1;
+    private long rangeId = 0; // 0 is an invalid id in SQL
     private List<Long> peerRangeIds;
 
     public Path() { }

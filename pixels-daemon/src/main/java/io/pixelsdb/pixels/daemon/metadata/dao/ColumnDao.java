@@ -42,7 +42,7 @@ public abstract class ColumnDao implements Dao<MetadataProto.Column>
 
     abstract public List<MetadataProto.Column> getByTable(MetadataProto.Table table, boolean getStatistics);
 
-    abstract public Ordered getOrderByTable(MetadataProto.Table table);
+    abstract public Ordered getOrderedByTable(MetadataProto.Table table);
 
     abstract public boolean update(MetadataProto.Column column);
 
