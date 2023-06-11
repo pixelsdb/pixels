@@ -17,18 +17,32 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.metadata.domain;
+package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
+import io.pixelsdb.pixels.daemon.MetadataProto;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The set of columns belong to a schema version or peer path.
+ * The set of column ids belong to a schema version or peer path in the metadata.
  * @author hank
  * @create 2023-06-09
  */
 public class Columns
 {
     private List<Long> columnIds;
+
+    public Columns() { }
+
+    public Columns(List<MetadataProto.Column> columns)
+    {
+        this.columnIds = new ArrayList<>(columns.size());
+        for (MetadataProto.Column column : columns)
+        {
+            this.columnIds.add(column.getId());
+        }
+    }
 
     public List<Long> getColumnIds()
     {

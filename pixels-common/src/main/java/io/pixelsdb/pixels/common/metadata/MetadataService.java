@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.metadata;
 
-import com.alibaba.fastjson.JSON;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -573,13 +572,13 @@ public class MetadataService
         return false;
     }
 
-    public boolean CreatePeerPath(String uri, Columns columns, Path path, Peer peer) throws MetadataException
+    public boolean CreatePeerPath(String uri, List<Column> columns, Path path, Peer peer) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.CreatePeerPathRequest request = MetadataProto.CreatePeerPathRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
                 .setPeerPath(MetadataProto.PeerPath.newBuilder().setUri(uri)
-                        .setColumns(JSON.toJSONString(columns)).setPathId(path.getId())
+                        .addAllColumns(Column.revertColumns(columns)).setPathId(path.getId())
                         .setPeerId(peer.getId())).build();
         try
         {
@@ -634,12 +633,12 @@ public class MetadataService
         }
     }
 
-    public boolean updatePeerPath(long peerPathId, String uri, Columns columns) throws MetadataException
+    public boolean updatePeerPath(long peerPathId, String uri, List<Column> columns) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.UpdatePeerPathRequest request = MetadataProto.UpdatePeerPathRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
-                .setPeerPathId(peerPathId).setUri(uri).setColumns(JSON.toJSONString(columns)).build();
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token)).setPeerPathId(peerPathId)
+                .setUri(uri).addAllColumns(Column.revertColumns(columns)).build();
         try
         {
             MetadataProto.UpdatePeerPathResponse response = this.stub.updatePeerPath(request);

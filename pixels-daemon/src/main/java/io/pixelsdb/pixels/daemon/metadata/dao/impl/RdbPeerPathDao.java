@@ -19,8 +19,11 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
+import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
+import io.pixelsdb.pixels.daemon.metadata.dao.ColumnDao;
+import io.pixelsdb.pixels.daemon.metadata.dao.DaoFactory;
 import io.pixelsdb.pixels.daemon.metadata.dao.PeerPathDao;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,6 +47,7 @@ public class RdbPeerPathDao extends PeerPathDao
     private static final Logger log = LogManager.getLogger(RdbPeerPathDao.class);
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
+    private static final ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
 
     @Override
     public MetadataProto.PeerPath getById(long id)
@@ -54,10 +58,11 @@ public class RdbPeerPathDao extends PeerPathDao
             ResultSet rs = st.executeQuery("SELECT * FROM PEER_PATHS WHERE PEER_PATH_ID=" + id);
             if (rs.next())
             {
+                Columns columns = JSON.parseObject(rs.getString("PEER_PATH_COLUMNS"), Columns.class);
                 MetadataProto.PeerPath peerPath = MetadataProto.PeerPath.newBuilder()
                         .setId(id)
                         .setUri(rs.getString("PEER_PATH_URI"))
-                        .setColumns(rs.getString("PEER_PATH_COLUMNS"))
+                        .addAllColumns(columnDao.getAllByIds(columns.getColumnIds(), false))
                         .setPathId(rs.getLong("PATHS_PATH_ID"))
                         .setPeerId(rs.getLong("PEERS_PEER_ID")).build();
                 return peerPath;
@@ -80,10 +85,11 @@ public class RdbPeerPathDao extends PeerPathDao
             List<MetadataProto.PeerPath> peerPaths = new ArrayList<>();
             while (rs.next())
             {
+                Columns columns = JSON.parseObject(rs.getString("PEER_PATH_COLUMNS"), Columns.class);
                 MetadataProto.PeerPath peerPath = MetadataProto.PeerPath.newBuilder()
                         .setId(rs.getLong("PEER_PATH_ID"))
                         .setUri(rs.getString("PEER_PATH_URI"))
-                        .setColumns(rs.getString("PEER_PATH_COLUMNS"))
+                        .addAllColumns(columnDao.getAllByIds(columns.getColumnIds(), false))
                         .setPathId(pathId)
                         .setPeerId(rs.getLong("PEERS_PEER_ID")).build();
                 peerPaths.add(peerPath);
@@ -107,10 +113,11 @@ public class RdbPeerPathDao extends PeerPathDao
             List<MetadataProto.PeerPath> peerPaths = new ArrayList<>();
             while (rs.next())
             {
+                Columns columns = JSON.parseObject(rs.getString("PEER_PATH_COLUMNS"), Columns.class);
                 MetadataProto.PeerPath peerPath = MetadataProto.PeerPath.newBuilder()
                         .setId(rs.getLong("PEER_PATH_ID"))
                         .setUri(rs.getString("PEER_PATH_URI"))
-                        .setColumns(rs.getString("PEER_PATH_COLUMNS"))
+                        .addAllColumns(columnDao.getAllByIds(columns.getColumnIds(), false))
                         .setPathId(rs.getLong("PATHS_PATH_ID"))
                         .setPeerId(peerId).build();
                 peerPaths.add(peerPath);
@@ -156,7 +163,7 @@ public class RdbPeerPathDao extends PeerPathDao
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, peerPath.getUri());
-            pst.setString(2, peerPath.getColumns());
+            pst.setString(2, JSON.toJSONString(new Columns(peerPath.getColumnsList())));
             pst.setLong(3, peerPath.getPathId());
             pst.setLong(4, peerPath.getPeerId());
             return pst.executeUpdate() == 1;
@@ -180,7 +187,7 @@ public class RdbPeerPathDao extends PeerPathDao
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, peerPath.getUri());
-            pst.setString(2, peerPath.getColumns());
+            pst.setString(2, JSON.toJSONString(new Columns(peerPath.getColumnsList())));
             pst.setLong(3, peerPath.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)

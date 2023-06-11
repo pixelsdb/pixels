@@ -108,7 +108,7 @@ message Peer {
 message PeerPath {
     uint64 id = 1;
     string uri = 2;
-    string columns = 3;
+    repeated Column columns = 3;
     uint64 pathId = 4;
     uint64 peerId = 5;
 }
@@ -138,7 +138,7 @@ message Path {
 
 message SchemaVersion {
     uint64 id = 1;
-    string columns = 2;
+    repeated Column columns = 2;
     uint64 timestamp = 3;
     uint64 tableId = 4;
 }
@@ -488,7 +488,7 @@ message UpdatePeerPathRequest {
     RequestHeader header = 1;
     uint64 peerPathId = 2;
     string uri = 3;
-    string columns = 4;
+    repeated Column columns = 4;
 }
 
 message UpdatePeerPathResponse {

@@ -67,10 +67,76 @@ public class RdbColumnDao extends ColumnDao
                         .setTableId(rs.getLong("TBLS_TBL_ID")).build();
                 return column;
             }
-
         } catch (SQLException e)
         {
             log.error("getById in RdbColumnDao", e);
+        }
+
+        return null;
+    }
+
+    @Override
+    public List<MetadataProto.Column> getAllByIds(List<Long> ids, boolean getStatistics)
+    {
+        Connection conn = db.getConnection();
+        if (getStatistics)
+        {
+            try (Statement st = conn.createStatement())
+            {
+                List<MetadataProto.Column> columns = new ArrayList<>();
+                for (Long id : ids)
+                {
+                    ResultSet rs = st.executeQuery(
+                            "SELECT COL_NAME, COL_TYPE, COL_CHUNK_SIZE, COL_SIZE, COL_NULL_FRACTION, " +
+                                    "COL_CARDINALITY, COL_RECORD_STATS, TBLS_TBL_ID " + "FROM COLS WHERE COL_ID=" + id);
+                    if (rs.next())
+                    {
+                        byte[] recordStats = rs.getBytes("COL_RECORD_STATS");
+                        MetadataProto.Column column = MetadataProto.Column.newBuilder()
+                                .setId(id)
+                                .setName(rs.getString("COL_NAME"))
+                                .setType(rs.getString("COL_TYPE"))
+                                .setChunkSize(rs.getDouble("COL_CHUNK_SIZE"))
+                                .setSize(rs.getDouble("COL_SIZE"))
+                                .setNullFraction(rs.getDouble("COL_NULL_FRACTION"))
+                                .setCardinality(rs.getLong("COL_CARDINALITY"))
+                                .setRecordStats(recordStats != null ?
+                                        ByteString.copyFrom(recordStats) : ByteString.EMPTY)
+                                .setTableId(rs.getLong("TBLS_TBL_ID")).build();
+                        columns.add(column);
+                    }
+                }
+                return columns;
+            } catch (SQLException e)
+            {
+                log.error("getAllByIds in RdbColumnDao", e);
+            }
+        }
+        else
+        {
+            try (Statement st = conn.createStatement())
+            {
+                List<MetadataProto.Column> columns = new ArrayList<>();
+                for (Long id : ids)
+                {
+                    ResultSet rs = st.executeQuery(
+                            "SELECT COL_NAME, COL_TYPE, COL_SIZE, TBLS_TBL_ID FROM COLS WHERE COL_ID=" + id);
+                    if (rs.next())
+                    {
+                        MetadataProto.Column column = MetadataProto.Column.newBuilder()
+                                .setId(id)
+                                .setName(rs.getString("COL_NAME"))
+                                .setType(rs.getString("COL_TYPE"))
+                                .setSize(rs.getDouble("COL_SIZE"))
+                                .setTableId(rs.getLong("TBLS_TBL_ID")).build();
+                        columns.add(column);
+                    }
+                }
+                return columns;
+            } catch (SQLException e)
+            {
+                log.error("getAllByIds in RdbColumnDao", e);
+            }
         }
 
         return null;
@@ -105,7 +171,6 @@ public class RdbColumnDao extends ColumnDao
                     columns.add(column);
                 }
                 return columns;
-
             } catch (SQLException e)
             {
                 log.error("getByTable in RdbColumnDao", e);
@@ -130,7 +195,6 @@ public class RdbColumnDao extends ColumnDao
                     columns.add(column);
                 }
                 return columns;
-
             } catch (SQLException e)
             {
                 log.error("getByTable in RdbColumnDao", e);
@@ -157,7 +221,6 @@ public class RdbColumnDao extends ColumnDao
             }
             columnOrdered.setColumnOrder(columns);
             return columnOrdered;
-
         } catch (SQLException e)
         {
             log.error("getOrderedByTable in RdbColumnDao", e);

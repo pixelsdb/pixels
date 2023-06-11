@@ -20,9 +20,14 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.annotation.JSONField;
+import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.nio.ByteBuffer;
+import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -51,9 +56,33 @@ public class Column extends Base
         this.size = column.getSize();
         this.nullFraction = column.getNullFraction();
         this.cardinality = column.getCardinality();
-        // The default value pf bytes in protobuf is empty bytes, thus no need to check for null.
+        // The default value of bytes in protobuf is empty bytes, thus no need to check for null.
         this.recordStats = column.getRecordStats().asReadOnlyByteBuffer();
         this.tableId = column.getTableId();
+    }
+
+    public static List<Column> convertColumns(List<MetadataProto.Column> protoColumns)
+    {
+        requireNonNull(protoColumns, "protoColumns is null");
+        ImmutableList.Builder<Column> columnsBuilder =
+                ImmutableList.builderWithExpectedSize(protoColumns.size());
+        for (MetadataProto.Column protoColumn : protoColumns)
+        {
+            columnsBuilder.add(new Column(protoColumn));
+        }
+        return columnsBuilder.build();
+    }
+
+    public static List<MetadataProto.Column> revertColumns(List<Column> columns)
+    {
+        requireNonNull(columns, "columns is null");
+        ImmutableList.Builder<MetadataProto.Column> columnsBuilder =
+                ImmutableList.builderWithExpectedSize(columns.size());
+        for (Column column : columns)
+        {
+            columnsBuilder.add(column.toProto());
+        }
+        return columnsBuilder.build();
     }
 
     public String getName()
@@ -159,5 +188,13 @@ public class Column extends Base
                 ", recordStats=bytes(" + recordStats.remaining() +
                 "), tableId=" + tableId +
                 '}';
+    }
+
+    private MetadataProto.Column toProto()
+    {
+        return MetadataProto.Column.newBuilder().setId(this.getId()).setName(this.name).setType(this.type)
+                .setChunkSize(this.chunkSize).setSize(this.size).setNullFraction(this.nullFraction)
+                .setCardinality(this.cardinality).setRecordStats(ByteString.copyFrom(this.recordStats))
+                .setTableId(this.tableId).build();
     }
 }

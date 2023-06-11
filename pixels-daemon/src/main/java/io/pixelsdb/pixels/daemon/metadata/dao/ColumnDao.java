@@ -40,6 +40,8 @@ public abstract class ColumnDao implements Dao<MetadataProto.Column>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
+    abstract public List<MetadataProto.Column> getAllByIds(List<Long> ids, boolean getStatistics);
+
     abstract public List<MetadataProto.Column> getByTable(MetadataProto.Table table, boolean getStatistics);
 
     abstract public Ordered getOrderedByTable(MetadataProto.Table table);

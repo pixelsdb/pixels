@@ -564,7 +564,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 .setToken(request.getHeader().getToken());
 
         MetadataProto.PeerPath peerPath = MetadataProto.PeerPath.newBuilder()
-                .setId(request.getPeerPathId()).setUri(request.getUri()).setColumns(request.getColumns()).build();
+                .setId(request.getPeerPathId()).setUri(request.getUri())
+                .addAllColumns(request.getColumnsList()).build();
         if (this.peerPathDao.update(peerPath))
         {
             headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");

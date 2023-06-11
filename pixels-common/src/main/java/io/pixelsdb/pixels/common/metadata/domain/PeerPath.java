@@ -19,10 +19,10 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
-import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -34,18 +34,20 @@ import static java.util.Objects.requireNonNull;
 public class PeerPath extends Base
 {
     private String uri;
-    private Columns columns;
+    private List<Column> columns;
     private long pathId;
     private long peerId;
-    private String columnsJson;
 
     public PeerPath() { }
 
     public PeerPath(MetadataProto.PeerPath proto)
     {
         this.uri = proto.getUri();
-        this.columnsJson = proto.getColumns();
-        this.columns = JSON.parseObject(this.columnsJson, Columns.class);
+        this.columns = new ArrayList<>(proto.getColumnsCount());
+        for (MetadataProto.Column column : proto.getColumnsList())
+        {
+            this.columns.add(new Column(column));
+        }
         this.pathId = proto.getPathId();
         this.peerId = proto.getPeerId();
     }
@@ -92,22 +94,13 @@ public class PeerPath extends Base
         this.peerId = peerId;
     }
 
-    public Columns getColumns()
+    public List<Column> getColumns()
     {
-        if (this.columns == null)
-        {
-            this.columns = JSON.parseObject(this.columnsJson, Columns.class);
-        }
         return this.columns;
     }
 
-    public String getColumnsJson()
+    public void setColumns(List<Column> columns)
     {
-        return columnsJson;
-    }
-
-    public void setColumnsJson(String columnsJson)
-    {
-        this.columnsJson = columnsJson;
+        this.columns = columns;
     }
 }

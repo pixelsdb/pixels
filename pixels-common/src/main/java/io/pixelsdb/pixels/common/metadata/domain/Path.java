@@ -128,7 +128,7 @@ public class Path extends Base
     {
         MetadataProto.Path.Builder builder = MetadataProto.Path.newBuilder()
                 .setId(this.getId()).setUri(this.uri).setIsCompact(this.isCompact).setLayoutId(this.layoutId);
-        if (this.rangeId != -1)
+        if (this.rangeId > 0)
         {
             builder.setRangeId(this.rangeId);
         }

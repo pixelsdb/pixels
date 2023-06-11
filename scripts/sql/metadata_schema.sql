@@ -78,6 +78,34 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
 
 
 -- -----------------------------------------------------
+-- Table `pixels_metadata`.`RANGE_INDEXS`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXS` (
+                                                                `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
+                                                                `RI_STRUCT` MEDIUMBLOB NOT NULL,
+                                                                `KEY_COL_ID` BIGINT NOT NULL,
+                                                                `TBLS_TBL_ID` BIGINT NOT NULL,
+                                                                PRIMARY KEY (`RI_ID`),
+    INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
+    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC) VISIBLE,
+    INDEX `fk_RANGE_INDEX_COLS_idx` (`KEY_COL_ID` ASC) VISIBLE,
+    UNIQUE INDEX `KEY_COL_ID_UNIQUE` (`KEY_COL_ID` ASC) VISIBLE,
+    CONSTRAINT `fk_RANGE_INDEX_TBLS`
+    FOREIGN KEY (`TBLS_TBL_ID`)
+    REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+    CONSTRAINT `fk_RANGE_INDEX_COLS`
+    FOREIGN KEY (`KEY_COL_ID`)
+    REFERENCES `pixels_metadata`.`COLS` (`COL_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_bin;
+
+
+-- -----------------------------------------------------
 -- Table `pixels_metadata`.`SCHEMA_VERSIONS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
@@ -85,12 +113,19 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
                                                                    `SV_COLUMNS` MEDIUMTEXT NOT NULL,
                                                                    `SV_TIMESTAMP` BIGINT NOT NULL,
                                                                    `TBLS_TBL_ID` BIGINT NOT NULL,
+                                                                   `RANGE_INDEXS_RI_ID` BIGINT NULL DEFAULT NULL,
                                                                    PRIMARY KEY (`SV_ID`),
     INDEX `fk_SCHEMA_VERSIONS_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
+    INDEX `fk_SCHEMA_VERSIONS_RANGE_INDEXS_idx` (`RANGE_INDEXS_RI_ID` ASC) VISIBLE,
     CONSTRAINT `fk_SCHEMA_VERSIONS_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
     ON DELETE CASCADE
+    ON UPDATE CASCADE,
+    CONSTRAINT `fk_SCHEMA_VERSIONS_RANGE_INDEXS`
+    FOREIGN KEY (`RANGE_INDEXS_RI_ID`)
+    REFERENCES `pixels_metadata`.`RANGE_INDEXS` (`RI_ID`)
+    ON DELETE SET NULL
     ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
@@ -143,33 +178,6 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
     CONSTRAINT `fk_VIEWS_DBS`
     FOREIGN KEY (`DBS_DB_ID`)
     REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
-    ENGINE = InnoDB
-    DEFAULT CHARACTER SET = utf8mb4
-    COLLATE = utf8mb4_bin;
-
-
--- -----------------------------------------------------
--- Table `pixels_metadata`.`RANGE_INDEXS`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXS` (
-                                                                `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                                `RI_STRUCT` MEDIUMBLOB NOT NULL,
-                                                                `KEY_COL_ID` BIGINT NOT NULL,
-                                                                `TBLS_TBL_ID` BIGINT NOT NULL,
-                                                                PRIMARY KEY (`RI_ID`),
-    INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
-    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC) VISIBLE,
-    INDEX `fk_RANGE_INDEX_COLS_idx` (`KEY_COL_ID` ASC) VISIBLE,
-    CONSTRAINT `fk_RANGE_INDEX_TBLS`
-    FOREIGN KEY (`TBLS_TBL_ID`)
-    REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-    CONSTRAINT `fk_RANGE_INDEX_COLS`
-    FOREIGN KEY (`KEY_COL_ID`)
-    REFERENCES `pixels_metadata`.`COLS` (`COL_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE)
     ENGINE = InnoDB
