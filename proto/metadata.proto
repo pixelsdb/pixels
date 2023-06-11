@@ -276,7 +276,9 @@ message CreateTableRequest {
     string schemaName = 2;
     string tableName = 3;
     string storageScheme = 4;
-    repeated Column columns = 5;
+    repeated string orderedPathUris = 5;
+    repeated string compactPathUris = 6;
+    repeated Column columns = 7;
 }
 
 message CreateTableResponse {

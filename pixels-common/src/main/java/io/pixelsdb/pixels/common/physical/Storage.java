@@ -60,11 +60,20 @@ public interface Storage
 
         /**
          * Parse the scheme from the path which is prefixed with the storage scheme.
-         * @param schemedPath
+         * @param schemedPath the path started with storage scheme, e.g., s3://
+         * @return the storage scheme of the path, or null if the path is not started with a valid scheme
          */
         public static Scheme fromPath(String schemedPath)
         {
+            if (!schemedPath.contains("://"))
+            {
+                return null;
+            }
             String scheme = schemedPath.substring(0, schemedPath.indexOf("://"));
+            if (!Scheme.isValid(scheme))
+            {
+                return null;
+            }
             return Scheme.from(scheme);
         }
 
