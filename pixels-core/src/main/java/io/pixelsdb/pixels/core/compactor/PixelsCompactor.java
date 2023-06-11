@@ -351,7 +351,7 @@ public class PixelsCompactor
     {
         for (int i = 0; i < this.compactLayout.size(); ++i)
         {
-            ColumnletIndex index = this.compactLayout.get(i);
+            ColumnChunkIndex index = this.compactLayout.get(i);
             int rowGroupId = index.getRowGroupId();
             int columnId = index.getColumnId();
             PixelsProto.ColumnChunkIndex.Builder columnChunkIndexBuilder =

@@ -30,20 +30,20 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  * @author guodong
  * @author hank
  */
-public class ColumnletId
+public class ColumnChunkId
 {
     public short rowGroupId;
     public short columnId;
     public boolean direct;
 
-    public ColumnletId(short rowGroupId, short columnId, boolean direct)
+    public ColumnChunkId(short rowGroupId, short columnId, boolean direct)
     {
         this.rowGroupId = rowGroupId;
         this.columnId = columnId;
         this.direct = direct;
     }
 
-    public ColumnletId() {}
+    public ColumnChunkId() {}
 
     @Override
     public boolean equals(Object o)
@@ -56,7 +56,7 @@ public class ColumnletId
         {
             return false;
         }
-        ColumnletId other = (ColumnletId) o;
+        ColumnChunkId other = (ColumnChunkId) o;
         return Objects.equals(rowGroupId, other.rowGroupId) &&
                 Objects.equals(columnId, other.columnId);
     }

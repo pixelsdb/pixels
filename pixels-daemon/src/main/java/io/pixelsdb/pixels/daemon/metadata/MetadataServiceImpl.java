@@ -911,6 +911,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                     table = tableDao.getByNameAndSchema(table.getName(), schema);
                     if (columns.size() == columnDao.insertBatch(table, columns))
                     {
+                        // TODO: create the layout and paths.
                         headerBuilder.setErrorCode(0).setErrorMsg("");
                     } else
                     {

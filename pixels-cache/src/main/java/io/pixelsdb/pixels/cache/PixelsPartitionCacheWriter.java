@@ -375,8 +375,8 @@ public class PixelsPartitionCacheWriter {
             String[] files = fileStr.split(";");
             Compact compact = layout.getCompact();
             int cacheBorder = compact.getCacheBorder();
-            List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
-            return internalUpdateAll(version, cacheColumnletOrders, files);
+            List<String> cacheColumnChunkOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
+            return internalUpdateAll(version, cacheColumnChunkOrders, files);
         }
         catch (IOException | InterruptedException e)
         {
@@ -401,8 +401,8 @@ public class PixelsPartitionCacheWriter {
             String[] files = fileStr.split(";");
             Compact compact = layout.getCompact();
             int cacheBorder = compact.getCacheBorder();
-            List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
-            return internalUpdateIncremental(version, cacheColumnletOrders, files);
+            List<String> cacheColumnChunkOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
+            return internalUpdateIncremental(version, cacheColumnChunkOrders, files);
         }
         catch (IOException | InterruptedException e)
         {

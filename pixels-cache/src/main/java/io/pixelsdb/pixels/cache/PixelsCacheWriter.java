@@ -165,13 +165,13 @@ public class PixelsCacheWriter
             MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
             PixelsRadix radix;
             // check if cache and index exists.
-            Set<String> cachedColumnlets = new HashSet<>();
+            Set<String> cachedColumnChunks = new HashSet<>();
             // if overwrite is not true, and cache and index file already exists, reconstruct radix from existing index.
             if (!builderOverwrite && PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile))
             {
                 // cache exists in local cache file and index, reload the index.
                 radix = PixelsCacheUtil.loadRadixIndex(indexFile);
-                // build cachedColumnlets for PixelsCacheWriter.
+                // build cachedColumnChunks for PixelsCacheWriter.
                 int cachedVersion = PixelsCacheUtil.getIndexVersion(indexFile);
                 MetadataService metadataService = new MetadataService(
                         cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
@@ -179,7 +179,7 @@ public class PixelsCacheWriter
                         cacheConfig.getSchema(), cacheConfig.getTable(), cachedVersion);
                 Compact compact = cachedLayout.getCompact();
                 int cacheBorder = compact.getCacheBorder();
-                cachedColumnlets.addAll(compact.getColumnletOrder().subList(0, cacheBorder));
+                cachedColumnChunks.addAll(compact.getColumnChunkOrder().subList(0, cacheBorder));
                 metadataService.shutdown();
             }
             //   else, create a new radix tree, and initialize the index and cache file.
@@ -193,7 +193,7 @@ public class PixelsCacheWriter
             Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
 
             return new PixelsCacheWriter(cacheFile, indexFile, storage, radix,
-                    cachedColumnlets, etcdUtil, builderHostName);
+                    cachedColumnChunks, etcdUtil, builderHostName);
         }
     }
 
@@ -323,7 +323,7 @@ public class PixelsCacheWriter
         // get the new caching layout
         Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
-        List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
+        List<String> cacheColumnletOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
         // set rwFlag as write
         logger.debug("Set index rwFlag as write");
         try
@@ -431,7 +431,7 @@ public class PixelsCacheWriter
          */
         Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
-        List<String> nextVersionCached = compact.getColumnletOrder().subList(0, cacheBorder);
+        List<String> nextVersionCached = compact.getColumnChunkOrder().subList(0, cacheBorder);
         /**
          * Prepare structures for the survived and new coming cache elements.
          */

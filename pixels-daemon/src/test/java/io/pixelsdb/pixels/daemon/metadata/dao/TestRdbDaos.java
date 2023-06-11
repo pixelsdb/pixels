@@ -112,11 +112,11 @@ public class TestRdbDaos
         Layout layout1 = new Layout(layout);
         List<String> columnOrder = layout1.getOrdered().getColumnOrder();
         int cacheBorder = layout1.getCompact().getCacheBorder();
-        List<String> columnletOrder = layout1.getCompact().getColumnletOrder();
+        List<String> columnChunkOrder = layout1.getCompact().getColumnChunkOrder();
         Set<String> cachedColumns = new HashSet<>();
         for (int i = 0; i < cacheBorder; ++i)
         {
-            int columnId = Integer.parseInt(columnletOrder.get(i).split(":")[1]);
+            int columnId = Integer.parseInt(columnChunkOrder.get(i).split(":")[1]);
             cachedColumns.add(columnOrder.get(columnId));
         }
 

@@ -30,7 +30,7 @@ public class Compact
     private int numRowGroupInBlock;
     private int numColumn;
     private int cacheBorder;
-    private List<String> columnletOrder = new ArrayList<>();
+    private List<String> columnChunkOrder = new ArrayList<>();
 
     public int getNumRowGroupInBlock()
     {
@@ -62,18 +62,18 @@ public class Compact
         this.cacheBorder = cacheBorder;
     }
 
-    public List<String> getColumnletOrder()
+    public List<String> getColumnChunkOrder()
     {
-        return columnletOrder;
+        return columnChunkOrder;
     }
 
-    public void setColumnletOrder(List<String> columnletOrder)
+    public void setColumnChunkOrder(List<String> columnChunkOrder)
     {
-        this.columnletOrder = columnletOrder;
+        this.columnChunkOrder = columnChunkOrder;
     }
 
-    public void addColumnletOrder(String columnlet)
+    public void addColumnChunkOrder(String columnChunk)
     {
-        this.columnletOrder.add(columnlet);
+        this.columnChunkOrder.add(columnChunk);
     }
 }

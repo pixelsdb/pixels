@@ -22,12 +22,12 @@ package io.pixelsdb.pixels.core.compactor;
 /**
  * @author hank
  */
-public class ColumnletIndex
+public class ColumnChunkIndex
 {
     private int columnId = -1;
     private int rowGroupId = -1;
 
-    public ColumnletIndex(int rowGroupId, int columnId)
+    public ColumnChunkIndex(int rowGroupId, int columnId)
     {
         this.rowGroupId = rowGroupId;
         this.columnId = columnId;
