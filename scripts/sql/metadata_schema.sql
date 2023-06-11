@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`LAYOUTS` (
                                                            `LAYOUT_ORDERED` MEDIUMTEXT NOT NULL COMMENT 'The default order of this layout. It is used to determine the column order in a single-row-group blocks.',
                                                            `LAYOUT_COMPACT` LONGTEXT NOT NULL COMMENT 'the layout strategy, stored as json. It is used to determine how row groups are compacted into a big block.',
                                                            `LAYOUT_SPLITS` LONGTEXT NOT NULL COMMENT 'The suggested split size for access patterns, stored as json.',
-                                                           `LAYOUT_PROJECTIONS` LONGTEXT NOT NULL,
+                                                           `LAYOUT_PROJECTIONS` LONGTEXT NOT NULL COMMENT 'The projections each maps a set of columns to a different set of paths.',
                                                            `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
                                                            `TBLS_TBL_ID` BIGINT NOT NULL,
                                                            PRIMARY KEY (`LAYOUT_ID`),

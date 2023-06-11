@@ -42,7 +42,7 @@ public class CompactLayout
 
     public static CompactLayout fromCompact(Compact compact)
     {
-        CompactLayout layout = new CompactLayout(compact.getNumRowGroupInBlock(), compact.getNumColumn());
+        CompactLayout layout = new CompactLayout(compact.getNumRowGroupInFile(), compact.getNumColumn());
         for (String columnChunkStr : compact.getColumnChunkOrder())
         {
             String[] splits = columnChunkStr.split(":");

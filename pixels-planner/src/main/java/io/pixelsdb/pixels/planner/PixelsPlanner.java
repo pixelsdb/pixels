@@ -1421,7 +1421,7 @@ public class PixelsPlanner
                 logger.debug("split size for table '" + table.getTableName() + "': " + splitSize + " after adjustment");
             }
             logger.debug("using split size: " + splitSize);
-            int rowGroupNum = splits.getNumRowGroupInBlock();
+            int rowGroupNum = splits.getNumRowGroupInFile();
 
             // get compact path
             String[] compactPaths;
@@ -1446,8 +1446,8 @@ public class PixelsPlanner
                 ProjectionPattern projectionPattern = projectionsIndex.search(columnSet);
                 if (projectionPattern != null)
                 {
-                    logger.debug("suitable projection pattern is found, path='" + projectionPattern.getPath() + '\'');
-                    compactPaths = projectionPattern.getPath().split(";");
+                    logger.debug("suitable projection pattern is found, path='" + projectionPattern.getPaths() + '\'');
+                    compactPaths = projectionPattern.getPaths();
                 }
                 else
                 {
@@ -1518,11 +1518,11 @@ public class PixelsPlanner
         {
             case INVERTED:
                 index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
-                        splits.getNumRowGroupInBlock());
+                        splits.getNumRowGroupInFile());
                 break;
             case COST_BASED:
                 index = new CostBasedSplitsIndex(this.metadataService, schemaTableName,
-                        splits.getNumRowGroupInBlock(), splits.getNumRowGroupInBlock());
+                        splits.getNumRowGroupInFile(), splits.getNumRowGroupInFile());
                 break;
             default:
                 throw new UnsupportedOperationException("splits index type '" + indexType + "' is not supported");

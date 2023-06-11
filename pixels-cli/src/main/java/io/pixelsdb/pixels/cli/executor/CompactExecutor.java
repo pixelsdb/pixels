@@ -78,7 +78,7 @@ public class CompactExecutor implements CommandExecutor
         requireNonNull(layout, String.format("writable layout is not found for table '%s.%s'.",
                 schemaName, tableName));
         Compact compact = layout.getCompact();
-        int numRowGroupInBlock = compact.getNumRowGroupInBlock();
+        int numRowGroupInBlock = compact.getNumRowGroupInFile();
         int numColumn = compact.getNumColumn();
         CompactLayout compactLayout;
         if (naive.equalsIgnoreCase("yes") || naive.equalsIgnoreCase("y"))

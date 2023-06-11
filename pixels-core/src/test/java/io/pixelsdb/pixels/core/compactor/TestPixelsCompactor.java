@@ -53,7 +53,7 @@ public class TestPixelsCompactor
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = layouts.get(0);
         Compact compact = layout.getCompact();
-        int rowGroupNum = compact.getNumRowGroupInBlock();
+        int rowGroupNum = compact.getNumRowGroupInFile();
         int colNum = compact.getNumColumn();
         CompactLayout compactLayout = new CompactLayout(rowGroupNum, colNum);
         for (int i = 0; i < rowGroupNum; i++)
@@ -133,10 +133,10 @@ public class TestPixelsCompactor
 
         // compact
         int NO = 0;
-        for (int i = 0; i + compact.getNumRowGroupInBlock() < statuses.size(); i += compact.getNumRowGroupInBlock())
+        for (int i = 0; i + compact.getNumRowGroupInFile() < statuses.size(); i += compact.getNumRowGroupInFile())
         {
             List<String> sourcePaths = new ArrayList<>();
-            for (int j = 0; j < compact.getNumRowGroupInBlock(); ++j)
+            for (int j = 0; j < compact.getNumRowGroupInFile(); ++j)
             {
                 //System.out.println(statuses[i+j].getPath().toString());
                 sourcePaths.add(statuses.get(i + j).getPath());

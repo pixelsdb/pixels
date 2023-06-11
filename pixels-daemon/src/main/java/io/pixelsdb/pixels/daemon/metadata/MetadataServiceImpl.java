@@ -19,8 +19,12 @@
  */
 package io.pixelsdb.pixels.daemon.metadata;
 
+import com.alibaba.fastjson.JSON;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ProtocolStringList;
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.metadata.domain.*;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
@@ -54,10 +58,10 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
 
     /**
      * Build the initial schema version proto object without range index.
-     * @param table the table that the schema version belongs to
+     * @param table the table that the schema version belongs to, must have valid id
      * @param columns the columns owned by the schema version
      * @param transTs the transaction timestamp (i.e., version) of the schema version
-     * @return the initial schema version
+     * @return the initial schema version, the id of the schema version is not set
      */
     public static MetadataProto.SchemaVersion buildInitSchemaVersion(MetadataProto.Table table,
                                                                  List<MetadataProto.Column> columns, long transTs)
@@ -68,28 +72,86 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
 
     /**
      * Build the initial data layout of the given table and schema version.
-     * @param table the given table, must have id
-     * @param schemaVersion the given schema version, must have id
+     * @param table the given table, must have valid id
+     * @param schemaVersion the given schema version, must have valid id
      * @param columns the columns owned by the data layout
-     * @return the initial data layout
+     * @return the initial data layout, the id of the layout is not set
      */
     public static MetadataProto.Layout buildInitLayout(MetadataProto.Table table, MetadataProto.SchemaVersion schemaVersion,
                                                        List<MetadataProto.Column> columns)
     {
-        return null;
+        Ordered ordered = new Ordered();
+        for (MetadataProto.Column column : columns)
+        {
+            ordered.addColumnOrder(column.getName());
+        }
+        int compactFactor = Integer.parseInt(ConfigFactory.Instance().getProperty("compact.factor"));
+        OriginSplitPattern splitPattern = new OriginSplitPattern();
+        Compact compact = new Compact();
+        compact.setNumColumn(columns.size());
+        compact.setNumRowGroupInFile(compactFactor);
+        compact.setCacheBorder(0); // cache is disabled for initial layout
+        for (int columnId = 0; columnId < columns.size(); ++ columnId)
+        {
+            for (int rowGroupId = 0; rowGroupId < compactFactor; ++ rowGroupId)
+            {
+                // build a fully compact layout with all the chunks of the same column stored together
+                compact.addColumnChunkOrder(rowGroupId, columnId);
+            }
+            // build the only split pattern that contains all the columns
+            splitPattern.addAccessedColumns(columnId);
+        }
+        splitPattern.setNumRowGroupInSplit(compactFactor);
+        Splits splits = new Splits();
+        splits.setNumRowGroupInFile(compactFactor);
+        splits.addSplitPatterns(splitPattern);
+        // build an empty projection
+        Projections projections = new Projections();
+        projections.setNumProjections(0);
+        projections.setProjectionPatterns(ImmutableList.of());
+        return MetadataProto.Layout.newBuilder()
+                .setVersion(0) // the version of layout starts from 0
+                .setCreateAt(System.currentTimeMillis())
+                .setPermission(MetadataProto.Permission.READ_WRITE) // the initial layout should be writable
+                .setOrdered(JSON.toJSONString(ordered))
+                .setCompact(JSON.toJSONString(compact))
+                .setSplits(JSON.toJSONString(splits))
+                .setProjections(JSON.toJSONString(projections))
+                .setSchemaVersionId(schemaVersion.getId())
+                .setTableId(table.getId()).build(); // no need to set the ordered paths and compact paths
     }
 
     /**
      * Build the initial paths for the given layout, without attaching to any ranges.
-     * @param layout the given layout
+     * @param layout the given layout, must have valid id and version
      * @param basePathUris the URIs of the base paths
      * @param isCompact whether the paths are compact paths
-     * @return the initial paths
+     * @return the initial paths, the ids and range ids of the paths are not set
      */
     public static List<MetadataProto.Path> buildInitPaths(MetadataProto.Layout layout,
                                                           ProtocolStringList basePathUris, boolean isCompact)
     {
-        return null;
+        ImmutableList.Builder<MetadataProto.Path> pathsBuilder = ImmutableList.builderWithExpectedSize(basePathUris.size());
+        for (String basePathUri : basePathUris)
+        {
+            if (!basePathUri.endsWith("/"))
+            {
+                basePathUri += "/";
+            }
+            if (isCompact)
+            {
+                pathsBuilder.add(MetadataProto.Path.newBuilder()
+                        .setUri(basePathUri + "v-" + layout.getVersion() + "-compact")
+                        .setIsCompact(true).setLayoutId(layout.getId()).build());
+            }
+            else
+            {
+                pathsBuilder.add(MetadataProto.Path.newBuilder()
+                        .setUri(basePathUri + "v-" + layout.getVersion() + "-ordered")
+                        .setIsCompact(false).setLayoutId(layout.getId()).build());
+            }
+        }
+        return pathsBuilder.build();
     }
 
     /**

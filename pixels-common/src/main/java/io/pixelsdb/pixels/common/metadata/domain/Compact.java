@@ -27,19 +27,19 @@ import java.util.List;
  */
 public class Compact
 {
-    private int numRowGroupInBlock;
+    private int numRowGroupInFile;
     private int numColumn;
     private int cacheBorder;
     private List<String> columnChunkOrder = new ArrayList<>();
 
-    public int getNumRowGroupInBlock()
+    public int getNumRowGroupInFile()
     {
-        return numRowGroupInBlock;
+        return numRowGroupInFile;
     }
 
-    public void setNumRowGroupInBlock(int numRowGroupInBlock)
+    public void setNumRowGroupInFile(int numRowGroupInFile)
     {
-        this.numRowGroupInBlock = numRowGroupInBlock;
+        this.numRowGroupInFile = numRowGroupInFile;
     }
 
     public int getNumColumn()
@@ -72,8 +72,8 @@ public class Compact
         this.columnChunkOrder = columnChunkOrder;
     }
 
-    public void addColumnChunkOrder(String columnChunk)
+    public void addColumnChunkOrder(int rowGroupId, int columnId)
     {
-        this.columnChunkOrder.add(columnChunk);
+        this.columnChunkOrder.add(rowGroupId + ":" + columnId);
     }
 }

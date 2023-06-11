@@ -29,7 +29,7 @@ import java.util.List;
 public class OriginProjectionPattern
 {
     private List<Integer> accessedColumns = new ArrayList<>();
-    private String path;
+    private String[] paths;
 
     public List<Integer> getAccessedColumns()
     {
@@ -47,13 +47,13 @@ public class OriginProjectionPattern
         this.accessedColumns.add(accessedColumn);
     }
 
-    public String getPath()
+    public String[] getPaths()
     {
-        return path;
+        return paths;
     }
 
-    public void setPath(String path)
+    public void setPaths(String... path)
     {
-        this.path = path;
+        this.paths = path;
     }
 }

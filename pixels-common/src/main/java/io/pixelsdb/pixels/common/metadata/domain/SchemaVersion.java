@@ -40,7 +40,7 @@ public class SchemaVersion extends Base
     public SchemaVersion(MetadataProto.SchemaVersion schemaVersion)
     {
         this.columns = Column.convertColumns(schemaVersion.getColumnsList());
-        this.transTs = schemaVersion.getTimestamp();
+        this.transTs = schemaVersion.getTransTs();
         this.tableId = schemaVersion.getTableId();
         if (schemaVersion.hasRangeIndexId())
         {

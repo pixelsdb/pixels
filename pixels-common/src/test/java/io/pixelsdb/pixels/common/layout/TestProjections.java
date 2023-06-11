@@ -36,7 +36,7 @@ public class TestProjections
         Projections projections = new Projections();
         projections.setNumProjections(1);
         OriginProjectionPattern projectionPattern = new OriginProjectionPattern();
-        projectionPattern.setPath("s3://pixels-00");
+        projectionPattern.setPaths("s3://pixels-00");
         for (int i = 0; i < 1187; ++i)
         {
             projectionPattern.addAccessedColumns(i);
@@ -55,7 +55,7 @@ public class TestProjections
         for (OriginProjectionPattern pattern : projections.getProjectionPatterns())
         {
             System.out.println(pattern.getAccessedColumns());
-            System.out.println(pattern.getPath());
+            System.out.println(pattern.getPaths());
         }
     }
 }
