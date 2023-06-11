@@ -20,7 +20,12 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.JSON;
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.daemon.MetadataProto;
+
+import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -43,6 +48,18 @@ public class PeerPath extends Base
         this.columns = JSON.parseObject(this.columnsJson, Columns.class);
         this.pathId = proto.getPathId();
         this.peerId = proto.getPeerId();
+    }
+
+    public static List<PeerPath> convertPeerPaths(List<MetadataProto.PeerPath> protoPeerPaths)
+    {
+        requireNonNull(protoPeerPaths, "protoPeerPaths is null");
+        ImmutableList.Builder<PeerPath> pathsBuilder =
+                ImmutableList.builderWithExpectedSize(protoPeerPaths.size());
+        for (MetadataProto.PeerPath protoPeerPath : protoPeerPaths)
+        {
+            pathsBuilder.add(new PeerPath(protoPeerPath));
+        }
+        return pathsBuilder.build();
     }
 
     public String getUri()

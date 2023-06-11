@@ -25,11 +25,7 @@ import io.pixelsdb.pixels.daemon.metadata.dao.PathDao;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.PreparedStatement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -158,7 +154,14 @@ public class RdbPathDao extends PathDao
             pst.setString(1, path.getUri());
             pst.setBoolean(2, path.getIsCompact());
             pst.setLong(3, path.getLayoutId());
-            pst.setLong(4, path.getRangeId());
+            if (path.hasRangeId())
+            {
+                pst.setLong(4, path.getRangeId());
+            }
+            else
+            {
+                pst.setNull(4, Types.BIGINT);
+            }
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
