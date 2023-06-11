@@ -881,8 +881,7 @@ public class MetadataService
     }
 
     public boolean createTable(String schemaName, String tableName, Storage.Scheme storageScheme,
-                               List<String> orderedPathUris, List<String> compactPathUris,
-                               List<Column> columns) throws MetadataException
+                               List<String> basePathUris, List<Column> columns) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         assert tableName != null && !tableName.isEmpty();
@@ -901,8 +900,7 @@ public class MetadataService
         MetadataProto.CreateTableRequest request = MetadataProto.CreateTableRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName).setTableName(tableName).setStorageScheme(storageScheme.name())
-                .addAllOrderedPathUris(orderedPathUris).addAllCompactPathUris(compactPathUris)
-                .addAllColumns(columnList).build();
+                .addAllBasePathUris(basePathUris).addAllColumns(columnList).build();
         MetadataProto.CreateTableResponse response = this.stub.createTable(request);
         if (response.getHeader().getErrorCode() != 0)
         {
