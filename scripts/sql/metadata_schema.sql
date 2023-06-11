@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`TBLS` (
                                                         `TBL_ID` BIGINT NOT NULL AUTO_INCREMENT,
                                                         `TBL_NAME` VARCHAR(128) NOT NULL,
     `TBL_TYPE` VARCHAR(128) NULL,
-    `TBL_STORAGE_SCHEME` VARCHAR(32) NOT NULL DEFAULT 'file',
-    `TBL_ROW_COUNT` BIGINT NOT NULL DEFAULT 0,
+    `TBL_STORAGE_SCHEME` VARCHAR(32) NOT NULL DEFAULT 'file' COMMENT 'The name of the storage scheme of the files stored in all the paths of this table.',
+    `TBL_ROW_COUNT` BIGINT NOT NULL DEFAULT 0 COMMENT 'The number of rows in this table.',
     `DBS_DB_ID` BIGINT NOT NULL,
     PRIMARY KEY (`TBL_ID`),
     INDEX `fk_TBLS_DBS_idx` (`DBS_DB_ID` ASC) VISIBLE,
@@ -110,8 +110,8 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
                                                                    `SV_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                                   `SV_COLUMNS` MEDIUMTEXT NOT NULL,
-                                                                   `SV_TIMESTAMP` BIGINT NOT NULL,
+                                                                   `SV_COLUMNS` MEDIUMTEXT NOT NULL COMMENT 'The json string that contains the ids of the columns owned by this schema version.',
+                                                                   `SV_TRANS_TS` BIGINT NOT NULL COMMENT 'The transaction timestamp of this schema version.',
                                                                    `TBLS_TBL_ID` BIGINT NOT NULL,
                                                                    `RANGE_INDEXES_RI_ID` BIGINT NULL DEFAULT NULL,
                                                                    PRIMARY KEY (`SV_ID`),
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`LAYOUTS` (
                                                            `LAYOUT_ID` BIGINT NOT NULL AUTO_INCREMENT,
                                                            `LAYOUT_VERSION` BIGINT NOT NULL COMMENT 'The version of this layout.',
-                                                           `LAYOUT_CREATE_AT` BIGINT NOT NULL COMMENT 'The time (output of System.currentTimeMillis()) on which this layout is created.',
+                                                           `LAYOUT_CREATE_AT` BIGINT NOT NULL COMMENT 'The milliseconds of moment since the unix epoch that this layout is created.',
                                                            `LAYOUT_PERMISSION` TINYINT NOT NULL COMMENT '<0 for not readable and writable, 0 for readable only, >0 for readable and writable.',
                                                            `LAYOUT_ORDERED` MEDIUMTEXT NOT NULL COMMENT 'The default order of this layout. It is used to determine the column order in a single-row-group blocks.',
                                                            `LAYOUT_COMPACT` LONGTEXT NOT NULL COMMENT 'the layout strategy, stored as json. It is used to determine how row groups are compacted into a big block.',
@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PATHS` (
                                                          `PATH_ID` BIGINT NOT NULL AUTO_INCREMENT,
                                                          `PATH_URI` VARCHAR(4096) NOT NULL,
-    `PATH_IS_COMPACT` TINYINT NOT NULL,
+    `PATH_IS_COMPACT` TINYINT NOT NULL COMMENT 'True if the files in this path are compact.',
     `LAYOUTS_LAYOUT_ID` BIGINT NOT NULL,
     `RANGES_RANGE_ID` BIGINT NULL DEFAULT NULL,
     PRIMARY KEY (`PATH_ID`),
@@ -283,10 +283,10 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`USER_HAS_DB` (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEERS` (
                                                          `PEER_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                         `PEER_NAME` VARCHAR(128) NOT NULL,
-    `PEER_LOCATION` VARCHAR(1024) NOT NULL,
-    `PEER_HOST` VARCHAR(128) NOT NULL,
-    `PEER_PORT` INT NOT NULL,
+                                                         `PEER_NAME` VARCHAR(128) NOT NULL COMMENT 'The name of the peer, must be unique.',
+    `PEER_LOCATION` VARCHAR(1024) NOT NULL COMMENT 'The geographic location of the peer.',
+    `PEER_HOST` VARCHAR(128) NOT NULL COMMENT 'The registered host name or ip address of the peer.',
+    `PEER_PORT` INT NOT NULL COMMENT 'The registered port of this peer.',
     `PEER_STORAGE_SCHEME` VARCHAR(32) NOT NULL,
     PRIMARY KEY (`PEER_ID`),
     UNIQUE INDEX `PEER_NAME_UNIQUE` (`PEER_NAME` ASC) VISIBLE)
@@ -301,7 +301,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEERS` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
                                                               `PEER_PATH_ID` BIGINT NOT NULL AUTO_INCREMENT,
                                                               `PEER_PATH_URI` VARCHAR(32) NOT NULL,
-    `PEER_PATH_COLUMNS` MEDIUMTEXT NOT NULL,
+    `PEER_PATH_COLUMNS` MEDIUMTEXT NOT NULL COMMENT 'The json string that contains the ids of the columns stored in this peer path.',
     `PATHS_PATH_ID` BIGINT NOT NULL,
     `PEERS_PEER_ID` BIGINT NOT NULL,
     PRIMARY KEY (`PEER_PATH_ID`),

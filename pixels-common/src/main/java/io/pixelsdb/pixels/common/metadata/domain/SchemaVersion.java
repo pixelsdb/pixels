@@ -31,7 +31,7 @@ import java.util.List;
 public class SchemaVersion extends Base
 {
     private List<Column> columns;
-    private long timestamp;
+    private long transTs;
     private long tableId;
     private long rangeIndexId;
 
@@ -40,7 +40,7 @@ public class SchemaVersion extends Base
     public SchemaVersion(MetadataProto.SchemaVersion schemaVersion)
     {
         this.columns = Column.convertColumns(schemaVersion.getColumnsList());
-        this.timestamp = schemaVersion.getTimestamp();
+        this.transTs = schemaVersion.getTimestamp();
         this.tableId = schemaVersion.getTableId();
         if (schemaVersion.hasRangeIndexId())
         {
@@ -62,14 +62,14 @@ public class SchemaVersion extends Base
         this.columns = columns;
     }
 
-    public long getTimestamp()
+    public long getTransTs()
     {
-        return timestamp;
+        return transTs;
     }
 
-    public void setTimestamp(long timestamp)
+    public void setTransTs(long transTs)
     {
-        this.timestamp = timestamp;
+        this.transTs = transTs;
     }
 
     public long getTableId()

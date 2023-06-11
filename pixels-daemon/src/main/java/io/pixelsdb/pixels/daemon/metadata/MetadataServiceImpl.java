@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.metadata;
 
+import com.google.protobuf.ProtocolStringList;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.daemon.MetadataProto;
@@ -50,6 +51,46 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     private final PeerPathDao peerPathDao = DaoFactory.Instance().getPeerPathDao();
 
     public MetadataServiceImpl () { }
+
+    /**
+     * Build the initial schema version proto object without range index.
+     * @param table the table that the schema version belongs to
+     * @param columns the columns owned by the schema version
+     * @param transTs the transaction timestamp (i.e., version) of the schema version
+     * @return the initial schema version
+     */
+    public static MetadataProto.SchemaVersion buildInitSchemaVersion(MetadataProto.Table table,
+                                                                 List<MetadataProto.Column> columns, long transTs)
+    {
+        return MetadataProto.SchemaVersion.newBuilder()
+                .addAllColumns(columns).setTransTs(transTs).setTableId(table.getId()).build();
+    }
+
+    /**
+     * Build the initial data layout of the given table and schema version.
+     * @param table the given table, must have id
+     * @param schemaVersion the given schema version, must have id
+     * @param columns the columns owned by the data layout
+     * @return the initial data layout
+     */
+    public static MetadataProto.Layout buildInitLayout(MetadataProto.Table table, MetadataProto.SchemaVersion schemaVersion,
+                                                       List<MetadataProto.Column> columns)
+    {
+        return null;
+    }
+
+    /**
+     * Build the initial paths for the given layout, without attaching to any ranges.
+     * @param layout the given layout
+     * @param basePathUris the URIs of the base paths
+     * @param isCompact whether the paths are compact paths
+     * @return the initial paths
+     */
+    public static List<MetadataProto.Path> buildInitPaths(MetadataProto.Layout layout,
+                                                          ProtocolStringList basePathUris, boolean isCompact)
+    {
+        return null;
+    }
 
     /**
      * @param request

@@ -30,18 +30,18 @@ public class Layout extends Base
     private long createAt;
     private Permission permission;
     private Ordered ordered;
-    private List<Path> orderedPaths;
-    private Compact compact;
-    private List<Path> compactPaths;
-    private Splits splits;
-    private Projections projections;
-    private long tableId;
     private String orderedJson;
+    private List<Path> orderedPaths;
     private String[] orderedPathUris;
+    private Compact compact;
     private String compactJson;
+    private List<Path> compactPaths;
     private String[] compactPathUris;
+    private Splits splits;
     private String splitsJson;
+    private Projections projections;
     private String projectionsJson;
+    private long tableId;
 
     public Layout() { }
 
