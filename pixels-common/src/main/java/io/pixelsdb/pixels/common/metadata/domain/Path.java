@@ -45,7 +45,14 @@ public class Path extends Base
         this.uri = path.getUri();
         this.isCompact = path.getIsCompact();
         this.layoutId = path.getLayoutId();
-        this.rangeId = path.getRangeId();
+        if (path.hasRangeId())
+        {
+            this.rangeId = path.getRangeId();
+        }
+        else
+        {
+            this.rangeId = 0;
+        }
     }
 
     public static List<Path> convertPaths(List<MetadataProto.Path> protoPaths)

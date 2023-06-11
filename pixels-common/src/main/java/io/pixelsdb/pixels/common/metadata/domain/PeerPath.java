@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.common.metadata.domain;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -40,16 +39,12 @@ public class PeerPath extends Base
 
     public PeerPath() { }
 
-    public PeerPath(MetadataProto.PeerPath proto)
+    public PeerPath(MetadataProto.PeerPath peerPath)
     {
-        this.uri = proto.getUri();
-        this.columns = new ArrayList<>(proto.getColumnsCount());
-        for (MetadataProto.Column column : proto.getColumnsList())
-        {
-            this.columns.add(new Column(column));
-        }
-        this.pathId = proto.getPathId();
-        this.peerId = proto.getPeerId();
+        this.uri = peerPath.getUri();
+        this.columns = Column.convertColumns(peerPath.getColumnsList());
+        this.pathId = peerPath.getPathId();
+        this.peerId = peerPath.getPeerId();
     }
 
     public static List<PeerPath> convertPeerPaths(List<MetadataProto.PeerPath> protoPeerPaths)

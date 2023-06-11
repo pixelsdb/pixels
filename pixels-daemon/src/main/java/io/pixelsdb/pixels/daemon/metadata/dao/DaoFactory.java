@@ -3,8 +3,8 @@ package io.pixelsdb.pixels.daemon.metadata.dao;
 import io.pixelsdb.pixels.daemon.metadata.dao.impl.*;
 
 /**
- * Created at: 19-10-16
- * Author: hank
+ * @author hank
+ * @create 2019-10-16
  */
 public class DaoFactory
 {
@@ -27,6 +27,7 @@ public class DaoFactory
     private final PathDao pathDao;
     private final PeerDao peerDao;
     private final PeerPathDao peerPathDao;
+    private final SchemaVersionDao schemaVersionDao;
 
     private DaoFactory ()
     {
@@ -38,6 +39,7 @@ public class DaoFactory
         this.pathDao = new RdbPathDao();
         this.peerDao = new RdbPeerDao();
         this.peerPathDao = new RdbPeerPathDao();
+        this.schemaVersionDao = new RdbSchemaVersionDao();
     }
 
     public ColumnDao getColumnDao ()
@@ -78,5 +80,10 @@ public class DaoFactory
     public PeerPathDao getPeerPathDao()
     {
         return this.peerPathDao;
+    }
+
+    public SchemaVersionDao getSchemaVersionDao()
+    {
+        return this.schemaVersionDao;
     }
 }

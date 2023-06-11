@@ -37,13 +37,13 @@ public class Peer extends Base
 
     public Peer() { }
 
-    public Peer(MetadataProto.Peer proto)
+    public Peer(MetadataProto.Peer peer)
     {
-        this.name = proto.getName();
-        this.location = proto.getLocation();
-        this.host = proto.getHost();
-        this.port = proto.getPort();
-        this.storageScheme = Storage.Scheme.from(proto.getStorageScheme());
+        this.name = peer.getName();
+        this.location = peer.getLocation();
+        this.host = peer.getHost();
+        this.port = peer.getPort();
+        this.storageScheme = Storage.Scheme.from(peer.getStorageScheme());
     }
 
     public String getName()

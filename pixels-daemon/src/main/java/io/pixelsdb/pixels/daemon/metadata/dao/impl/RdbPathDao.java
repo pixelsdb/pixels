@@ -55,6 +55,7 @@ public class RdbPathDao extends PathDao
                         .setUri(rs.getString("PATH_URI"))
                         .setIsCompact(rs.getBoolean("PATH_IS_COMPACT"))
                         .setLayoutId(rs.getLong("LAYOUTS_LAYOUT_ID"))
+                        // Issue #437: range id is set to 0 if it is null in metadata.
                         .setRangeId(rs.getLong("RANGES_RANGE_ID")).build();
                 return path;
             }
@@ -81,6 +82,7 @@ public class RdbPathDao extends PathDao
                         .setUri(rs.getString("PATH_URI"))
                         .setIsCompact(rs.getBoolean("PATH_IS_COMPACT"))
                         .setLayoutId(layoutId)
+                        // Issue #437: range id is set to 0 if it is null in metadata.
                         .setRangeId(rs.getLong("RANGES_RANGE_ID")).build();
                 paths.add(path);
             }

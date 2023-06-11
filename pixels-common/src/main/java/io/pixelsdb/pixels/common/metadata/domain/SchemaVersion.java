@@ -19,9 +19,12 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import io.pixelsdb.pixels.daemon.MetadataProto;
+
 import java.util.List;
 
 /**
+ * The schema version of a table.
  * @author hank
  * @create 2023-06-11
  */
@@ -34,5 +37,58 @@ public class SchemaVersion extends Base
 
     public SchemaVersion() { }
 
+    public SchemaVersion(MetadataProto.SchemaVersion schemaVersion)
+    {
+        this.columns = Column.convertColumns(schemaVersion.getColumnsList());
+        this.timestamp = schemaVersion.getTimestamp();
+        this.tableId = schemaVersion.getTableId();
+        if (schemaVersion.hasRangeIndexId())
+        {
+            this.rangeIndexId = schemaVersion.getRangeIndexId();
+        }
+        else
+        {
+            this.rangeIndexId = 0;
+        }
+    }
 
+    public List<Column> getColumns()
+    {
+        return columns;
+    }
+
+    public void setColumns(List<Column> columns)
+    {
+        this.columns = columns;
+    }
+
+    public long getTimestamp()
+    {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp)
+    {
+        this.timestamp = timestamp;
+    }
+
+    public long getTableId()
+    {
+        return tableId;
+    }
+
+    public void setTableId(long tableId)
+    {
+        this.tableId = tableId;
+    }
+
+    public long getRangeIndexId()
+    {
+        return rangeIndexId;
+    }
+
+    public void setRangeIndexId(long rangeIndexId)
+    {
+        this.rangeIndexId = rangeIndexId;
+    }
 }

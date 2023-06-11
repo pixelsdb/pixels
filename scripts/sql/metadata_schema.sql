@@ -78,14 +78,14 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
 
 
 -- -----------------------------------------------------
--- Table `pixels_metadata`.`RANGE_INDEXS`
+-- Table `pixels_metadata`.`RANGE_INDEXES`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXS` (
-                                                                `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                                `RI_STRUCT` MEDIUMBLOB NOT NULL,
-                                                                `KEY_COL_ID` BIGINT NOT NULL,
-                                                                `TBLS_TBL_ID` BIGINT NOT NULL,
-                                                                PRIMARY KEY (`RI_ID`),
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
+                                                                 `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
+                                                                 `RI_STRUCT` MEDIUMBLOB NOT NULL,
+                                                                 `KEY_COL_ID` BIGINT NOT NULL,
+                                                                 `TBLS_TBL_ID` BIGINT NOT NULL,
+                                                                 PRIMARY KEY (`RI_ID`),
     INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
     UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC) VISIBLE,
     INDEX `fk_RANGE_INDEX_COLS_idx` (`KEY_COL_ID` ASC) VISIBLE,
@@ -113,18 +113,18 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
                                                                    `SV_COLUMNS` MEDIUMTEXT NOT NULL,
                                                                    `SV_TIMESTAMP` BIGINT NOT NULL,
                                                                    `TBLS_TBL_ID` BIGINT NOT NULL,
-                                                                   `RANGE_INDEXS_RI_ID` BIGINT NULL DEFAULT NULL,
+                                                                   `RANGE_INDEXES_RI_ID` BIGINT NULL DEFAULT NULL,
                                                                    PRIMARY KEY (`SV_ID`),
     INDEX `fk_SCHEMA_VERSIONS_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
-    INDEX `fk_SCHEMA_VERSIONS_RANGE_INDEXS_idx` (`RANGE_INDEXS_RI_ID` ASC) VISIBLE,
+    INDEX `fk_SCHEMA_VERSIONS_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC) VISIBLE,
     CONSTRAINT `fk_SCHEMA_VERSIONS_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE,
-    CONSTRAINT `fk_SCHEMA_VERSIONS_RANGE_INDEXS`
-    FOREIGN KEY (`RANGE_INDEXS_RI_ID`)
-    REFERENCES `pixels_metadata`.`RANGE_INDEXS` (`RI_ID`)
+    CONSTRAINT `fk_SCHEMA_VERSIONS_RANGE_INDEXES`
+    FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
+    REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
     ON DELETE SET NULL
     ON UPDATE CASCADE)
     ENGINE = InnoDB
@@ -192,13 +192,13 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
                                                           `RANGE_ID` BIGINT NOT NULL AUTO_INCREMENT,
                                                           `RANGE_RECORD_STATS` BLOB NOT NULL,
                                                           `RANGES_PARENT_ID` BIGINT NULL,
-                                                          `RANGE_INDEXS_RI_ID` BIGINT NOT NULL,
+                                                          `RANGE_INDEXES_RI_ID` BIGINT NOT NULL,
                                                           PRIMARY KEY (`RANGE_ID`),
-    INDEX `fk_RANGES_RANGE_INDEXS_idx` (`RANGE_INDEXS_RI_ID` ASC) VISIBLE,
+    INDEX `fk_RANGES_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC) VISIBLE,
     INDEX `fk_RANGES_RANGES_idx` (`RANGES_PARENT_ID` ASC) VISIBLE,
-    CONSTRAINT `fk_RANGES_RANGE_INDEXS`
-    FOREIGN KEY (`RANGE_INDEXS_RI_ID`)
-    REFERENCES `pixels_metadata`.`RANGE_INDEXS` (`RI_ID`)
+    CONSTRAINT `fk_RANGES_RANGE_INDEXES`
+    FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
+    REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE,
     CONSTRAINT `fk_RANGES_RANGES`
