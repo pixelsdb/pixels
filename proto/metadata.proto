@@ -70,7 +70,6 @@ message Schema {
     uint64 id = 1;
     string name = 2;
     string desc = 3;
-    repeated uint64 tableIds = 4;
 }
 
 message Table {
@@ -80,7 +79,6 @@ message Table {
     string storageScheme = 4;
     uint64 rowCount = 5;
     uint64 schemaId = 6;
-    repeated uint64 columnIds = 7;
 }
 
 message Column {
@@ -102,7 +100,6 @@ message Peer {
     string host = 4;
     int32 port = 5;
     string storageScheme = 6;
-    repeated uint64 peerPathIds = 7;
 }
 
 message PeerPath {
@@ -133,7 +130,6 @@ message Path {
     bool isCompact = 3;
     uint64 layoutId = 4;
     optional uint64 rangeId = 5;
-    repeated uint64 peerPathIds = 6;
 }
 
 message SchemaVersion {
@@ -141,6 +137,7 @@ message SchemaVersion {
     repeated Column columns = 2;
     uint64 timestamp = 3;
     uint64 tableId = 4;
+    optional uint64 rangeIndexId = 5;
 }
 
 enum Permission {

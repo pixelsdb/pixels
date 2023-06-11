@@ -19,10 +19,20 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import java.util.List;
+
 /**
  * @author hank
  * @create 2023-06-11
  */
-public class SchemaVersion
+public class SchemaVersion extends Base
 {
+    private List<Column> columns;
+    private long timestamp;
+    private long tableId;
+    private long rangeIndexId;
+
+    public SchemaVersion() { }
+
+
 }

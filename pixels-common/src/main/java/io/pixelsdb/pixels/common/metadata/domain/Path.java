@@ -37,7 +37,6 @@ public class Path extends Base
     private boolean isCompact;
     private long layoutId;
     private long rangeId = 0; // 0 is an invalid id in SQL
-    private List<Long> peerRangeIds;
 
     public Path() { }
 
@@ -47,7 +46,6 @@ public class Path extends Base
         this.isCompact = path.getIsCompact();
         this.layoutId = path.getLayoutId();
         this.rangeId = path.getRangeId();
-        this.peerRangeIds = path.getPeerPathIdsList();
     }
 
     public static List<Path> convertPaths(List<MetadataProto.Path> protoPaths)
@@ -114,16 +112,6 @@ public class Path extends Base
         this.rangeId = rangeId;
     }
 
-    public List<Long> getPeerRangeIds()
-    {
-        return peerRangeIds;
-    }
-
-    public void setPeerRangeIds(List<Long> peerRangeIds)
-    {
-        this.peerRangeIds = peerRangeIds;
-    }
-
     private MetadataProto.Path toProto()
     {
         MetadataProto.Path.Builder builder = MetadataProto.Path.newBuilder()
@@ -132,7 +120,6 @@ public class Path extends Base
         {
             builder.setRangeId(this.rangeId);
         }
-        builder.addAllPeerPathIds(this.peerRangeIds);
         return builder.build();
     }
 }

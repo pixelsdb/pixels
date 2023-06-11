@@ -19,17 +19,12 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
-import com.alibaba.fastjson.annotation.JSONField;
 import io.pixelsdb.pixels.daemon.MetadataProto;
-
-import java.util.HashSet;
-import java.util.Set;
 
 public class Schema extends Base
 {
     private String name;
     private String desc;
-    private Set<Long> tableIds = new HashSet<>();
 
     public Schema()
     {
@@ -39,7 +34,6 @@ public class Schema extends Base
     {
         this.name = schema.getName();
         this.desc = schema.getDesc();
-        this.tableIds.addAll(schema.getTableIdsList());
     }
 
     public String getName()
@@ -62,28 +56,11 @@ public class Schema extends Base
         this.desc = desc;
     }
 
-    @JSONField(serialize = false)
-    public Set<Long> getTableIds()
-    {
-        return tableIds;
-    }
-
-    public void setTables(Set<Long> tableIds)
-    {
-        this.tableIds = tableIds;
-    }
-
-    public void addTableId(long tableId)
-    {
-        this.tableIds.add(tableId);
-    }
-
     @Override
     public String toString()
     {
         return "Schema{" +
                 "name='" + name + '\'' +
-                ", desc='" + desc + '\'' +
-                '}';
+                ", desc='" + desc + '\'' + '}';
     }
 }
