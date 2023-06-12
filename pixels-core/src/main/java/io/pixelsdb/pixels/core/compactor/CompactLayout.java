@@ -31,7 +31,7 @@ public class CompactLayout
 {
     private int rowGroupNumber = 0;
     private int columnNumber = 0;
-    private List<ColumnletIndex> indices = null;
+    private List<ColumnChunkIndex> indices = null;
 
     protected CompactLayout(int rowGroupNumber, int columnNumber)
     {
@@ -42,10 +42,10 @@ public class CompactLayout
 
     public static CompactLayout fromCompact(Compact compact)
     {
-        CompactLayout layout = new CompactLayout(compact.getNumRowGroupInBlock(), compact.getNumColumn());
-        for (String columnletStr : compact.getColumnletOrder())
+        CompactLayout layout = new CompactLayout(compact.getNumRowGroupInFile(), compact.getNumColumn());
+        for (String columnChunkStr : compact.getColumnChunkOrder())
         {
-            String[] splits = columnletStr.split(":");
+            String[] splits = columnChunkStr.split(":");
             int rowGroupId = Integer.parseInt(splits[0]);
             int columnId = Integer.parseInt(splits[1]);
             layout.append(rowGroupId, columnId);
@@ -93,7 +93,7 @@ public class CompactLayout
 
     protected void append(int rowGroupId, int columnId)
     {
-        this.indices.add(new ColumnletIndex(rowGroupId, columnId));
+        this.indices.add(new ColumnChunkIndex(rowGroupId, columnId));
     }
 
     public int size()
@@ -101,7 +101,7 @@ public class CompactLayout
         return rowGroupNumber * columnNumber;
     }
 
-    public ColumnletIndex get(int i)
+    public ColumnChunkIndex get(int i)
     {
         return this.indices.get(i);
     }

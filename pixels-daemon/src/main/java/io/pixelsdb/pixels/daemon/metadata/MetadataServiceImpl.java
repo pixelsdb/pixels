@@ -19,7 +19,12 @@
  */
 package io.pixelsdb.pixels.daemon.metadata;
 
+import com.alibaba.fastjson.JSON;
+import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ProtocolStringList;
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.metadata.domain.*;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
@@ -32,20 +37,122 @@ import java.util.List;
 import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
 /**
- * Created at: 19-4-16
- * Author: hank
+ * @author hank
+ * @create 2019-04-16
+ * @update 2023-06-10 add peer, path, and peerPath related methods.
  */
 public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImplBase
 {
-    private static Logger log = LogManager.getLogger(MetadataServiceImpl.class);
+    private static final Logger log = LogManager.getLogger(MetadataServiceImpl.class);
 
-    private SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
-    private TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
-    private ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
-    private LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
-    private ViewDao viewDao = DaoFactory.Instance().getViewDao("rdb");
+    private final SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao();
+    private final TableDao tableDao = DaoFactory.Instance().getTableDao();
+    private final ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
+    private final LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
+    private final ViewDao viewDao = DaoFactory.Instance().getViewDao();
+    private final PathDao pathDao = DaoFactory.Instance().getPathDao();
+    private final PeerDao peerDao = DaoFactory.Instance().getPeerDao();
+    private final PeerPathDao peerPathDao = DaoFactory.Instance().getPeerPathDao();
+    private final SchemaVersionDao schemaVersionDao = DaoFactory.Instance().getSchemaVersionDao();
 
     public MetadataServiceImpl () { }
+
+    /**
+     * Build the initial schema version proto object without range index.
+     * @param tableId the id of the table that the schema version belongs to
+     * @param columns the columns owned by the schema version, must have ids
+     * @param transTs the transaction timestamp (i.e., version) of the schema version
+     * @return the initial schema version, the id of the schema version is not set
+     */
+    public static MetadataProto.SchemaVersion buildInitSchemaVersion(long tableId, List<MetadataProto.Column> columns, long transTs)
+    {
+        return MetadataProto.SchemaVersion.newBuilder()
+                .addAllColumns(columns).setTransTs(transTs).setTableId(tableId).build();
+    }
+
+    /**
+     * Build the initial data layout of the given table and schema version.
+     * @param tableId the id of the given table
+     * @param schemaVersionId the id of the given schema version
+     * @param columns the columns owned by the data layout, must have names
+     * @return the initial data layout, the id of the layout is not set
+     */
+    public static MetadataProto.Layout buildInitLayout(long tableId, long schemaVersionId, List<MetadataProto.Column> columns)
+    {
+        Ordered ordered = new Ordered();
+        for (MetadataProto.Column column : columns)
+        {
+            ordered.addColumnOrder(column.getName());
+        }
+        int compactFactor = Integer.parseInt(ConfigFactory.Instance().getProperty("compact.factor"));
+        OriginSplitPattern splitPattern = new OriginSplitPattern();
+        Compact compact = new Compact();
+        compact.setNumColumn(columns.size());
+        compact.setNumRowGroupInFile(compactFactor);
+        compact.setCacheBorder(0); // cache is disabled for initial layout
+        for (int columnId = 0; columnId < columns.size(); ++ columnId)
+        {
+            for (int rowGroupId = 0; rowGroupId < compactFactor; ++ rowGroupId)
+            {
+                // build a fully compact layout with all the chunks of the same column stored together
+                compact.addColumnChunkOrder(rowGroupId, columnId);
+            }
+            // build the only split pattern that contains all the columns
+            splitPattern.addAccessedColumns(columnId);
+        }
+        splitPattern.setNumRowGroupInSplit(compactFactor);
+        Splits splits = new Splits();
+        splits.setNumRowGroupInFile(compactFactor);
+        splits.addSplitPatterns(splitPattern);
+        // build an empty projection
+        Projections projections = new Projections();
+        projections.setNumProjections(0);
+        projections.setProjectionPatterns(ImmutableList.of());
+        return MetadataProto.Layout.newBuilder()
+                .setVersion(0) // the version of layout starts from 0
+                .setCreateAt(System.currentTimeMillis())
+                .setPermission(MetadataProto.Permission.READ_WRITE) // the initial layout should be writable
+                .setOrdered(JSON.toJSONString(ordered))
+                .setCompact(JSON.toJSONString(compact))
+                .setSplits(JSON.toJSONString(splits))
+                .setProjections(JSON.toJSONString(projections))
+                .setSchemaVersionId(schemaVersionId)
+                .setTableId(tableId).build(); // no need to set the ordered paths and compact paths
+    }
+
+    /**
+     * Build the initial paths for the given layout, without attaching to any ranges.
+     * @param layoutId the id of the given layout
+     * @param layoutVersion the version of the given layout
+     * @param basePathUris the URIs of the base paths
+     * @param isCompact whether the paths are compact paths
+     * @return the initial paths, the ids and range ids of the paths are not set
+     */
+    public static List<MetadataProto.Path> buildInitPaths(long layoutId, long layoutVersion,
+                                                          ProtocolStringList basePathUris, boolean isCompact)
+    {
+        ImmutableList.Builder<MetadataProto.Path> pathsBuilder = ImmutableList.builderWithExpectedSize(basePathUris.size());
+        for (String basePathUri : basePathUris)
+        {
+            if (!basePathUri.endsWith("/"))
+            {
+                basePathUri += "/";
+            }
+            if (isCompact)
+            {
+                pathsBuilder.add(MetadataProto.Path.newBuilder()
+                        .setUri(basePathUri + "v-" + layoutVersion + "-compact")
+                        .setIsCompact(true).setLayoutId(layoutId).build());
+            }
+            else
+            {
+                pathsBuilder.add(MetadataProto.Path.newBuilder()
+                        .setUri(basePathUri + "v-" + layoutVersion + "-ordered")
+                        .setIsCompact(false).setLayoutId(layoutId).build());
+            }
+        }
+        return pathsBuilder.build();
+    }
 
     /**
      * @param request
@@ -278,7 +385,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                if (request.getVersion() < 0)
+                if (request.getLayoutVersion() < 0)
                 {
                     layout = layoutDao.getLatestByTable(table, request.getPermissionRange());
                     if (layout == null)
@@ -290,12 +397,12 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 }
                 else
                 {
-                    List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, request.getVersion(),
+                    List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, request.getLayoutVersion(),
                             request.getPermissionRange());
                     if (layouts == null || layouts.isEmpty())
                     {
                         headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout of version '" +
-                                request.getVersion() + "' for table '" +
+                                request.getLayoutVersion() + "' for table '" +
                                 request.getSchemaName() + "." + request.getTableName() + "' with permission '" +
                                 request.getPermissionRange().name() + "' not found");
                     } else if (layouts.size() != 1)
@@ -377,6 +484,353 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
+    @Override
+    public void createPath(MetadataProto.CreatePathRequest request, StreamObserver<MetadataProto.CreatePathResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.pathDao.insert(request.getPath()) > 0)
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED).setErrorMsg("create path failed");
+        }
+
+        MetadataProto.CreatePathResponse response = MetadataProto.CreatePathResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getPaths(MetadataProto.GetPathsRequest request, StreamObserver<MetadataProto.GetPathsResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetPathsResponse.Builder responseBuilder = MetadataProto.GetPathsResponse.newBuilder();
+        if (request.hasLayoutId())
+        {
+            List<MetadataProto.Path> paths = this.pathDao.getAllByLayoutId(request.getLayoutId());
+            if (paths != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.addAllPaths(paths).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PATHS_FAILED).setErrorMsg("get paths by layout id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else if (request.hasRangeId())
+        {
+            List<MetadataProto.Path> paths = this.pathDao.getAllByRangeId(request.getRangeId());
+            if (paths != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.addAllPaths(paths).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PATHS_FAILED).setErrorMsg("get paths by range id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_PATHS_FAILED).setErrorMsg("request does not have layout id or range id");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updatePath(MetadataProto.UpdatePathRequest request, StreamObserver<MetadataProto.UpdatePathResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Path path = MetadataProto.Path.newBuilder()
+                .setId(request.getPathId()).setUri(request.getUri()).setIsCompact(request.getIsCompact()).build();
+        if (this.pathDao.update(path))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_PATH_FAILED).setErrorMsg("update path failed");
+        }
+
+        MetadataProto.UpdatePathResponse response = MetadataProto.UpdatePathResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deletePaths(MetadataProto.DeletePathsRequest request, StreamObserver<MetadataProto.DeletePathsResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.pathDao.deleteByIds(request.getPathIdsList()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_PATHS_FAILED).setErrorMsg("delete paths failed");
+        }
+
+        MetadataProto.DeletePathsResponse response = MetadataProto.DeletePathsResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void createPeerPath(MetadataProto.CreatePeerPathRequest request, StreamObserver<MetadataProto.CreatePeerPathResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.peerPathDao.insert(request.getPeerPath()) > 0)
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_PEER_PATH_FAILED).setErrorMsg("create peer path failed");
+        }
+
+        MetadataProto.CreatePeerPathResponse response = MetadataProto.CreatePeerPathResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getPeerPaths(MetadataProto.GetPeerPathsRequest request, StreamObserver<MetadataProto.GetPeerPathsResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetPeerPathsResponse.Builder responseBuilder = MetadataProto.GetPeerPathsResponse.newBuilder();
+        if (request.hasPathId())
+        {
+            List<MetadataProto.PeerPath> peerPaths = this.peerPathDao.getAllByPathId(request.getPathId());
+            if (peerPaths != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.addAllPeerPaths(peerPaths).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PEER_PATHS_FAILED).setErrorMsg("get peer paths by path id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else if (request.hasPeerId())
+        {
+            List<MetadataProto.PeerPath> peerPaths = this.peerPathDao.getAllByPeerId(request.getPeerId());
+            if (peerPaths != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.addAllPeerPaths(peerPaths).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PEER_PATHS_FAILED).setErrorMsg("get peer paths by peer id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_PEER_PATHS_FAILED).setErrorMsg("request does not have path id or peer id");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updatePeerPath(MetadataProto.UpdatePeerPathRequest request, StreamObserver<MetadataProto.UpdatePeerPathResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.PeerPath peerPath = MetadataProto.PeerPath.newBuilder()
+                .setId(request.getPeerPathId()).setUri(request.getUri())
+                .addAllColumns(request.getColumnsList()).build();
+        if (this.peerPathDao.update(peerPath))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_PEER_PATH_FAILED).setErrorMsg("update peer path failed");
+        }
+
+        MetadataProto.UpdatePeerPathResponse response = MetadataProto.UpdatePeerPathResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deletePeerPaths(MetadataProto.DeletePeerPathsRequest request, StreamObserver<MetadataProto.DeletePeerPathsResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.peerPathDao.deleteByIds(request.getPeerPathIdsList()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_PEER_PATHS_FAILED).setErrorMsg("delete peer paths failed");
+        }
+
+        MetadataProto.DeletePeerPathsResponse response = MetadataProto.DeletePeerPathsResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void createPeer(MetadataProto.CreatePeerRequest request, StreamObserver<MetadataProto.CreatePeerResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.peerDao.insert(request.getPeer()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_PEER_FAILED).setErrorMsg("create peer failed");
+        }
+
+        MetadataProto.CreatePeerResponse response = MetadataProto.CreatePeerResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getPeer(MetadataProto.GetPeerRequest request, StreamObserver<MetadataProto.GetPeerResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetPeerResponse.Builder responseBuilder = MetadataProto.GetPeerResponse.newBuilder();
+        if (request.hasId())
+        {
+            MetadataProto.Peer peer = this.peerDao.getById(request.getId());
+            if (peer != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.setPeer(peer).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PEER_FAILED).setErrorMsg("get peer by id failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else if (request.hasName())
+        {
+            MetadataProto.Peer peer = this.peerDao.getByName(request.getName());
+            if (peer != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.setPeer(peer).setHeader(headerBuilder);
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_PEER_FAILED).setErrorMsg("get peer by name failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_PEER_FAILED).setErrorMsg("request does not have id or name");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updatePeer(MetadataProto.UpdatePeerRequest request, StreamObserver<MetadataProto.UpdatePeerResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.peerDao.update(request.getPeer()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_PEER_FAILED).setErrorMsg("update peer failed");
+        }
+
+        MetadataProto.UpdatePeerResponse response = MetadataProto.UpdatePeerResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deletePeer(MetadataProto.DeletePeerRequest request, StreamObserver<MetadataProto.DeletePeerResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (request.hasId())
+        {
+            if (this.peerDao.deleteById(request.getId()))
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_DELETE_PEER_FAILED).setErrorMsg("delete peer by id failed");
+            }
+        }
+        else if (request.hasName())
+        {
+            if (this.peerDao.deleteByName(request.getName()))
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_DELETE_PEER_FAILED).setErrorMsg("delete peer by name failed");
+            }
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_PEER_FAILED).setErrorMsg("request does not have id or name");
+        }
+
+        MetadataProto.DeletePeerResponse response = MetadataProto.DeletePeerResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
     /**
      * @param request
      * @param responseObserver
@@ -440,7 +894,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_UPDATE_COUMN_FAILED).setErrorMsg("make sure the column exists");
+            headerBuilder.setErrorCode(METADATA_UPDATE_COLUMN_FAILED).setErrorMsg("make sure the column exists");
         }
 
         MetadataProto.UpdateColumnResponse response = MetadataProto.UpdateColumnResponse.newBuilder()
@@ -558,16 +1012,84 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 if (tableDao.insert(table))
                 {
                     // to get table id from database.
-                    table = tableDao.getByNameAndSchema(table.getName(), schema);
-                    if (columns.size() == columnDao.insertBatch(table, columns))
+                    try
                     {
-                        headerBuilder.setErrorCode(0).setErrorMsg("");
-                    } else
+                        table = tableDao.getByNameAndSchema(table.getName(), schema);
+                        if (columns.size() == columnDao.insertBatch(table, columns))
+                        {
+                            columns = columnDao.getByTable(table, false);
+                            // Issue #437: TODO - use real transaction timestamp for schema version.
+                            MetadataProto.SchemaVersion schemaVersion = buildInitSchemaVersion(table.getId(), columns, 0);
+                            long schemaVersionId = schemaVersionDao.insert(schemaVersion);
+                            if (schemaVersionId > 0)
+                            {
+                                MetadataProto.Layout layout = buildInitLayout(table.getId(), schemaVersionId, columns);
+                                long layoutId = layoutDao.insert(layout);
+                                if (layoutId > 0)
+                                {
+                                    List<MetadataProto.Path> orderedPaths = buildInitPaths(layoutId, layout.getVersion(),
+                                            request.getBasePathUrisList(), false);
+                                    boolean allSuccess = true;
+                                    for (MetadataProto.Path orderedPath : orderedPaths)
+                                    {
+                                        if (pathDao.insert(orderedPath) <= 0)
+                                        {
+                                            allSuccess = false;
+                                            break;
+                                        }
+                                    }
+                                    if (allSuccess)
+                                    {
+                                        List<MetadataProto.Path> compactPaths = buildInitPaths(layoutId, layout.getVersion(),
+                                                request.getBasePathUrisList(), true);
+                                        for (MetadataProto.Path compactPath : compactPaths)
+                                        {
+                                            if (pathDao.insert(compactPath) <= 0)
+                                            {
+                                                allSuccess = false;
+                                                break;
+                                            }
+                                        }
+                                        if (allSuccess)
+                                        {
+                                            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                        } else
+                                        {
+                                            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
+                                                    .setErrorMsg("failed to add compact paths for table '" +
+                                                            request.getSchemaName() + "." + request.getTableName() + "'");
+                                        }
+                                    } else
+                                    {
+                                        headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
+                                                .setErrorMsg("failed to add ordered paths for table '" +
+                                                        request.getSchemaName() + "." + request.getTableName() + "'");
+                                    }
+                                } else
+                                {
+                                    headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
+                                            .setErrorMsg("failed to add layout for table '" +
+                                                    request.getSchemaName() + "." + request.getTableName() + "'");
+                                }
+                            } else
+                            {
+                                headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
+                                        .setErrorMsg("failed to add schema version for table '" +
+                                                request.getSchemaName() + "." + request.getTableName() + "'");
+                            }
+                        } else
+                        {
+                            headerBuilder.setErrorCode(METADATA_ADD_COLUMNS_FAILED).setErrorMsg(
+                                    "failed to add columns to table '" + request.getSchemaName() + "." + request.getTableName() + "'");
+                        }
+                    } catch (Throwable e)
                     {
+                        String msg = "failed to create the other components for table '" +
+                                request.getSchemaName() + "." + request.getTableName() + "'";
+                        log.error(msg, e);
+                        headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg(msg);
+                        // cascade delete the inconsistent states in metadata
                         tableDao.deleteByNameAndSchema(table.getName(), schema);
-                        headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg(
-                                "failed to add columns to table '" +
-                                        request.getSchemaName() + "." + request.getTableName() + "'");
                     }
                 } else
                 {

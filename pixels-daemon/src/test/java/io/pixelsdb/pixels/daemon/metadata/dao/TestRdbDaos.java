@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao;
 
-import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Order;
+import io.pixelsdb.pixels.common.metadata.domain.Ordered;
+import io.pixelsdb.pixels.daemon.MetadataProto;
 import org.junit.Test;
 
 import java.io.*;
@@ -34,7 +34,7 @@ public class TestRdbDaos
     @Test
     public void testSchema ()
     {
-        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
+        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao();
         MetadataProto.Schema schema = schemaDao.getByName("pixels");
         System.out.println(schema.getId() + ", " + schema.getName() + ", " + schema.getDesc());
     }
@@ -42,7 +42,7 @@ public class TestRdbDaos
     @Test
     public void testTable ()
     {
-        TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
+        TableDao tableDao = DaoFactory.Instance().getTableDao();
         List<MetadataProto.Table> tables = tableDao.getByName("test_105");
         for (MetadataProto.Table table : tables)
         {
@@ -56,10 +56,10 @@ public class TestRdbDaos
         String schemaName = "pixels";
         String tableName = "test_1187";
 
-        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
-        TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
-        ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
-        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
+        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao();
+        TableDao tableDao = DaoFactory.Instance().getTableDao();
+        ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
 
         MetadataProto.Schema schema = schemaDao.getByName(schemaName);
         MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
@@ -73,7 +73,11 @@ public class TestRdbDaos
 
         for (MetadataProto.Layout layout : layouts)
         {
-            System.out.println(layout.getOrderPath());
+            for (MetadataProto.Path path : layout.getOrderedPathsList())
+            {
+                System.out.print(path.getUri() + ";");
+            }
+            System.out.println();
         }
     }
 
@@ -83,10 +87,10 @@ public class TestRdbDaos
         String schemaName = "pixels";
         String tableName = "test_1187";
 
-        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
-        TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
-        ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
-        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
+        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao();
+        TableDao tableDao = DaoFactory.Instance().getTableDao();
+        ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
 
         MetadataProto.Schema schema = schemaDao.getByName(schemaName);
         MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
@@ -106,13 +110,13 @@ public class TestRdbDaos
         }
 
         Layout layout1 = new Layout(layout);
-        List<String> columnOrder = layout1.getOrderObject().getColumnOrder();
-        int cacheBorder = layout1.getCompactObject().getCacheBorder();
-        List<String> columnletOrder = layout1.getCompactObject().getColumnletOrder();
+        List<String> columnOrder = layout1.getOrdered().getColumnOrder();
+        int cacheBorder = layout1.getCompact().getCacheBorder();
+        List<String> columnChunkOrder = layout1.getCompact().getColumnChunkOrder();
         Set<String> cachedColumns = new HashSet<>();
         for (int i = 0; i < cacheBorder; ++i)
         {
-            int columnId = Integer.parseInt(columnletOrder.get(i).split(":")[1]);
+            int columnId = Integer.parseInt(columnChunkOrder.get(i).split(":")[1]);
             cachedColumns.add(columnOrder.get(columnId));
         }
 
@@ -122,16 +126,16 @@ public class TestRdbDaos
         }
     }
 
-    // get from dbiir27
+    // get
     @Test
     public void getLayout()
             throws IOException
     {
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/Users/Jelly/Desktop/dbiir10-splits")));
-        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
         Layout layout = new Layout(layoutDao.getById(21));
-        Order order = layout.getOrderObject();
-        List<String> columnOrder = order.getColumnOrder();
+        Ordered ordered = layout.getOrdered();
+        List<String> columnOrder = ordered.getColumnOrder();
         for (String col : columnOrder)
         {
             writer.write(col);
@@ -140,14 +144,14 @@ public class TestRdbDaos
         writer.close();
     }
 
-    // update dbiir10
+    // update
     @Test
     public void updateLayout()
             throws IOException
     {
         BufferedReader reader = new BufferedReader(new FileReader(new File("/Users/Jelly/Desktop/splits")));
         String splits = reader.readLine();
-        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
         layoutDao.update(layoutDao.getById(10).toBuilder().setSplits(splits).build());
         reader.close();
     }

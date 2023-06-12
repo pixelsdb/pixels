@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.cli.executor;
 
+import com.google.common.base.Joiner;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -76,8 +77,8 @@ public class CompactExecutor implements CommandExecutor
 
         requireNonNull(layout, String.format("writable layout is not found for table '%s.%s'.",
                 schemaName, tableName));
-        Compact compact = layout.getCompactObject();
-        int numRowGroupInBlock = compact.getNumRowGroupInBlock();
+        Compact compact = layout.getCompact();
+        int numRowGroupInBlock = compact.getNumRowGroupInFile();
         int numColumn = compact.getNumColumn();
         CompactLayout compactLayout;
         if (naive.equalsIgnoreCase("yes") || naive.equalsIgnoreCase("y"))
@@ -91,15 +92,15 @@ public class CompactExecutor implements CommandExecutor
 
         // get input file paths
         ConfigFactory configFactory = ConfigFactory.Instance();
-        validateOrderOrCompactPath(layout.getOrderPath());
-        validateOrderOrCompactPath(layout.getCompactPath());
+        validateOrderOrCompactPath(layout.getOrderedPathUris());
+        validateOrderOrCompactPath(layout.getCompactPathUris());
         // PIXELS-399: it is not a problem if the order or compact path contains multiple directories
-        Storage orderStorage = StorageFactory.Instance().getStorage(layout.getOrderPath());
-        Storage compactStorage = StorageFactory.Instance().getStorage(layout.getCompactPath());
+        Storage orderStorage = StorageFactory.Instance().getStorage(layout.getOrderedPathUris()[0]);
+        Storage compactStorage = StorageFactory.Instance().getStorage(layout.getCompactPathUris()[0]);
         long blockSize = Long.parseLong(configFactory.getProperty("block.size"));
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
-        List<Status> statuses = orderStorage.listStatus(layout.getOrderPath());
-        String[] targetPaths = layout.getCompactPath().split(";");
+        List<Status> statuses = orderStorage.listStatus(layout.getOrderedPathUris());
+        String[] targetPaths = layout.getCompactPathUris();
         int targetPathId = 0;
 
         // compact
@@ -186,8 +187,8 @@ public class CompactExecutor implements CommandExecutor
         while (!compactExecutor.awaitTermination(100, TimeUnit.SECONDS));
 
         long endTime = System.currentTimeMillis();
-        System.out.println("Pixels files in '" + layout.getOrderPath() + "' are compacted into '" +
-                layout.getCompactPath() + "' by " + threadNum + " threads in " +
+        System.out.println("Pixels files in '" + Joiner.on(";").join(layout.getOrderedPathUris()) + "' are compacted into '" +
+                Joiner.on(";").join(layout.getCompactPathUris()) + "' by " + threadNum + " threads in " +
                 (endTime - startTime) / 1000 + "s.");
     }
 }

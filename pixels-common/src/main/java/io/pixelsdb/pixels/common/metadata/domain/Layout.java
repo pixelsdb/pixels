@@ -22,34 +22,28 @@ package io.pixelsdb.pixels.common.metadata.domain;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import com.alibaba.fastjson.JSON;
 
+import java.util.List;
+
 public class Layout extends Base
 {
-    public enum Permission
-    {
-        DISABLED,
-        READ_ONLY,
-        READ_WRITE,
-        UNRECOGNIZED
-    }
-
-    private int version;
+    private long version;
     private long createAt;
     private Permission permission;
-    private String order;
-    private String orderPath;
-    private String compact;
-    private String compactPath;
-    private String splits;
-    private String projections;
+    private Ordered ordered;
+    private String orderedJson;
+    private List<Path> orderedPaths;
+    private String[] orderedPathUris;
+    private Compact compact;
+    private String compactJson;
+    private List<Path> compactPaths;
+    private String[] compactPathUris;
+    private Splits splits;
+    private String splitsJson;
+    private Projections projections;
+    private String projectionsJson;
     private long tableId;
-    private Order orderObj = null;
-    private Compact compactObj = null;
-    private Splits splitsObj = null;
-    private Projections projectionsObj = null;
 
-    public Layout()
-    {
-    }
+    public Layout() { }
 
     public Layout(MetadataProto.Layout layout)
     {
@@ -71,21 +65,35 @@ public class Layout extends Base
                 this.permission = Permission.UNRECOGNIZED;
                 break;
         }
-        this.order = layout.getOrder();
-        this.orderPath = layout.getOrderPath();
-        this.compact = layout.getCompact();
-        this.compactPath = layout.getCompactPath();
-        this.splits = layout.getSplits();
-        this.projections = layout.getProjections();
+        this.orderedJson = layout.getOrdered();
+        this.ordered = JSON.parseObject(this.orderedJson, Ordered.class);
+        this.orderedPaths = Path.convertPaths(layout.getOrderedPathsList());
+        this.orderedPathUris = new String[this.orderedPaths.size()];
+        for (int i = 0; i < this.orderedPathUris.length; ++i)
+        {
+            this.orderedPathUris[i] = this.orderedPaths.get(i).getUri();
+        }
+        this.compactJson = layout.getCompact();
+        this.compact = JSON.parseObject(this.compactJson, Compact.class);
+        this.compactPaths = Path.convertPaths(layout.getCompactPathsList());
+        this.compactPathUris = new String[this.compactPaths.size()];
+        for (int i = 0; i < this.compactPathUris.length; ++i)
+        {
+            this.compactPathUris[i] = this.compactPaths.get(i).getUri();
+        }
+        this.splitsJson = layout.getSplits();
+        this.splits = JSON.parseObject(this.splitsJson, Splits.class);
+        this.projectionsJson = layout.getProjections();
+        this.projections = JSON.parseObject(this.projectionsJson, Projections.class);
         this.tableId = layout.getTableId();
     }
 
-    public int getVersion()
+    public long getVersion()
     {
         return version;
     }
 
-    public void setVersion(int version)
+    public void setVersion(long version)
     {
         this.version = version;
     }
@@ -121,100 +129,126 @@ public class Layout extends Base
         this.permission = permission;
     }
 
-    public String getOrder()
+    public Ordered getOrdered()
     {
-        return order;
-    }
-
-    public Order getOrderObject()
-    {
-        if (this.orderObj == null)
+        if (this.ordered == null)
         {
-            this.orderObj = JSON.parseObject(this.order, Order.class);
+            this.ordered = JSON.parseObject(this.orderedJson, Ordered.class);
         }
-        return this.orderObj;
+        return ordered;
     }
 
-    public void setOrder(String order)
+    public String getOrderedJson()
     {
-        this.order = order;
+        return orderedJson;
     }
 
-    public String getOrderPath()
+    public void setOrderedJson(String orderedJson)
     {
-        return orderPath;
+        this.orderedJson = orderedJson;
     }
 
-    public void setOrderPath(String orderPath)
+    public List<Path> getOrderedPaths()
     {
-        this.orderPath = orderPath;
+        return orderedPaths;
     }
 
-    public String getCompact()
+    public String[] getOrderedPathUris()
     {
+        if (this.orderedPathUris == null)
+        {
+            this.orderedPathUris = new String[this.orderedPaths.size()];
+            for (int i = 0; i < this.orderedPathUris.length; ++i)
+            {
+                this.orderedPathUris[i] = this.orderedPaths.get(i).getUri();
+            }
+        }
+        return this.orderedPathUris;
+    }
+
+    public void setOrderedPaths(List<Path> orderedPaths)
+    {
+        this.orderedPaths = orderedPaths;
+    }
+
+    public Compact getCompact()
+    {
+        if (this.compact == null)
+        {
+            JSON.parseObject(this.compactJson, Compact.class);
+        }
         return compact;
     }
 
-    public Compact getCompactObject()
+    public String getCompactJson()
     {
-        if (this.compactObj == null)
+        return compactJson;
+    }
+
+    public void setCompactJson(String compactJson)
+    {
+        this.compactJson = compactJson;
+    }
+
+    public List<Path> getCompactPaths()
+    {
+        return compactPaths;
+    }
+
+    public String[] getCompactPathUris()
+    {
+        if (this.compactPathUris == null)
         {
-            this.compactObj = JSON.parseObject(this.compact, Compact.class);
+            this.compactPathUris = new String[this.compactPaths.size()];
+            for (int i = 0; i < this.compactPathUris.length; ++i)
+            {
+                this.compactPathUris[i] = this.compactPaths.get(i).getUri();
+            }
         }
-        return this.compactObj;
+        return this.compactPathUris;
     }
 
-    public void setCompact(String compact)
+    public void setCompactPaths(List<Path> compactPaths)
     {
-        this.compact = compact;
+        this.compactPaths = compactPaths;
     }
 
-    public String getCompactPath()
+    public Splits getSplits()
     {
-        return compactPath;
-    }
-
-    public void setCompactPath(String compactPath)
-    {
-        this.compactPath = compactPath;
-    }
-
-    public String getSplits()
-    {
+        if (this.splits == null)
+        {
+            JSON.parseObject(this.splitsJson, Splits.class);
+        }
         return splits;
     }
 
-    public Splits getSplitsObject()
+    public String getSplitsJson()
     {
-        if (this.splitsObj == null)
+        return this.splitsJson;
+    }
+
+    public void setSplitsJson(String splitsJson)
+    {
+        this.splitsJson = splitsJson;
+    }
+
+    public Projections getProjections()
+    {
+        if (this.projections == null)
         {
-            this.splitsObj = JSON.parseObject(this.splits, Splits.class);
+            JSON.parseObject(this.projectionsJson, Projections.class);
         }
-        return this.splitsObj;
-    }
-
-    public void setSplits(String split)
-    {
-        this.splits = split;
-    }
-
-    public String getProjections()
-    {
         return projections;
     }
 
-    public Projections getProjectionsObject()
+    public String getProjectionsJson()
     {
-        if (this.projectionsObj == null)
-        {
-            this.projectionsObj = JSON.parseObject(this.projections, Projections.class);
-        }
-        return this.projectionsObj;
+        return this.projectionsJson;
     }
 
-    public void setProjections(String projections)
+    public void setProjectionsJson(String projectionsJson)
     {
-        this.projections = projections;
+        this.projectionsJson = projectionsJson;
     }
 
     public long getTableId()
@@ -234,13 +268,10 @@ public class Layout extends Base
                 "version=" + version +
                 ", createAt=" + createAt +
                 ", permission=" + permission + '\'' +
-                ", order='" + order + '\'' +
-                ", orderPath='" + orderPath + '\'' +
-                ", compact='" + compact + '\'' +
-                ", compactPath='" + compactPath + '\'' +
-                ", splits='" + splits + '\'' +
-                ", projections='" + projections + '\'' +
-                ", tableId=" + tableId +
-                '}';
+                ", ordered='" + orderedJson + '\'' +
+                ", compact='" + compactJson + '\'' +
+                ", splits='" + splitsJson + '\'' +
+                ", projections='" + projectionsJson + '\'' +
+                ", tableId=" + tableId + '}';
     }
 }

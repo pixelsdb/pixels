@@ -106,10 +106,10 @@ public class TestMetadataService
         for (Layout layout : layouts)
         {
             // get index
-            int version = layout.getVersion();
-            Order order = JSON.parseObject(layout.getOrder(), Order.class);
-            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
-            System.out.println(JSON.toJSONString(order));
+            long version = layout.getVersion();
+            Ordered ordered = layout.getOrdered();
+            Splits splits = layout.getSplits();
+            System.out.println(JSON.toJSONString(ordered));
             System.out.println(JSON.toJSONString(splits));
         }
     }

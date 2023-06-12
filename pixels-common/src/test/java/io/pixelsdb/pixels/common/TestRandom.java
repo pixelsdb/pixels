@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common;
 
+import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.metadata.domain.Projections;
 import org.junit.Test;
 
 import java.util.Random;
@@ -47,5 +49,9 @@ public class TestRandom
         {
             System.out.println(split);
         }
+
+        Projections projections = new Projections();
+        System.out.println(JSON.toJSONString(projections));
+        System.out.println(JSON.parseObject("", Projections.class) == null);
     }
 }

@@ -24,17 +24,17 @@ import java.util.List;
 
 public class Splits
 {
-    private int numRowGroupInBlock;
+    private int numRowGroupInFile;
     private List<OriginSplitPattern> splitPatterns = new ArrayList<>();
 
-    public int getNumRowGroupInBlock()
+    public int getNumRowGroupInFile()
     {
-        return numRowGroupInBlock;
+        return numRowGroupInFile;
     }
 
-    public void setNumRowGroupInBlock(int numRowGroupInBlock)
+    public void setNumRowGroupInFile(int numRowGroupInFile)
     {
-        this.numRowGroupInBlock = numRowGroupInBlock;
+        this.numRowGroupInFile = numRowGroupInFile;
     }
 
     public List<OriginSplitPattern> getSplitPatterns()

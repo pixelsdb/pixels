@@ -64,17 +64,17 @@ public class StatExecutor implements CommandExecutor
             {
                 if (orderedEnabled)
                 {
-                    String orderedPath = layout.getOrderPath();
-                    validateOrderOrCompactPath(orderedPath);
-                    Storage storage = StorageFactory.Instance().getStorage(orderedPath);
-                    files.addAll(storage.listPaths(orderedPath));
+                    String[] orderedPaths = layout.getOrderedPathUris();
+                    validateOrderOrCompactPath(orderedPaths);
+                    Storage storage = StorageFactory.Instance().getStorage(orderedPaths[0]);
+                    files.addAll(storage.listPaths(orderedPaths));
                 }
                 if (compactEnabled)
                 {
-                    String compactPath = layout.getCompactPath();
-                    validateOrderOrCompactPath(compactPath);
-                    Storage storage = StorageFactory.Instance().getStorage(compactPath);
-                    files.addAll(storage.listPaths(compactPath));
+                    String[] compactPaths = layout.getCompactPathUris();
+                    validateOrderOrCompactPath(compactPaths);
+                    Storage storage = StorageFactory.Instance().getStorage(compactPaths[0]);
+                    files.addAll(storage.listPaths(compactPaths));
                 }
             }
         }

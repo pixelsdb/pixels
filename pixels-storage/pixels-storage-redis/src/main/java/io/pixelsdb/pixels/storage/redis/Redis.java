@@ -168,10 +168,10 @@ public class Redis implements Storage
     }
 
     @Override
-    public List<Status> listStatus(String path) throws IOException
+    public List<Status> listStatus(String... path) throws IOException
     {
         List<Status> statuses = null;
-        for (String eachPath : path.split(";"))
+        for (String eachPath : path)
         {
             eachPath = dropSchemePrefix(eachPath);
             Set<String> keys = this.jedis.keys(eachPath + "*");
@@ -190,10 +190,10 @@ public class Redis implements Storage
     }
 
     @Override
-    public List<String> listPaths(String path) throws IOException
+    public List<String> listPaths(String... path) throws IOException
     {
         List<String> paths = null;
-        for (String eachPath : path.split(";"))
+        for (String eachPath : path)
         {
             eachPath = dropSchemePrefix(eachPath);
             Set<String> keys = this.jedis.keys(eachPath + "*");

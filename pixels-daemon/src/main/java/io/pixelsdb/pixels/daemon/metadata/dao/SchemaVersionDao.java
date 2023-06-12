@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,16 +19,29 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao;
 
-import org.junit.Test;
+import io.pixelsdb.pixels.daemon.MetadataProto;
+
+import java.util.List;
 
 /**
- * Created at: 8/28/21
- * Author: hank
+ * @author hank
+ * @create 2023-06-11
  */
-public class TestEtcdDaos
+public abstract class SchemaVersionDao implements Dao<MetadataProto.SchemaVersion>
 {
-    @Test
-    public void testEtcdDao()
+    @Override
+    public abstract MetadataProto.SchemaVersion getById(long id);
+
+    @Override
+    public List<MetadataProto.SchemaVersion> getAll()
     {
+        throw new UnsupportedOperationException("getAll is not supported.");
     }
+
+    /**
+     * Insert the schema version into metadata.
+     * @param schemaVersion the schema version
+     * @return the auto-increment id of the inserted schema version, <= 0 if insert is failed
+     */
+    public abstract long insert (MetadataProto.SchemaVersion schemaVersion);
 }

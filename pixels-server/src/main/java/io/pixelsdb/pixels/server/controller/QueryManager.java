@@ -103,7 +103,7 @@ public class QueryManager
         }
 
         this.jdbcUrl = ConfigFactory.Instance().getProperty("presto.pixels.jdbc.url");
-        boolean orderEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.order.layout.enabled"));
+        boolean orderEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
         boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
         this.costEffectiveConnProp = new Properties();
         this.costEffectiveConnProp.setProperty("user", ConfigFactory.Instance().getProperty("presto.user"));

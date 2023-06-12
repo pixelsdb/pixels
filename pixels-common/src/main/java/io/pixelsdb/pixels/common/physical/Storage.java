@@ -60,11 +60,20 @@ public interface Storage
 
         /**
          * Parse the scheme from the path which is prefixed with the storage scheme.
-         * @param schemedPath
+         * @param schemedPath the path started with storage scheme, e.g., s3://
+         * @return the storage scheme of the path, or null if the path is not started with a valid scheme
          */
         public static Scheme fromPath(String schemedPath)
         {
+            if (!schemedPath.contains("://"))
+            {
+                return null;
+            }
             String scheme = schemedPath.substring(0, schemedPath.indexOf("://"));
+            if (!Scheme.isValid(scheme))
+            {
+                return null;
+            }
             return Scheme.from(scheme);
         }
 
@@ -102,26 +111,24 @@ public interface Storage
     String ensureSchemePrefix(String path) throws IOException;
 
     /**
-     * Get the statuses of the files or subdirectories in the given path if it is
-     * a directory or multiple directories seperated by semicolon (;).
+     * Get the statuses of the files or subdirectories in the given path of one or more directories.
      * The path in the returned status does not start with the scheme name.
      * For local fs, path is considered as local.
-     * @param path the given path, may contain multiple directories that are seperated by semicolon.
+     * @param path the given path, may contain multiple directories.
      * @return the statuses of the files or subdirectories.
      * @throws IOException
      */
-    List<Status> listStatus(String path) throws IOException;
+    List<Status> listStatus(String... path) throws IOException;
 
     /**
-     * Get the paths of the files or subdirectories in the given path if it is
-     * a directory or multiple directories seperated by semicolon (;).
+     * Get the paths of the files or subdirectories in the given path of one or more directories.
      * The returned path does not start with the scheme name.
      * For local fs, path is considered as local.
-     * @param path the given path, may contain multiple directories that are seperated by semicolon.
+     * @param path the given path, may contain multiple directories.
      * @return the paths of the files or subdirectories.
      * @throws IOException
      */
-    List<String> listPaths(String path) throws IOException;
+    List<String> listPaths(String... path) throws IOException;
 
     /**
      * Get the status of this path if it is a file.

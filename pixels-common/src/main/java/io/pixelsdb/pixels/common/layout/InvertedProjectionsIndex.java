@@ -50,7 +50,7 @@ public class InvertedProjectionsIndex implements ProjectionsIndex
             BitSet bitMap = new BitSet(this.projectionPatterns.size());
             for (int i = 0; i < this.projectionPatterns.size(); ++i)
             {
-                if (this.projectionPatterns.get(i).contaiansColumn(column))
+                if (this.projectionPatterns.get(i).containsColumn(column))
                 {
                     bitMap.set(i, true);
                 }
@@ -64,7 +64,7 @@ public class InvertedProjectionsIndex implements ProjectionsIndex
     {
         ProjectionPattern bestPattern = null;
 
-        if (columnSet.isEmpty())
+        if (columnSet.isEmpty() || this.projectionPatterns.isEmpty())
         {
             return null;
         }

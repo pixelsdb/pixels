@@ -20,19 +20,16 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.annotation.JSONField;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.daemon.MetadataProto;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class Table extends Base
 {
     private String name;
     private String type;
-    private String storageScheme;
+    private Storage.Scheme storageScheme;
     private long rowCount;
     private long schemaId;
-    private List<Long> columnIds = new ArrayList<>();
 
     public Table()
     {
@@ -42,10 +39,9 @@ public class Table extends Base
     {
         this.name = table.getName();
         this.type = table.getType();
-        this.storageScheme = table.getStorageScheme();
+        this.storageScheme = Storage.Scheme.from(table.getStorageScheme());
         this.rowCount = table.getRowCount();
         this.schemaId = table.getSchemaId();
-        this.columnIds.addAll(table.getColumnIdsList());
     }
 
     public String getName()
@@ -68,12 +64,12 @@ public class Table extends Base
         this.type = type;
     }
 
-    public String getStorageScheme()
+    public Storage.Scheme getStorageScheme()
     {
         return storageScheme;
     }
 
-    public void setStorageScheme(String storageScheme)
+    public void setStorageScheme(Storage.Scheme storageScheme)
     {
         this.storageScheme = storageScheme;
     }
@@ -99,22 +95,6 @@ public class Table extends Base
         this.schemaId = schemaId;
     }
 
-    @JSONField(serialize = false)
-    public List<Long> getColumnIds()
-    {
-        return columnIds;
-    }
-
-    public void setColumnIds(List<Long> columnIds)
-    {
-        this.columnIds = columnIds;
-    }
-
-    public void addColumnId(long columnId)
-    {
-        this.columnIds.add(columnId);
-    }
-
     @Override
     public String toString()
     {
@@ -123,8 +103,6 @@ public class Table extends Base
                 ", type='" + type + '\'' +
                 ", storageScheme='" + storageScheme + '\'' +
                 ", rowCount=" + rowCount +
-                ", schemaId=" + schemaId +
-                ", columnIds=" + columnIds +
-                '}';
+                ", schemaId=" + schemaId + '}';
     }
 }

@@ -101,10 +101,10 @@ public final class LocalFS implements Storage
     }
 
     @Override
-    public List<Status> listStatus(String path) throws IOException
+    public List<Status> listStatus(String... path) throws IOException
     {
         List<Status> statuses = new ArrayList<>();
-        for (String eachPath : path.split(";"))
+        for (String eachPath : path)
         {
             FilePath p = new FilePath(eachPath);
             if (!p.valid)
@@ -148,10 +148,10 @@ public final class LocalFS implements Storage
     }
 
     @Override
-    public List<String> listPaths(String path) throws IOException
+    public List<String> listPaths(String... path) throws IOException
     {
         List<String> paths = new ArrayList<>();
-        for (String eachPath : path.split(";"))
+        for (String eachPath : path)
         {
             FilePath p = new FilePath(eachPath);
             if (!p.valid)

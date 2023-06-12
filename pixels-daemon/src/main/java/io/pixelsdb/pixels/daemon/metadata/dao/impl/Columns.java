@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,27 +17,40 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.metadata.domain;
+package io.pixelsdb.pixels.daemon.metadata.dao.impl;
+
+import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class Order
+/**
+ * The set of column ids belong to a schema version or peer path in the metadata.
+ * @author hank
+ * @create 2023-06-09
+ */
+public class Columns
 {
-    private List<String> columnOrder = new ArrayList<>();
+    private List<Long> columnIds;
 
-    public List<String> getColumnOrder()
+    public Columns() { }
+
+    public Columns(List<MetadataProto.Column> columns)
     {
-        return columnOrder;
+        this.columnIds = new ArrayList<>(columns.size());
+        for (MetadataProto.Column column : columns)
+        {
+            this.columnIds.add(column.getId());
+        }
     }
 
-    public void setColumnOrder(List<String> columnOrder)
+    public List<Long> getColumnIds()
     {
-        this.columnOrder = columnOrder;
+        return columnIds;
     }
 
-    public void addColumnOrder(String column)
+    public void setColumnIds(List<Long> columnIds)
     {
-        this.columnOrder.add(column);
+        this.columnIds = columnIds;
     }
 }

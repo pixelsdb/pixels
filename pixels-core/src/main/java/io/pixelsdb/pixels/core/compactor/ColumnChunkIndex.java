@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 PixelsDB.
+ * Copyright 2017-2019 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,43 +17,29 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.metadata.domain;
-
-import java.util.ArrayList;
-import java.util.List;
+package io.pixelsdb.pixels.core.compactor;
 
 /**
- * Created at: 10/19/21
- * Author: hank
+ * @author hank
  */
-public class OriginProjectionPattern
+public class ColumnChunkIndex
 {
-    private List<Integer> accessedColumns = new ArrayList<>();
-    private String[] paths;
+    private int columnId = -1;
+    private int rowGroupId = -1;
 
-    public List<Integer> getAccessedColumns()
+    public ColumnChunkIndex(int rowGroupId, int columnId)
     {
-        return accessedColumns;
+        this.rowGroupId = rowGroupId;
+        this.columnId = columnId;
     }
 
-    public void setAccessedColumns(List<Integer> accessedColumns)
+    public int getColumnId()
     {
-        this.accessedColumns = accessedColumns;
+        return columnId;
     }
 
-
-    public void addAccessedColumns(int accessedColumn)
+    public int getRowGroupId()
     {
-        this.accessedColumns.add(accessedColumn);
-    }
-
-    public String[] getPaths()
-    {
-        return paths;
-    }
-
-    public void setPaths(String... path)
-    {
-        this.paths = path;
+        return rowGroupId;
     }
 }

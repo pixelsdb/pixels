@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2019 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,29 +17,27 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.compactor;
+package io.pixelsdb.pixels.common.metadata.domain;
 
-/**
- * @author hank
- */
-public class ColumnletIndex
+import java.util.ArrayList;
+import java.util.List;
+
+public class Ordered
 {
-    private int columnId = -1;
-    private int rowGroupId = -1;
+    private List<String> columnOrder = new ArrayList<>();
 
-    public ColumnletIndex(int rowGroupId, int columnId)
+    public List<String> getColumnOrder()
     {
-        this.rowGroupId = rowGroupId;
-        this.columnId = columnId;
+        return columnOrder;
     }
 
-    public int getColumnId()
+    public void setColumnOrder(List<String> columnOrder)
     {
-        return columnId;
+        this.columnOrder = columnOrder;
     }
 
-    public int getRowGroupId()
+    public void addColumnOrder(String column)
     {
-        return rowGroupId;
+        this.columnOrder.add(column);
     }
 }

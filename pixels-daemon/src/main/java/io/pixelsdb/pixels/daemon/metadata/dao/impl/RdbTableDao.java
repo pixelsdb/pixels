@@ -208,6 +208,7 @@ public class RdbTableDao extends TableDao
         {
             log.error("insert in RdbTableDao", e);
         }
+
         return false;
     }
 
@@ -231,8 +232,9 @@ public class RdbTableDao extends TableDao
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
-            log.error("insert in RdbTableDao", e);
+            log.error("update in RdbTableDao", e);
         }
+
         return false;
     }
 
@@ -248,8 +250,9 @@ public class RdbTableDao extends TableDao
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
-            log.error("delete in RdbTableDao", e);
+            log.error("deleteByNameAndSchema in RdbTableDao", e);
         }
+
         return false;
     }
 }
