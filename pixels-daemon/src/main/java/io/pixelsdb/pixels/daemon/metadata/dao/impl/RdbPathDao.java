@@ -143,7 +143,7 @@ public class RdbPathDao extends PathDao
     }
 
     @Override
-    public boolean insert(MetadataProto.Path path)
+    public long insert(MetadataProto.Path path)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO PATHS(" +
@@ -164,13 +164,28 @@ public class RdbPathDao extends PathDao
             {
                 pst.setNull(4, Types.BIGINT);
             }
-            return pst.executeUpdate() == 1;
+            if (pst.executeUpdate() == 1)
+            {
+                ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
+                if (rs.next())
+                {
+                    return rs.getLong(1);
+                }
+                else
+                {
+                    return -1;
+                }
+            }
+            else
+            {
+                return -1;
+            }
         } catch (SQLException e)
         {
             log.error("insert in RdbPathDao", e);
         }
 
-        return false;
+        return -1;
     }
 
     @Override

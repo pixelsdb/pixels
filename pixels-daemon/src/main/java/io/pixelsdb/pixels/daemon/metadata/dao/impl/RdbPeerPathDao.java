@@ -152,7 +152,7 @@ public class RdbPeerPathDao extends PeerPathDao
     }
 
     @Override
-    public boolean insert(MetadataProto.PeerPath peerPath)
+    public long insert(MetadataProto.PeerPath peerPath)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO PEER_PATHS(" +
@@ -166,13 +166,28 @@ public class RdbPeerPathDao extends PeerPathDao
             pst.setString(2, JSON.toJSONString(new Columns(peerPath.getColumnsList())));
             pst.setLong(3, peerPath.getPathId());
             pst.setLong(4, peerPath.getPeerId());
-            return pst.executeUpdate() == 1;
+            if (pst.executeUpdate() == 1)
+            {
+                ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
+                if (rs.next())
+                {
+                    return rs.getLong(1);
+                }
+                else
+                {
+                    return -1;
+                }
+            }
+            else
+            {
+                return -1;
+            }
         } catch (SQLException e)
         {
             log.error("insert in RdbPeerPathDao", e);
         }
 
-        return false;
+        return -1;
     }
 
     @Override

@@ -53,32 +53,31 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     private final PathDao pathDao = DaoFactory.Instance().getPathDao();
     private final PeerDao peerDao = DaoFactory.Instance().getPeerDao();
     private final PeerPathDao peerPathDao = DaoFactory.Instance().getPeerPathDao();
+    private final SchemaVersionDao schemaVersionDao = DaoFactory.Instance().getSchemaVersionDao();
 
     public MetadataServiceImpl () { }
 
     /**
      * Build the initial schema version proto object without range index.
-     * @param table the table that the schema version belongs to, must have valid id
+     * @param tableId the id of the table that the schema version belongs to
      * @param columns the columns owned by the schema version
      * @param transTs the transaction timestamp (i.e., version) of the schema version
      * @return the initial schema version, the id of the schema version is not set
      */
-    public static MetadataProto.SchemaVersion buildInitSchemaVersion(MetadataProto.Table table,
-                                                                 List<MetadataProto.Column> columns, long transTs)
+    public static MetadataProto.SchemaVersion buildInitSchemaVersion(long tableId, List<MetadataProto.Column> columns, long transTs)
     {
         return MetadataProto.SchemaVersion.newBuilder()
-                .addAllColumns(columns).setTransTs(transTs).setTableId(table.getId()).build();
+                .addAllColumns(columns).setTransTs(transTs).setTableId(tableId).build();
     }
 
     /**
      * Build the initial data layout of the given table and schema version.
-     * @param table the given table, must have valid id
-     * @param schemaVersion the given schema version, must have valid id
+     * @param tableId the id of the given table
+     * @param schemaVersionId the id of the given schema version
      * @param columns the columns owned by the data layout
      * @return the initial data layout, the id of the layout is not set
      */
-    public static MetadataProto.Layout buildInitLayout(MetadataProto.Table table, MetadataProto.SchemaVersion schemaVersion,
-                                                       List<MetadataProto.Column> columns)
+    public static MetadataProto.Layout buildInitLayout(long tableId, long schemaVersionId, List<MetadataProto.Column> columns)
     {
         Ordered ordered = new Ordered();
         for (MetadataProto.Column column : columns)
@@ -117,18 +116,19 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 .setCompact(JSON.toJSONString(compact))
                 .setSplits(JSON.toJSONString(splits))
                 .setProjections(JSON.toJSONString(projections))
-                .setSchemaVersionId(schemaVersion.getId())
-                .setTableId(table.getId()).build(); // no need to set the ordered paths and compact paths
+                .setSchemaVersionId(schemaVersionId)
+                .setTableId(tableId).build(); // no need to set the ordered paths and compact paths
     }
 
     /**
      * Build the initial paths for the given layout, without attaching to any ranges.
-     * @param layout the given layout, must have valid id and version
+     * @param layoutId the id of the given layout
+     * @param layoutVersion the version of the given layout
      * @param basePathUris the URIs of the base paths
      * @param isCompact whether the paths are compact paths
      * @return the initial paths, the ids and range ids of the paths are not set
      */
-    public static List<MetadataProto.Path> buildInitPaths(MetadataProto.Layout layout,
+    public static List<MetadataProto.Path> buildInitPaths(long layoutId, long layoutVersion,
                                                           ProtocolStringList basePathUris, boolean isCompact)
     {
         ImmutableList.Builder<MetadataProto.Path> pathsBuilder = ImmutableList.builderWithExpectedSize(basePathUris.size());
@@ -141,14 +141,14 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             if (isCompact)
             {
                 pathsBuilder.add(MetadataProto.Path.newBuilder()
-                        .setUri(basePathUri + "v-" + layout.getVersion() + "-compact")
-                        .setIsCompact(true).setLayoutId(layout.getId()).build());
+                        .setUri(basePathUri + "v-" + layoutVersion + "-compact")
+                        .setIsCompact(true).setLayoutId(layoutId).build());
             }
             else
             {
                 pathsBuilder.add(MetadataProto.Path.newBuilder()
-                        .setUri(basePathUri + "v-" + layout.getVersion() + "-ordered")
-                        .setIsCompact(false).setLayoutId(layout.getId()).build());
+                        .setUri(basePathUri + "v-" + layoutVersion + "-ordered")
+                        .setIsCompact(false).setLayoutId(layoutId).build());
             }
         }
         return pathsBuilder.build();
@@ -490,13 +490,13 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        if (this.pathDao.insert(request.getPath()))
+        if (this.pathDao.insert(request.getPath()) > 0)
         {
             headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_CREATE_PATH_FAILED).setErrorMsg("create path failed");
+            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED).setErrorMsg("create path failed");
         }
 
         MetadataProto.CreatePathResponse response = MetadataProto.CreatePathResponse.newBuilder()
@@ -600,13 +600,13 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        if (this.peerPathDao.insert(request.getPeerPath()))
+        if (this.peerPathDao.insert(request.getPeerPath()) > 0)
         {
             headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_CREATE_PEER_PATH_FAILED).setErrorMsg("create peer path failed");
+            headerBuilder.setErrorCode(METADATA_ADD_PEER_PATH_FAILED).setErrorMsg("create peer path failed");
         }
 
         MetadataProto.CreatePeerPathResponse response = MetadataProto.CreatePeerPathResponse.newBuilder()
@@ -717,7 +717,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_CREATE_PEER_FAILED).setErrorMsg("create peer failed");
+            headerBuilder.setErrorCode(METADATA_ADD_PEER_FAILED).setErrorMsg("create peer failed");
         }
 
         MetadataProto.CreatePeerResponse response = MetadataProto.CreatePeerResponse.newBuilder()
@@ -894,7 +894,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_UPDATE_COUMN_FAILED).setErrorMsg("make sure the column exists");
+            headerBuilder.setErrorCode(METADATA_UPDATE_COLUMN_FAILED).setErrorMsg("make sure the column exists");
         }
 
         MetadataProto.UpdateColumnResponse response = MetadataProto.UpdateColumnResponse.newBuilder()
@@ -1015,14 +1015,78 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                     table = tableDao.getByNameAndSchema(table.getName(), schema);
                     if (columns.size() == columnDao.insertBatch(table, columns))
                     {
-                        // TODO: create the layout and paths.
-                        headerBuilder.setErrorCode(0).setErrorMsg("");
+                        // Issue #437: TODO - use real transaction timestamp for schema version.
+                        MetadataProto.SchemaVersion schemaVersion = buildInitSchemaVersion(table.getId(), columns, 0);
+                        long schemaVersionId = schemaVersionDao.insert(schemaVersion);
+                        if (schemaVersionId > 0)
+                        {
+                            MetadataProto.Layout layout = buildInitLayout(table.getId(), schemaVersionId, columns);
+                            long layoutId = layoutDao.insert(layout);
+                            if (layoutId > 0)
+                            {
+                                List<MetadataProto.Path> orderedPaths = buildInitPaths(layoutId, layout.getVersion(),
+                                        request.getBasePathUrisList(), false);
+                                boolean allSuccess = true;
+                                for (MetadataProto.Path orderedPath : orderedPaths)
+                                {
+                                    if (pathDao.insert(orderedPath) <= 0)
+                                    {
+                                        allSuccess = false;
+                                        break;
+                                    }
+                                }
+                                if (allSuccess)
+                                {
+                                    List<MetadataProto.Path> compactPaths = buildInitPaths(layoutId, layout.getVersion(),
+                                            request.getBasePathUrisList(), true);
+                                    for (MetadataProto.Path compactPath : compactPaths)
+                                    {
+                                        if (pathDao.insert(compactPath) <= 0)
+                                        {
+                                            allSuccess = false;
+                                            break;
+                                        }
+                                    }
+                                    if (allSuccess)
+                                    {
+                                        headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                    }
+                                    else
+                                    {
+                                        headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
+                                                .setErrorMsg("failed to add compact paths for table '" +
+                                                        request.getSchemaName() + "." + request.getTableName() + "'");
+                                    }
+                                }
+                                else
+                                {
+                                    headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
+                                            .setErrorMsg("failed to add ordered paths for table '" +
+                                                    request.getSchemaName() + "." + request.getTableName() + "'");
+                                }
+                            }
+                            else
+                            {
+                                headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
+                                        .setErrorMsg("failed to add layout for table '" +
+                                                request.getSchemaName() + "." + request.getTableName() + "'");
+                            }
+                        }
+                        else
+                        {
+                            headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
+                                    .setErrorMsg("failed to add schema version for table '" +
+                                    request.getSchemaName() + "." + request.getTableName() + "'");
+                        }
                     } else
                     {
+                        headerBuilder.setErrorCode(METADATA_ADD_COLUMNS_FAILED).setErrorMsg(
+                                "failed to add columns to table '" + request.getSchemaName() + "." + request.getTableName() + "'");
+                    }
+                    if (headerBuilder.getErrorCode() != SUCCESS)
+                    {
+                        // cascade delete the inconsistent states in metadata
                         tableDao.deleteByNameAndSchema(table.getName(), schema);
-                        headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg(
-                                "failed to add columns to table '" +
-                                        request.getSchemaName() + "." + request.getTableName() + "'");
                     }
                 } else
                 {

@@ -72,7 +72,7 @@ public class RdbSchemaVersionDao extends SchemaVersionDao
     }
 
     @Override
-    public boolean insert(MetadataProto.SchemaVersion schemaVersion)
+    public long insert(MetadataProto.SchemaVersion schemaVersion)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO SCHEMA_VERSIONS(" +
@@ -93,12 +93,27 @@ public class RdbSchemaVersionDao extends SchemaVersionDao
             {
                 pst.setNull(4, Types.BIGINT);
             }
-            return pst.executeUpdate() == 1;
+            if (pst.executeUpdate() == 1)
+            {
+                ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
+                if (rs.next())
+                {
+                    return rs.getLong(1);
+                }
+                else
+                {
+                    return -1;
+                }
+            }
+            else
+            {
+                return -1;
+            }
         } catch (SQLException e)
         {
             log.error("insert in RdbSchemaVersionDao", e);
         }
 
-        return false;
+        return -1;
     }
 }

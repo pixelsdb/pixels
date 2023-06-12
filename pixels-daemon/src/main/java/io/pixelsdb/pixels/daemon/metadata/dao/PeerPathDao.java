@@ -50,13 +50,18 @@ public abstract class PeerPathDao implements Dao<MetadataProto.PeerPath>
         }
         else
         {
-            return insert(peerPath);
+            return insert(peerPath) > 0;
         }
     }
 
     abstract public boolean exists (MetadataProto.PeerPath peerPath);
 
-    abstract public boolean insert (MetadataProto.PeerPath peerPath);
+    /**
+     * Insert the peer path into metadata.
+     * @param peerPath the peer path
+     * @return the auto-increment id of the inserted peer path, <= 0 if insert is failed
+     */
+    abstract public long insert (MetadataProto.PeerPath peerPath);
 
     abstract public boolean update (MetadataProto.PeerPath peerPath);
 

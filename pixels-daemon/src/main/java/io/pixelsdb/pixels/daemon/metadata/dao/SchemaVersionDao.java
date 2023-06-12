@@ -38,5 +38,10 @@ public abstract class SchemaVersionDao implements Dao<MetadataProto.SchemaVersio
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public abstract boolean insert (MetadataProto.SchemaVersion schemaVersion);
+    /**
+     * Insert the schema version into metadata.
+     * @param schemaVersion the schema version
+     * @return the auto-increment id of the inserted schema version, <= 0 if insert is failed
+     */
+    public abstract long insert (MetadataProto.SchemaVersion schemaVersion);
 }

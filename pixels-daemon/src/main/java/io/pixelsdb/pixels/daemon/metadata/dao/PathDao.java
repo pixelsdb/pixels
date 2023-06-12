@@ -56,7 +56,12 @@ public abstract class PathDao implements Dao<MetadataProto.Path>
 
     abstract public boolean exists (MetadataProto.Path path);
 
-    abstract public boolean insert (MetadataProto.Path path);
+    /**
+     * Insert the path into metadata.
+     * @param path the path
+     * @return the auto-increment id of the inserted path, <= 0 if insert is failed
+     */
+    abstract public long insert (MetadataProto.Path path);
 
     abstract public boolean update (MetadataProto.Path path);
 

@@ -64,13 +64,18 @@ public abstract class LayoutDao implements Dao<MetadataProto.Layout>
         }
         else
         {
-            return insert(layout);
+            return insert(layout) > 0;
         }
     }
 
     abstract public boolean exists (MetadataProto.Layout layout);
 
-    abstract public boolean insert (MetadataProto.Layout layout);
+    /**
+     * Insert the layout into metadata.
+     * @param layout the layout
+     * @return the auto-increment id of the inserted layout, <= 0 if insert is failed
+     */
+    abstract public long insert (MetadataProto.Layout layout);
 
     abstract public boolean update (MetadataProto.Layout layout);
 }

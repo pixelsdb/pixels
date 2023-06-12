@@ -199,7 +199,7 @@ public class RdbLayoutDao extends LayoutDao
         return false;
     }
 
-    public boolean insert (MetadataProto.Layout layout)
+    public long insert (MetadataProto.Layout layout)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO LAYOUTS(" +
@@ -223,13 +223,28 @@ public class RdbLayoutDao extends LayoutDao
             pst.setString(7, layout.getProjections());
             pst.setLong(8, layout.getSchemaVersionId());
             pst.setLong(9, layout.getTableId());
-            return pst.executeUpdate() == 1;
+            if (pst.executeUpdate() == 1)
+            {
+                ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
+                if (rs.next())
+                {
+                    return rs.getLong(1);
+                }
+                else
+                {
+                    return -1;
+                }
+            }
+            else
+            {
+                return -1;
+            }
         } catch (SQLException e)
         {
             log.error("insert in RdbLayoutDao", e);
         }
 
-        return false;
+        return -1;
     }
 
     public boolean update (MetadataProto.Layout layout)
