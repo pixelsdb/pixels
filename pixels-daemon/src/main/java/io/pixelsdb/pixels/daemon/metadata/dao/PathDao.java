@@ -50,7 +50,7 @@ public abstract class PathDao implements Dao<MetadataProto.Path>
         }
         else
         {
-            return insert(path);
+            return insert(path) > 0;
         }
     }
 

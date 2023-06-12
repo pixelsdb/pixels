@@ -50,11 +50,11 @@ public enum Permission
     {
         switch (permission)
         {
-            case -1:
-                return MetadataProto.Permission.DISABLED;
             case 0:
-                return MetadataProto.Permission.READ_ONLY;
+                return MetadataProto.Permission.DISABLED;
             case 1:
+                return MetadataProto.Permission.READ_ONLY;
+            case 2:
                 return MetadataProto.Permission.READ_WRITE;
         }
         return MetadataProto.Permission.DISABLED;
@@ -65,11 +65,11 @@ public enum Permission
         switch (permission)
         {
             case DISABLED:
-                return -1;
-            case READ_ONLY:
                 return 0;
+            case READ_ONLY:
+                return 1;
             case READ_WRITE:
-                return -1;
+                return 2;
         }
         return -1;
     }

@@ -216,7 +216,7 @@ public class RdbLayoutDao extends LayoutDao
         {
             pst.setLong(1, layout.getVersion());
             pst.setLong(2, layout.getCreateAt());
-            pst.setInt(3, convertPermission(layout.getPermission()));
+            pst.setShort(3, convertPermission(layout.getPermission()));
             pst.setString(4, layout.getOrdered());
             pst.setString(5, layout.getCompact());
             pst.setString(6, layout.getSplits());
@@ -264,7 +264,7 @@ public class RdbLayoutDao extends LayoutDao
         {
             pst.setLong(1, layout.getVersion());
             pst.setLong(2, layout.getCreateAt());
-            pst.setInt(3, convertPermission(layout.getPermission()));
+            pst.setShort(3, convertPermission(layout.getPermission()));
             pst.setString(4, layout.getOrdered());
             pst.setString(5, layout.getCompact());
             pst.setString(6, layout.getSplits());
