@@ -60,7 +60,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     /**
      * Build the initial schema version proto object without range index.
      * @param tableId the id of the table that the schema version belongs to
-     * @param columns the columns owned by the schema version
+     * @param columns the columns owned by the schema version, must have ids
      * @param transTs the transaction timestamp (i.e., version) of the schema version
      * @return the initial schema version, the id of the schema version is not set
      */
@@ -74,7 +74,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
      * Build the initial data layout of the given table and schema version.
      * @param tableId the id of the given table
      * @param schemaVersionId the id of the given schema version
-     * @param columns the columns owned by the data layout
+     * @param columns the columns owned by the data layout, must have names
      * @return the initial data layout, the id of the layout is not set
      */
     public static MetadataProto.Layout buildInitLayout(long tableId, long schemaVersionId, List<MetadataProto.Column> columns)
@@ -1012,36 +1012,27 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 if (tableDao.insert(table))
                 {
                     // to get table id from database.
-                    table = tableDao.getByNameAndSchema(table.getName(), schema);
-                    if (columns.size() == columnDao.insertBatch(table, columns))
+                    try
                     {
-                        // Issue #437: TODO - use real transaction timestamp for schema version.
-                        MetadataProto.SchemaVersion schemaVersion = buildInitSchemaVersion(table.getId(), columns, 0);
-                        long schemaVersionId = schemaVersionDao.insert(schemaVersion);
-                        if (schemaVersionId > 0)
+                        table = tableDao.getByNameAndSchema(table.getName(), schema);
+                        if (columns.size() == columnDao.insertBatch(table, columns))
                         {
-                            MetadataProto.Layout layout = buildInitLayout(table.getId(), schemaVersionId, columns);
-                            long layoutId = layoutDao.insert(layout);
-                            if (layoutId > 0)
+                            columns = columnDao.getByTable(table, false);
+                            // Issue #437: TODO - use real transaction timestamp for schema version.
+                            MetadataProto.SchemaVersion schemaVersion = buildInitSchemaVersion(table.getId(), columns, 0);
+                            long schemaVersionId = schemaVersionDao.insert(schemaVersion);
+                            if (schemaVersionId > 0)
                             {
-                                List<MetadataProto.Path> orderedPaths = buildInitPaths(layoutId, layout.getVersion(),
-                                        request.getBasePathUrisList(), false);
-                                boolean allSuccess = true;
-                                for (MetadataProto.Path orderedPath : orderedPaths)
+                                MetadataProto.Layout layout = buildInitLayout(table.getId(), schemaVersionId, columns);
+                                long layoutId = layoutDao.insert(layout);
+                                if (layoutId > 0)
                                 {
-                                    if (pathDao.insert(orderedPath) <= 0)
+                                    List<MetadataProto.Path> orderedPaths = buildInitPaths(layoutId, layout.getVersion(),
+                                            request.getBasePathUrisList(), false);
+                                    boolean allSuccess = true;
+                                    for (MetadataProto.Path orderedPath : orderedPaths)
                                     {
-                                        allSuccess = false;
-                                        break;
-                                    }
-                                }
-                                if (allSuccess)
-                                {
-                                    List<MetadataProto.Path> compactPaths = buildInitPaths(layoutId, layout.getVersion(),
-                                            request.getBasePathUrisList(), true);
-                                    for (MetadataProto.Path compactPath : compactPaths)
-                                    {
-                                        if (pathDao.insert(compactPath) <= 0)
+                                        if (pathDao.insert(orderedPath) <= 0)
                                         {
                                             allSuccess = false;
                                             break;
@@ -1049,42 +1040,54 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                                     }
                                     if (allSuccess)
                                     {
-                                        headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
-                                    }
-                                    else
+                                        List<MetadataProto.Path> compactPaths = buildInitPaths(layoutId, layout.getVersion(),
+                                                request.getBasePathUrisList(), true);
+                                        for (MetadataProto.Path compactPath : compactPaths)
+                                        {
+                                            if (pathDao.insert(compactPath) <= 0)
+                                            {
+                                                allSuccess = false;
+                                                break;
+                                            }
+                                        }
+                                        if (allSuccess)
+                                        {
+                                            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                        } else
+                                        {
+                                            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
+                                                    .setErrorMsg("failed to add compact paths for table '" +
+                                                            request.getSchemaName() + "." + request.getTableName() + "'");
+                                        }
+                                    } else
                                     {
                                         headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
-                                                .setErrorMsg("failed to add compact paths for table '" +
+                                                .setErrorMsg("failed to add ordered paths for table '" +
                                                         request.getSchemaName() + "." + request.getTableName() + "'");
                                     }
-                                }
-                                else
+                                } else
                                 {
-                                    headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
-                                            .setErrorMsg("failed to add ordered paths for table '" +
+                                    headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
+                                            .setErrorMsg("failed to add layout for table '" +
                                                     request.getSchemaName() + "." + request.getTableName() + "'");
                                 }
-                            }
-                            else
+                            } else
                             {
                                 headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
-                                        .setErrorMsg("failed to add layout for table '" +
+                                        .setErrorMsg("failed to add schema version for table '" +
                                                 request.getSchemaName() + "." + request.getTableName() + "'");
                             }
-                        }
-                        else
+                        } else
                         {
-                            headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
-                                    .setErrorMsg("failed to add schema version for table '" +
-                                    request.getSchemaName() + "." + request.getTableName() + "'");
+                            headerBuilder.setErrorCode(METADATA_ADD_COLUMNS_FAILED).setErrorMsg(
+                                    "failed to add columns to table '" + request.getSchemaName() + "." + request.getTableName() + "'");
                         }
-                    } else
+                    } catch (Throwable e)
                     {
-                        headerBuilder.setErrorCode(METADATA_ADD_COLUMNS_FAILED).setErrorMsg(
-                                "failed to add columns to table '" + request.getSchemaName() + "." + request.getTableName() + "'");
-                    }
-                    if (headerBuilder.getErrorCode() != SUCCESS)
-                    {
+                        String msg = "failed to create the other components for table '" +
+                                request.getSchemaName() + "." + request.getTableName() + "'";
+                        log.error(msg, e);
+                        headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg(msg);
                         // cascade delete the inconsistent states in metadata
                         tableDao.deleteByNameAndSchema(table.getName(), schema);
                     }
