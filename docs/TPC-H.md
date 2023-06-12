@@ -90,6 +90,10 @@ The last parameter `-c` of `COMPACT` command is the maximum number
 of threads used for data compaction. For large tables such as `lineitem`, you can increase `-c` to
 improve the compaction performance. Compaction is normally faster than loading with same number of threads.
 
+> `compact.factor` in `$PIXELS_HOME/pixels.properties` determines how many row groups are compacted into a single
+> file. The default value is 32, which is appropriate in most conditions. An experimental evaluation of the effects
+> of compact factor on AWS S3 can be found in our [ICDE'22](https://ieeexplore.ieee.org/document/9835615) paper.
+
 To avoid scanning the small files in the ordered path during query execution,
 create an empty bucket in S3 and change the ordered path in the metadata database
 to the empty bucket.
@@ -108,7 +112,7 @@ STAT -s tpch -t partsupp -o false -c true
 STAT -s tpch -t orders -o false -c true
 STAT -s tpch -t lineitem -o false -c true
 ```
-After it is finished, statistics of each tpch column can be found in the `pixels_metadata.COLS` metadata table.
+When it is finished, statistics of each tpch column can be found in the `pixels_metadata.COLS` metadata table.
 Finally, manually update the row count for each tpch table in `pixels_metadata.TBLS.TBL_ROW_COUNT`.
 
 Set `splits.index.type=cost_based` and restart Trino to benefit from cost-based query optimization.
