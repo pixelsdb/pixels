@@ -52,7 +52,8 @@ public class PlanAnalysis
     }
 
     // One-time traversal to collect all the required analysis factors
-    public void traversePlan() {
+    public void traversePlan()
+    {
         Consumer<RelNode> nodeCounter = (node) -> nodeCount++;
 
         Consumer<RelNode> depthCalculator = (node) -> {

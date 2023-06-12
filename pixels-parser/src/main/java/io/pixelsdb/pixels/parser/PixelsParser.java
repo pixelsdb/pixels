@@ -21,16 +21,22 @@ package io.pixelsdb.pixels.parser;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteSystemProperty;
+import org.apache.calcite.interpreter.Bindables;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.*;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.JoinPushThroughJoinRule;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
@@ -42,8 +48,11 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql.validate.SqlValidatorWithHints;
+import org.apache.calcite.sql2rel.RelDecorrelator;
+import org.apache.calcite.sql2rel.RelFieldTrimmer;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.apache.calcite.tools.RelBuilder;
 
 import java.util.List;
 import java.util.Properties;
@@ -62,6 +71,7 @@ public class PixelsParser
     private final CalciteCatalogReader catalogReader;
     private final SqlValidatorWithHints validator;
     private final VolcanoPlanner planner;
+    private final RelOptCluster cluster;
 
     public PixelsParser(MetadataService ms,
                         String schemaName,
@@ -87,6 +97,7 @@ public class PixelsParser
                 typeFactory);
 
         this.planner = createPlanner();
+        this.cluster = RelOptCluster.create(planner, rexBuilder);
     }
 
     private VolcanoPlanner createPlanner()
@@ -121,8 +132,6 @@ public class PixelsParser
 
     public RelNode toRelNode(SqlNode sqlNode)
     {
-        RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
-
         SqlToRelConverter.Config converterConfig = SqlToRelConverter.config()
                 .withInSubQueryThreshold(Integer.MAX_VALUE)
                 .withExpand(false);
@@ -132,6 +141,66 @@ public class PixelsParser
         RelRoot relRoot = sqlToRelConverter.convertQuery(sqlNode, false, true);
 
         return relRoot.rel;
+    }
+
+    public RelNode toBestRelNode(SqlNode sqlNode)
+    {
+        SqlToRelConverter.Config converterConfig = SqlToRelConverter.config()
+                .withInSubQueryThreshold(Integer.MAX_VALUE)
+                .withExpand(false);
+        SqlToRelConverter sqlToRelConverter = new SqlToRelConverter(null, validator, catalogReader, cluster,
+                StandardConvertletTable.INSTANCE, converterConfig);
+
+        RelRoot relRoot = sqlToRelConverter.convertQuery(sqlNode, false, true);
+        RelNode plan = relRoot.rel;
+
+        // Stage 1. Subquery Removal
+        {
+            final HepProgramBuilder hepProgramBuilder = HepProgram.builder();
+            for (RelOptRule rule : SUBQUERY_REMOVE_RULES) {
+                hepProgramBuilder.addRuleInstance(rule);
+            }
+            HepProgram hepProgram = hepProgramBuilder.build();
+            HepPlanner hepPlanner = new HepPlanner(hepProgram,
+                    null, true, null, RelOptCostImpl.FACTORY);
+            hepPlanner.setRoot(plan);
+            plan = hepPlanner.findBestExp();
+        }
+
+        // Stage 2. Decorrelate
+        {
+            final RelBuilder relBuilder =
+                    RelFactories.LOGICAL_BUILDER.create(plan.getCluster(), null);
+            plan = RelDecorrelator.decorrelateQuery(plan, relBuilder);
+        }
+
+        // Stage 3. Trim Fields (optional)
+        {
+            final RelBuilder relBuilder =
+                    RelFactories.LOGICAL_BUILDER.create(plan.getCluster(), null);
+            plan = new RelFieldTrimmer(null, relBuilder).trim(plan);
+        }
+
+        // Stage 4. Volcano Planner
+        {
+            planner.setRoot(planner.changeTraits(plan, plan.getTraitSet().replace(EnumerableConvention.INSTANCE)));
+            plan = planner.findBestExp();
+        }
+
+        // Stage 5. Convert Project/Filter to Calc
+        {
+            final HepProgramBuilder hepProgramBuilder = HepProgram.builder();
+            for (RelOptRule rule : CALC_RULES) {
+                hepProgramBuilder.addRuleInstance(rule);
+            }
+            HepProgram hepProgram = hepProgramBuilder.build();
+            HepPlanner hepPlanner = new HepPlanner(hepProgram,
+                    null, true, null, RelOptCostImpl.FACTORY);
+            hepPlanner.setRoot(plan);
+            plan = hepPlanner.findBestExp();
+        }
+
+        return plan;
     }
 
     public SqlParser.Config getParserConfig()
@@ -214,4 +283,21 @@ public class PixelsParser
                     EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
                     EnumerableRules.ENUMERABLE_TABLE_FUNCTION_SCAN_RULE);
 
+    public static final List<RelOptRule> SUBQUERY_REMOVE_RULES =
+            ImmutableList.of(
+                    CoreRules.PROJECT_SUB_QUERY_TO_CORRELATE,
+                    CoreRules.FILTER_SUB_QUERY_TO_CORRELATE,
+                    CoreRules.JOIN_SUB_QUERY_TO_CORRELATE);
+
+    public static final ImmutableList<RelOptRule> CALC_RULES =
+            ImmutableList.of(
+                    Bindables.FROM_NONE_RULE,
+                    EnumerableRules.ENUMERABLE_CALC_RULE,
+                    EnumerableRules.ENUMERABLE_FILTER_TO_CALC_RULE,
+                    EnumerableRules.ENUMERABLE_PROJECT_TO_CALC_RULE,
+                    CoreRules.CALC_MERGE,
+                    CoreRules.FILTER_CALC_MERGE,
+                    CoreRules.PROJECT_CALC_MERGE,
+                    CoreRules.FILTER_TO_CALC,
+                    CoreRules.PROJECT_TO_CALC);
 }

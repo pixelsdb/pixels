@@ -22,8 +22,10 @@ package io.pixelsdb.pixels.parser;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.config.Lex;
+import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.externalize.RelJsonWriter;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -33,6 +35,8 @@ import org.apache.calcite.sql.parser.impl.SqlParserImpl;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.assertTrue;
 
 import java.util.Properties;
 
@@ -75,10 +79,40 @@ public class TestPixelsParser
         SqlNode validatedNode = this.tpchPixelsParser.validate(parsedNode);
         System.out.println("No exception, validation success.");
 
-        RelNode rel = this.tpchPixelsParser.toRelNode(validatedNode);
+        RelNode initialPlan = this.tpchPixelsParser.toRelNode(validatedNode);
+        RelNode optimizedPlan = this.tpchPixelsParser.toBestRelNode(validatedNode);
+
         final RelJsonWriter writer = new RelJsonWriter();
-        rel.explain(writer);
+        initialPlan.explain(writer);
         System.out.println("Logical plan: \n" + writer.asString());
+
+        RelMetadataQuery mq = optimizedPlan.getCluster().getMetadataQuery();
+        RelOptCost costInitial = mq.getCumulativeCost(initialPlan);
+        RelOptCost costOptimized = mq.getCumulativeCost(optimizedPlan);
+        System.out.println("Initial cost: " + costInitial + " | Optimized cost: " + costOptimized);
+
+        assertTrue(costOptimized.isLe(costInitial));
+    }
+
+    @Test
+    public void testPixelsParserTpchCoverage() throws SqlParseException, NoSuchFieldException, IllegalAccessException
+    {
+        for (int i = 1; i <= 22; i++) {
+            String query = TpchQuery.getQuery(i);
+            SqlNode parsedNode = this.tpchPixelsParser.parseQuery(query);
+            System.out.println("Tpch Query " + i + ": \n" + parsedNode);
+
+            SqlNode validatedNode = this.tpchPixelsParser.validate(parsedNode);
+
+            RelNode initialPlan = this.tpchPixelsParser.toRelNode(validatedNode);
+            RelNode optimizedPlan = this.tpchPixelsParser.toBestRelNode(validatedNode);
+
+            // not assert that optimized cost less than initial cost due to some exceptions
+            RelMetadataQuery mq = optimizedPlan.getCluster().getMetadataQuery();
+            RelOptCost costInitial = mq.getCumulativeCost(initialPlan);
+            RelOptCost costOptimized = mq.getCumulativeCost(optimizedPlan);
+            System.out.println("Initial cost: " + costInitial + " | Optimized cost: " + costOptimized);
+        }
     }
 
     @Test(expected = SqlParseException.class)
