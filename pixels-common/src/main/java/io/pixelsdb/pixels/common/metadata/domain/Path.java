@@ -119,6 +119,16 @@ public class Path extends Base
         this.rangeId = rangeId;
     }
 
+    @Override
+    public String toString()
+    {
+        return "Path{" +
+                "uri='" + uri + '\'' +
+                ", isCompact='" + isCompact + '\'' +
+                ", layoutId='" + layoutId + '\'' +
+                ", rangeId='" + rangeId + '\'' + '}';
+    }
+
     private MetadataProto.Path toProto()
     {
         MetadataProto.Path.Builder builder = MetadataProto.Path.newBuilder()

@@ -95,4 +95,15 @@ public class Peer extends Base
     {
         this.storageScheme = storageScheme;
     }
+
+    @Override
+    public String toString()
+    {
+        return "Peer{" +
+                "name='" + name + '\'' +
+                ", location='" + location + '\'' +
+                ", host='" + host + '\'' +
+                ", port='" + port + '\'' +
+                ", storageScheme='" + storageScheme + '\'' + '}';
+    }
 }

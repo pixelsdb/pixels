@@ -98,4 +98,14 @@ public class PeerPath extends Base
     {
         this.columns = columns;
     }
+
+    @Override
+    public String toString()
+    {
+        return "PeerPath{" +
+                "uri='" + uri + '\'' +
+                ", columns='" + columns + '\'' +
+                ", pathId='" + pathId + '\'' +
+                ", peerId='" + peerId + '\'' + '}';
+    }
 }

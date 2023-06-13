@@ -759,7 +759,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to create peer in metadata", e);
+            throw new MetadataException("failed to get peer in metadata", e);
         }
     }
 
