@@ -35,7 +35,7 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.*;

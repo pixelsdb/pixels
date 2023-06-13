@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.server.rest.request;
 
+import io.pixelsdb.pixels.common.server.ExecutionHint;
+
 /**
  * @author hank
  * @create 2023-05-24

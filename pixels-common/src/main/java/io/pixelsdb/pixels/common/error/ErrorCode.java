@@ -39,8 +39,8 @@ public class ErrorCode
     public static final int METADATA_TABLE_EXIST = (ERROR_BASE_METADATA + 7);
     public static final int METADATA_DELETE_SCHEMA_FAILED = (ERROR_BASE_METADATA + 8);
     public static final int METADATA_DELETE_TABLE_FAILED = (ERROR_BASE_METADATA + 9);
-    public static final int METADATA_ADD_COUMNS_FAILED = (ERROR_BASE_METADATA + 10);
-    public static final int METADATA_UPDATE_COUMN_FAILED = (ERROR_BASE_METADATA + 11);
+    public static final int METADATA_ADD_COLUMNS_FAILED = (ERROR_BASE_METADATA + 10);
+    public static final int METADATA_UPDATE_COLUMN_FAILED = (ERROR_BASE_METADATA + 11);
     public static final int METADATA_UPDATE_LAYOUT_FAILED = (ERROR_BASE_METADATA + 12);
     public static final int METADATA_ADD_LAYOUT_FAILED = (ERROR_BASE_METADATA + 13);
     public static final int METADATA_ADD_SCHEMA_FAILED = (ERROR_BASE_METADATA + 14);
@@ -51,6 +51,19 @@ public class ErrorCode
     public static final int METADATA_DELETE_VIEW_FAILED = (ERROR_BASE_METADATA + 19);
     public static final int METADATA_UNKNOWN_DATA_TYPE = (ERROR_BASE_METADATA + 20);
     public static final int METADATA_UPDATE_TABLE_FAILED = (ERROR_BASE_METADATA + 21);
+    public static final int METADATA_ADD_PATH_FAILED = (ERROR_BASE_METADATA + 22);
+    public static final int METADATA_GET_PATHS_FAILED = (ERROR_BASE_METADATA + 23);
+    public static final int METADATA_UPDATE_PATH_FAILED = (ERROR_BASE_METADATA + 24);
+    public static final int METADATA_DELETE_PATHS_FAILED = (ERROR_BASE_METADATA + 25);
+    public static final int METADATA_ADD_PEER_FAILED = (ERROR_BASE_METADATA + 26);
+    public static final int METADATA_GET_PEER_FAILED = (ERROR_BASE_METADATA + 27);
+    public static final int METADATA_UPDATE_PEER_FAILED = (ERROR_BASE_METADATA + 28);
+    public static final int METADATA_DELETE_PEER_FAILED = (ERROR_BASE_METADATA + 29);
+    public static final int METADATA_ADD_PEER_PATH_FAILED = (ERROR_BASE_METADATA + 30);
+    public static final int METADATA_GET_PEER_PATHS_FAILED = (ERROR_BASE_METADATA + 31);
+    public static final int METADATA_UPDATE_PEER_PATH_FAILED = (ERROR_BASE_METADATA + 32);
+    public static final int METADATA_DELETE_PEER_PATHS_FAILED = (ERROR_BASE_METADATA + 33);
+    public static final int METADATA_ADD_SCHEMA_VERSION_FAILED = (ERROR_BASE_METADATA + 34);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue
@@ -61,7 +74,7 @@ public class ErrorCode
     public static final int ERROR_MQ_WRITER_IS_RUNNING = (ERROR_BASE_MQ + 4);
     public static final int ERROR_MQ_READER_IS_ROLLBACK = (ERROR_BASE_MQ + 5);
     public static final int ERROR_MQ_READER_IS_RUNNING = (ERROR_BASE_MQ + 6);
-    public static final int ERROR_MQ_READER_INVALID_MESSAGE_LENGTH = (ERROR_BASE_MQ + 6);
+    public static final int ERROR_MQ_READER_INVALID_MESSAGE_LENGTH = (ERROR_BASE_MQ + 7);
     // end error code for shared memory message queue
 
     // begin error code for transactions
@@ -69,6 +82,19 @@ public class ErrorCode
     public static final int TRANS_LOW_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 1);
     public static final int TRANS_HIGH_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 2);
     public static final int TRANS_ID_NOT_EXIST = (ERROR_TRANS + 3);
-    public static final int TRANS_BAD_GET_CONTEXT_REQUEST = (ERROR_TRANS + 4);
+    public static final int TRANS_CONTEXT_NOT_FOUND = (ERROR_TRANS + 4);
+    public static final int TRANS_COMMIT_FAILED = (ERROR_TRANS + 5);
+    public static final int TRANS_ROLLBACK_FAILED = (ERROR_TRANS + 6);
+
+    // begin error code for query schedule
+    private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;
+    public static final int QUERY_SCHEDULE_DEQUEUE_FAILED = (ERROR_QUERY_SCHEDULE + 1);
+
+    // begin error code for query server
+    private static final int ERROR_QUERY_SERVER = ERROR_BASE + 400;
+    public static final int QUERY_SERVER_PENDING_INTERRUPTED = (ERROR_QUERY_SERVER + 2);
+    public static final int QUERY_SERVER_EXECUTE_FAILED = (ERROR_QUERY_SERVER + 1);
+    public static final int QUERY_SERVER_NOT_SUPPORTED = (ERROR_QUERY_SERVER + 2);
+
     // end error code for transactions
 }

@@ -13,9 +13,10 @@ integrations are opensourced in separate repositories:
 * [Pixels SerDe for Hive](https://github.com/pixelsdb/pixels-hive)
 
 Pixels also has its own query engine [Pixels-Turbo](pixels-turbo).
-It processes sustained queries in an autoscaling MPP cluster (currently based on Trino) and exploits serverless functions (e.g, AWS Lambda) to accelerate the processing of workload spikes.
-With `Pixels-Turbo`, we can achieve better performance and cost-efficiency for sustained workloads, while not compromising elasticity
-for workload spikes.
+It processes sustained queries in an autoscaling MPP cluster (currently based on Trino) and exploits serverless functions 
+(e.g, [AWS Lambda](https://aws.amazon.com/lambda/) and [vHive / Knative](https://github.com/vhive-serverless/vHive)) 
+to accelerate the processing of workload spikes. With `Pixels-Turbo`, we can achieve better performance and cost-efficiency 
+for sustained workloads, while not compromising elasticity for workload spikes.
 
 
 ## Build Pixels

@@ -94,7 +94,7 @@ public class RdbViewDao extends ViewDao
             }
         } catch (SQLException e)
         {
-            log.error("getByNameAndDB in RdbViewDao", e);
+            log.error("getByNameAndSchema in RdbViewDao", e);
         }
 
         return null;
@@ -198,6 +198,7 @@ public class RdbViewDao extends ViewDao
         {
             log.error("insert in RdbViewDao", e);
         }
+
         return false;
     }
 
@@ -219,8 +220,9 @@ public class RdbViewDao extends ViewDao
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
-            log.error("insert in RdbViewDao", e);
+            log.error("update in RdbViewDao", e);
         }
+
         return false;
     }
 
@@ -236,8 +238,9 @@ public class RdbViewDao extends ViewDao
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
-            log.error("delete in RdbViewDao", e);
+            log.error("deleteByNameAndSchema in RdbViewDao", e);
         }
+
         return false;
     }
 }

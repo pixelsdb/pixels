@@ -30,6 +30,12 @@ sudo update-java-alternatives --set /path/to/jdk-17.0
 ```
 Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 
+## Install Maven
+
+Pixels requires maven 3 to build the source code. 
+On some old operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
+In this case, you need to install a later maven that is compatible with your JDK manually. 
+
 ## Setup AWS Credentials*
 
 If we use S3 as the underlying storage system, we have to configure the AWS credentials.
@@ -50,7 +56,7 @@ export PIXELS_HOME=$HOME/opt/pixels/
 ```
 
 But you still need to:
-- Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
+- Put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib`.
 - Modify `pixels.properties` to ensure the following properties are valid:
 ```properties
 pixels.var.dir=/home/pixels/opt/pixels/var/
@@ -62,6 +68,9 @@ metadata.server.port=18888
 metadata.server.host=localhost
 trans.server.port=18889
 trans.server.host=localhost
+# query scheduling server for pixels-turbo
+query.schedule.server.port=18893
+query.schedule.server.host=localhost
 etcd.hosts=localhost
 etcd.port=2379
 metrics.node.text.dir=/home/pixels/opt/node_exporter/text/
@@ -131,7 +140,17 @@ sudo apt update
 sudo apt install mysql-server
 sudo mysql_secure_installation
 ```
+
+> Not that for mysql 8+, you may need to set a native password for mysql `root` user before running `mysql_secure_installation`, for example:
+> ```bash
+> sudo mysql
+> mysql> ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your_root_password';
+> mysql> exit
+> sudo mysql_secure_installation
+> ```
+
 Login MySQL and create a user and a metadata database for Pixels:
+
 ```mysql
 CREATE USER 'pixels'@'%' IDENTIFIED BY 'password';
 CREATE DATABASE pixels_metadata;
@@ -159,12 +178,17 @@ export PATH=$PATH:$ETCD
 ```
 All the following commands are executed under `~/opt` by default.
 Create the link and start etcd:
+
 ```bash
 ln -s etcd-v3.3.4-linux-amd64-bin etcd
 cd etcd
 ./start-etcd.sh
 ```
 You can use `screen` or `nohup` to run it in the background.
+
+The default `etcd/conf.yml` is good for the default Ubuntu user in AWS Ubuntu instances.
+If you are using your own OS installation or a different user, please modify the settings in `conf.yml` accordingly, 
+especially for the `data-dir` and `*-urls`.
 
 ## Install Hadoop*
 Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
@@ -196,6 +220,7 @@ Decompress `pixels-trino-listener-*.zip` and `pixels-trino-connector-*.zip` into
 The `etc` directory contains the configuration files of Trino.
 In addition to the configurations mentioned in the official docs, add the following configurations
 for Pixels:
+
 * Create the listener config file named `event-listener.properties` in the `etc` directory, with the following content:
 ```properties
 event-listener.name=pixels-event-listener
@@ -218,7 +243,7 @@ pixels.config=/home/ubuntu/opt/pixels/pixels.properties
 # it can be on, off, auto
 cloud.function.switch=auto
 local.scan.concurrency=40
-clean.local.result=true
+clean.intermediate.result=true
 ```
 `pixels.config` is used to specify the config file for Pixels, and has a higher priority than the config file under `PIXELS_HOME`.
 **Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
@@ -229,24 +254,25 @@ This feature is named `Pixels Turbo` and can be turned on by setting `cloud.func
 If Pixels Turbo is enabled, we also need to set the following settings in `PIXELS_HOME/pixels.properties`:
 ```properties
 executor.input.storage.scheme=s3
-executor.input.storage.endpoint=input-endpoint-dummy
-executor.input.storage.access.key=input-ak-dummy
-executor.input.storage.secret.key=input-sk-dummy
 executor.intermediate.storage.scheme=s3
-executor.intermediate.storage.endpoint=intermediate-endpoint-dummy
-executor.intermediate.storage.access.key=intermediate-ak-dummy
-executor.intermediate.storage.secret.key=intermediate-sk-dummy
-executor.intermediate.folder=/pixels-lambda-test/
+executor.intermediate.folder=/pixels-turbo/intermediate/
 executor.output.storage.scheme=s3
-executor.output.storage.endpoint=output-endpoint-dummy
-executor.output.storage.access.key=output-ak-dummy
-executor.output.storage.secret.key=output-sk-dummy
-executor.output.folder=/pixels-lambda-test/
+executor.output.folder=/pixels-turbo/output/
 ```
-Those storage schemes, endpoints, and access and secret keys are used to access the input data 
-(the data of the base tables defined by `CREATE TABLE` statements), the intermediate data (intermediate
-results generated during query execution), and the output data (the result of the sub-plan executed in
-the serverless workers), respectively.
+Those storage schemes are used to access the input data (the storage scheme of the base tables defined by 
+`CREATE TABLE` statements), the intermediate data (intermediate results generated during query execution), and the 
+output data (the result of the sub-plan executed in the serverless workers), respectively.
+If any of these storage schemes is `minio` or `redis`, we also need to set the other information, such as the endpoint
+and keys, of the storage:
+```properties
+minio.region=eu-central-2
+minio.endpoint=http://localhost:9000
+minio.access.key=minio-access-key-dummy
+minio.secret.key=minio-secret-key-dummy
+redis.endpoint=localhost:6379
+redis.access.key=redis-user-dummy
+redis.secret.key=redis-password-dummy
+```
 Ensure that they are valid so that the serverless workers can access the corresponding storage systems.
 Especially, the `executor.input.storage.scheme` must be consistent with the storage scheme of the base
 tables. This is checked during query-planning for Pixels Turbo.
@@ -312,10 +338,12 @@ If pixels-cache is enabled, set up the cache before starting Pixels:
 sudo ./sbin/pin-cache.sh
 ```
 `reset-cache.sh` is only needed for the first time of using pixels-cache.
-It initializes some states in etcd for the cache.
+It initializes some states in etcd for the cache. 
+If you have modified the `etcd` urls, then you need to change the `ENDPOINTS` property in `reset-cache.sh` as well.
 
 Even if pixels-cache is disabled, `reset-cache.sh` is needed for the first time of starting Pixels.
 Then, start the daemons of Pixels using:
+
 ```bash
 ./sbin/start-pixels.sh
 ```

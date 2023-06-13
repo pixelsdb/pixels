@@ -146,6 +146,7 @@ public class RdbSchemaDao extends SchemaDao
         {
             log.error("insert in RdbSchemaDao", e);
         }
+
         return false;
     }
 
@@ -165,8 +166,9 @@ public class RdbSchemaDao extends SchemaDao
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
-            log.error("insert in RdbSchemaDao", e);
+            log.error("update in RdbSchemaDao", e);
         }
+
         return false;
     }
 
@@ -189,6 +191,7 @@ public class RdbSchemaDao extends SchemaDao
         {
             log.error("deleteByName in RdbSchemaDao", e);
         }
+
         return false;
     }
 }

@@ -7,6 +7,7 @@ import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
+import io.pixelsdb.pixels.daemon.turbo.QueryScheduleServer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -78,6 +79,7 @@ public class DaemonMain
                     ConfigFactory config = ConfigFactory.Instance();
                     int metadataServerPort = Integer.parseInt(config.getProperty("metadata.server.port"));
                     int transServerPort = Integer.parseInt(config.getProperty("trans.server.port"));
+                    int queryScheduleServerPort = Integer.parseInt(config.getProperty("query.schedule.server.port"));
 
                     try
                     {
@@ -87,6 +89,9 @@ public class DaemonMain
                         // start transaction server
                         TransServer transServer = new TransServer(transServerPort);
                         container.addServer("transaction", transServer);
+                        // start query schedule server
+                        QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
+                        container.addServer("query_schedule", queryScheduleServer);
                         // start cache coordinator
                         CacheCoordinator cacheCoordinator = new CacheCoordinator();
                         container.addServer("cache_coordinator", cacheCoordinator);

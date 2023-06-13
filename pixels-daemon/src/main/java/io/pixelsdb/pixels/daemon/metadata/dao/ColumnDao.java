@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao;
 
-import io.pixelsdb.pixels.common.metadata.domain.Order;
+import io.pixelsdb.pixels.common.metadata.domain.Ordered;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.util.List;
@@ -40,9 +40,11 @@ public abstract class ColumnDao implements Dao<MetadataProto.Column>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
+    abstract public List<MetadataProto.Column> getAllByIds(List<Long> ids, boolean getStatistics);
+
     abstract public List<MetadataProto.Column> getByTable(MetadataProto.Table table, boolean getStatistics);
 
-    abstract public Order getOrderByTable(MetadataProto.Table table);
+    abstract public Ordered getOrderedByTable(MetadataProto.Table table);
 
     abstract public boolean update(MetadataProto.Column column);
 

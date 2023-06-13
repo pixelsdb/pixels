@@ -19,7 +19,9 @@
  */
 package io.pixelsdb.pixels.planner;
 
+import com.alibaba.fastjson.JSON;
 import com.google.gson.Gson;
+import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 import org.junit.Test;
 
@@ -41,5 +43,20 @@ public class TestOutput
         String json = gson.toJson(scanOutput);
         assert json != null && !json.isEmpty();
         System.out.println(json);
+    }
+
+    @Test
+    public void testEncodeScanInput()
+    {
+        ScanInput scanInput = new ScanInput();
+        scanInput.setTransId(1);
+        scanInput.setOperatorName("scan");
+        System.out.println(JSON.toJSONString(scanInput));
+        Gson gson = new Gson();
+        System.out.println(gson.toJson(scanInput));
+        ScanInput scanInput1 = JSON.parseObject(JSON.toJSONString(scanInput), ScanInput.class);
+        ScanInput scanInput2 = gson.fromJson(gson.toJson(scanInput), ScanInput.class);
+        System.out.println(scanInput1.getOperatorName());
+        System.out.println(scanInput2.getOperatorName());
     }
 }

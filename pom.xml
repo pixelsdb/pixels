@@ -55,6 +55,8 @@
         <module>pixels-turbo/pixels-invoker-lambda</module>
         <module>pixels-turbo/pixels-scaling-ec2</module>
         <module>pixels-turbo/pixels-amphi</module>
+        <module>pixels-turbo/pixels-worker-vhive</module>
+        <module>pixels-turbo/pixels-invoker-vhive</module>
     </modules>
 
     <properties>
@@ -79,6 +81,7 @@
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
         <dep.netty.version>4.1.77.Final</dep.netty.version>
         <dep.fastjson.version>1.2.83</dep.fastjson.version>
+        <dep.commons-cli.version>1.5.0</dep.commons-cli.version>
         <dep.guava.version>29.0-jre</dep.guava.version>
         <dep.protobuf.version>3.21.7</dep.protobuf.version>
         <dep.grpc.version>1.49.1</dep.grpc.version>
@@ -88,6 +91,10 @@
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
         <dep.apache-calcite.version>1.32.0</dep.apache-calcite.version>
+
+        <!--profiling-->
+        <dep.async-profiler.version>2.9</dep.async-profiler.version>
+        <dep.commons-net.version>3.9.0</dep.commons-net.version>
 
         <!-- logging -->
         <dep.log4j.version>2.17.1</dep.log4j.version>
@@ -180,6 +187,11 @@
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-invoker-lambda</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-invoker-vhive</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -439,6 +451,11 @@
                 <artifactId>protobuf-java</artifactId>
                 <version>${dep.protobuf.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java-util</artifactId>
+                <version>${dep.protobuf.version}</version>
+            </dependency>
 
             <!-- grpc -->
             <dependency>
@@ -462,6 +479,13 @@
                 <groupId>com.alibaba</groupId>
                 <artifactId>fastjson</artifactId>
                 <version>${dep.fastjson.version}</version>
+            </dependency>
+
+            <!-- apache commons cli -->
+            <dependency>
+                <groupId>commons-cli</groupId>
+                <artifactId>commons-cli</artifactId>
+                <version>${dep.commons-cli.version}</version>
             </dependency>
 
             <!-- netty -->
@@ -523,6 +547,18 @@
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-slf4j18-impl</artifactId>
                 <version>${dep.log4j.version}</version>
+            </dependency>
+
+            <!--profiling-->
+            <dependency>
+                <groupId>tools.profiler</groupId>
+                <artifactId>async-profiler</artifactId>
+                <version>${dep.async-profiler.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-net</groupId>
+                <artifactId>commons-net</artifactId>
+                <version>${dep.commons-net.version}</version>
             </dependency>
 
             <!-- testing -->

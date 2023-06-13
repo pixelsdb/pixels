@@ -26,8 +26,8 @@ import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.worker.common.BasePartitionWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.common.WorkerMetrics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * @author hank
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PartitionWorker implements RequestHandler<PartitionInput, PartitionOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(PartitionWorker.class);
+    private static final Logger logger = LogManager.getLogger(PartitionWorker.class);
     private final WorkerMetrics workerMetrics = new WorkerMetrics();
 
     @Override

@@ -66,6 +66,10 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         else
         {
             this.smallPartitionInputs = ImmutableList.copyOf(smallPartitionInputs);
+            for (PartitionInput partitionInput : this.smallPartitionInputs)
+            {
+                partitionInput.setOperatorName(name);
+            }
         }
         if (largePartitionInputs == null || largePartitionInputs.isEmpty())
         {
@@ -74,6 +78,10 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         else
         {
             this.largePartitionInputs = ImmutableList.copyOf(largePartitionInputs);
+            for (PartitionInput partitionInput : this.largePartitionInputs)
+            {
+                partitionInput.setOperatorName(name);
+            }
         }
     }
 
@@ -138,15 +146,16 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             joinOutputs = new CompletableFuture[joinInputs.size()];
             for (int i = 0; i < joinInputs.size(); ++i)
             {
+                JoinInput joinInput = joinInputs.get(i);
                 if (joinAlgo == JoinAlgorithm.PARTITIONED)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInputs.get(i));
+                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInput);
                 }
                 else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInputs.get(i));
+                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInput);
                 }
                 else
                 {

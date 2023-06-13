@@ -28,19 +28,63 @@ option java_outer_classname = "TurboProto";
 
 package turbo.proto;
 
+// The service definitions for query scheduling in pixels-turbo.
+service QueryScheduleService {
+  rpc ScheduleQuery (ScheduleQueryRequest) returns (ScheduleQueryResponse);
+  rpc FinishQuery (FinishQueryRequest) returns (FinishQueryResponse);
+  rpc GetQuerySlots (GetQuerySlotsRequest) returns (GetQuerySlotsResponse);
+}
+
+// begin request/response definition for query scheduling service
+
+message ScheduleQueryRequest {
+  uint64 transId = 1;
+  bool forceMpp = 2;
+}
+
+message ScheduleQueryResponse {
+  int32 errorCode = 1;
+  string executorType = 2;
+}
+
+message FinishQueryRequest {
+  uint64 transId = 1;
+  string executorType = 2;
+}
+
+message FinishQueryResponse {
+  int32 errorCode = 1;
+}
+
+message GetQuerySlotsRequest {
+}
+
+message GetQuerySlotsResponse {
+  int32 errorCode = 1;
+  uint32 MppSlots = 2;
+  uint32 CfSlots = 3;
+}
+
 // The service definitions for the serverless workers in vHive.
 service vHiveWorkerService {
-  rpc SayHello (HelloRequest) returns (HelloResponse);
+  rpc Process (WorkerRequest) returns (WorkerResponse);
+  rpc GetMemory (GetMemoryRequest) returns (GetMemoryResponse);
 }
 
 // begin request/response definition for vHive worker services
-
-message HelloRequest {
-  string name = 1;
+message WorkerRequest {
+  string workerType = 1;
+  string json = 2;
 }
 
-message HelloResponse {
-  string msg = 1;
+message WorkerResponse {
+  string json = 1;
 }
 
+message GetMemoryRequest {
+}
+
+message GetMemoryResponse {
+  uint64 memoryMB = 1;
+}
 

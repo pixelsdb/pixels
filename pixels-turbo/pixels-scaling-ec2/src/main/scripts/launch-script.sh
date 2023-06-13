@@ -16,21 +16,21 @@ function get_private_ip {
 
 # start trino node
 # replace dummies in configurations
-# ~/opt/trino-server-375/etc/config.properties replace coordinator-ip-dummy with the private ip of coordinator
+# ~/opt/trino-server/etc/config.properties replace coordinator-ip-dummy with the private ip of coordinator
 sed -i 's/coordinator-ip-dummy/172.31.33.182/g' /home/ubuntu/opt/trino-server/etc/config.properties
 
-# ~/opt/trino-server-375/etc/node.properties replace instance-id-dummy with the real instance id
+# ~/opt/trino-server/etc/node.properties replace instance-id-dummy with the real instance id
 instance_id=$(get_instance_id)
 sed -i "s/instance-id-dummy/$instance_id/g" /home/ubuntu/opt/trino-server/etc/node.properties
 
-# ~/opt/trino-server-375/etc/catalog/pixels.properties replace output-endpoint-dummy with the local minio endpoint
+# ~/opt/pixels/pixels.properties replace output-endpoint-dummy with the local minio endpoint
 private_ip=$(get_private_ip)
 sed -i "s+output-endpoint-dummy+http://$private_ip:9000/+" /home/ubuntu/opt/pixels/pixels.properties
 
-# ~/opt/trino-server-375/etc/catalog/pixels.properties replace output-folder-dummy with the local minio folder
+# ~/opt/pixels/pixels.properties replace output-folder-dummy with the local minio folder
 sed -i "s+output-folder-dummy+pixels-lambda/output+" /home/ubuntu/opt/pixels/pixels.properties
 
-# ~/opt/trino-server-375/etc/catalog/pixels.properties set output.scheme to minio
+# ~/opt/pixels/pixels.properties set output.scheme to minio
 sed -i "s/output-scheme-dummy/minio/g" /home/ubuntu/opt/pixels/pixels.properties
 
 echo "start trino"

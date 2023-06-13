@@ -63,7 +63,7 @@ public class TestBroadcastChainJoinLambdaInvoker
         region.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20230416153117_0.pxl", 0, 4)))));
         region.setFilter(regionFilter);
-        region.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        region.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
         leftTables.add(region);
 
         BroadcastTableInfo nation = new BroadcastTableInfo();
@@ -74,7 +74,7 @@ public class TestBroadcastChainJoinLambdaInvoker
         nation.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20230416135645_0.pxl", 0, 4)))));
         nation.setFilter(nationFilter);
-        nation.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        nation.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
         leftTables.add(nation);
 
         ChainJoinInfo chainJoinInfo0 = new ChainJoinInfo();
@@ -95,7 +95,7 @@ public class TestBroadcastChainJoinLambdaInvoker
         supplier.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20230416155327_0_compact.pxl", 0, 4)))));
         supplier.setFilter(supplierFilter);
-        supplier.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        supplier.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
         leftTables.add(supplier);
 
         ChainJoinInfo chainJoinInfo1 = new ChainJoinInfo();
@@ -126,7 +126,7 @@ public class TestBroadcastChainJoinLambdaInvoker
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 28, 4)))));
         lineitem.setFilter(lineitemFilter);
-        lineitem.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        lineitem.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
         joinInput.setLargeTable(lineitem);
 
         JoinInfo joinInfo = new JoinInfo();
@@ -140,7 +140,7 @@ public class TestBroadcastChainJoinLambdaInvoker
         joinInput.setJoinInfo(joinInfo);
 
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/unit_tests/",
-                new StorageInfo(Storage.Scheme.s3, null, null, null), true,
+                new StorageInfo(Storage.Scheme.s3, null, null, null, null), true,
                 Arrays.asList("broadcast_chain_join_0")));
 
         System.out.println(JSON.toJSONString(joinInput));

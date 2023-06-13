@@ -70,6 +70,20 @@ public class Redis implements Storage
              */
             InitId(REDIS_ID_KEY);
         }
+        String endpoint = ConfigFactory.Instance().getProperty("redis.endpoint");
+        userName = ConfigFactory.Instance().getProperty("redis.access.key");
+        password = ConfigFactory.Instance().getProperty("redis.secret.key");
+        if (endpoint.contains("://"))
+        {
+            endpoint = endpoint.substring(endpoint.indexOf("://") + 3);
+        }
+        String[] splits = endpoint.split(":");
+
+        if (!Objects.equals(hostName, splits[0]) || port != Integer.parseInt(splits[1]))
+        {
+            hostName = splits[0];
+            port = Integer.parseInt(splits[1]);
+        }
     }
 
     /**
@@ -154,10 +168,10 @@ public class Redis implements Storage
     }
 
     @Override
-    public List<Status> listStatus(String path) throws IOException
+    public List<Status> listStatus(String... path) throws IOException
     {
         List<Status> statuses = null;
-        for (String eachPath : path.split(";"))
+        for (String eachPath : path)
         {
             eachPath = dropSchemePrefix(eachPath);
             Set<String> keys = this.jedis.keys(eachPath + "*");
@@ -176,10 +190,10 @@ public class Redis implements Storage
     }
 
     @Override
-    public List<String> listPaths(String path) throws IOException
+    public List<String> listPaths(String... path) throws IOException
     {
         List<String> paths = null;
-        for (String eachPath : path.split(";"))
+        for (String eachPath : path)
         {
             eachPath = dropSchemePrefix(eachPath);
             Set<String> keys = this.jedis.keys(eachPath + "*");

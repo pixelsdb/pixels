@@ -37,7 +37,6 @@ public class OriginSplitPattern
         this.accessedColumns = accessedColumns;
     }
 
-
     public void addAccessedColumns(int accessedColumn)
     {
         this.accessedColumns.add(accessedColumn);

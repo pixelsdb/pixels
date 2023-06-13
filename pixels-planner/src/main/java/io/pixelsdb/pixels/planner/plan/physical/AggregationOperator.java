@@ -70,6 +70,11 @@ public class AggregationOperator extends Operator
         requireNonNull(finalAggrInputs, "finalAggrInputs is null");
         checkArgument(!finalAggrInputs.isEmpty(), "finalAggrInputs is empty");
         this.finalAggrInputs = ImmutableList.copyOf(finalAggrInputs);
+        for (AggregationInput aggrInput : this.finalAggrInputs)
+        {
+            aggrInput.setOperatorName(name);
+        }
+
         if (scanInputs == null || scanInputs.isEmpty())
         {
             this.scanInputs = ImmutableList.of();
@@ -77,6 +82,10 @@ public class AggregationOperator extends Operator
         else
         {
             this.scanInputs = ImmutableList.copyOf(scanInputs);
+            for (ScanInput scanInput : this.scanInputs)
+            {
+                scanInput.setOperatorName(name);
+            }
         }
     }
 

@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.core.reader;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import io.pixelsdb.pixels.cache.ColumnletId;
+import io.pixelsdb.pixels.cache.ColumnChunkId;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
@@ -579,7 +579,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 throw new IOException("failed to get block id.", e);
                 //return false;
             }
-            List<ColumnletId> cacheChunks = new ArrayList<>(targetRGNum * targetColumns.length);
+            List<ColumnChunkId> cacheChunks = new ArrayList<>(targetRGNum * targetColumns.length);
             // find cached chunks
             for (int colId : targetColumns)
             {
@@ -598,7 +598,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier))
                     {
-                        ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId, true/*direct*/);
+                        ColumnChunkId chunkId = new ColumnChunkId((short) rgId, (short) colId, true/*direct*/);
                         cacheChunks.add(chunkId);
                     }
                     // if cache miss, add chunkId to be read from disks
@@ -623,13 +623,13 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
             // read cached chunks
 //            long cacheReadStartNano = System.nanoTime();
-            for (ColumnletId columnletId : cacheChunks)
+            for (ColumnChunkId columnChunkId : cacheChunks)
             {
-                short rgId = columnletId.rowGroupId;
-                short colId = columnletId.columnId;
+                short rgId = columnChunkId.rowGroupId;
+                short colId = columnChunkId.columnId;
 //                long getBegin = System.nanoTime();
-                ByteBuffer columnlet = cacheReader.get(blockId, rgId, colId, columnletId.direct);
-                memoryUsage += columnletId.direct ? 0 : columnlet.capacity();
+                ByteBuffer columnlet = cacheReader.get(blockId, rgId, colId, columnChunkId.direct);
+                memoryUsage += columnChunkId.direct ? 0 : columnlet.capacity();
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;

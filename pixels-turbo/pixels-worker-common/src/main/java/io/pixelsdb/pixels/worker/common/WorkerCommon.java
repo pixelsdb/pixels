@@ -29,8 +29,8 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -53,7 +53,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class WorkerCommon
 {
-    private static final Logger logger = LoggerFactory.getLogger(WorkerCommon.class);
+    private static final Logger logger = LogManager.getLogger(WorkerCommon.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
     private static Storage s3;
@@ -80,7 +80,8 @@ public class WorkerCommon
             }
             else if (WorkerCommon.minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
             {
-                ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
+                ConfigMinio(storageInfo.getRegion(), storageInfo.getEndpoint(),
+                        storageInfo.getAccessKey(), storageInfo.getSecretKey());
                 WorkerCommon.minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
             }
             else if (WorkerCommon.redis == null && storageInfo.getScheme() == Storage.Scheme.redis)

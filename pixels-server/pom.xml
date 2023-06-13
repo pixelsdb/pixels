@@ -109,6 +109,11 @@
             <artifactId>simpleclient_pushgateway</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-jdbc</artifactId>
+        </dependency>
+
         <!--apache commons -->
         <dependency>
             <groupId>org.apache.commons</groupId>

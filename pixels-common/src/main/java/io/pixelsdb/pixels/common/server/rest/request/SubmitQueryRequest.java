@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.server.rest.request;
 
+import io.pixelsdb.pixels.common.server.ExecutionHint;
+
 /**
  * @author hank
  * @create 2023-05-24
@@ -28,23 +30,17 @@ public class SubmitQueryRequest
     private String query;
     private ExecutionHint executionHint;
     private int limitRows;
-    /**
-     * It is only valid when {@link #executionHint} is 'scheduled'.
-     */
-    private long startTime;
 
     /**
      * Default constructor for Jackson.
      */
     public SubmitQueryRequest() { }
 
-    public SubmitQueryRequest(String query, ExecutionHint executionHint,
-                              int limitRows, long startTime)
+    public SubmitQueryRequest(String query, ExecutionHint executionHint, int limitRows)
     {
         this.query = query;
         this.executionHint = executionHint;
         this.limitRows = limitRows;
-        this.startTime = startTime;
     }
 
     public String getQuery()
@@ -75,15 +71,5 @@ public class SubmitQueryRequest
     public void setLimitRows(int limitRows)
     {
         this.limitRows = limitRows;
-    }
-
-    public long getStartTime()
-    {
-        return startTime;
-    }
-
-    public void setStartTime(long startTime)
-    {
-        this.startTime = startTime;
     }
 }

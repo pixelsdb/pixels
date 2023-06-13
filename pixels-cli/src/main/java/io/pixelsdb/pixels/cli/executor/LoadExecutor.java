@@ -33,6 +33,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.pixelsdb.pixels.cli.Main.validateOrderOrCompactPath;
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -48,13 +49,14 @@ public class LoadExecutor implements CommandExecutor
         String origin = ns.getString("original_data_path");
         int rowNum = Integer.parseInt(ns.getString("row_num"));
         String regex = ns.getString("row_regex");
-        String loadingDataPath = ns.getString("loading_data_path");
+        String[] loadingDataPaths = requireNonNull(
+                ns.getString("loading_data_paths"), "paths is null").split(";");
         int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
         boolean enableEncoding = Boolean.parseBoolean(ns.getString("enable_encoding"));
         System.out.println("enable encoding: " + enableEncoding);
-        if (loadingDataPath != null && !loadingDataPath.isEmpty())
+        if (loadingDataPaths.length > 0)
         {
-            validateOrderOrCompactPath(loadingDataPath);
+            validateOrderOrCompactPath(loadingDataPaths);
         }
 
         if (!origin.endsWith("/"))
@@ -64,7 +66,7 @@ public class LoadExecutor implements CommandExecutor
 
         Storage storage = StorageFactory.Instance().getStorage(origin);
 
-        Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex, enableEncoding, loadingDataPath);
+        Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex, enableEncoding, loadingDataPaths);
 
         // source already exist, producer option is false, add list of source to the queue
         List<String> fileList = storage.listPaths(origin);

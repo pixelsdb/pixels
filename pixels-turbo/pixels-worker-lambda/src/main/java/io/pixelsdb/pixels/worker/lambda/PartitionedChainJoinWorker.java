@@ -26,8 +26,8 @@ import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.worker.common.BasePartitionedChainJoinWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.common.WorkerMetrics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * @author hank
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PartitionedChainJoinWorker implements RequestHandler<PartitionedChainJoinInput, JoinOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(PartitionedChainJoinWorker.class);
+    private static final Logger logger = LogManager.getLogger(PartitionedChainJoinWorker.class);
     private final WorkerMetrics workerMetrics = new WorkerMetrics();
 
     @Override

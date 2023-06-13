@@ -33,20 +33,6 @@ public abstract class LayoutDao implements Dao<MetadataProto.Layout>
     @Override
     abstract public MetadataProto.Layout getById(long id);
 
-    protected MetadataProto.Layout.Permission convertPermission (short permission)
-    {
-        switch (permission)
-        {
-            case -1:
-                return MetadataProto.Layout.Permission.DISABLED;
-            case 0:
-                return MetadataProto.Layout.Permission.READ_ONLY;
-            case 1:
-                return MetadataProto.Layout.Permission.READ_WRITE;
-        }
-        return MetadataProto.Layout.Permission.DISABLED;
-    }
-
     @Override
     public List<MetadataProto.Layout> getAll()
     {
@@ -67,7 +53,7 @@ public abstract class LayoutDao implements Dao<MetadataProto.Layout>
      * @param version < 0 to get all versions of layouts.
      * @return
      */
-    abstract public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, int version,
+    abstract public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, long version,
                                                           MetadataProto.GetLayoutRequest.PermissionRange permissionRange);
 
     public boolean save (MetadataProto.Layout layout)
@@ -78,27 +64,18 @@ public abstract class LayoutDao implements Dao<MetadataProto.Layout>
         }
         else
         {
-            return insert(layout);
+            return insert(layout) > 0;
         }
     }
 
     abstract public boolean exists (MetadataProto.Layout layout);
 
-    abstract public boolean insert (MetadataProto.Layout layout);
-
-    protected short convertPermission (MetadataProto.Layout.Permission permission)
-    {
-        switch (permission)
-        {
-            case DISABLED:
-                return -1;
-            case READ_ONLY:
-                return 0;
-            case READ_WRITE:
-                return -1;
-        }
-        return -1;
-    }
+    /**
+     * Insert the layout into metadata.
+     * @param layout the layout
+     * @return the auto-increment id of the inserted layout, <= 0 if insert is failed
+     */
+    abstract public long insert (MetadataProto.Layout layout);
 
     abstract public boolean update (MetadataProto.Layout layout);
 }

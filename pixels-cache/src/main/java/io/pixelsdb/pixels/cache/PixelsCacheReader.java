@@ -188,7 +188,7 @@ public class PixelsCacheReader
         return null;
     }
 
-    public void batchGet(List<ColumnletId> columnletIds, byte[][] container)
+    public void batchGet(List<ColumnChunkId> columnChunkIds, byte[][] container)
     {
         // TODO batch get cache items. merge cache accesses to reduce the number of jni invocation.
     }

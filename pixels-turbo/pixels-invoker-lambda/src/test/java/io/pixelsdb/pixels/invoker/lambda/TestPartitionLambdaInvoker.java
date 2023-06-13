@@ -69,7 +69,7 @@ public class TestPartitionLambdaInvoker
             tableInfo.setColumnsToRead(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
             tableInfo.setFilter(filter);
             tableInfo.setBase(true);
-            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
             input.setTableInfo(tableInfo);
             input.setProjection(new boolean[]{true, true, true, true});
             PartitionInfo partitionInfo = new PartitionInfo();
@@ -77,7 +77,7 @@ public class TestPartitionLambdaInvoker
             partitionInfo.setKeyColumnIds(new int[]{0});
             input.setPartitionInfo(partitionInfo);
             input.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_part_" + i, false,
-                    new StorageInfo(Storage.Scheme.s3, null, null, null), true));
+                    new StorageInfo(Storage.Scheme.s3, null, null, null, null), true));
 
             System.out.println(JSON.toJSONString(input));
 
@@ -111,7 +111,7 @@ public class TestPartitionLambdaInvoker
             tableInfo.setFilter(filter);
             tableInfo.setBase(true);
             tableInfo.setColumnsToRead(new String[]{"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
-            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+            tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
             input.setTableInfo(tableInfo);
             input.setProjection(new boolean[]{true, true, true, true});
             PartitionInfo partitionInfo = new PartitionInfo();
@@ -119,7 +119,7 @@ public class TestPartitionLambdaInvoker
             partitionInfo.setKeyColumnIds(new int[]{0});
             input.setPartitionInfo(partitionInfo);
             input.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/lineitem_part_" + i, false,
-                    new StorageInfo(Storage.Scheme.s3, null, null, null), true));
+                    new StorageInfo(Storage.Scheme.s3, null, null, null, null), true));
 
             System.out.println(JSON.toJSONString(input));
 

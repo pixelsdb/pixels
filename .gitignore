@@ -20,6 +20,7 @@ package-info.java
 *.sql
 *.log
 *.txt
+!*/CMakeLists.txt
 *.csv
 resources/*.xml
 *.so

@@ -122,13 +122,13 @@ public final class HDFS implements Storage
     }
 
     @Override
-    public List<Status> listStatus(String path) throws IOException
+    public List<Status> listStatus(String... path) throws IOException
     {
         List<Status> statuses = new ArrayList<>();
         FileStatus[] fileStatuses;
         try
         {
-            for (String eachPath : path.split(";"))
+            for (String eachPath : path)
             {
                 fileStatuses = this.fs.listStatus(new Path(eachPath));
                 if (fileStatuses != null)
@@ -148,13 +148,13 @@ public final class HDFS implements Storage
     }
 
     @Override
-    public List<String> listPaths(String path) throws IOException
+    public List<String> listPaths(String... path) throws IOException
     {
         List<String> paths = new ArrayList<>();
         FileStatus[] fileStatuses;
         try
         {
-            for (String eachPath : path.split(";"))
+            for (String eachPath : path)
             {
                 fileStatuses = this.fs.listStatus(new Path(eachPath));
                 if (fileStatuses != null)

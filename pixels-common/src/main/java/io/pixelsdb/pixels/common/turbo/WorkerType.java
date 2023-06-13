@@ -32,5 +32,21 @@ public enum WorkerType
     BROADCAST_CHAIN_JOIN,
     PARTITIONED_JOIN,
     PARTITIONED_CHAIN_JOIN,
-    AGGREGATION
+    AGGREGATION;
+
+    public static WorkerType from(String value)
+    {
+        return valueOf(value.toUpperCase());
+    }
+
+    public boolean equals(String other)
+    {
+        return this.toString().equalsIgnoreCase(other);
+    }
+
+    public boolean equals(WorkerType other)
+    {
+        // enums in Java can be compared using '=='.
+        return this == other;
+    }
 }

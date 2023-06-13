@@ -66,7 +66,7 @@ public class PixelsConsumer extends Consumer
         boolean isRunning = true;
         try
         {
-            String pixelsPath = parameters.getLoadingPath();
+            final String[] targetPaths = parameters.getLoadingPaths();
             String schemaStr = parameters.getSchema();
             int[] orderMapping = parameters.getOrderMapping();
             int maxRowNum = parameters.getMaxRowNum();
@@ -84,7 +84,6 @@ public class PixelsConsumer extends Consumer
             short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
             TypeDescription schema = TypeDescription.fromString(schemaStr);
-            final String[] targetPaths = pixelsPath.split(";");
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             ColumnVector[] columnVectors = rowBatch.cols;
 

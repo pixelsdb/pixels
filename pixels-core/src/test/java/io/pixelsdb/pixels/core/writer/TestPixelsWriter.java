@@ -355,9 +355,9 @@ public class TestPixelsWriter
             List<Status> fileStatuses = storage.listStatus(directory);
             MetadataService metadataService = new MetadataService("dbiir10", 18888);
             Layout layout = metadataService.getLayout("pixels", "test_105", 0);
-            Compact compact = layout.getCompactObject();
+            Compact compact = layout.getCompact();
             int cacheBorder = compact.getCacheBorder();
-            List<String> cacheOrders = compact.getColumnletOrder().subList(0, cacheBorder);
+            List<String> cacheOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
             long startNano = System.nanoTime();
             // write cache
             for (Status fileStatus : fileStatuses)

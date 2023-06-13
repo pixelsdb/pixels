@@ -42,8 +42,7 @@ public class TransServer implements Server
     {
         assert (port > 0 && port <= 65535);
         this.rpcServer = ServerBuilder.forPort(port)
-                .addService(new TransServiceImpl())
-                .build();
+                .addService(new TransServiceImpl()).build();
     }
 
     @Override

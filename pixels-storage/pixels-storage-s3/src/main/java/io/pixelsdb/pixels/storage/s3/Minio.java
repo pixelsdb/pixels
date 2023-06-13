@@ -22,10 +22,12 @@ package io.pixelsdb.pixels.storage.s3;
 import io.pixelsdb.pixels.common.exception.StorageException;
 import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
@@ -55,9 +57,10 @@ public final class Minio extends AbstractS3
     // private static Logger logger = LogManager.getLogger(Minio.class);
     private static final String SchemePrefix = Scheme.minio.name() + "://";
 
-    private static String minIOEndpoint = null;
-    private static String minIOAccessKey = null;
-    private static String minIOSecretKey = null;
+    private static String minioRegion;
+    private static String minioEndpoint;
+    private static String minioAccessKey;
+    private static String minioSecretKey;
 
     static
     {
@@ -70,6 +73,10 @@ public final class Minio extends AbstractS3
              */
             InitId(MINIO_ID_KEY);
         }
+        minioRegion = ConfigFactory.Instance().getProperty("minio.region");
+        minioEndpoint = ConfigFactory.Instance().getProperty("minio.endpoint");
+        minioAccessKey = ConfigFactory.Instance().getProperty("minio.access.key");
+        minioSecretKey = ConfigFactory.Instance().getProperty("minio.secret.key");
     }
 
     /**
@@ -80,24 +87,29 @@ public final class Minio extends AbstractS3
      * <br/>
      * If the configurations are not changed, this method is a no-op.
      *
+     * @param region the new region of Minio
      * @param endpoint the new endpoint of Minio
      * @param accessKey the new access key of Minio
      * @param secretKey the new secret key of Minio
      * @throws IOException
      */
-    public static void ConfigMinio(String endpoint, String accessKey, String secretKey) throws IOException
+    public static void ConfigMinio(String region, String endpoint, String accessKey, String secretKey)
+            throws IOException
     {
+        requireNonNull(region, "region is null");
         requireNonNull(endpoint, "endpoint is null");
         requireNonNull(accessKey, "accessKey is null");
         requireNonNull(secretKey, "secretKey is null");
 
-        if (!Objects.equals(minIOEndpoint, endpoint) ||
-                !Objects.equals(minIOAccessKey, accessKey) ||
-                !Objects.equals(minIOSecretKey, secretKey))
+        if (!Objects.equals(minioRegion, region) ||
+                !Objects.equals(minioEndpoint, endpoint) ||
+                !Objects.equals(minioAccessKey, accessKey) ||
+                !Objects.equals(minioSecretKey, secretKey))
         {
-            minIOEndpoint = endpoint;
-            minIOAccessKey = accessKey;
-            minIOSecretKey = secretKey;
+            minioRegion = region;
+            minioEndpoint = endpoint;
+            minioAccessKey = accessKey;
+            minioSecretKey = secretKey;
             StorageFactory.Instance().reload(Scheme.minio);
         }
     }
@@ -109,18 +121,19 @@ public final class Minio extends AbstractS3
 
     private void connect()
     {
-        requireNonNull(minIOEndpoint, "Minio endpoint is not set");
-        requireNonNull(minIOAccessKey, "Minio access key is not set");
-        requireNonNull(minIOSecretKey, "Minio secret key is not set");
+        requireNonNull(minioEndpoint, "Minio endpoint is not set");
+        requireNonNull(minioAccessKey, "Minio access key is not set");
+        requireNonNull(minioSecretKey, "Minio secret key is not set");
 
         this.s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
                         .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
                         .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
                         .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                         .maxConnections(MaxRequestConcurrency))
-                .endpointOverride(URI.create(minIOEndpoint))
+                .endpointOverride(URI.create(minioEndpoint))
+                .region(Region.of(minioRegion))
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(minIOAccessKey, minIOSecretKey))).build();
+                        AwsBasicCredentials.create(minioAccessKey, minioSecretKey))).build();
     }
 
     @Override

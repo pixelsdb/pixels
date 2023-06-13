@@ -124,7 +124,7 @@ public class Main
                         .help("specify the number of consumer threads used for data generation");
                 argumentParser.addArgument("-e", "--enable_encoding").setDefault(true)
                         .help("specify the option of enabling encoding or not");
-                argumentParser.addArgument("-l", "--loading_data_path")
+                argumentParser.addArgument("-l", "--loading_data_paths")
                         .help("specify the path of loading data");
 
                 Namespace ns = null;
@@ -330,12 +330,11 @@ public class Main
 
     /**
      * Check if the order or compact path from pixels metadata is valid.
-     * @param path the order or compact path from pixels metadata.
+     * @param paths the order or compact pathw from pixels metadata.
      */
-    public static void validateOrderOrCompactPath(String path)
+    public static void validateOrderOrCompactPath(String[] paths)
     {
-        requireNonNull(path, "path is null");
-        String[] paths = path.split(";");
+        requireNonNull(paths, "paths is null");
         checkArgument(paths.length > 0, "path must contain at least one valid directory");
         try
         {

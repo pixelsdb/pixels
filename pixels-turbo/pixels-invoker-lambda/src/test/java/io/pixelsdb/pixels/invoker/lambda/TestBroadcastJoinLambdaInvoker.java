@@ -75,7 +75,7 @@ public class TestBroadcastJoinLambdaInvoker
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20230416155202_0_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20230416155202_0_compact.pxl", 28, 4)))));
         leftTable.setFilter(leftFilter);
-        leftTable.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        leftTable.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
         joinInput.setSmallTable(leftTable);
 
         BroadcastTableInfo rightTable = new BroadcastTableInfo();
@@ -93,7 +93,7 @@ public class TestBroadcastJoinLambdaInvoker
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20230416153320_0_compact.pxl", 28, 4)))));
         rightTable.setFilter(rightFilter);
-        rightTable.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null));
+        rightTable.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
         joinInput.setLargeTable(rightTable);
 
         JoinInfo joinInfo = new JoinInfo();
@@ -106,7 +106,7 @@ public class TestBroadcastJoinLambdaInvoker
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {2}, 100));
         joinInput.setJoinInfo(joinInfo);
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/unit_tests/",
-                new StorageInfo(Storage.Scheme.s3, null, null, null), true,
+                new StorageInfo(Storage.Scheme.s3, null, null, null, null), true,
                 Arrays.asList("broadcast_join_lineitem_part_0")));
 
         System.out.println(JSON.toJSONString(joinInput));

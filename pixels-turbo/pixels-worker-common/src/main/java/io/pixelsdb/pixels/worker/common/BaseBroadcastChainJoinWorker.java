@@ -34,7 +34,7 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.*;

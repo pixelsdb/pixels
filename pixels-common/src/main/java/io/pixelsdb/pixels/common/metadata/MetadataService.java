@@ -20,12 +20,13 @@
 package io.pixelsdb.pixels.common.metadata;
 
 import com.google.protobuf.ByteString;
-import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.common.metadata.domain.*;
-import io.pixelsdb.pixels.daemon.MetadataProto;
-import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.domain.*;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.daemon.MetadataProto;
+import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_VIEW_NOT_FOUND;
+import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermission;
 
 /**
  * Created by hank on 18-6-17.
@@ -330,7 +332,7 @@ public class MetadataService
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
-                .setVersion(version)
+                .setLayoutVersion(version)
                 .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.READABLE).build();
         return internalGetLayout(request);
     }
@@ -343,7 +345,7 @@ public class MetadataService
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
-                .setVersion(-1)
+                .setLayoutVersion(-1)
                 .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.ALL).build();
 
         return internalGetLayout(request);
@@ -382,29 +384,20 @@ public class MetadataService
         return layout;
     }
 
-    private MetadataProto.Layout.Permission convertPermission(Layout.Permission permission)
-    {
-        switch (permission)
-        {
-            case DISABLED:
-                return MetadataProto.Layout.Permission.DISABLED;
-            case READ_ONLY:
-                return MetadataProto.Layout.Permission.READ_ONLY;
-            case READ_WRITE:
-                return MetadataProto.Layout.Permission.READ_WRITE;
-        }
-        return MetadataProto.Layout.Permission.UNRECOGNIZED;
-    }
-
+    /**
+     * The ordered and compact paths of the layout are not updated, they need to be added separately.
+     * @param layout the new layout
+     * @return true if success, false otherwise
+     * @throws MetadataException
+     */
     public boolean updateLayout(Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
                 .setId(layout.getId()).setPermission(convertPermission(layout.getPermission()))
-                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplits())
-                .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
-                .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
-                .setVersion(layout.getVersion()).setProjections(layout.getProjections())
+                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplitsJson())
+                .setOrdered(layout.getOrderedJson()).setCompact(layout.getCompactJson())
+                .setVersion(layout.getVersion()).setProjections(layout.getProjectionsJson())
                 .setTableId(layout.getTableId()).build();
         MetadataProto.UpdateLayoutRequest request = MetadataProto.UpdateLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -429,15 +422,20 @@ public class MetadataService
         return true;
     }
 
+    /**
+     * The ordered and compact paths of the layout are not added, they need to be added separately.
+     * @param layout the new layout
+     * @return true if success, false otherwise
+     * @throws MetadataException
+     */
     public boolean addLayout(Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
                 .setId(layout.getId()).setPermission(convertPermission(layout.getPermission()))
-                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplits())
-                .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
-                .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
-                .setVersion(layout.getVersion()).setProjections(layout.getProjections())
+                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplitsJson())
+                .setOrdered(layout.getOrderedJson()).setCompact(layout.getCompactJson())
+                .setVersion(layout.getVersion()).setProjections(layout.getProjectionsJson())
                 .setTableId(layout.getTableId()).build();
         MetadataProto.AddLayoutRequest request = MetadataProto.AddLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -460,6 +458,389 @@ public class MetadataService
             throw new MetadataException("failed to add layout into metadata", e);
         }
         return true;
+    }
+
+    public boolean createPath(String uri, boolean isCompact, Layout layout) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.CreatePathRequest request = MetadataProto.CreatePathRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setPath(MetadataProto.Path.newBuilder().setUri(uri).setIsCompact(isCompact)
+                        .setLayoutId(layout.getId())).build();
+        try
+        {
+            MetadataProto.CreatePathResponse response = this.stub.createPath(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to create path in metadata", e);
+        }
+        return false;
+    }
+
+    public List<Path> getPaths(long layoutOrRangeId, boolean isLayoutId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetPathsRequest.Builder requestBuilder = MetadataProto.GetPathsRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token));
+        if (isLayoutId)
+        {
+            requestBuilder.setLayoutId(layoutOrRangeId);
+        }
+        else
+        {
+            requestBuilder.setRangeId(layoutOrRangeId);
+        }
+        try
+        {
+            MetadataProto.GetPathsResponse response = this.stub.getPaths(requestBuilder.build());
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return Path.convertPaths(response.getPathsList());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get paths from metadata", e);
+        }
+    }
+
+    public boolean updatePath(long pathId, String uri, boolean isCompact) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.UpdatePathRequest request = MetadataProto.UpdatePathRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setPathId(pathId).setUri(uri).setIsCompact(isCompact).build();
+        try
+        {
+            MetadataProto.UpdatePathResponse response = this.stub.updatePath(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update path in metadata", e);
+        }
+        return false;
+    }
+
+    public boolean deletePaths(List<Long> pathIds) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DeletePathsRequest request = MetadataProto.DeletePathsRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .addAllPathIds(pathIds).build();
+        try
+        {
+            MetadataProto.DeletePathsResponse response = this.stub.deletePaths(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to delete paths from metadata", e);
+        }
+        return false;
+    }
+
+    public boolean CreatePeerPath(String uri, List<Column> columns, Path path, Peer peer) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.CreatePeerPathRequest request = MetadataProto.CreatePeerPathRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setPeerPath(MetadataProto.PeerPath.newBuilder().setUri(uri)
+                        .addAllColumns(Column.revertColumns(columns)).setPathId(path.getId())
+                        .setPeerId(peer.getId())).build();
+        try
+        {
+            MetadataProto.CreatePeerPathResponse response = this.stub.createPeerPath(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to create peer path in metadata", e);
+        }
+        return false;
+    }
+
+    public List<PeerPath> getPeerPaths(long pathOrPeerId, boolean isPathId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetPeerPathsRequest.Builder requestBuilder = MetadataProto.GetPeerPathsRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token));
+        if (isPathId)
+        {
+            requestBuilder.setPathId(pathOrPeerId);
+        }
+        else
+        {
+            requestBuilder.setPeerId(pathOrPeerId);
+        }
+        try
+        {
+            MetadataProto.GetPeerPathsResponse response = this.stub.getPeerPaths(requestBuilder.build());
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return PeerPath.convertPeerPaths(response.getPeerPathsList());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get peer paths from metadata", e);
+        }
+    }
+
+    public boolean updatePeerPath(long peerPathId, String uri, List<Column> columns) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.UpdatePeerPathRequest request = MetadataProto.UpdatePeerPathRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token)).setPeerPathId(peerPathId)
+                .setUri(uri).addAllColumns(Column.revertColumns(columns)).build();
+        try
+        {
+            MetadataProto.UpdatePeerPathResponse response = this.stub.updatePeerPath(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update peer path in metadata", e);
+        }
+        return false;
+    }
+
+    public boolean deletePeerPaths(List<Long> peerPathIds) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DeletePeerPathsRequest request = MetadataProto.DeletePeerPathsRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .addAllPeerPathIds(peerPathIds).build();
+        try
+        {
+            MetadataProto.DeletePeerPathsResponse response = this.stub.deletePeerPaths(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to delete peer paths from metadata", e);
+        }
+        return false;
+    }
+
+    public boolean createPeer(String name, String location,
+                              String host, int port, Storage.Scheme storageScheme) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.CreatePeerRequest request = MetadataProto.CreatePeerRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setPeer(MetadataProto.Peer.newBuilder().setName(name).setLocation(location)
+                        .setHost(host).setPort(port).setStorageScheme(storageScheme.name())).build();
+        try
+        {
+            MetadataProto.CreatePeerResponse response = this.stub.createPeer(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to create peer in metadata", e);
+        }
+        return false;
+    }
+
+    public Peer getPeer(int peerId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetPeerRequest request = MetadataProto.GetPeerRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token)).setId(peerId).build();
+        try
+        {
+            MetadataProto.GetPeerResponse response = this.stub.getPeer(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return new Peer(response.getPeer());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to create peer in metadata", e);
+        }
+    }
+
+    public Peer getPeer(String name) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetPeerRequest request = MetadataProto.GetPeerRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token)).setName(name).build();
+        try
+        {
+            MetadataProto.GetPeerResponse response = this.stub.getPeer(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return new Peer(response.getPeer());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to create peer in metadata", e);
+        }
+    }
+
+    public boolean updatePeer(Peer peer) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.UpdatePeerRequest request = MetadataProto.UpdatePeerRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setPeer(MetadataProto.Peer.newBuilder().setId(peer.getId()).setName(peer.getName())
+                        .setLocation(peer.getLocation()).setHost(peer.getHost()).setPort(peer.getPort())
+                        .setStorageScheme(peer.getStorageScheme().name())).build();
+        try
+        {
+            MetadataProto.UpdatePeerResponse response = this.stub.updatePeer(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update peer in metadata", e);
+        }
+        return false;
+    }
+
+    public boolean deletePeer(int peerId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DeletePeerRequest request = MetadataProto.DeletePeerRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setId(peerId).build();
+        try
+        {
+            MetadataProto.DeletePeerResponse response = this.stub.deletePeer(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to delete peer from metadata", e);
+        }
+        return false;
+    }
+
+    public boolean deletePeer(String name) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DeletePeerRequest request = MetadataProto.DeletePeerRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setName(name).build();
+        try
+        {
+            MetadataProto.DeletePeerResponse response = this.stub.deletePeer(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to delete peer from metadata", e);
+        }
+        return false;
     }
 
     public boolean createSchema(String schemaName) throws MetadataException
@@ -498,11 +879,12 @@ public class MetadataService
         return true;
     }
 
-    public boolean createTable(String schemaName, String tableName, String storageScheme, List<Column> columns) throws MetadataException
+    public boolean createTable(String schemaName, String tableName, Storage.Scheme storageScheme,
+                               List<String> basePathUris, List<Column> columns) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         assert tableName != null && !tableName.isEmpty();
-        assert storageScheme != null && !storageScheme.isEmpty();
+        assert storageScheme != null;
         assert columns != null && !columns.isEmpty();
 
         String token = UUID.randomUUID().toString();
@@ -516,8 +898,8 @@ public class MetadataService
         }
         MetadataProto.CreateTableRequest request = MetadataProto.CreateTableRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).setStorageScheme(storageScheme)
-                .addAllColumns(columnList).build();
+                .setSchemaName(schemaName).setTableName(tableName).setStorageScheme(storageScheme.name())
+                .addAllBasePathUris(basePathUris).addAllColumns(columnList).build();
         MetadataProto.CreateTableResponse response = this.stub.createTable(request);
         if (response.getHeader().getErrorCode() != 0)
         {

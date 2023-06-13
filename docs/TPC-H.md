@@ -12,20 +12,16 @@ The file(s) of each table are stored in a separate directory named by the table 
 
 ## Create TPC-H Database
 Log in trino-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
-Change the value of the `storage` table property in the create-table statement to `hdfs` if HDFS is used as the
-underlying storage system instead of S3.
-> Note that trino-cli can execute only one SQL statement at each time.
+In each `CREATE TABLE` statement, the table property `storage` defines the type of storage system used to store the
+files in this table, whereas the table property `paths` defines the URIs of the paths in which the table files are stored.
+Multiple URIs can be listed one after another, seperated by semicolon, in `paths`.
+> Note that the URIs in `paths` can have no storage scheme or their storage scheme must be consistent with `storage`. 
 
 Then, use `SHOW SCHEMAS` and `SHOW TABLES` statements to check if the tpch database has been
 created successfully.
 
-Connect to MySQL using the user `pixels`, and execute the SQL statements in `scripts/sql/tpch_layouts.sql`
-to create the table layouts for the tables in the TPC-H database in Pixels. Actually, these layouts
-should be created by the storage layout optimizer ([Rainbow](https://ieeexplore.ieee.org/document/8509421)).
-However, we directly load the layouts here for simplicity.
-
 Create the container to store the tables in S3. The container name is the same as the hostname
-(e.g., `pixels-tpch`) in the `LAYOUT_ORDER_PATH` and `LAYOUT_COMPACT_PATH` of each table layout.
+(e.g., `pixels-tpch`) in the `paths` of each table.
 Change the bucket name if it already exists.
 
 During data loading, Pixels will automatically create the folders in the bucket to store the files in each table.
@@ -68,7 +64,13 @@ Connect to trino-cli:
 cd ~/opt/trino-server
 ./bin/trino --server localhost:8080 --catalog pixels --schema tpch
 ```
-Execute the TPC-H queries in trino-cli.
+In trino-cli, select the ordered data layout by setting the two session properties:
+```sql
+set session pixels.ordered_path_enabled=true
+set session pixels.compact_path_enabled=false
+```
+By default, both paths are enabled. You can also enable the compact path and disable the ordered path when [data compaction](#data-compaction) is done.
+After selecting the data layout, execute the TPC-H queries in trino-cli.
 
 ## Data Compaction*
 This is optional. It is only needed if we want to test the query performance on the compact layout.
@@ -76,15 +78,21 @@ In pixels-cli, use the following commands to compact the files in the ordered pa
 ```bash
 COMPACT -s tpch -t customer -n no -c 2
 COMPACT -s tpch -t lineitem -n no -c 16
+COMPACT -s tpch -t nation -n no -c 1
 COMPACT -s tpch -t orders -n no -c 8
 COMPACT -s tpch -t part -n no -c 1
 COMPACT -s tpch -t partsupp -n no -c 8
+COMPACT -s tpch -t region -n no -c 1
 COMPACT -s tpch -t supplier -n no -c 1
 ```
 The tables `nation` and `region` are too small, no need to compact them.
 The last parameter `-c` of `COMPACT` command is the maximum number
 of threads used for data compaction. For large tables such as `lineitem`, you can increase `-c` to
 improve the compaction performance. Compaction is normally faster than loading with same number of threads.
+
+> `compact.factor` in `$PIXELS_HOME/pixels.properties` determines how many row groups are compacted into a single
+> file. The default value is 32, which is appropriate in most conditions. An experimental evaluation of the effects
+> of compact factor on AWS S3 can be found in our [ICDE'22](https://ieeexplore.ieee.org/document/9835615) paper.
 
 To avoid scanning the small files in the ordered path during query execution,
 create an empty bucket in S3 and change the ordered path in the metadata database
@@ -104,7 +112,7 @@ STAT -s tpch -t partsupp -o false -c true
 STAT -s tpch -t orders -o false -c true
 STAT -s tpch -t lineitem -o false -c true
 ```
-After it is finished, statistics of each tpch column can be found in the `pixels_metadata.COLS` metadata table.
+When it is finished, statistics of each tpch column can be found in the `pixels_metadata.COLS` metadata table.
 Finally, manually update the row count for each tpch table in `pixels_metadata.TBLS.TBL_ROW_COUNT`.
 
 Set `splits.index.type=cost_based` and restart Trino to benefit from cost-based query optimization.

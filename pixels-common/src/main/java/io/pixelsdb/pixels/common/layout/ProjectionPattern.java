@@ -34,8 +34,8 @@ import java.util.Set;
 public class ProjectionPattern
 {
     // it seems that this.pattern can be a Set.
-    private ColumnSet columnSet;
-    private String path;
+    private final ColumnSet columnSet;
+    private String[] paths;
 
     public ProjectionPattern()
     {
@@ -57,17 +57,17 @@ public class ProjectionPattern
         return this.columnSet;
     }
 
-    public void setPath(String path)
+    public void setPaths(String... paths)
     {
-        this.path = path;
+        this.paths = paths;
     }
 
-    public String getPath()
+    public String[] getPaths()
     {
-        return path;
+        return paths;
     }
 
-    public boolean contaiansColumn(String column)
+    public boolean containsColumn(String column)
     {
         return this.columnSet.contains(column);
     }
@@ -77,14 +77,14 @@ public class ProjectionPattern
     {
         if (this.columnSet.isEmpty())
         {
-            return "path: " + path + ", pattern is empty";
+            return "paths: " + paths + ", pattern is empty";
         }
         StringBuilder builder = new StringBuilder();
         for (String column : this.columnSet.getColumns())
         {
             builder.append(",").append(column);
         }
-        return "path: " + path + ", pattern: " + builder.substring(1);
+        return "paths: " + paths + ", pattern: " + builder.substring(1);
     }
 
     public static List<ProjectionPattern> buildPatterns(List<String> columns, Projections projectionInfo)
@@ -105,7 +105,7 @@ public class ProjectionPattern
                 pattern.addColumn(columns.get(column));
             }
             // set split size of each pattern
-            pattern.setPath(originProjPattern.getPath());
+            pattern.setPaths(originProjPattern.getPaths());
 
             ColumnSet columnSet = pattern.getColumnSet();
 
