@@ -25,9 +25,8 @@ efficiency in cloud functions.
 
 ## Build Pixels
 
-Pixels is mainly implemented in Java, while there is a C++ implementation of the Pixels Reader.
-The [C++ document](cpp/README.md) gives the instructions of using the C++ reader.
-Here we explain how to build and use the Java components.
+Pixels is mainly implemented in Java (with some JNI hooks of system calls and C/C++ libs), while there is a C++ implementation of the Pixels Reader.
+The [C++ document](cpp/README.md) gives the instructions of using the C++ reader. Here we explain how to build and use the Java components.
 
 Install JDK 17.0.3 or above, and clone the Pixels codebase into any `SRC_BASE` directory:
 ```bash
