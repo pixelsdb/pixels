@@ -8,7 +8,7 @@ Pixels outperforms Parquet, which is the most widely used columnar format in tod
 
 We have integrated Pixels with popular query engines including DuckDB, Trino (405), Presto (0.279), and Hive (2.3+).
 
-The DuckDB integration and the C++ implementation of Pixels are in the [cpp](cpp) folder.
+The DuckDB integration and the C++ implementation of Pixels Reader are in the [cpp](cpp) folder.
 The other integrations are opensourced in separate repositories:
 * [Pixels Connector for Trino](https://github.com/pixelsdb/pixels-trino)
 * [Pixels Connector for Presto](https://github.com/pixelsdb/pixels-presto)
