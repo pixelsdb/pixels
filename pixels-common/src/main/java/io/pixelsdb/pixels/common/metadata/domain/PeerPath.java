@@ -41,6 +41,7 @@ public class PeerPath extends Base
 
     public PeerPath(MetadataProto.PeerPath peerPath)
     {
+        this.setId(peerPath.getId());
         this.uri = peerPath.getUri();
         this.columns = Column.convertColumns(peerPath.getColumnsList());
         this.pathId = peerPath.getPathId();
@@ -103,7 +104,8 @@ public class PeerPath extends Base
     public String toString()
     {
         return "PeerPath{" +
-                "uri='" + uri + '\'' +
+                "peerPathId='" + this.getId() + '\'' +
+                ", uri='" + uri + '\'' +
                 ", columns='" + columns + '\'' +
                 ", pathId='" + pathId + '\'' +
                 ", peerId='" + peerId + '\'' + '}';
