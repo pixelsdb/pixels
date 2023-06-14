@@ -42,6 +42,7 @@ public class Path extends Base
 
     public Path(MetadataProto.Path path)
     {
+        this.setId(path.getId());
         this.uri = path.getUri();
         this.isCompact = path.getIsCompact();
         this.layoutId = path.getLayoutId();
@@ -117,6 +118,17 @@ public class Path extends Base
     public void setRangeId(long rangeId)
     {
         this.rangeId = rangeId;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "Path{" +
+                ", pathId='" + this.getId() + '\'' +
+                ", uri='" + uri + '\'' +
+                ", isCompact='" + isCompact + '\'' +
+                ", layoutId='" + layoutId + '\'' +
+                ", rangeId='" + rangeId + '\'' + '}';
     }
 
     private MetadataProto.Path toProto()
