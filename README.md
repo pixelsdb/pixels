@@ -6,20 +6,27 @@ It is optimized for analytical tables stored in on-premises and cloud-native sto
 including S3, GCS, HDFS, Redis, and local file systems.
 Pixels outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to two orders of magnitude.
 
-We have integrated Pixels with popular query engines including Trino (405), Presto (0.279), and Hive (2.3+). These
-integrations are opensourced in separate repositories:
+We have integrated Pixels with popular query engines including DuckDB, Trino (405), Presto (0.279), and Hive (2.3+).
+
+The DuckDB integration and the C++ implementation of Pixels Reader are in the [cpp](cpp) folder.
+The other integrations are opensourced in separate repositories:
 * [Pixels Connector for Trino](https://github.com/pixelsdb/pixels-trino)
 * [Pixels Connector for Presto](https://github.com/pixelsdb/pixels-presto)
 * [Pixels SerDe for Hive](https://github.com/pixelsdb/pixels-hive)
 
 Pixels also has its own query engine [Pixels-Turbo](pixels-turbo).
-It processes sustained queries in an autoscaling MPP cluster (currently based on Trino) and exploits serverless functions 
-(e.g, [AWS Lambda](https://aws.amazon.com/lambda/) and [vHive / Knative](https://github.com/vhive-serverless/vHive)) 
+It prioritizes processing queries in an autoscaling MPP cluster (currently based on Trino) and exploits serverless functions 
+(e.g, [AWS Lambda](https://aws.amazon.com/lambda/) or [vHive / Knative](https://github.com/vhive-serverless/vHive)) 
 to accelerate the processing of workload spikes. With `Pixels-Turbo`, we can achieve better performance and cost-efficiency 
-for sustained workloads, while not compromising elasticity for workload spikes.
+for continuous workloads while not compromising elasticity for workload spikes.
 
+On the basis of Pixels-Turbo, we are also building a pure cloud-function-based serverless query engine, and exploring how to improve the query execution 
+efficiency in cloud functions.
 
 ## Build Pixels
+
+Pixels is mainly implemented in Java (with some JNI hooks of system calls and C/C++ libs), while there is a C++ implementation of the Pixels Reader.
+The [C++ document](cpp/README.md) gives the instructions of using the C++ reader. Here we explain how to build and use the Java components.
 
 Install JDK 17.0.3 or above, and clone the Pixels codebase into any `SRC_BASE` directory:
 ```bash

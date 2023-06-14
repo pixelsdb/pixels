@@ -5,21 +5,16 @@
 
 ### Prerequisites
 
-tbb install:
+Install tbb:
 ```shell
 echo "deb http://cz.archive.ubuntu.com/ubuntu eoan main universe" | sudo tee -a  /etc/apt/sources.list
-sudo apt update
-sudo apt install libtbb-dev
+sudo apt-get update
+sudo apt-get install -y libtbb-dev
 ```
 
-protobuf install:
+Install protobuf and iouring:
 ```shell
-apt install protobuf-compiler
-```
-
-iouring install:
-```shell
-sudo apt-get -y install liburing-dev
+sudo apt-get install -y protobuf-compiler liburing-dev
 ```
 
 ### Compilation
