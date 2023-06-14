@@ -33,7 +33,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.pixelsdb.pixels.cli.Main.validateOrderOrCompactPath;
-import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -49,14 +48,18 @@ public class LoadExecutor implements CommandExecutor
         String origin = ns.getString("original_data_path");
         int rowNum = Integer.parseInt(ns.getString("row_num"));
         String regex = ns.getString("row_regex");
-        String[] loadingDataPaths = requireNonNull(
-                ns.getString("loading_data_paths"), "paths is null").split(";");
+        String paths = ns.getString("loading_data_paths");
         int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
         boolean enableEncoding = Boolean.parseBoolean(ns.getString("enable_encoding"));
         System.out.println("enable encoding: " + enableEncoding);
-        if (loadingDataPaths.length > 0)
+        String[] loadingDataPaths = null;
+        if (paths != null)
         {
-            validateOrderOrCompactPath(loadingDataPaths);
+            loadingDataPaths = paths.split(";");
+            if (loadingDataPaths.length > 0)
+            {
+                validateOrderOrCompactPath(loadingDataPaths);
+            }
         }
 
         if (!origin.endsWith("/"))
