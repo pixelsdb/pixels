@@ -72,6 +72,11 @@ set session pixels.compact_path_enabled=false
 By default, both paths are enabled. You can also enable the compact path and disable the ordered path when [data compaction](#data-compaction) is done.
 After selecting the data layout, execute the TPC-H queries in trino-cli.
 
+If you are using trino JDBC, you can set these session properties in the JDBC [connection properties](https://trino.io/docs/405/client/jdbc.html#connection-parameters):
+```java
+properties.setProperty("sessionProperties", "pixels.ordered_path_enabled:true;pixels.compact_path_enabled:false");
+```
+
 ## Data Compaction*
 This is optional. It is only needed if we want to test the query performance on the compact layout.
 In pixels-cli, use the following commands to compact the files in the ordered path of each table:
@@ -94,9 +99,7 @@ improve the compaction performance. Compaction is normally faster than loading w
 > file. The default value is 32, which is appropriate in most conditions. An experimental evaluation of the effects
 > of compact factor on AWS S3 can be found in our [ICDE'22](https://ieeexplore.ieee.org/document/9835615) paper.
 
-To avoid scanning the small files in the ordered path during query execution,
-create an empty bucket in S3 and change the ordered path in the metadata database
-to the empty bucket.
+To avoid scanning the small files in the ordered path during query execution, disable the ordered path and enable the compact path before executing queries.
 
 ## Statistics Collection*
 This is optional. Data statistics enable cost-based query optimization for the queries.
