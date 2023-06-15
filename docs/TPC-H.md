@@ -112,7 +112,4 @@ STAT -s tpch -t partsupp -o false -c true
 STAT -s tpch -t orders -o false -c true
 STAT -s tpch -t lineitem -o false -c true
 ```
-When it is finished, statistics of each tpch column can be found in the `pixels_metadata.COLS` metadata table.
-Finally, manually update the row count for each tpch table in `pixels_metadata.TBLS.TBL_ROW_COUNT`.
-
-Set `splits.index.type=cost_based` and restart Trino to benefit from cost-based query optimization.
+When it is finished successfully, set `splits.index.type=cost_based` and restart Trino to benefit from cost-based data splitting (determining the number of tasks to scan a base table).
