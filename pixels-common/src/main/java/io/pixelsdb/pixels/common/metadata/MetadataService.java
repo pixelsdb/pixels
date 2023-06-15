@@ -572,7 +572,7 @@ public class MetadataService
         return false;
     }
 
-    public boolean CreatePeerPath(String uri, List<Column> columns, Path path, Peer peer) throws MetadataException
+    public boolean createPeerPath(String uri, List<Column> columns, Path path, Peer peer) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.CreatePeerPathRequest request = MetadataProto.CreatePeerPathRequest.newBuilder()
@@ -759,7 +759,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to create peer in metadata", e);
+            throw new MetadataException("failed to get peer in metadata", e);
         }
     }
 

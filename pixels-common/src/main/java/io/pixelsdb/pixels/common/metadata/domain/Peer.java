@@ -39,6 +39,7 @@ public class Peer extends Base
 
     public Peer(MetadataProto.Peer peer)
     {
+        this.setId(peer.getId());
         this.name = peer.getName();
         this.location = peer.getLocation();
         this.host = peer.getHost();
@@ -94,5 +95,17 @@ public class Peer extends Base
     public void setStorageScheme(Storage.Scheme storageScheme)
     {
         this.storageScheme = storageScheme;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "Peer{" +
+                "peerId='" + this.getId() + '\'' +
+                ", name='" + name + '\'' +
+                ", location='" + location + '\'' +
+                ", host='" + host + '\'' +
+                ", port='" + port + '\'' +
+                ", storageScheme='" + storageScheme + '\'' + '}';
     }
 }
