@@ -39,7 +39,6 @@ int main() {
 
     // Init an in-memory DuckDB instance
     DuckDBManager db_manager(":memory:");
-    db_manager.importSqlFile("./resources/tpch_schema.sql");
 
     // Configure aws sdk
     Aws::SDKOptions options;

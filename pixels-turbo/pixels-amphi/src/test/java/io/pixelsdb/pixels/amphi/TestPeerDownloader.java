@@ -201,41 +201,44 @@ public class TestPeerDownloader
         String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com";
         MetadataService metadataService = new MetadataService(hostAddr, 18888);
 
-//        List<Column> columns = metadataService.getColumns("tpch_1g", "lineitem", false);
-//        List<Column> partial = columns.stream()
-//                .filter(column -> column.getName().equals("l_quantity"))
-//                .collect(Collectors.toList());
-//
-//        String avroSchema = "{"
-//                + "\"type\":\"record\","
-//                + "\"name\":\"Lineitem\","
-//                + "\"fields\":["
-//                + "{\"name\":\"l_quantity\",\"type\":{\"type\":\"bytes\",\"logicalType\":\"decimal\",\"precision\":15,\"scale\":2}}"
-//                + "]"
-//                + "}";
-//        Schema regionSchema = new Schema.Parser().parse(avroSchema);
-//
-//        Storage inputStorage = StorageFactory.Instance().getStorage("s3");
-//        List<Status> statuses = inputStorage.listStatus("s3://pixels-tpch1g/lineitem/v-0-order");
-//        String[] sourcePaths = statuses.stream().map(status -> status.getPath()).toArray(String[]::new);
-
-        List<Column> columns = metadataService.getColumns("tpch_1g", "customer", false);
+        List<Column> columns = metadataService.getColumns("tpch_1g", "lineitem", false);
         List<Column> partial = columns.stream()
-                .filter(column -> column.getName().equals("c_acctbal"))
+                .filter(column -> column.getName().equals("l_orderkey") || column.getName().equals("l_shipdate") || column.getName().equals("l_quantity"))
                 .collect(Collectors.toList());
 
         String avroSchema = "{"
                 + "\"type\":\"record\","
                 + "\"name\":\"Lineitem\","
                 + "\"fields\":["
-                + "{\"name\":\"c_acctbal\",\"type\":{\"type\":\"bytes\",\"logicalType\":\"decimal\",\"precision\":15,\"scale\":2}}"
+                + "{\"name\":\"l_quantity\",\"type\":{\"type\":\"bytes\",\"logicalType\":\"decimal\",\"precision\":15,\"scale\":2}},"
+                + "{\"name\":\"l_orderkey\",\"type\":\"long\"},"
+                + "{\"name\":\"l_shipdate\",\"type\":{\"type\":\"int\",\"logicalType\":\"date\"}}"
                 + "]"
                 + "}";
         Schema regionSchema = new Schema.Parser().parse(avroSchema);
 
         Storage inputStorage = StorageFactory.Instance().getStorage("s3");
-        List<Status> statuses = inputStorage.listStatus("s3://pixels-tpch1g/customer/v-0-order");
+        List<Status> statuses = inputStorage.listStatus("s3://pixels-tpch1g/lineitem/v-0-order");
         String[] sourcePaths = statuses.stream().map(status -> status.getPath()).toArray(String[]::new);
+
+//        List<Column> columns = metadataService.getColumns("tpch_1g", "orders", false);
+//        List<Column> partial = columns.stream()
+//                .filter(column -> column.getName().equals("o_orderstatus") || column.getName().equals("o_orderkey"))
+//                .collect(Collectors.toList());
+//
+//        String avroSchema = "{"
+//                + "\"type\":\"record\","
+//                + "\"name\":\"order\","
+//                + "\"fields\":["
+//                + "{\"name\":\"o_orderstatus\",\"type\":\"string\"},"
+//                + "{\"name\":\"o_orderkey\",\"type\":\"long\"}"
+//                + "]"
+//                + "}";
+//        Schema regionSchema = new Schema.Parser().parse(avroSchema);
+//
+//        Storage inputStorage = StorageFactory.Instance().getStorage("s3");
+//        List<Status> statuses = inputStorage.listStatus("s3://pixels-tpch1g/orders/v-0-order");
+//        String[] sourcePaths = statuses.stream().map(status -> status.getPath()).toArray(String[]::new);
 
         Storage outputStorage = StorageFactory.Instance().getStorage("file");
 
@@ -245,7 +248,7 @@ public class TestPeerDownloader
                 .setSourcePaths(Arrays.asList(sourcePaths))
                 .setInputStorage(inputStorage)
                 .setOutputStorage(outputStorage)
-                .setOutDirPath("/Users/backfire/test-customer")
+                .setOutDirPath("/Users/backfire/test-lineitem")
                 .build();
 
         downloader.writeParquetFile();
