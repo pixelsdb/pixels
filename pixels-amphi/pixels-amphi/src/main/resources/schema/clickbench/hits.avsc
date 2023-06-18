@@ -1,0 +1,438 @@
+{
+  "type": "record",
+  "name": "hits",
+  "fields": [
+    {
+      "name": "WatchID",
+      "type": "long"
+    },
+    {
+      "name": "JavaEnable",
+      "type": "int"
+    },
+    {
+      "name": "Title",
+      "type": "string"
+    },
+    {
+      "name": "GoodEvent",
+      "type": "int"
+    },
+    {
+      "name": "EventTime",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "EventDate",
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
+    },
+    {
+      "name": "CounterID",
+      "type": "int"
+    },
+    {
+      "name": "ClientIP",
+      "type": "int"
+    },
+    {
+      "name": "RegionID",
+      "type": "int"
+    },
+    {
+      "name": "UserID",
+      "type": "long"
+    },
+    {
+      "name": "CounterClass",
+      "type": "int"
+    },
+    {
+      "name": "OS",
+      "type": "int"
+    },
+    {
+      "name": "UserAgent",
+      "type": "int"
+    },
+    {
+      "name": "URL",
+      "type": "string"
+    },
+    {
+      "name": "Referer",
+      "type": "string"
+    },
+    {
+      "name": "IsRefresh",
+      "type": "int"
+    },
+    {
+      "name": "RefererCategoryID",
+      "type": "int"
+    },
+    {
+      "name": "RefererRegionID",
+      "type": "int"
+    },
+    {
+      "name": "URLCategoryID",
+      "type": "int"
+    },
+    {
+      "name": "URLRegionID",
+      "type": "int"
+    },
+    {
+      "name": "ResolutionWidth",
+      "type": "int"
+    },
+    {
+      "name": "ResolutionHeight",
+      "type": "int"
+    },
+    {
+      "name": "ResolutionDepth",
+      "type": "int"
+    },
+    {
+      "name": "FlashMajor",
+      "type": "int"
+    },
+    {
+      "name": "FlashMinor",
+      "type": "int"
+    },
+    {
+      "name": "FlashMinor2",
+      "type": "string"
+    },
+    {
+      "name": "NetMajor",
+      "type": "int"
+    },
+    {
+      "name": "NetMinor",
+      "type": "int"
+    },
+    {
+      "name": "UserAgentMajor",
+      "type": "int"
+    },
+    {
+      "name": "UserAgentMinor",
+      "type": "string"
+    },
+    {
+      "name": "CookieEnable",
+      "type": "int"
+    },
+    {
+      "name": "JavascriptEnable",
+      "type": "int"
+    },
+    {
+      "name": "IsMobile",
+      "type": "int"
+    },
+    {
+      "name": "MobilePhone",
+      "type": "int"
+    },
+    {
+      "name": "MobilePhoneModel",
+      "type": "string"
+    },
+    {
+      "name": "Params",
+      "type": "string"
+    },
+    {
+      "name": "IPNetworkID",
+      "type": "int"
+    },
+    {
+      "name": "TraficSourceID",
+      "type": "int"
+    },
+    {
+      "name": "SearchEngineID",
+      "type": "int"
+    },
+    {
+      "name": "SearchPhrase",
+      "type": "string"
+    },
+    {
+      "name": "AdvEngineID",
+      "type": "int"
+    },
+    {
+      "name": "IsArtifical",
+      "type": "int"
+    },
+    {
+      "name": "WindowClientWidth",
+      "type": "int"
+    },
+    {
+      "name": "WindowClientHeight",
+      "type": "int"
+    },
+    {
+      "name": "ClientTimeZone",
+      "type": "int"
+    },
+    {
+      "name": "ClientEventTime",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "SilverlightVersion1",
+      "type": "int"
+    },
+    {
+      "name": "SilverlightVersion2",
+      "type": "int"
+    },
+    {
+      "name": "SilverlightVersion3",
+      "type": "int"
+    },
+    {
+      "name": "SilverlightVersion4",
+      "type": "int"
+    },
+    {
+      "name": "PageCharset",
+      "type": "string"
+    },
+    {
+      "name": "CodeVersion",
+      "type": "int"
+    },
+    {
+      "name": "IsLink",
+      "type": "int"
+    },
+    {
+      "name": "IsDownload",
+      "type": "int"
+    },
+    {
+      "name": "IsNotBounce",
+      "type": "int"
+    },
+    {
+      "name": "FUniqID",
+      "type": "long"
+    },
+    {
+      "name": "OriginalURL",
+      "type": "string"
+    },
+    {
+      "name": "HID",
+      "type": "int"
+    },
+    {
+      "name": "IsOldCounter",
+      "type": "int"
+    },
+    {
+      "name": "IsEvent",
+      "type": "int"
+    },
+    {
+      "name": "IsParameter",
+      "type": "int"
+    },
+    {
+      "name": "DontCountHits",
+      "type": "int"
+    },
+    {
+      "name": "WithHash",
+      "type": "int"
+    },
+    {
+      "name": "HitColor",
+      "type": "string"
+    },
+    {
+      "name": "LocalEventTime",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "Age",
+      "type": "int"
+    },
+    {
+      "name": "Sex",
+      "type": "int"
+    },
+    {
+      "name": "Income",
+      "type": "int"
+    },
+    {
+      "name": "Interests",
+      "type": "int"
+    },
+    {
+      "name": "Robotness",
+      "type": "int"
+    },
+    {
+      "name": "RemoteIP",
+      "type": "int"
+    },
+    {
+      "name": "WindowName",
+      "type": "int"
+    },
+    {
+      "name": "OpenerName",
+      "type": "int"
+    },
+    {
+      "name": "HistoryLength",
+      "type": "int"
+    },
+    {
+      "name": "BrowserLanguage",
+      "type": "string"
+    },
+    {
+      "name": "BrowserCountry",
+      "type": "string"
+    },
+    {
+      "name": "SocialNetwork",
+      "type": "string"
+    },
+    {
+      "name": "SocialAction",
+      "type": "string"
+    },
+    {
+      "name": "HTTPError",
+      "type": "int"
+    },
+    {
+      "name": "SendTiming",
+      "type": "int"
+    },
+    {
+      "name": "DNSTiming",
+      "type": "int"
+    },
+    {
+      "name": "ConnectTiming",
+      "type": "int"
+    },
+    {
+      "name": "ResponseStartTiming",
+      "type": "int"
+    },
+    {
+      "name": "ResponseEndTiming",
+      "type": "int"
+    },
+    {
+      "name": "FetchTiming",
+      "type": "int"
+    },
+    {
+      "name": "SocialSourceNetworkID",
+      "type": "int"
+    },
+    {
+      "name": "SocialSourcePage",
+      "type": "string"
+    },
+    {
+      "name": "ParamPrice",
+      "type": "long"
+    },
+    {
+      "name": "ParamOrderID",
+      "type": "string"
+    },
+    {
+      "name": "ParamCurrency",
+      "type": "string"
+    },
+    {
+      "name": "ParamCurrencyID",
+      "type": "int"
+    },
+    {
+      "name": "OpenstatServiceName",
+      "type": "string"
+    },
+    {
+      "name": "OpenstatCampaignID",
+      "type": "string"
+    },
+    {
+      "name": "OpenstatAdID",
+      "type": "string"
+    },
+    {
+      "name": "OpenstatSourceID",
+      "type": "string"
+    },
+    {
+      "name": "UTMSource",
+      "type": "string"
+    },
+    {
+      "name": "UTMMedium",
+      "type": "string"
+    },
+    {
+      "name": "UTMCampaign",
+      "type": "string"
+    },
+    {
+      "name": "UTMContent",
+      "type": "string"
+    },
+    {
+      "name": "UTMTerm",
+      "type": "string"
+    },
+    {
+      "name": "FromTag",
+      "type": "string"
+    },
+    {
+      "name": "HasGCLID",
+      "type": "int"
+    },
+    {
+      "name": "RefererHash",
+      "type": "long"
+    },
+    {
+      "name": "URLHash",
+      "type": "long"
+    },
+    {
+      "name": "CLID",
+      "type": "int"
+    }
+  ]
+}
