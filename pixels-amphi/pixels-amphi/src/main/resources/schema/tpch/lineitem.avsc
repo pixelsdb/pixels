@@ -1,0 +1,99 @@
+{
+  "type": "record",
+  "name": "lineitem",
+  "fields": [
+    {
+      "name": "l_orderkey",
+      "type": "long"
+    },
+    {
+      "name": "l_partkey",
+      "type": "long"
+    },
+    {
+      "name": "l_suppkey",
+      "type": "long"
+    },
+    {
+      "name": "l_linenumber",
+      "type": "int"
+    },
+    {
+      "name": "l_quantity",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 15,
+        "scale": 2
+      }
+    },
+    {
+      "name": "l_extendedprice",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 15,
+        "scale": 2
+      }
+    },
+    {
+      "name": "l_discount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 15,
+        "scale": 2
+      }
+    },
+    {
+      "name": "l_tax",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 15,
+        "scale": 2
+      }
+    },
+    {
+      "name": "l_returnflag",
+      "type": "string"
+    },
+    {
+      "name": "l_linestatus",
+      "type": "string"
+    },
+    {
+      "name": "l_shipdate",
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
+    },
+    {
+      "name": "l_commitdate",
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
+    },
+    {
+      "name": "l_receiptdate",
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
+    },
+    {
+      "name": "l_shipinstruct",
+      "type": "string"
+    },
+    {
+      "name": "l_shipmode",
+      "type": "string"
+    },
+    {
+      "name": "l_comment",
+      "type": "string"
+    }
+  ]
+}

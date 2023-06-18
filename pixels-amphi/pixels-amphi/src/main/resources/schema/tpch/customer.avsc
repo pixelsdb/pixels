@@ -1,0 +1,43 @@
+{
+  "type": "record",
+  "name": "customer",
+  "fields": [
+    {
+      "name": "c_custkey",
+      "type": "long"
+    },
+    {
+      "name": "c_name",
+      "type": "string"
+    },
+    {
+      "name": "c_address",
+      "type": "string"
+    },
+    {
+      "name": "c_nationkey",
+      "type": "long"
+    },
+    {
+      "name": "c_phone",
+      "type": "string"
+    },
+    {
+      "name": "c_acctbal",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 15,
+        "scale": 2
+      }
+    },
+    {
+      "name": "c_mktsegment",
+      "type": "string"
+    },
+    {
+      "name": "c_comment",
+      "type": "string"
+    }
+  ]
+}

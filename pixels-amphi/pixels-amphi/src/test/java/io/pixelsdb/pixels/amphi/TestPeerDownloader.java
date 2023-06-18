@@ -45,6 +45,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -252,5 +253,26 @@ public class TestPeerDownloader
                 .build();
 
         downloader.writeParquetFile();
+    }
+
+    @Test
+    public void testLoadAvroSchema()
+    {
+        try {
+            // 加载Schema
+            InputStream schemaStream = TestPeerDownloader.class.getClassLoader().getResourceAsStream("schema/tpch/lineitem.avsc");
+            Schema schema = new Schema.Parser().parse(schemaStream);
+            System.out.println(schema);
+
+            // 验证Schema
+            if (schema.getType() == Schema.Type.RECORD && schema.getName().equals("lineitem")) {
+                System.out.println("Schema is valid.");
+            } else {
+                System.out.println("Schema is invalid.");
+            }
+        } catch (IOException e) {
+            System.out.println("Failed to load schema: " + e.getMessage());
+        }
+
     }
 }

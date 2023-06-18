@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "region",
+  "fields": [
+    {
+      "name": "r_regionkey",
+      "type": "long"
+    },
+    {
+      "name": "r_name",
+      "type": "string"
+    },
+    {
+      "name": "r_comment",
+      "type": "string"
+    }
+  ]
+}

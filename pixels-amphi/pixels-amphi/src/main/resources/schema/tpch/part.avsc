@@ -1,0 +1,47 @@
+{
+  "type": "record",
+  "name": "part",
+  "fields": [
+    {
+      "name": "p_partkey",
+      "type": "long"
+    },
+    {
+      "name": "p_name",
+      "type": "string"
+    },
+    {
+      "name": "p_mfgr",
+      "type": "string"
+    },
+    {
+      "name": "p_brand",
+      "type": "string"
+    },
+    {
+      "name": "p_type",
+      "type": "string"
+    },
+    {
+      "name": "p_size",
+      "type": "int"
+    },
+    {
+      "name": "p_container",
+      "type": "string"
+    },
+    {
+      "name": "p_retailprice",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 15,
+        "scale": 2
+      }
+    },
+    {
+      "name": "p_comment",
+      "type": "string"
+    }
+  ]
+}

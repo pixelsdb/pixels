@@ -1,0 +1,39 @@
+{
+  "type": "record",
+  "name": "supplier",
+  "fields": [
+    {
+      "name": "s_suppkey",
+      "type": "long"
+    },
+    {
+      "name": "s_name",
+      "type": "string"
+    },
+    {
+      "name": "s_address",
+      "type": "string"
+    },
+    {
+      "name": "s_nationkey",
+      "type": "long"
+    },
+    {
+      "name": "s_phone",
+      "type": "string"
+    },
+    {
+      "name": "s_acctbal",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 15,
+        "scale": 2
+      }
+    },
+    {
+      "name": "s_comment",
+      "type": "string"
+    }
+  ]
+}
