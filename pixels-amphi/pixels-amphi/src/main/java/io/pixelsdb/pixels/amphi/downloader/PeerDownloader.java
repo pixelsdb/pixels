@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.amphi;
+package io.pixelsdb.pixels.amphi.downloader;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -39,7 +39,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;

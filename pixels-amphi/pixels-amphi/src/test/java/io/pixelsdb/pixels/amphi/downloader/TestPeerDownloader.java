@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.amphi.downloader;
 
-import io.pixelsdb.pixels.amphi.PeerDownloader;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -43,6 +42,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -252,22 +252,16 @@ public class TestPeerDownloader
     }
 
     @Test
-    public void testLoadAvroSchema()
+    public void testDownloadProcess()
+            throws IOException, MetadataException
     {
-        try {
-            // 加载Schema
-            InputStream schemaStream = TestPeerDownloader.class.getClassLoader().getResourceAsStream("schema/tpch/lineitem.avsc");
-            Schema schema = new Schema.Parser().parse(schemaStream);
-            System.out.println(schema);
-
-            // 验证Schema
-            if (schema.getType() == Schema.Type.RECORD && schema.getName().equals("lineitem")) {
-                System.out.println("Schema is valid.");
-            } else {
-                System.out.println("Schema is invalid.");
-            }
-        } catch (IOException e) {
-            System.out.println("Failed to load schema: " + e.getMessage());
+        URL resourceUrl = getClass().getClassLoader().getResource("config/tpch.json");
+        if (resourceUrl != null) {
+            String resourcesPath = resourceUrl.getPath();
+            String[] args = {resourcesPath};
+            DownloadProcess.main(args);
+        } else {
+            System.out.println("Cannot find configuration file path.");
         }
 
     }
