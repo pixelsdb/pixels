@@ -1,8 +1,7 @@
-# server configuration
+# pixels server configuration
 server_address: ec2-18-218-128-203.us-east-2.compute.amazonaws.com
 server_port: 18892
-
-# pixels configuration
+metadata_service_port: 18888
 
 # trino configuration
 trino_url: ec2-18-218-128-203.us-east-2.compute.amazonaws.com

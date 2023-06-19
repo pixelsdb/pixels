@@ -31,7 +31,7 @@ using amphi::proto::TranspileSqlResponse;
 using amphi::proto::RequestHeader;
 
 TranspileSqlClient::TranspileSqlClient(std::shared_ptr<Channel> channel)
-        : stub_(AmphiService::NewStub(channel)) {}
+        : stub_(AmphiService::NewStub(channel)) {};
 
 std::string TranspileSqlClient::TranspileSql(
         const std::string& token,

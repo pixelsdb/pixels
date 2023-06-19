@@ -31,7 +31,7 @@ using amphi::proto::TrinoQueryResponse;
 using amphi::proto::RequestHeader;
 
 TrinoQueryClient::TrinoQueryClient(std::shared_ptr<Channel> channel)
-        : stub_(AmphiService::NewStub(channel)) {}
+        : stub_(AmphiService::NewStub(channel)) {};
 
 std::string TrinoQueryClient::TrinoQuery(
         const std::string& token,

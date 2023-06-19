@@ -23,6 +23,7 @@
 
 #include "duckdb.hpp"
 #include "db/duckdb_manager.h"
+#include "grpc/metadata_client.h"
 #include "grpc/transpile_sql_client.h"
 #include "grpc/trino_query_client.h"
 #include "exception/grpc_transpile_exception.h"
@@ -101,6 +102,17 @@ TEST(grpc, trinoQueryTest) {
                                      "cntrycode: 30, numcust: 910, totacctbal: 6813438.36\n");
         spdlog::info("Get expected query result: {}", tpch_query_result);
     }
+}
+
+TEST(grpc, metadataGetSchemasTest) {
+    std::string metadata_host = config["server_address"].as<std::string>();
+    std::string port = config["metadata_service_port"].as<std::string>();
+    MetadataClient metadata_client(grpc::CreateChannel(metadata_host + ":" + port, grpc::InsecureChannelCredentials()));
+    spdlog::info("Connected to metadata service: {}", metadata_host + ":" + port);
+
+    metadata::proto::GetSchemasRequest request;
+    metadata::proto::GetSchemasResponse response = metadata_client.GetSchemas(request);
+    std::cout << "Response: " << response.DebugString() << std::endl;
 }
 
 TEST(DuckDBManager, importTpchSchemaTest) {
