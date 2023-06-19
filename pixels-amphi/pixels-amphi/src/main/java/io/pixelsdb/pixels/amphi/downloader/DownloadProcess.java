@@ -45,8 +45,6 @@ import java.util.stream.Collectors;
  *
  */
 public class DownloadProcess {
-    private static final String RESOURCE_PATH = "src/main/resources";
-
     public static void main(String[] args)
             throws IOException, IllegalArgumentException, MetadataException
     {
@@ -114,7 +112,7 @@ public class DownloadProcess {
         Storage outputStorageInstance = StorageFactory.Instance().getStorage(outputStorage);
 
         PartialSchemaLoader partialSchemaLoader = new PartialSchemaLoader();
-        partialSchemaLoader.registerAllSchemas(RESOURCE_PATH);
+        partialSchemaLoader.registerAllSchemas();
 
         // Download the data by table level
         for (int i = 0; i < schemaData.size(); i++)

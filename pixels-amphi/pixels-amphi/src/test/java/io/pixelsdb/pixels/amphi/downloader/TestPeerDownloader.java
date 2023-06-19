@@ -41,11 +41,9 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -179,7 +177,6 @@ public class TestPeerDownloader
                 .withConf(new Configuration())
                 .build();
 
-        // TODO: avro is row-based model, any column store model makes it faster?
         for (int i = 0; i < regionKeys.size(); i++) {
             GenericRecord record = new GenericData.Record(schema);
             record.put("r_regionkey", regionKeys.get(i));
@@ -189,66 +186,6 @@ public class TestPeerDownloader
         }
 
         writer.close();
-    }
-
-    /* Download two columns of region table */
-    @Test
-    public void testPeerDownloaderSimple() throws IOException, MetadataException
-    {
-        String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com";
-        MetadataService metadataService = new MetadataService(hostAddr, 18888);
-
-        List<Column> columns = metadataService.getColumns("tpch_1g", "lineitem", false);
-        List<Column> partial = columns.stream()
-                .filter(column -> column.getName().equals("l_orderkey") || column.getName().equals("l_shipdate") || column.getName().equals("l_quantity"))
-                .collect(Collectors.toList());
-
-        String avroSchema = "{"
-                + "\"type\":\"record\","
-                + "\"name\":\"Lineitem\","
-                + "\"fields\":["
-                + "{\"name\":\"l_quantity\",\"type\":{\"type\":\"bytes\",\"logicalType\":\"decimal\",\"precision\":15,\"scale\":2}},"
-                + "{\"name\":\"l_orderkey\",\"type\":\"long\"},"
-                + "{\"name\":\"l_shipdate\",\"type\":{\"type\":\"int\",\"logicalType\":\"date\"}}"
-                + "]"
-                + "}";
-        Schema regionSchema = new Schema.Parser().parse(avroSchema);
-
-        Storage inputStorage = StorageFactory.Instance().getStorage("s3");
-        List<Status> statuses = inputStorage.listStatus("s3://pixels-tpch1g/lineitem/v-0-order");
-        String[] sourcePaths = statuses.stream().map(status -> status.getPath()).toArray(String[]::new);
-
-//        List<Column> columns = metadataService.getColumns("tpch_1g", "orders", false);
-//        List<Column> partial = columns.stream()
-//                .filter(column -> column.getName().equals("o_orderstatus") || column.getName().equals("o_orderkey"))
-//                .collect(Collectors.toList());
-//
-//        String avroSchema = "{"
-//                + "\"type\":\"record\","
-//                + "\"name\":\"order\","
-//                + "\"fields\":["
-//                + "{\"name\":\"o_orderstatus\",\"type\":\"string\"},"
-//                + "{\"name\":\"o_orderkey\",\"type\":\"long\"}"
-//                + "]"
-//                + "}";
-//        Schema regionSchema = new Schema.Parser().parse(avroSchema);
-//
-//        Storage inputStorage = StorageFactory.Instance().getStorage("s3");
-//        List<Status> statuses = inputStorage.listStatus("s3://pixels-tpch1g/orders/v-0-order");
-//        String[] sourcePaths = statuses.stream().map(status -> status.getPath()).toArray(String[]::new);
-
-        Storage outputStorage = StorageFactory.Instance().getStorage("file");
-
-        PeerDownloader downloader = PeerDownloader.newBuilder()
-                .setSchema(regionSchema)
-                .setColumns(partial)
-                .setSourcePaths(Arrays.asList(sourcePaths))
-                .setInputStorage(inputStorage)
-                .setOutputStorage(outputStorage)
-                .setOutDirPath("/Users/backfire/test-lineitem")
-                .build();
-
-        downloader.writeParquetFile();
     }
 
     @Test

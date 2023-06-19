@@ -22,10 +22,8 @@ package io.pixelsdb.pixels.amphi.downloader;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,18 +41,26 @@ public class PartialSchemaLoader
     {
     }
 
-    public static void registerAllSchemas(String resourcePath) throws IOException
+    public static void registerAllSchemas()
+            throws IOException, IllegalArgumentException
     {
-        Files.walk(Paths.get(resourcePath))
-                .filter(Files::isRegularFile)
-                .forEach(file -> {
-                    try {
-                        Schema schema = new Schema.Parser().parse(new File(file.toString()));
-                        registeredSchemas.put(schema.getFullName(), schema);
+        ClassLoader classLoader = PartialSchemaLoader.class.getClassLoader();
+        try (InputStream is = classLoader.getResourceAsStream("schemas.txt");
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                String schemaFile;
+                while ((schemaFile = reader.readLine()) != null) {
+                    try (InputStream schemaIs = classLoader.getResourceAsStream(schemaFile)) {
+                        if (schemaIs == null) {
+                            throw new IllegalArgumentException("File not found: " + schemaFile);
+                        } else {
+                            Schema schema = new Schema.Parser().parse(schemaIs);
+                            registeredSchemas.put(schema.getFullName(), schema);
+                        }
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        throw e;
                     }
-                });
+                }
+        }
     }
 
     // Specify a subset of fields to acquire partial schema

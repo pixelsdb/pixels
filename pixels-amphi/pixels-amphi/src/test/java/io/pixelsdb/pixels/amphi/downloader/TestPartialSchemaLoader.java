@@ -32,13 +32,12 @@ import static org.junit.Assert.*;
 
 public class TestPartialSchemaLoader
 {
-    private static final String RESOURCE_PATH = "src/main/resources";
     private static final PartialSchemaLoader partialSchemaLoader = new PartialSchemaLoader();
 
     @Before
     public void setup() throws IOException
     {
-        partialSchemaLoader.registerAllSchemas(RESOURCE_PATH);
+        partialSchemaLoader.registerAllSchemas();
     }
 
     @Test
