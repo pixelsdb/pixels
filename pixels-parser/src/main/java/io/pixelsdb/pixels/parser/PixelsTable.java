@@ -19,19 +19,27 @@
  */
 package io.pixelsdb.pixels.parser;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
+import io.pixelsdb.pixels.common.metadata.domain.Table;
 
 import io.pixelsdb.pixels.core.TypeDescription;
 import org.apache.calcite.adapter.java.AbstractQueryableTable;
 import org.apache.calcite.linq4j.QueryProvider;
 import org.apache.calcite.linq4j.Queryable;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelReferentialConstraint;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.schema.Statistic;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.ImmutableBitSet;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -81,7 +89,6 @@ public class PixelsTable extends AbstractQueryableTable
         }
     }
 
-
     private RelDataType pixelsType(Column column, RelDataTypeFactory typeFactory) throws IllegalArgumentException
     {
         String typeStr = column.getType();
@@ -104,6 +111,48 @@ public class PixelsTable extends AbstractQueryableTable
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unsupported or invalid type name: " + category);
         }
+    }
+
+    /**
+     * Provide accurate row count from metadata, while leaving others as the default value.
+     * TODO: stat on pixels server and test
+     */
+    @Override
+    public Statistic getStatistic()
+    {
+        final Table table;
+        try {
+            table = this.metadataService.getTable(this.schemaName, this.tableName);
+        } catch (MetadataException e) {
+            throw new RuntimeException(e);
+        }
+
+        return new Statistic()
+        {
+            @Override
+            public Double getRowCount()
+            {
+                return (double) table.getRowCount();
+            }
+
+            @Override
+            public boolean isKey(ImmutableBitSet columns)
+            {
+                return false;
+            }
+
+            @Override
+            public List<RelCollation> getCollations()
+            {
+                return Collections.emptyList();
+            }
+
+            @Override
+            public List<RelReferentialConstraint> getReferentialConstraints()
+            {
+                return Collections.emptyList();
+            }
+        };
     }
 
     @Override

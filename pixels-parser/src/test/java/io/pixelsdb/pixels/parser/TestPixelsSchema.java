@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.schema.Statistic;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.junit.After;
@@ -98,6 +99,7 @@ public class TestPixelsSchema
 
         PixelsTable customerTable = (PixelsTable) tableMap.get("customer");
         RelDataType rowType = customerTable.getRowType(new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT));
+        Statistic statistic = customerTable.getStatistic();
         List<RelDataTypeField> fieldList = rowType.getFieldList();
 
         assertEquals("Table customer should have 8 columns", 8, rowType.getFieldCount());
