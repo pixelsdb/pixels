@@ -115,7 +115,7 @@ public class PixelsTable extends AbstractQueryableTable
 
     /**
      * Provide accurate row count from metadata, while leaving others as the default value.
-     * TODO: stat on pixels server and test
+     *
      */
     @Override
     public Statistic getStatistic()

@@ -42,7 +42,7 @@ import java.util.Properties;
 
 public class TestPixelsParser
 {
-    String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com";
+    String hostAddr = "ec2-13-59-249-225.us-east-2.compute.amazonaws.com";
 
     MetadataService instance = null;
 

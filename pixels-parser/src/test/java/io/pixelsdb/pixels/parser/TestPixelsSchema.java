@@ -37,7 +37,7 @@ import static org.junit.Assert.*;
 
 public class TestPixelsSchema
 {
-    String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com";
+    String hostAddr = "ec2-13-59-249-225.us-east-2.compute.amazonaws.com";
 
     MetadataService instance = null;
 
@@ -95,7 +95,7 @@ public class TestPixelsSchema
 
         assertNotNull(tableMap);
         assertEquals("TPC-H schema should have 8 tables.", 8, tableMap.size());
-        assertEquals("Table names are correct.", expectedTableNames, tableMap.keySet());
+        assertEquals("Table names should match the schema.", expectedTableNames, tableMap.keySet());
 
         PixelsTable customerTable = (PixelsTable) tableMap.get("customer");
         RelDataType rowType = customerTable.getRowType(new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT));
@@ -113,5 +113,8 @@ public class TestPixelsSchema
         // DECIMAL(15, 2)
         assertEquals(15, fieldList.get(5).getValue().getPrecision());
         assertEquals(2, fieldList.get(5).getValue().getScale());
+
+        // Validate statistics in PixelsTable
+        assertEquals(Double.valueOf("15000000"), statistic.getRowCount());
     }
 }
