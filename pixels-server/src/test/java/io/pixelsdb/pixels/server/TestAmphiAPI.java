@@ -21,10 +21,16 @@ package io.pixelsdb.pixels.server;
 
 import io.pixelsdb.pixels.amphi.AmphiProto;
 import io.pixelsdb.pixels.amphi.AmphiServiceGrpc;
+import io.pixelsdb.pixels.common.exception.AmphiException;
+import io.pixelsdb.pixels.server.grpc.SqlglotExecutor;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -98,6 +104,36 @@ public class TestAmphiAPI
         assertEquals("INVALID_ARGUMENT: SQLglot parsing error: Expected table name but got None. Line 1, Col: 10.",
                 response.getHeader().getErrorMsg());
     }
+
+    @Test
+    @DirtiesContext
+    public void testParseColumnFieldsSimple() throws AmphiException, IOException, InterruptedException
+    {
+        String simpleQuery = "SELECT a, b + 1 AS c FROM d";
+
+        SqlglotExecutor executor = new SqlglotExecutor();
+        List<String> columnList = new ArrayList<>();
+
+        columnList = executor.parseColumnFields(simpleQuery);
+        assertEquals(2, columnList.size());
+        assertEquals(Arrays.asList("a", "b"), columnList);
+    }
+
+    @Test
+    @DirtiesContext
+    public void testParseColumnFieldsTpch() throws AmphiException, IOException, InterruptedException
+    {
+        String simpleQuery = "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price, sum(l_extendedprice *(1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge, avg(l_quantity) as avg_qty, avg(l_extendedprice) as avg_price, avg(l_discount) as avg_disc, count(*) as count_order from LINEITEM where l_shipdate <= date '1998-12-01' - interval '108' day(3) group by l_returnflag, l_linestatus order by l_returnflag, l_linestatus";
+
+        SqlglotExecutor executor = new SqlglotExecutor();
+        List<String> columnList = new ArrayList<>();
+        columnList = executor.parseColumnFields(simpleQuery);
+
+        Set<String> expectedColumns = new HashSet<>(Arrays.asList("l_returnflag", "l_linestatus", "l_returnflag", "l_linestatus", "l_quantity", "l_extendedprice", "l_quantity", "l_extendedprice", "l_discount", "l_shipdate", "l_returnflag", "l_linestatus", "l_extendedprice", "l_extendedprice", "l_discount", "l_tax", "l_discount"));
+        assertEquals(17, columnList.size());
+        assertEquals(expectedColumns, columnList.stream().collect(Collectors.toSet()));
+    }
+
 
     @Test
     @DirtiesContext

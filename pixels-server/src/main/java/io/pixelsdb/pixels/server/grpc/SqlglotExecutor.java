@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.server.grpc;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.TypeReference;
 import io.pixelsdb.pixels.common.exception.AmphiException;
 
 import java.io.BufferedReader;
@@ -28,6 +30,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 
 public class SqlglotExecutor
 {
@@ -59,6 +62,37 @@ public class SqlglotExecutor
         }
 
         return output;
+    }
+
+    public List<String> parseColumnFields(String sqlStatement)
+            throws IOException, InterruptedException, AmphiException
+    {
+        InputStream scriptInputStream = SqlglotExecutor.class.getResourceAsStream("/scripts/sqlglot_metadata.py");
+        Path scriptPath = Files.createTempFile("sqlglot_metadata", ".py");
+
+        Files.copy(scriptInputStream, scriptPath, StandardCopyOption.REPLACE_EXISTING);
+
+        Process sqlglotProcess = new ProcessBuilder("python3", scriptPath.toString(), sqlStatement, "column")
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                .start();
+
+        int exitCode = sqlglotProcess.waitFor();
+        String output = getProcessOutput(sqlglotProcess.getInputStream());
+        String errorMsg = getProcessOutput(sqlglotProcess.getErrorStream());
+
+        switch (exitCode)
+        {
+            case 0:
+                break;
+            case 1:
+                throw new AmphiException(errorMsg);
+            default:
+                throw new RuntimeException("Unknown error occurred with exit code " + exitCode + ": " + errorMsg);
+        }
+
+        List<String> columnList = JSON.parseObject(output.toString(), new TypeReference<List<String>>(){});
+
+        return columnList;
     }
 
     private static String getProcessOutput(InputStream inputStream) throws IOException
