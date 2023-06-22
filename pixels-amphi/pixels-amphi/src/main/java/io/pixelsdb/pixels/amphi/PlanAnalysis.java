@@ -19,38 +19,54 @@
  */
 package io.pixelsdb.pixels.amphi;
 
-import org.apache.calcite.rel.RelFieldCollation;
+import io.pixelsdb.pixels.common.exception.AmphiException;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.Column;
+import io.pixelsdb.pixels.common.metadata.domain.Table;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelVisitor;
 import org.apache.calcite.rel.core.*;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexNode;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * PlanAnalysis consumes and analyzes the logical plan (RelNode).
  */
 public class PlanAnalysis
 {
+    private final String sql;
     private final RelNode root;
+
+    private final MetadataService metadataService;
+    private final String schemaName;
+
     private int nodeCount = 0;
     private int maxDepth = 0;
 
     private Set<String> scannedTables = new HashSet<>();
     private Set<String> operatorTypes = new HashSet<>();
-    private List<String> projectColumns = new ArrayList<>();
+    private Map<String, List<String>> projectColumns = new HashMap<>();
 
     private List<Map<String, Object>> filterDetails = new ArrayList<>();
     private List<Map<String, Object>> joinDetails = new ArrayList<>();
     private List<Map<String, Object>> aggregateDetails = new ArrayList<>();
 
-    public PlanAnalysis(RelNode root)
+    public PlanAnalysis(MetadataService instance, String sql, RelNode root, String schemaName)
     {
+        this.sql = sql;
         this.root = root;
+        this.metadataService = instance;
+        this.schemaName = schemaName;
+    }
+
+    public void analyze() throws AmphiException, IOException, InterruptedException, MetadataException
+    {
+        traversePlan();
+        sqlglotAnalyze();
     }
 
     // One-time traversal to collect all the required analysis factors
@@ -121,17 +137,6 @@ public class PlanAnalysis
             }
         };
 
-        Consumer<RelNode> projectColumnsCollector = (node) -> {
-            if (node instanceof Project) {
-                Project project = (Project) node;
-                RelDataType rowType = project.getRowType();
-                List<RelDataTypeField> fieldList = rowType.getFieldList();
-                for (RelDataTypeField field : fieldList) {
-                    projectColumns.add(field.getName());
-                }
-            }
-        };
-
         Consumer<RelNode> scannedTableCollector = (node) -> {
             if (node instanceof TableScan) {
                 TableScan tableScan = (TableScan) node;
@@ -149,8 +154,7 @@ public class PlanAnalysis
                 operatorTypeCollector,
                 filterDetailsCollector,
                 joinDetailsCollector,
-                aggregateDetailsCollector,
-                projectColumnsCollector
+                aggregateDetailsCollector
         };
 
         RelVisitor visitor = new RelVisitor() {
@@ -164,6 +168,34 @@ public class PlanAnalysis
             }
         };
         visitor.go(root);
+    }
+
+    // Leverage sqlglot to parse high-level features of sql query
+    public void sqlglotAnalyze() throws AmphiException, IOException, InterruptedException, MetadataException
+    {
+        SqlglotExecutor executor = new SqlglotExecutor();
+        List<String> columnList = new ArrayList<>();
+        Set<String> columnSet = new HashSet<>();
+
+        // Retrieve the raw column fields
+        columnList = executor.parseColumnFields(this.sql);
+        columnSet = columnList.stream().collect(Collectors.toSet());
+
+        // Validate the column fields with metadata
+        List<Table> tables = metadataService.getTables(this.schemaName);
+        for (Table table : tables)
+        {
+            List<String> columnsInTable = new ArrayList<>();
+            List<Column> tableColumns = this.metadataService.getColumns(this.schemaName, table.getName(), false);
+            for (Column column : tableColumns)
+            {
+                if (columnSet.contains(column.getName()))
+                {
+                    columnsInTable.add(column.getName());
+                }
+            }
+            this.projectColumns.put(table.getName(), columnsInTable);
+        }
     }
 
     public RelNode getRoot()
@@ -211,7 +243,7 @@ public class PlanAnalysis
         return this.aggregateDetails;
     }
 
-    public List<String> getProjectColumns()
+    public Map<String, List<String>> getProjectColumns()
     {
         return projectColumns;
     }

@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.amphi;
 
+import io.pixelsdb.pixels.common.exception.AmphiException;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.parser.PixelsParser;
 import org.apache.calcite.config.CalciteConnectionProperty;
@@ -36,6 +38,7 @@ import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
+import java.io.IOException;
 import java.util.*;
 
 public class TestPlanAnalysis
@@ -67,14 +70,6 @@ public class TestPlanAnalysis
         this.instance.shutdown();
     }
 
-//    String query = "select o_year, sum( case when nation = 'INDIA' then volume else 0 end) / sum(volume) as mkt_share " +
-//            "from( select extract( year from o_orderdate ) as o_year, l_extendedprice * (1 - l_discount) as volume, n2.n_name as nation " +
-//            "from PART, SUPPLIER, LINEITEM, ORDERS, CUSTOMER, NATION n1, NATION n2, REGION " +
-//            "where p_partkey = l_partkey and s_suppkey = l_suppkey and l_orderkey = o_orderkey and o_custkey = c_custkey and c_nationkey = n1.n_nationkey and n1.n_regionkey = r_regionkey and " +
-//            "r_name = 'ASIA' and s_nationkey = n2.n_nationkey and o_orderdate between '1995-01-01' and '1996-12-31' and p_type = 'SMALL PLATED COPPER' ) as all_nations " +
-//            "group by o_year " +
-//            "order by o_year";
-
     @Test
     public void testPlanAnalysisSimple() throws SqlParseException
     {
@@ -92,7 +87,7 @@ public class TestPlanAnalysis
         System.out.println("Logical plan: \n" + writer.asString());
 
         // Run one-time traversal to collect analysis
-        PlanAnalysis analysis = new PlanAnalysis(rel);
+        PlanAnalysis analysis = new PlanAnalysis(instance, query, rel, "tpch");
         analysis.traversePlan();
 
         // Get analyzed factors
@@ -101,7 +96,6 @@ public class TestPlanAnalysis
         int scannedTablesCount = analysis.getScannedTableCount();
         Set<String> operatorTypes = analysis.getOperatorTypes();
         Set<String> scannedTables = analysis.getScannedTables();
-        List<String> projectColumns = analysis.getProjectColumns();
         List<Map<String, Object>> filterDetails = analysis.getFilterDetails();
         List<Map<String, Object>> joinDetails = analysis.getJoinDetails();
         List<Map<String, Object>> aggregateDetails = analysis.getAggregateDetails();
@@ -111,7 +105,6 @@ public class TestPlanAnalysis
         System.out.println("Number of unique scanned tables: " + scannedTablesCount);
         System.out.println("Logical operators in plan: " + operatorTypes);
         System.out.println("Scanned tables in plan: " + scannedTables);
-        System.out.println("Project columns in plan: " + projectColumns);
         System.out.println("Filter operators in plan: " + filterDetails);
         System.out.println("Join operators in plan: " + joinDetails);
         System.out.println("Aggregate operators in plan: " + aggregateDetails);
@@ -155,4 +148,51 @@ public class TestPlanAnalysis
         assertEquals("Join operators in the plan have the expected details.", expectedJoinDetails, joinDetails);
         assertEquals("Aggregate operators in the plan have the expected details.", expectedAggregateDetails, aggregateDetails);
     }
+
+    @Test
+    public void testPlanAnalysisColumnSimple() throws SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        String query = "select SUM(o_totalprice) from orders, customer";
+
+        SqlNode parsedNode = this.tpchPixelsParser.parseQuery(query);
+        System.out.println("Parsed SQL Query: \n" + parsedNode);
+
+        SqlNode validatedNode = this.tpchPixelsParser.validate(parsedNode);
+        System.out.println("No exception, validation success.");
+
+        RelNode rel = this.tpchPixelsParser.toRelNode(validatedNode);
+
+        // Run one-time traversal to collect analysis
+        PlanAnalysis analysis = new PlanAnalysis(instance, query, rel, "tpch");
+        analysis.analyze();
+
+        System.out.println(analysis.getProjectColumns());
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpch() throws SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        String query = "select o_year, sum( case when nation = 'INDIA' then volume else 0 end) / sum(volume) as mkt_share " +
+                "from( select extract( year from o_orderdate ) as o_year, l_extendedprice * (1 - l_discount) as volume, n2.n_name as nation " +
+                "from PART, SUPPLIER, LINEITEM, ORDERS, CUSTOMER, NATION n1, NATION n2, REGION " +
+                "where p_partkey = l_partkey and s_suppkey = l_suppkey and l_orderkey = o_orderkey and o_custkey = c_custkey and c_nationkey = n1.n_nationkey and n1.n_regionkey = r_regionkey and " +
+                "r_name = 'ASIA' and s_nationkey = n2.n_nationkey and o_orderdate between '1995-01-01' and '1996-12-31' and p_type = 'SMALL PLATED COPPER' ) as all_nations " +
+                "group by o_year " +
+                "order by o_year";
+
+        SqlNode parsedNode = this.tpchPixelsParser.parseQuery(query);
+        System.out.println("Parsed SQL Query: \n" + parsedNode);
+
+        SqlNode validatedNode = this.tpchPixelsParser.validate(parsedNode);
+        System.out.println("No exception, validation success.");
+
+        RelNode rel = this.tpchPixelsParser.toRelNode(validatedNode);
+
+        // Run one-time traversal to collect analysis
+        PlanAnalysis analysis = new PlanAnalysis(instance, query, rel, "tpch");
+        analysis.analyze();
+
+        System.out.println(analysis.getProjectColumns());
+    }
 }
+
