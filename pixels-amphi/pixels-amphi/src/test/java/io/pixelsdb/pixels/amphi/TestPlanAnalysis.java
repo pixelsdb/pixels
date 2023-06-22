@@ -40,7 +40,7 @@ import java.util.*;
 
 public class TestPlanAnalysis
 {
-    String hostAddr = " ec2-13-59-249-225.us-east-2.compute.amazonaws.com";
+    String hostAddr = "ec2-13-59-249-225.us-east-2.compute.amazonaws.com";
 
     MetadataService instance = null;
 
@@ -101,20 +101,20 @@ public class TestPlanAnalysis
         int scannedTablesCount = analysis.getScannedTableCount();
         Set<String> operatorTypes = analysis.getOperatorTypes();
         Set<String> scannedTables = analysis.getScannedTables();
+        List<String> projectColumns = analysis.getProjectColumns();
         List<Map<String, Object>> filterDetails = analysis.getFilterDetails();
         List<Map<String, Object>> joinDetails = analysis.getJoinDetails();
         List<Map<String, Object>> aggregateDetails = analysis.getAggregateDetails();
-        List<Map<String, Object>> projectDetails = analysis.getProjectDetails();
 
         System.out.println("Total number of nodes in plan: " + nodeCount);
         System.out.println("Maximum depth of the plan tree: " + maxDepth);
         System.out.println("Number of unique scanned tables: " + scannedTablesCount);
         System.out.println("Logical operators in plan: " + operatorTypes);
         System.out.println("Scanned tables in plan: " + scannedTables);
+        System.out.println("Project columns in plan: " + projectColumns);
         System.out.println("Filter operators in plan: " + filterDetails);
         System.out.println("Join operators in plan: " + joinDetails);
         System.out.println("Aggregate operators in plan: " + aggregateDetails);
-        System.out.println("Project operators in plan: " + projectDetails);
 
         // Validate the analysis
         int expectedNodeCount = 5;

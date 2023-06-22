@@ -23,6 +23,8 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelVisitor;
 import org.apache.calcite.rel.core.*;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 
@@ -40,11 +42,11 @@ public class PlanAnalysis
 
     private Set<String> scannedTables = new HashSet<>();
     private Set<String> operatorTypes = new HashSet<>();
+    private List<String> projectColumns = new ArrayList<>();
 
     private List<Map<String, Object>> filterDetails = new ArrayList<>();
     private List<Map<String, Object>> joinDetails = new ArrayList<>();
     private List<Map<String, Object>> aggregateDetails = new ArrayList<>();
-    private List<Map<String, Object>> projectDetails = new ArrayList<>();
 
     public PlanAnalysis(RelNode root)
     {
@@ -119,25 +121,14 @@ public class PlanAnalysis
             }
         };
 
-        Consumer<RelNode> projectDetailsCollector = (node) -> {
+        Consumer<RelNode> projectColumnsCollector = (node) -> {
             if (node instanceof Project) {
                 Project project = (Project) node;
-                Map<String, Object> projectInfo = new HashMap<>();
-                List<String> expressions = new ArrayList<>();
-                for (RexNode expr : project.getProjects()) {
-                    expressions.add(expr.toString());
+                RelDataType rowType = project.getRowType();
+                List<RelDataTypeField> fieldList = rowType.getFieldList();
+                for (RelDataTypeField field : fieldList) {
+                    projectColumns.add(field.getName());
                 }
-                projectInfo.put("Expressions", expressions);
-
-                // TODO: indirect retrieval
-                if (project.getInput() instanceof TableScan) {
-                    TableScan tableScan = (TableScan) project.getInput();
-                    projectInfo.put("Table", tableScan.getTable().getQualifiedName().get(1));
-                    List<String> fieldNames = tableScan.getRowType().getFieldNames();
-                    projectInfo.put("Fields", fieldNames);
-                }
-
-                projectDetails.add(projectInfo);
             }
         };
 
@@ -159,7 +150,7 @@ public class PlanAnalysis
                 filterDetailsCollector,
                 joinDetailsCollector,
                 aggregateDetailsCollector,
-                projectDetailsCollector
+                projectColumnsCollector
         };
 
         RelVisitor visitor = new RelVisitor() {
@@ -220,9 +211,9 @@ public class PlanAnalysis
         return this.aggregateDetails;
     }
 
-    public List<Map<String, Object>> getProjectDetails()
+    public List<String> getProjectColumns()
     {
-        return this.projectDetails;
+        return projectColumns;
     }
 
 }
