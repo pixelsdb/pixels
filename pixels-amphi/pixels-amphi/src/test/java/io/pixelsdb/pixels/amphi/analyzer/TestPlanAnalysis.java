@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.amphi.analyzer;
 
-import io.pixelsdb.pixels.amphi.analyzer.PlanAnalysis;
+import io.pixelsdb.pixels.amphi.TpchQuery;
 import io.pixelsdb.pixels.common.exception.AmphiException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
@@ -44,8 +44,9 @@ import java.util.*;
 
 public class TestPlanAnalysis
 {
-    String hostAddr = "ec2-13-59-249-225.us-east-2.compute.amazonaws.com";
+//    String hostAddr = "ec2-13-59-249-225.us-east-2.compute.amazonaws.com"; // 128g r5
 
+    String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com"; // 8g t2
     MetadataService instance = null;
 
     PixelsParser tpchPixelsParser = null;
@@ -194,6 +195,663 @@ public class TestPlanAnalysis
         analysis.analyze();
 
         System.out.println(analysis.getProjectColumns());
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ1()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ1 = new HashMap<String, List<String>>()
+        {{
+            put("lineitem", new ArrayList<String>() {{
+                add("l_returnflag");
+                add("l_linestatus");
+                add("l_quantity");
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_tax");
+                add("l_shipdate");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ1 = deriveTpchColumns(TpchQuery.getQuery(1));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ1, columnQ1);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ2()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ2 = new HashMap<String, List<String>>()
+        {{
+            put("part", new ArrayList<String>() {{
+                add("p_partkey");
+                add("p_size");
+                add("p_type");
+                add("p_mfgr");
+            }});
+            put("supplier", new ArrayList<String>() {{
+                add("s_acctbal");
+                add("s_name");
+                add("s_suppkey");
+                add("s_address");
+                add("s_phone");
+                add("s_comment");
+                add("s_nationkey");
+            }});
+            put("partsupp", new ArrayList<String>() {{
+                add("ps_partkey");
+                add("ps_suppkey");
+                add("ps_supplycost");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_name");
+                add("n_nationkey");
+                add("n_regionkey");
+            }});
+            put("region", new ArrayList<String>() {{
+                add("r_regionkey");
+                add("r_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ2 = deriveTpchColumns(TpchQuery.getQuery(2));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ2, columnQ2);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ3()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ3 = new HashMap<String, List<String>>()
+        {{
+            put("customer", new ArrayList<String>() {{
+                add("c_mktsegment");
+                add("c_custkey");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_orderdate");
+                add("o_shippriority");
+                add("o_custkey");
+                add("o_orderkey");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_orderkey");
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_shipdate");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ3 = deriveTpchColumns(TpchQuery.getQuery(3));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ3, columnQ3);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ4()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ4 = new HashMap<String, List<String>>()
+        {{
+            put("orders", new ArrayList<String>() {{
+                add("o_orderdate");
+                add("o_orderpriority");
+                add("o_orderkey");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_orderkey");
+                add("l_commitdate");
+                add("l_receiptdate");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ4 = deriveTpchColumns(TpchQuery.getQuery(4));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ4, columnQ4);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ5()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ5 = new HashMap<String, List<String>>()
+        {{
+            put("customer", new ArrayList<String>() {{
+                add("c_custkey");
+                add("c_nationkey");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_orderkey");
+                add("o_orderdate");
+                add("o_custkey");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_orderkey");
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_suppkey");
+            }});
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_nationkey");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_name");
+                add("n_nationkey");
+                add("n_regionkey");
+            }});
+            put("region", new ArrayList<String>() {{
+                add("r_regionkey");
+                add("r_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ5 = deriveTpchColumns(TpchQuery.getQuery(5));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ5, columnQ5);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ6()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ6 = new HashMap<String, List<String>>()
+        {{
+            put("lineitem", new ArrayList<String>() {{
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_shipdate");
+                add("l_quantity");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ6 = deriveTpchColumns(TpchQuery.getQuery(6));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ6, columnQ6);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ7()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ7 = new HashMap<String, List<String>>()
+        {{
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_nationkey");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_shipdate");
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_suppkey");
+                add("l_orderkey");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_orderkey");
+                add("o_custkey");
+            }});
+            put("customer", new ArrayList<String>() {{
+                add("c_custkey");
+                add("c_nationkey");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_nationkey");
+                add("n_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ7 = deriveTpchColumns(TpchQuery.getQuery(7));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ7, columnQ7);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ8()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ8 = new HashMap<String, List<String>>()
+        {{
+            put("part", new ArrayList<String>() {{
+                add("p_partkey");
+                add("p_type");
+            }});
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_nationkey");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_suppkey");
+                add("l_orderkey");
+                add("l_partkey");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_orderkey");
+                add("o_orderdate");
+                add("o_custkey");
+            }});
+            put("customer", new ArrayList<String>() {{
+                add("c_custkey");
+                add("c_nationkey");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_nationkey");
+                add("n_name");
+                add("n_regionkey");
+            }});
+            put("region", new ArrayList<String>() {{
+                add("r_regionkey");
+                add("r_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ8 = deriveTpchColumns(TpchQuery.getQuery(8));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ8, columnQ8);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ9()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ9 = new HashMap<String, List<String>>()
+        {{
+            put("part", new ArrayList<String>() {{
+                add("p_partkey");
+                add("p_name");
+            }});
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_nationkey");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_quantity");
+                add("l_suppkey");
+                add("l_orderkey");
+                add("l_partkey");
+            }});
+            put("partsupp", new ArrayList<String>() {{
+                add("ps_suppkey");
+                add("ps_partkey");
+                add("ps_supplycost");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_orderkey");
+                add("o_orderdate");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_nationkey");
+                add("n_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ9 = deriveTpchColumns(TpchQuery.getQuery(9));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ9, columnQ9);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ10()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ10 = new HashMap<String, List<String>>()
+        {{
+            put("customer", new ArrayList<String>() {{
+                add("c_custkey");
+                add("c_name");
+                add("c_acctbal");
+                add("c_phone");
+                add("c_address");
+                add("c_comment");
+                add("c_nationkey");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_custkey");
+                add("o_orderkey");
+                add("o_orderdate");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_orderkey");
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_returnflag");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_nationkey");
+                add("n_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ10 = deriveTpchColumns(TpchQuery.getQuery(10));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ10, columnQ10);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ11()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ11 = new HashMap<String, List<String>>()
+        {{
+            put("partsupp", new ArrayList<String>() {{
+                add("ps_partkey");
+                add("ps_supplycost");
+                add("ps_availqty");
+                add("ps_suppkey");
+            }});
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_nationkey");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_nationkey");
+                add("n_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ11 = deriveTpchColumns(TpchQuery.getQuery(11));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ11, columnQ11);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ12()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ12 = new HashMap<String, List<String>>()
+        {{
+            put("orders", new ArrayList<String>() {{
+                add("o_orderkey");
+                add("o_orderpriority");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_orderkey");
+                add("l_shipmode");
+                add("l_commitdate");
+                add("l_receiptdate");
+                add("l_shipdate");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ12 = deriveTpchColumns(TpchQuery.getQuery(12));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ12, columnQ12);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ13()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ13 = new HashMap<String, List<String>>()
+        {{
+            put("customer", new ArrayList<String>() {{
+                add("c_custkey");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_orderkey");
+                add("o_custkey");
+                add("o_comment");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ13 = deriveTpchColumns(TpchQuery.getQuery(13));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ13, columnQ13);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ14()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ14 = new HashMap<String, List<String>>()
+        {{
+            put("lineitem", new ArrayList<String>() {{
+                add("l_partkey");
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_shipdate");
+            }});
+            put("part", new ArrayList<String>() {{
+                add("p_partkey");
+                add("p_type");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ14 = deriveTpchColumns(TpchQuery.getQuery(14));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ14, columnQ14);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ15()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ15 = new HashMap<String, List<String>>()
+        {{
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_name");
+                add("s_address");
+                add("s_phone");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_suppkey");
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_shipdate");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ15 = deriveTpchColumns(TpchQuery.getQuery(15));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ15, columnQ15);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ16()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ16 = new HashMap<String, List<String>>()
+        {{
+            put("partsupp", new ArrayList<String>() {{
+                add("ps_partkey");
+                add("ps_suppkey");
+            }});
+            put("part", new ArrayList<String>() {{
+                add("p_partkey");
+                add("p_brand");
+                add("p_type");
+                add("p_size");
+            }});
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_comment");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ16 = deriveTpchColumns(TpchQuery.getQuery(16));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ16, columnQ16);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ17()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ17 = new HashMap<String, List<String>>()
+        {{
+            put("lineitem", new ArrayList<String>() {{
+                add("l_partkey");
+                add("l_quantity");
+                add("l_extendedprice");
+            }});
+            put("part", new ArrayList<String>() {{
+                add("p_partkey");
+                add("p_brand");
+                add("p_container");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ17 = deriveTpchColumns(TpchQuery.getQuery(17));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ17, columnQ17);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ18()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ18 = new HashMap<String, List<String>>()
+        {{
+            put("customer", new ArrayList<String>() {{
+                add("c_name");
+                add("c_custkey");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_orderkey");
+                add("o_orderdate");
+                add("o_totalprice");
+                add("o_custkey");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_orderkey");
+                add("l_quantity");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ18 = deriveTpchColumns(TpchQuery.getQuery(18));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ18, columnQ18);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ19()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ19 = new HashMap<String, List<String>>()
+        {{
+            put("lineitem", new ArrayList<String>() {{
+                add("l_partkey");
+                add("l_quantity");
+                add("l_extendedprice");
+                add("l_discount");
+                add("l_shipmode");
+                add("l_shipinstruct");
+            }});
+            put("part", new ArrayList<String>() {{
+                add("p_partkey");
+                add("p_brand");
+                add("p_container");
+                add("p_size");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ19 = deriveTpchColumns(TpchQuery.getQuery(19));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ19, columnQ19);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ20()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ20 = new HashMap<String, List<String>>()
+        {{
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_name");
+                add("s_address");
+                add("s_nationkey");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_nationkey");
+                add("n_name");
+            }});
+            put("partsupp", new ArrayList<String>() {{
+                add("ps_suppkey");
+                add("ps_partkey");
+                add("ps_availqty");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_partkey");
+                add("l_suppkey");
+                add("l_quantity");
+                add("l_shipdate");
+            }});
+            put("part", new ArrayList<String>() {{
+                add("p_partkey");
+                add("p_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ20 = deriveTpchColumns(TpchQuery.getQuery(20));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ20, columnQ20);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ21()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ21 = new HashMap<String, List<String>>()
+        {{
+            put("supplier", new ArrayList<String>() {{
+                add("s_suppkey");
+                add("s_name");
+                add("s_nationkey");
+            }});
+            put("lineitem", new ArrayList<String>() {{
+                add("l_suppkey");
+                add("l_orderkey");
+                add("l_receiptdate");
+                add("l_commitdate");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_orderkey");
+                add("o_orderstatus");
+            }});
+            put("nation", new ArrayList<String>() {{
+                add("n_nationkey");
+                add("n_name");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ21 = deriveTpchColumns(TpchQuery.getQuery(21));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ21, columnQ21);
+    }
+
+    @Test
+    public void testPlanAnalysisColumnTpchQ22()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        Map<String, List<String>> answerQ22 = new HashMap<String, List<String>>()
+        {{
+            put("customer", new ArrayList<String>() {{
+                add("c_phone");
+                add("c_acctbal");
+                add("c_custkey");
+            }});
+            put("orders", new ArrayList<String>() {{
+                add("o_custkey");
+            }});
+        }};
+
+        Map<String, List<String>> columnQ22 = deriveTpchColumns(TpchQuery.getQuery(22));
+        VALIDATE_COLUMN_CORRECTNESS(answerQ22, columnQ22);
+    }
+
+    private Map<String, List<String>> deriveTpchColumns(String query)
+            throws SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        SqlNode parsedNode = this.tpchPixelsParser.parseQuery(query);
+        SqlNode validatedNode = this.tpchPixelsParser.validate(parsedNode);
+        RelNode rel = this.tpchPixelsParser.toRelNode(validatedNode);
+
+        PlanAnalysis analysis = new PlanAnalysis(instance, query, rel, "tpch");
+        analysis.analyze();
+        return analysis.getProjectColumns();
+    }
+
+    private static void VALIDATE_COLUMN_CORRECTNESS(Map<String, List<String>> answer, Map<String, List<String>> result)
+    {
+        for (Map.Entry<String, List<String>> entry : result.entrySet())
+        {
+            String key = entry.getKey();
+            List<String> resultList = entry.getValue();
+            if (!resultList.isEmpty())
+            {
+                assertTrue(answer.containsKey(key));
+                List<String> answerList = answer.get(key);
+                assertEquals(new HashSet<>(answerList), new HashSet<>(resultList));
+            }
+        }
     }
 }
 
