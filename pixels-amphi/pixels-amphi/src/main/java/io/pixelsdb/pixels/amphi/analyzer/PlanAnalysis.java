@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.amphi;
+package io.pixelsdb.pixels.amphi.analyzer;
 
 import io.pixelsdb.pixels.common.exception.AmphiException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
