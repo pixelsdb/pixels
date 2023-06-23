@@ -210,6 +210,11 @@
                 <artifactId>pixels-daemon</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-amphi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- presto-jdbc -->
             <dependency>

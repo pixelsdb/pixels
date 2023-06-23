@@ -20,9 +20,13 @@
 package io.pixelsdb.pixels.server.grpc;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.amphi.coordinator.Coordinator;
 import io.pixelsdb.pixels.common.exception.AmphiException;
 import io.pixelsdb.pixels.amphi.AmphiProto;
 import io.pixelsdb.pixels.amphi.AmphiServiceGrpc;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -74,7 +78,8 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
     }
 
     @Override
-    public void trinoQuery(AmphiProto.TrinoQueryRequest request, StreamObserver<AmphiProto.TrinoQueryResponse> responseObserver) {
+    public void trinoQuery(AmphiProto.TrinoQueryRequest request, StreamObserver<AmphiProto.TrinoQueryResponse> responseObserver)
+    {
         Connection conn = null;
         Statement stmt = null;
         ResultSet rs = null;
@@ -120,6 +125,66 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
         }
 
         AmphiProto.TrinoQueryResponse response = responseBuilder.build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    // TODO: validate request metadata (peer, schema, etc.) and throw exceptions (better exception handling)
+    @Override
+    public void coordinateQuery(AmphiProto.CoordinateQueryRequest request, StreamObserver<AmphiProto.CoordinateQueryResponse> responseObserver)
+    {
+        ConfigFactory configFactory = ConfigFactory.Instance();
+        String metadataHost = configFactory.getProperty("metadata.server.host");
+        int metadataPort = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
+        String trinoEndpoint = configFactory.getProperty("presto.pixels.jdbc.url");
+        trinoEndpoint = trinoEndpoint.substring(0, trinoEndpoint.lastIndexOf('/'));
+
+        MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
+        Coordinator coordinator = new Coordinator(metadataService);
+        boolean inCloud = false;
+
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        String rsStr = "";
+        String errorMessage = null;
+        int errorCode = 0;
+
+        try {
+            inCloud = coordinator.decideInCloud(request.getSqlStatement(), request.getSchema(), request.getPeerName());
+            if (inCloud)
+            {
+                trinoEndpoint = trinoEndpoint + request.getSchema();
+                conn = DriverManager.getConnection(trinoEndpoint, "pixels", "");
+
+                stmt = conn.createStatement();
+                rs = stmt.executeQuery(request.getSqlStatement());
+                rsStr = resultSetToString(rs);
+            }
+        } catch (AmphiException e) {
+            errorMessage = e.getMessage();
+            errorCode = 1;
+        } catch (MetadataException e) {
+            errorMessage = e.getMessage();
+            errorCode = 2;
+        } catch (Exception e) {
+            errorMessage = e.getMessage();
+            errorCode = 3;
+        }
+
+        AmphiProto.ResponseHeader.Builder headerBuilder = AmphiProto.ResponseHeader.newBuilder()
+                .setErrorCode(errorCode)
+                .setErrorMsg(errorMessage != null ? errorMessage : "");
+        AmphiProto.CoordinateQueryResponse.Builder responseBuilder = AmphiProto.CoordinateQueryResponse.newBuilder();
+
+        if (errorMessage != null) {
+            responseBuilder.setHeader(headerBuilder);
+        } else {
+            responseBuilder.setInCloud(inCloud);
+            responseBuilder.setQueryResult(rsStr);
+        }
+
+        AmphiProto.CoordinateQueryResponse response = responseBuilder.build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

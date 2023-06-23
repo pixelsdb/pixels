@@ -69,32 +69,39 @@
         <dependency>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-common</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-encoding</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-column</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-hadoop</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-avro</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- hadoop -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-mapreduce-client-core</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- grpc -->

@@ -48,6 +48,10 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-amphi</artifactId>
+        </dependency>
 
         <!-- trino-jdbc -->
         <dependency>

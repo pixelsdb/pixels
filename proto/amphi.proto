@@ -32,6 +32,7 @@ package amphi.proto;
 service AmphiService {
   rpc TranspileSql (TranspileSqlRequest) returns (TranspileSqlResponse);
   rpc TrinoQuery (TrinoQueryRequest) returns (TrinoQueryResponse);
+  rpc CoordinateQuery (CoordinateQueryRequest) returns (CoordinateQueryResponse);
 }
 
 // header
@@ -70,4 +71,17 @@ message TrinoQueryRequest {
 message TrinoQueryResponse {
   ResponseHeader header = 1;
   string queryResult = 2;
+}
+
+message CoordinateQueryRequest {
+  RequestHeader header = 1;
+  string peerName = 2;
+  string schema = 3;
+  string sqlStatement = 4;
+}
+
+message CoordinateQueryResponse {
+  ResponseHeader header = 1;
+  bool inCloud = 2; // to be executed on peer side if false
+  string queryResult = 3; // empty if inCloud is false
 }
