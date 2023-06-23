@@ -55,7 +55,8 @@ public class TestMetadataService
     }
 
     @Test
-    public void testPeerApi() throws MetadataException, UnknownHostException
+    public void testPeerApi()
+            throws MetadataException, UnknownHostException
     {
         InetAddress inetAddress = InetAddress.getLocalHost();
 
@@ -100,10 +101,10 @@ public class TestMetadataService
     }
 
     @Test
-    public void testPeerPathApi() throws MetadataException, UnknownHostException
+    public void testPeerPathApi()
+            throws MetadataException, UnknownHostException
     {
         InetAddress inetAddress = InetAddress.getLocalHost();
-
         boolean peerCreatedError = instance.createPeer("mac-laptop", "epfl", inetAddress.getHostAddress(), 8889, Storage.Scheme.s3);
         assertFalse(peerCreatedError);
         Peer mockPeer = instance.getPeer("mac-laptop");
@@ -117,7 +118,8 @@ public class TestMetadataService
         List<Column> allColumns = instance.getColumns("tpch", "lineitem", false);
         assertEquals(16, allColumns.size());
         List<Column> partialColumns = allColumns.stream()
-                .filter(column -> (column.getName().equals("l_orderkey") || column.getName().equals("l_quantity") || column.getName().equals("l_discount")))
+                .filter(column -> (column.getName().equals("l_shipdate") || column.getName().equals("l_quantity")
+                        || column.getName().equals("l_discount") || column.getName().equals("l_extendedprice")))
                 .collect(Collectors.toList());
         assertEquals(3, partialColumns.size());
         Layout lineitemLayout = instance.getLatestLayout("tpch", "lineitem");
