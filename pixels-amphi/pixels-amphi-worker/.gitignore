@@ -1,3 +1,5 @@
 !CMakeLists.txt
-!tpch_schema.sql
+!*.sql
+!*.txt
+.ipynb_checkpoints/
 build

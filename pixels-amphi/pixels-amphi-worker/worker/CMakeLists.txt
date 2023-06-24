@@ -8,6 +8,7 @@ set(worker_cxx
         src/grpc/transpile_sql_client.cpp
         src/grpc/trino_query_client.cpp
         src/exception/grpc_exception.cpp
+        src/exception/grpc_coordinator_query_exception.cpp
         src/exception/grpc_metadata_exception.cpp
         src/exception/grpc_transpile_exception.cpp
         src/exception/grpc_trino_query_exception.cpp

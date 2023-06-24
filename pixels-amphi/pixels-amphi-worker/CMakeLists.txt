@@ -16,6 +16,7 @@ find_package(AWSSDK REQUIRED COMPONENTS s3)
 
 add_subdirectory(worker)
 add_subdirectory(tests)
+add_subdirectory(benchmark)
 
 add_executable(${PROJECT_NAME} worker_cli.cpp)
 

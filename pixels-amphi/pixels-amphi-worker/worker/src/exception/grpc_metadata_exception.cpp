@@ -19,7 +19,7 @@
  */
 #include "exception/grpc_metadata_exception.h"
 
-GrpcMetadataException::GrpcMetadataException(const std::string& message) : message_(message) {}
+GrpcMetadataException::GrpcMetadataException(const std::string& message) : message_(message) {};
 
 const char* GrpcMetadataException::what() const noexcept {
     return message_.c_str();

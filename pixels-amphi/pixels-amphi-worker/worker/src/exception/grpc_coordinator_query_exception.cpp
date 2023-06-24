@@ -17,10 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#include "exception/grpc_trino_query_exception.h"
+#include "exception/grpc_coordinator_query_exception.h"
 
-GrpcTrinoQueryException::GrpcTrinoQueryException(const std::string& message) : message_(message) {};
+GrpcCoordinatorQueryException::GrpcCoordinatorQueryException(const std::string& message) : message_(message) {};
 
-const char* GrpcTrinoQueryException::what() const noexcept {
+const char* GrpcCoordinatorQueryException::what() const noexcept {
     return message_.c_str();
 }

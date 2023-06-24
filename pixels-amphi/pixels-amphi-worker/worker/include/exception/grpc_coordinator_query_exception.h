@@ -17,10 +17,20 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#include "exception/grpc_trino_query_exception.h"
+#ifndef PIXELS_AMPHI_WORKER_GRPC_COORDINATOR_QUERY_EXCEPTION_H
+#define PIXELS_AMPHI_WORKER_GRPC_COORDINATOR_QUERY_EXCEPTION_H
 
-GrpcTrinoQueryException::GrpcTrinoQueryException(const std::string& message) : message_(message) {};
+#include <exception>
+#include <iostream>
+#include <string>
 
-const char* GrpcTrinoQueryException::what() const noexcept {
-    return message_.c_str();
-}
+class GrpcCoordinatorQueryException: public std::exception {
+private:
+    std::string message_;
+public:
+    GrpcCoordinatorQueryException(const std::string& message);
+
+    const char* what() const noexcept override;
+};
+
+#endif //PIXELS_AMPHI_WORKER_GRPC_COORDINATOR_QUERY_EXCEPTION_H
