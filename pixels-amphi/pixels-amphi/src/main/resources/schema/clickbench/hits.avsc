@@ -3,435 +3,435 @@
   "name": "hits",
   "fields": [
     {
-      "name": "WatchID",
+      "name": "watchid",
       "type": "long"
     },
     {
-      "name": "JavaEnable",
+      "name": "javaenable",
       "type": "int"
     },
     {
-      "name": "Title",
+      "name": "title",
       "type": "string"
     },
     {
-      "name": "GoodEvent",
+      "name": "goodevent",
       "type": "int"
     },
     {
-      "name": "EventTime",
+      "name": "eventtime",
       "type": {
         "type": "long",
         "logicalType": "timestamp-millis"
       }
     },
     {
-      "name": "EventDate",
+      "name": "eventdate",
       "type": {
         "type": "int",
         "logicalType": "date"
       }
     },
     {
-      "name": "CounterID",
+      "name": "counterid",
       "type": "int"
     },
     {
-      "name": "ClientIP",
+      "name": "clientip",
       "type": "int"
     },
     {
-      "name": "RegionID",
+      "name": "regionid",
       "type": "int"
     },
     {
-      "name": "UserID",
+      "name": "userid",
       "type": "long"
     },
     {
-      "name": "CounterClass",
+      "name": "counterclass",
       "type": "int"
     },
     {
-      "name": "OS",
+      "name": "os",
       "type": "int"
     },
     {
-      "name": "UserAgent",
+      "name": "useragent",
       "type": "int"
     },
     {
-      "name": "URL",
+      "name": "url",
       "type": "string"
     },
     {
-      "name": "Referer",
+      "name": "referer",
       "type": "string"
     },
     {
-      "name": "IsRefresh",
+      "name": "isrefresh",
       "type": "int"
     },
     {
-      "name": "RefererCategoryID",
+      "name": "referercategoryid",
       "type": "int"
     },
     {
-      "name": "RefererRegionID",
+      "name": "refererregionid",
       "type": "int"
     },
     {
-      "name": "URLCategoryID",
+      "name": "urlcategoryid",
       "type": "int"
     },
     {
-      "name": "URLRegionID",
+      "name": "urlregionid",
       "type": "int"
     },
     {
-      "name": "ResolutionWidth",
+      "name": "resolutionwidth",
       "type": "int"
     },
     {
-      "name": "ResolutionHeight",
+      "name": "resolutionheight",
       "type": "int"
     },
     {
-      "name": "ResolutionDepth",
+      "name": "resolutiondepth",
       "type": "int"
     },
     {
-      "name": "FlashMajor",
+      "name": "flashmajor",
       "type": "int"
     },
     {
-      "name": "FlashMinor",
+      "name": "flashminor",
       "type": "int"
     },
     {
-      "name": "FlashMinor2",
+      "name": "flashminor2",
       "type": "string"
     },
     {
-      "name": "NetMajor",
+      "name": "netmajor",
       "type": "int"
     },
     {
-      "name": "NetMinor",
+      "name": "netminor",
       "type": "int"
     },
     {
-      "name": "UserAgentMajor",
+      "name": "useragentmajor",
       "type": "int"
     },
     {
-      "name": "UserAgentMinor",
+      "name": "useragentminor",
       "type": "string"
     },
     {
-      "name": "CookieEnable",
+      "name": "cookieenable",
       "type": "int"
     },
     {
-      "name": "JavascriptEnable",
+      "name": "javascriptenable",
       "type": "int"
     },
     {
-      "name": "IsMobile",
+      "name": "ismobile",
       "type": "int"
     },
     {
-      "name": "MobilePhone",
+      "name": "mobilephone",
       "type": "int"
     },
     {
-      "name": "MobilePhoneModel",
+      "name": "mobilephonemodel",
       "type": "string"
     },
     {
-      "name": "Params",
+      "name": "params",
       "type": "string"
     },
     {
-      "name": "IPNetworkID",
+      "name": "ipnetworkid",
       "type": "int"
     },
     {
-      "name": "TraficSourceID",
+      "name": "traficsourceid",
       "type": "int"
     },
     {
-      "name": "SearchEngineID",
+      "name": "searchengineid",
       "type": "int"
     },
     {
-      "name": "SearchPhrase",
+      "name": "searchphrase",
       "type": "string"
     },
     {
-      "name": "AdvEngineID",
+      "name": "advengineid",
       "type": "int"
     },
     {
-      "name": "IsArtifical",
+      "name": "isartifical",
       "type": "int"
     },
     {
-      "name": "WindowClientWidth",
+      "name": "windowclientwidth",
       "type": "int"
     },
     {
-      "name": "WindowClientHeight",
+      "name": "windowclientheight",
       "type": "int"
     },
     {
-      "name": "ClientTimeZone",
+      "name": "clienttimezone",
       "type": "int"
     },
     {
-      "name": "ClientEventTime",
+      "name": "clienteventtime",
       "type": {
         "type": "long",
         "logicalType": "timestamp-millis"
       }
     },
     {
-      "name": "SilverlightVersion1",
+      "name": "silverlightversion1",
       "type": "int"
     },
     {
-      "name": "SilverlightVersion2",
+      "name": "silverlightversion2",
       "type": "int"
     },
     {
-      "name": "SilverlightVersion3",
+      "name": "silverlightversion3",
       "type": "int"
     },
     {
-      "name": "SilverlightVersion4",
+      "name": "silverlightversion4",
       "type": "int"
     },
     {
-      "name": "PageCharset",
+      "name": "pagecharset",
       "type": "string"
     },
     {
-      "name": "CodeVersion",
+      "name": "codeversion",
       "type": "int"
     },
     {
-      "name": "IsLink",
+      "name": "islink",
       "type": "int"
     },
     {
-      "name": "IsDownload",
+      "name": "isdownload",
       "type": "int"
     },
     {
-      "name": "IsNotBounce",
+      "name": "isnotbounce",
       "type": "int"
     },
     {
-      "name": "FUniqID",
+      "name": "funiqid",
       "type": "long"
     },
     {
-      "name": "OriginalURL",
+      "name": "originalurl",
       "type": "string"
     },
     {
-      "name": "HID",
+      "name": "hid",
       "type": "int"
     },
     {
-      "name": "IsOldCounter",
+      "name": "isoldcounter",
       "type": "int"
     },
     {
-      "name": "IsEvent",
+      "name": "isevent",
       "type": "int"
     },
     {
-      "name": "IsParameter",
+      "name": "isparameter",
       "type": "int"
     },
     {
-      "name": "DontCountHits",
+      "name": "dontcounthits",
       "type": "int"
     },
     {
-      "name": "WithHash",
+      "name": "withhash",
       "type": "int"
     },
     {
-      "name": "HitColor",
+      "name": "hitcolor",
       "type": "string"
     },
     {
-      "name": "LocalEventTime",
+      "name": "localeventtime",
       "type": {
         "type": "long",
         "logicalType": "timestamp-millis"
       }
     },
     {
-      "name": "Age",
+      "name": "age",
       "type": "int"
     },
     {
-      "name": "Sex",
+      "name": "sex",
       "type": "int"
     },
     {
-      "name": "Income",
+      "name": "income",
       "type": "int"
     },
     {
-      "name": "Interests",
+      "name": "interests",
       "type": "int"
     },
     {
-      "name": "Robotness",
+      "name": "robotness",
       "type": "int"
     },
     {
-      "name": "RemoteIP",
+      "name": "remoteip",
       "type": "int"
     },
     {
-      "name": "WindowName",
+      "name": "windowname",
       "type": "int"
     },
     {
-      "name": "OpenerName",
+      "name": "openername",
       "type": "int"
     },
     {
-      "name": "HistoryLength",
+      "name": "historylength",
       "type": "int"
     },
     {
-      "name": "BrowserLanguage",
+      "name": "browserlanguage",
       "type": "string"
     },
     {
-      "name": "BrowserCountry",
+      "name": "browsercountry",
       "type": "string"
     },
     {
-      "name": "SocialNetwork",
+      "name": "socialnetwork",
       "type": "string"
     },
     {
-      "name": "SocialAction",
+      "name": "socialaction",
       "type": "string"
     },
     {
-      "name": "HTTPError",
+      "name": "httperror",
       "type": "int"
     },
     {
-      "name": "SendTiming",
+      "name": "sendtiming",
       "type": "int"
     },
     {
-      "name": "DNSTiming",
+      "name": "dnstiming",
       "type": "int"
     },
     {
-      "name": "ConnectTiming",
+      "name": "connecttiming",
       "type": "int"
     },
     {
-      "name": "ResponseStartTiming",
+      "name": "responsestarttiming",
       "type": "int"
     },
     {
-      "name": "ResponseEndTiming",
+      "name": "responseendtiming",
       "type": "int"
     },
     {
-      "name": "FetchTiming",
+      "name": "fetchtiming",
       "type": "int"
     },
     {
-      "name": "SocialSourceNetworkID",
+      "name": "socialsourcenetworkid",
       "type": "int"
     },
     {
-      "name": "SocialSourcePage",
+      "name": "socialsourcepage",
       "type": "string"
     },
     {
-      "name": "ParamPrice",
+      "name": "paramprice",
       "type": "long"
     },
     {
-      "name": "ParamOrderID",
+      "name": "paramorderid",
       "type": "string"
     },
     {
-      "name": "ParamCurrency",
+      "name": "paramcurrency",
       "type": "string"
     },
     {
-      "name": "ParamCurrencyID",
+      "name": "paramcurrencyid",
       "type": "int"
     },
     {
-      "name": "OpenstatServiceName",
+      "name": "openstatservicename",
       "type": "string"
     },
     {
-      "name": "OpenstatCampaignID",
+      "name": "openstatcampaignid",
       "type": "string"
     },
     {
-      "name": "OpenstatAdID",
+      "name": "openstadid",
       "type": "string"
     },
     {
-      "name": "OpenstatSourceID",
+      "name": "openstatsourceid",
       "type": "string"
     },
     {
-      "name": "UTMSource",
+      "name": "utmsource",
       "type": "string"
     },
     {
-      "name": "UTMMedium",
+      "name": "utmmedium",
       "type": "string"
     },
     {
-      "name": "UTMCampaign",
+      "name": "utmcampaign",
       "type": "string"
     },
     {
-      "name": "UTMContent",
+      "name": "utmcontent",
       "type": "string"
     },
     {
-      "name": "UTMTerm",
+      "name": "utmterm",
       "type": "string"
     },
     {
-      "name": "FromTag",
+      "name": "fromtag",
       "type": "string"
     },
     {
-      "name": "HasGCLID",
+      "name": "hasgclid",
       "type": "int"
     },
     {
-      "name": "RefererHash",
+      "name": "refererhash",
       "type": "long"
     },
     {
-      "name": "URLHash",
+      "name": "urlhash",
       "type": "long"
     },
     {
-      "name": "CLID",
+      "name": "clid",
       "type": "int"
     }
   ]
