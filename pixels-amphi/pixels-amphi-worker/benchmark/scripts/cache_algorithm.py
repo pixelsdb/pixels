@@ -187,10 +187,14 @@ if __name__ == "__main__":
     # Print the total size
     print("The total size of the columns: ", sum(col_size))
 
-    # Print the respective column size of each workload query
+    # Print the respective column size percentage of each workload query
+    print(schema)
+    print(queries[2])
+    print(col_stat)
+    print(get_columns(schema, queries[2]))
     total_size = sum(col_size)
     for i, query in enumerate(queries):
-        print("The column size percentage of query {}: {}".format(i + 1, sum([col_stat[col] for col in get_columns(schema, query)])))
+        print("The size percentage of columns in query", i, ":", sum([col_stat[col] for col in get_columns(schema, query)]) / total_size * 100)
 
     # Plan the cache columns and write to json file
     cache_plan = plan_cache_columns(strategy, schema, col_stat, queries, storage_restriction)

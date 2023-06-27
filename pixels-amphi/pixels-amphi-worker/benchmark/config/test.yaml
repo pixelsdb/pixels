@@ -6,4 +6,3 @@ workload_path: ../workload/tpch.txt
 # Strategy options
 strategy: most_coverage_columns
 storage_restriction: 154119190
-

@@ -1,0 +1,8 @@
+# Path relevant to scripts/
+schema_path: ../schema/clickbench.json
+table_stat_path: ../schema/clickbench_stat.json
+workload_path: ../workload/clickbench.txt
+
+# Strategy options
+strategy: most_number_columns
+storage_restriction: 154119190
