@@ -1,15 +1,12 @@
 {
-  "MetadataServiceHost": "ec2-3-142-249-61.us-east-2.compute.amazonaws.com",
+  "MetadataServiceHost": "ec2-18-217-227-237.us-east-2.compute.amazonaws.com",
   "MetadataServicePort": 18888,
   "SchemaName": "clickbench",
   "SchemaData": [
     {
       "table": "hits",
       "columns": [
-        "watchid",
-        "clientip",
-        "isrefresh",
-        "resolutionwidth"
+        "clienteventtime"
       ]
     }
   ],
