@@ -118,7 +118,7 @@ public class Utils
 
     public static void startProfile(String filename) throws IOException
     {
-        PROFILER.execute(String.format("start,jfr,threads,event=%s,file=%s", EVENT, filename));
+        PROFILER.execute(String.format("start,jfr,threads,total,event=%s,file=%s", EVENT, filename));
     }
 
     public static void stopProfile(String filename) throws IOException
