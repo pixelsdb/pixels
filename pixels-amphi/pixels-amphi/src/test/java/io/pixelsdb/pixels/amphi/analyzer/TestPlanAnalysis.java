@@ -44,12 +44,13 @@ import java.util.*;
 
 public class TestPlanAnalysis
 {
-//    String hostAddr = "ec2-13-59-249-225.us-east-2.compute.amazonaws.com"; // 128g r5
+    String hostAddr = "ec2-3-142-249-61.us-east-2.compute.amazonaws.com"; // 128g r5
 
-    String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com"; // 8g t2
+//    String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com"; // 8g t2
     MetadataService instance = null;
 
     PixelsParser tpchPixelsParser = null;
+    PixelsParser clickbenchPixelsParser = null;
 
     @Before
     public void init()
@@ -64,6 +65,7 @@ public class TestPlanAnalysis
         properties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "false");
 
         this.tpchPixelsParser = new PixelsParser(this.instance, "tpch", parserConfig, properties);
+        this.clickbenchPixelsParser = new PixelsParser(this.instance, "clickbench", parserConfig, properties);
     }
 
     @After
@@ -214,7 +216,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ1 = deriveTpchColumns(TpchQuery.getQuery(1));
+        Map<String, List<String>> columnQ1 = deriveColumns(TpchQuery.getQuery(1), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ1, columnQ1);
     }
 
@@ -255,7 +257,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ2 = deriveTpchColumns(TpchQuery.getQuery(2));
+        Map<String, List<String>> columnQ2 = deriveColumns(TpchQuery.getQuery(2), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ2, columnQ2);
     }
 
@@ -283,7 +285,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ3 = deriveTpchColumns(TpchQuery.getQuery(3));
+        Map<String, List<String>> columnQ3 = deriveColumns(TpchQuery.getQuery(3), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ3, columnQ3);
     }
 
@@ -305,7 +307,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ4 = deriveTpchColumns(TpchQuery.getQuery(4));
+        Map<String, List<String>> columnQ4 = deriveColumns(TpchQuery.getQuery(4), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ4, columnQ4);
     }
 
@@ -345,7 +347,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ5 = deriveTpchColumns(TpchQuery.getQuery(5));
+        Map<String, List<String>> columnQ5 = deriveColumns(TpchQuery.getQuery(5), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ5, columnQ5);
     }
 
@@ -363,7 +365,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ6 = deriveTpchColumns(TpchQuery.getQuery(6));
+        Map<String, List<String>> columnQ6 = deriveColumns(TpchQuery.getQuery(6), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ6, columnQ6);
     }
 
@@ -398,7 +400,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ7 = deriveTpchColumns(TpchQuery.getQuery(7));
+        Map<String, List<String>> columnQ7 = deriveColumns(TpchQuery.getQuery(7), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ7, columnQ7);
     }
 
@@ -443,7 +445,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ8 = deriveTpchColumns(TpchQuery.getQuery(8));
+        Map<String, List<String>> columnQ8 = deriveColumns(TpchQuery.getQuery(8), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ8, columnQ8);
     }
 
@@ -484,7 +486,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ9 = deriveTpchColumns(TpchQuery.getQuery(9));
+        Map<String, List<String>> columnQ9 = deriveColumns(TpchQuery.getQuery(9), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ9, columnQ9);
     }
 
@@ -520,7 +522,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ10 = deriveTpchColumns(TpchQuery.getQuery(10));
+        Map<String, List<String>> columnQ10 = deriveColumns(TpchQuery.getQuery(10), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ10, columnQ10);
     }
 
@@ -546,7 +548,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ11 = deriveTpchColumns(TpchQuery.getQuery(11));
+        Map<String, List<String>> columnQ11 = deriveColumns(TpchQuery.getQuery(11), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ11, columnQ11);
     }
 
@@ -569,7 +571,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ12 = deriveTpchColumns(TpchQuery.getQuery(12));
+        Map<String, List<String>> columnQ12 = deriveColumns(TpchQuery.getQuery(12), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ12, columnQ12);
     }
 
@@ -589,7 +591,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ13 = deriveTpchColumns(TpchQuery.getQuery(13));
+        Map<String, List<String>> columnQ13 = deriveColumns(TpchQuery.getQuery(13), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ13, columnQ13);
     }
 
@@ -611,7 +613,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ14 = deriveTpchColumns(TpchQuery.getQuery(14));
+        Map<String, List<String>> columnQ14 = deriveColumns(TpchQuery.getQuery(14), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ14, columnQ14);
     }
 
@@ -635,7 +637,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ15 = deriveTpchColumns(TpchQuery.getQuery(15));
+        Map<String, List<String>> columnQ15 = deriveColumns(TpchQuery.getQuery(15), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ15, columnQ15);
     }
 
@@ -661,7 +663,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ16 = deriveTpchColumns(TpchQuery.getQuery(16));
+        Map<String, List<String>> columnQ16 = deriveColumns(TpchQuery.getQuery(16), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ16, columnQ16);
     }
 
@@ -683,7 +685,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ17 = deriveTpchColumns(TpchQuery.getQuery(17));
+        Map<String, List<String>> columnQ17 = deriveColumns(TpchQuery.getQuery(17), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ17, columnQ17);
     }
 
@@ -709,7 +711,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ18 = deriveTpchColumns(TpchQuery.getQuery(18));
+        Map<String, List<String>> columnQ18 = deriveColumns(TpchQuery.getQuery(18), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ18, columnQ18);
     }
 
@@ -735,7 +737,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ19 = deriveTpchColumns(TpchQuery.getQuery(19));
+        Map<String, List<String>> columnQ19 = deriveColumns(TpchQuery.getQuery(19), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ19, columnQ19);
     }
 
@@ -772,7 +774,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ20 = deriveTpchColumns(TpchQuery.getQuery(20));
+        Map<String, List<String>> columnQ20 = deriveColumns(TpchQuery.getQuery(20), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ20, columnQ20);
     }
 
@@ -803,7 +805,7 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ21 = deriveTpchColumns(TpchQuery.getQuery(21));
+        Map<String, List<String>> columnQ21 = deriveColumns(TpchQuery.getQuery(21), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ21, columnQ21);
     }
 
@@ -823,18 +825,46 @@ public class TestPlanAnalysis
             }});
         }};
 
-        Map<String, List<String>> columnQ22 = deriveTpchColumns(TpchQuery.getQuery(22));
+        Map<String, List<String>> columnQ22 = deriveColumns(TpchQuery.getQuery(22), "tpch");
         VALIDATE_COLUMN_CORRECTNESS(answerQ22, columnQ22);
     }
 
-    private Map<String, List<String>> deriveTpchColumns(String query)
+    @Test
+    public void testPlanAnalysisColumnClickbenchExample()
+            throws NoSuchFieldException, IllegalAccessException, SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
+    {
+        String query = "SELECT watchid, clientip, COUNT(*) AS c, SUM(isrefresh), AVG(resolutionwidth) FROM hits GROUP BY watchid, clientip ORDER BY c DESC LIMIT 10";
+        Map<String, List<String>> answer = new HashMap<String, List<String>>()
+        {{
+            put("hits", new ArrayList<String>() {{
+                add("watchid");
+                add("clientip");
+                add("isrefresh");
+                add("resolutionwidth");
+            }});
+        }};
+
+        Map<String, List<String>> columns = deriveColumns(query, "clickbench");
+        VALIDATE_COLUMN_CORRECTNESS(answer, columns);
+    }
+
+    private Map<String, List<String>> deriveColumns(String query, String schema)
             throws SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
     {
-        SqlNode parsedNode = this.tpchPixelsParser.parseQuery(query);
-        SqlNode validatedNode = this.tpchPixelsParser.validate(parsedNode);
-        RelNode rel = this.tpchPixelsParser.toRelNode(validatedNode);
+        PixelsParser deriveParser = null;
+        if (schema.equals("tpch")) {
+            deriveParser = this.tpchPixelsParser;
+        } else if (schema.equals("clickbench")) {
+            deriveParser = this.clickbenchPixelsParser;
+        } else {
+            throw new IllegalArgumentException("The schema name has not been registered as a parser: " + schema);
+        }
 
-        PlanAnalysis analysis = new PlanAnalysis(instance, query, rel, "tpch");
+        SqlNode parsedNode = deriveParser.parseQuery(query);
+        SqlNode validatedNode = deriveParser.validate(parsedNode);
+        RelNode rel = deriveParser.toRelNode(validatedNode);
+
+        PlanAnalysis analysis = new PlanAnalysis(instance, query, rel, schema);
         analysis.analyze();
         return analysis.getProjectColumns();
     }

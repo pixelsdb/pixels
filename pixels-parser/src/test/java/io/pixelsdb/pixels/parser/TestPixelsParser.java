@@ -42,7 +42,7 @@ import java.util.Properties;
 
 public class TestPixelsParser
 {
-    String hostAddr = "ec2-13-59-249-225.us-east-2.compute.amazonaws.com";
+    String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com";
 
     MetadataService instance = null;
 
@@ -72,7 +72,7 @@ public class TestPixelsParser
     @Test
     public void testPixelsParserTpchExample() throws SqlParseException
     {
-        String query = TpchQuery.Q8;
+        String query = TpchQuery.Q2;
         SqlNode parsedNode = this.tpchPixelsParser.parseQuery(query);
         System.out.println("Parsed SQL Query: \n" + parsedNode);
 
@@ -83,8 +83,8 @@ public class TestPixelsParser
         RelNode optimizedPlan = this.tpchPixelsParser.toBestRelNode(validatedNode);
 
         final RelJsonWriter writer = new RelJsonWriter();
-        initialPlan.explain(writer);
-        System.out.println("Logical plan: \n" + writer.asString());
+//        initialPlan.explain(writer);
+//        System.out.println("Logical plan: \n" + writer.asString());
 
         RelMetadataQuery mq = optimizedPlan.getCluster().getMetadataQuery();
         RelOptCost costInitial = mq.getCumulativeCost(initialPlan);

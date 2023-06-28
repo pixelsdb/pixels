@@ -1,21 +1,15 @@
 {
   "MetadataServiceHost": "ec2-3-142-249-61.us-east-2.compute.amazonaws.com",
   "MetadataServicePort": 18888,
-  "SchemaName": "tpch_1g",
+  "SchemaName": "clickbench",
   "SchemaData": [
     {
-      "table": "lineitem",
+      "table": "hits",
       "columns": [
-        "l_orderkey",
-        "l_shipdate",
-        "l_quantity"
-      ]
-    },
-    {
-      "table": "orders",
-      "columns": [
-        "o_orderkey",
-        "o_orderstatus"
+        "watchid",
+        "clientip",
+        "isrefresh",
+        "resolutionwidth"
       ]
     }
   ],
