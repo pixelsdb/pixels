@@ -166,6 +166,7 @@ if __name__ == "__main__":
     schema_path = benchmark_path + config['schema_path']
     table_stat_path = benchmark_path + config['table_stat_path']
     workload_path = benchmark_path + config['workload_path']
+    cache_plan_path = benchmark_path + config['cache_plan_path']
 
     # Load the schema (table name: List[column name])
     with open(schema_path) as f:
@@ -189,10 +190,6 @@ if __name__ == "__main__":
     print("The total size of the columns: ", sum(col_size))
 
     # Print the respective column size percentage of each workload query
-    print(schema)
-    print(queries[2])
-    print(col_stat)
-    print(get_columns(schema, queries[2]))
     total_size = sum(col_size)
     for i, query in enumerate(queries):
         print("The size percentage of columns in query", i, ":", sum([col_stat[col] for col in get_columns(schema, query)]) / total_size * 100)
@@ -200,5 +197,5 @@ if __name__ == "__main__":
     # Plan the cache columns and write to json file
     cache_plan = plan_cache_columns(strategy, schema, col_stat, queries, storage_restriction)
     print("The columns planned to cache: ", cache_plan)
-    with open('plan.json', 'w') as f:
+    with open(cache_plan_path, 'w') as f:
         json.dump(cache_plan, f, indent=4)
