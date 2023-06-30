@@ -136,13 +136,16 @@ int main(int argc, char** argv) {
     // If no error and in-cloud false, execute the query with DuckDB
     std::string workload_path = benchmark_dir_path + benchmark_config["workload_path"].as<std::string>();
     std::vector<std::string> workload = readWorkloadQueries(workload_path);
-    CoordinateQueryClient coordinator_client(grpc::CreateChannel(pixels_server_addr + ":" + std::to_string(pixels_server_port), grpc::InsecureChannelCredentials()));
+    grpc::ChannelArguments ch_args;
+    ch_args.SetMaxReceiveMessageSize(100*1024*1024);
+    ch_args.SetMaxSendMessageSize(100*1024*1024);
+    CoordinateQueryClient coordinator_client(grpc::CreateCustomChannel(pixels_server_addr + ":" + std::to_string(pixels_server_port), grpc::InsecureChannelCredentials(), ch_args));
     for (const std::string& query : workload) {
 	logger->info("Sent query " + query  + " to Coordinator");
         auto coordinator_start_time = std::chrono::high_resolution_clock::now();
         amphi::proto::CoordinateQueryResponse coordinator_response = coordinator_client.CoordinateQuery("", worker_name, schema_name, query);
         auto coordinator_end_time = std::chrono::high_resolution_clock::now();
-        auto coordinator_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(coordinator_end_time - coordinator_start_time).count();
+        auto coordinator_elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(coordinator_end_time - coordinator_start_time).count();
 
         // Adaptive decision: already get in-cloud result or need to execute on-premises
         bool inCloud = coordinator_response.incloud();
@@ -154,13 +157,9 @@ int main(int argc, char** argv) {
             auto engine_start_time = std::chrono::high_resolution_clock::now();
             auto result = db_manager.executeQuery(query);
             auto engine_end_time = std::chrono::high_resolution_clock::now();
-            auto engine_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(engine_end_time - engine_start_time).count();
-            std::streambuf* original_buf = std::cout.rdbuf();
-            std::ostringstream str_cout;
-            std::cout.rdbuf(str_cout.rdbuf());
+            auto engine_elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(engine_end_time - engine_start_time).count();
+            logger->info("Query On-premises execution: \n");
             result->Print();
-            std::cout.rdbuf(original_buf);
-            logger->info("Query On-premises execution: \n" + str_cout.str());
             results_file << "worker" << std::endl;;
             results_file << engine_elapsed_time << std::endl;;
         }
