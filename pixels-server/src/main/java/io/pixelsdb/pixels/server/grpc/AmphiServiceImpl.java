@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 import java.sql.*;
+import java.util.Properties;
 
 /**
  * @author hank
@@ -150,12 +151,15 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
         String errorMessage = null;
         int errorCode = 0;
 
+        Properties properties = new Properties();
+        properties.setProperty("user", "pixels");
+        properties.setProperty("sessionProperties", "pixels.ordered_path_enabled:true;pixels.compact_path_enabled:false");
+
         try {
             inCloud = coordinator.decideInCloud(request.getSqlStatement(), request.getSchema(), request.getPeerName());
             if (inCloud)
             {
-                trinoEndpoint = trinoEndpoint + "sessionProperties=pixels.ordered_path_enabled=true,pixels.compact_path_enabled=false";
-                conn = DriverManager.getConnection(trinoEndpoint, "pixels", "");
+                conn = DriverManager.getConnection(trinoEndpoint, properties);
                 conn.setCatalog("pixels");
                 conn.setSchema(request.getSchema());
 
