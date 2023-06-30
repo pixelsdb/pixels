@@ -1,8 +1,8 @@
 # Path relevant to scripts/
 schema_path: ../schema/tpch.json
-table_stat_path: ../schema/tpch_stat_1g.json
+table_stat_path: ../schema/tpch_stat_100g.json
 workload_path: ../workload/tpch.txt
 
 # Strategy options
 strategy: most_coverage_columns
-storage_restriction: 154119190
+storage_restriction: 1541191900000000000
