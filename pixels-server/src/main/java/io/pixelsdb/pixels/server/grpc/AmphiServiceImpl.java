@@ -154,8 +154,10 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
             inCloud = coordinator.decideInCloud(request.getSqlStatement(), request.getSchema(), request.getPeerName());
             if (inCloud)
             {
-                trinoEndpoint = trinoEndpoint + request.getSchema();
+                trinoEndpoint = trinoEndpoint + "sessionProperties=pixels.ordered_path_enabled=true,pixels.compact_path_enabled=false";
                 conn = DriverManager.getConnection(trinoEndpoint, "pixels", "");
+                conn.setCatalog("pixels");
+                conn.setSchema(request.getSchema());
 
                 stmt = conn.createStatement();
                 rs = stmt.executeQuery(request.getSqlStatement());
