@@ -117,7 +117,7 @@ def cache_most_coverage_columns(schema: Dict[str, List[str]],
     for i in range(1, len(workload) + 1):
         for j in mapping[i]:
             aij_list.append("q"+str(i)+"_"+str(index_col_dict[j]))
-    print(aij_list)
+
     # Define the MILP problem
     prob = LpProblem("Cache Coverage", LpMaximize)
 
@@ -141,11 +141,11 @@ def cache_most_coverage_columns(schema: Dict[str, List[str]],
 
     # Storage restriction
     prob += lpSum([stat[index_col_dict[i]] * x[index_col_dict[i]] for i in range(1, len(col_name) + 1)]) <= storage_restriction
-    print(prob)
+    # print(prob)
     prob.solve()
 
-    for v in prob.variables():
-        print(v.name, "=", v.varValue)
+    # for v in prob.variables():
+    #     print(v.name, "=", v.varValue)
 
     # Return the columns that are cached
     cache_columns = []
