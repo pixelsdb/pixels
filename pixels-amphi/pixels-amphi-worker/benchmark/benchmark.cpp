@@ -34,6 +34,7 @@
 #include "nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/stdout_sinks.h"
 
 #include "grpc/coordinate_query_client.h"
 #include "grpc/transpile_sql_client.h"
@@ -54,7 +55,7 @@ void reportCachePath(MetadataClient& metadata_client,
                      std::map<std::string, std::vector<std::string>> cache_plan);
 std::string getTimestamp();
 
-std::shared_ptr<spdlog::logger> logger;
+std::shared_ptr<spdlog::logger> logger = spdlog::stdout_logger_mt("console");;
 
 /* Run benchmark with two configuration paths, for worker and benchmark respectively. */
 int main(int argc, char** argv) {
@@ -71,7 +72,7 @@ int main(int argc, char** argv) {
     std::string benchmark_dir_path = benchmark_config["benchmark_path"].as<std::string>();
     std::string cache_data_path = benchmark_config["cache_data_path"].as<std::string>();
     std::string log_filename = benchmark_dir_path + "logs/" + exp_name + "_" + getTimestamp() + ".log";
-    logger = spdlog::basic_logger_mt("basic_logger", log_filename);
+    // logger = spdlog::basic_logger_mt("basic_logger", log_filename);
     logger->info("Running the benchmark for experiment: " + exp_name);
     logger->info("Data cached in directory: " + cache_data_path);
 
@@ -137,6 +138,7 @@ int main(int argc, char** argv) {
     std::vector<std::string> workload = readWorkloadQueries(workload_path);
     CoordinateQueryClient coordinator_client(grpc::CreateChannel(pixels_server_addr + ":" + std::to_string(pixels_server_port), grpc::InsecureChannelCredentials()));
     for (const std::string& query : workload) {
+	logger->info("Sent query " + query  + " to Coordinator");
         auto coordinator_start_time = std::chrono::high_resolution_clock::now();
         amphi::proto::CoordinateQueryResponse coordinator_response = coordinator_client.CoordinateQuery("", worker_name, schema_name, query);
         auto coordinator_end_time = std::chrono::high_resolution_clock::now();
@@ -284,6 +286,7 @@ void reportCachePath(MetadataClient& metadata_client,
         }
         peer_path.set_pathid(path.id());
         peer_path.set_peerid(registered_peer.id());
+	createpeerpath_request.mutable_peerpath()->CopyFrom(peer_path);
         metadata::proto::CreatePeerPathResponse createpeerpath_response =
                 metadata_client.CreatePeerPath(createpeerpath_request);
 
