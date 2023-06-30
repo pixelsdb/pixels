@@ -2,4 +2,6 @@
 !*.sql
 !*.txt
 .ipynb_checkpoints/
+logs/
+results/
 build

@@ -162,9 +162,10 @@ if __name__ == "__main__":
 
     # Load the configuration file
     config = read_yaml_config(args.config)
-    schema_path = config['schema_path']
-    table_stat_path = config['table_stat_path']
-    workload_path = config['workload_path']
+    benchmark_path = config['benchmark_path']
+    schema_path = benchmark_path + config['schema_path']
+    table_stat_path = benchmark_path + config['table_stat_path']
+    workload_path = benchmark_path + config['workload_path']
 
     # Load the schema (table name: List[column name])
     with open(schema_path) as f:

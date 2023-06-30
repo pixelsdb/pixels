@@ -1,0 +1,17 @@
+## Experiment level settings
+exp_name: tpch_template
+schema_name: tpch
+benchmark_path: /Users/backfire/Database/pixels/pixels-amphi/pixels-amphi-worker/benchmark/
+# benchmark_path: /home/ubuntu/opt/pixels/pixels-amphi/pixels-amphi-worker/benchmark/
+init_sql_path: sql/tpch.sql
+cache_data_path: /home/ubuntu/data/tpch/
+
+## Parameters for cache plan generation (*path relative to benchmark*)
+schema_path: schema/tpch.json
+table_stat_path: schema/tpch_stat.json
+workload_path: workload/tpch.txt
+cache_plan_path: results/tpch_plan.json
+# Strategy options
+strategy: most_coverage_columns
+storage_restriction: 15411919000000
+

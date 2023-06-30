@@ -4,6 +4,7 @@ find_package(gRPC CONFIG REQUIRED)
 
 set(worker_cxx
         src/db/duckdb_manager.cpp
+        src/grpc/coordinate_query_client.cpp
         src/grpc/metadata_client.cpp
         src/grpc/transpile_sql_client.cpp
         src/grpc/trino_query_client.cpp

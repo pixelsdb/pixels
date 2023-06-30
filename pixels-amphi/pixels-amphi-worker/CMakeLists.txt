@@ -13,6 +13,7 @@ find_package(yaml-cpp REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(cli REQUIRED)
 find_package(AWSSDK REQUIRED COMPONENTS s3)
+find_package(nlohmann_json REQUIRED)
 
 add_subdirectory(worker)
 add_subdirectory(tests)
