@@ -374,7 +374,7 @@ public class PixelsPlanner
                     }
 
                     SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                            joinedTable.getTableName(), joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+                            joinedTable.getTableName(), true, joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                     // The right operator must be set as the large child.
                     joinOperator.setLargeChild(rightOperator);
                     return joinOperator;
@@ -573,7 +573,7 @@ public class PixelsPlanner
                 chainJoinInfos.add(chainJoinInfo);
                 broadcastChainJoinInput.setChainJoinInfos(chainJoinInfos);
 
-                return new SingleStageJoinOperator(joinedTable.getTableName(),
+                return new SingleStageJoinOperator(joinedTable.getTableName(), false,
                         broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN);
             }
         }
@@ -583,10 +583,10 @@ public class PixelsPlanner
             requireNonNull(childOperator, "failed to get child operator");
             // check if there is an incomplete chain join.
             if (childOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN &&
-                    joinAlgo == JoinAlgorithm.BROADCAST &&
-                    join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+                    !childOperator.isComplete() && // Issue #482: ensure the child operator is complete
+                    joinAlgo == JoinAlgorithm.BROADCAST && join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
-                // the current join is still a broadcast join, thus the left child is an incomplete chain join.
+                // the current join is still a broadcast join and the left child is an incomplete chain join.
                 if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
                         parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
@@ -674,7 +674,7 @@ public class PixelsPlanner
                         joinInputs.add(complete);
                     }
 
-                    return new SingleStageJoinOperator(joinedTable.getTableName(),
+                    return new SingleStageJoinOperator(joinedTable.getTableName(), true,
                             joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                 }
             }
@@ -833,7 +833,7 @@ public class PixelsPlanner
                 }
             }
             SingleStageJoinOperator joinOperator =
-                    new SingleStageJoinOperator(joinedTable.getTableName(), joinInputs.build(), joinAlgo);
+                    new SingleStageJoinOperator(joinedTable.getTableName(), true, joinInputs.build(), joinAlgo);
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 joinOperator.setSmallChild(childOperator);
