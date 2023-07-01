@@ -624,11 +624,20 @@ public class PixelsPlanner
                                 parent.get().getJoin().getJoinEndian());
 
                         /*
-                        * If the program reaches here, as this is on a single-pipeline and the parent is present,
-                        * the current join must be the left child of the parent. Therefore, we can use the left key
-                        * column ids of the parent as the post partitioning key column ids.
+                        * Issue #484:
+                        * After we supported multi-pipeline join, this method might be called from getMultiPipelineJoinOperator().
+                        * Therefore, the current join might be either the left child or the right child of the parent, and we must
+                        * decide whether to use the left key column ids or the right key column ids of the parent as the post
+                        * partitioning key column ids.
                         * */
-                        postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                        if (joinedTable == parent.get().getJoin().getLeftTable())
+                        {
+                            postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                        }
+                        else
+                        {
+                            postPartitionInfo = new PartitionInfo(parent.get().getJoin().getRightKeyColumnIds(), numPartition);
+                        }
 
                         /*
                          * For broadcast and broadcast chain join, if every worker in its parent has to
