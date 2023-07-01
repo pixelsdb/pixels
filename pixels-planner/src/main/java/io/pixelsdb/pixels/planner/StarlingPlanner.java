@@ -349,7 +349,7 @@ public class StarlingPlanner
             }
 
             SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                    joinedTable.getTableName(), joinInputs.build(), JoinAlgorithm.BROADCAST);
+                    joinedTable.getTableName(), true, joinInputs.build(), JoinAlgorithm.BROADCAST);
             joinOperator.setSmallChild(leftOperator);
             joinOperator.setLargeChild(rightOperator);
             return joinOperator;
@@ -609,7 +609,7 @@ public class StarlingPlanner
                 }
             }
             SingleStageJoinOperator joinOperator =
-                    new SingleStageJoinOperator(joinedTable.getTableName(), joinInputs.build(), joinAlgo);
+                    new SingleStageJoinOperator(joinedTable.getTableName(), true, joinInputs.build(), joinAlgo);
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 joinOperator.setSmallChild(childOperator);
