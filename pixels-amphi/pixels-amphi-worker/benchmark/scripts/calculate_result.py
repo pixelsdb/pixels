@@ -34,3 +34,5 @@ if __name__ == '__main__':
     # Print the cost percentage
     print("Worker cost: {}%".format(worker_cost / total_cost * 100))
     print("Cloud cost: {}%".format(cloud_cost / total_cost * 100))
+    cloud_queries = list(filter(lambda x: x == 'cloud', execution_location))
+    print("In-cloud query percentage: {}%".format(len(cloud_queries) / len(execution_location) * 100))
