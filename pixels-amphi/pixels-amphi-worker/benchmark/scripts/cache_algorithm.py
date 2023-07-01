@@ -36,6 +36,7 @@ def plan_cache_columns(strategy:str,
                        schema: Dict[str, List[str]], 
                        stat: Dict[str, int],
                        workload: List[str],
+                       workload_cost: List[int],
                        storage_restriction: int) -> Dict[str, List[str]]:
     
     # two baseline methods: most number / most frequent
@@ -45,6 +46,8 @@ def plan_cache_columns(strategy:str,
         return cache_most_frequent_columns(schema, stat, workload, storage_restriction)
     elif strategy == "most_coverage_columns":
         return cache_most_coverage_columns(schema, stat, workload, storage_restriction)
+    elif strategy == "cost_optimal_columns":
+        return cache_cost_optimal_columns(schema, stat, workload, workload_cost, storage_restriction)
 
 # Cache as much columns as possible based on the column statistics
 # note: unwise as none column of lineitem cached
@@ -106,7 +109,6 @@ def cache_most_coverage_columns(schema: Dict[str, List[str]],
     col_name = list(stat.keys())
     col_index_dict = dict(zip(col_name, range(1, len(col_name) + 1)))
     index_col_dict = dict(zip(range(1, len(col_name) + 1), col_name))
-    print(col_index_dict)
 
     # Mapping from workload index to column names (increasing order)
     mapping = {}
@@ -127,6 +129,58 @@ def cache_most_coverage_columns(schema: Dict[str, List[str]],
 
     # Objective function: maximize the number of queries covered
     prob += lpSum([y[i] for i in range(1, len(workload) + 1)])
+
+    # Constraints
+    for yi, col_ids in mapping.items():
+        for col in col_ids:
+            prob += y[yi] <= a["q"+str(yi)+"_"+str(index_col_dict[col])]
+
+    for col in range(1, len(col_name) + 1):
+        for yi, col_ids in mapping.items():
+            if col in col_ids:
+                prob += x[index_col_dict[col]] >= a["q"+str(yi)+"_"+str(index_col_dict[col])]
+
+    # Storage restriction
+    prob += lpSum([stat[index_col_dict[i]] * x[index_col_dict[i]] for i in range(1, len(col_name) + 1)]) <= storage_restriction
+    prob.solve()
+
+    # Return the columns that are cached
+    cache_columns = []
+    for i in range(1, len(col_name) + 1):
+        if x[index_col_dict[i]].varValue == 1:
+            cache_columns.append(index_col_dict[i])
+
+    return collist_to_partial_schema(schema, cache_columns)
+
+# Cache to make the optimal cost of the workload
+def cache_cost_optimal_columns(schema: Dict[str, List[str]], 
+                                stat: Dict[str, int],
+                                workload: List[str],
+                                workload_cost: List[int],
+                                storage_restriction: int) -> Dict[str, List[str]]:
+    col_name = list(stat.keys())
+    col_index_dict = dict(zip(col_name, range(1, len(col_name) + 1)))
+    index_col_dict = dict(zip(range(1, len(col_name) + 1), col_name))
+
+    # Mapping from workload index to column names (increasing order)
+    mapping = {}
+    for i in range(1, len(workload) + 1):
+        mapping[i] = sorted([col_index_dict[name] for name in get_columns(schema, workload[i - 1])])
+
+    aij_list = []
+    for i in range(1, len(workload) + 1):
+        for j in mapping[i]:
+            aij_list.append("q"+str(i)+"_"+str(index_col_dict[j]))
+
+    # Define the MILP problem
+    prob = LpProblem("Cache Coverage", LpMinimize)
+
+    a = LpVariable.dicts("a", aij_list, cat='Binary')
+    x = LpVariable.dicts("x", col_name, cat='Binary')
+    y = LpVariable.dicts("y", range(1, len(workload) + 1), cat='Binary')
+
+    # Objective function: minimize the in-cloud computation cost
+    prob += lpSum([workload_cost[i-1] * (1-y[i]) for i in range(1, len(workload) + 1)])
 
     # Constraints
     for yi, col_ids in mapping.items():
@@ -167,6 +221,7 @@ if __name__ == "__main__":
     table_stat_path = benchmark_path + config['table_stat_path']
     workload_path = benchmark_path + config['workload_path']
     cache_plan_path = benchmark_path + config['cache_plan_path']
+    workload_cost_path = benchmark_path + config['workload_cost_path']
 
     # Load the schema (table name: List[column name])
     with open(schema_path) as f:
@@ -182,6 +237,10 @@ if __name__ == "__main__":
     # Load the workload queries
     with open(workload_path) as f:
         queries = [line.strip() for line in f]
+
+    # Load the workload cost from json file
+    with open(workload_cost_path) as f:
+        workload_cost = list(json.load(f).values())[0]
     
     strategy = config['strategy']
     storage_restriction = (int)(config['storage_restriction'])
@@ -195,7 +254,7 @@ if __name__ == "__main__":
         print("The size percentage of columns in query", i, ":", sum([col_stat[col] for col in get_columns(schema, query)]) / total_size * 100)
 
     # Plan the cache columns and write to json file
-    cache_plan = plan_cache_columns(strategy, schema, col_stat, queries, storage_restriction)
+    cache_plan = plan_cache_columns(strategy, schema, col_stat, queries, workload_cost, storage_restriction)
     print("The columns planned to cache: ", cache_plan)
     with open(cache_plan_path, 'w') as f:
         json.dump(cache_plan, f, indent=4)
