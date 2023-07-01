@@ -315,6 +315,7 @@ public class PixelsPlanner
             rightOperator = getJoinOperator((JoinedTable) rightTable, Optional.empty());
             if (leftOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN)
             {
+                checkArgument(!leftOperator.isComplete(), "left broadcast chain join should be incomplete");
                 boolean postPartition = false;
                 PartitionInfo postPartitionInfo = null;
                 if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
