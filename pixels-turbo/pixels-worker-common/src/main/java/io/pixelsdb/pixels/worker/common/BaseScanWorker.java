@@ -135,6 +135,11 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             for (InputSplit inputSplit : inputSplits)
             {
                 List<InputInfo> scanInputs = inputSplit.getInputInfos();
+                /*
+                 * Issue #435:
+                 * For table scan without partial aggregation, the path in output info is a folder.
+                 * Each scan input split generates an output file in this folder.
+                 */
                 String outputPath = outputFolder + "scan_" + outputId++;
 
                 threadPool.execute(() -> {
