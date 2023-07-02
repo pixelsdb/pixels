@@ -133,7 +133,6 @@ public class TestConverter
     {
         return new OutputInfo(
                 "mypath",
-                true,
                 genStorageInfo(),
                 false
         );

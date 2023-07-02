@@ -44,7 +44,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -83,7 +82,6 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
-            String requestId = context.getRequestId();
 
             long transId = event.getTransId();
             requireNonNull(event.getTableInfo(), "even.tableInfo is null");
@@ -92,8 +90,6 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             boolean[] scanProjection = requireNonNull(event.getScanProjection(),
                     "event.scanProjection is null");
             boolean partialAggregationPresent = event.isPartialAggregationPresent();
-            checkArgument(partialAggregationPresent != event.getOutput().isRandomFileName(),
-                    "partial aggregation and random output file name should not equal");
             String outputFolder = event.getOutput().getPath();
             StorageInfo outputStorageInfo = event.getOutput().getStorageInfo();
             if (!outputFolder.endsWith("/"))
@@ -139,7 +135,12 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             for (InputSplit inputSplit : inputSplits)
             {
                 List<InputInfo> scanInputs = inputSplit.getInputInfos();
-                String outputPath = outputFolder + requestId + "_scan_" + outputId++;
+                /*
+                 * Issue #435:
+                 * For table scan without partial aggregation, the path in output info is a folder.
+                 * Each scan input split generates an output file in this folder.
+                 */
+                String outputPath = outputFolder + "scan_" + outputId++;
 
                 threadPool.execute(() -> {
                     try

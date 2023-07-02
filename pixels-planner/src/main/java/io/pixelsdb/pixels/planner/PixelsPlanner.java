@@ -203,7 +203,7 @@ public class PixelsPlanner
                 scanInput.setPartialAggregationPresent(true);
                 scanInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = intermediateBase + (outputId++) + "/partial_aggr";
-                scanInput.setOutput(new OutputInfo(fileName, false, IntermediateStorageInfo, true));
+                scanInput.setOutput(new OutputInfo(fileName, IntermediateStorageInfo, true));
                 scanInputsBuilder.add(scanInput);
                 aggrInputFilesBuilder.add(fileName);
             }
@@ -271,7 +271,7 @@ public class PixelsPlanner
             aggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
             finalAggrInput.setAggregationInfo(aggregationInfo);
             String fileName = intermediateBase + (hash) + "/final_aggr";
-            finalAggrInput.setOutput(new OutputInfo(fileName, false, IntermediateStorageInfo, true));
+            finalAggrInput.setOutput(new OutputInfo(fileName, IntermediateStorageInfo, true));
             finalAggrInputsBuilder.add(finalAggrInput);
         }
 
@@ -1202,8 +1202,7 @@ public class PixelsPlanner
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setProjection(partitionProjection);
-            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part",
-                    false, InputStorageInfo, true));
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);

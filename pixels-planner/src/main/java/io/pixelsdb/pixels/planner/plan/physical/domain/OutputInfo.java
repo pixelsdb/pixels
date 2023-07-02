@@ -30,11 +30,6 @@ public class OutputInfo
      */
     private String path;
     /**
-     * Whether the serverless worker should generate a random file name.
-     * If true, {@link #path} is used as the folder of the output file.
-     */
-    private boolean randomFileName;
-    /**
      * The information of the storage endpoint.
      */
     private StorageInfo storageInfo;
@@ -48,10 +43,9 @@ public class OutputInfo
      */
     public OutputInfo() { }
 
-    public OutputInfo(String path, boolean randomFileName, StorageInfo storageInfo, boolean encoding)
+    public OutputInfo(String path, StorageInfo storageInfo, boolean encoding)
     {
         this.path = path;
-        this.randomFileName = randomFileName;
         this.storageInfo = storageInfo;
         this.encoding = encoding;
     }
@@ -64,16 +58,6 @@ public class OutputInfo
     public void setPath(String path)
     {
         this.path = path;
-    }
-
-    public boolean isRandomFileName()
-    {
-        return randomFileName;
-    }
-
-    public void setRandomFileName(boolean randomFileName)
-    {
-        this.randomFileName = randomFileName;
     }
 
     public StorageInfo getStorageInfo()
