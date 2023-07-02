@@ -128,7 +128,6 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
 
             OutputInfo outputInfo = requireNonNull(event.getOutput(), "event.output is null");
             String outputPath = outputInfo.getPath();
-            checkArgument(!outputInfo.isRandomFileName(), "output should not be random file");
             StorageInfo outputStorageInfo = requireNonNull(outputInfo.getStorageInfo(),
                     "event.output.storageInfo is null");
             boolean encoding = outputInfo.isEncoding();

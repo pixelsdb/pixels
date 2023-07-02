@@ -36,7 +36,7 @@ public class MultiOutputInfo extends OutputInfo
 
     public MultiOutputInfo(String path, StorageInfo storageInfo, boolean encoding, List<String> fileNames)
     {
-        super(path, false, storageInfo, encoding);
+        super(path, storageInfo, encoding);
         this.fileNames = fileNames;
     }
 
@@ -56,19 +56,6 @@ public class MultiOutputInfo extends OutputInfo
     public void setPath(String path)
     {
         super.setPath(path);
-    }
-
-    /**
-     * randomFileName is ignored and is always false.
-     * @param randomFileName
-     */
-    @Override
-    public void setRandomFileName(boolean randomFileName)
-    {
-        if (randomFileName)
-        {
-            throw new UnsupportedOperationException("can not use random file name on MultiOutputInfo");
-        }
     }
 
     public List<String> getFileNames()

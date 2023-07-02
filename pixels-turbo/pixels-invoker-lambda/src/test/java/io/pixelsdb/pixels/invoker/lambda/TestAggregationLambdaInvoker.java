@@ -73,7 +73,7 @@ public class TestAggregationLambdaInvoker
         aggregationInfo.setResultColumnTypes(new String[] {"bigint"});
         aggregationInfo.setFunctionTypes(new FunctionType[] {FunctionType.SUM});
         aggregationInput.setAggregationInfo(aggregationInfo);
-        aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_final_aggr", false,
+        aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_final_aggr",
                 new StorageInfo(Storage.Scheme.s3, null, null, null, null), true));
 
         System.out.println(JSON.toJSONString(aggregationInput));
