@@ -44,6 +44,8 @@ def plan_cache_columns(strategy:str,
         return cache_most_columns(schema, stat, workload, storage_restriction)
     elif strategy == "most_frequent_columns":
         return cache_most_frequent_columns(schema, stat, workload, storage_restriction)
+    elif strategy == "rate_greedy_columns":
+        return cache_rate_greedy_columns(schema, stat, workload, storage_restriction)
     elif strategy == "most_coverage_columns":
         return cache_most_coverage_columns(schema, stat, workload, storage_restriction)
     elif strategy == "cost_optimal_columns":
@@ -92,6 +94,35 @@ def cache_most_frequent_columns(schema: Dict[str, List[str]],
     # Cache the most frequent columns until the storage restriction is reached
     cache_columns = []
     for column, freq in sorted_freq:
+        if stat[column] <= storage_restriction:
+            cache_columns.append(column)
+            storage_restriction -= stat[column]
+        else:
+            continue
+
+    return collist_to_partial_schema(schema, cache_columns)
+
+# Cache the columns greedy based on the rate of size to frequency
+def cache_rate_greedy_columns(schema: Dict[str, List[str]],
+                                stat: Dict[str, int],
+                                workload: List[str],
+                                storage_restriction: int) -> Dict[str, List[str]]:
+    # Get the columns frequency in the workload
+    col_freq = {}
+    for query in workload:
+        for col in get_columns(schema, query):
+            if col in col_freq:
+                col_freq[col] += 1
+            else:
+                col_freq[col] = 1
+    
+    # Sort the columns based on the frequency / size
+    sorted_rate = sorted([(col, col_freq[col] / stat[col]) for col in col_freq], key=lambda x: x[1], reverse=True)
+    print("The rate of columns in the workload: ", sorted_rate)
+
+    # Cache the most frequent columns until the storage restriction is reached
+    cache_columns = []
+    for column, rate in sorted_rate:
         if stat[column] <= storage_restriction:
             cache_columns.append(column)
             storage_restriction -= stat[column]
