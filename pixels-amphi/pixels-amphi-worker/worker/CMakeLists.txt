@@ -17,14 +17,14 @@ set(worker_cxx
         src/utils/constants.cpp
         src/utils/aws_utils.cpp)
 
-set(PROTO_FILES_DIR "${CMAKE_CURRENT_LIST_DIR}/../proto")
+set(PROTO_FILES_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../proto")
 set(PROTO_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY ${PROTO_OUTPUT_DIR})
 
 # Proto files
-get_filename_component(amphi_proto "../proto/amphi.proto" ABSOLUTE)
+get_filename_component(amphi_proto "../../../proto/amphi.proto" ABSOLUTE)
 get_filename_component(amphi_proto_path "${amphi_proto}" PATH)
-get_filename_component(metadata_proto "../proto/metadata.proto" ABSOLUTE)
+get_filename_component(metadata_proto "../../../proto/metadata.proto" ABSOLUTE)
 get_filename_component(metadata_proto_path "${metadata_proto}" PATH)
 
 # Generated sources
