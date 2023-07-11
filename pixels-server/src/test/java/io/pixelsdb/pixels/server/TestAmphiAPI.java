@@ -20,9 +20,9 @@
 package io.pixelsdb.pixels.server;
 
 import io.pixelsdb.pixels.amphi.AmphiProto;
+import io.pixelsdb.pixels.amphi.analyzer.SqlglotExecutor;
 import io.pixelsdb.pixels.amphi.AmphiServiceGrpc;
 import io.pixelsdb.pixels.common.exception.AmphiException;
-import io.pixelsdb.pixels.server.grpc.SqlglotExecutor;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

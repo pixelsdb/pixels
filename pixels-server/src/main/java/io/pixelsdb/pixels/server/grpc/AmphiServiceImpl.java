@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.amphi.coordinator.Coordinator;
 import io.pixelsdb.pixels.common.exception.AmphiException;
 import io.pixelsdb.pixels.amphi.AmphiProto;
 import io.pixelsdb.pixels.amphi.AmphiServiceGrpc;
+import io.pixelsdb.pixels.amphi.analyzer.SqlglotExecutor;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
