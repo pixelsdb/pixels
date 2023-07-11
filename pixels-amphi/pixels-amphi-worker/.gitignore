@@ -1,6 +1,7 @@
 !CMakeLists.txt
 !*.sql
 !*.txt
+.ipynb
 .ipynb_checkpoints/
 logs/
 results/
