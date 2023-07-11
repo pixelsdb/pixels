@@ -48,18 +48,18 @@ public class SingleStageJoinOperator extends JoinOperator
     protected JoinOperator largeChild = null;
     protected CompletableFuture<?>[] joinOutputs = null;
 
-    public SingleStageJoinOperator(String name, JoinInput joinInput, JoinAlgorithm joinAlgo)
+    public SingleStageJoinOperator(String name, boolean complete, JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
-        super(name);
-        // ImmutableList.of() add the reference of joinInput into the returned list
+        super(name, complete);
+        // ImmutableList.of() adds the reference of joinInput into the returned list
         joinInput.setOperatorName(name);
         this.joinInputs = ImmutableList.of(joinInput);
         this.joinAlgo = joinAlgo;
     }
 
-    public SingleStageJoinOperator(String name, List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
+    public SingleStageJoinOperator(String name, boolean complete, List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
-        super(name);
+        super(name, complete);
         this.joinInputs = ImmutableList.copyOf(joinInputs);
         for (JoinInput joinInput : this.joinInputs)
         {

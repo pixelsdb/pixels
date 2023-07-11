@@ -40,9 +40,25 @@ public abstract class JoinOperator extends Operator
         LargeSideCompletionRatio = Double.parseDouble(ratio);
     }
 
-    public JoinOperator(String name)
+    /**
+     * Issue #482:
+     * Whether this join operator is completely constructed and can be executed.
+     * During the construction of broadcast chain join, intermediate join operators might be incomplete.
+     */
+    private final boolean complete;
+
+    public JoinOperator(String name, boolean complete)
     {
         super(name);
+        this.complete = complete;
+    }
+
+    /**
+     * @return true if this join operator is completely constructed and can be executed.
+     */
+    public boolean isComplete()
+    {
+        return complete;
     }
 
     public abstract List<JoinInput> getJoinInputs();

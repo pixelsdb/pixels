@@ -128,7 +128,6 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
 
             OutputInfo outputInfo = requireNonNull(event.getOutput(), "event.output is null");
             String outputPath = outputInfo.getPath();
-            checkArgument(!outputInfo.isRandomFileName(), "output should not be random file");
             StorageInfo outputStorageInfo = requireNonNull(outputInfo.getStorageInfo(),
                     "event.output.storageInfo is null");
             boolean encoding = outputInfo.isEncoding();
@@ -174,6 +173,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                     }
                     catch (Exception e)
                     {
+                        logger.error(String.format("error during scan: %s", e));
                         throw new WorkerException("error during scan", e);
                     }
                 });
@@ -184,6 +184,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
+                logger.error(String.format("interrupted while waiting for the termination of aggregation: %s", e));
                 throw new WorkerException("interrupted while waiting for the termination of aggregation", e);
             }
 
@@ -327,6 +328,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                     {
                         continue;
                     }
+                    logger.error(String.format("failed to read the input partial aggregation file '%s' and perform aggregation: %s", inputFile, e));
                     throw new WorkerException("failed to read the input partial aggregation file '" +
                             inputFile + "' and perform aggregation", e);
                 }
@@ -338,6 +340,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                     TimeUnit.MILLISECONDS.sleep(100);
                 } catch (InterruptedException e)
                 {
+                    logger.error(String.format("interrupted while waiting for the input files: %s", e));
                     throw new WorkerException("interrupted while waiting for the input files");
                 }
             }

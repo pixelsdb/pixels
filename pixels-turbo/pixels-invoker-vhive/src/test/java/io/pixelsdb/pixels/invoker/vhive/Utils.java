@@ -59,8 +59,7 @@ public class Utils
         aggregationInfo.setResultColumnTypes(new String[]{"bigint"});
         aggregationInfo.setFunctionTypes(new FunctionType[]{FunctionType.SUM});
         aggregationInput.setAggregationInfo(aggregationInfo);
-        aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_final_aggr", false,
-                storageInfo, true));
+        aggregationInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_final_aggr", storageInfo, true));
         return aggregationInput;
     }
 
@@ -169,8 +168,7 @@ public class Utils
         aggregationInfo.setResultColumnTypes(new String[]{"bigint"});
         aggregationInfo.setFunctionTypes(new FunctionType[]{FunctionType.SUM});
         scanInput.setPartialAggregationInfo(aggregationInfo);
-        scanInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_partial_aggr_" + i, false,
-                storageInfo, true));
+        scanInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_partial_aggr_" + i, storageInfo, true));
         return scanInput;
     }
 
@@ -402,8 +400,7 @@ public class Utils
         partitionInfo.setNumPartition(40);
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
-        input.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_part_" + i, false,
-                storageInfo, true));
+        input.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_part_" + i, storageInfo, true));
         return input;
     }
 
@@ -434,8 +431,7 @@ public class Utils
         partitionInfo.setNumPartition(40);
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
-        input.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/lineitem_part_" + i, false,
-                storageInfo, true));
+        input.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/lineitem_part_" + i, storageInfo, true));
         return input;
     }
 

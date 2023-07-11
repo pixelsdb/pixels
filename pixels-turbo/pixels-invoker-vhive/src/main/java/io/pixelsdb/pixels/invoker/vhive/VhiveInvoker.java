@@ -45,7 +45,7 @@ public abstract class VhiveInvoker implements Invoker
             memoryMB = (int) response.getMemoryMB();
         } catch (Exception e)
         {
-            logger.warn("failed to get memory: " + e);
+            logger.error("failed to get memory: " + e);
         }
         this.memoryMB = memoryMB;
     }

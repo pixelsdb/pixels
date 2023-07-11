@@ -90,10 +90,10 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
     @Override
     public void getMemory(TurboProto.GetMemoryRequest request, StreamObserver<TurboProto.GetMemoryResponse> responseObserver)
     {
-        // return the MB(1024 * 1024) size
+        // return the MB(1024 * 1024) size, represent the entire microVM memory size
         int dataSize = 1024 * 1024;
         TurboProto.GetMemoryResponse response = TurboProto.GetMemoryResponse.newBuilder()
-                .setMemoryMB(Runtime.getRuntime().totalMemory() / dataSize)
+                .setMemoryMB(Runtime.getRuntime().maxMemory() / dataSize)
                 .build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
