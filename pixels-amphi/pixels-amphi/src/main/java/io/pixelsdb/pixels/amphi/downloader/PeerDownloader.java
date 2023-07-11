@@ -52,8 +52,7 @@ import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISIO
 import static java.util.Objects.requireNonNull;
 
 /**
- * Pixels partial columns downloader, table/directory level
- *
+ * Pixels partial columns downloader, in table/directory level.
  */
 public class PeerDownloader
 {
@@ -198,14 +197,12 @@ public class PeerDownloader
         {
             // check arguments
             if (schema == null || inputStorage == null || outputStorage == null ||
-                    outDirPath == null || columns.size() == 0 || sourcePaths.size() == 0)
-            {
+                    outDirPath == null || columns.size() == 0 || sourcePaths.size() == 0) {
                 throw new IllegalArgumentException("Missing argument(s) to build PeerDownloader");
             }
 
             // create output directory
-            if (!outputStorage.exists(outDirPath))
-            {
+            if (!outputStorage.exists(outDirPath)) {
                 outputStorage.mkdirs(outDirPath);
             }
 
@@ -231,7 +228,8 @@ public class PeerDownloader
     }
 
     /**
-     * Write the selected columns into a single parquet file
+     * Write the selected columns into a single parquet file.
+     * @throws IOException
      */
     public void writeParquetFile() throws IOException
     {
@@ -289,6 +287,12 @@ public class PeerDownloader
         }
     }
 
+    /**
+     * Instantiate a PixelsReader instance given the configuration.
+     * @param filePath
+     * @return PixelsReader instance
+     * @throws IOException
+     */
     private PixelsReader getPixelsReader(String filePath) throws IOException
     {
         PixelsReader pixelsReader = null;
@@ -299,15 +303,19 @@ public class PeerDownloader
                     .setPath(filePath)
                     .setPixelsFooterCache(new PixelsFooterCache())
                     .build();
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             throw new IOException("Failed to instantiate the PixelsReader: " + e.getMessage());
         }
 
         return pixelsReader;
     }
 
+    /**
+     * Instantiate a ParquetWriter instance given the configuration
+     * @param filePath
+     * @return ParquetWriter instance
+     * @throws IOException
+     */
     private ParquetWriter<GenericRecord> getParquetWriter(Path filePath) throws IOException
     {
         ParquetWriter<GenericRecord> parquetWriter = null;
@@ -321,15 +329,21 @@ public class PeerDownloader
                     .withConf(this.hadoopConfiguration)
                     .build();
         }
-        catch (Exception e)
-        {
+        catch (Exception e) {
             throw new IOException("Failed to instantiate the ParquetWriter: " + e.getMessage());
         }
 
         return parquetWriter;
     }
 
-    // Given the column type, cast column vectors to the generic record, TODO: could be problem
+    /**
+     * Given the column type, cast column vectors to the generic record.
+     * @param schema
+     * @param columns
+     * @param columnVectors
+     * @param rowIdx
+     * @return GenericRecord with type cast from Pixels
+     */
     private static GenericRecord castToGenericRecord(Schema schema, List<Column> columns, List<ColumnVector> columnVectors, int rowIdx)
     {
         GenericRecord record = new GenericData.Record(schema);

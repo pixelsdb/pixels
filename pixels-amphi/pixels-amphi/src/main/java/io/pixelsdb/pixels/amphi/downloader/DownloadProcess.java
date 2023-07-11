@@ -32,7 +32,6 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import org.apache.avro.Schema;
 
 import java.io.IOException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -42,7 +41,6 @@ import java.util.stream.Collectors;
 
 /**
  * Built as the main method to download partial data to the local storage.
- *
  */
 public class DownloadProcess {
     public static void main(String[] args)

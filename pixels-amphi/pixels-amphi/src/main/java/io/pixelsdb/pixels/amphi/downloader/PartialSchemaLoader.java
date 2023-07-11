@@ -30,7 +30,6 @@ import java.util.Map;
 
 /**
  * Partial Avro Schema, load and select subset of columns of the full schema
- *
  */
 public class PartialSchemaLoader
 {
@@ -41,6 +40,11 @@ public class PartialSchemaLoader
     {
     }
 
+    /**
+     * Register the schemas from the specification in resources folder.
+     * @throws IOException
+     * @throws IllegalArgumentException
+     */
     public static void registerAllSchemas()
             throws IOException, IllegalArgumentException
     {
@@ -63,12 +67,16 @@ public class PartialSchemaLoader
         }
     }
 
-    // Specify a subset of fields to acquire partial schema
+    /**
+     * Specify a subset of fields to acquire the partial schema
+     * @param schemaName
+     * @param fields
+     * @return partial Schema given the fields subset
+     */
     public static Schema getPartialSchema(String schemaName, List<String> fields)
     {
         Schema fullSchema = registeredSchemas.get(schemaName);
-        if (fullSchema == null)
-        {
+        if (fullSchema == null) {
             throw new IllegalArgumentException("Schema " + schemaName + " does not exist.");
         }
 
@@ -80,8 +88,7 @@ public class PartialSchemaLoader
         {
             Schema.Field field = fullSchema.getField(fieldName);
 
-            if (field == null)
-            {
+            if (field == null) {
                 throw new IllegalArgumentException("Field " + fieldName + " does not exist in schema " + schemaName);
             }
 

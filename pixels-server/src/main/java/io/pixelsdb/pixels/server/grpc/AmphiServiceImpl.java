@@ -131,7 +131,6 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
         responseObserver.onCompleted();
     }
 
-    // TODO: validate request metadata (peer, schema, etc.) and throw exceptions (better exception handling)
     @Override
     public void coordinateQuery(AmphiProto.CoordinateQueryRequest request, StreamObserver<AmphiProto.CoordinateQueryResponse> responseObserver)
     {
@@ -145,9 +144,9 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
         Coordinator coordinator = new Coordinator(metadataService);
         boolean inCloud = false;
 
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
+        Connection conn;
+        Statement stmt;
+        ResultSet rs;
         String rsStr = "";
         String errorMessage = null;
         int errorCode = 0;
@@ -158,8 +157,7 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
 
         try {
             inCloud = coordinator.decideInCloud(request.getSqlStatement(), request.getSchema(), request.getPeerName());
-            if (inCloud)
-            {
+            if (inCloud) {
                 conn = DriverManager.getConnection(trinoEndpoint, properties);
                 conn.setCatalog("pixels");
                 conn.setSchema(request.getSchema());

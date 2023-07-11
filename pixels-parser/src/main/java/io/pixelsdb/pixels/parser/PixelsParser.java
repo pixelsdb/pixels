@@ -119,17 +119,33 @@ public class PixelsParser
         return planner;
     }
 
+    /**
+     * Parsing the SQL query.
+     * @param sql
+     * @return sqlNode instance parsed from string format
+     * @throws SqlParseException
+     */
     public SqlNode parseQuery(String sql) throws SqlParseException
     {
         SqlParser parser = SqlParser.create(sql, parserConfig);
         return parser.parseQuery(); // Assumed only analytical workload
     }
 
+    /**
+     * Validation of the parsed SQL query.
+     * @param sqlNode
+     * @return validated sqlNode instance
+     */
     public SqlNode validate(SqlNode sqlNode)
     {
         return validator.validate(sqlNode);
     }
 
+    /**
+     * Convert the SQL query to unoptimized logical plan.
+     * @param sqlNode
+     * @return RelNode instance representing unoptimized logical plan
+     */
     public RelNode toRelNode(SqlNode sqlNode)
     {
         SqlToRelConverter.Config converterConfig = SqlToRelConverter.config()
@@ -143,6 +159,11 @@ public class PixelsParser
         return relRoot.rel;
     }
 
+    /**
+     * Applying the transformation rules to logical plan.
+     * @param sqlNode
+     * @return optimized logical plan with given rules
+     */
     public RelNode toBestRelNode(SqlNode sqlNode)
     {
         SqlToRelConverter.Config converterConfig = SqlToRelConverter.config()

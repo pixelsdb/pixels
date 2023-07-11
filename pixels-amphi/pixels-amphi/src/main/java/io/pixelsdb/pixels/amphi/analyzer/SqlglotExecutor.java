@@ -32,8 +32,21 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 
+/**
+ * Executor to call external SQLglot utility process.
+ */
 public class SqlglotExecutor
 {
+    /**
+     * Transpile a SQL statement from one dialect to another.
+     * @param sqlStatement
+     * @param fromDialect
+     * @param toDialect
+     * @return transpiled SQL statement
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws AmphiException
+     */
     public String transpileSql(String sqlStatement, String fromDialect, String toDialect)
             throws IOException, InterruptedException, AmphiException
     {
@@ -64,6 +77,14 @@ public class SqlglotExecutor
         return output;
     }
 
+    /**
+     * Parse the scanned columns in SQL statement.
+     * @param sqlStatement
+     * @return the list of column scanned
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws AmphiException
+     */
     public List<String> parseColumnFields(String sqlStatement)
             throws IOException, InterruptedException, AmphiException
     {

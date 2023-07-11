@@ -56,7 +56,16 @@ public class Coordinator
     }
 
     /**
-     * Endpoint to make the coordinator decision, could be further extended in the future (optional rules).
+     * Endpoint to make the coordinator decision.
+     * @param query
+     * @param schema
+     * @param peerName
+     * @return boolean indicator on query execution in-cloud (true) or on-premise (false)
+     * @throws SqlParseException
+     * @throws AmphiException
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws MetadataException
      */
     public boolean decideInCloud(String query, String schema, String peerName)
             throws SqlParseException, AmphiException, IOException, InterruptedException, MetadataException
@@ -81,8 +90,7 @@ public class Coordinator
         logger.trace("Required columns for the query: " + projectColumns);
 
         // If the worker has already cached all columns to execute the query, then perform on the worker
-        if (cachedAllColumns(projectColumns, schema, peerName))
-        {
+        if (cachedAllColumns(projectColumns, schema, peerName)) {
             logger.trace("Peer " + peerName + " does not contain all required columns for query " + query);
             return false;
         }
@@ -91,9 +99,13 @@ public class Coordinator
         return true;
     }
 
-
     /**
-     * Retrieve peer path from metadata service to decide availability of columns.
+     * Retrieve peer path from metadata service and decide the availability of required columns.
+     * @param columns
+     * @param schema
+     * @param peerName
+     * @return boolean indicator on local availability of columns
+     * @throws MetadataException
      */
     private boolean cachedAllColumns(Map<String, List<String>> columns, String schema, String peerName)
             throws MetadataException
@@ -108,8 +120,7 @@ public class Coordinator
             String table = entry.getKey();
             List<String> columnList = entry.getValue();
 
-            if (columnList.isEmpty())
-            {
+            if (columnList.isEmpty()) {
                 continue;
             }
 
@@ -117,14 +128,12 @@ public class Coordinator
             Path orderedPath = metadataService.getPaths(layout.getId(), true).get(0);
 
             // Check if columnList subset of cachedColumns
-            if (!pathIdToColumns.containsKey(orderedPath.getId()))
-            {
+            if (!pathIdToColumns.containsKey(orderedPath.getId())) {
                 return false;
             }
             List<String> cachedColumns = pathIdToColumns.get(orderedPath.getId())
                     .stream().map(column -> column.getName()).collect(Collectors.toList());
-            if (!cachedColumns.containsAll(columnList))
-            {
+            if (!cachedColumns.containsAll(columnList)) {
                 return false;
             }
         }

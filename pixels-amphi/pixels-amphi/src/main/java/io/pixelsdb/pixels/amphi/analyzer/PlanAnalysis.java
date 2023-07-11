@@ -69,7 +69,9 @@ public class PlanAnalysis
         sqlglotAnalyze();
     }
 
-    // One-time traversal to collect all the required analysis factors
+    /**
+     * One-time traversal to collect all the required analysis factors.
+     */
     public void traversePlan()
     {
         Consumer<RelNode> nodeCounter = (node) -> nodeCount++;
@@ -160,7 +162,6 @@ public class PlanAnalysis
         RelVisitor visitor = new RelVisitor() {
             @Override
             public void visit(RelNode node, int ordinal, RelNode parent) {
-                // Execute all analysis functions
                 for (Consumer<RelNode> function : functions) {
                     function.accept(node);
                 }
@@ -170,12 +171,18 @@ public class PlanAnalysis
         visitor.go(root);
     }
 
-    // Leverage sqlglot to parse high-level features of sql query
+    /**
+     * Leverage sqlglot package to parse high-level features of sql query.
+     * @throws AmphiException
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws MetadataException
+     */
     public void sqlglotAnalyze() throws AmphiException, IOException, InterruptedException, MetadataException
     {
         SqlglotExecutor executor = new SqlglotExecutor();
-        List<String> columnList = new ArrayList<>();
-        Set<String> columnSet = new HashSet<>();
+        List<String> columnList;
+        Set<String> columnSet;
 
         // Retrieve the raw column fields
         columnList = executor.parseColumnFields(this.sql);
@@ -187,10 +194,8 @@ public class PlanAnalysis
         {
             List<String> columnsInTable = new ArrayList<>();
             List<Column> tableColumns = this.metadataService.getColumns(this.schemaName, table.getName(), false);
-            for (Column column : tableColumns)
-            {
-                if (columnSet.contains(column.getName()))
-                {
+            for (Column column : tableColumns) {
+                if (columnSet.contains(column.getName())) {
                     columnsInTable.add(column.getName());
                 }
             }

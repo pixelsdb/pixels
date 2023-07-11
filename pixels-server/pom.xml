@@ -124,6 +124,18 @@
             <artifactId>commons-lang3</artifactId>
         </dependency>
 
+        <!-- apache calcite -->
+        <dependency>
+            <groupId>org.apache.calcite</groupId>
+            <artifactId>calcite-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.calcite</groupId>
+            <artifactId>calcite-plus</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- spring boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

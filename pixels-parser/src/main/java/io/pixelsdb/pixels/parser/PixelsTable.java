@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.parser;
 
-import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -30,7 +29,6 @@ import org.apache.calcite.adapter.java.AbstractQueryableTable;
 import org.apache.calcite.linq4j.QueryProvider;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelReferentialConstraint;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -115,7 +113,6 @@ public class PixelsTable extends AbstractQueryableTable
 
     /**
      * Provide accurate row count from metadata, while leaving others as the default value.
-     *
      */
     @Override
     public Statistic getStatistic()
