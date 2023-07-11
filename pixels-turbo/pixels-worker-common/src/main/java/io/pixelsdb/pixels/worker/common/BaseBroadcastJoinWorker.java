@@ -153,6 +153,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     }
                     catch (Exception e)
                     {
+                        logger.error(String.format("error during hash table construction: %s", e));
                         throw new WorkerException("error during hash table construction", e);
                     }
                 }));
@@ -195,6 +196,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                                             !rightTable.isBase(), rightCols, rightFilter, result.get(0), workerMetrics);
                         } catch (Exception e)
                         {
+                            logger.error(String.format("error during broadcast join: %s", e));
                             throw new WorkerException("error during broadcast join", e);
                         }
                     });
@@ -205,6 +207,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
                 } catch (InterruptedException e)
                 {
+                    logger.error(String.format("interrupted while waiting for the termination of join: %s", e));
                     throw new WorkerException("interrupted while waiting for the termination of join", e);
                 }
             }
@@ -259,6 +262,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
             } catch (Exception e)
             {
+                logger.error(String.format("failed to finish writing and close the join result file '%s': %s", outputPath, e));
                 throw new WorkerException(
                         "failed to finish writing and close the join result file '" + outputPath + "'", e);
             }

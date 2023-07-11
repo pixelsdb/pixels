@@ -205,8 +205,7 @@ public class StarlingPlanner
                 partitionInput.setProjection(scanProjection);
                 partitionInput.setPartitionInfo(partitionInfo);
                 String fileName = intermediateBase + (outputId++) + "/part";
-                partitionInput.setOutput(new OutputInfo(fileName, false,
-                        IntermediateStorageInfo, true));
+                partitionInput.setOutput(new OutputInfo(fileName, IntermediateStorageInfo, true));
                 partitionInputsBuilder.add(partitionInput);
                 AggrInputFilesBuilder.add(fileName);
             }
@@ -261,7 +260,7 @@ public class StarlingPlanner
             aggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
             finalAggrInput.setAggregationInfo(aggregationInfo);
             String fileName = intermediateBase + (hash) + "/final_aggr";
-            finalAggrInput.setOutput(new OutputInfo(fileName, false, IntermediateStorageInfo, true));
+            finalAggrInput.setOutput(new OutputInfo(fileName, IntermediateStorageInfo, true));
             finalAggrInputsBuilder.add(finalAggrInput);
         }
 
@@ -349,7 +348,7 @@ public class StarlingPlanner
             }
 
             SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                    joinedTable.getTableName(), joinInputs.build(), JoinAlgorithm.BROADCAST);
+                    joinedTable.getTableName(), true, joinInputs.build(), JoinAlgorithm.BROADCAST);
             joinOperator.setSmallChild(leftOperator);
             joinOperator.setLargeChild(rightOperator);
             return joinOperator;
@@ -609,7 +608,7 @@ public class StarlingPlanner
                 }
             }
             SingleStageJoinOperator joinOperator =
-                    new SingleStageJoinOperator(joinedTable.getTableName(), joinInputs.build(), joinAlgo);
+                    new SingleStageJoinOperator(joinedTable.getTableName(), true, joinInputs.build(), joinAlgo);
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 joinOperator.setSmallChild(childOperator);
@@ -987,8 +986,7 @@ public class StarlingPlanner
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setProjection(partitionProjection);
-            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part",
-                    false, InputStorageInfo, true));
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);

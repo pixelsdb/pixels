@@ -181,6 +181,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     }
                     catch (Exception e)
                     {
+                        logger.error(String.format("error during hash table construction: %s", e));
                         throw new WorkerException("error during hash table construction", e);
                     }
                 }));
@@ -234,6 +235,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                                             result.get(0), workerMetrics);
                         } catch (Exception e)
                         {
+                            logger.error(String.format("error during hash join: %s", e));
                             throw new WorkerException("error during hash join", e);
                         }
                     });
@@ -244,6 +246,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
                 } catch (InterruptedException e)
                 {
+                    logger.error(String.format("interrupted while waiting for the termination of join: %s", e));
                     throw new WorkerException("interrupted while waiting for the termination of join", e);
                 }
             }
@@ -334,6 +337,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
             } catch (Exception e)
             {
+                logger.error(String.format("failed to finish writing and close the join result file '%s': %s", outputPath, e));
                 throw new WorkerException(
                         "failed to finish writing and close the join result file '" + outputPath + "'", e);
             }

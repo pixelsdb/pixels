@@ -74,7 +74,7 @@ public class TestPartialAggregationLambdaInvoker
             aggregationInfo.setResultColumnTypes(new String[]{"bigint"});
             aggregationInfo.setFunctionTypes(new FunctionType[]{FunctionType.SUM});
             scanInput.setPartialAggregationInfo(aggregationInfo);
-            scanInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_partial_aggr_" + i, false,
+            scanInput.setOutput(new OutputInfo("pixels-lambda-test/unit_tests/orders_partial_aggr_" + i,
                     new StorageInfo(Storage.Scheme.s3, null, null, null, null), true));
 
             System.out.println(JSON.toJSONString(scanInput));

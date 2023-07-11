@@ -203,7 +203,7 @@ public class PixelsPlanner
                 scanInput.setPartialAggregationPresent(true);
                 scanInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = intermediateBase + (outputId++) + "/partial_aggr";
-                scanInput.setOutput(new OutputInfo(fileName, false, IntermediateStorageInfo, true));
+                scanInput.setOutput(new OutputInfo(fileName, IntermediateStorageInfo, true));
                 scanInputsBuilder.add(scanInput);
                 aggrInputFilesBuilder.add(fileName);
             }
@@ -271,7 +271,7 @@ public class PixelsPlanner
             aggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
             finalAggrInput.setAggregationInfo(aggregationInfo);
             String fileName = intermediateBase + (hash) + "/final_aggr";
-            finalAggrInput.setOutput(new OutputInfo(fileName, false, IntermediateStorageInfo, true));
+            finalAggrInput.setOutput(new OutputInfo(fileName, IntermediateStorageInfo, true));
             finalAggrInputsBuilder.add(finalAggrInput);
         }
 
@@ -315,6 +315,8 @@ public class PixelsPlanner
             rightOperator = getJoinOperator((JoinedTable) rightTable, Optional.empty());
             if (leftOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN)
             {
+                // Issue #487: add incomplete check.
+                checkArgument(!leftOperator.isComplete(), "left broadcast chain join should be incomplete");
                 boolean postPartition = false;
                 PartitionInfo postPartitionInfo = null;
                 if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
@@ -374,7 +376,7 @@ public class PixelsPlanner
                     }
 
                     SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                            joinedTable.getTableName(), joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+                            joinedTable.getTableName(), true, joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                     // The right operator must be set as the large child.
                     joinOperator.setLargeChild(rightOperator);
                     return joinOperator;
@@ -573,7 +575,7 @@ public class PixelsPlanner
                 chainJoinInfos.add(chainJoinInfo);
                 broadcastChainJoinInput.setChainJoinInfos(chainJoinInfos);
 
-                return new SingleStageJoinOperator(joinedTable.getTableName(),
+                return new SingleStageJoinOperator(joinedTable.getTableName(), false,
                         broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN);
             }
         }
@@ -583,10 +585,10 @@ public class PixelsPlanner
             requireNonNull(childOperator, "failed to get child operator");
             // check if there is an incomplete chain join.
             if (childOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN &&
-                    joinAlgo == JoinAlgorithm.BROADCAST &&
-                    join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+                    !childOperator.isComplete() && // Issue #482: ensure the child operator is complete
+                    joinAlgo == JoinAlgorithm.BROADCAST && join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
-                // the current join is still a broadcast join, thus the left child is an incomplete chain join.
+                // the current join is still a broadcast join and the left child is an incomplete chain join.
                 if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
                         parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
@@ -624,11 +626,20 @@ public class PixelsPlanner
                                 parent.get().getJoin().getJoinEndian());
 
                         /*
-                        * If the program reaches here, as this is on a single-pipeline and the parent is present,
-                        * the current join must be the left child of the parent. Therefore, we can use the left key
-                        * column ids of the parent as the post partitioning key column ids.
+                        * Issue #484:
+                        * After we supported multi-pipeline join, this method might be called from getMultiPipelineJoinOperator().
+                        * Therefore, the current join might be either the left child or the right child of the parent, and we must
+                        * decide whether to use the left key column ids or the right key column ids of the parent as the post
+                        * partitioning key column ids.
                         * */
-                        postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                        if (joinedTable == parent.get().getJoin().getLeftTable())
+                        {
+                            postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                        }
+                        else
+                        {
+                            postPartitionInfo = new PartitionInfo(parent.get().getJoin().getRightKeyColumnIds(), numPartition);
+                        }
 
                         /*
                          * For broadcast and broadcast chain join, if every worker in its parent has to
@@ -674,7 +685,7 @@ public class PixelsPlanner
                         joinInputs.add(complete);
                     }
 
-                    return new SingleStageJoinOperator(joinedTable.getTableName(),
+                    return new SingleStageJoinOperator(joinedTable.getTableName(), true,
                             joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                 }
             }
@@ -833,7 +844,7 @@ public class PixelsPlanner
                 }
             }
             SingleStageJoinOperator joinOperator =
-                    new SingleStageJoinOperator(joinedTable.getTableName(), joinInputs.build(), joinAlgo);
+                    new SingleStageJoinOperator(joinedTable.getTableName(), true, joinInputs.build(), joinAlgo);
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 joinOperator.setSmallChild(childOperator);
@@ -1191,8 +1202,7 @@ public class PixelsPlanner
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setProjection(partitionProjection);
-            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part",
-                    false, InputStorageInfo, true));
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);

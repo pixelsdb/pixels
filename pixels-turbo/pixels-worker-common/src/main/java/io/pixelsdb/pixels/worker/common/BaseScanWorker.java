@@ -44,7 +44,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -83,7 +82,6 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
-            String requestId = context.getRequestId();
 
             long transId = event.getTransId();
             requireNonNull(event.getTableInfo(), "even.tableInfo is null");
@@ -92,8 +90,6 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             boolean[] scanProjection = requireNonNull(event.getScanProjection(),
                     "event.scanProjection is null");
             boolean partialAggregationPresent = event.isPartialAggregationPresent();
-            checkArgument(partialAggregationPresent != event.getOutput().isRandomFileName(),
-                    "partial aggregation and random output file name should not equal");
             String outputFolder = event.getOutput().getPath();
             StorageInfo outputStorageInfo = event.getOutput().getStorageInfo();
             if (!outputFolder.endsWith("/"))
@@ -139,7 +135,12 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             for (InputSplit inputSplit : inputSplits)
             {
                 List<InputInfo> scanInputs = inputSplit.getInputInfos();
-                String outputPath = outputFolder + requestId + "_scan_" + outputId++;
+                /*
+                 * Issue #435:
+                 * For table scan without partial aggregation, the path in output info is a folder.
+                 * Each scan input split generates an output file in this folder.
+                 */
+                String outputPath = outputFolder + "scan_" + outputId++;
 
                 threadPool.execute(() -> {
                     try
@@ -154,6 +155,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                     }
                     catch (Exception e)
                     {
+                        logger.error(String.format("error during scan: %s", e));
                         throw new WorkerException("error during scan", e);
                     }
                 });
@@ -164,6 +166,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
+                logger.error(String.format("interrupted while waiting for the termination of scan: %s", e));
                 throw new WorkerException("interrupted while waiting for the termination of scan", e);
             }
 
@@ -288,6 +291,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 numReadRequests += recordReader.getNumReadRequests();
             } catch (Exception e)
             {
+                logger.error(String.format("failed to scan the file '%s' and output the result: %s", inputInfo.getPath(), e));
                 throw new WorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the result", e);
             }
@@ -326,6 +330,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             return numRowGroup;
         } catch (Exception e)
         {
+            logger.error(String.format("failed finish writing and close the output file '%s': %s", outputPath, e));
             throw new WorkerException(
                     "failed finish writing and close the output file '" + outputPath + "'", e);
         }

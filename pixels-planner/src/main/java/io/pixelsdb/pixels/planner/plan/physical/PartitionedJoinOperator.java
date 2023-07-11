@@ -54,7 +54,8 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                                    List<PartitionInput> largePartitionInputs,
                                    List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
-        super(name, joinInputs, joinAlgo);
+        // Issue #482: partitioned join must be complete when constructed.
+        super(name, true, joinInputs, joinAlgo);
         if (joinAlgo != JoinAlgorithm.PARTITIONED && joinAlgo != JoinAlgorithm.PARTITIONED_CHAIN)
         {
             throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is not supported");
