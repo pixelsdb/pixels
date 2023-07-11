@@ -19,8 +19,10 @@
  */
 #include "exception/grpc_coordinator_query_exception.h"
 
-GrpcCoordinatorQueryException::GrpcCoordinatorQueryException(const std::string& message) : message_(message) {};
+GrpcCoordinatorQueryException::GrpcCoordinatorQueryException(
+    const std::string& message)
+    : message_(message){};
 
 const char* GrpcCoordinatorQueryException::what() const noexcept {
-    return message_.c_str();
+  return message_.c_str();
 }
