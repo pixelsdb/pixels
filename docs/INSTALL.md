@@ -50,8 +50,8 @@ Therefore, we have to configure these credentials using
 To build Pixels from source and install it locally, you can simply run:
 
 ```bash 
-# You may also want to append this line into `~/.bashrc`
-export PIXELS_HOME=$HOME/opt/pixels/
+echo 'export PIXELS_HOME=$HOME/opt/pixels/' >> ~/.bashrc
+source ~/.bashrc
 ./install.sh
 ```
 
