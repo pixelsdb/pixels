@@ -521,7 +521,7 @@ public class PixelsWriterImpl implements PixelsWriter
                     physicalWriter.append(rowGroupBuffer, 0, rowGroupBuffer.length);
                     writtenBytes += rowGroupBuffer.length;
                     int alignment = Integer.parseInt(ConfigFactory.Instance().getProperty("row.group.align"));
-                    // add align bytes to make sure the column size is the multiple of fsBlockSize
+                    // add align bytes to make sure the column size is the multiple of `alignment`
                     if(rowGroupBuffer.length % alignment != 0) {
                         int alignByte = alignment - rowGroupBuffer.length % alignment;
                         byte[] emptyArray = new byte[alignByte];
