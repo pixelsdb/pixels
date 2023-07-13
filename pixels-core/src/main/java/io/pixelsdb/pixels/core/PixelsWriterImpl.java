@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.PhysicalWriterUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto.CompressionKind;
 import io.pixelsdb.pixels.core.PixelsProto.RowGroupInformation;
 import io.pixelsdb.pixels.core.PixelsProto.RowGroupStatistic;
@@ -519,6 +520,14 @@ public class PixelsWriterImpl implements PixelsWriter
                     byte[] rowGroupBuffer = writer.getColumnChunkContent();
                     physicalWriter.append(rowGroupBuffer, 0, rowGroupBuffer.length);
                     writtenBytes += rowGroupBuffer.length;
+                    int alignment = Integer.parseInt(ConfigFactory.Instance().getProperty("row.group.align"));
+                    // add align bytes to make sure the column size is the multiple of fsBlockSize
+                    if(rowGroupBuffer.length % alignment != 0) {
+                        int alignByte = alignment - rowGroupBuffer.length % alignment;
+                        byte[] emptyArray = new byte[alignByte];
+                        physicalWriter.append(emptyArray, 0, alignByte);
+                        writtenBytes += alignByte;
+                    }
                 }
                 physicalWriter.flush();
             }
@@ -542,7 +551,11 @@ public class PixelsWriterImpl implements PixelsWriter
             PixelsProto.ColumnChunkIndex.Builder chunkIndexBuilder = writer.getColumnChunkIndex();
             chunkIndexBuilder.setChunkOffset(curRowGroupOffset + rowGroupDataLength);
             chunkIndexBuilder.setChunkLength(writer.getColumnChunkSize());
+            int alignment = Integer.parseInt(ConfigFactory.Instance().getProperty("row.group.align"));
             rowGroupDataLength += writer.getColumnChunkSize();
+            if((curRowGroupOffset + rowGroupDataLength) % alignment != 0) {
+                rowGroupDataLength += (int) (alignment - (curRowGroupOffset + rowGroupDataLength) % alignment);
+            }
             // collect columnChunkIndex from every column chunk into curRowGroupIndex
             curRowGroupIndex.addColumnChunkIndexEntries(chunkIndexBuilder.build());
             // collect columnChunkStatistic into rowGroupStatistic
