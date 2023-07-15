@@ -107,7 +107,7 @@ void ScanImplementation() {
 		option.setQueryId(1);
 		auto pixelsRecordReader = pixelsReader->read(option);
 		while(true) {
-			std::shared_ptr<VectorizedRowBatch> v = pixelsRecordReader->readBatch(2048, false);
+			std::shared_ptr<VectorizedRowBatch> v = pixelsRecordReader->readBatch(false);
 			local.rowCount += v->rowCount;
 			if(v->endOfFile) {
 				break;

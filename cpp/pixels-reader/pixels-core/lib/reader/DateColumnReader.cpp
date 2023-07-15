@@ -1,4 +1,4 @@
-//
+ //
 // Created by yuly on 06.04.23.
 //
 
@@ -15,7 +15,7 @@ void DateColumnReader::close() {
 
 void DateColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::ColumnEncoding & encoding, int offset,
                                int size, int pixelStride, int vectorIndex, std::shared_ptr<ColumnVector> vector,
-                               pixels::proto::ColumnChunkIndex & chunkIndex) {
+                               pixels::proto::ColumnChunkIndex & chunkIndex, std::shared_ptr<pixelsFilterMask> filterMask) {
 	std::shared_ptr<DateColumnVector> columnVector =
 	    std::static_pointer_cast<DateColumnVector>(vector);
 	if(offset == 0) {

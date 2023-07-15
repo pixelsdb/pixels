@@ -16,7 +16,8 @@ public:
 	          pixels::proto::ColumnEncoding & encoding,
 	          int offset, int size, int pixelStride,
 	          int vectorIndex, std::shared_ptr<ColumnVector> vector,
-	          pixels::proto::ColumnChunkIndex & chunkIndex) override;
+	          pixels::proto::ColumnChunkIndex & chunkIndex,
+			  std::shared_ptr<pixelsFilterMask> filterMask) override;
 private:
 	/**
      * True if the data type of the values is long (int64), otherwise the data type is int32.

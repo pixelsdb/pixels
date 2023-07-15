@@ -5,21 +5,17 @@
 #include "vector/BinaryColumnVector.h"
 
 BinaryColumnVector::BinaryColumnVector(int len, bool encoding): ColumnVector(len, encoding) {
-    vector = new uint8_t *[len];
-    start = new int[len];
-    lens = new int[len];
+    posix_memalign(reinterpret_cast<void **>(&vector), 4096,
+                   len * sizeof(duckdb::string_t));
     memoryUsage += (long) sizeof(uint8_t) * len;
 }
 
 void BinaryColumnVector::close() {
 	if(!closed) {
 		ColumnVector::close();
-		delete[] vector;
+		free(vector);
 		vector = nullptr;
-		delete[] start;
-		start = nullptr;
-		delete[] lens;
-		lens = nullptr;
+
 	}
 }
 
@@ -27,24 +23,17 @@ void BinaryColumnVector::setRef(int elementNum, uint8_t * const &sourceBuf, int 
     if(elementNum >= writeIndex) {
         writeIndex = elementNum + 1;
     }
-    this->vector[elementNum] = sourceBuf;
-    this->start[elementNum] = start;
-    this->lens[elementNum] = length;
+    this->vector[elementNum]
+        = duckdb::string_t((char *)(sourceBuf + start), length);
+
     // TODO: isNull should implemented, but not now.
 
 }
 
 void BinaryColumnVector::print(int rowCount) {
-//	throw InvalidArgumentException("not support print binarycolumnvector.");
-    for(int i = 0; i < rowCount; i++) {
-        int s = start[i];
-        int l = lens[i];
-        for(int j = 0; j < l; j++) {
-            std::cout<<(char)(*(vector[i] + s + j));
-        }
-        std::cout<<std::endl;
-    }
+	throw InvalidArgumentException("not support print binarycolumnvector.");
 }
+
 BinaryColumnVector::~BinaryColumnVector() {
 	if(!closed) {
 		BinaryColumnVector::close();

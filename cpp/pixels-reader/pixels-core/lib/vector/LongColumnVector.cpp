@@ -7,11 +7,13 @@
 LongColumnVector::LongColumnVector(int len, bool encoding, bool isLong): ColumnVector(len, encoding) {
 	if(encoding) {
 		if(isLong) {
-			longVector = new int64_t[len];
+            posix_memalign(reinterpret_cast<void **>(&longVector), 4096,
+                           len * sizeof(int64_t));
 			intVector = nullptr;
 		} else {
 			longVector = nullptr;
-			intVector = new int[len];
+            posix_memalign(reinterpret_cast<void **>(&intVector), 4096,
+                           len * sizeof(int32_t));
 		}
 	} else {
 		longVector = nullptr;
@@ -25,10 +27,10 @@ void LongColumnVector::close() {
 	if(!closed) {
 		ColumnVector::close();
 		if(encoding && longVector != nullptr) {
-			delete[] longVector;
+			free(longVector);
 		}
 		if(encoding && intVector != nullptr) {
-			delete[] intVector;
+			free(intVector);
 		}
 		longVector = nullptr;
 		intVector = nullptr;

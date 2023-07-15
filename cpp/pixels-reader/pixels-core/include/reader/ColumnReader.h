@@ -9,6 +9,9 @@
 #include "physical/natives/ByteBuffer.h"
 #include "pixels-common/pixels.pb.h"
 #include "math.h"
+#include "duckdb.h"
+#include "duckdb/common/types/vector.hpp"
+#include "PixelsFilter.h"
 
 class ColumnReader {
 public:
@@ -38,7 +41,8 @@ public:
                       pixels::proto::ColumnEncoding & encoding,
                       int offset, int size, int pixelStride,
                       int vectorIndex, std::shared_ptr<ColumnVector> vector,
-                      pixels::proto::ColumnChunkIndex & chunkIndex) = 0;
+                      pixels::proto::ColumnChunkIndex & chunkIndex,
+                      std::shared_ptr<pixelsFilterMask> filterMask) = 0;
 private:
 	bool hasNull;
 protected:

@@ -3,6 +3,7 @@
 //
 
 #include "reader/StringColumnReader.h"
+#include "profiler/CountProfiler.h"
 
 StringColumnReader::StringColumnReader(std::shared_ptr<TypeDescription> type) : ColumnReader(type) {
     bufferOffset = 0;
@@ -16,7 +17,7 @@ void StringColumnReader::close() {
 
 void StringColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::ColumnEncoding & encoding, int offset,
                               int size, int pixelStride, int vectorIndex, std::shared_ptr<ColumnVector> vector,
-                              pixels::proto::ColumnChunkIndex & chunkIndex) {
+                              pixels::proto::ColumnChunkIndex & chunkIndex, std::shared_ptr<pixelsFilterMask> filterMask) {
     if(offset == 0) {
         elementIndex = 0;
         bufferOffset = 0;
@@ -26,32 +27,73 @@ void StringColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::
     std::shared_ptr<BinaryColumnVector> columnVector =
             std::static_pointer_cast<BinaryColumnVector>(vector);
     // TODO: if dictionary encoded
-	if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY) {
-		for(int i = 0; i < size; i++) {
-			if(elementIndex % pixelStride == 0) {
-				int pixelId = elementIndex / pixelStride;
-				// TODO: should write the remaining code
-			}
-			int originId = orders[(int) contentDecoder->next()];
-			int tmpLen = starts[originId + 1] - starts[originId];
-			// use setRef instead of setVal to reduce memory copy.
-			columnVector->setRef(i + vectorIndex, originsBuf->getPointer(), starts[originId], tmpLen);
-			elementIndex++;
-		}
-	} else {
-		for(int i = 0; i < size; i++) {
-			if(elementIndex % pixelStride == 0) {
-				int pixelId = elementIndex / pixelStride;
-				// TODO: should write the remaining code
-			}
-			int len = (int) lensDecoder->next();
-			// use setRef instead of setVal to reduce memory copy
-			columnVector->setRef(
-			    i + vectorIndex, contentBuf->getPointer(), bufferOffset, len);
-			bufferOffset += len;
-			elementIndex++;
-		}
-	}
+    if(filterMask != nullptr) {
+        if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY) {
+            for(int i = 0; i < size; i++) {
+                if(elementIndex % pixelStride == 0) {
+                    int pixelId = elementIndex / pixelStride;
+                    // TODO: should write the remaining code
+                }
+                if(filterMask->get(i)) {
+                    int originId = orders[(int) contentDecoder->next()];
+                    int tmpLen = starts[originId + 1] - starts[originId];
+                    // use setRef instead of setVal to reduce memory copy.
+                    columnVector->setRef(i + vectorIndex, originsBuf->getPointer(), starts[originId], tmpLen);
+                } else {
+                    // skip this number
+                    contentDecoder->next();
+                }
+                elementIndex++;
+            }
+        } else {
+            for(int i = 0; i < size; i++) {
+                if(elementIndex % pixelStride == 0) {
+                    int pixelId = elementIndex / pixelStride;
+                    // TODO: should write the remaining code
+                }
+                if(filterMask->get(i)) {
+                    int len = (int) lensDecoder->next();
+                    // use setRef instead of setVal to reduce memory copy
+                    columnVector->setRef(
+                            i + vectorIndex, contentBuf->getPointer(), bufferOffset, len);
+                    bufferOffset += len;
+                } else {
+                    // skip this number
+                    int len = (int) lensDecoder->next();
+                    bufferOffset += len;
+                }
+                elementIndex++;
+            }
+        }
+    } else {
+        if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY) {
+            for(int i = 0; i < size; i++) {
+                if(elementIndex % pixelStride == 0) {
+                    int pixelId = elementIndex / pixelStride;
+                    // TODO: should write the remaining code
+                }
+                int originId = orders[(int) contentDecoder->next()];
+                int tmpLen = starts[originId + 1] - starts[originId];
+                // use setRef instead of setVal to reduce memory copy.
+                columnVector->setRef(i + vectorIndex, originsBuf->getPointer(), starts[originId], tmpLen);
+                elementIndex++;
+            }
+        } else {
+            for(int i = 0; i < size; i++) {
+                if(elementIndex % pixelStride == 0) {
+                    int pixelId = elementIndex / pixelStride;
+                    // TODO: should write the remaining code
+                }
+                int len = (int) lensDecoder->next();
+                // use setRef instead of setVal to reduce memory copy
+                columnVector->setRef(
+                        i + vectorIndex, contentBuf->getPointer(), bufferOffset, len);
+                bufferOffset += len;
+                elementIndex++;
+            }
+        }
+    }
+
 
 }
 

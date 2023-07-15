@@ -6,7 +6,8 @@
 
 DateColumnVector::DateColumnVector(int len, bool encoding): ColumnVector(len, encoding) {
 	if(encoding) {
-		this->dates = new int[len];
+        posix_memalign(reinterpret_cast<void **>(&dates), 4096,
+                       len * sizeof(int32_t));
 	} else {
 		this->dates = nullptr;
 	}
@@ -16,7 +17,7 @@ DateColumnVector::DateColumnVector(int len, bool encoding): ColumnVector(len, en
 void DateColumnVector::close() {
 	if(!closed) {
 		if(encoding && dates != nullptr) {
-			delete[] dates;
+			free(dates);
 		}
 		dates = nullptr;
 		ColumnVector::close();

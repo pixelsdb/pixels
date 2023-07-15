@@ -19,6 +19,14 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr<PhysicalReader> r
     queryId = option.getQueryId();
     RGStart = option.getRGStart();
     RGLen = option.getRGLen();
+
+    enabledFilterPushDown = option.isEnabledFilterPushDown();
+    if(enabledFilterPushDown) {
+        filter = option.getFilter();
+    } else {
+        filter = nullptr;
+    }
+    filterMask = nullptr;
     everRead = false;
 	everPrepareRead = false;
     targetRGNum = 0;
@@ -28,8 +36,9 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr<PhysicalReader> r
     fileName = physicalReader->getName();
     enableEncodedVector = option.isEnableEncodedColumnVector();
     includedColumnNum = 0;
-    rowIndex = 0L;
 	endOfFile = false;
+    resultRowBatch = nullptr;
+
     checkBeforeRead();
 }
 
@@ -105,6 +114,11 @@ void PixelsRecordReaderImpl::checkBeforeRead() {
 void PixelsRecordReaderImpl::UpdateRowGroupInfo() {
 	// if not end of file, update row count
 	curRGRowCount = (int) footer.rowgroupinfos(targetRGs.at(curRGIdx)).numberofrows();
+
+    if(enabledFilterPushDown) {
+        filterMask = std::make_shared<pixelsFilterMask>(curRGRowCount);
+    }
+
 	curRGFooter = rowGroupFooters.at(curRGIdx);
 	// refresh resultColumnsEncoded for reading the column vectors in the next row group.
 	const pixels::proto::RowGroupEncoding& rgEncoding = rowGroupFooters.at(curRGIdx)->rowgroupencoding();
@@ -124,23 +138,11 @@ void PixelsRecordReaderImpl::UpdateRowGroupInfo() {
 	everRead = false;
 }
 
-std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readRowGroup(bool reuse) {
-	if(endOfFile) {
-		endOfFile = true;
-		return createEmptyEOFRowBatch(0);
-	}
-	// if the function "read" is invoked by readRowGroup, readBatch will ignore this function.
-	if(!everRead) {
-		if(!read()) {
-			throw std::runtime_error("failed to read file");
-		}
-	}
-	return readBatch(curRGRowCount, reuse);
-}
+
 
 
 // If cross multiple row group, we only process one row group
-std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(int batchSize, bool reuse) {
+std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse) {
     if(endOfFile) {
 		endOfFile = true;
 		return createEmptyEOFRowBatch(0);
@@ -151,53 +153,75 @@ std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(int batchS
 		}
 	}
 
-	std::shared_ptr<VectorizedRowBatch> resultRowBatch;
-	resultRowBatch = resultSchema->createRowBatch(batchSize, resultColumnsEncoded);
+
 	// TODO: resultRowBatch.projectionSize
 
 
-	int curBatchSize = 0;
-	auto columnVectors = resultRowBatch->cols;
+    // update current batch size
+    int curBatchSize = curRGRowCount;
+    if(resultRowBatch == nullptr) {
+        resultRowBatch = resultSchema->createRowBatch(curBatchSize, resultColumnsEncoded);
+    }
+    resultRowBatch->rowCount = 0;
+    auto columnVectors = resultRowBatch->cols;
+    if(filterMask != nullptr) {
+        filterMask->set();
+    }
 
+    std::vector<int> filterColumnIndex;
+    if(filter != nullptr) {
+        for (auto &filterCol : filter->filters) {
+            if(filterMask->isNone()) {
+                break;
+            }
+            int i = filterCol.first;
+            int index = curChunkBufferIndex.at(i);
+            auto & encoding = curEncoding.at(i);
+            auto & chunkIndex = curChunkIndex.at(i);
+            readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
+                                postScript.pixelstride(), resultRowBatch->rowCount,
+                                columnVectors.at(i), *chunkIndex, filterMask);
+            filterColumnIndex.emplace_back(index);
+            PixelsFilter::ApplyFilter(columnVectors.at(i), *filterCol.second, *filterMask,
+                                      resultSchema->getChildren().at(i));
+        }
+    }
 
-	while (resultRowBatch->rowCount < batchSize && curRowInRG < curRGRowCount) {
-		// update current batch size
-		curBatchSize = curRGRowCount - curRowInRG;
-		if (curBatchSize + resultRowBatch->rowCount >= batchSize) {
-			curBatchSize = batchSize - resultRowBatch->rowCount;
-		}
+    // read vectors
+    for(int i = 0; i < resultColumns.size(); i++) {
+        if(filterMask != nullptr) {
+            if(filterMask->isNone()) {
+                break;
+            }
+        }
+        // Skip the columns that calculate the filter mask, since they are already processed
+        int index = curChunkBufferIndex.at(i);
+        if(std::find(filterColumnIndex.begin(), filterColumnIndex.end(), index) != filterColumnIndex.end()) {
+            continue;
+        }
+        auto & encoding = curEncoding.at(i);
+        auto & chunkIndex = curChunkIndex.at(i);
+        readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
+                            postScript.pixelstride(), resultRowBatch->rowCount,
+                            columnVectors.at(i), *chunkIndex, filterMask);
+    }
 
-		// Read vectors. Don't touch the BufferPool here, because bufferPool is switched
-		for(int i = 0; i < resultColumns.size(); i++) {
-			// TODO: if !columnVectors[i].duplicate
-			int index = curChunkBufferIndex.at(i);
-			auto & encoding = curEncoding.at(i);
-			auto & chunkIndex = curChunkIndex.at(i);
-			readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
-								postScript.pixelstride(), resultRowBatch->rowCount,
-								columnVectors.at(i), *chunkIndex);
-		}
-
-		// update current row index in the row group
-		curRowInRG += curBatchSize;
-		rowIndex += curBatchSize;
-		resultRowBatch->rowCount += curBatchSize;
-		// update row group index if current row index exceeds max row count in the row group
-		if(curRowInRG >= curRGRowCount) {
-			curRGIdx++;
-			if(curRGIdx < targetRGNum) {
-				UpdateRowGroupInfo();
-			} else {
-				// if end of file, set result vectorized row batch endOfFile
-				// TODO: set checkValid to false!
-				resultRowBatch->endOfFile = true;
-				endOfFile = true;
-			}
-			curRowInRG = 0;
-			// Here we make sure only process one row group
-			break;
-		}
-	}
+    // update current row index in the row group
+    curRowInRG += curBatchSize;
+    resultRowBatch->rowCount += curBatchSize;
+    // update row group index if current row index exceeds max row count in the row group
+    if(curRowInRG >= curRGRowCount) {
+        curRGIdx++;
+        if(curRGIdx < targetRGNum) {
+            UpdateRowGroupInfo();
+        } else {
+            // if end of file, set result vectorized row batch endOfFile
+            // TODO: set checkValid to false!
+            resultRowBatch->endOfFile = true;
+            endOfFile = true;
+        }
+        curRowInRG = 0;
+    }
 	return resultRowBatch;
 }
 
@@ -295,6 +319,11 @@ void PixelsRecordReaderImpl::asyncReadComplete(int requestSize) {
         }
     }
 
+}
+
+
+std::shared_ptr<pixelsFilterMask> PixelsRecordReaderImpl::getFilterMask() {
+    return filterMask;
 }
 
 bool PixelsRecordReaderImpl::read() {
@@ -395,8 +424,6 @@ void PixelsRecordReaderImpl::close() {
 	rowGroupFooters.clear();
 	includedColumnTypes.clear();
 	endOfFile = true;
+    // TODO: we should use pointer for filterMask
 }
-
-
-
 

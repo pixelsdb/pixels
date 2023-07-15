@@ -20,6 +20,7 @@
 #include "profiler/TimeProfiler.h"
 #include "physical/BufferPool.h"
 #include "physical/natives/DirectUringRandomAccessFile.h"
+#include "PixelsFilter.h"
 
 class ChunkId {
 public:
@@ -44,16 +45,14 @@ public:
                                     const PixelsReaderOption& opt,
                                     std::shared_ptr<PixelsFooterCache> pixelsFooterCache
                                     );
-
     void asyncReadComplete(int requestSize);
-	std::shared_ptr<VectorizedRowBatch> readRowGroup(bool reuse) override;
-    std::shared_ptr<VectorizedRowBatch> readBatch(int batchSize, bool reuse) override;
-
+    std::shared_ptr<VectorizedRowBatch> readBatch(bool reuse) override;
 	std::shared_ptr<TypeDescription> getResultSchema() override;
+    bool read();
+	std::shared_ptr<pixelsFilterMask> getFilterMask();
 	bool isEndOfFile() override;
     ~PixelsRecordReaderImpl();
 	void close() override;
-    bool read();
 private:
     std::vector<int64_t> bufferIds;
     void prepareRead();
@@ -65,6 +64,7 @@ private:
     pixels::proto::PostScript postScript;
 	std::shared_ptr<PixelsFooterCache> footerCache;
     PixelsReaderOption option;
+    duckdb::TableFilterSet * filter;
     long queryId;
     int RGStart;
     int RGLen;
@@ -75,9 +75,10 @@ private:
     int curRowInRG;
 	int curRowInStride;
     std::string fileName;
-    long rowIndex;
 	bool endOfFile;
 	int curRGRowCount;
+    bool enabledFilterPushDown;
+    std::shared_ptr<pixelsFilterMask> filterMask;
 	std::shared_ptr<pixels::proto::RowGroupFooter> curRGFooter;
 	std::vector<std::shared_ptr<pixels::proto::ColumnEncoding>> curEncoding;
 	std::vector<int> curChunkBufferIndex;
@@ -107,5 +108,6 @@ private:
 
     std::shared_ptr<TypeDescription> fileSchema;
     std::shared_ptr<TypeDescription> resultSchema;
+    std::shared_ptr<VectorizedRowBatch> resultRowBatch;
 };
 #endif //PIXELS_PIXELSRECORDREADERIMPL_H

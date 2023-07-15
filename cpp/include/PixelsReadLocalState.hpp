@@ -20,7 +20,6 @@ struct PixelsReadLocalState : public LocalTableFunctionState {
     shared_ptr<PixelsRecordReader> nextPixelsRecordReader;
 	// this is used for storing row batch results.
 	shared_ptr<VectorizedRowBatch> vectorizedRowBatch;
-	std::vector<shared_ptr<VectorizedRowBatch>> vectorizedRowBatchPool;
 	int rowOffset;
 	vector<column_t> column_ids;
 	vector<string> column_names;

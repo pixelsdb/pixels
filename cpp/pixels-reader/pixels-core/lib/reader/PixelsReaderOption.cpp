@@ -9,6 +9,7 @@ PixelsReaderOption::PixelsReaderOption() {
     skipCorruptRecords = false;
     tolerantSchemaEvolution = true;
     enableEncodedColumnVector = true;
+    enableFilterPushDown = false;
     queryId = -1L;
     rgStart = 0;
     rgLen = -1;  // -1 means reading to the end of the file
@@ -66,6 +67,23 @@ void PixelsReaderOption::setEnableEncodedColumnVector(bool enabled) {
 bool PixelsReaderOption::isEnableEncodedColumnVector() {
     return enableEncodedColumnVector;
 }
+
+void PixelsReaderOption::setEnabledFilterPushDown(bool enabledFilterPushDown) {
+    this->enableFilterPushDown = enabledFilterPushDown;
+}
+
+bool PixelsReaderOption::isEnabledFilterPushDown() {
+    return this->enableFilterPushDown;
+}
+
+void PixelsReaderOption::setFilter(duckdb::TableFilterSet * filter) {
+    this->filter = filter;
+}
+
+duckdb::TableFilterSet * PixelsReaderOption::getFilter() {
+    return this->filter;
+}
+
 
 
 

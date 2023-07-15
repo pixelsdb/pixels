@@ -15,7 +15,7 @@ void IntegerColumnReader::close() {
 
 void IntegerColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::ColumnEncoding & encoding, int offset,
                                int size, int pixelStride, int vectorIndex, std::shared_ptr<ColumnVector> vector,
-                               pixels::proto::ColumnChunkIndex & chunkIndex) {
+                               pixels::proto::ColumnChunkIndex & chunkIndex, std::shared_ptr<pixelsFilterMask> filterMask) {
     std::shared_ptr<LongColumnVector> columnVector =
             std::static_pointer_cast<LongColumnVector>(vector);
     // if read from start, init the stream and decoder
