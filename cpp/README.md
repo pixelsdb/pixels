@@ -19,9 +19,9 @@ sudo apt-get install -y protobuf-compiler liburing-dev
 
 ### Compilation
 
-The repository relies on [pixels reader](https://github.com/yuly16/pixels-reader-cxx) and [duckdb](https://github.com/yuly16/duckdb). 
+The repository relies on [duckdb](https://github.com/yuly16/duckdb). It is refered from [pixels reader](https://github.com/yuly16/pixels-reader-cxx). 
 
-First fetch `pixels reader` and `duckdb` submodules from github:
+First fetch `duckdb` submodules from github:
 
 ```
 make pull
@@ -48,7 +48,13 @@ To run this binary:
 
 Note: the benchmark runs on diascld31 server. If you run the benchmark on your machine, please refer to [Common issue](#4-i-fail-to-run-the-pixels-and-parquet-benchmark)
 
+#### 1. Simple query
+We run one simple query by the following command:
 
+```
+build/release/benchmark/benchmark_runner "benchmark/tpch/pixels/tpch_1/q01.benchmark"
+```
+#### 2. TPCH benchmark
 The benchmark script is `run_benchmark.py` in `duckdb/scripts` directory.
 
 Check the usage:

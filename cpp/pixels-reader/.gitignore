@@ -1,0 +1,5 @@
+**/cmake-build-debug
+.idea
+demo
+**/CMakeCache.txt
+**/CMakeFiles

@@ -90,6 +90,7 @@ private:
 	                            DataChunk &output,
 	                            const std::shared_ptr<TypeDescription> & schema,
 	                            unsigned long thisOutputChunkRows);
+    static bool enable_filter_pushdown;
 };
 
 } // namespace duckdb
