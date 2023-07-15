@@ -203,7 +203,7 @@ public class PixelsConsumer extends Consumer
         {
             System.out.println("PixelsConsumer: " + e.getMessage());
             currentThread().interrupt();
-        } catch (IOException e)
+        } catch (Throwable e)
         {
             e.printStackTrace();
         } finally

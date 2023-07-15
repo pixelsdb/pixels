@@ -114,7 +114,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ByteBuffer[] chunkBuffers;
     private ColumnReader[] readers;      // column readers for each target columns
-    private boolean enableEncodedVector;
+    private final boolean enableEncodedVector;
 
     private long diskReadBytes = 0L;
     private long cacheReadBytes = 0L;
