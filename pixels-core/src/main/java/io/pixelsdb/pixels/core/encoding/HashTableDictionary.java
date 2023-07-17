@@ -17,16 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.utils;
+package io.pixelsdb.pixels.core.encoding;
+
+import io.pixelsdb.pixels.core.utils.EncodingUtils;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
 import static io.pixelsdb.pixels.core.utils.BitUtils.longBytesToLong;
@@ -34,12 +33,15 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
 /**
  * @author hank
- * @date 8/13/22
+ * @create 2022-08-13
  */
 public class HashTableDictionary implements Dictionary
 {
     private final int NUM_DICTIONARIES = 41;
-    private final List<Map<KeyBuffer, Integer>> dictionaries;
+    private final List<LinkedHashMap<KeyBuffer, Integer>> dictionaries;
+    /**
+     * The counter to generate the position (i.e., encoded id) for the distinct keys.
+     */
     private int originalPosition = 0;
 
     public HashTableDictionary(int initialCapacity)
@@ -52,7 +54,8 @@ public class HashTableDictionary implements Dictionary
         this.dictionaries = new ArrayList<>(NUM_DICTIONARIES);
         for (int i = 0; i < NUM_DICTIONARIES; ++i)
         {
-            this.dictionaries.add(new HashMap<>(capacity));
+            // Issue #498: linked hash map maintains the insertion order of the entries by default.
+            this.dictionaries.add(new LinkedHashMap<>(capacity));
         }
     }
 
@@ -111,6 +114,41 @@ public class HashTableDictionary implements Dictionary
     public void visit(Dictionary.Visitor visitor) throws IOException
     {
         VisitorContextImpl visitorContext = new VisitorContextImpl();
+        boolean keyIsFound = false;
+        List<Iterator<Map.Entry<KeyBuffer, Integer>>> dictIterators = new ArrayList<>(NUM_DICTIONARIES);
+        for (int i = 0; i < NUM_DICTIONARIES; ++i)
+        {
+            dictIterators.add(this.dictionaries.get(i).entrySet().iterator());
+        }
+        for (int position = 0; position < this.originalPosition; ++position)
+        {
+            Map.Entry<KeyBuffer, Integer> entry = null;
+            for (int i = 0; i < dictIterators.size(); ++i)
+            {
+                Iterator<Map.Entry<KeyBuffer, Integer>> dictIterator = dictIterators.get(i);
+                if (!dictIterator.hasNext())
+                {
+                    // this dictionary has no remaining keys to visit
+                    dictIterators.remove(i--);
+                    continue;
+                }
+                entry = dictIterator.next();
+                if (entry.getValue() == position)
+                {
+                    keyIsFound = true;
+                    break;
+                }
+            }
+            if (!keyIsFound)
+            {
+                throw new IOException(String.format("key position %d is not found, the dictionary is corrupt", position));
+            }
+            keyIsFound = false;
+            KeyBuffer key = entry.getKey();
+            visitorContext.setKey(key.bytes, key.offset, key.length, position);
+            visitor.visit(visitorContext);
+        }
+/*
         for (Map<KeyBuffer, Integer> dict : this.dictionaries)
         for (Map.Entry<KeyBuffer, Integer> entry : dict.entrySet())
         {
@@ -118,6 +156,7 @@ public class HashTableDictionary implements Dictionary
             visitorContext.setKey(key.bytes, key.offset, key.length, entry.getValue());
             visitor.visit(visitorContext);
         }
+ */
     }
 
     private static class KeyBuffer implements Comparable<KeyBuffer>
@@ -125,6 +164,7 @@ public class HashTableDictionary implements Dictionary
         private final byte[] bytes;
         private final int offset;
         private final int length;
+        private Integer hashCode = null;
 
         public KeyBuffer(byte[] bytes, int offset, int length)
         {
@@ -210,23 +250,28 @@ public class HashTableDictionary implements Dictionary
         @Override
         public int hashCode()
         {
-            int result = 31 + Integer.hashCode(this.length), len = this.length;
-
-            long address = ARRAY_BYTE_BASE_OFFSET + this.offset, word;
-            while (len >= Long.BYTES)
+            if (this.hashCode == null)
             {
-                word = unsafe.getLong(this.bytes, address);
-                result = 31 * result + (int) (word ^ word >>> 32);
-                address += Long.BYTES;
-                len -= Long.BYTES;
-            }
-            int i = (int) (address - ARRAY_BYTE_BASE_OFFSET);
-            while (len-- > 0)
-            {
-                result = result * 31 + (int) this.bytes[i++];
-            }
+                int result = 31 + Integer.hashCode(this.length), len = this.length;
 
-            return result;
+                long address = ARRAY_BYTE_BASE_OFFSET + this.offset, word;
+                while (len >= Long.BYTES)
+                {
+                    word = unsafe.getLong(this.bytes, address);
+                    result = 31 * result + (int) (word ^ word >>> 32);
+                    address += Long.BYTES;
+                    len -= Long.BYTES;
+                }
+                int i = (int) (address - ARRAY_BYTE_BASE_OFFSET);
+                while (len-- > 0)
+                {
+                    result = result * 31 + (int) this.bytes[i++];
+                }
+
+                this.hashCode = result;
+                return result;
+            }
+            return this.hashCode;
         }
 
         public static KeyBuffer wrap(byte[] keyContent, int offset, int length)

@@ -23,9 +23,9 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
-import io.pixelsdb.pixels.core.utils.Dictionary;
+import io.pixelsdb.pixels.core.encoding.Dictionary;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
-import io.pixelsdb.pixels.core.utils.HashTableDictionary;
+import io.pixelsdb.pixels.core.encoding.HashTableDictionary;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 

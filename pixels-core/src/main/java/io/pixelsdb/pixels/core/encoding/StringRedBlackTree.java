@@ -17,7 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.utils;
+package io.pixelsdb.pixels.core.encoding;
+
+import io.pixelsdb.pixels.core.utils.DynamicByteArray;
+import io.pixelsdb.pixels.core.utils.DynamicIntArray;
+import io.pixelsdb.pixels.core.utils.EncodingUtils;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -29,6 +33,9 @@ import java.util.Arrays;
  * This id derived from the StringRedBlockTree implementation in Apache Orc.
  * A red-black tree that stores strings. The strings are stored as UTF-8 bytes
  * and an offset for each entry.
+ *
+ * @author guodong
+ * @author hank
  */
 public class StringRedBlackTree extends RedBlackTree implements Dictionary
 {
@@ -116,6 +123,13 @@ public class StringRedBlackTree extends RedBlackTree implements Dictionary
                 start, end - start);
     }
 
+    /**
+     * Visit the items (keys) recursively in a deep-first manner.
+     * @param node the root key to start visiting
+     * @param visitor the visitor
+     * @param context the context instance that is reused by the visitor
+     * @throws IOException
+     */
     private void recurse(int node, Visitor visitor, VisitorContextImpl context) throws IOException
     {
         if (node != NULL)
@@ -136,7 +150,21 @@ public class StringRedBlackTree extends RedBlackTree implements Dictionary
     public void visit(Visitor visitor)
             throws IOException
     {
-        recurse(root, visitor, new VisitorContextImpl());
+        /*
+         * Issue #498:
+         * Previously, we visit the keys in the rea-black tree in a deep-first manner like this:
+         * recurse(root, visitor, new VisitorContextImpl());
+         *
+         * This is not necessary anymore, as we plan to remove the orders array from dictionary encoding
+         * and store the dictionary keys in the order they were inserted.
+         */
+        int size = this.keyOffsets.size();
+        VisitorContextImpl visitorContext = new VisitorContextImpl();
+        for (int position = 0; position < size; ++position)
+        {
+            visitorContext.setKeyPosition(position);
+            visitor.visit(visitorContext);
+        }
     }
 
     /**
