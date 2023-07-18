@@ -116,25 +116,38 @@ public class HashTableDictionary implements Dictionary
         VisitorContextImpl visitorContext = new VisitorContextImpl();
         boolean keyIsFound = false;
         List<Iterator<Map.Entry<KeyBuffer, Integer>>> dictIterators = new ArrayList<>(NUM_DICTIONARIES);
+        List<Map.Entry<KeyBuffer, Integer>> firstEntries = new ArrayList<>(NUM_DICTIONARIES);
         for (int i = 0; i < NUM_DICTIONARIES; ++i)
         {
-            dictIterators.add(this.dictionaries.get(i).entrySet().iterator());
+            Iterator<Map.Entry<KeyBuffer, Integer>> iterator = this.dictionaries.get(i).entrySet().iterator();
+            if (iterator.hasNext())
+            {
+                Map.Entry<KeyBuffer, Integer> entry = iterator.next();
+                firstEntries.add(entry);
+                dictIterators.add(iterator);
+            }
         }
         for (int position = 0; position < this.originalPosition; ++position)
         {
             Map.Entry<KeyBuffer, Integer> entry = null;
-            for (int i = 0; i < dictIterators.size(); ++i)
+            for (int i = 0; i < firstEntries.size(); ++i)
             {
-                Iterator<Map.Entry<KeyBuffer, Integer>> dictIterator = dictIterators.get(i);
-                if (!dictIterator.hasNext())
-                {
-                    // this dictionary has no remaining keys to visit
-                    dictIterators.remove(i--);
-                    continue;
-                }
-                entry = dictIterator.next();
+                entry = firstEntries.get(i);
+                Iterator<Map.Entry<KeyBuffer, Integer>> iterator = dictIterators.get(i);
                 if (entry.getValue() == position)
                 {
+                    // find the right entry (dictionary key with the correct position id)
+                    if (iterator.hasNext())
+                    {
+                        // get the next first key from the iterator
+                        firstEntries.set(i, iterator.next());
+                    }
+                    else
+                    {
+                        // the corresponding iterator has no remaining keys to visit
+                        dictIterators.remove(i);
+                        firstEntries.remove(i);
+                    }
                     keyIsFound = true;
                     break;
                 }
