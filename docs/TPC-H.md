@@ -37,7 +37,7 @@ java -jar ./sbin/pixels-cli-*-full.jar
 
 Then use the following commands in pixels-cli to load data for the TPC-H tables:
 ```bash
-LOAD -o file:///data/tpch/100gcustomer/ -s tpch -t customer -n 319150 -r \| -c 1
+LOAD -o file:///data/tpch/100g/customer -s tpch -t customer -n 319150 -r \| -c 1
 LOAD -o file:///data/tpch/100g/lineitem -s tpch -t lineitem -n 600040 -r \| -c 1
 LOAD -o file:///data/tpch/100g/nation -s tpch -t nation -n 100 -r \| -c 1
 LOAD -o file:///data/tpch/100g/orders -s tpch -t orders -n 638300 -r \| -c 1
