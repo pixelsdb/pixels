@@ -161,15 +161,6 @@ public class HashTableDictionary implements Dictionary
             visitorContext.setKey(key.bytes, key.offset, key.length, position);
             visitor.visit(visitorContext);
         }
-/*
-        for (Map<KeyBuffer, Integer> dict : this.dictionaries)
-        for (Map.Entry<KeyBuffer, Integer> entry : dict.entrySet())
-        {
-            KeyBuffer key = entry.getKey();
-            visitorContext.setKey(key.bytes, key.offset, key.length, entry.getValue());
-            visitor.visit(visitorContext);
-        }
- */
     }
 
     private static class KeyBuffer implements Comparable<KeyBuffer>
