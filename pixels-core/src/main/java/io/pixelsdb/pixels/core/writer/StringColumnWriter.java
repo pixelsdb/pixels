@@ -273,7 +273,7 @@ public class StringColumnWriter extends BaseColumnWriter
          * Encoded id is exactly the index of the key in the dictionary.
          */
 
-        ByteBuffer offsetsBuf = ByteBuffer.allocate(3 * Integer.BYTES);
+        ByteBuffer offsetsBuf = ByteBuffer.allocate(2 * Integer.BYTES);
         offsetsBuf.putInt(originsFieldOffset);
         offsetsBuf.putInt(startsFieldOffset);
         outputStream.write(offsetsBuf.array());
