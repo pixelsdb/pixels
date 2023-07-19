@@ -179,7 +179,8 @@ public class BitUtils
     /**
      * Bit de-compaction, this method does not modify the current position in input byte buffer.
      *
-     * @param input input byte buffer, which can be direct.
+     * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
+     * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
      * @param length byte length of the input
      * @return de-compacted bits

@@ -54,17 +54,9 @@ public class StringColumnReader
      */
     private ByteBuf originsBuf = null;
     /**
-     * Mapping encoded dictionary id to element index in origins.
-     */
-    private int[] orders = null;
-    /**
      * elements' ABSOLUTE start offsets in originsBuf.
      */
     private int[] starts = null;
-    /**
-     * Number of origin elements in dictionary.
-     */
-    private int originNum;
 
     private byte[] isNull = new byte[8];
     /**
@@ -122,7 +114,6 @@ public class StringColumnReader
         this.contentBuf = null;
         this.inputBuffer = null;
         this.originsBuf = null;
-        this.orders = null;
         this.starts = null;
         this.isNull = null;
         if (this.contentDecoder != null)
@@ -203,7 +194,7 @@ public class StringColumnReader
                         columnVector.noNulls = false;
                     } else
                     {
-                        int originId = orders[(int) contentDecoder.next()];
+                        int originId = (int) contentDecoder.next();
                         int tmpLen = starts[originId + 1] - starts[originId];
                         // use setRef instead of setVal to reduce memory copy.
                         columnVector.setRef(i + vectorIndex, buffer, starts[originId], tmpLen);
@@ -291,7 +282,7 @@ public class StringColumnReader
                     columnVector.noNulls = false;
                 } else
                 {
-                    int originId = orders[(int) contentDecoder.next()];
+                    int originId = (int) contentDecoder.next();
                     columnVector.setId(i + vectorIndex, originId);
                 }
                 if (hasNull)
@@ -320,7 +311,6 @@ public class StringColumnReader
             inputBuffer.skipBytes(inputLength - 3 * Integer.BYTES);
             originsOffset = inputBuffer.readInt();
             startsOffset = inputBuffer.readInt();
-            int ordersOffset = inputBuffer.readInt();
             inputBuffer.resetReaderIndex();
             // read buffers
             contentBuf = inputBuffer.slice(0, originsOffset);
@@ -344,9 +334,8 @@ public class StringColumnReader
                 inputBuffer.getBytes(originsOffset, bytes, 0, startsOffset - originsOffset);
                 originsBuf = Unpooled.wrappedBuffer(bytes);
             }
-            // read starts and orders
-            ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
-            ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, inputLength - ordersOffset);
+            // read starts, the last two integers (8 bytes) are the origin offset and starts offset
+            ByteBuf startsBuf = inputBuffer.slice(startsOffset, inputLength - startsOffset - 2 * Integer.BYTES);
 
             // DO NOT use originsOffset as bufferStart, as multiple input buffers read
             // from disk (not from pixels cache) may share the same backing array, each starting
@@ -380,13 +369,12 @@ public class StringColumnReader
                 starts = startsArray.toArray();
             }
 
-            this.originNum = starts.length - 1;
-            RunLenIntDecoder ordersDecoder = new RunLenIntDecoder(new ByteBufInputStream(ordersBuf), false);
-            orders = new int[originNum];
-            for (int i = 0; i < originNum && ordersDecoder.hasNext(); i++)
-            {
-                orders[i] = (int) ordersDecoder.next();
-            }
+            /*
+             * Issue #498:
+             * We no longer read the orders array (encoded-id to key-index mapping) from files.
+             * Encoded id is exactly the index of the key in the dictionary.
+             */
+
             contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
         }
         else

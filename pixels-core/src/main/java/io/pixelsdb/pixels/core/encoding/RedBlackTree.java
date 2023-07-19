@@ -17,7 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.utils;
+package io.pixelsdb.pixels.core.encoding;
+
+import io.pixelsdb.pixels.core.utils.DynamicIntArray;
 
 /**
  * red-black tree from apache orc project
@@ -25,6 +27,9 @@ package io.pixelsdb.pixels.core.utils;
  * A memory efficient red-black tree that does not allocate any objects per
  * an element. This class is abstract and assumes that the child class
  * handles the key and comparisons with the key.
+ *
+ * @author guodong
+ * @author hank
  */
 abstract class RedBlackTree
 {

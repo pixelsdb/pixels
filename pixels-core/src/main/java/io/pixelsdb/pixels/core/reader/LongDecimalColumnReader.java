@@ -32,7 +32,7 @@ import java.nio.ByteOrder;
 /**
  * The column reader of long decimals with max precision and scale 38.
  *
- * @date 03/07/2022
+ * @date 2022-07-03
  * @author hank
  */
 public class LongDecimalColumnReader

@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.utils;
+package io.pixelsdb.pixels.core.encoding;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,7 +25,7 @@ import java.io.OutputStream;
 /**
  * The dictionary used for string dictionary encoding.
  * @author hank
- * @date 8/15/22
+ * @create 2022-08-15
  */
 public interface Dictionary
 {
@@ -63,6 +63,16 @@ public interface Dictionary
 
     void clear();
 
+    /**
+     * This method prepares a {@link VisitorContext} instance for each item (key) in this dictionary,
+     * and calls {@link Visitor#visit(VisitorContext)} to visit the item.
+     * <p>
+     * The items <b>MUST</b> be visited in the ascending order of the item's key position, i.e., the encoded id of the item in this dictionary.
+     * The visitor can write (serialize) the dictionary item to an output stream.
+     * </p>
+     * @param visitor the visitor that is going to serialize the dictionary to an output stream.
+     * @throws IOException
+     */
     void visit(Visitor visitor) throws IOException;
 
     /**
@@ -71,8 +81,8 @@ public interface Dictionary
     interface Visitor
     {
         /**
-         * Called once for each item in the dictionary.
-         * @param context the information about each item
+         * Called exact once for each item in the dictionary.
+         * @param context the information about each item.
          * @throws IOException
          */
         void visit(VisitorContext context) throws IOException;
@@ -84,13 +94,7 @@ public interface Dictionary
     interface VisitorContext
     {
         /**
-         * Get the position, i.e., id of the key in the dictionary.
-         * @return the number returned by {@link #add(byte[], int, int)}.
-         */
-        int getKeyPosition();
-
-        /**
-         * Write the bytes for the string to the given output stream.
+         * Write the key to the given output stream.
          * @param out the stream to write to.
          * @throws IOException
          */
