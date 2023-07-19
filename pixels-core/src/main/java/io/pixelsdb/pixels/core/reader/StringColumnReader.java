@@ -335,7 +335,7 @@ public class StringColumnReader
                 originsBuf = Unpooled.wrappedBuffer(bytes);
             }
             // read starts
-            ByteBuf startsBuf = inputBuffer.slice(startsOffset, inputLength - startsOffset);
+            ByteBuf startsBuf = inputBuffer.slice(startsOffset, inputLength - startsOffset - 3 * Integer.BYTES);
 
             // DO NOT use originsOffset as bufferStart, as multiple input buffers read
             // from disk (not from pixels cache) may share the same backing array, each starting
