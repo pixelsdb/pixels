@@ -94,12 +94,6 @@ public interface Dictionary
     interface VisitorContext
     {
         /**
-         * Get the position, i.e., encoded id of the key in the dictionary.
-         * @return the number returned by {@link #add(byte[], int, int)}.
-         */
-        int getKeyPosition();
-
-        /**
          * Write the key to the given output stream.
          * @param out the stream to write to.
          * @throws IOException

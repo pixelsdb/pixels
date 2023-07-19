@@ -241,10 +241,8 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         int originsFieldOffset;
         int startsFieldOffset;
-        int ordersFieldOffset;
         int size = dictionary.size();
         long[] starts = new long[size];
-        long[] orders = new long[size];
 
         originsFieldOffset = outputStream.size();
 
@@ -259,9 +257,8 @@ public class StringColumnWriter extends BaseColumnWriter
                     throws IOException
             {
                 context.writeBytes(outputStream);
-                starts[currentId] = initStart;
+                starts[currentId++] = initStart;
                 initStart += context.getLength();
-                orders[context.getKeyPosition()] = currentId++;
             }
         });
 
@@ -269,15 +266,16 @@ public class StringColumnWriter extends BaseColumnWriter
 
         // write out run length starts array
         outputStream.write(encoder.encode(starts));
-        ordersFieldOffset = outputStream.size();
 
-        // write out run length orders array
-        outputStream.write(encoder.encode(orders));
+        /*
+         * Issue #498:
+         * We no longer write the orders array (encoded-id to key-index mapping) to files.
+         * Encoded id is exactly the index of the key in the dictionary.
+         */
 
         ByteBuffer offsetsBuf = ByteBuffer.allocate(3 * Integer.BYTES);
         offsetsBuf.putInt(originsFieldOffset);
         offsetsBuf.putInt(startsFieldOffset);
-        offsetsBuf.putInt(ordersFieldOffset);
         outputStream.write(offsetsBuf.array());
     }
 

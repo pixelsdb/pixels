@@ -158,7 +158,7 @@ public class HashTableDictionary implements Dictionary
             }
             keyIsFound = false;
             KeyBuffer key = entry.getKey();
-            visitorContext.setKey(key.bytes, key.offset, key.length, position);
+            visitorContext.setKey(key.bytes, key.offset, key.length);
             visitor.visit(visitorContext);
         }
     }
@@ -289,13 +289,6 @@ public class HashTableDictionary implements Dictionary
         private byte[] key;
         private int offset;
         private int length;
-        private int keyPosition;
-
-        @Override
-        public int getKeyPosition()
-        {
-            return keyPosition;
-        }
 
         @Override
         public void writeBytes(OutputStream out) throws IOException
@@ -309,12 +302,11 @@ public class HashTableDictionary implements Dictionary
             return length;
         }
 
-        public void setKey(byte[] key, int offset, int length, int keyPosition)
+        public void setKey(byte[] key, int offset, int length)
         {
             this.key = key;
             this.offset = offset;
             this.length = length;
-            this.keyPosition = keyPosition;
         }
     }
 }

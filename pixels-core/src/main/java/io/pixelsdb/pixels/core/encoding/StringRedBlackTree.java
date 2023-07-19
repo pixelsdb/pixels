@@ -184,7 +184,6 @@ public class StringRedBlackTree extends RedBlackTree implements Dictionary
         private int start;
         private int end;
 
-        @Override
         public int getKeyPosition()
         {
             return keyPosition;
