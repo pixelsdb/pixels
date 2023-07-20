@@ -38,8 +38,9 @@ import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_VIEW_NOT_FOUND;
 import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermission;
 
 /**
- * Created by hank on 18-6-17.
- * Adapt to GRPC in April 2019.
+ * @author hank
+ * @create 2018-06-17
+ * @update 2019-04 adapt to GRPC.
  */
 public class MetadataService
 {
