@@ -350,9 +350,8 @@ public class PlanOptimizer
                     MetadataCache.Instance().getTable(schemaTableName);
             if (metadataTable == null)
             {
-                metadataTable = metadataService.getTable(
-                        table.getSchemaName(), table.getTableName());
-                MetadataCache.Instance().cacheTable(schemaTableName, metadataTable);
+                metadataTable = metadataService.getTable(table.getSchemaName(), table.getTableName());
+                // Issue #485: metadata cache is refreshed when the table is firstly accessed during query parsing.
             }
             return metadataTable.getRowCount();
         }
@@ -389,8 +388,9 @@ public class PlanOptimizer
                     if (columnStats.hasDateStatistics())
                     {
                         PixelsProto.DateStatistic dateStatistic = columnStats.getDateStatistics();
-                        logger.debug("column " + column.getName() + " min: " + dateStatistic.getMinimum() + ", max: " + dateStatistic.getMaximum()
-                        + ", selectivity: " + s + ", columnFilter: " + JSON.toJSONString(columnFilter));
+                        logger.debug(String.format("column %s min: %d, max: %d, selectivity: %f, columnFilter: %s",
+                                column.getName(), dateStatistic.getMinimum(), dateStatistic.getMaximum(),
+                                s, JSON.toJSONString(columnFilter)));
                     }
                     if (s >= 0 && s < selectivity)
                     {
@@ -422,9 +422,8 @@ public class PlanOptimizer
             List<Column> columns = MetadataCache.Instance().getTableColumns(schemaTableName);
             if (columns == null)
             {
-                columns = metadataService.getColumns(
-                        table.getSchemaName(), table.getTableName(), true);
-                MetadataCache.Instance().cacheTableColumns(schemaTableName, columns);
+                columns = metadataService.getColumns(table.getSchemaName(), table.getTableName(), true);
+                // Issue #485: metadata cache is refreshed when the table is firstly accessed during query parsing.
             }
             columnMap = new HashMap<>(columns.size());
             for (Column column : columns)

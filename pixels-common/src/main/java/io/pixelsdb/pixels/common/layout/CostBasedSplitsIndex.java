@@ -37,7 +37,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * The splits index that calculates the split size using the statistics.
  * @author hank
- * @date 13/07/2022
+ * @create 2022-07-13
  */
 public class CostBasedSplitsIndex implements SplitsIndex
 {
@@ -74,7 +74,7 @@ public class CostBasedSplitsIndex implements SplitsIndex
         {
             columns = this.metadataService.getColumns(
                     schemaTableName.getSchemaName(), schemaTableName.getTableName(), true);
-            MetadataCache.Instance().cacheTableColumns(schemaTableName, columns);
+            // Issue #485: metadata cache is refreshed when the table is firstly accessed during query parsing.
         }
         this.columnMap = new HashMap<>(columns.size());
         double rowGroupSize = 0, tableSize = 0;
@@ -95,7 +95,7 @@ public class CostBasedSplitsIndex implements SplitsIndex
             {
                 table = this.metadataService.getTable(
                         schemaTableName.getSchemaName(), schemaTableName.getTableName());
-                MetadataCache.Instance().cacheTable(schemaTableName, table);
+                // Issue #485: metadata cache is refreshed when the table is firstly accessed during query parsing.
             }
             double numRowGroups = Math.ceil(tableSize / rowGroupSize);
             checkArgument(table.getRowCount() > 0,

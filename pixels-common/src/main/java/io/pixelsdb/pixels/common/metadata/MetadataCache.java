@@ -31,7 +31,7 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
- * @date 13/07/2022
+ * @create 2022-07-13
  */
 public class MetadataCache
 {
@@ -48,19 +48,29 @@ public class MetadataCache
 
     private MetadataCache() { }
 
-    public void cacheTable(SchemaTableName schemaTableName, Table table)
+    /**
+     * Cache the table metadata, refresh the cache if the table already exists.
+     * @param schemaTableName the schema and table name of the table
+     * @param table the metadata of the table
+     */
+    public synchronized void cacheTable(SchemaTableName schemaTableName, Table table)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
         requireNonNull(table, "table is null");
         this.tableMap.put(schemaTableName, table);
     }
 
-    public Table getTable(SchemaTableName schemaTableName)
+    public synchronized Table getTable(SchemaTableName schemaTableName)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
         return this.tableMap.get(schemaTableName);
     }
 
+    /**
+     * Cache the metadata of the table's columns, refresh the cache if table columns are already cached.
+     * @param schemaTableName the schema and table name of the table
+     * @param columns the metadata of the table's columns
+     */
     public synchronized void cacheTableColumns(SchemaTableName schemaTableName, List<Column> columns)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
@@ -79,6 +89,11 @@ public class MetadataCache
         return this.tableColumnsMap.get(schemaTableName);
     }
 
+    /**
+     * Drop the cached columns for all the tables. This should only be used in the scenarios without concurrent access
+     * to the metadata cache (e.g., in pixels-cli).
+     */
+    @Deprecated
     public synchronized void dropCachedColumns()
     {
         this.tableColumnsMap.clear();
