@@ -5,7 +5,7 @@ Run `mvn package` to generate the executable JAR file in `target/pixels-worker-v
 
 ## Docker Build
 
-After `docker` installation, use the `Dockerfile` under the root directory of `pixels-worker-hive` to build the docker image:
+After `docker` installation, use the `Dockerfile` under the root directory of `pixels-worker-vhive` to build the docker image:
 
 ```bash
 # run the following command under the root directory of pixels-worker-vhive module

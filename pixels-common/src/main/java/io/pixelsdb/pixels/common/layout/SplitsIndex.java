@@ -34,7 +34,7 @@ public interface SplitsIndex
      */
     SplitPattern search(ColumnSet columnSet);
 
-    int getVersion();
+    long getVersion();
 
     int getMaxSplitSize();
 }

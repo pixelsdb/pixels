@@ -22,8 +22,9 @@ package io.pixelsdb.pixels.common.metadata;
 import com.google.common.base.Objects;
 
 /**
- * @author: tao, hank
- * @date: Create in 2018-06-19 14:46
+ * @author tao
+ * @author hank
+ * @create 2018-06-19 14:46
  **/
 public class SchemaTableName
 {

@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.cli.executor;
 
 import com.facebook.presto.jdbc.PrestoDriver;
 import com.google.common.collect.ImmutableList;
-import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -174,8 +173,11 @@ public class StatExecutor implements CommandExecutor
         /* Set cardinality and null_fraction after the chunk size and column size,
          * because chunk size and column size must exist in the metadata when calculating
          * the cardinality and null_fraction using SQL queries.
+         *
+         * Issue #485:
+         * No need to drop the cached columns here, because metadata cache is only used in
+         * the query engine process during transactional query execution.
          */
-        MetadataCache.Instance().dropCachedColumns();
         try (Connection connection = DriverManager.getConnection(jdbc, properties))
         {
             for (Column column : columns)
