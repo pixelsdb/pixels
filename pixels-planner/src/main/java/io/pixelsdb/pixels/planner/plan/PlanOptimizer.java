@@ -69,11 +69,6 @@ public class PlanOptimizer
     private final boolean selectivityEnabled;
     private final double aggrPartitionSizeRows;
 
-    /**
-     * schemaTableName -> (columnName -> column)
-     */
-    private final Map<SchemaTableName, Map<String, Column>> columnStatisticCache = new HashMap<>();
-
     private PlanOptimizer()
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
@@ -94,7 +89,7 @@ public class PlanOptimizer
         this.aggrPartitionSizeRows = Long.parseLong(aggrPartitionSizeRows);
     }
 
-    public JoinAlgorithm getJoinAlgorithm(Table leftTable, Table rightTable, JoinEndian joinEndian)
+    public JoinAlgorithm getJoinAlgorithm(long transId, Table leftTable, Table rightTable, JoinEndian joinEndian)
             throws MetadataException, InvalidProtocolBufferException
     {
         // Table size is used to estimate the read cost, it should NOT be multiplied by the selectivity.
@@ -102,17 +97,17 @@ public class PlanOptimizer
         long smallTableRows;
         if (joinEndian == JoinEndian.SMALL_LEFT)
         {
-            double selectivity = getTableSelectivity(leftTable);
+            double selectivity = getTableSelectivity(transId, leftTable);
             logger.debug("selectivity on table '" + leftTable.getTableName() + "': " + selectivity);
-            smallTableSize = getTableInputSize(leftTable);
-            smallTableRows = (long) (getTableRowCount(leftTable) * selectivity);
+            smallTableSize = getTableInputSize(transId, leftTable);
+            smallTableRows = (long) (getTableRowCount(transId, leftTable) * selectivity);
         }
         else
         {
-            double selectivity = getTableSelectivity(rightTable);
+            double selectivity = getTableSelectivity(transId, rightTable);
             logger.debug("selectivity on table '" + rightTable.getTableName() + "': " + selectivity);
-            smallTableSize = getTableInputSize(rightTable);
-            smallTableRows = (long) (getTableRowCount(rightTable) * selectivity);
+            smallTableSize = getTableInputSize(transId, rightTable);
+            smallTableRows = (long) (getTableRowCount(transId, rightTable) * selectivity);
         }
         if (smallTableSize >= broadcastThresholdBytes || smallTableRows > broadcastThresholdRows)
         {
@@ -125,18 +120,19 @@ public class PlanOptimizer
         // Chain joins are only generated during execution.
     }
 
-    public JoinEndian getJoinEndian(Table leftTable, Table rightTable) throws MetadataException, InvalidProtocolBufferException
+    public JoinEndian getJoinEndian(long transId, Table leftTable, Table rightTable)
+            throws MetadataException, InvalidProtocolBufferException
     {
         // Use row count instead of input size, because building hash table is the main cost.
-        double leftSelectivity = getTableSelectivity(leftTable);
-        double rightSelectivity = getTableSelectivity(rightTable);
+        double leftSelectivity = getTableSelectivity(transId, leftTable);
+        double rightSelectivity = getTableSelectivity(transId, rightTable);
         logger.debug("selectivity on table '" + leftTable.getTableName() + "': " + leftSelectivity);
         logger.debug("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
-        long leftTableRowCount = (long) (getTableRowCount(leftTable) * leftSelectivity);
-        long rightTableRowCount = (long) (getTableRowCount(rightTable) * rightSelectivity);
+        long leftTableRowCount = (long) (getTableRowCount(transId, leftTable) * leftSelectivity);
+        long rightTableRowCount = (long) (getTableRowCount(transId, rightTable) * rightSelectivity);
 
-        double leftTableSize = getTableInputSize(leftTable);
-        double rightTableSize = getTableInputSize(rightTable);
+        double leftTableSize = getTableInputSize(transId, leftTable);
+        double rightTableSize = getTableInputSize(transId, rightTable);
         if ((leftTableSize < broadcastThresholdBytes && leftTableRowCount < broadcastThresholdRows) &&
                 (rightTableSize < broadcastThresholdBytes && rightTableRowCount < broadcastThresholdRows))
         {
@@ -173,27 +169,27 @@ public class PlanOptimizer
         }
     }
 
-    public int getJoinNumPartition(Table leftTable, Table rightTable, JoinEndian joinEndian)
+    public int getJoinNumPartition(long transId, Table leftTable, Table rightTable, JoinEndian joinEndian)
             throws MetadataException, InvalidProtocolBufferException
     {
         double totalSize = 0;
-        double leftSelectivity = getTableSelectivity(leftTable);
-        double rightSelectivity = getTableSelectivity(rightTable);
+        double leftSelectivity = getTableSelectivity(transId, leftTable);
+        double rightSelectivity = getTableSelectivity(transId, rightTable);
         logger.debug("selectivity on table '" + leftTable.getTableName() + "': " + leftSelectivity);
         logger.debug("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
-        totalSize += getTableInputSize(leftTable) * leftSelectivity;
-        totalSize += getTableInputSize(rightTable) * rightSelectivity;
+        totalSize += getTableInputSize(transId, leftTable) * leftSelectivity;
+        totalSize += getTableInputSize(transId, rightTable) * rightSelectivity;
         double smallTableRowCount;
         double largeTableRowCount;
         if (joinEndian == JoinEndian.SMALL_LEFT)
         {
-            smallTableRowCount = getTableRowCount(leftTable) * leftSelectivity;
-            largeTableRowCount = getTableRowCount(rightTable) * rightSelectivity;
+            smallTableRowCount = getTableRowCount(transId, leftTable) * leftSelectivity;
+            largeTableRowCount = getTableRowCount(transId, rightTable) * rightSelectivity;
         }
         else
         {
-            smallTableRowCount = getTableRowCount(rightTable) * rightSelectivity;
-            largeTableRowCount = getTableRowCount(leftTable) * leftSelectivity;
+            smallTableRowCount = getTableRowCount(transId, rightTable) * rightSelectivity;
+            largeTableRowCount = getTableRowCount(transId, leftTable) * leftSelectivity;
         }
 
         int numFromSize = (int) Math.ceil(totalSize / joinPartitionSizeBytes);
@@ -203,11 +199,11 @@ public class PlanOptimizer
         return Math.max(Math.max(numFromSize, numFromRows), 8);
     }
 
-    public int getAggrNumPartitions(AggregatedTable table) throws MetadataException
+    public int getAggrNumPartitions(long transId, AggregatedTable table) throws MetadataException
     {
         Table originTable = table.getAggregation().getOriginTable();
         int[] groupKeyColumnIds = table.getAggregation().getGroupKeyColumnIds();
-        long cardinality = getTableCardinality(originTable, groupKeyColumnIds);
+        long cardinality = getTableCardinality(transId, originTable, groupKeyColumnIds);
         int numPartitions = (int) (cardinality / aggrPartitionSizeRows);
         if (cardinality % aggrPartitionSizeRows > 0)
         {
@@ -216,11 +212,11 @@ public class PlanOptimizer
         return numPartitions;
     }
 
-    private long getTableCardinality(Table table, int[] keyColumnIds) throws MetadataException
+    private long getTableCardinality(long transId, Table table, int[] keyColumnIds) throws MetadataException
     {
         if (table.getTableType() == BASE)
         {
-            Map<String, Column> columnMap = getColumnMap((BaseTable) table);
+            Map<String, Column> columnMap = getColumnMap(transId, (BaseTable) table);
             long cardinality = 0;
             for (int columnId : keyColumnIds)
             {
@@ -280,7 +276,7 @@ public class PlanOptimizer
                 }
                 if (!leftKeyColumnIds.isEmpty())
                 {
-                    long columnCard = getTableCardinality(join.getLeftTable(),
+                    long columnCard = getTableCardinality(transId, join.getLeftTable(),
                             leftKeyColumnIds.stream().mapToInt(Integer::intValue).toArray());
                     if (columnCard > cardinality)
                     {
@@ -289,7 +285,7 @@ public class PlanOptimizer
                 }
                 if (!rightKeyColumnIds.isEmpty())
                 {
-                    long columnCard = getTableCardinality(join.getRightTable(),
+                    long columnCard = getTableCardinality(transId, join.getRightTable(),
                             rightKeyColumnIds.stream().mapToInt(Integer::intValue).toArray());
                     if (columnCard > cardinality)
                     {
@@ -321,11 +317,11 @@ public class PlanOptimizer
         return -1;
     }
 
-    private double getTableInputSize(Table table) throws MetadataException
+    private double getTableInputSize(long transId, Table table) throws MetadataException
     {
         if (table.getTableType() == BASE)
         {
-            Map<String, Column> columnMap = getColumnMap((BaseTable) table);
+            Map<String, Column> columnMap = getColumnMap(transId, (BaseTable) table);
             double size = 0;
             for (String columnName : table.getColumnNames())
             {
@@ -338,16 +334,16 @@ public class PlanOptimizer
         Table leftTable = joinedTable.getJoin().getLeftTable();
         Table rightTable = joinedTable.getJoin().getRightTable();
         // We estimate the size of the joined table by the sum of the two tables' size.
-        return getTableInputSize(leftTable) + getTableInputSize(rightTable);
+        return getTableInputSize(transId, leftTable) + getTableInputSize(transId, rightTable);
     }
 
-    protected long getTableRowCount(Table table) throws MetadataException
+    protected long getTableRowCount(long transId, Table table) throws MetadataException
     {
         if (table.getTableType() == BASE)
         {
             SchemaTableName schemaTableName = new SchemaTableName(table.getSchemaName(), table.getTableName());
             io.pixelsdb.pixels.common.metadata.domain.Table metadataTable =
-                    MetadataCache.Instance().getTable(schemaTableName);
+                    MetadataCache.Instance().getTable(transId, schemaTableName);
             if (metadataTable == null)
             {
                 metadataTable = metadataService.getTable(table.getSchemaName(), table.getTableName());
@@ -360,10 +356,10 @@ public class PlanOptimizer
         Table leftTable = joinedTable.getJoin().getLeftTable();
         Table rightTable = joinedTable.getJoin().getRightTable();
         // We estimate the number of rows in the joined table by the max of the two tables' row count.
-        return Math.max(getTableRowCount(leftTable), getTableRowCount(rightTable));
+        return Math.max(getTableRowCount(transId, leftTable), getTableRowCount(transId, rightTable));
     }
 
-    public double getTableSelectivity(Table table) throws MetadataException, InvalidProtocolBufferException
+    public double getTableSelectivity(long transId, Table table) throws MetadataException, InvalidProtocolBufferException
     {
         if (!this.selectivityEnabled)
         {
@@ -372,7 +368,7 @@ public class PlanOptimizer
 
         if (table.getTableType() == BASE)
         {
-            Map<String, Column> columnMap = getColumnMap((BaseTable) table);
+            Map<String, Column> columnMap = getColumnMap(transId, (BaseTable) table);
             double selectivity = 1.0;
             TableScanFilter tableScanFilter = ((BaseTable) table).getFilter();
             String[] columnsToRead = table.getColumnNames();
@@ -406,31 +402,24 @@ public class PlanOptimizer
         Table leftTable = joinedTable.getJoin().getLeftTable();
         Table rightTable = joinedTable.getJoin().getRightTable();
         // We estimate the selectivity the joined table by the minimum of the two tables' selectivity.
-        return Math.min(getTableSelectivity(leftTable), getTableSelectivity(rightTable));
+        return Math.min(getTableSelectivity(transId, leftTable), getTableSelectivity(transId, rightTable));
     }
 
-    private Map<String, Column> getColumnMap(BaseTable table) throws MetadataException
+    private Map<String, Column> getColumnMap(long transId, BaseTable table) throws MetadataException
     {
         SchemaTableName schemaTableName = new SchemaTableName(table.getSchemaName(), table.getTableName());
         Map<String, Column> columnMap;
-        if (columnStatisticCache.containsKey(schemaTableName))
+        // Issue #485: for consistency issue, we should not cache the column map outside the metadata cache.
+        List<Column> columns = MetadataCache.Instance().getTableColumns(transId, schemaTableName);
+        if (columns == null)
         {
-            columnMap = columnStatisticCache.get(schemaTableName);
+            columns = metadataService.getColumns(table.getSchemaName(), table.getTableName(), true);
+            // Issue #485: metadata cache is refreshed when the table is firstly accessed during query parsing.
         }
-        else
+        columnMap = new HashMap<>(columns.size());
+        for (Column column : columns)
         {
-            List<Column> columns = MetadataCache.Instance().getTableColumns(schemaTableName);
-            if (columns == null)
-            {
-                columns = metadataService.getColumns(table.getSchemaName(), table.getTableName(), true);
-                // Issue #485: metadata cache is refreshed when the table is firstly accessed during query parsing.
-            }
-            columnMap = new HashMap<>(columns.size());
-            for (Column column : columns)
-            {
-                columnMap.put(column.getName(), column);
-            }
-            columnStatisticCache.put(schemaTableName, columnMap);
+            columnMap.put(column.getName(), column);
         }
         return columnMap;
     }

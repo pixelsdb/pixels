@@ -38,7 +38,7 @@ public class TestCostBasedSplitsIndex
                 ConfigFactory.Instance().getProperty("metadata.server.host"),
                 Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port")));
 
-        CostBasedSplitsIndex index = new CostBasedSplitsIndex(metadataService,
+        CostBasedSplitsIndex index = new CostBasedSplitsIndex(0L, 0L, metadataService,
                 new SchemaTableName("tpch", "orders"),4, 8);
 
         ColumnSet columnSet = new ColumnSet();

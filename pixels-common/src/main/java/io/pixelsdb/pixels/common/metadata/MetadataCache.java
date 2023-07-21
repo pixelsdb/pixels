@@ -42,60 +42,119 @@ public class MetadataCache
         return instance;
     }
 
-    private final Map<SchemaTableName, List<Column>> tableColumnsMap = new HashMap<>();
+    private class TransMetadata
+    {
+        private final Map<SchemaTableName, List<Column>> tableColumnsMap = new HashMap<>();
+        private final Map<SchemaTableName, Table> tableMap = new HashMap<>();
+    }
 
-    private final Map<SchemaTableName, Table> tableMap = new HashMap<>();
+    private final Map<Long, TransMetadata> transMetadataMap = new HashMap<>();
 
     private MetadataCache() { }
 
     /**
+     * Initialize metadata cache for a transaction. This method is idempotent.
+     * For the same transaction id, before commit, calling this method after the first time is no-op.
+     * @param transId the transaction id
+     */
+    public synchronized void initCache(long transId)
+    {
+        if (!this.transMetadataMap.containsKey(transId))
+        {
+            this.transMetadataMap.put(transId, new TransMetadata());
+        }
+    }
+
+    /**
+     * Drop the metadata cache of a transaction. This method should be only called after the transaction is commit.
+     * @param transId the transaction id
+     */
+    public synchronized void dropCache(long transId)
+    {
+        this.transMetadataMap.remove(transId);
+    }
+
+    /**
+     * @param transId the transaction id
+     * @param schemaTableName the schema and table name of the table
+     * @return true if the table is cached by the transaction
+     */
+    public synchronized boolean isTableCached(long transId, SchemaTableName schemaTableName)
+    {
+        requireNonNull(schemaTableName, "schemaTableName is null");
+        TransMetadata transMetadata = this.transMetadataMap.get(transId);
+        requireNonNull(transMetadata, "metadata cache is not initialized for the transaction");
+        return transMetadata.tableMap.containsKey(schemaTableName);
+    }
+
+    /**
+     * @param transId the transaction id
+     * @param schemaTableName the schema and table name of the table
+     * @return true if the column of the table is cached by the transaction
+     */
+    public synchronized boolean isTableColumnsCached(long transId, SchemaTableName schemaTableName)
+    {
+        requireNonNull(schemaTableName, "schemaTableName is null");
+        TransMetadata transMetadata = this.transMetadataMap.get(transId);
+        requireNonNull(transMetadata, "metadata cache is not initialized for the transaction");
+        return transMetadata.tableColumnsMap.containsKey(schemaTableName);
+    }
+
+    /**
      * Cache the table metadata, refresh the cache if the table already exists.
+     * @param transId the transaction id
      * @param schemaTableName the schema and table name of the table
      * @param table the metadata of the table
      */
-    public synchronized void cacheTable(SchemaTableName schemaTableName, Table table)
+    public synchronized void cacheTable(long transId, SchemaTableName schemaTableName, Table table)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
         requireNonNull(table, "table is null");
-        this.tableMap.put(schemaTableName, table);
+        TransMetadata transMetadata = this.transMetadataMap.get(transId);
+        requireNonNull(transMetadata, "metadata cache is not initialized for the transaction");
+        transMetadata.tableMap.put(schemaTableName, table);
     }
 
-    public synchronized Table getTable(SchemaTableName schemaTableName)
+    /**
+     * Get the cached metadata for the table.
+     * @param transId the transaction id
+     * @param schemaTableName the schema and table name of the table
+     * @return null if the metadata of the table is not cached
+     */
+    public synchronized Table getTable(long transId, SchemaTableName schemaTableName)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
-        return this.tableMap.get(schemaTableName);
+        TransMetadata transMetadata = this.transMetadataMap.get(transId);
+        requireNonNull(transMetadata, "metadata cache is not initialized for the transaction");
+        return transMetadata.tableMap.get(schemaTableName);
     }
 
     /**
      * Cache the metadata of the table's columns, refresh the cache if table columns are already cached.
+     * @param transId the transaction id
      * @param schemaTableName the schema and table name of the table
      * @param columns the metadata of the table's columns
      */
-    public synchronized void cacheTableColumns(SchemaTableName schemaTableName, List<Column> columns)
+    public synchronized void cacheTableColumns(long transId, SchemaTableName schemaTableName, List<Column> columns)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
         requireNonNull(columns, "columns is null");
-        this.tableColumnsMap.put(schemaTableName, ImmutableList.copyOf(columns));
+        TransMetadata transMetadata = this.transMetadataMap.get(transId);
+        requireNonNull(transMetadata, "metadata cache is not initialized for the transaction");
+        transMetadata.tableColumnsMap.put(schemaTableName, ImmutableList.copyOf(columns));
     }
 
     /**
      * Get the cached column metadata for the table.
+     * @param transId the transaction id
      * @param schemaTableName the schema and table name of the table
-     * @return null for cache miss
+     * @return null if the column metadata of the table is not cached
      */
-    public synchronized List<Column> getTableColumns(SchemaTableName schemaTableName)
+    public synchronized List<Column> getTableColumns(long transId, SchemaTableName schemaTableName)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
-        return this.tableColumnsMap.get(schemaTableName);
-    }
-
-    /**
-     * Drop the cached columns for all the tables. This should only be used in the scenarios without concurrent access
-     * to the metadata cache (e.g., in pixels-cli).
-     */
-    @Deprecated
-    public synchronized void dropCachedColumns()
-    {
-        this.tableColumnsMap.clear();
+        TransMetadata transMetadata = this.transMetadataMap.get(transId);
+        requireNonNull(transMetadata, "metadata cache is not initialized for the transaction");
+        return transMetadata.tableColumnsMap.get(schemaTableName);
     }
 }

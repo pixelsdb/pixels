@@ -52,28 +52,27 @@ public class CostBasedSplitsIndex implements SplitsIndex
         SPLIT_SIZE_ROWS = Long.parseLong(splitSizeRows);
     }
 
-    private int version;
+    private final long version;
     private final int defaultSplitSize;
     private final int maxSplitSize;
-    private final MetadataService metadataService;
     private final Map<String, Column> columnMap;
 
-    public CostBasedSplitsIndex(MetadataService metadataService, SchemaTableName schemaTableName,
-                                int defaultSplitSize, int maxSplitSize)
+    public CostBasedSplitsIndex(long transId, long version, MetadataService metadataService,
+                                SchemaTableName schemaTableName, int defaultSplitSize, int maxSplitSize)
             throws MetadataException
     {
+        this.version = version;
         checkArgument(defaultSplitSize > 0, "defaultSplitSize must be positive");
         this.defaultSplitSize = defaultSplitSize;
         checkArgument(maxSplitSize >= defaultSplitSize,
                 "maxSplitSize must be greater or equal to defaultSplitSize");
-        this.metadataService = requireNonNull(metadataService, "metadataService is null");
+        requireNonNull(metadataService, "metadataService is null");
         requireNonNull(schemaTableName, "schemaTableName is null");
 
-        List<Column> columns = MetadataCache.Instance().getTableColumns(schemaTableName);
+        List<Column> columns = MetadataCache.Instance().getTableColumns(transId, schemaTableName);
         if (columns == null)
         {
-            columns = this.metadataService.getColumns(
-                    schemaTableName.getSchemaName(), schemaTableName.getTableName(), true);
+            columns = metadataService.getColumns(schemaTableName.getSchemaName(), schemaTableName.getTableName(), true);
             // Issue #485: metadata cache is refreshed when the table is firstly accessed during query parsing.
         }
         this.columnMap = new HashMap<>(columns.size());
@@ -90,11 +89,10 @@ public class CostBasedSplitsIndex implements SplitsIndex
 
         if (SPLIT_SIZE_ROWS > 0)
         {
-            Table table = MetadataCache.Instance().getTable(schemaTableName);
+            Table table = MetadataCache.Instance().getTable(transId, schemaTableName);
             if (table == null)
             {
-                table = this.metadataService.getTable(
-                        schemaTableName.getSchemaName(), schemaTableName.getTableName());
+                table = metadataService.getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName());
                 // Issue #485: metadata cache is refreshed when the table is firstly accessed during query parsing.
             }
             double numRowGroups = Math.ceil(tableSize / rowGroupSize);
@@ -168,7 +166,7 @@ public class CostBasedSplitsIndex implements SplitsIndex
     }
 
     @Override
-    public int getVersion()
+    public long getVersion()
     {
         return version;
     }
@@ -177,10 +175,5 @@ public class CostBasedSplitsIndex implements SplitsIndex
     public int getMaxSplitSize()
     {
         return maxSplitSize;
-    }
-
-    public void setVersion(int version)
-    {
-        this.version = version;
     }
 }
