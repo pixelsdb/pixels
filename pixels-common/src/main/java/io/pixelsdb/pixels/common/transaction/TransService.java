@@ -23,6 +23,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.TransException;
+import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.daemon.TransProto;
 import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 
@@ -68,6 +69,7 @@ public class TransService
         }
         TransContext context = new TransContext(response.getTransId(), response.getTimestamp(), readOnly);
         TransContextCache.Instance().addTransContext(context);
+        MetadataCache.Instance().initCache(context.getTransId());
         return context;
     }
 
@@ -81,6 +83,7 @@ public class TransService
             throw new TransException("failed to commit transaction, error code=" + response.getErrorCode());
         }
         TransContextCache.Instance().setTransCommit(transId);
+        MetadataCache.Instance().dropCache(transId);
         return true;
     }
 
@@ -94,6 +97,7 @@ public class TransService
             throw new TransException("failed to rollback transaction, error code=" + response.getErrorCode());
         }
         TransContextCache.Instance().setTransRollback(transId);
+        MetadataCache.Instance().dropCache(transId);
         return true;
     }
 
