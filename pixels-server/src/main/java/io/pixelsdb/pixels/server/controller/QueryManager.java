@@ -96,7 +96,14 @@ public class QueryManager
         int port = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
         try
         {
-            this.queryScheduleService = new QueryScheduleService(host, port);
+            /*
+             * Issue #490:
+             * Auto scaling the MPP cluster is done by the query engine backend (e.g., Trino).
+             * Here, we only need to get the query slots from the query schedule service and do not need to report
+             * metrics for cluster auto-scaling, so we set scalingEnabled to false.
+             */
+            this.queryScheduleService = new QueryScheduleService(host, port, false);
+            Runtime.getRuntime().addShutdownHook(new Thread(this.queryScheduleService::shutdown));
         } catch (QueryScheduleException e)
         {
             throw new QueryServerException("failed to initialize query schedule service", e);
