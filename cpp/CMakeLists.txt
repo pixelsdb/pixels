@@ -17,6 +17,7 @@ add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 include_directories(pixels-reader/pixels-common/include)
 include_directories(pixels-reader/pixels-core/include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/pixels-reader)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/pixels-reader/pixels-common/liburing/src/include)
 
 add_subdirectory(pixels-reader)
 

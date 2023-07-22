@@ -5,48 +5,38 @@
 #include "exception/InvalidArgumentException.h"
 
 PixelsFooterCache::PixelsFooterCache() {
-    fileTailCacheMap = FileTailTable(200);
-    rowGroupFooterCacheMap = RGFooterTable(200);
 }
 
 void PixelsFooterCache::putFileTail(const std::string& id, std::shared_ptr<FileTail> fileTail) {
-    FileTailTable::accessor accessor;
-    if(fileTailCacheMap.insert(accessor, id)) {
-        accessor->second = fileTail;
-    }
+    fileTailCacheMap[id] = fileTail;
 }
 
 std::shared_ptr<FileTail> PixelsFooterCache::getFileTail(const std::string& id) {
-    FileTailTable::accessor accessor;
-    if(fileTailCacheMap.find(accessor, id)) {
-        return accessor->second;
+    if(fileTailCacheMap.find(id) != fileTailCacheMap.end()) {
+        return fileTailCacheMap[id];
     } else {
         throw InvalidArgumentException("No such a FileTail id.");
     }
 }
 
 void PixelsFooterCache::putRGFooter(const std::string& id, std::shared_ptr<RowGroupFooter> footer) {
-    RGFooterTable::accessor accessor;
-    if(rowGroupFooterCacheMap.insert(accessor, id)) {
-        accessor->second = footer;
-    }
+    rowGroupFooterCacheMap[id] = footer;
 }
 
 bool PixelsFooterCache::containsFileTail(const std::string &id) {
-    return fileTailCacheMap.count(id) > 0;
+    return fileTailCacheMap.find(id) != fileTailCacheMap.end();
 }
 
 std::shared_ptr<RowGroupFooter> PixelsFooterCache::getRGFooter(const std::string& id) {
-    RGFooterTable::accessor accessor;
-    if(rowGroupFooterCacheMap.find(accessor, id)) {
-        return accessor->second;
+    if(rowGroupFooterCacheMap.find(id) != rowGroupFooterCacheMap.end()) {
+        return rowGroupFooterCacheMap[id];
     } else {
         throw InvalidArgumentException("No such a RGFooter id.");
     }
 }
 
 bool PixelsFooterCache::containsRGFooter(const std::string &id) {
-    return rowGroupFooterCacheMap.count(id) > 0;
+    return rowGroupFooterCacheMap.find(id) != rowGroupFooterCacheMap.end();
 }
 
 
