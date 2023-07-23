@@ -133,7 +133,9 @@ Set `cache.storage.scheme` to be the name of the storage system where the cached
 Set `cache.enabled` to `false` if you don't use pixels-cache.
 
 ## Install MySQL
-MySQL and etcd are used to store the metadata and states of Pixels. To install MySQL:
+MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later is tested. Other forks or variants may also work.
+
+To install MySQL:
 ```bash
 sudo apt update
 sudo apt install mysql-server
