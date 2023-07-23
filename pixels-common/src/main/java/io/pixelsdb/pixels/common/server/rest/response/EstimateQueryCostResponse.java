@@ -23,7 +23,7 @@ package io.pixelsdb.pixels.common.server.rest.response;
  * @author hank
  * @create 2023-05-24
  */
-public class EstimateCostResponse
+public class EstimateQueryCostResponse
 {
     private int errorCode;
     private String errorMessage;
@@ -33,10 +33,10 @@ public class EstimateCostResponse
     /**
      * Default constructor for Jackson.
      */
-    public EstimateCostResponse() { }
+    public EstimateQueryCostResponse() { }
 
-    public EstimateCostResponse(int errorCode, String errorMessage,
-                                double latencyMs, double costCents)
+    public EstimateQueryCostResponse(int errorCode, String errorMessage,
+                                     double latencyMs, double costCents)
     {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;

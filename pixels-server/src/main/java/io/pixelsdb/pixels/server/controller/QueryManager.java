@@ -23,8 +23,9 @@ import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.QueryScheduleException;
 import io.pixelsdb.pixels.common.exception.QueryServerException;
 import io.pixelsdb.pixels.common.server.ExecutionHint;
+import io.pixelsdb.pixels.common.server.QueryStatus;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
-import io.pixelsdb.pixels.common.server.rest.response.GetResultResponse;
+import io.pixelsdb.pixels.common.server.rest.response.GetQueryResultResponse;
 import io.pixelsdb.pixels.common.server.rest.response.SubmitQueryResponse;
 import io.pixelsdb.pixels.common.turbo.QueryScheduleService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -81,7 +82,7 @@ public class QueryManager
 
     private final ArrayBlockingQueue<ReceivedQuery> pendingQueue = new ArrayBlockingQueue<>(1024);
     private final ConcurrentHashMap<String, ReceivedQuery> runningQueries = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, GetResultResponse> queryResults = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, GetQueryResultResponse> queryResults = new ConcurrentHashMap<>();
     private final ExecutorService submitService = Executors.newSingleThreadExecutor();
     private final ExecutorService executeService = Executors.newCachedThreadPool();
     private final QueryScheduleService queryScheduleService;
@@ -164,7 +165,7 @@ public class QueryManager
      * @return the trace token
      * @throws QueryServerException
      */
-    public SubmitQueryResponse submitQuery(SubmitQueryRequest request) throws QueryServerException
+    public SubmitQueryResponse submitQuery(SubmitQueryRequest request)
     {
         if (request.getExecutionHint() == ExecutionHint.COST_EFFECTIVE)
         {
@@ -251,13 +252,13 @@ public class QueryManager
                 }
 
                 // TODO: support get cost from trans service.
-                GetResultResponse result = new GetResultResponse(ErrorCode.SUCCESS, "",
+                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
                         columnPrintSizes, columnNames, rows, latencyMs, 0);
                 this.runningQueries.remove(traceToken);
                 this.queryResults.put(traceToken, result);
             } catch (SQLException e)
             {
-                GetResultResponse result = new GetResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED, e.getMessage(),
+                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED, e.getMessage(),
                         null, null, null, 0, 0);
                 this.runningQueries.remove(traceToken);
                 this.queryResults.put(traceToken, result);
@@ -284,18 +285,25 @@ public class QueryManager
         return this.runningQueries.size();
     }
 
-    public boolean isQueryRunning(String traceId)
+    public QueryStatus getQueryStatus(String traceToken)
     {
-        return this.runningQueries.containsKey(traceId);
+        if (this.pendingQueue.contains(traceToken))
+        {
+            return QueryStatus.PENDING;
+        }
+        if (this.runningQueries.containsKey(traceToken))
+        {
+            return QueryStatus.RUNNING;
+        }
+        if (this.queryResults.containsKey(traceToken))
+        {
+            return QueryStatus.FINISHED;
+        }
+        return QueryStatus.UNKNOWN;
     }
 
-    public boolean isQueryFinished(String traceId)
+    public GetQueryResultResponse popQueryResult(String traceToken)
     {
-        return this.queryResults.containsKey(traceId);
-    }
-
-    public GetResultResponse popQueryResult(String traceId)
-    {
-        return this.queryResults.remove(traceId);
+        return this.queryResults.remove(traceToken);
     }
 }

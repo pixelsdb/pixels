@@ -19,11 +19,15 @@
  */
 package io.pixelsdb.pixels.common.server.rest.response;
 
+import io.pixelsdb.pixels.common.error.ErrorCode;
+
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * @author hank
  * @create 2023-05-24
  */
-public class GetResultResponse
+public class GetQueryResultResponse
 {
     private int errorCode;
     private String errorMessage;
@@ -36,10 +40,25 @@ public class GetResultResponse
     /**
      * Default constructor for Jackson.
      */
-    public GetResultResponse() { }
+    public GetQueryResultResponse() { }
 
-    public GetResultResponse(int errorCode, String errorMessage, int[] columnPrintSizes,
-                             String[] columnNames, String[][] rows, double latencyMs, double costCents)
+    /**
+     * Construct a response with error. Error code and error message must be set to tell the error details.
+     * @param errorCode the error code
+     * @param errorMessage the error message
+     */
+    public GetQueryResultResponse(int errorCode, String errorMessage)
+    {
+        checkArgument(errorCode != ErrorCode.SUCCESS,
+                "this constructor is only used to create a response with error");
+        checkArgument(errorMessage != null && !errorMessage.isEmpty(),
+                "error message can not be null or empty");
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+    }
+
+    public GetQueryResultResponse(int errorCode, String errorMessage, int[] columnPrintSizes,
+                                  String[] columnNames, String[][] rows, double latencyMs, double costCents)
     {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;

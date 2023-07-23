@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.server;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.server.ExecutionHint;
-import io.pixelsdb.pixels.common.server.rest.request.GetResultRequest;
+import io.pixelsdb.pixels.common.server.rest.request.GetQueryResultRequest;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
 import io.pixelsdb.pixels.common.server.rest.response.SubmitQueryResponse;
 import io.pixelsdb.pixels.server.constant.RestUrlPath;
@@ -61,8 +61,8 @@ public class TestQueryAPI
                 .andDo(print()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         SubmitQueryResponse response = JSON.parseObject(json, SubmitQueryResponse.class);
         TimeUnit.SECONDS.sleep(5);
-        this.mockMvc.perform(post(RestUrlPath.GET_RESULT).contentType(MediaType.APPLICATION_JSON).content(
-                JSON.toJSONString(new GetResultRequest(response.getCallbackToken())))).andDo(print()).andExpect(status().isOk());
+        this.mockMvc.perform(post(RestUrlPath.GET_QUERY_RESULT).contentType(MediaType.APPLICATION_JSON).content(
+                JSON.toJSONString(new GetQueryResultRequest(response.getTraceToken())))).andDo(print()).andExpect(status().isOk());
     }
 
     @Test
@@ -75,7 +75,7 @@ public class TestQueryAPI
                 .andDo(print()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         SubmitQueryResponse response = JSON.parseObject(json, SubmitQueryResponse.class);
         TimeUnit.SECONDS.sleep(5);
-        this.mockMvc.perform(post(RestUrlPath.GET_RESULT).contentType(MediaType.APPLICATION_JSON).content(
-                JSON.toJSONString(new GetResultRequest(response.getCallbackToken())))).andDo(print()).andExpect(status().isOk());
+        this.mockMvc.perform(post(RestUrlPath.GET_QUERY_RESULT).contentType(MediaType.APPLICATION_JSON).content(
+                JSON.toJSONString(new GetQueryResultRequest(response.getTraceToken())))).andDo(print()).andExpect(status().isOk());
     }
 }

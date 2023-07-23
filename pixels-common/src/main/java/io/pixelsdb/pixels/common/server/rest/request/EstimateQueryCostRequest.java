@@ -25,7 +25,7 @@ import io.pixelsdb.pixels.common.server.ExecutionHint;
  * @author hank
  * @create 2023-05-24
  */
-public class EstimateCostRequest
+public class EstimateQueryCostRequest
 {
     private String query;
     private ExecutionHint executionHint;
@@ -33,9 +33,9 @@ public class EstimateCostRequest
     /**
      * Default constructor for Jackson.
      */
-    public EstimateCostRequest() { }
+    public EstimateQueryCostRequest() { }
 
-    public EstimateCostRequest(String query, ExecutionHint executionHint)
+    public EstimateQueryCostRequest(String query, ExecutionHint executionHint)
     {
         this.query = query;
         this.executionHint = executionHint;
