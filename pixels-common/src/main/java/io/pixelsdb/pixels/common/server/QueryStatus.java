@@ -25,7 +25,6 @@ package io.pixelsdb.pixels.common.server;
  */
 public enum QueryStatus
 {
-    UNKNOWN,
     PENDING,
     RUNNING,
     FINISHED

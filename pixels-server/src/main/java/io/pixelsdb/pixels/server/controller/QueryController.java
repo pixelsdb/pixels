@@ -43,6 +43,7 @@ import java.util.Map;
  * The REST methods for query execution, scheduling, and cost estimation.
  * @author hank
  * @create 2023-05-30
+ * @update 2023-07-23 add {@link #getQueryStatus(GetQueryStatusRequest)}.
  */
 @RestController
 public class QueryController

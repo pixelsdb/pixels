@@ -83,6 +83,7 @@ public class QueryManager
     private final ArrayBlockingQueue<ReceivedQuery> pendingQueue = new ArrayBlockingQueue<>(1024);
     private final ConcurrentHashMap<String, ReceivedQuery> runningQueries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, GetQueryResultResponse> queryResults = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Object> finishedQueries = new ConcurrentHashMap<>();
     private final ExecutorService submitService = Executors.newSingleThreadExecutor();
     private final ExecutorService executeService = Executors.newCachedThreadPool();
     private final QueryScheduleService queryScheduleService;
@@ -287,23 +288,29 @@ public class QueryManager
 
     public QueryStatus getQueryStatus(String traceToken)
     {
-        if (this.pendingQueue.contains(traceToken))
+        if (this.queryResults.containsKey(traceToken) || this.finishedQueries.containsKey(traceToken))
         {
-            return QueryStatus.PENDING;
+            return QueryStatus.FINISHED;
         }
         if (this.runningQueries.containsKey(traceToken))
         {
             return QueryStatus.RUNNING;
         }
-        if (this.queryResults.containsKey(traceToken))
-        {
-            return QueryStatus.FINISHED;
-        }
-        return QueryStatus.UNKNOWN;
+        return QueryStatus.PENDING;
     }
 
+    /**
+     * Get the query result of a query with the trace token.
+     * @param traceToken the trace token of the query
+     * @return null if the query result is not found
+     */
     public GetQueryResultResponse popQueryResult(String traceToken)
     {
-        return this.queryResults.remove(traceToken);
+        GetQueryResultResponse response = this.queryResults.remove(traceToken);
+        if (response != null)
+        {
+            this.finishedQueries.put(traceToken, traceToken);
+        }
+        return response;
     }
 }
