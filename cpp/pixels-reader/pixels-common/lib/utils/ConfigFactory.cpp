@@ -37,7 +37,7 @@ void ConfigFactory::Print() {
 
 std::string ConfigFactory::getProperty(std::string key) {
 	if(prop.find(key) == prop.end()) {
-		throw InvalidArgumentException("ConfigFactory::getProperty: no key found. ");
+		throw InvalidArgumentException("ConfigFactory::getProperty: no key found: " + key);
 	}
 	return prop[key];
 }

@@ -5,15 +5,14 @@
 #ifndef PIXELS_PIXELSFOOTERCACHE_H
 #define PIXELS_PIXELSFOOTERCACHE_H
 
-#include "tbb/concurrent_hash_map.h"
 #include <iostream>
 #include <string>
 #include "pixels-common/pixels.pb.h"
+#include <unordered_map>
 
-using namespace tbb;
 using namespace pixels::proto;
-typedef concurrent_hash_map<std::string, std::shared_ptr<FileTail>> FileTailTable;
-typedef concurrent_hash_map<std::string, std::shared_ptr<RowGroupFooter>> RGFooterTable;
+typedef std::unordered_map<std::string, std::shared_ptr<FileTail>> FileTailTable;
+typedef std::unordered_map<std::string, std::shared_ptr<RowGroupFooter>> RGFooterTable;
 
 class PixelsFooterCache {
 public:

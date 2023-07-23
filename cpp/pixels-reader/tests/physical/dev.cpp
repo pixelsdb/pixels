@@ -15,7 +15,6 @@
 #include <thread>
 #include "physical/scheduler/NoopScheduler.h"
 #include "physical/SchedulerFactory.h"
-#include "tbb/concurrent_hash_map.h"
 #include "utils/Constants.h"
 #include "exception/PixelsFileMagicInvalidException.h"
 #include <vector>
@@ -127,19 +126,6 @@ TEST(physical, NoopScheduler) {
     auto localReader = std::make_shared<PhysicalLocalReader>(localfs, "/home/liyu/files/hello.txt");
     auto bbs = noop->executeBatch(localReader, batch, queryId);
     std::cout<<"fuck"<<std::endl;
-}
-
-
-TEST(physical, Concurrent) {
-    tbb::concurrent_hash_map<int, int> table;
-    tbb::concurrent_hash_map<int, int>::accessor accessor;
-    if(table.insert(accessor, 1)) {
-        accessor->second = 2;
-    }
-
-    if(table.find(accessor, 1)) {
-        std::cout<<accessor->second<<std::endl;
-    }
 }
 
 TEST(utils, Constants) {

@@ -5,16 +5,10 @@
 
 ### Prerequisites
 
-Install tbb:
-```shell
-echo "deb http://cz.archive.ubuntu.com/ubuntu eoan main universe" | sudo tee -a  /etc/apt/sources.list
-sudo apt-get update
-sudo apt-get install -y libtbb-dev
-```
 
-Install protobuf and iouring:
+Install protobuf:
 ```shell
-sudo apt-get install -y protobuf-compiler liburing-dev
+sudo apt-get install -y protobuf-compiler
 ```
 
 ### Compilation
@@ -27,6 +21,7 @@ First fetch `duckdb` submodules from github:
 make pull
 ```
 
+Then set the `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels).
 
 Finally compile the code:
 
@@ -43,6 +38,17 @@ To run this binary:
 ```
 ./build/release/examples/pixels-example/pixels-example
 ```
+
+### Run pixels reader in CLion
+In order to run the code in CLion, we should set the cmake configuration in CLion. 
+
+In `"setting"`->`"Build,Execution,Deployment"`->`"CMake"`, set `"Generator"` as `"Let CMake decide"`, and
+set `CMake options` as:
+```shell
+-DDUCKDB_OOT_EXTENSION_NAMES="pixels" -DDUCKDB_OOT_EXTENSION_PIXELS_PATH=${PIXELS_HOME}/cpp -DDUCKDB_OOT_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_OOT_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_HOME}/cpp/include
+```
+
+
 
 ### Benchmark
 

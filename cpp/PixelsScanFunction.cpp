@@ -36,7 +36,7 @@ TableFunctionSet PixelsScanFunction::GetFunctionSet() {
 	TableFunction table_function({LogicalType::VARCHAR}, PixelsScanImplementation, PixelsScanBind,
 	                             PixelsScanInitGlobal, PixelsScanInitLocal);
 	table_function.projection_pushdown = true;
-	table_function.filter_pushdown = false;
+	table_function.filter_pushdown = true;
     enable_filter_pushdown = table_function.filter_pushdown;
 //	table_function.filter_prune = true;
 	table_function.get_batch_index = PixelsScanGetBatchIndex;
