@@ -142,7 +142,7 @@ sudo apt install mysql-server
 sudo mysql_secure_installation
 ```
 
-> Not that for mysql 8+, you may need to set a native password for mysql `root` user before running `mysql_secure_installation`, for example:
+> Note that for mysql 8+, you may have to set a native password for mysql `root` user before running `mysql_secure_installation`, for example:
 > ```bash
 > sudo mysql
 > mysql> ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your_root_password';
