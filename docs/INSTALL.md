@@ -133,14 +133,16 @@ Set `cache.storage.scheme` to be the name of the storage system where the cached
 Set `cache.enabled` to `false` if you don't use pixels-cache.
 
 ## Install MySQL
-MySQL and etcd are used to store the metadata and states of Pixels. To install MySQL:
+MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later is tested. Other forks or variants may also work.
+
+To install MySQL:
 ```bash
 sudo apt update
 sudo apt install mysql-server
 sudo mysql_secure_installation
 ```
 
-> Not that for mysql 8+, you may need to set a native password for mysql `root` user before running `mysql_secure_installation`, for example:
+> Note that for mysql 8+, you may have to set a native password for mysql `root` user before running `mysql_secure_installation`, for example:
 > ```bash
 > sudo mysql
 > mysql> ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your_root_password';

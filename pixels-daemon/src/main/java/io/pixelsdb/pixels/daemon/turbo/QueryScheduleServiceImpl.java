@@ -108,4 +108,16 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
+
+    @Override
+    public void getQueryConcurrency(TurboProto.GetQueryConcurrencyRequest request,
+                                    StreamObserver<TurboProto.GetQueryConcurrencyResponse> responseObserver)
+    {
+        int mppConcurrency = QueryScheduleQueues.Instance().getMppConcurrency();
+        int cfConcurrency = QueryScheduleQueues.Instance().getCfConcurrency();
+        TurboProto.GetQueryConcurrencyResponse response = TurboProto.GetQueryConcurrencyResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS).setMppConcurrency(mppConcurrency).setCfConcurrency(cfConcurrency).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
 }

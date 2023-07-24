@@ -17,33 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.server.rest.request;
+package io.pixelsdb.pixels.common.server;
 
 /**
  * @author hank
- * @create 2023-05-24
+ * @create 2023-07-23
  */
-public class GetResultRequest
+public enum QueryStatus
 {
-    private String callbackToken;
-
-    /**
-     * Default constructor for Jackson.
-     */
-    public GetResultRequest() { }
-
-    public GetResultRequest(String callbackToken)
-    {
-        this.callbackToken = callbackToken;
-    }
-
-    public String getCallbackToken()
-    {
-        return callbackToken;
-    }
-
-    public void setCallbackToken(String callbackToken)
-    {
-        this.callbackToken = callbackToken;
-    }
+    PENDING,
+    RUNNING,
+    FINISHED
 }

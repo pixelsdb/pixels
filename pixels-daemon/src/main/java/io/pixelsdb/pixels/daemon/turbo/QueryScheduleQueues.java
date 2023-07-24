@@ -87,6 +87,16 @@ public class QueryScheduleQueues
         return false;
     }
 
+    public int getMppConcurrency()
+    {
+        return this.mppQueue.size();
+    }
+
+    public int getCfConcurrency()
+    {
+        return this.cfQueue.size();
+    }
+
     public int getMppSlots()
     {
         return this.mppQueue.remainingCapacity();

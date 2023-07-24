@@ -23,9 +23,10 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.QueryScheduleException;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.turbo.QueryScheduleServiceGrpc;
 import io.pixelsdb.pixels.turbo.TurboProto;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +37,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class QueryScheduleService
 {
+    private static final Logger log = LogManager.getLogger(QueryScheduleService.class);
     private final ManagedChannel channel;
     private final QueryScheduleServiceGrpc.QueryScheduleServiceBlockingStub stub;
     private final boolean scalingEnabled;
@@ -43,24 +45,43 @@ public class QueryScheduleService
 
     public static class QuerySlots
     {
-        public final int MppSlots;
-        public final int CfSlots;
+        public final int mppSlots;
+        public final int cfSlots;
 
         public QuerySlots(int mppSlots, int cfSlots)
         {
-            MppSlots = mppSlots;
-            CfSlots = cfSlots;
+            this.mppSlots = mppSlots;
+            this.cfSlots = cfSlots;
         }
     }
 
-    public QueryScheduleService(String host, int port) throws QueryScheduleException
+    public static class QueryConcurrency
+    {
+        public final int mppConcurrency;
+        public final int cfConcurrency;
+
+        public QueryConcurrency(int mppConcurrency, int cfConcurrency)
+        {
+            this.mppConcurrency = mppConcurrency;
+            this.cfConcurrency = cfConcurrency;
+        }
+    }
+
+    /**
+     * Create an instance of the query schedule service to schedule a query for execution.
+     * @param host the hostname of the query schedule server
+     * @param port the port of the query schedule server
+     * @param scalingEnabled true to enable metrics collection for auto-scaling of the query engine backend.
+     * @throws QueryScheduleException
+     */
+    public QueryScheduleService(String host, int port, boolean scalingEnabled) throws QueryScheduleException
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
         this.stub = QueryScheduleServiceGrpc.newBlockingStub(channel);
-        this.scalingEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("scaling.enabled"));
+        this.scalingEnabled = scalingEnabled;
         if (this.scalingEnabled)
         {
             Optional<MetricsCollector> collector = MetricsCollector.Instance();
@@ -69,7 +90,10 @@ public class QueryScheduleService
                 this.metricsCollector = collector.get();
                 this.metricsCollector.startAutoReport();
             }
-            throw new QueryScheduleException("query schedule service: no implementation for metrics collector");
+            else
+            {
+                throw new QueryScheduleException("query schedule service: no implementation for metrics collector");
+            }
         }
         else
         {
@@ -77,9 +101,15 @@ public class QueryScheduleService
         }
     }
 
-    public void shutdown() throws InterruptedException
+    public void shutdown()
     {
-        this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        try
+        {
+            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e)
+        {
+            log.error("interrupted when shutdown rpc server", e);
+        }
         if (this.scalingEnabled)
         {
             this.metricsCollector.stopAutoReport();
@@ -119,5 +149,16 @@ public class QueryScheduleService
             throw new QueryScheduleException("failed to get query slots, error code=" + response.getErrorCode());
         }
         return new QuerySlots(response.getMppSlots(), response.getCfSlots());
+    }
+
+    public QueryConcurrency getQueryConcurrency() throws QueryScheduleException
+    {
+        TurboProto.GetQueryConcurrencyRequest request = TurboProto.GetQueryConcurrencyRequest.newBuilder().build();
+        TurboProto.GetQueryConcurrencyResponse response = this.stub.getQueryConcurrency(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new QueryScheduleException("failed to get query concurrency, error code=" + response.getErrorCode());
+        }
+        return new QueryConcurrency(response.getMppConcurrency(), response.getCfConcurrency());
     }
 }

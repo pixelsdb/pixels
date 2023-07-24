@@ -20,11 +20,14 @@
 package io.pixelsdb.pixels.server.controller;
 
 import io.pixelsdb.pixels.common.error.ErrorCode;
-import io.pixelsdb.pixels.common.server.rest.request.EstimateCostRequest;
-import io.pixelsdb.pixels.common.server.rest.request.GetResultRequest;
+import io.pixelsdb.pixels.common.server.QueryStatus;
+import io.pixelsdb.pixels.common.server.rest.request.EstimateQueryCostRequest;
+import io.pixelsdb.pixels.common.server.rest.request.GetQueryResultRequest;
+import io.pixelsdb.pixels.common.server.rest.request.GetQueryStatusRequest;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
-import io.pixelsdb.pixels.common.server.rest.response.EstimateCostResponse;
-import io.pixelsdb.pixels.common.server.rest.response.GetResultResponse;
+import io.pixelsdb.pixels.common.server.rest.response.EstimateQueryCostResponse;
+import io.pixelsdb.pixels.common.server.rest.response.GetQueryResultResponse;
+import io.pixelsdb.pixels.common.server.rest.response.GetQueryStatusResponse;
 import io.pixelsdb.pixels.common.server.rest.response.SubmitQueryResponse;
 import io.pixelsdb.pixels.server.constant.RestUrlPath;
 import org.springframework.http.MediaType;
@@ -32,21 +35,26 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * The REST methods for query execution, scheduling, and cost estimation.
  * @author hank
  * @create 2023-05-30
+ * @update 2023-07-23 add {@link #getQueryStatus(GetQueryStatusRequest)}.
  */
 @RestController
 public class QueryController
 {
-    @PostMapping(value = RestUrlPath.ESTIMATE_COST,
+    @PostMapping(value = RestUrlPath.ESTIMATE_QUERY_COST,
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    public EstimateCostResponse estimateCost(@RequestBody EstimateCostRequest request)
+    public EstimateQueryCostResponse estimateQueryCost(@RequestBody EstimateQueryCostRequest request)
     {
         // TODO: implement estimate cost.
-        return new EstimateCostResponse(ErrorCode.QUERY_SERVER_NOT_SUPPORTED,
+        return new EstimateQueryCostResponse(ErrorCode.QUERY_SERVER_NOT_SUPPORTED,
                 "estimate cost is not supported", 0, 0);
     }
 
@@ -58,11 +66,35 @@ public class QueryController
         return QueryManager.Instance().submitQuery(request);
     }
 
-    @PostMapping(value = RestUrlPath.GET_RESULT,
+    @PostMapping(value = RestUrlPath.GET_QUERY_STATUS,
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    public GetResultResponse getResult(@RequestBody GetResultRequest request)
+    public GetQueryStatusResponse getQueryStatus(@RequestBody GetQueryStatusRequest request)
     {
-        return QueryManager.Instance().popQueryResult(request.getCallbackToken());
+        if (request.getTraceTokens() == null || request.getTraceTokens().isEmpty())
+        {
+            return new GetQueryStatusResponse(ErrorCode.QUERY_SERVER_BAD_REQUEST,
+                    "traceTokens is null or empty", Collections.emptyMap());
+        }
+        Map<String, QueryStatus> queryStatuses = new HashMap<>(request.getTraceTokens().size());
+        for (String traceToken : request.getTraceTokens())
+        {
+            queryStatuses.put(traceToken, QueryManager.Instance().getQueryStatus(traceToken));
+        }
+        return new GetQueryStatusResponse(ErrorCode.SUCCESS, "", queryStatuses);
+    }
+
+    @PostMapping(value = RestUrlPath.GET_QUERY_RESULT,
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public GetQueryResultResponse getQueryResult(@RequestBody GetQueryResultRequest request)
+    {
+        GetQueryResultResponse response = QueryManager.Instance().popQueryResult(request.getTraceToken());
+        if (response != null)
+        {
+            return response;
+        }
+        return new GetQueryResultResponse(ErrorCode.QUERY_SERVER_QUERY_NOT_FINISHED,
+                "the query is not finished yet");
     }
 }

@@ -18,11 +18,11 @@ USE `pixels_metadata` ;
 -- Table `pixels_metadata`.`DBS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`DBS` (
-                                                       `DB_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                       `DB_NAME` VARCHAR(128) NOT NULL,
+    `DB_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `DB_NAME` VARCHAR(128) NOT NULL,
     `DB_DESC` VARCHAR(4000) NULL,
     PRIMARY KEY (`DB_ID`),
-    UNIQUE INDEX `DB_NAME_UNIQUE` (`DB_NAME` ASC) VISIBLE)
+    UNIQUE INDEX `DB_NAME_UNIQUE` (`DB_NAME` ASC))
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -32,15 +32,15 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`DBS` (
 -- Table `pixels_metadata`.`TBLS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`TBLS` (
-                                                        `TBL_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                        `TBL_NAME` VARCHAR(128) NOT NULL,
+    `TBL_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `TBL_NAME` VARCHAR(128) NOT NULL,
     `TBL_TYPE` VARCHAR(128) NULL,
     `TBL_STORAGE_SCHEME` VARCHAR(32) NOT NULL DEFAULT 'file' COMMENT 'The name of the storage scheme of the files stored in all the paths of this table.',
     `TBL_ROW_COUNT` BIGINT NOT NULL DEFAULT 0 COMMENT 'The number of rows in this table.',
     `DBS_DB_ID` BIGINT NOT NULL,
     PRIMARY KEY (`TBL_ID`),
-    INDEX `fk_TBLS_DBS_idx` (`DBS_DB_ID` ASC) VISIBLE,
-    UNIQUE INDEX `TBL_NAME_DB_ID_UNIQUE` (`TBL_NAME` ASC, `DBS_DB_ID` ASC) VISIBLE,
+    INDEX `fk_TBLS_DBS_idx` (`DBS_DB_ID` ASC),
+    UNIQUE INDEX `TBL_NAME_DB_ID_UNIQUE` (`TBL_NAME` ASC, `DBS_DB_ID` ASC),
     CONSTRAINT `fk_TBLS_DBS`
     FOREIGN KEY (`DBS_DB_ID`)
     REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
@@ -55,8 +55,8 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`TBLS` (
 -- Table `pixels_metadata`.`COLS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
-                                                        `COL_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                        `COL_NAME` VARCHAR(128) NOT NULL,
+    `COL_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `COL_NAME` VARCHAR(128) NOT NULL,
     `COL_TYPE` VARCHAR(128) NOT NULL,
     `COL_CHUNK_SIZE` DOUBLE NOT NULL DEFAULT 0,
     `COL_SIZE` DOUBLE NOT NULL DEFAULT 0,
@@ -65,8 +65,8 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
     `COL_RECORD_STATS` BLOB NULL DEFAULT NULL,
     `TBLS_TBL_ID` BIGINT NOT NULL,
     PRIMARY KEY (`COL_ID`),
-    INDEX `fk_COLS_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
-    UNIQUE INDEX `COL_NAME_TBL_ID_UNIQUE` (`COL_NAME` ASC, `TBLS_TBL_ID` ASC) VISIBLE,
+    INDEX `fk_COLS_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    UNIQUE INDEX `COL_NAME_TBL_ID_UNIQUE` (`COL_NAME` ASC, `TBLS_TBL_ID` ASC),
     CONSTRAINT `fk_COLS_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
@@ -81,15 +81,15 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
 -- Table `pixels_metadata`.`RANGE_INDEXES`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
-                                                                 `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                                 `RI_STRUCT` MEDIUMBLOB NOT NULL,
-                                                                 `KEY_COL_ID` BIGINT NOT NULL,
-                                                                 `TBLS_TBL_ID` BIGINT NOT NULL,
-                                                                 PRIMARY KEY (`RI_ID`),
-    INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
-    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC) VISIBLE,
-    INDEX `fk_RANGE_INDEX_COLS_idx` (`KEY_COL_ID` ASC) VISIBLE,
-    UNIQUE INDEX `KEY_COL_ID_UNIQUE` (`KEY_COL_ID` ASC) VISIBLE,
+    `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `RI_STRUCT` MEDIUMBLOB NOT NULL,
+    `KEY_COL_ID` BIGINT NOT NULL,
+    `TBLS_TBL_ID` BIGINT NOT NULL,
+    PRIMARY KEY (`RI_ID`),
+    INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_RANGE_INDEX_COLS_idx` (`KEY_COL_ID` ASC),
+    UNIQUE INDEX `KEY_COL_ID_UNIQUE` (`KEY_COL_ID` ASC),
     CONSTRAINT `fk_RANGE_INDEX_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
@@ -109,14 +109,14 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
 -- Table `pixels_metadata`.`SCHEMA_VERSIONS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
-                                                                   `SV_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                                   `SV_COLUMNS` MEDIUMTEXT NOT NULL COMMENT 'The json string that contains the ids of the columns owned by this schema version.',
-                                                                   `SV_TRANS_TS` BIGINT NOT NULL COMMENT 'The transaction timestamp of this schema version.',
-                                                                   `TBLS_TBL_ID` BIGINT NOT NULL,
-                                                                   `RANGE_INDEXES_RI_ID` BIGINT NULL DEFAULT NULL,
-                                                                   PRIMARY KEY (`SV_ID`),
-    INDEX `fk_SCHEMA_VERSIONS_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
-    INDEX `fk_SCHEMA_VERSIONS_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC) VISIBLE,
+    `SV_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `SV_COLUMNS` MEDIUMTEXT NOT NULL COMMENT 'The json string that contains the ids of the columns owned by this schema version.',
+    `SV_TRANS_TS` BIGINT NOT NULL COMMENT 'The transaction timestamp of this schema version.',
+    `TBLS_TBL_ID` BIGINT NOT NULL,
+    `RANGE_INDEXES_RI_ID` BIGINT NULL DEFAULT NULL,
+    PRIMARY KEY (`SV_ID`),
+    INDEX `fk_SCHEMA_VERSIONS_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_SCHEMA_VERSIONS_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC),
     CONSTRAINT `fk_SCHEMA_VERSIONS_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
@@ -136,19 +136,19 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
 -- Table `pixels_metadata`.`LAYOUTS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`LAYOUTS` (
-                                                           `LAYOUT_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                           `LAYOUT_VERSION` BIGINT NOT NULL COMMENT 'The version of this layout.',
-                                                           `LAYOUT_CREATE_AT` BIGINT NOT NULL COMMENT 'The milliseconds of moment since the unix epoch that this layout is created.',
-                                                           `LAYOUT_PERMISSION` TINYINT NOT NULL COMMENT '<0 for not readable and writable, 0 for readable only, >0 for readable and writable.',
-                                                           `LAYOUT_ORDERED` MEDIUMTEXT NOT NULL COMMENT 'The default order of this layout. It is used to determine the column order in a single-row-group blocks.',
-                                                           `LAYOUT_COMPACT` LONGTEXT NOT NULL COMMENT 'the layout strategy, stored as json. It is used to determine how row groups are compacted into a big block.',
-                                                           `LAYOUT_SPLITS` LONGTEXT NOT NULL COMMENT 'The suggested split size for access patterns, stored as json.',
-                                                           `LAYOUT_PROJECTIONS` LONGTEXT NOT NULL COMMENT 'The projections each maps a set of columns to a different set of paths.',
-                                                           `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
-                                                           `TBLS_TBL_ID` BIGINT NOT NULL,
-                                                           PRIMARY KEY (`LAYOUT_ID`),
-    INDEX `fk_LAYOUTS_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
-    INDEX `fk_LAYOUTS_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC) VISIBLE,
+    `LAYOUT_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `LAYOUT_VERSION` BIGINT NOT NULL COMMENT 'The version of this layout.',
+    `LAYOUT_CREATE_AT` BIGINT NOT NULL COMMENT 'The milliseconds of moment since the unix epoch that this layout is created.',
+    `LAYOUT_PERMISSION` TINYINT NOT NULL COMMENT '<0 for not readable and writable, 0 for readable only, >0 for readable and writable.',
+    `LAYOUT_ORDERED` MEDIUMTEXT NOT NULL COMMENT 'The default order of this layout. It is used to determine the column order in a single-row-group blocks.',
+    `LAYOUT_COMPACT` LONGTEXT NOT NULL COMMENT 'the layout strategy, stored as json. It is used to determine how row groups are compacted into a big block.',
+    `LAYOUT_SPLITS` LONGTEXT NOT NULL COMMENT 'The suggested split size for access patterns, stored as json.',
+    `LAYOUT_PROJECTIONS` LONGTEXT NOT NULL COMMENT 'The projections each maps a set of columns to a different set of paths.',
+    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
+    `TBLS_TBL_ID` BIGINT NOT NULL,
+    PRIMARY KEY (`LAYOUT_ID`),
+    INDEX `fk_LAYOUTS_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_LAYOUTS_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
     CONSTRAINT `fk_LAYOUTS_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
@@ -168,13 +168,13 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`LAYOUTS` (
 -- Table `pixels_metadata`.`VIEWS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
-                                                         `VIEW_ID` BIGINT NOT NULL,
-                                                         `VIEW_NAME` VARCHAR(128) NOT NULL,
+    `VIEW_ID` BIGINT NOT NULL,
+    `VIEW_NAME` VARCHAR(128) NOT NULL,
     `VIEW_TYPE` VARCHAR(128) NULL,
     `VIEW_DATA` LONGTEXT NOT NULL,
     `DBS_DB_ID` BIGINT NOT NULL,
     PRIMARY KEY (`VIEW_ID`),
-    INDEX `fk_VIEWS_DBS_idx` (`DBS_DB_ID` ASC) VISIBLE,
+    INDEX `fk_VIEWS_DBS_idx` (`DBS_DB_ID` ASC),
     CONSTRAINT `fk_VIEWS_DBS`
     FOREIGN KEY (`DBS_DB_ID`)
     REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
@@ -189,13 +189,13 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 -- Table `pixels_metadata`.`RANGES`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
-                                                          `RANGE_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                          `RANGE_RECORD_STATS` BLOB NOT NULL,
-                                                          `RANGES_PARENT_ID` BIGINT NULL,
-                                                          `RANGE_INDEXES_RI_ID` BIGINT NOT NULL,
-                                                          PRIMARY KEY (`RANGE_ID`),
-    INDEX `fk_RANGES_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC) VISIBLE,
-    INDEX `fk_RANGES_RANGES_idx` (`RANGES_PARENT_ID` ASC) VISIBLE,
+    `RANGE_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `RANGE_RECORD_STATS` BLOB NOT NULL,
+    `RANGES_PARENT_ID` BIGINT NULL,
+    `RANGE_INDEXES_RI_ID` BIGINT NOT NULL,
+    PRIMARY KEY (`RANGE_ID`),
+    INDEX `fk_RANGES_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC),
+    INDEX `fk_RANGES_RANGES_idx` (`RANGES_PARENT_ID` ASC),
     CONSTRAINT `fk_RANGES_RANGE_INDEXES`
     FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
     REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
@@ -215,14 +215,14 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
 -- Table `pixels_metadata`.`PATHS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PATHS` (
-                                                         `PATH_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                         `PATH_URI` VARCHAR(4096) NOT NULL,
+    `PATH_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `PATH_URI` VARCHAR(4096) NOT NULL,
     `PATH_IS_COMPACT` TINYINT NOT NULL COMMENT 'True if the files in this path are compact.',
     `LAYOUTS_LAYOUT_ID` BIGINT NOT NULL,
     `RANGES_RANGE_ID` BIGINT NULL DEFAULT NULL,
     PRIMARY KEY (`PATH_ID`),
-    INDEX `fk_PATHS_RANGES_idx` (`RANGES_RANGE_ID` ASC) VISIBLE,
-    INDEX `fk_PATHS_LAYOUTS_idx` (`LAYOUTS_LAYOUT_ID` ASC) VISIBLE,
+    INDEX `fk_PATHS_RANGES_idx` (`RANGES_RANGE_ID` ASC),
+    INDEX `fk_PATHS_LAYOUTS_idx` (`LAYOUTS_LAYOUT_ID` ASC),
     CONSTRAINT `fk_PATHS_RANGES`
     FOREIGN KEY (`RANGES_RANGE_ID`)
     REFERENCES `pixels_metadata`.`RANGES` (`RANGE_ID`)
@@ -242,12 +242,12 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PATHS` (
 -- Table `pixels_metadata`.`USERS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`USERS` (
-                                                         `USER_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                         `USER_NAME` VARCHAR(128) NOT NULL,
+    `USER_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `USER_NAME` VARCHAR(128) NOT NULL,
     `USER_PASSWORD` VARCHAR(128) NOT NULL,
     `USER_EMAIL` VARCHAR(128) NOT NULL,
     PRIMARY KEY (`USER_ID`),
-    UNIQUE INDEX `USER_NAME_UNIQUE` (`USER_NAME` ASC) VISIBLE)
+    UNIQUE INDEX `USER_NAME_UNIQUE` (`USER_NAME` ASC))
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -257,12 +257,12 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`USERS` (
 -- Table `pixels_metadata`.`USER_HAS_DB`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`USER_HAS_DB` (
-                                                               `USERS_USER_ID` BIGINT NOT NULL,
-                                                               `DBS_DB_ID` BIGINT NOT NULL,
-                                                               `USER_DB_PERMITION` TINYINT NOT NULL,
-                                                               PRIMARY KEY (`USERS_USER_ID`, `DBS_DB_ID`),
-    INDEX `fk_USERS_has_DBS_DBS_idx` (`DBS_DB_ID` ASC) VISIBLE,
-    INDEX `fk_USERS_has_DBS_USERS_idx` (`USERS_USER_ID` ASC) VISIBLE,
+    `USERS_USER_ID` BIGINT NOT NULL,
+    `DBS_DB_ID` BIGINT NOT NULL,
+    `USER_DB_PERMITION` TINYINT NOT NULL,
+    PRIMARY KEY (`USERS_USER_ID`, `DBS_DB_ID`),
+    INDEX `fk_USERS_has_DBS_DBS_idx` (`DBS_DB_ID` ASC),
+    INDEX `fk_USERS_has_DBS_USERS_idx` (`USERS_USER_ID` ASC),
     CONSTRAINT `fk_USERS_has_DBS_USERS`
     FOREIGN KEY (`USERS_USER_ID`)
     REFERENCES `pixels_metadata`.`USERS` (`USER_ID`)
@@ -282,14 +282,14 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`USER_HAS_DB` (
 -- Table `pixels_metadata`.`PEERS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEERS` (
-                                                         `PEER_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                         `PEER_NAME` VARCHAR(128) NOT NULL COMMENT 'The name of the peer, must be unique.',
+    `PEER_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `PEER_NAME` VARCHAR(128) NOT NULL COMMENT 'The name of the peer, must be unique.',
     `PEER_LOCATION` VARCHAR(1024) NOT NULL COMMENT 'The geographic location of the peer.',
     `PEER_HOST` VARCHAR(128) NOT NULL COMMENT 'The registered host name or ip address of the peer.',
     `PEER_PORT` INT NOT NULL COMMENT 'The registered port of this peer.',
     `PEER_STORAGE_SCHEME` VARCHAR(32) NOT NULL,
     PRIMARY KEY (`PEER_ID`),
-    UNIQUE INDEX `PEER_NAME_UNIQUE` (`PEER_NAME` ASC) VISIBLE)
+    UNIQUE INDEX `PEER_NAME_UNIQUE` (`PEER_NAME` ASC))
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -299,14 +299,14 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEERS` (
 -- Table `pixels_metadata`.`PEER_PATHS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
-                                                              `PEER_PATH_ID` BIGINT NOT NULL AUTO_INCREMENT,
-                                                              `PEER_PATH_URI` VARCHAR(32) NOT NULL,
+    `PEER_PATH_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `PEER_PATH_URI` VARCHAR(32) NOT NULL,
     `PEER_PATH_COLUMNS` MEDIUMTEXT NOT NULL COMMENT 'The json string that contains the ids of the columns stored in this peer path.',
     `PATHS_PATH_ID` BIGINT NOT NULL,
     `PEERS_PEER_ID` BIGINT NOT NULL,
     PRIMARY KEY (`PEER_PATH_ID`),
-    INDEX `fk_PEER_PATHS_PATHS_idx` (`PATHS_PATH_ID` ASC) VISIBLE,
-    INDEX `fk_PEER_PATHS_PEERS_idx` (`PEERS_PEER_ID` ASC) VISIBLE,
+    INDEX `fk_PEER_PATHS_PATHS_idx` (`PATHS_PATH_ID` ASC),
+    INDEX `fk_PEER_PATHS_PEERS_idx` (`PEERS_PEER_ID` ASC),
     CONSTRAINT `fk_PEER_PATHS_PATHS`
     FOREIGN KEY (`PATHS_PATH_ID`)
     REFERENCES `pixels_metadata`.`PATHS` (`PATH_ID`)

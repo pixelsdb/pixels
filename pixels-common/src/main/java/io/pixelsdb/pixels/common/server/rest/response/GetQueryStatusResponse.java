@@ -19,26 +19,30 @@
  */
 package io.pixelsdb.pixels.common.server.rest.response;
 
+import io.pixelsdb.pixels.common.server.QueryStatus;
+
+import java.util.Map;
+
 /**
  * @author hank
- * @create 2023-05-24
+ * @create 2023-07-23
  */
-public class SubmitQueryResponse
+public class GetQueryStatusResponse
 {
     private int errorCode;
     private String errorMessage;
-    private String traceToken;
+    private Map<String, QueryStatus> queryStatuses;
 
     /**
      * Default constructor for Jackson.
      */
-    public SubmitQueryResponse() { }
+    public GetQueryStatusResponse() { }
 
-    public SubmitQueryResponse(int errorCode, String errorMessage, String traceToken)
+    public GetQueryStatusResponse(int errorCode, String errorMessage, Map<String, QueryStatus> queryStatuses)
     {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
-        this.traceToken = traceToken;
+        this.queryStatuses = queryStatuses;
     }
 
     public int getErrorCode()
@@ -61,13 +65,13 @@ public class SubmitQueryResponse
         this.errorMessage = errorMessage;
     }
 
-    public String getTraceToken()
+    public Map<String, QueryStatus> getQueryStatuses()
     {
-        return traceToken;
+        return queryStatuses;
     }
 
-    public void setTraceToken(String traceToken)
+    public void setQueryStatuses(Map<String, QueryStatus> queryStatuses)
     {
-        this.traceToken = traceToken;
+        this.queryStatuses = queryStatuses;
     }
 }

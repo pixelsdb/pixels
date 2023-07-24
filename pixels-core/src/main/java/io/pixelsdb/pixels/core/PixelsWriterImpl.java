@@ -58,6 +58,7 @@ import static java.util.Objects.requireNonNull;
  * Pixels file writer default implementation
  * <p>
  * This writer is NOT thread safe!
+ * </p>
  *
  * @author guodong
  * @author hank
@@ -100,7 +101,15 @@ public class PixelsWriterImpl implements PixelsWriter
     private final List<TypeDescription> children;
 
     private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
-    private int chunkAlignment;
+    /**
+     * The number of bytes that each column chunk is aligned to.
+     */
+    private final int chunkAlignment;
+    /**
+     * The byte buffer padded to each column chunk for alignment.
+     */
+    private final byte[] chunkPaddingBuffer;
+
     private PixelsWriterImpl(
             TypeDescription schema,
             int pixelStride,
@@ -126,6 +135,7 @@ public class PixelsWriterImpl implements PixelsWriter
         this.partitioned = partitioned;
         this.partKeyColumnIds = requireNonNull(partKeyColumnIds, "partKeyColumnIds is null");
         this.chunkAlignment = Integer.parseInt(ConfigFactory.Instance().getProperty("column.chunk.alignment"));
+        this.chunkPaddingBuffer = new byte[this.chunkAlignment];
         children = schema.getChildren();
         checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
         this.columnWriters = new ColumnWriter[children.size()];
@@ -521,10 +531,10 @@ public class PixelsWriterImpl implements PixelsWriter
                     physicalWriter.append(rowGroupBuffer, 0, rowGroupBuffer.length);
                     writtenBytes += rowGroupBuffer.length;
                     // add align bytes to make sure the column size is the multiple of fsBlockSize
-                    if(rowGroupBuffer.length % chunkAlignment != 0) {
+                    if(rowGroupBuffer.length % chunkAlignment != 0)
+                    {
                         int alignByte = chunkAlignment - rowGroupBuffer.length % chunkAlignment;
-                        byte[] emptyArray = new byte[alignByte];
-                        physicalWriter.append(emptyArray, 0, alignByte);
+                        physicalWriter.append(chunkPaddingBuffer, 0, alignByte);
                         writtenBytes += alignByte;
                     }
                 }
@@ -551,7 +561,8 @@ public class PixelsWriterImpl implements PixelsWriter
             chunkIndexBuilder.setChunkOffset(curRowGroupOffset + rowGroupDataLength);
             chunkIndexBuilder.setChunkLength(writer.getColumnChunkSize());
             rowGroupDataLength += writer.getColumnChunkSize();
-            if((curRowGroupOffset + rowGroupDataLength) % chunkAlignment != 0) {
+            if((curRowGroupOffset + rowGroupDataLength) % chunkAlignment != 0)
+            {
                 rowGroupDataLength += (int) (chunkAlignment - (curRowGroupOffset + rowGroupDataLength) % chunkAlignment);
             }
             // collect columnChunkIndex from every column chunk into curRowGroupIndex
