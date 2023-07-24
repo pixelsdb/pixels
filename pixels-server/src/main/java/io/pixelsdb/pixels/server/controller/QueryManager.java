@@ -147,7 +147,7 @@ public class QueryManager
             {
                 try
                 {
-                    ReceivedQuery query = pendingQueueRe.poll(1000, TimeUnit.MILLISECONDS);
+                    ReceivedQuery query = pendingQueueRe.poll(60, TimeUnit.SECONDS);
                     if (query != null)
                     {
                         // this queue should only contain relaxed queries that are to be executed in the mpp cluster
@@ -209,7 +209,7 @@ public class QueryManager
             {
                 try
                 {
-                    ReceivedQuery query = pendingQueueBe.poll(1000, TimeUnit.MILLISECONDS);
+                    ReceivedQuery query = pendingQueueBe.poll(60, TimeUnit.SECONDS);
                     if (query != null)
                     {
                         // this queue should only contain best-effort queries that are to be executed in the mpp cluster
@@ -246,12 +246,19 @@ public class QueryManager
      */
     public SubmitQueryResponse submitQuery(SubmitQueryRequest request)
     {
-        if (request.getExecutionHint() == ExecutionHint.RELAXED)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
         {
             try
             {
                 String traceToken = UUID.randomUUID().toString();
-                this.pendingQueueRe.put(new ReceivedQuery(traceToken, request, System.currentTimeMillis()));
+                if (request.getExecutionHint() == ExecutionHint.RELAXED)
+                {
+                    this.pendingQueueRe.put(new ReceivedQuery(traceToken, request, System.currentTimeMillis()));
+                }
+                else
+                {
+                    this.pendingQueueBe.put(new ReceivedQuery(traceToken, request, System.currentTimeMillis()));
+                }
                 return new SubmitQueryResponse(ErrorCode.SUCCESS, "", traceToken);
             } catch (InterruptedException e)
             {
