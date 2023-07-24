@@ -67,7 +67,7 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
                     TimeUnit.MILLISECONDS.sleep(10);
                 } catch (InterruptedException e)
                 {
-                    log.error("interrupted while waiting for enqueue adaptively.");
+                    log.error("interrupted while waiting for enqueue adaptively");
                 }
             }
         }

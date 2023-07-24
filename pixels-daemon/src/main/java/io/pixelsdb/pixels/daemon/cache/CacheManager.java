@@ -252,8 +252,8 @@ public class CacheManager
                                     }
                                 } else if (cacheStatus.get() == CacheNodeStatus.UPDATING.StatusCode)
                                 {
-                                    // The local cache is been updating, ignore the new version.
-                                    logger.warn("The local cache is been updating for version (" + localCacheVersion + "), " +
+                                    // The local cache is updating, ignore the new version.
+                                    logger.warn("The local cache is updating for version (" + localCacheVersion + "), " +
                                             "ignore the new cache version (" + version + ").");
                                 } else
                                 {
