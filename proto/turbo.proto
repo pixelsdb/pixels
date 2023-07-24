@@ -33,6 +33,7 @@ service QueryScheduleService {
   rpc ScheduleQuery (ScheduleQueryRequest) returns (ScheduleQueryResponse);
   rpc FinishQuery (FinishQueryRequest) returns (FinishQueryResponse);
   rpc GetQuerySlots (GetQuerySlotsRequest) returns (GetQuerySlotsResponse);
+  rpc GetQueryConcurrency (GetQueryConcurrencyRequest) returns (GetQueryConcurrencyResponse);
 }
 
 // begin request/response definition for query scheduling service
@@ -61,8 +62,17 @@ message GetQuerySlotsRequest {
 
 message GetQuerySlotsResponse {
   int32 errorCode = 1;
-  uint32 MppSlots = 2;
-  uint32 CfSlots = 3;
+  uint32 mppSlots = 2;
+  uint32 cfSlots = 3;
+}
+
+message GetQueryConcurrencyRequest {
+}
+
+message GetQueryConcurrencyResponse {
+  int32 errorCode = 1;
+  uint32 mppConcurrency = 2;
+  uint32 cfConcurrency = 3;
 }
 
 // The service definitions for the serverless workers in vHive.

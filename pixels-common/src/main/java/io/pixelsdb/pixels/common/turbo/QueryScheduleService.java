@@ -45,13 +45,25 @@ public class QueryScheduleService
 
     public static class QuerySlots
     {
-        public final int MppSlots;
-        public final int CfSlots;
+        public final int mppSlots;
+        public final int cfSlots;
 
         public QuerySlots(int mppSlots, int cfSlots)
         {
-            MppSlots = mppSlots;
-            CfSlots = cfSlots;
+            this.mppSlots = mppSlots;
+            this.cfSlots = cfSlots;
+        }
+    }
+
+    public static class QueryConcurrency
+    {
+        public final int mppConcurrency;
+        public final int cfConcurrency;
+
+        public QueryConcurrency(int mppConcurrency, int cfConcurrency)
+        {
+            this.mppConcurrency = mppConcurrency;
+            this.cfConcurrency = cfConcurrency;
         }
     }
 
@@ -137,5 +149,16 @@ public class QueryScheduleService
             throw new QueryScheduleException("failed to get query slots, error code=" + response.getErrorCode());
         }
         return new QuerySlots(response.getMppSlots(), response.getCfSlots());
+    }
+
+    public QueryConcurrency getQueryConcurrency() throws QueryScheduleException
+    {
+        TurboProto.GetQueryConcurrencyRequest request = TurboProto.GetQueryConcurrencyRequest.newBuilder().build();
+        TurboProto.GetQueryConcurrencyResponse response = this.stub.getQueryConcurrency(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new QueryScheduleException("failed to get query concurrency, error code=" + response.getErrorCode());
+        }
+        return new QueryConcurrency(response.getMppConcurrency(), response.getCfConcurrency());
     }
 }

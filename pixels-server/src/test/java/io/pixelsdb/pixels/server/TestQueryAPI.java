@@ -57,7 +57,7 @@ public class TestQueryAPI
         String json = this.mockMvc.perform(
                 post(RestUrlPath.SUBMIT_QUERY).contentType(MediaType.APPLICATION_JSON).content(
                         JSON.toJSONString(new SubmitQueryRequest(
-                                "select * from nation", ExecutionHint.COST_EFFECTIVE, 10))))
+                                "select * from nation", ExecutionHint.RELAXED, 10))))
                 .andDo(print()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         SubmitQueryResponse response = JSON.parseObject(json, SubmitQueryResponse.class);
         TimeUnit.SECONDS.sleep(5);
