@@ -1,7 +1,21 @@
 # Pixels-Worker-Vhive
 
-This module is to be used to create the docker image for vHive functions.
-Run `mvn package` to generate the executable JAR file in `target/pixels-worker-vhive-jar-with-dependencies.jar`.
+This module is for creating the Docker image for vHive cloud functions.
+
+\* Currently, you need to modify [pixels-trino/connector/pom.xml](https://github.com/pixelsdb/pixels-trino/blob/master/connector/pom.xml): replace the `pixels-invoker-lambda` with `pixels-invoker-vhive`.
+
+After [building Pixels](https://github.com/pixelsdb/pixels#build-pixels), we have the executable JAR file `target/pixels-worker-vhive-jar-with-dependencies.jar`.
+Also modify the following items in `pixels.properties`:
+```properties
+# which cloud function service to use, can be lambda (AWS Lambda) or vhive (vHive)
+executor.function.service=vhive
+executor.ordered.layout.enabled=false
+executor.compact.layout.enabled=true
+# parameter for vhive client
+vhive.hostname=[Your serverless endpoint, acquired by `kn service list` after deployment]
+vhive.port=80
+## or localhost:50051 if you are locally running your worker Docker image without deployment
+```
 
 ## Docker Build
 
@@ -14,20 +28,8 @@ docker build -f ./Dockerfile -t <your-docker-username>/<your-docker-image-name>:
 
 ## Docker Run
 
-The docker image needs some environement variables to run successfully:
-
-```properties
-PROFILING_ENABLED=true | false
-PROFILING_EVENT=wall | alloc
-FTP_HOST=<your-ftp-host>
-FTP_PORT=<your-ftp-port>
-FTP_USERNAME=<your-ftp-username>
-FTP_PASSWORD=<your-ftp-password>
-```
-
-If you want to run the docker image locally, please provide these environement variables by `--env` to correctly
-start the gRPC server in docker.
-The entire docker command to test the docker image is:
+First of all, test the Docker image locally.
+Please pass the required environement variables by the `--env` option to correctly start the gRPC server in docker.
 
 ```bash
 docker run -p 50051:50051 --rm --network=bridge \
@@ -37,18 +39,17 @@ docker run -p 50051:50051 --rm --network=bridge \
 --env FTP_PORT=<your-ftp-port> \
 --env FTP_USERNAME=<your-ftp-username> \
 --env FTP_PASSWORD=<your-ftp-password> \
-<your-docker-username>/<your-docker-image-name>:<your-iamge-tag>
+<your-docker-username>/<your-docker-image-name>:<your-image-tag>
 ```
+... where you can also use `false` for `PROFILING_ENABLED`, and `alloc` for `PROFILING_EVENT`.
 
-As for vHive function deployment, these environment variables are specify in
-the `configs/knative_workload/worker.yaml`([vHive project directory](https://github.com/pixelsdb/vHive)), modify and set them to
-the real values.
+As for vHive function deployment, these environment variables are specified in the `configs/knative_workload/worker.yaml`([vHive project directory](https://github.com/pixelsdb/vhive)). Modify them accordingly before deployment.
 
 ## Docker Push
 
-If function image can correctly run inside the local docker container, you can push it to your own
-registry for the vHive worker's `containerd` to pull.
-Here we assume you choose the docker hub by default:
+If the function image works well inside the local docker container, you can push it to your own
+registry for the vHive worker to pull.
+Note that Docker uses the docker hub by default, unless otherwise specified.
 
 ```bash
 docker push <your-docker-username>/<your-docker-image-name>:<your-image-tag>
@@ -57,9 +58,9 @@ docker push <your-docker-username>/<your-docker-image-name>:<your-image-tag>
 ## FTP Service for Debuging and Profiling
 
 As you can see, we have FTP related environment variables in the configuration.
-This is because the image will generate the logging file and profiling file during the execution, and the function image
-running inside the Firecracker microVM is temporary.
-Therefore, we need a permanent location to store such files for analysis.
+This is because the function image will generate the logging file and profiling file during the execution, but the Firecracker microVM
+where the image resides is short-lived.
+Therefore, we need a persistent location to store such files for analysis.
 
 Now our module use FTP service as a solution.
 You can follow [this tutorial](https://ubuntu.com/server/docs/service-ftp)
