@@ -27,15 +27,15 @@ package pixels.proto;
 option java_package = "io.pixelsdb.pixels.core";
 option java_outer_classname = "PixelsProto";
 
-// Row Group: A logical horizontal partitioning of the data into rows. There is no physical
-//            structure that is guaranteed for a row group. A row group consists of a column
-//            chunk for each column in the dataset.
-// Column Chunk: A chunk of the data for a particular column. These live in a particular row group and is guaranteed to
-//               be contiguous in the file.
-// Pixel: A column chunk is divided into several pixels. A pixel is conceptually an smallest indivisible unit in terms
-//        of indexing. Each pixel contains a fixed num (e.g., 10000) of values inside.
+//     Row Group: The logical and horizontal partition of a table.
+//                Row group has no physical boundaries in the file.
+//                Data in a row group is stored in columns.
+//  Column Chunk: The chunk of data for a column in a row group.
+//                A column chunk is stored sequentially in the file.
+//         Pixel: Each column chunk contains a sequence of 'pixels'.
+//                Each pixel contains a number (e.g., 10000) of values.
 
-// The contents of the file tail that must be serialized.
+// The content of the file tail that must be serialized.
 message FileTail {
     optional Footer footer = 1;
     optional PostScript postscript = 2;
@@ -44,11 +44,11 @@ message FileTail {
 }
 
 // PostScript
-// version: pixels file version
+// version: Pixels file version
 // contentLength: file content length (everything except FileTail)
-// number of rows: number of rows in the file
-// compression: compression kind. currently USELESS
-// compressionBlockSize: compression block size. currently USELESS
+// numberOfRows: number of rows in the file
+// compression: compression kind, currently NOT USED
+// compressionBlockSize: compression block size, currently NOT USED
 // pixelStride: the maximum number of rows in a pixel
 // magic: "PIXELS"
 message PostScript {
