@@ -340,14 +340,16 @@ public class QueryManager
                 // TODO: support get cost from trans service.
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
                         columnPrintSizes, columnNames, rows, latencyMs, 0);
-                this.runningQueries.remove(traceToken);
+                // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
+                this.runningQueries.remove(traceToken);
             } catch (SQLException e)
             {
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED,
                         e.getMessage(), null, null, null, 0, 0);
-                this.runningQueries.remove(traceToken);
+                // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
+                this.runningQueries.remove(traceToken);
                 log.error("failed to execute query with trac token " + traceToken, e);
                 throw new QueryServerException("failed to execute query with trac token " + traceToken, e);
             }
@@ -391,12 +393,14 @@ public class QueryManager
      * @param traceToken the trace token of the query
      * @return null if the query result is not found
      */
-    public GetQueryResultResponse popQueryResult(String traceToken)
+    public synchronized GetQueryResultResponse popQueryResult(String traceToken)
     {
-        GetQueryResultResponse response = this.queryResults.remove(traceToken);
+        GetQueryResultResponse response = this.queryResults.get(traceToken);
         if (response != null)
         {
+            // put it into finished query before removing from query results, to avoid unknown query status
             this.finishedQueries.put(traceToken, traceToken);
+            this.queryResults.remove(traceToken);
         }
         return response;
     }
