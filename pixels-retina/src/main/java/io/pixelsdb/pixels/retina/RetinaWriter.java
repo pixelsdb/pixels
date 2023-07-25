@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.retina;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -33,8 +32,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.daemon.MetadataProto;
-import io.pixelsdb.pixels.load.Config;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -52,7 +50,6 @@ public class RetinaWriter {
     MetadataService metadataService;
 
     private Properties prop;
-    private Config config;
 
     HashMap<String, TypeDescription> schemas;
 
@@ -105,7 +102,7 @@ public class RetinaWriter {
         String key = schemaName + ":" + tableName;
         TypeDescription schema = schemas.getOrDefault(key, null);
         if (schema == null) {
-            List<Column> columns = metadataService.getColumns(schemaName, tableName);
+            List<Column> columns = metadataService.getColumns(schemaName, tableName, false);
             StringBuilder builder = new StringBuilder();
             builder.append("struct<");
             String prefix = "struct<";

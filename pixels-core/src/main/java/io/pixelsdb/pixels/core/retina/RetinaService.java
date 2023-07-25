@@ -22,12 +22,11 @@ package io.pixelsdb.pixels.core.retina;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.RetinaProto;
 import io.pixelsdb.pixels.core.RetinaServiceGrpc;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.util.UUID;
