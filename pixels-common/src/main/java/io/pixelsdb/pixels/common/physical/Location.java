@@ -33,8 +33,9 @@ import java.net.URI;
  * blocks and each block has its own location. For these storage systems,
  * the file's locations are the locations of the blocks.
  * <p/>
- * @create 2021-08-20
+ *
  * @author hank
+ * @create 2021-08-20
  */
 public class Location
 {

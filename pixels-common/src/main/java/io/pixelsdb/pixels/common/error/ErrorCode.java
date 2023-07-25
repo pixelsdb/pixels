@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.error;
 
 /**
- * Created at: 19-4-19
- * Author: hank
+ * @author hank
+ * @create 2019-04-19
  */
 public class ErrorCode
 {
