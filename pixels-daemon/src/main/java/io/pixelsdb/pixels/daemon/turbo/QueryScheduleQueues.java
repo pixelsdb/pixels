@@ -26,6 +26,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 
 /**
  * This is only used by pixels-turbo to queue the running queries and choose the query executor.
+ *
  * @author hank
  * @create 2022-10-24
  */

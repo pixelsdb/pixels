@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.exception;
 
 /**
- * Created at: 20/02/2022
- * Author: hank
+ * @author hank
+ * @create 2022-02-20
  */
 public class TransException extends Exception
 {

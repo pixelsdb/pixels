@@ -22,8 +22,8 @@ package io.pixelsdb.pixels.common.layout;
 import java.util.*;
 
 /**
- * Created at: 20/10/2021
- * Author: hank
+ * @author hank
+ * @create 2021-10-20
  */
 public class InvertedProjectionsIndex implements ProjectionsIndex
 {

@@ -43,8 +43,8 @@ import java.util.Random;
  *     performance stable.
  * </p>
  *
- * Created at: 16/10/2021
- * Author: hank
+ * @author hank
+ * @create 2021-10-16
  */
 public class RateLimitedScheduler extends SortMergeScheduler
 {

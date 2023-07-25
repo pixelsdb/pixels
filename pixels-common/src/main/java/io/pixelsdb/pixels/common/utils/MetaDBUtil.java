@@ -31,7 +31,7 @@ import java.sql.SQLException;
  */
 public class MetaDBUtil
 {
-    private static MetaDBUtil INSTANCE = new MetaDBUtil();
+    private static final MetaDBUtil INSTANCE = new MetaDBUtil();
 
     public static MetaDBUtil Instance()
     {

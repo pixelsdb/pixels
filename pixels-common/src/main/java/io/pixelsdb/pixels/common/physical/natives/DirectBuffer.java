@@ -32,8 +32,8 @@ import static com.google.common.base.Preconditions.checkArgument;
  * The buffer that is allocated in off-heap memory. We need more controls on the buffer,
  * so we do not used jdk's DirectByteBuffer.
  * <br/>
- * Created at: 02/02/2023
- * Author: hank
+ * @author hank
+ * @create 2023-02-02
  */
 public class DirectBuffer implements Closeable
 {

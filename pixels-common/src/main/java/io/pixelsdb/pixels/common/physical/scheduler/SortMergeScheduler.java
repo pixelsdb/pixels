@@ -36,8 +36,8 @@ import java.util.concurrent.CompletableFuture;
 /**
  * SortMerge scheduler firstly sorts the requests in the batch by the start offset,
  * then it tries to merge the requests that can be read sequentially from the reader.
- * Created at: 9/12/21
- * Author: hank
+ * @author hank
+ * @create 2021-09-12
  */
 public class SortMergeScheduler implements Scheduler
 {

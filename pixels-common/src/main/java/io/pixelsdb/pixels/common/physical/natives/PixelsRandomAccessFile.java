@@ -8,8 +8,9 @@ import java.nio.ByteBuffer;
 /**
  * Random access file in pixels, currently it is read-only.
  * We assume that all the data in this file were written in big endian.
- * Created at: 2/21/23
- * Author: hank
+ *
+ * @author hank
+ * @create 2023-02-21
  */
 public interface PixelsRandomAccessFile extends DataInput, Closeable
 {
