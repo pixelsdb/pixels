@@ -24,13 +24,13 @@ option java_package = "com.retina.demo";
 package retina;
 
 service RetinaService {
-  rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse) {}
-  rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse) {}
-  rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse) {}
-  rpc QueryRecords (QueryRecordsRequest) returns (QueryRecordsResponse) {}
-  rpc FinishRecords (QueryAck) returns (ResponseHeader) {}
-  rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse) {}
-  rpc FinishVisibility (QueryAck) returns (ResponseHeader) {}
+  rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
+  rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
+  rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
+  rpc QueryRecords (QueryRecordsRequest) returns (QueryRecordsResponse);
+  rpc FinishRecords (QueryAck) returns (ResponseHeader);
+  rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
+  rpc FinishVisibility (QueryAck) returns (ResponseHeader);
 }
 
 // header
