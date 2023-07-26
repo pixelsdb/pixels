@@ -34,7 +34,6 @@ private:
     int startsOffset;
 
 	int * starts;
-	int * orders;
     int startsLength;
     /**
      * In this method, we have reduced most of significant memory copies.

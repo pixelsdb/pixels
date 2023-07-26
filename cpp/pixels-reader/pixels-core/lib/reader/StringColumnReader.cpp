@@ -8,7 +8,6 @@
 StringColumnReader::StringColumnReader(std::shared_ptr<TypeDescription> type) : ColumnReader(type) {
     bufferOffset = 0;
 	starts = nullptr;
-	orders = nullptr;
 }
 
 void StringColumnReader::close() {
@@ -35,7 +34,7 @@ void StringColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::
                     // TODO: should write the remaining code
                 }
                 if(filterMask->get(i)) {
-                    int originId = orders[(int) contentDecoder->next()];
+                    int originId = (int) contentDecoder->next();
                     int tmpLen = starts[originId + 1] - starts[originId];
                     // use setRef instead of setVal to reduce memory copy.
                     columnVector->setRef(i + vectorIndex, originsBuf->getPointer(), starts[originId], tmpLen);
@@ -72,7 +71,7 @@ void StringColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::
                     int pixelId = elementIndex / pixelStride;
                     // TODO: should write the remaining code
                 }
-                int originId = orders[(int) contentDecoder->next()];
+                int originId = (int) contentDecoder->next();
                 int tmpLen = starts[originId + 1] - starts[originId];
                 // use setRef instead of setVal to reduce memory copy.
                 columnVector->setRef(i + vectorIndex, originsBuf->getPointer(), starts[originId], tmpLen);
@@ -102,19 +101,16 @@ void StringColumnReader::readContent(std::shared_ptr<ByteBuffer> input,
                                      pixels::proto::ColumnEncoding & encoding) {
     if(encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY) {
         input->markReaderIndex();
-        input->skipBytes(inputLength - 3 * sizeof(int));
+        input->skipBytes(inputLength - 2 * sizeof(int));
         originsOffset = input->getInt();
         startsOffset = input->getInt();
-        int ordersOffset = input->getInt();
         input->resetReaderIndex();
         // read buffers
         contentBuf = std::make_shared<ByteBuffer>(*input, 0, originsOffset);
 		originsBuf = std::make_shared<ByteBuffer>(
 		    *input, originsOffset, startsOffset - originsOffset);
 		std::shared_ptr<ByteBuffer> startsBuf = std::make_shared<ByteBuffer>(
-		    *input, startsOffset, ordersOffset - startsOffset);
-		std::shared_ptr<ByteBuffer> ordersBuf = std::make_shared<ByteBuffer>(
-		    *input, ordersOffset, inputLength - ordersOffset);
+		    *input, startsOffset, inputLength - startsOffset - 2 * sizeof(int));
 		int bufferStart = 0;
 		std::shared_ptr<RunLenIntDecoder> startsDecoder =
 		    std::make_shared<RunLenIntDecoder>(startsBuf, false);
@@ -128,14 +124,6 @@ void StringColumnReader::readContent(std::shared_ptr<ByteBuffer> input,
 			starts[i] = bufferStart + startsOffset - originsOffset;
 		} else {
             throw InvalidArgumentException("StringColumnReader::readContent: dictionary size must  be defined. ");
-		}
-		int originNum = startsLength - 1;
-		std::shared_ptr<RunLenIntDecoder> ordersDecoder =
-		    std::make_shared<RunLenIntDecoder>(ordersBuf, false);
-		orders = new int[originNum];
-		for (int i = 0; i < originNum && ordersDecoder->hasNext(); i++)
-		{
-			orders[i] = (int) ordersDecoder->next();
 		}
 		contentDecoder = std::make_shared<RunLenIntDecoder>(contentBuf, false);
     } else {
@@ -154,8 +142,5 @@ void StringColumnReader::readContent(std::shared_ptr<ByteBuffer> input,
 StringColumnReader::~StringColumnReader() {
 	if(starts != nullptr) {
 		delete[] starts;
-	}
-	if(orders != nullptr) {
-		delete[] orders;
 	}
 }
