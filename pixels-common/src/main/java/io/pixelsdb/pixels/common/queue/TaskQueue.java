@@ -23,7 +23,6 @@ package io.pixelsdb.pixels.common.queue;
  * @author hank
  * @create 2023-07-26
  */
-public class EtcdTaskQueue
+public class TaskQueue
 {
-
 }
