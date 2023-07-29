@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -38,32 +38,26 @@ public class Task<T>
 
     private final String id;
     private final T payload;
-    private final long leasePeriodMs;
+    private final Lease lease;
     private Status status;
-    private long leaseStartTimeMs;
-    private LeaseOwner leaseOwner;
 
     public Task(String id, T payload, long leasePeriodMs)
     {
         this.id = id;
         this.payload = payload;
-        this.leasePeriodMs = leasePeriodMs;
+        this.lease = new Lease(leasePeriodMs);
         this.status = Status.PENDING;
-        this.leaseStartTimeMs = 0;
-        this.leaseOwner = null;
     }
 
     public Task(String id, String payloadJson, Class<T> clazz, long leasePeriodMs)
     {
         this.id = id;
         this.payload = JSON.parseObject(payloadJson, clazz);
-        this.leasePeriodMs = leasePeriodMs;
+        this.lease = new Lease(leasePeriodMs);
         this.status = Status.PENDING;
-        this.leaseStartTimeMs = 0;
-        this.leaseOwner = null;
     }
 
-    public boolean start(LeaseOwner leaseOwner)
+    public boolean start(LeaseHolder leaseHolder)
     {
         synchronized (this.id)
         {
@@ -71,33 +65,38 @@ public class Task<T>
             {
                 return false;
             }
-            this.leaseOwner = requireNonNull(leaseOwner, "lease owner is null");
-            this.leaseStartTimeMs = System.currentTimeMillis();
+            this.lease.setOwner(requireNonNull(leaseHolder, "lease owner is null"));
+            this.lease.setStartTimeMs(System.currentTimeMillis());
             this.status = Status.RUNNING;
             return true;
         }
     }
 
-    public boolean extendLease(LeaseOwner leaseOwner)
+    public boolean extendLease(LeaseHolder leaseHolder)
     {
         synchronized (this.id)
         {
             long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseOwner, currentTimeMs))
+            if (!isRunningWell(leaseHolder, currentTimeMs))
             {
                 return false;
             }
-            this.leaseStartTimeMs = currentTimeMs;
+            this.lease.setStartTimeMs(currentTimeMs);
             return true;
         }
     }
 
-    public boolean complete(LeaseOwner leaseOwner)
+    public Lease getLease()
+    {
+        return lease;
+    }
+
+    public boolean complete(LeaseHolder leaseHolder)
     {
         synchronized (this.id)
         {
             long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseOwner, currentTimeMs))
+            if (!isRunningWell(leaseHolder, currentTimeMs))
             {
                 return false;
             }
@@ -106,12 +105,12 @@ public class Task<T>
         }
     }
 
-    public boolean abort(LeaseOwner leaseOwner)
+    public boolean abort(LeaseHolder leaseHolder)
     {
         synchronized (this.id)
         {
             long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseOwner, currentTimeMs))
+            if (!isRunningWell(leaseHolder, currentTimeMs))
             {
                 return false;
             }
@@ -125,26 +124,17 @@ public class Task<T>
         return status;
     }
 
-    public boolean isOwnedBy(LeaseOwner leaseOwner)
-    {
-        if (this.leaseOwner == null || leaseOwner == null)
-        {
-            return false;
-        }
-        return this.leaseOwner == leaseOwner || this.leaseOwner.equals(leaseOwner);
-    }
-
-    private boolean isRunningWell(LeaseOwner leaseOwner, long currentTimeMs)
+    private boolean isRunningWell(LeaseHolder leaseHolder, long currentTimeMs)
     {
         if (this.status != Status.RUNNING)
         {
             return false;
         }
-        if (!isOwnedBy(leaseOwner))
+        if (!this.lease.isHoldBy(leaseHolder))
         {
             return false;
         }
-        if (currentTimeMs - this.leaseStartTimeMs > leasePeriodMs)
+        if (this.lease.hasExpired(currentTimeMs))
         {
             this.status = Status.TIMEOUT;
             return false;

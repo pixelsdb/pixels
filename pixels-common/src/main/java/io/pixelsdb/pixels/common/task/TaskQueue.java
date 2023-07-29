@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.common.task;
 
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -28,40 +30,73 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class TaskQueue<E extends Task<?>>
 {
-    private final ConcurrentLinkedQueue<E> backingQueue;
+    private final ConcurrentLinkedQueue<E> pendingQueue;
+    private final ConcurrentHashMap<String, E> runningTasks;
 
     public TaskQueue()
     {
-        this.backingQueue = new ConcurrentLinkedQueue<>();
+        this.pendingQueue = new ConcurrentLinkedQueue<>();
+        this.runningTasks = new ConcurrentHashMap<>();
     }
 
     public TaskQueue(Collection<E> tasks)
     {
-        this.backingQueue = new ConcurrentLinkedQueue<>(tasks);
+        this.pendingQueue = new ConcurrentLinkedQueue<>(tasks);
+        this.runningTasks = new ConcurrentHashMap<>();
     }
 
-    public boolean addAll(Collection<E> tasks)
+    public boolean offerAllPending(Collection<E> tasks)
     {
-        return this.backingQueue.addAll(tasks);
+        return this.pendingQueue.addAll(tasks);
     }
 
-    public void clear()
+    public boolean offerPending(E task)
     {
-        this.backingQueue.clear();
+        return this.pendingQueue.offer(task);
     }
 
-    public boolean offer(E task)
+    public E pollPendingAndRun(LeaseHolder leaseHolder)
     {
-        return this.backingQueue.offer(task);
+        E task = this.pendingQueue.poll();
+        if (task != null)
+        {
+            task.start(leaseHolder);
+            this.runningTasks.put(task.getId(), task);
+            return task;
+        }
+        else
+        {
+            return null;
+        }
     }
 
-    public E poll()
+    public E complete(String taskId, LeaseHolder leaseHolder)
     {
-        return this.backingQueue.poll();
+        E task = this.runningTasks.remove(taskId);
+        if (task != null)
+        {
+            task.complete(leaseHolder);
+            return task;
+        }
+        else
+        {
+            return null;
+        }
     }
 
-    public E peek()
+    public E removeNextExpired()
     {
-        return this.backingQueue.peek();
+        long currentTimeMs = System.currentTimeMillis();
+        Iterator<E> iterator = this.pendingQueue.iterator();
+        while (iterator.hasNext())
+        {
+            E task = iterator.next();
+            if (task.getLease().hasExpired(currentTimeMs))
+            {
+                iterator.remove();
+                return task;
+            }
+        }
+        return null;
     }
 }
