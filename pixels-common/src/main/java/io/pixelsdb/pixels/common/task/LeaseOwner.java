@@ -17,23 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.queue;
-
-import io.pixelsdb.pixels.common.metadata.domain.Base;
-import org.junit.Test;
+package io.pixelsdb.pixels.common.task;
 
 /**
  * @author hank
- * @create 2023-07-26
+ * @create 2023-07-29
  */
-public class TestQueue
+public class LeaseOwner
 {
-    @Test
-    public void testTaskConstruction()
-    {
-        Task<Base> task = new Task<>("123", "{\"id\":456}", Base.class);
-        System.out.println(task.getId());
-        System.out.println(task.getPayloadJson());
-        System.out.println(task.getPayload().getId());
-    }
 }

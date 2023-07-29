@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2021-2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,12 +17,23 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.queue;
+package io.pixelsdb.pixels.common.task;
+
+import io.pixelsdb.pixels.common.metadata.domain.Base;
+import org.junit.Test;
 
 /**
  * @author hank
  * @create 2023-07-26
  */
-public class TaskQueue
+public class TestQueue
 {
+    @Test
+    public void testTaskConstruction()
+    {
+        Task<Base> task = new Task<>("123", "{\"id\":456}", Base.class, 60000);
+        System.out.println(task.getId());
+        System.out.println(task.getPayloadJson());
+        System.out.println(task.getPayload().getId());
+    }
 }
