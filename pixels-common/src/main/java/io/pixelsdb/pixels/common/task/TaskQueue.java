@@ -24,6 +24,8 @@ import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * @author hank
  * @create 2023-07-26
@@ -41,26 +43,54 @@ public class TaskQueue<E extends Task<?>>
 
     public TaskQueue(Collection<E> tasks)
     {
+        checkPendingTasks(tasks);
         this.pendingQueue = new ConcurrentLinkedQueue<>(tasks);
         this.runningTasks = new ConcurrentHashMap<>();
     }
 
+    /**
+     * Load a batch of pending tasks into this task queue.
+     * @param tasks the pending tasks
+     * @return true if loaded successfully
+     */
     public boolean offerAllPending(Collection<E> tasks)
     {
+        checkPendingTasks(tasks);
         return this.pendingQueue.addAll(tasks);
     }
 
+    private void checkPendingTasks(Collection<E> tasks)
+    {
+        checkArgument(tasks != null && !tasks.isEmpty(), "tasks should not be null or empty");
+        for (E task : tasks)
+        {
+            checkArgument(task.getStatus() == Task.Status.PENDING,
+                    "one of the tasks is not in pending status");
+        }
+    }
+
+    /**
+     * Load a pending task into this task queue.
+     * @param task the pending task
+     * @return true if loaded successfully
+     */
     public boolean offerPending(E task)
     {
         return this.pendingQueue.offer(task);
     }
 
-    public E pollPendingAndRun(LeaseHolder leaseHolder)
+    /**
+     * Poll one pending task from the head of the pending queue, set it as running,
+     * and put it into the list of running tasks.
+     * @param leaseholder the leaseholder who is responsible for running the task
+     * @return the task that is started and with a lease hold by the lease hold, or null if not such task
+     */
+    public E pollPendingAndRun(Leaseholder leaseholder)
     {
         E task = this.pendingQueue.poll();
         if (task != null)
         {
-            task.start(leaseHolder);
+            task.start(leaseholder);
             this.runningTasks.put(task.getId(), task);
             return task;
         }
@@ -70,12 +100,18 @@ public class TaskQueue<E extends Task<?>>
         }
     }
 
-    public E complete(String taskId, LeaseHolder leaseHolder)
+    /**
+     * Retrieve a running task and set its status to complete.
+     * @param taskId the task id
+     * @param leaseholder the leaseholder who is running the task
+     * @return the task that is completed, or null if no such task
+     */
+    public E complete(String taskId, Leaseholder leaseholder)
     {
         E task = this.runningTasks.remove(taskId);
         if (task != null)
         {
-            task.complete(leaseHolder);
+            task.complete(leaseholder);
             return task;
         }
         else
@@ -84,6 +120,10 @@ public class TaskQueue<E extends Task<?>>
         }
     }
 
+    /**
+     * Iterate the list of running tasks, find and remove the next task with an expired lease.
+     * @return the task that is found and remove, or null if no such task
+     */
     public E removeNextExpired()
     {
         long currentTimeMs = System.currentTimeMillis();

@@ -29,7 +29,7 @@ public class Lease
 {
     private final long periodMs;
     private long startTimeMs;
-    private LeaseHolder owner;
+    private Leaseholder owner;
 
     public Lease(long periodMs)
     {
@@ -55,17 +55,17 @@ public class Lease
         this.startTimeMs = startTimeMs;
     }
 
-    public LeaseHolder getOwner()
+    public Leaseholder getOwner()
     {
         return owner;
     }
 
-    public void setOwner(LeaseHolder owner)
+    public void setHolder(Leaseholder owner)
     {
         this.owner = owner;
     }
 
-    public boolean isHoldBy(LeaseHolder leaseHolder)
+    public boolean isHoldBy(Leaseholder leaseHolder)
     {
         if (this.owner == null || leaseHolder == null)
         {

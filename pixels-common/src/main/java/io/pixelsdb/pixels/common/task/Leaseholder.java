@@ -31,12 +31,12 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @create 2023-07-29
  */
-public class LeaseHolder
+public class Leaseholder
 {
     private final String ownerId;
     private final Map<String, String> ownerMetadata;
 
-    public LeaseHolder(String ownerId)
+    public Leaseholder(String ownerId)
     {
         this.ownerId = requireNonNull(ownerId, "owner id is null");
         this.ownerMetadata = new HashMap<>();
@@ -70,11 +70,11 @@ public class LeaseHolder
         {
             return true;
         }
-        if (!(obj instanceof LeaseHolder))
+        if (!(obj instanceof Leaseholder))
         {
             return false;
         }
-        LeaseHolder that = (LeaseHolder) obj;
+        Leaseholder that = (Leaseholder) obj;
         return Objects.equals(this.ownerId, that.ownerId);
     }
 

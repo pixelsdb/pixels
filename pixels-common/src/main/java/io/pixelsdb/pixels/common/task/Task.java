@@ -57,7 +57,7 @@ public class Task<T>
         this.status = Status.PENDING;
     }
 
-    public boolean start(LeaseHolder leaseHolder)
+    public boolean start(Leaseholder leaseholder)
     {
         synchronized (this.id)
         {
@@ -65,19 +65,19 @@ public class Task<T>
             {
                 return false;
             }
-            this.lease.setOwner(requireNonNull(leaseHolder, "lease owner is null"));
+            this.lease.setHolder(requireNonNull(leaseholder, "leaseholder is null"));
             this.lease.setStartTimeMs(System.currentTimeMillis());
             this.status = Status.RUNNING;
             return true;
         }
     }
 
-    public boolean extendLease(LeaseHolder leaseHolder)
+    public boolean extendLease(Leaseholder leaseholder)
     {
         synchronized (this.id)
         {
             long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseHolder, currentTimeMs))
+            if (!isRunningWell(leaseholder, currentTimeMs))
             {
                 return false;
             }
@@ -91,12 +91,12 @@ public class Task<T>
         return lease;
     }
 
-    public boolean complete(LeaseHolder leaseHolder)
+    public boolean complete(Leaseholder leaseholder)
     {
         synchronized (this.id)
         {
             long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseHolder, currentTimeMs))
+            if (!isRunningWell(leaseholder, currentTimeMs))
             {
                 return false;
             }
@@ -105,12 +105,12 @@ public class Task<T>
         }
     }
 
-    public boolean abort(LeaseHolder leaseHolder)
+    public boolean abort(Leaseholder leaseholder)
     {
         synchronized (this.id)
         {
             long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseHolder, currentTimeMs))
+            if (!isRunningWell(leaseholder, currentTimeMs))
             {
                 return false;
             }
@@ -124,13 +124,13 @@ public class Task<T>
         return status;
     }
 
-    private boolean isRunningWell(LeaseHolder leaseHolder, long currentTimeMs)
+    private boolean isRunningWell(Leaseholder leaseholder, long currentTimeMs)
     {
         if (this.status != Status.RUNNING)
         {
             return false;
         }
-        if (!this.lease.isHoldBy(leaseHolder))
+        if (!this.lease.isHoldBy(leaseholder))
         {
             return false;
         }
