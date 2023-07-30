@@ -7,12 +7,12 @@
 LongColumnVector::LongColumnVector(int len, bool encoding, bool isLong): ColumnVector(len, encoding) {
 	if(encoding) {
 		if(isLong) {
-            posix_memalign(reinterpret_cast<void **>(&longVector), 4096,
+            posix_memalign(reinterpret_cast<void **>(&longVector), 32,
                            len * sizeof(int64_t));
 			intVector = nullptr;
 		} else {
 			longVector = nullptr;
-            posix_memalign(reinterpret_cast<void **>(&intVector), 4096,
+            posix_memalign(reinterpret_cast<void **>(&intVector), 32,
                            len * sizeof(int32_t));
 		}
 	} else {

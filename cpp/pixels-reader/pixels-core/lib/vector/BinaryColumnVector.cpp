@@ -5,7 +5,7 @@
 #include "vector/BinaryColumnVector.h"
 
 BinaryColumnVector::BinaryColumnVector(int len, bool encoding): ColumnVector(len, encoding) {
-    posix_memalign(reinterpret_cast<void **>(&vector), 4096,
+    posix_memalign(reinterpret_cast<void **>(&vector), 32,
                    len * sizeof(duckdb::string_t));
     memoryUsage += (long) sizeof(uint8_t) * len;
 }
