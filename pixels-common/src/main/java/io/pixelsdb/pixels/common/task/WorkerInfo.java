@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,21 +19,10 @@
  */
 package io.pixelsdb.pixels.common.task;
 
-import io.pixelsdb.pixels.common.metadata.domain.Base;
-import org.junit.Test;
-
 /**
  * @author hank
- * @create 2023-07-26
+ * @create 2023-07-31
  */
-public class TestQueue
+public interface WorkerInfo
 {
-    @Test
-    public void testTaskConstruction()
-    {
-        Task<Base> task = new Task<>("123", "{\"id\":456}", Base.class);
-        System.out.println(task.getTaskId());
-        System.out.println(task.getPayloadJson());
-        System.out.println(task.getPayload().getId());
-    }
 }

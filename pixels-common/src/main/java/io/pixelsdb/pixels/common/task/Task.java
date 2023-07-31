@@ -23,6 +23,7 @@ import com.alibaba.fastjson.JSON;
 
 import java.util.Objects;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -36,67 +37,52 @@ public class Task<T>
         PENDING, RUNNING, TIMEOUT, COMPLETE, ABORT
     }
 
-    private final String id;
+    private final String taskId;
     private final T payload;
-    private final Lease lease;
     private Status status;
+    private Worker worker;
 
-    public Task(String id, T payload, long leasePeriodMs)
+    public Task(String taskId, T payload)
     {
-        this.id = id;
+        this.taskId = taskId;
         this.payload = payload;
-        this.lease = new Lease(leasePeriodMs);
         this.status = Status.PENDING;
+        this.worker = null;
     }
 
-    public Task(String id, String payloadJson, Class<T> clazz, long leasePeriodMs)
+    public Task(String taskId, String payloadJson, Class<T> clazz)
     {
-        this.id = id;
+        this.taskId = taskId;
         this.payload = JSON.parseObject(payloadJson, clazz);
-        this.lease = new Lease(leasePeriodMs);
         this.status = Status.PENDING;
+        this.worker = null;
     }
 
-    public boolean start(Leaseholder leaseholder)
+    public boolean start(Worker worker)
     {
-        synchronized (this.id)
+        requireNonNull(worker, "worker is null");
+        synchronized (this.taskId)
         {
             if (this.status != Status.PENDING)
             {
                 return false;
             }
-            this.lease.setHolder(requireNonNull(leaseholder, "leaseholder is null"));
-            this.lease.setStartTimeMs(System.currentTimeMillis());
+            if (this.worker != null)
+            {
+                return false;
+            }
+            checkArgument(worker.isAlive(), "the worker does not have a valid lease");
+            this.worker = worker;
             this.status = Status.RUNNING;
             return true;
         }
     }
 
-    public boolean extendLease(Leaseholder leaseholder)
+    public boolean complete()
     {
-        synchronized (this.id)
+        synchronized (this.taskId)
         {
-            long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseholder, currentTimeMs))
-            {
-                return false;
-            }
-            this.lease.setStartTimeMs(currentTimeMs);
-            return true;
-        }
-    }
-
-    public Lease getLease()
-    {
-        return lease;
-    }
-
-    public boolean complete(Leaseholder leaseholder)
-    {
-        synchronized (this.id)
-        {
-            long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseholder, currentTimeMs))
+            if (!isRunningWell())
             {
                 return false;
             }
@@ -105,12 +91,11 @@ public class Task<T>
         }
     }
 
-    public boolean abort(Leaseholder leaseholder)
+    public boolean abort()
     {
-        synchronized (this.id)
+        synchronized (this.taskId)
         {
-            long currentTimeMs = System.currentTimeMillis();
-            if (!isRunningWell(leaseholder, currentTimeMs))
+            if (!isRunningWell())
             {
                 return false;
             }
@@ -119,22 +104,23 @@ public class Task<T>
         }
     }
 
+
     public Status getStatus()
     {
         return status;
     }
 
-    private boolean isRunningWell(Leaseholder leaseholder, long currentTimeMs)
+    public boolean isRunningWell()
     {
         if (this.status != Status.RUNNING)
         {
             return false;
         }
-        if (!this.lease.isHoldBy(leaseholder))
+        if (this.worker == null)
         {
             return false;
         }
-        if (this.lease.hasExpired(currentTimeMs))
+        if (!this.worker.isAlive())
         {
             this.status = Status.TIMEOUT;
             return false;
@@ -147,9 +133,9 @@ public class Task<T>
         return JSON.toJSONString(this.payload);
     }
 
-    public String getId()
+    public String getTaskId()
     {
-        return id;
+        return taskId;
     }
 
     public T getPayload()
@@ -160,7 +146,7 @@ public class Task<T>
     @Override
     public int hashCode()
     {
-        return 31 * Objects.hashCode(this.id) + Objects.hashCode(this.payload);
+        return 31 * Objects.hashCode(this.taskId) + Objects.hashCode(this.payload);
     }
 
     @Override
@@ -175,7 +161,7 @@ public class Task<T>
             return false;
         }
         Task<?> that = (Task<?>) obj;
-        return Objects.equals(this.id, that.id) && Objects.equals(this.payload, that.payload);
+        return Objects.equals(this.taskId, that.taskId) && Objects.equals(this.payload, that.payload);
     }
 
     @Override

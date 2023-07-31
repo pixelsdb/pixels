@@ -29,13 +29,11 @@ public class Lease
 {
     private final long periodMs;
     private long startTimeMs;
-    private Leaseholder owner;
 
     public Lease(long periodMs)
     {
         this.periodMs = periodMs;
         this.startTimeMs = 0L;
-        this.owner = null;
     }
 
     public long getPeriodMs()
@@ -48,30 +46,11 @@ public class Lease
         return startTimeMs;
     }
 
-    public void setStartTimeMs(long startTimeMs)
+    protected void setStartTimeMs(long startTimeMs)
     {
         checkArgument(startTimeMs > this.startTimeMs,
                 "the new start time must be later than the current one");
         this.startTimeMs = startTimeMs;
-    }
-
-    public Leaseholder getOwner()
-    {
-        return owner;
-    }
-
-    public void setHolder(Leaseholder owner)
-    {
-        this.owner = owner;
-    }
-
-    public boolean isHoldBy(Leaseholder leaseHolder)
-    {
-        if (this.owner == null || leaseHolder == null)
-        {
-            return false;
-        }
-        return this.owner == leaseHolder || this.owner.equals(leaseHolder);
     }
 
     public boolean hasExpired(long currentTimeMs)

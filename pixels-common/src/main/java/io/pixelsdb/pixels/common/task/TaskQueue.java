@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.task;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -59,7 +60,7 @@ public class TaskQueue<E extends Task<?>>
         return this.pendingQueue.addAll(tasks);
     }
 
-    private void checkPendingTasks(Collection<E> tasks)
+    private  void checkPendingTasks(Collection<E> tasks)
     {
         checkArgument(tasks != null && !tasks.isEmpty(), "tasks should not be null or empty");
         for (E task : tasks)
@@ -82,16 +83,16 @@ public class TaskQueue<E extends Task<?>>
     /**
      * Poll one pending task from the head of the pending queue, set it as running,
      * and put it into the list of running tasks.
-     * @param leaseholder the leaseholder who is responsible for running the task
+     * @param worker the worker who is responsible for running the task
      * @return the task that is started and with a lease hold by the lease hold, or null if not such task
      */
-    public E pollPendingAndRun(Leaseholder leaseholder)
+    public E pollPendingAndRun(Worker worker)
     {
         E task = this.pendingQueue.poll();
         if (task != null)
         {
-            task.start(leaseholder);
-            this.runningTasks.put(task.getId(), task);
+            task.start(worker);
+            this.runningTasks.put(task.getTaskId(), task);
             return task;
         }
         else
@@ -103,15 +104,14 @@ public class TaskQueue<E extends Task<?>>
     /**
      * Retrieve a running task and set its status to complete.
      * @param taskId the task id
-     * @param leaseholder the leaseholder who is running the task
      * @return the task that is completed, or null if no such task
      */
-    public E complete(String taskId, Leaseholder leaseholder)
+    public E complete(String taskId)
     {
         E task = this.runningTasks.remove(taskId);
         if (task != null)
         {
-            task.complete(leaseholder);
+            task.complete();
             return task;
         }
         else
@@ -126,12 +126,11 @@ public class TaskQueue<E extends Task<?>>
      */
     public E removeNextExpired()
     {
-        long currentTimeMs = System.currentTimeMillis();
-        Iterator<E> iterator = this.pendingQueue.iterator();
+        Iterator<Map.Entry<String, E>> iterator = this.runningTasks.entrySet().iterator();
         while (iterator.hasNext())
         {
-            E task = iterator.next();
-            if (task.getLease().hasExpired(currentTimeMs))
+            E task = iterator.next().getValue();
+            if (!task.isRunningWell())
             {
                 iterator.remove();
                 return task;

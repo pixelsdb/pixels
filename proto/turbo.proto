@@ -75,6 +75,85 @@ message GetQueryConcurrencyResponse {
   uint32 cfConcurrency = 3;
 }
 
+// The service definitions for worker coordination, all requests are sent from worker to coordinator.
+service WorkerCoordinateService {
+  // also create a lease for the worker
+  rpc RegisterWorker (RegisterWorkerRequest) returns (RegisterWorkerResponse);
+  // get the downstream workers the execution outputs should be sent to
+  rpc GetDownStreamWorkers (GetDownStreamWorkersRequest) returns (GetDownStreamWorkersResponse);
+  // get a batch of tasks for the worker to execute
+  rpc ExecuteTasks (ExecuteTasksRequest) returns (ExecuteTasksResponse);
+  // tell the coordinator that the tasks are completed
+  rpc CompleteTasks (CompleteTasksRequest) returns (CompleteTasksResponse);
+  // report heartbeat and extend the lease for a worker
+  rpc ExtendLease (ExtendLeaseRequest) returns (ExtendLeaseResponse);
+  // tell the coordinator that the worker is about to terminate and release the lease
+  rpc TerminateWorker (TerminateWorkerRequest) returns (TerminateWorkerResponse);
+}
+
+message WorkerInfo {
+  string ip = 1; // the ip address of the worker
+  int32 streamPort = 2; // the tcp port that the worker receives data streams
+  int64 transId = 3; // the id of the transaction (query) this worker is working for
+  string operatorName = 4; // the name of the operator this worker is working for
+  optional int64 hashValue = 5; // the hash value of the hash bucket for a hash-partitioned shuffle
+}
+
+message RegisterWorkerRequest {
+  WorkerInfo workerInfo = 1;
+}
+
+message RegisterWorkerResponse {
+  int32 errorCode = 1;
+  int64 workerId = 2; // the unique id assigned by the coordinator for this worker
+  int64 leaseStartTimeMs = 3; // the time since the epoch in milliseconds of the lease
+  int64 leasePeriodMs = 4; // the valid period in milliseconds of the lease
+}
+
+message GetDownStreamWorkersRequest {
+  int64 workerId = 1;
+}
+
+message GetDownStreamWorkersResponse {
+  int32 errorCode = 1;
+  repeated WorkerInfo downStreamWorkers = 2;
+}
+
+message ExecuteTasksRequest {
+  int64 workerId = 1;
+}
+
+message ExecuteTasksResponse {
+  int32 errorCode = 1;
+  repeated string taskInputs = 2; // the tasks in json string format
+}
+
+message CompleteTasksRequest {
+  int64 workerId = 1;
+  repeated string taskOutputs = 2; // the task results in json string format
+}
+
+message CompleteTasksResponse {
+  int32 errorCode = 1;
+}
+
+message ExtendLeaseRequest {
+  int64 workerId = 1;
+}
+
+message ExtendLeaseResponse {
+  int32 errorCode = 1;
+  int64 leaseStartTimeMs = 2; // the new start time in milliseconds since the epoch of the extended lease
+}
+
+message TerminateWorkerRequest {
+  int64 workerId = 1;
+}
+
+message TerminateWorkerResponse {
+  int32 errorCode = 1;
+}
+
 // The service definitions for the serverless workers in vHive.
 service vHiveWorkerService {
   rpc Process (WorkerRequest) returns (WorkerResponse);
@@ -97,4 +176,3 @@ message GetMemoryRequest {
 message GetMemoryResponse {
   uint64 memoryMB = 1;
 }
-
