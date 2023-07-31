@@ -81,7 +81,9 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
+            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
+                    new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
             List<BroadcastTableInfo> chainTables = event.getChainTables();
@@ -210,9 +212,8 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         {
                             BasePartitionedJoinWorker.buildHashTable(transId, partitionJoiner, parts, leftColumnsToRead,
                                     leftInputStorageInfo.getScheme(), hashValues, numPartition, workerMetrics);
-                        } catch (Exception e)
+                        } catch (Throwable e)
                         {
-                            logger.error(String.format("error during hash table construction: %s", e));
                             throw new WorkerException("error during hash table construction", e);
                         }
                     }));
@@ -251,9 +252,8 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                                         joinWithRightTable(transId, partitionJoiner, chainJoiner, parts, rightColumnsToRead,
                                                 rightInputStorageInfo.getScheme(), hashValues, numPartition,
                                                 result.get(0), workerMetrics);
-                            } catch (Exception e)
+                            } catch (Throwable e)
                             {
-                                logger.error(String.format("error during hash join: %s", e));
                                 throw new WorkerException("error during hash join", e);
                             }
                         });
@@ -264,7 +264,6 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
                     } catch (InterruptedException e)
                     {
-                        logger.error(String.format("interrupted while waiting for the termination of join: %s", e));
                         throw new WorkerException("interrupted while waiting for the termination of join", e);
                     }
                 }
@@ -317,9 +316,8 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
                 workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
                 workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-            } catch (Exception e)
+            } catch (Throwable e)
             {
-                logger.error(String.format("failed to scan the partitioned file '%s' and do the join: %s", rightPartitioned, e));
                 throw new WorkerException("failed to scan the partitioned file '" +
                         rightPartitioned + "' and do the join", e);
             }
@@ -327,7 +325,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(joinOutput, workerMetrics);
             return joinOutput;
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             logger.error("error during join", e);
             joinOutput.setSuccessful(false);
@@ -385,9 +383,9 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             BaseBroadcastChainJoinWorker.chainJoin(transId, executor, currJoiner, finalJoiner, lastChainTable, workerMetrics);
             workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
             return finalJoiner;
-        } catch (Exception e)
+        } catch (Throwable e)
         {
-            throw new RuntimeException("failed to join left tables", e);
+            throw new WorkerException("failed to join left tables", e);
         }
     }
 
@@ -477,7 +475,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         numReadRequests += recordReader.getNumReadRequests();
                     }
                     it.remove();
-                } catch (Exception e)
+                } catch (Throwable e)
                 {
                     if (e instanceof IOException)
                     {
@@ -600,7 +598,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         numReadRequests += recordReader.getNumReadRequests();
                     }
                     it.remove();
-                } catch (Exception e)
+                } catch (Throwable e)
                 {
                     if (e instanceof IOException)
                     {

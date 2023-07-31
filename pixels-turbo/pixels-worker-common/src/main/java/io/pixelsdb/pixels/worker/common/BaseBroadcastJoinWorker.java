@@ -78,7 +78,9 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
+            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
+                    new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
             BroadcastTableInfo leftTable = requireNonNull(event.getSmallTable(), "leftTable is null");
@@ -151,9 +153,8 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                         buildHashTable(transId, joiner, inputs, leftInputStorageInfo.getScheme(),
                                 !leftTable.isBase(), leftCols, leftFilter, workerMetrics);
                     }
-                    catch (Exception e)
+                    catch (Throwable e)
                     {
-                        logger.error(String.format("error during hash table construction: %s", e));
                         throw new WorkerException("error during hash table construction", e);
                     }
                 }));
@@ -194,9 +195,8 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                                             outputPartitionInfo, result, workerMetrics) :
                                     joinWithRightTable(transId, joiner, inputs, rightInputStorageInfo.getScheme(),
                                             !rightTable.isBase(), rightCols, rightFilter, result.get(0), workerMetrics);
-                        } catch (Exception e)
+                        } catch (Throwable e)
                         {
-                            logger.error(String.format("error during broadcast join: %s", e));
                             throw new WorkerException("error during broadcast join", e);
                         }
                     });
@@ -207,8 +207,12 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
                 } catch (InterruptedException e)
                 {
-                    logger.error(String.format("interrupted while waiting for the termination of join: %s", e));
                     throw new WorkerException("interrupted while waiting for the termination of join", e);
+                }
+
+                if (exceptionHandler.hasException())
+                {
+                    throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
                 }
             }
 
@@ -260,9 +264,8 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
                 workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
                 workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-            } catch (Exception e)
+            } catch (Throwable e)
             {
-                logger.error(String.format("failed to finish writing and close the join result file '%s': %s", outputPath, e));
                 throw new WorkerException(
                         "failed to finish writing and close the join result file '" + outputPath + "'", e);
             }
@@ -270,7 +273,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(joinOutput, workerMetrics);
             return joinOutput;
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             logger.error("error during join", e);
             joinOutput.setSuccessful(false);
@@ -345,7 +348,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     readBytes += recordReader.getCompletedBytes();
                     numReadRequests += recordReader.getNumReadRequests();
                     it.remove();
-                } catch (Exception e)
+                } catch (Throwable e)
                 {
                     if (checkExistence && e instanceof IOException)
                     {
@@ -448,7 +451,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     readBytes += recordReader.getCompletedBytes();
                     numReadRequests += recordReader.getNumReadRequests();
                     it.remove();
-                } catch (Exception e)
+                } catch (Throwable e)
                 {
                     if (checkExistence && e instanceof IOException)
                     {
@@ -560,7 +563,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     readBytes += recordReader.getCompletedBytes();
                     numReadRequests += recordReader.getNumReadRequests();
                     it.remove();
-                } catch (Exception e)
+                } catch (Throwable e)
                 {
                     if (checkExistence && e instanceof IOException)
                     {
