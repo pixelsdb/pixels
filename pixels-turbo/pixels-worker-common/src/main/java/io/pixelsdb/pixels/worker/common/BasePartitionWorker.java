@@ -79,7 +79,9 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
+            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
+                    new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
             requireNonNull(event.getTableInfo(), "event.tableInfo is null");
@@ -119,9 +121,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                         partitionFile(transId, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
                                 filter, keyColumnIds, projection, partitioned, writerSchema);
                     }
-                    catch (Exception e)
+                    catch (Throwable e)
                     {
-                        logger.error(String.format("error during partitioning: %s", e));
                         throw new WorkerException("error during partitioning", e);
                     }
                 });
@@ -132,8 +133,12 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error(String.format("interrupted while waiting for the termination of partitioning: %s", e));
                 throw new WorkerException("interrupted while waiting for the termination of partitioning", e);
+            }
+
+            if (exceptionHandler.hasException())
+            {
+                throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
             }
 
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
@@ -172,7 +177,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             WorkerCommon.setPerfMetrics(partitionOutput, workerMetrics);
             return partitionOutput;
         }
-        catch (Exception e)
+        catch (Throwable e)
         {
             logger.error("error during partition", e);
             partitionOutput.setSuccessful(false);
@@ -262,9 +267,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 readCostTimer.add(recordReader.getReadTimeNanos());
                 readBytes += recordReader.getCompletedBytes();
                 numReadRequests += recordReader.getNumReadRequests();
-            } catch (Exception e)
+            } catch (Throwable e)
             {
-                logger.error(String.format("failed to scan the file '%s' and output the partitioning result: %s"));
                 throw new WorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the partitioning result", e);
             }

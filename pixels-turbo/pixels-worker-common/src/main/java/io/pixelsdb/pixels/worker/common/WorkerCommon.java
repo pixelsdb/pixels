@@ -89,7 +89,7 @@ public class WorkerCommon
                 ConfigRedis(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                 WorkerCommon.redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
             }
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             throw new WorkerException("failed to initialize the storage of scheme " + storageInfo.getScheme(), e);
         }
@@ -156,7 +156,7 @@ public class WorkerCommon
         {
             leftFuture.get();
             rightFuture.get();
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             logger.error("interrupted while waiting for the termination of schema read", e);
         }
@@ -209,7 +209,7 @@ public class WorkerCommon
         {
             leftFuture.get();
             rightFuture.get();
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             logger.error("interrupted while waiting for the termination of schema read", e);
         }
@@ -245,7 +245,7 @@ public class WorkerCommon
                         TypeDescription fileSchema = reader.getFileSchema();
                         reader.close();
                         return fileSchema;
-                    } catch (Exception e)
+                    } catch (Throwable e)
                     {
                         if (e instanceof IOException)
                         {
@@ -281,7 +281,7 @@ public class WorkerCommon
                     TypeDescription fileSchema = reader.getFileSchema();
                     reader.close();
                     return fileSchema;
-                } catch (Exception e)
+                } catch (Throwable e)
                 {
                     if (e instanceof IOException)
                     {
