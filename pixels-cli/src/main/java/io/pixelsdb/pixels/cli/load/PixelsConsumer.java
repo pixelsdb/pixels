@@ -30,7 +30,6 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Date;
 import java.util.concurrent.BlockingQueue;
@@ -104,12 +103,7 @@ public class PixelsConsumer extends Consumer
                     Storage originStorage = StorageFactory.Instance().getStorage(originalFilePath);
                     reader = new BufferedReader(new InputStreamReader(originStorage.open(originalFilePath)));
 
-                    // choose the target output directory using round-robin
-                    int targetPathId = GlobalTargetPathId.getAndIncrement() % targetPaths.length;
-                    String targetDirPath = targetPaths[targetPathId];
-                    Storage targetStorage = StorageFactory.Instance().getStorage(targetDirPath);
-
-                    System.out.println("loading data into directory: " + targetDirPath);
+                    System.out.println("loading data from: " + originalFilePath);
 
                     while ((line = reader.readLine()) != null)
                     {
@@ -120,7 +114,12 @@ public class PixelsConsumer extends Consumer
                                 System.err.println("thread: " + currentThread().getName() + " got empty line.");
                                 continue;
                             }
-                            // we create a new pixels file if we can read a next line from the source file.
+                            // we create a new pixels file if we can read a next line from the source file
+
+                            // choose the target output directory using round-robin
+                            int targetPathId = GlobalTargetPathId.getAndIncrement() % targetPaths.length;
+                            String targetDirPath = targetPaths[targetPathId];
+                            Storage targetStorage = StorageFactory.Instance().getStorage(targetDirPath);
 
                             if (!targetDirPath.endsWith("/"))
                             {
