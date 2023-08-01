@@ -135,6 +135,7 @@ public class PixelsWriterImpl implements PixelsWriter
         this.partitioned = partitioned;
         this.partKeyColumnIds = requireNonNull(partKeyColumnIds, "partKeyColumnIds is null");
         this.chunkAlignment = Integer.parseInt(ConfigFactory.Instance().getProperty("column.chunk.alignment"));
+        checkArgument(this.chunkAlignment >= 0, "column.chunk.alignment must >= 0");
         this.chunkPaddingBuffer = new byte[this.chunkAlignment];
         children = schema.getChildren();
         checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
@@ -517,6 +518,16 @@ public class PixelsWriterImpl implements PixelsWriter
             // flush writes the isNull bit map into the internal output stream.
             writer.flush();
             rowGroupDataLength += writer.getColumnChunkSize();
+            if (chunkAlignment != 0 && rowGroupDataLength % chunkAlignment != 0)
+            {
+                /*
+                 * Issue #519:
+                 * This is necessary as the prepare() method of some storage (e.g., hdfs)
+                 * has to determine whether to start a new block, if the current block
+                 * is not large enough.
+                 */
+                rowGroupDataLength += chunkAlignment - rowGroupDataLength % chunkAlignment;
+            }
         }
 
         // write and flush row group content
@@ -525,25 +536,40 @@ public class PixelsWriterImpl implements PixelsWriter
             curRowGroupOffset = physicalWriter.prepare(rowGroupDataLength);
             if (curRowGroupOffset != -1)
             {
+                // Issue #519: make sure to start writing the column chunks in the row group from an aligned offset.
+                int tryAlign = 0;
+                while (chunkAlignment != 0 && curRowGroupOffset % chunkAlignment != 0 && tryAlign++ < 2)
+                {
+                    int alignBytes = (int) (chunkAlignment - curRowGroupOffset % chunkAlignment);
+                    physicalWriter.append(chunkPaddingBuffer, 0, alignBytes);
+                    writtenBytes += alignBytes;
+                    curRowGroupOffset = physicalWriter.prepare(rowGroupDataLength);
+                }
+                if (tryAlign > 2)
+                {
+                    LOGGER.warn("failed to align the start offset of the column chunks in the row group");
+                    throw new IOException("failed to align the start offset of the column chunks in the row group");
+                }
+
                 for (ColumnWriter writer : columnWriters)
                 {
                     byte[] rowGroupBuffer = writer.getColumnChunkContent();
                     physicalWriter.append(rowGroupBuffer, 0, rowGroupBuffer.length);
                     writtenBytes += rowGroupBuffer.length;
                     // add align bytes to make sure the column size is the multiple of fsBlockSize
-                    if(rowGroupBuffer.length % chunkAlignment != 0)
+                    if(chunkAlignment != 0 && rowGroupBuffer.length % chunkAlignment != 0)
                     {
-                        int alignByte = chunkAlignment - rowGroupBuffer.length % chunkAlignment;
-                        physicalWriter.append(chunkPaddingBuffer, 0, alignByte);
-                        writtenBytes += alignByte;
+                        int alignBytes = chunkAlignment - rowGroupBuffer.length % chunkAlignment;
+                        physicalWriter.append(chunkPaddingBuffer, 0, alignBytes);
+                        writtenBytes += alignBytes;
                     }
                 }
                 physicalWriter.flush();
             }
             else
             {
-                LOGGER.warn("Write row group prepare failed");
-                throw new IOException("Write row group prepare failed");
+                LOGGER.warn("write row group prepare failed");
+                throw new IOException("write row group prepare failed");
             }
         }
         catch (IOException e)
@@ -561,9 +587,16 @@ public class PixelsWriterImpl implements PixelsWriter
             chunkIndexBuilder.setChunkOffset(curRowGroupOffset + rowGroupDataLength);
             chunkIndexBuilder.setChunkLength(writer.getColumnChunkSize());
             rowGroupDataLength += writer.getColumnChunkSize();
-            if((curRowGroupOffset + rowGroupDataLength) % chunkAlignment != 0)
+            if(chunkAlignment != 0 && rowGroupDataLength % chunkAlignment != 0)
             {
-                rowGroupDataLength += (int) (chunkAlignment - (curRowGroupOffset + rowGroupDataLength) % chunkAlignment);
+                /*
+                 * Issue #519:
+                 * This line must be consistent with how column chunks are padded above.
+                 * If we only pad after each column chunk when writing it into the physical writer
+                 * without checking the alignment of the current position of the physical writer,
+                 * then we should not consider curRowGroupOffset when calculating the alignment here.
+                 */
+                rowGroupDataLength += chunkAlignment - rowGroupDataLength % chunkAlignment;
             }
             // collect columnChunkIndex from every column chunk into curRowGroupIndex
             curRowGroupIndex.addColumnChunkIndexEntries(chunkIndexBuilder.build());
