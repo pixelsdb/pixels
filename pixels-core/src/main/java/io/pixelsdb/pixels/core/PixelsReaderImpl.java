@@ -51,8 +51,7 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  */
 @NotThreadSafe
-public class PixelsReaderImpl
-        implements PixelsReader
+public class PixelsReaderImpl implements PixelsReader
 {
     private static final Logger LOGGER = LogManager.getLogger(PixelsReaderImpl.class);
 
@@ -344,7 +343,7 @@ public class PixelsReaderImpl
     @Override
     public boolean isPartitioned()
     {
-        return this.footer.hasPartitioned() && this.footer.getPartitioned();
+        return this.postScript.hasPartitioned() && this.postScript.getPartitioned();
     }
 
     /**

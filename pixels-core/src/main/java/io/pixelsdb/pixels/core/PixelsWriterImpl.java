@@ -682,7 +682,6 @@ public class PixelsWriterImpl implements PixelsWriter
         {
             footerBuilder.addRowGroupStats(rowGroupStatistic);
         }
-        footerBuilder.setPartitioned(partitioned);
         footer = footerBuilder.build();
 
         // build PostScript
@@ -694,6 +693,7 @@ public class PixelsWriterImpl implements PixelsWriter
                 .setCompressionBlockSize(compressionBlockSize)
                 .setPixelStride(pixelStride)
                 .setWriterTimezone(timeZone.getDisplayName())
+                .setPartitioned(partitioned)
                 .setMagic(Constants.MAGIC)
                 .build();
 
