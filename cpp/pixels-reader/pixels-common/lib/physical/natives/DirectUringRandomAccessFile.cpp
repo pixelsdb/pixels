@@ -67,21 +67,23 @@ void DirectUringRandomAccessFile::Initialize() {
 }
 
 void DirectUringRandomAccessFile::Reset() {
-	// Important! Because sometimes ring is nullptr here.
-	// For example, two threads A and B share the same global state. If A finish all files while B just starts,
-	// B would execute Reset function from InitLocal. If we don't set this 'if' branch, ring would be double freed.
-	if(ring != nullptr) {
+    // Important! Because sometimes ring is nullptr here.
+    // For example, two threads A and B share the same global state. If A finish all files while B just starts,
+    // B would execute Reset function from InitLocal. If we don't set this 'if' branch, ring would be double freed.
+    if(ring != nullptr) {
         // We don't use this function anymore since it slows down the speed
         //		if(io_uring_unregister_buffers(ring) != 0) {
         //			throw InvalidArgumentException("DirectUringRandomAccessFile::UnregisterBuffer: unregister buffer fails. ");
         //		}
-		io_uring_queue_exit(ring);
-		free(iovecs);
-		delete(ring);
-		ring = nullptr;
-		isRegistered = false;
-	}
-
+        io_uring_queue_exit(ring);
+        delete(ring);
+        ring = nullptr;
+        isRegistered = false;
+    }
+    if(iovecs != nullptr) {
+        free(iovecs);
+        iovecs = nullptr;
+    }
 }
 
 DirectUringRandomAccessFile::~DirectUringRandomAccessFile() {
