@@ -31,8 +31,6 @@ struct PixelsReadLocalState : public LocalTableFunctionState {
     idx_t next_batch_index;
     std::string next_file_name;
     std::string curr_file_name;
-    // the state when PixelsScanInitLocal calls
-    bool is_first_state;
     // the state when next_file_index is none. In this state we only readBatch the curr_file.
     bool is_last_state;
 };

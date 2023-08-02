@@ -193,13 +193,12 @@ unique_ptr<LocalTableFunctionState> PixelsScanFunction::PixelsScanInitLocal(
 			result->column_names.emplace_back(fieldNames.at(column_id));
 		}
 	}
-    result->is_first_state = true;
     result->is_last_state = false;
     result->next_file_index = 0;
     result->next_batch_index = 0;
     result->curr_file_index = 0;
     result->curr_batch_index = 0;
-	if(!PixelsParallelStateNext(context.client, bind_data, *result, gstate)) {
+	if(!PixelsParallelStateNext(context.client, bind_data, *result, gstate, true)) {
 		return nullptr;
 	}
 	PixelsReaderOption option = GetPixelsReaderOption(*result, gstate);
@@ -373,7 +372,8 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 
 bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
                                                   PixelsReadLocalState &scan_data,
-                                                  PixelsReadGlobalState &parallel_state) {
+                                                  PixelsReadGlobalState &parallel_state,
+                                                  bool is_init_state) {
     unique_lock<mutex> parallel_lock(parallel_state.lock);
     if (parallel_state.error_opening_file) {
         throw InvalidArgumentException("PixelsScanInitLocal: file open error.");
@@ -385,7 +385,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     // 2. When PixelsScanImplementation invokes this function (scan_data.next_file_index > -1), if
     // scan_data.next_file_index >= (int) parallel_state.readers.size(), it means the current file is already
     // done, so the function return false.
-    if ((scan_data.is_first_state && parallel_state.file_index >= parallel_state.readers.size()) ||
+    if ((is_init_state && parallel_state.file_index >= parallel_state.readers.size()) ||
             scan_data.is_last_state) {
 		::BufferPool::Reset();
 		// if async io is enabled, we need to unregister uring buffer
@@ -405,7 +405,6 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     scan_data.next_file_index = parallel_state.file_index;
     scan_data.next_batch_index = scan_data.next_file_index;
     scan_data.curr_file_name = scan_data.next_file_name;
-    scan_data.is_first_state = false;
     parallel_state.file_index++;
     parallel_lock.unlock();
     // The below code uses global state but no race happens, so we don't need the lock anymore
