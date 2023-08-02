@@ -71,16 +71,7 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
                 return;
             } else {
                 if(!data.is_last_state) {
-                    PixelsReaderOption option;
-                    option.setSkipCorruptRecords(true);
-                    option.setTolerantSchemaEvolution(true);
-                    option.setEnableEncodedColumnVector(true);
-                    option.setFilter(gstate.filters);
-                    option.setEnabledFilterPushDown(enable_filter_pushdown);
-                    // includeCols comes from the caller of PixelsPageSource
-                    option.setIncludeCols(data.column_names);
-                    option.setRGRange(0, data.nextReader->getRowGroupNum());
-                    option.setQueryId(1);
+                    PixelsReaderOption option = GetPixelsReaderOption(data, gstate);
                     data.nextPixelsRecordReader = data.nextReader->read(option);
                 }
             }
@@ -211,16 +202,7 @@ unique_ptr<LocalTableFunctionState> PixelsScanFunction::PixelsScanInitLocal(
 	if(!PixelsParallelStateNext(context.client, bind_data, *result, gstate)) {
 		return nullptr;
 	}
-	PixelsReaderOption option;
-	option.setSkipCorruptRecords(true);
-	option.setTolerantSchemaEvolution(true);
-	option.setEnableEncodedColumnVector(true);
-	option.setEnabledFilterPushDown(enable_filter_pushdown);
-    option.setFilter(gstate.filters);
-	// includeCols comes from the caller of PixelsPageSource
-	option.setIncludeCols(result->column_names);
-	option.setRGRange(0, result->nextReader->getRowGroupNum());
-	option.setQueryId(1);
+	PixelsReaderOption option = GetPixelsReaderOption(*result, gstate);
 
 //    option.setBatchSize(STANDARD_VECTOR_SIZE);
 	result->nextPixelsRecordReader = result->nextReader->read(option);
@@ -457,6 +439,20 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     }
     ::BufferPool::Switch();
     return true;
+}
+
+PixelsReaderOption PixelsScanFunction::GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state) {
+    PixelsReaderOption option;
+    option.setSkipCorruptRecords(true);
+    option.setTolerantSchemaEvolution(true);
+    option.setEnableEncodedColumnVector(true);
+    option.setFilter(global_state.filters);
+    option.setEnabledFilterPushDown(enable_filter_pushdown);
+    // includeCols comes from the caller of PixelsPageSource
+    option.setIncludeCols(local_state.column_names);
+    option.setRGRange(0, local_state.nextReader->getRowGroupNum());
+    option.setQueryId(1);
+    return option;
 }
 
 
