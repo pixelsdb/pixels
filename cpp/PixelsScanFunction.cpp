@@ -70,7 +70,8 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
             if(!PixelsParallelStateNext(context, bind_data, data, gstate)) {
                 return;
             } else {
-                if(!data.is_last_state) {
+                // only when the thread processes the last file, data.nextReader is nullptr
+                if(data.nextReader != nullptr) {
                     PixelsReaderOption option = GetPixelsReaderOption(data, gstate);
                     data.nextPixelsRecordReader = data.nextReader->read(option);
                 }
@@ -84,7 +85,8 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
         }
         if(data.vectorizedRowBatch == nullptr) {
             currPixelsRecordReader->asyncReadComplete(data.column_names.size());
-            if(!data.is_last_state) {
+            // only when the thread processes the last file, data.nextPixelsRecordReader is nullptr
+            if(data.nextPixelsRecordReader != nullptr) {
                 nextPixelsRecordReader->read();
             }
             data.vectorizedRowBatch = currPixelsRecordReader->readBatch(false);
@@ -193,7 +195,6 @@ unique_ptr<LocalTableFunctionState> PixelsScanFunction::PixelsScanInitLocal(
 			result->column_names.emplace_back(fieldNames.at(column_id));
 		}
 	}
-    result->is_last_state = false;
     result->next_file_index = 0;
     result->next_batch_index = 0;
     result->curr_file_index = 0;
@@ -386,7 +387,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     // scan_data.next_file_index >= (int) parallel_state.readers.size(), it means the current file is already
     // done, so the function return false.
     if ((is_init_state && parallel_state.file_index >= parallel_state.readers.size()) ||
-            scan_data.is_last_state) {
+            scan_data.next_file_index >= parallel_state.readers.size()) {
 		::BufferPool::Reset();
 		// if async io is enabled, we need to unregister uring buffer
 		if(ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io")) {
@@ -432,7 +433,6 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
             parallel_state.readers[scan_data.next_file_index] = scan_data.nextReader;
         }
     } else {
-        scan_data.is_last_state = true;
         scan_data.nextReader = nullptr;
         scan_data.nextPixelsRecordReader = nullptr;
     }
