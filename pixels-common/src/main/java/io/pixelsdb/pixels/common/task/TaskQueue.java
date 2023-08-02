@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.common.task;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
+import com.google.common.collect.ImmutableList;
+
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -33,11 +33,13 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class TaskQueue<E extends Task<?>>
 {
+    private final LinkedList<E> allTasks;
     private final ConcurrentLinkedQueue<E> pendingQueue;
     private final ConcurrentHashMap<String, E> runningTasks;
 
     public TaskQueue()
     {
+        this.allTasks = new LinkedList<>();
         this.pendingQueue = new ConcurrentLinkedQueue<>();
         this.runningTasks = new ConcurrentHashMap<>();
     }
@@ -45,6 +47,7 @@ public class TaskQueue<E extends Task<?>>
     public TaskQueue(Collection<E> tasks)
     {
         checkPendingTasks(tasks);
+        this.allTasks = new LinkedList<>(tasks);
         this.pendingQueue = new ConcurrentLinkedQueue<>(tasks);
         this.runningTasks = new ConcurrentHashMap<>();
     }
@@ -137,5 +140,10 @@ public class TaskQueue<E extends Task<?>>
             }
         }
         return null;
+    }
+
+    public List<E> getAllTasks()
+    {
+        return ImmutableList.copyOf(this.allTasks);
     }
 }

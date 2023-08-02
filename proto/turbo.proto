@@ -96,7 +96,7 @@ message WorkerInfo {
   int32 streamPort = 2; // the tcp port that the worker receives data streams
   int64 transId = 3; // the id of the transaction (query) this worker is working for
   string operatorName = 4; // the name of the operator this worker is working for
-  optional int64 hashValue = 5; // the hash value of the hash bucket for a hash-partitioned shuffle
+  optional int64 hashBucketId = 5; // the hash value of the hash bucket for a hash-partitioned shuffle
 }
 
 message RegisterWorkerRequest {

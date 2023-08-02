@@ -58,7 +58,7 @@ public class Task<T>
         this.worker = null;
     }
 
-    public boolean start(Worker worker)
+    protected boolean start(Worker worker)
     {
         requireNonNull(worker, "worker is null");
         synchronized (this.taskId)
@@ -78,7 +78,7 @@ public class Task<T>
         }
     }
 
-    public boolean complete()
+    protected boolean complete()
     {
         synchronized (this.taskId)
         {
@@ -91,7 +91,7 @@ public class Task<T>
         }
     }
 
-    public boolean abort()
+    protected boolean abort()
     {
         synchronized (this.taskId)
         {
@@ -138,7 +138,7 @@ public class Task<T>
         return taskId;
     }
 
-    public T getPayload()
+    protected T getPayload()
     {
         return payload;
     }

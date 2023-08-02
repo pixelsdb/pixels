@@ -17,12 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.planner.plan;
+package io.pixelsdb.pixels.planner.coordinate;
 
 /**
  * @author hank
- * @create 2023-07-31
+ * @create 2023-08-02
  */
-public class WorkerCoordinator
+public class WorkerCoordinateServer
 {
 }
