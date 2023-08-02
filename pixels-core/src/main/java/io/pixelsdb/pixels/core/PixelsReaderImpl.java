@@ -159,8 +159,8 @@ public class PixelsReaderImpl
             // get PhysicalReader
             PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderStorage, builderPath);
             // try to get file tail from cache
-            String fileName = fsReader.getName();
-            PixelsProto.FileTail fileTail = builderPixelsFooterCache.getFileTail(fileName);
+            String filePath = fsReader.getPath();
+            PixelsProto.FileTail fileTail = builderPixelsFooterCache.getFileTail(filePath);
             if (fileTail == null)
             {
                 if (fsReader == null)
@@ -177,7 +177,7 @@ public class PixelsReaderImpl
                 fsReader.seek(fileTailOffset);
                 ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
                 fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
-                builderPixelsFooterCache.putFileTail(fileName, fileTail);
+                builderPixelsFooterCache.putFileTail(filePath, fileTail);
             }
 
             // check file MAGIC and file version

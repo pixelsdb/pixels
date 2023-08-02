@@ -35,7 +35,8 @@ option java_outer_classname = "PixelsProto";
 //         Pixel: Each column chunk contains a sequence of 'pixels'.
 //                Each pixel contains a number (e.g., 10000) of values.
 
-// The content of the file tail that must be serialized.
+// The content of the file tail that must be serialized and stored at
+// the end of each file, followed by 8 bytes
 message FileTail {
     optional Footer footer = 1;
     optional PostScript postscript = 2;
