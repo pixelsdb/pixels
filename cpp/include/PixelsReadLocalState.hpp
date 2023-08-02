@@ -16,6 +16,18 @@
 namespace duckdb {
 
 struct PixelsReadLocalState : public LocalTableFunctionState {
+    PixelsReadLocalState() {
+        curr_file_index = 0;
+        next_file_index = 0;
+        curr_batch_index = 0;
+        next_batch_index = 0;
+        rowOffset = 0;
+        currPixelsRecordReader = nullptr;
+        nextPixelsRecordReader = nullptr;
+        vectorizedRowBatch = nullptr;
+        currReader = nullptr;
+        nextReader = nullptr;
+    }
 	shared_ptr<PixelsRecordReader> currPixelsRecordReader;
     shared_ptr<PixelsRecordReader> nextPixelsRecordReader;
 	// this is used for storing row batch results.
