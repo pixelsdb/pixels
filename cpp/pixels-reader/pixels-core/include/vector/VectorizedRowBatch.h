@@ -28,17 +28,16 @@ public:
     static int DEFAULT_SIZE;
     int maxSize;                                       // capacity, i.e. the maximum number of rows can be stored in this row batch
 
-    // If this is true, then there is no data in the batch -- we have hit the end of input
-    bool endOfFile;
     explicit VectorizedRowBatch(int nCols, int size = DEFAULT_SIZE);
 	~VectorizedRowBatch();
 	void close();
     int getMaxSize();
+    uint64_t position();
     int count();
     bool isEmpty();
     bool isFull();
     int freeSlots();
-
+    bool isEndOfFile();
 private:
 	bool closed;
 };

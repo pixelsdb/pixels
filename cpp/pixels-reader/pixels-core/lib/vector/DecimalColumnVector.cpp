@@ -18,16 +18,16 @@
  * Author: hank
  */
 
-DecimalColumnVector::DecimalColumnVector(int precision, int scale, bool encoding) {
+DecimalColumnVector::DecimalColumnVector(int precision, int scale, bool encoding): ColumnVector(VectorizedRowBatch::DEFAULT_SIZE, encoding) {
     DecimalColumnVector(VectorizedRowBatch::DEFAULT_SIZE, precision, scale, encoding);
 }
 
-DecimalColumnVector::DecimalColumnVector(int len, int precision, int scale, bool encoding): ColumnVector(len, encoding) {
+DecimalColumnVector::DecimalColumnVector(uint64_t len, int precision, int scale, bool encoding): ColumnVector(len, encoding) {
 	// decimal column vector has no encoding so we don't allocate memory to this->vector
 	this->vector = nullptr;
     this->precision = precision;
     this->scale = scale;
-    memoryUsage += (long) sizeof(long) * len;
+    memoryUsage += (uint64_t) sizeof(uint64_t) * len;
 }
 
 void DecimalColumnVector::close() {
@@ -50,6 +50,13 @@ DecimalColumnVector::~DecimalColumnVector() {
     }
 }
 
+void * DecimalColumnVector::current() {
+    if(vector == nullptr) {
+        return nullptr;
+    } else {
+        return vector + readIndex;
+    }
+}
 
 int DecimalColumnVector::getPrecision() {
 	return precision;

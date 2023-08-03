@@ -4,8 +4,9 @@
 
 #include "vector/ColumnVector.h"
 
-ColumnVector::ColumnVector(int len, bool encoding) {
+ColumnVector::ColumnVector(uint64_t len, bool encoding) {
     writeIndex = 0;
+    readIndex = 0;
     length = len;
 	this->encoding = encoding;
     memoryUsage = len + sizeof(int) * 3 + 4;
@@ -22,11 +23,24 @@ void ColumnVector::close() {
 
 void ColumnVector::reset() {
     writeIndex = 0;
+    readIndex = 0;
     // TODO: reset other variables
 }
 
 void ColumnVector::print(int rowCount) {
     throw InvalidArgumentException("This columnVector doesn't implement this function.");
+}
+
+void ColumnVector::increment(uint64_t size) {
+    readIndex += size;
+}
+
+bool ColumnVector::isFull() {
+    return readIndex >= length;
+}
+
+uint64_t ColumnVector::position() {
+    return readIndex;
 }
 
 

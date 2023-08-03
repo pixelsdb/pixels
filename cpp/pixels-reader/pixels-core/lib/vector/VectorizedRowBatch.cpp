@@ -76,7 +76,6 @@ int VectorizedRowBatch::freeSlots() {
 void VectorizedRowBatch::close() {
 	if(!closed) {
 		maxSize = 0;
-		endOfFile = false;
 		for(const auto& col : cols) {
 			col->close();
 		}
@@ -84,3 +83,20 @@ void VectorizedRowBatch::close() {
 		closed = true;
 	}
 }
+
+bool VectorizedRowBatch::isEndOfFile() {
+    bool isEndOfFile = closed;
+    if(!cols.empty()) {
+        isEndOfFile = cols.at(0)->isFull();
+    }
+    return isEndOfFile;
+}
+
+uint64_t VectorizedRowBatch::position() {
+    uint64_t position = 0;
+    if(!cols.empty()) {
+        position = cols.at(0)->position();
+    }
+    return position;
+}
+

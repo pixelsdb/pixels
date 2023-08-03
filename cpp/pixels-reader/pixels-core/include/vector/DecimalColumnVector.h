@@ -19,10 +19,11 @@ public:
     * should normally be the default size.
     */
     DecimalColumnVector(int precision, int scale, bool encoding = false);
-    DecimalColumnVector(int len, int precision, int scale, bool encoding = false);
+    DecimalColumnVector(uint64_t len, int precision, int scale, bool encoding = false);
     ~DecimalColumnVector();
     void print(int rowCount) override;
     void close() override;
+    void * current() override;
 	int getPrecision();
 	int getScale();
 };
