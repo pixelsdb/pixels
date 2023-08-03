@@ -77,6 +77,14 @@ public class PixelsWriterImpl implements PixelsWriter
     private final boolean encoding;
     private final boolean partitioned;
     private final Optional<List<Integer>> partKeyColumnIds;
+    /**
+     * The number of bytes that each column chunk is aligned to.
+     */
+    private final int chunkAlignment;
+    /**
+     * The byte buffer padded to each column chunk for alignment.
+     */
+    private final byte[] chunkPaddingBuffer;
 
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
@@ -101,14 +109,6 @@ public class PixelsWriterImpl implements PixelsWriter
     private final List<TypeDescription> children;
 
     private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
-    /**
-     * The number of bytes that each column chunk is aligned to.
-     */
-    private final int chunkAlignment;
-    /**
-     * The byte buffer padded to each column chunk for alignment.
-     */
-    private final byte[] chunkPaddingBuffer;
 
     private PixelsWriterImpl(
             TypeDescription schema,
@@ -282,8 +282,7 @@ public class PixelsWriterImpl implements PixelsWriter
             return this;
         }
 
-        public PixelsWriter build()
-                throws PixelsWriterException
+        public PixelsWriter build() throws PixelsWriterException
         {
             requireNonNull(this.builderStorage, "storage is not set");
             requireNonNull(this.builderFilePath, "file path is not set");
@@ -399,8 +398,7 @@ public class PixelsWriterImpl implements PixelsWriter
     }
 
     @Override
-    public boolean addRowBatch(VectorizedRowBatch rowBatch)
-            throws IOException
+    public boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException
     {
         checkArgument(!partitioned, "this file is hash partitioned, " +
                 "use addRowBatch(rowBatch, hashValue) instead");
@@ -498,8 +496,7 @@ public class PixelsWriterImpl implements PixelsWriter
         }
     }
 
-    private void writeRowGroup()
-            throws IOException
+    private void writeRowGroup() throws IOException
     {
         int rowGroupDataLength = 0;
 
@@ -660,8 +657,7 @@ public class PixelsWriterImpl implements PixelsWriter
         this.fileContentLength += rowGroupDataLength;
     }
 
-    private void writeFileTail()
-            throws IOException
+    private void writeFileTail() throws IOException
     {
         PixelsProto.Footer footer;
         PixelsProto.PostScript postScript;
@@ -694,6 +690,7 @@ public class PixelsWriterImpl implements PixelsWriter
                 .setPixelStride(pixelStride)
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(partitioned)
+                .setColumnChunkAlignment(chunkAlignment)
                 .setMagic(Constants.MAGIC)
                 .build();
 
