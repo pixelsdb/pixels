@@ -381,12 +381,22 @@ public class PixelsCompactor
                 fsReader.seek(columnChunkOffset);
                 byte[] chunkBuffer = new byte[(int) columnChunkLength];
                 fsReader.readFully(chunkBuffer);
-                int alignBytes = 0;
-                if(chunkAlignment != 0 && columnChunkLength % chunkAlignment != 0)
+
+                // Issue #521: prepare for writing the column chunk, and make sure the start offset is aligned.
+                long chunkStartOffset = fsWriter.prepare((int) columnChunkLength);
+                int tryAlign = 0;
+                while (chunkAlignment != 0 && chunkStartOffset % chunkAlignment != 0 && tryAlign++ < 2)
                 {
-                    alignBytes = (int) (chunkAlignment - columnChunkLength % chunkAlignment);
+                    int alignBytes = (int) (chunkAlignment - chunkStartOffset % chunkAlignment);
+                    this.fsWriter.append(chunkPaddingBuffer, 0, alignBytes);
+                    chunkStartOffset = this.fsWriter.prepare((int) columnChunkLength);
                 }
-                long chunkStartOffset = prepareForeAlignedWrite((int) columnChunkLength + alignBytes);
+                if (tryAlign > 2)
+                {
+                    LOGGER.warn("failed to align the start offset of the column chunk");
+                    throw new IOException("failed to align the start offset of the column chunk");
+                }
+
                 this.fsWriter.append(chunkBuffer, 0, (int) columnChunkLength);
                 /*
                  * Issue #521:
@@ -406,31 +416,6 @@ public class PixelsCompactor
                 e.printStackTrace();
             }
         }
-    }
-
-    /**
-     * Prepare for writing the data of the given length, and make sure the write will start from
-     * and aligned offset.
-     * @param lengthToPrepare the given length of the data to write
-     * @return the aligned offset that will start writing the data
-     * @throws IOException
-     */
-    private long prepareForeAlignedWrite(int lengthToPrepare) throws IOException
-    {
-        long startOffset = fsWriter.prepare(lengthToPrepare);
-        int tryAlign = 0;
-        while (chunkAlignment != 0 && startOffset % chunkAlignment != 0 && tryAlign++ < 2)
-        {
-            int alignBytes = (int) (chunkAlignment - startOffset % chunkAlignment);
-            this.fsWriter.append(chunkPaddingBuffer, 0, alignBytes);
-            startOffset = this.fsWriter.prepare(lengthToPrepare);
-        }
-        if (tryAlign > 2)
-        {
-            LOGGER.warn("failed to align the start offset of the next write");
-            throw new IOException("failed to align the start offset of the next write");
-        }
-        return startOffset;
     }
 
     private void writeRowGroupFooters()
