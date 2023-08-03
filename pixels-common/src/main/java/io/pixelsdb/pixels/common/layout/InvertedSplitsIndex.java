@@ -55,7 +55,7 @@ public class InvertedSplitsIndex implements SplitsIndex
             BitSet bitMap = new BitSet(this.querySplitPatterns.size());
             for (int i = 0; i < this.querySplitPatterns.size(); ++i)
             {
-                if (this.querySplitPatterns.get(i).contaiansColumn(column))
+                if (this.querySplitPatterns.get(i).containsColumn(column))
                 {
                     bitMap.set(i, true);
                 }
