@@ -39,10 +39,11 @@ import java.nio.ByteOrder;
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
-    private final boolean isLong;                                       // current column type is long or int     // if the current pixel is the first pixel
-    public IntegerColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    private final boolean isLong;                                       // current column type is long or int, used for the first pixel
+
+    public IntegerColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         encoder = new RunLenIntEncoder();
         this.isLong = type.getCategory() == TypeDescription.Category.LONG;
     }
@@ -114,7 +115,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
             if (isLong)
             {
                 curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
-                curVecPartitionBuffer.order(ByteOrder.LITTLE_ENDIAN);
+                curVecPartitionBuffer.order(byteOrder);
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
@@ -123,7 +124,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
             else
             {
                 curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
-                curVecPartitionBuffer.order(ByteOrder.LITTLE_ENDIAN);
+                curVecPartitionBuffer.order(byteOrder);
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);

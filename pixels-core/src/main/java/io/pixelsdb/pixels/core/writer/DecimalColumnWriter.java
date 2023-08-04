@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 /**
  * The column writer of decimals.
@@ -36,9 +37,9 @@ public class DecimalColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public DecimalColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public DecimalColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         encodingUtils = new EncodingUtils();
     }
 

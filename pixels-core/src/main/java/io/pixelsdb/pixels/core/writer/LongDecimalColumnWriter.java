@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongDecimalColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 /**
  * The column writer of long decimals.
@@ -37,9 +38,9 @@ public class LongDecimalColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public LongDecimalColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public LongDecimalColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         encodingUtils = new EncodingUtils();
     }
 

@@ -69,6 +69,22 @@ public class PixelsWriterImpl implements PixelsWriter
 {
     private static final Logger LOGGER = LogManager.getLogger(PixelsWriterImpl.class);
 
+    static final ByteOrder WRITER_ENDIAN;
+
+    static
+    {
+        boolean littleEndian = Boolean.parseBoolean(
+                ConfigFactory.Instance().getProperty("column.chunk.little.endian"));
+        if (littleEndian)
+        {
+            WRITER_ENDIAN = ByteOrder.LITTLE_ENDIAN;
+        }
+        else
+        {
+            WRITER_ENDIAN = ByteOrder.BIG_ENDIAN;
+        }
+    }
+
     private final TypeDescription schema;
     private final int pixelStride;
     private final int rowGroupSize;
@@ -144,7 +160,7 @@ public class PixelsWriterImpl implements PixelsWriter
         fileColStatRecorders = new StatsRecorder[children.size()];
         for (int i = 0; i < children.size(); ++i)
         {
-            columnWriters[i] = newColumnWriter(children.get(i), pixelStride, encoding);
+            columnWriters[i] = newColumnWriter(children.get(i), pixelStride, encoding, WRITER_ENDIAN);
             fileColStatRecorders[i] = StatsRecorder.create(children.get(i));
         }
 
@@ -611,7 +627,7 @@ public class PixelsWriterImpl implements PixelsWriter
              * We temporarily fix this problem by creating a new column writer for each row group.
              */
             // writer.reset();
-            columnWriters[i] = newColumnWriter(children.get(i), pixelStride, encoding);
+            columnWriters[i] = newColumnWriter(children.get(i), pixelStride, encoding, WRITER_ENDIAN);
         }
 
         // put curRowGroupIndex into rowGroupFooter

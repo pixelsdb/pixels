@@ -17,9 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core;
+package io.pixelsdb.pixels.example.core;
 
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -27,13 +29,10 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import java.io.IOException;
 
 /**
- * pixels
- *
  * @author guodong
  * @author hank
  */
-public class MockPixelsReader
-        implements Runnable
+public class MockPixelsReader implements Runnable
 {
     private final Storage storage;
     private final String filePath;

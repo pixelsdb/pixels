@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 import static java.util.Objects.requireNonNull;
 
@@ -40,6 +41,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 {
     final int pixelStride;                     // indicate num of elements in a pixel
     final boolean isEncoding;                  // indicate if encoding enabled during writing
+    final ByteOrder byteOrder;                 // indicate the endianness used during writing
     final boolean[] isNull;
     private final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
     private final PixelsProto.ColumnStatistic.Builder columnChunkStat;
@@ -61,11 +63,12 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final ByteArrayOutputStream outputStream;  // column chunk content
     private final ByteArrayOutputStream isNullStream;  // column chunk isNull
 
-    public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
         this.type = requireNonNull(type, "type is null");
         this.pixelStride = pixelStride;
         this.isEncoding = isEncoding;
+        this.byteOrder = requireNonNull(byteOrder, "byteOrder is null");
         this.isNull = new boolean[pixelStride];
 
         this.columnChunkIndex =

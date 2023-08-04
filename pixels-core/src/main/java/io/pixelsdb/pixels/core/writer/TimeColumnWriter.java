@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Time column writer.
@@ -39,9 +40,9 @@ public class TimeColumnWriter extends BaseColumnWriter
 {
     private final int[] curPixelVector = new int[pixelStride];
 
-    public TimeColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public TimeColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         // time is likely to be negative according to different time zone.
         encoder = new RunLenIntEncoder(true, true);
     }

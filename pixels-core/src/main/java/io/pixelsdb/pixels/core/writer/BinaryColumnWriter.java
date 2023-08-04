@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 /**
  * pixels binary column writer.
@@ -40,9 +41,9 @@ public class BinaryColumnWriter extends BaseColumnWriter
     private final int maxLength;
     private int numTruncated;
 
-    public BinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public BinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         this.maxLength = type.getMaxLength();
         this.numTruncated = 0;
     }

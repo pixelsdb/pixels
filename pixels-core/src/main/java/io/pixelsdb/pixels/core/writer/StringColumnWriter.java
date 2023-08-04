@@ -62,9 +62,9 @@ public class StringColumnWriter extends BaseColumnWriter
     private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
 
-    public StringColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public StringColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         this.futureUseDictionaryEncoding = isEncoding;
         this.currentUseDictionaryEncoding = isEncoding;
         encoder = new RunLenIntEncoder(false, true);
@@ -233,7 +233,7 @@ public class StringColumnWriter extends BaseColumnWriter
         outputStream.write(encoder.encode(tmpLens));
 
         ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
-        offsetBuf.order(ByteOrder.LITTLE_ENDIAN);
+        offsetBuf.order(byteOrder);
         offsetBuf.putInt(lensFieldOffset);
         outputStream.write(offsetBuf.array());
     }
@@ -276,7 +276,7 @@ public class StringColumnWriter extends BaseColumnWriter
          */
 
         ByteBuffer offsetsBuf = ByteBuffer.allocate(2 * Integer.BYTES);
-        offsetsBuf.order(ByteOrder.LITTLE_ENDIAN);
+        offsetsBuf.order(byteOrder);
         offsetsBuf.putInt(originsFieldOffset);
         offsetsBuf.putInt(startsFieldOffset);
         outputStream.write(offsetsBuf.array());

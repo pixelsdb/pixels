@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.UUID;
 
 /**
@@ -43,7 +44,7 @@ public class TestStringColumnWriter
             stringColumnVector.add(UUID.randomUUID().toString());
         }
         StringColumnWriter stringColumnWriter = new StringColumnWriter(
-                TypeDescription.createString(), 10000, true);
+                TypeDescription.createString(), 10000, true, ByteOrder.BIG_ENDIAN);
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < 1000; ++i)
         {
