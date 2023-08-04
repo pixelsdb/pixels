@@ -7,10 +7,10 @@ clean:
 
 # run mvn package before to generate target jar
 gen:
-	javah -d ./src/main/cpp -cp ./target/pixels-cache-0.1.0.jar io.pixelsdb.pixels.cache.utils.RadixTreeDumper
-	javah -d ./src/main/cpp -cp ./target/pixels-cache-0.1.0.jar io.pixelsdb.pixels.cache.NativeRadixIndexReader
-	javah -d ./src/main/cpp -cp ./target/pixels-cache-0.1.0.jar io.pixelsdb.pixels.cache.NativeHashIndexReader
-	javah -d ./src/main/cpp -cp ./target/pixels-cache-0.1.0.jar io.pixelsdb.pixels.cache.utils.RadixIndexEndianRewriter
+	javah -d ./src/main/cpp -cp ./target/pixels-cache-0.2.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.utils.RadixTreeDumper
+	javah -d ./src/main/cpp -cp ./target/pixels-cache-0.2.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.NativeRadixIndexReader
+	javah -d ./src/main/cpp -cp ./target/pixels-cache-0.2.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.NativeHashIndexReader
+	javah -d ./src/main/cpp -cp ./target/pixels-cache-0.2.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.utils.RadixIndexEndianRewriter
 
 disc:
 	javap -s -p target/yeeef/Address.class
