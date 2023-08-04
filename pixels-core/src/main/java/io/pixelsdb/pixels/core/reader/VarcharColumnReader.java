@@ -26,8 +26,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
  * @author guodong
  * @author hank
  */
-public class VarcharColumnReader
-        extends StringColumnReader
+public class VarcharColumnReader extends StringColumnReader
 {
     // This class is implemented in Issue #100.
 

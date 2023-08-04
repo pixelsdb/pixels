@@ -39,8 +39,7 @@ import java.sql.Timestamp;
  * @author guodong
  * @author hank
  */
-public class TimestampColumnReader
-        extends ColumnReader
+public class TimestampColumnReader extends ColumnReader
 {
     private ByteBuffer inputBuffer = null;
     private InputStream inputStream = null;
@@ -70,7 +69,6 @@ public class TimestampColumnReader
     @Override
     public void close() throws IOException
     {
-
     }
 
     /**
@@ -89,8 +87,7 @@ public class TimestampColumnReader
     @Override
     public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
-                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
-            throws IOException
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
         if (offset == 0)

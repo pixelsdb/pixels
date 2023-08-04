@@ -101,8 +101,7 @@ public abstract class ColumnReader implements Closeable
      */
     public abstract void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                               int offset, int size, int pixelStride, final int vectorIndex,
-                              ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
-            throws IOException;
+                              ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException;
 
     public ColumnReader(TypeDescription type)
     {

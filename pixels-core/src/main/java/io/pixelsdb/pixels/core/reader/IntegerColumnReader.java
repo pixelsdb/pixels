@@ -35,8 +35,7 @@ import java.nio.ByteOrder;
 /**
  * @author guodong
  */
-public class IntegerColumnReader
-        extends ColumnReader
+public class IntegerColumnReader extends ColumnReader
 {
     private RunLenIntDecoder decoder;
     private ByteBuffer inputBuffer;
@@ -96,8 +95,7 @@ public class IntegerColumnReader
     @Override
     public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
-                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
-            throws IOException
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         // if read from start, init the stream and decoder
@@ -108,7 +106,7 @@ public class IntegerColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
-            this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            this.inputBuffer.order(chunkIndex.getLittleEndian() ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull

@@ -30,8 +30,7 @@ import java.nio.ByteBuffer;
  * TODO: unimplemented.
  * @author guodong
  */
-public class BinaryColumnReader
-        extends ColumnReader
+public class BinaryColumnReader extends ColumnReader
 {
     BinaryColumnReader(TypeDescription type)
     {
@@ -54,7 +53,6 @@ public class BinaryColumnReader
     @Override
     public void close() throws IOException
     {
-
     }
 
     /**

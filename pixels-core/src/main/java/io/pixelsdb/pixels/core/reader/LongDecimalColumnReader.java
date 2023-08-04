@@ -35,8 +35,7 @@ import java.nio.ByteOrder;
  * @date 2022-07-03
  * @author hank
  */
-public class LongDecimalColumnReader
-        extends ColumnReader
+public class LongDecimalColumnReader extends ColumnReader
 {
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;

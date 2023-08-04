@@ -37,8 +37,7 @@ import java.nio.ByteBuffer;
  *
  * @author hank
  */
-public class TimeColumnReader
-        extends ColumnReader
+public class TimeColumnReader extends ColumnReader
 {
     private ByteBuffer inputBuffer = null;
     private InputStream inputStream = null;
@@ -68,7 +67,6 @@ public class TimeColumnReader
     @Override
     public void close() throws IOException
     {
-
     }
 
     /**
@@ -87,8 +85,7 @@ public class TimeColumnReader
     @Override
     public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
-                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
-            throws IOException
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
         TimeColumnVector columnVector = (TimeColumnVector) vector;
         if (offset == 0)

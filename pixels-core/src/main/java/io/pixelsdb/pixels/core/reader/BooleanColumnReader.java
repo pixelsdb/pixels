@@ -31,8 +31,7 @@ import java.nio.ByteBuffer;
 /**
  * @author guodong
  */
-public class BooleanColumnReader
-        extends ColumnReader
+public class BooleanColumnReader extends ColumnReader
 {
     private ByteBuffer inputBuffer;
     private byte[] bits;

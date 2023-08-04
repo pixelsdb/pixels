@@ -40,8 +40,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * @author guodong
  * @author hank
  */
-public class StringColumnReader
-        extends ColumnReader
+public class StringColumnReader extends ColumnReader
 {
     private int originsOffset;
 
@@ -301,8 +300,7 @@ public class StringColumnReader
     /**
      * In this method, we have reduced most of significant memory copies.
      */
-    private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding)
-            throws IOException
+    private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding) throws IOException
     {
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
