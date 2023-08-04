@@ -49,8 +49,7 @@ public class BinaryColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         byte[][] values = columnVector.vector;
@@ -73,8 +72,8 @@ public class BinaryColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartBinary(BinaryColumnVector columnVector, byte[][] values, int curPartLength, int curPartOffset)
-            throws IOException
+    private void writeCurPartBinary(BinaryColumnVector columnVector, byte[][] values,
+                                    int curPartLength, int curPartOffset) throws IOException
     {
         for (int i = 0; i < curPartLength; i++)
         {

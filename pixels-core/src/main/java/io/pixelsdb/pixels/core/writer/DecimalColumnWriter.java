@@ -44,8 +44,7 @@ public class DecimalColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int length)
-            throws IOException
+    public int write(ColumnVector vector, int length) throws IOException
     {
         DecimalColumnVector columnVector = (DecimalColumnVector) vector;
         long[] values = columnVector.vector;

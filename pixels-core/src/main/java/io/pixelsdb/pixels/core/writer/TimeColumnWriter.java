@@ -48,8 +48,7 @@ public class TimeColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         TimeColumnVector columnVector = (TimeColumnVector) vector;
         int[] times = columnVector.times;
@@ -92,8 +91,7 @@ public class TimeColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel()
-            throws IOException
+    public void newPixel() throws IOException
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {
@@ -133,8 +131,7 @@ public class TimeColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void close()
-            throws IOException
+    public void close() throws IOException
     {
         encoder.close();
         super.close();

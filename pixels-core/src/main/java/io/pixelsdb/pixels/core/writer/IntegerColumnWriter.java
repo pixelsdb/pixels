@@ -49,8 +49,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
@@ -95,8 +94,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    void newPixel()
-            throws IOException
+    void newPixel() throws IOException
     {
         // update stats
         for (int i = 0; i < curPixelVectorIndex; i++)

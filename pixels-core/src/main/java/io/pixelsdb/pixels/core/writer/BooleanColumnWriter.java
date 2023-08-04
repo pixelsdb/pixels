@@ -43,8 +43,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         ByteColumnVector columnVector = (ByteColumnVector) vector;
         byte[] values = columnVector.vector;
@@ -87,8 +86,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel()
-            throws IOException
+    public void newPixel() throws IOException
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {

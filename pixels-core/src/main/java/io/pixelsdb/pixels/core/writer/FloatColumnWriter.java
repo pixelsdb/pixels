@@ -43,8 +43,7 @@ public class FloatColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int length)
-            throws IOException
+    public int write(ColumnVector vector, int length) throws IOException
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         long[] values = columnVector.vector;
