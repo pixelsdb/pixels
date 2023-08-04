@@ -38,6 +38,7 @@ import org.apache.logging.log4j.Logger;
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -171,7 +172,7 @@ public class PixelsReaderImpl implements PixelsReader
                 // get FileTail
                 long fileLen = fsReader.getFileLength();
                 fsReader.seek(fileLen - Long.BYTES);
-                long fileTailOffset = fsReader.readLong();
+                long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
                 int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
                 fsReader.seek(fileTailOffset);
                 ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);

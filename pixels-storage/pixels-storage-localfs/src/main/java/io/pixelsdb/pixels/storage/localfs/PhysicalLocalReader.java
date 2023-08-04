@@ -26,9 +26,12 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -141,15 +144,29 @@ public class PhysicalLocalReader implements PhysicalReader
     }
 
     @Override
-    public long readLong() throws IOException
+    public long readLong(ByteOrder byteOrder) throws IOException
     {
-        return raf.readLong();
+        if (requireNonNull(byteOrder).equals(ByteOrder.BIG_ENDIAN))
+        {
+            return raf.readLong();
+        }
+        else
+        {
+            return Long.reverseBytes(raf.readLong());
+        }
     }
 
     @Override
-    public int readInt() throws IOException
+    public int readInt(ByteOrder byteOrder) throws IOException
     {
-        return raf.readInt();
+        if (requireNonNull(byteOrder).equals(ByteOrder.BIG_ENDIAN))
+        {
+            return raf.readInt();
+        }
+        else
+        {
+            return Integer.reverseBytes(raf.readInt());
+        }
     }
 
     @Override

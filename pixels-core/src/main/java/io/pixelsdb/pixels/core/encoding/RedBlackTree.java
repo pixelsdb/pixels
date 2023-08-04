@@ -169,8 +169,7 @@ abstract class RedBlackTree
      * @param greatGrandparent Grandparent's parent
      * @return Does parent also need to be checked and/or fixed?
      */
-    private boolean add(int node, boolean fromLeft, int parent,
-                        int grandparent, int greatGrandparent)
+    private boolean add(int node, boolean fromLeft, int parent, int grandparent, int greatGrandparent)
     {
         if (node == NULL)
         {

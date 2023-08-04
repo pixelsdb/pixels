@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Time column writer.
@@ -39,16 +40,15 @@ public class TimeColumnWriter extends BaseColumnWriter
 {
     private final int[] curPixelVector = new int[pixelStride];
 
-    public TimeColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public TimeColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         // time is likely to be negative according to different time zone.
         encoder = new RunLenIntEncoder(true, true);
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         TimeColumnVector columnVector = (TimeColumnVector) vector;
         int[] times = columnVector.times;
@@ -91,8 +91,7 @@ public class TimeColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel()
-            throws IOException
+    public void newPixel() throws IOException
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {
@@ -109,6 +108,7 @@ public class TimeColumnWriter extends BaseColumnWriter
         {
             ByteBuffer curVecPartitionBuffer =
                     ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
+            curVecPartitionBuffer.order(byteOrder);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 curVecPartitionBuffer.putInt(curPixelVector[i]);
@@ -132,8 +132,7 @@ public class TimeColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void close()
-            throws IOException
+    public void close() throws IOException
     {
         encoder.close();
         super.close();

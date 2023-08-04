@@ -27,8 +27,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
  * @author guodong
  * @author hank
  */
-public class CharColumnReader
-        extends StringColumnReader
+public class CharColumnReader extends StringColumnReader
 {
     // This class is implemented in Issue #100.
 

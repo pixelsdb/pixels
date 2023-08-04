@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
 
+import java.nio.ByteOrder;
+
 /**
  * pixels column writer for <code>Char</code>
  * It is the same as VarcharColumnWriter, which means it never pads zero
@@ -30,8 +32,8 @@ import io.pixelsdb.pixels.core.TypeDescription;
  */
 public class CharColumnWriter extends VarcharColumnWriter
 {
-    public CharColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public CharColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
     }
 }

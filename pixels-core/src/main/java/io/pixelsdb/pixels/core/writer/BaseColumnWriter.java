@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 import static java.util.Objects.requireNonNull;
 
@@ -40,6 +41,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 {
     final int pixelStride;                     // indicate num of elements in a pixel
     final boolean isEncoding;                  // indicate if encoding enabled during writing
+    final ByteOrder byteOrder;                 // indicate the endianness used during writing
     final boolean[] isNull;
     private final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
     private final PixelsProto.ColumnStatistic.Builder columnChunkStat;
@@ -61,15 +63,17 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final ByteArrayOutputStream outputStream;  // column chunk content
     private final ByteArrayOutputStream isNullStream;  // column chunk isNull
 
-    public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
         this.type = requireNonNull(type, "type is null");
         this.pixelStride = pixelStride;
         this.isEncoding = isEncoding;
+        this.byteOrder = requireNonNull(byteOrder, "byteOrder is null");
         this.isNull = new boolean[pixelStride];
 
         this.columnChunkIndex =
-                PixelsProto.ColumnChunkIndex.newBuilder();
+                PixelsProto.ColumnChunkIndex.newBuilder()
+                        .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN));
         this.columnChunkStat =
                 PixelsProto.ColumnStatistic.newBuilder();
         this.pixelStatRecorder = StatsRecorder.create(type);
@@ -92,8 +96,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
      * @return size in bytes of the current column chunk
      */
     @Override
-    public abstract int write(ColumnVector vector, int size)
-            throws IOException;
+    public abstract int write(ColumnVector vector, int size) throws IOException;
 
     /**
      * Get byte array of column chunk content
@@ -134,8 +137,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     }
 
     @Override
-    public void flush()
-            throws IOException
+    public void flush() throws IOException
     {
         if (curPixelEleIndex > 0)
         {
@@ -147,8 +149,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
         isNullStream.writeTo(outputStream);
     }
 
-    void newPixel()
-            throws IOException
+    void newPixel() throws IOException
     {
         // isNull
         if (hasNull)

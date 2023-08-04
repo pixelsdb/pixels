@@ -34,6 +34,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.TimeZone;
@@ -250,7 +251,7 @@ public class PixelsCompactor
                 // get FileTail
                 long fileLen = fsReader.getFileLength();
                 fsReader.seek(fileLen - Long.BYTES);
-                long fileTailOffset = fsReader.readLong();
+                long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
                 int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
                 fsReader.seek(fileTailOffset);
                 byte[] fileTailBuffer = new byte[fileTailLength];

@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISION;
 
@@ -42,51 +43,51 @@ public interface ColumnWriter
      * @param isEncoding set true if enable data encoding.
      * @return
      */
-    public static ColumnWriter newColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    static ColumnWriter newColumnWriter(TypeDescription type, int pixelStride,
+                                        boolean isEncoding, ByteOrder byteOrder)
     {
         switch (type.getCategory())
         {
             case BOOLEAN:
-                return new BooleanColumnWriter(type, pixelStride, isEncoding);
+                return new BooleanColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case BYTE:
-                return new ByteColumnWriter(type, pixelStride, isEncoding);
+                return new ByteColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case SHORT:
             case INT:
             case LONG:
-                return new IntegerColumnWriter(type, pixelStride, isEncoding);
+                return new IntegerColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case FLOAT:
-                return new FloatColumnWriter(type, pixelStride, isEncoding);
+                return new FloatColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case DOUBLE:
-                return new DoubleColumnWriter(type, pixelStride, isEncoding);
+                return new DoubleColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case DECIMAL: // Issue #196: precision and scale are passed through type.
                 if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
-                    return new DecimalColumnWriter(type, pixelStride, isEncoding);
+                    return new DecimalColumnWriter(type, pixelStride, isEncoding, byteOrder);
                 else
-                    return new LongDecimalColumnWriter(type, pixelStride, isEncoding);
+                    return new LongDecimalColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case STRING:
-                return new StringColumnWriter(type, pixelStride, isEncoding);
+                return new StringColumnWriter(type, pixelStride, isEncoding, byteOrder);
             // Issue #196: max length of char, varchar, binary, and varbinary, are passed through type.
             case CHAR:
-                return new CharColumnWriter(type, pixelStride, isEncoding);
+                return new CharColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case VARCHAR:
-                return new VarcharColumnWriter(type, pixelStride, isEncoding);
+                return new VarcharColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case BINARY:
-                return new BinaryColumnWriter(type, pixelStride, isEncoding);
+                return new BinaryColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case VARBINARY:
-                return new VarbinaryColumnWriter(type, pixelStride, isEncoding);
+                return new VarbinaryColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case DATE:
-                return new DateColumnWriter(type, pixelStride, isEncoding);
+                return new DateColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case TIME:
-                return new TimeColumnWriter(type, pixelStride, isEncoding);
+                return new TimeColumnWriter(type, pixelStride, isEncoding, byteOrder);
             case TIMESTAMP:
-                return new TimestampColumnWriter(type, pixelStride, isEncoding);
+                return new TimestampColumnWriter(type, pixelStride, isEncoding, byteOrder);
             default:
                 throw new IllegalArgumentException("Bad schema type: " + type.getCategory());
         }
     }
 
-    int write(ColumnVector vector, int length)
-            throws IOException;
+    int write(ColumnVector vector, int length) throws IOException;
 
     byte[] getColumnChunkContent();
 
@@ -102,9 +103,7 @@ public interface ColumnWriter
 
     void reset();
 
-    void flush()
-            throws IOException;
+    void flush() throws IOException;
 
-    void close()
-            throws IOException;
+    void close() throws IOException;
 }

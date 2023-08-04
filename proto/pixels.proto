@@ -36,7 +36,7 @@ option java_outer_classname = "PixelsProto";
 // the RowGroupInformation, column chunk level configurations are in the ColumnChunkIndex.
 
 // The content of the file tail that must be serialized and stored at the end of each file,
-// followed by 8 bytes indicating the start offset of the file tail.
+// followed by an eight-byte integer in big endian indicating the start offset of the file tail.
 message FileTail {
     optional Footer footer = 1;
     optional PostScript postscript = 2;
@@ -235,7 +235,7 @@ message ColumnChunkIndex {
     repeated PixelStatistic pixelStatistics = 5;
     // whether this column chunk is stored in little endian
     optional bool littleEndian = 6;
-    // whether the null positions are padded with arbitrary values, only used for non-encoded column chunks
+    // whether the null positions are padded with arbitrary value, only valid non-encoded column chunks
     optional bool nullsPadded = 7;
 }
 

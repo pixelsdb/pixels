@@ -33,6 +33,7 @@ import io.pixelsdb.pixels.core.vector.DictionaryColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -40,8 +41,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * @author guodong
  * @author hank
  */
-public class StringColumnReader
-        extends ColumnReader
+public class StringColumnReader extends ColumnReader
 {
     private int originsOffset;
 
@@ -154,7 +154,9 @@ public class StringColumnReader
                 inputBuffer.release();
             }
             // no memory copy
-            inputBuffer = Unpooled.wrappedBuffer(input);
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            inputBuffer = Unpooled.wrappedBuffer(input)
+                    .order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             readContent(input.remaining(), encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             bufferOffset = 0;
@@ -301,8 +303,7 @@ public class StringColumnReader
     /**
      * In this method, we have reduced most of significant memory copies.
      */
-    private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding)
-            throws IOException
+    private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding) throws IOException
     {
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {

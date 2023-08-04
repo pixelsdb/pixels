@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 /**
  * pixels
@@ -35,15 +36,14 @@ public class FloatColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public FloatColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public FloatColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         encodingUtils = new EncodingUtils();
     }
 
     @Override
-    public int write(ColumnVector vector, int length)
-            throws IOException
+    public int write(ColumnVector vector, int length) throws IOException
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         long[] values = columnVector.vector;

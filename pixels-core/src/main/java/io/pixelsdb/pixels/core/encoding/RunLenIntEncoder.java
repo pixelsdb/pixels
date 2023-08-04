@@ -88,8 +88,7 @@ public class RunLenIntEncoder extends Encoder
     }
 
     @Override
-    public byte[] encode(long[] values, int offset, int length)
-            throws IOException
+    public byte[] encode(long[] values, int offset, int length) throws IOException
     {
         for (int i = 0; i < length; i++)
         {
@@ -102,8 +101,7 @@ public class RunLenIntEncoder extends Encoder
     }
 
     @Override
-    public byte[] encode(int[] values, int offset, int length)
-            throws IOException
+    public byte[] encode(int[] values, int offset, int length) throws IOException
     {
         for (int i = 0; i < length; i++)
         {
@@ -116,22 +114,19 @@ public class RunLenIntEncoder extends Encoder
     }
 
     @Override
-    public byte[] encode(long[] values)
-            throws IOException
+    public byte[] encode(long[] values) throws IOException
     {
         return encode(values, 0, values.length);
     }
 
     @Override
-    public byte[] encode(int[] values)
-            throws IOException
+    public byte[] encode(int[] values) throws IOException
     {
         return encode(values, 0, values.length);
     }
 
     @Override
-    public void close()
-            throws IOException
+    public void close() throws IOException
     {
         gapVsPatchList = null;
         outputStream.close();
@@ -184,7 +179,7 @@ public class RunLenIntEncoder extends Encoder
             }
         }
 
-        // its faster to exit under delta overflow condition without checking for
+        // it is faster to exit under delta overflow condition without checking for
         // PATCHED_BASE condition as encoding using DIRECT is faster and has less
         // overhead than PATCHED_BASE
         if (!isSafeSubtract(max, min))
@@ -264,7 +259,7 @@ public class RunLenIntEncoder extends Encoder
             // after base reducing the values, if the difference in bits between
             // 95th percentile and 100th percentile value is zero then there
             // is no point in patching the values, in which case we will
-            // fallback to DIRECT encoding.
+            // fall back to DIRECT encoding.
             // The decision to use patched base was based on zigzag values, but the
             // actual patching is done on base reduced literals.
             if ((brBits100p - brBits95p) != 0)
@@ -400,8 +395,7 @@ public class RunLenIntEncoder extends Encoder
         }
     }
 
-    private void writeValues()
-            throws IOException
+    private void writeValues() throws IOException
     {
         if (numLiterals != 0)
         {
@@ -427,8 +421,7 @@ public class RunLenIntEncoder extends Encoder
         }
     }
 
-    private void write(long value)
-            throws IOException
+    private void write(long value) throws IOException
     {
         if (numLiterals == 0)
         {
@@ -548,8 +541,7 @@ public class RunLenIntEncoder extends Encoder
         }
     }
 
-    private void flush()
-            throws IOException
+    private void flush() throws IOException
     {
         if (numLiterals != 0)
         {
@@ -622,8 +614,7 @@ public class RunLenIntEncoder extends Encoder
         fixedRunLength = 0;
     }
 
-    private void writeDirectValues()
-            throws IOException
+    private void writeDirectValues() throws IOException
     {
         // write the number of fixed bits required in next 5 bits
         int fb = zzBits100p;
@@ -658,8 +649,7 @@ public class RunLenIntEncoder extends Encoder
         variableRunLength = 0;
     }
 
-    private void writePatchedBaseValues()
-            throws IOException
+    private void writePatchedBaseValues() throws IOException
     {
         // NOTE: Aligned bit packing cannot be applied for PATCHED_BASE encoding
         // because patch is applied to MSB bits. For example: If fixed bit width of
@@ -733,8 +723,7 @@ public class RunLenIntEncoder extends Encoder
         variableRunLength = 0;
     }
 
-    private void writeDeltaValues()
-            throws IOException
+    private void writeDeltaValues() throws IOException
     {
         int len;
         int fb = bitsDeltaMax;
@@ -814,7 +803,7 @@ public class RunLenIntEncoder extends Encoder
             // store the first value as delta value using zigzag encoding
             writeVslong(outputStream, adjDeltas[0]);
 
-            // adjacent delta values are bit packed. The length of adjDeltas array is
+            // adjacent delta values are bit-packed. The length of adjDeltas array is
             // always one less than the number of literals (delta difference for n
             // elements is n-1). We have already written one element, write the
             // remaining numLiterals - 2 elements here
@@ -823,10 +812,9 @@ public class RunLenIntEncoder extends Encoder
     }
 
     /**
-     * Bitpack and write the input values to underlying output stream
+     * Bit-pack and write the input values to underlying output stream
      */
-    private void writeInts(long[] input, int offset, int len, int bitSize)
-            throws IOException
+    private void writeInts(long[] input, int offset, int len, int bitSize) throws IOException
     {
         if (input == null || input.length < 1 || offset < 0 || len < 1 || bitSize < 1)
         {
@@ -1064,9 +1052,7 @@ public class RunLenIntEncoder extends Encoder
         return (left ^ right) >= 0 | (left ^ (left - right)) >= 0;
     }
 
-    private void writeVulong(OutputStream output,
-                             long value)
-            throws IOException
+    private void writeVulong(OutputStream output, long value) throws IOException
     {
         while (true)
         {
@@ -1083,8 +1069,7 @@ public class RunLenIntEncoder extends Encoder
         }
     }
 
-    private void writeVslong(OutputStream output,
-                             long value)
+    private void writeVslong(OutputStream output, long value)
             throws IOException
     {
         writeVulong(output, (value << 1) ^ (value >> 63));

@@ -31,6 +31,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * String column writer.
@@ -61,17 +62,16 @@ public class StringColumnWriter extends BaseColumnWriter
     private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
 
-    public StringColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public StringColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         this.futureUseDictionaryEncoding = isEncoding;
         this.currentUseDictionaryEncoding = isEncoding;
         encoder = new RunLenIntEncoder(false, true);
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         currentUseDictionaryEncoding = futureUseDictionaryEncoding;
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
@@ -161,8 +161,7 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel()
-            throws IOException
+    public void newPixel() throws IOException
     {
         if (currentUseDictionaryEncoding)
         {
@@ -175,8 +174,7 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void flush()
-            throws IOException
+    public void flush() throws IOException
     {
         // flush out pixels field
         super.flush();
@@ -210,8 +208,7 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void close()
-            throws IOException
+    public void close() throws IOException
     {
         lensArray.clear();
         dictionary.clear();
@@ -219,8 +216,7 @@ public class StringColumnWriter extends BaseColumnWriter
         super.close();
     }
 
-    private void flushLens()
-            throws IOException
+    private void flushLens() throws IOException
     {
         int lensFieldOffset = outputStream.size();
         long[] tmpLens = new long[lensArray.size()];
@@ -232,12 +228,12 @@ public class StringColumnWriter extends BaseColumnWriter
         outputStream.write(encoder.encode(tmpLens));
 
         ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
+        offsetBuf.order(byteOrder);
         offsetBuf.putInt(lensFieldOffset);
         outputStream.write(offsetBuf.array());
     }
 
-    private void flushDictionary()
-            throws IOException
+    private void flushDictionary() throws IOException
     {
         int originsFieldOffset;
         int startsFieldOffset;
@@ -274,6 +270,7 @@ public class StringColumnWriter extends BaseColumnWriter
          */
 
         ByteBuffer offsetsBuf = ByteBuffer.allocate(2 * Integer.BYTES);
+        offsetsBuf.order(byteOrder);
         offsetsBuf.putInt(originsFieldOffset);
         offsetsBuf.putInt(startsFieldOffset);
         outputStream.write(offsetsBuf.array());
