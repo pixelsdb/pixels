@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * example command to start pixels-daemon:
- * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar datanode|coordinator
+ * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-full.jar datanode|coordinator
  * */
 public class DaemonMain
 {
