@@ -154,9 +154,9 @@ public class StringColumnReader extends ColumnReader
                 inputBuffer.release();
             }
             // no memory copy
-            inputBuffer = Unpooled.wrappedBuffer(input);
             boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
-            inputBuffer = inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            inputBuffer = Unpooled.wrappedBuffer(input)
+                    .order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             readContent(input.remaining(), encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             bufferOffset = 0;
