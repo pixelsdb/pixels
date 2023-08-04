@@ -1,8 +1,8 @@
-# Pixels-Worker-Vhive
+# Pixels-Worker-vHive
 
 This module is for creating the Docker image for vHive cloud functions.
 
-\* Currently, you need to modify [pixels-trino/connector/pom.xml](https://github.com/pixelsdb/pixels-trino/blob/master/connector/pom.xml): replace the `pixels-invoker-lambda` with `pixels-invoker-vhive`.
+Currently, you need to modify [pixels-trino/connector/pom.xml](https://github.com/pixelsdb/pixels-trino/blob/master/connector/pom.xml): replace the `pixels-invoker-lambda` with `pixels-invoker-vhive`.
 
 After [building Pixels](https://github.com/pixelsdb/pixels#build-pixels), we have the executable JAR file `target/pixels-worker-vhive-jar-with-dependencies.jar`.
 Also modify the following items in `pixels.properties`:
@@ -29,7 +29,7 @@ docker build -f ./Dockerfile -t <your-docker-username>/<your-docker-image-name>:
 ## Docker Run
 
 First of all, test the Docker image locally.
-Please pass the required environement variables by the `--env` option to correctly start the gRPC server in docker.
+Please pass the required environment variables by the `--env` option to correctly start the gRPC server in docker.
 
 ```bash
 docker run -p 50051:50051 --rm --network=bridge \
@@ -55,7 +55,7 @@ Note that Docker uses the docker hub by default, unless otherwise specified.
 docker push <your-docker-username>/<your-docker-image-name>:<your-image-tag>
 ```
 
-## FTP Service for Debuging and Profiling
+## FTP Service for Debugging and Profiling
 
 As you can see, we have FTP related environment variables in the configuration.
 This is because the function image will generate the logging file and profiling file during the execution, but the Firecracker microVM
@@ -66,4 +66,3 @@ Now our module use FTP service as a solution.
 You can follow [this tutorial](https://ubuntu.com/server/docs/service-ftp)
 and [this one](https://www.digitalocean.com/community/tutorials/how-to-set-up-vsftpd-for-a-user-s-directory-on-ubuntu-20-04)
 to set up an FTP server easily.
-

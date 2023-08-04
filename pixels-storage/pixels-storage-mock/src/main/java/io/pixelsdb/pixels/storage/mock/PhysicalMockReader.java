@@ -26,6 +26,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -136,13 +137,13 @@ public class PhysicalMockReader implements PhysicalReader
     }
 
     @Override
-    public long readLong() throws IOException
+    public long readLong(ByteOrder byteOrder) throws IOException
     {
         return 0;
     }
 
     @Override
-    public int readInt() throws IOException
+    public int readInt(ByteOrder byteOrder) throws IOException
     {
         return 0;
     }
