@@ -36,7 +36,7 @@ public:
     * Use this constructor by default. All column vectors
     * should normally be the default size.
     */
-    BinaryColumnVector(int len = VectorizedRowBatch::DEFAULT_SIZE, bool encoding = false);
+    explicit BinaryColumnVector(uint64_t len = VectorizedRowBatch::DEFAULT_SIZE, bool encoding = false);
 
 	~BinaryColumnVector();
     /**
@@ -48,6 +48,7 @@ public:
      * @param length     length of source byte sequence
      */
     void setRef(int elementNum, uint8_t * const & sourceBuf, int start, int length);
+    void * current() override;
     void close() override;
     void print(int rowCount) override;
 };

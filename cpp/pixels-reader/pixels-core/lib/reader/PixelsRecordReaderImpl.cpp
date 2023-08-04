@@ -162,7 +162,7 @@ std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse
     if(resultRowBatch == nullptr) {
         resultRowBatch = resultSchema->createRowBatch(curBatchSize, resultColumnsEncoded);
     }
-    resultRowBatch->rowCount = 0;
+
     auto columnVectors = resultRowBatch->cols;
     if(filterMask != nullptr) {
         filterMask->set();
@@ -217,7 +217,6 @@ std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse
         } else {
             // if end of file, set result vectorized row batch endOfFile
             // TODO: set checkValid to false!
-            resultRowBatch->endOfFile = true;
             endOfFile = true;
         }
         curRowInRG = 0;
@@ -406,8 +405,7 @@ std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::createEmptyEOFRowBat
 	auto emptySchema = TypeDescription::createSchema(
 	    std::vector<std::shared_ptr<pixels::proto::Type>>());
 	auto emptyRowBatch = emptySchema->createRowBatch(0);
-	emptyRowBatch->rowCount = size;
-	emptyRowBatch->endOfFile = true;
+	emptyRowBatch->rowCount = 0;
 	return emptyRowBatch;
 }
 bool PixelsRecordReaderImpl::isEndOfFile() {
@@ -420,6 +418,7 @@ void PixelsRecordReaderImpl::close() {
 	for(const auto& reader: readers) {
 		reader->close();
 	}
+    resultRowBatch->close();
 	readers.clear();
 	rowGroupFooters.clear();
 	includedColumnTypes.clear();

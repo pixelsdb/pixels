@@ -41,16 +41,19 @@ public:
       * length is the capacity, i.e., maximum number of values, of this column vector
       * <b>DO NOT</b> modify it or used it as the number of values in-used.
       */
-    int length;
-    int writeIndex;
-    long memoryUsage;
+    uint64_t length;
+    uint64_t writeIndex;
+    uint64_t readIndex;
+    uint64_t memoryUsage;
 	bool closed;
 	bool encoding;
-    ColumnVector() = default;
-    explicit ColumnVector(int len, bool encoding);
-
+    explicit ColumnVector(uint64_t len, bool encoding);
+    void increment(uint64_t size);              // increment the readIndex
+    bool isFull();                         // if the readIndex reaches length
+    uint64_t position();                   // return readIndex
     virtual void close();
     virtual void reset();
+    virtual void * current() = 0;              // get the pointer in the current location
     virtual void print(int rowCount);      // this is only used for debug
 };
 

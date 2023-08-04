@@ -59,48 +59,29 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
     auto &bind_data = (PixelsReadBindData &)*data_p.bind_data;
 
     do {
-        if(data.currPixelsRecordReader.get() == nullptr ||
-           (data.currPixelsRecordReader->isEndOfFile() && data.rowOffset >= data.vectorizedRowBatch->rowCount)) {
-            if(data.vectorizedRowBatch.get() != nullptr) {
-                data.vectorizedRowBatch->close();
-            }
-            if(data.currPixelsRecordReader.get() != nullptr) {
+        if(data.currPixelsRecordReader == nullptr ||
+           (data.currPixelsRecordReader->isEndOfFile() && data.vectorizedRowBatch->isEndOfFile())) {
+            if(data.currPixelsRecordReader != nullptr) {
                 data.currPixelsRecordReader.reset();
             }
             if(!PixelsParallelStateNext(context, bind_data, data, gstate)) {
                 return;
-            } else {
-                if(!data.is_last_state) {
-                    PixelsReaderOption option;
-                    option.setSkipCorruptRecords(true);
-                    option.setTolerantSchemaEvolution(true);
-                    option.setEnableEncodedColumnVector(true);
-                    option.setFilter(gstate.filters);
-                    option.setEnabledFilterPushDown(enable_filter_pushdown);
-                    // includeCols comes from the caller of PixelsPageSource
-                    option.setIncludeCols(data.column_names);
-                    option.setRGRange(0, data.nextReader->getRowGroupNum());
-                    option.setQueryId(1);
-                    data.nextPixelsRecordReader = data.nextReader->read(option);
-                }
             }
         }
         auto currPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(data.currPixelsRecordReader);
         auto nextPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(data.nextPixelsRecordReader);
 
-        if(data.vectorizedRowBatch != nullptr && data.rowOffset >= data.vectorizedRowBatch->rowCount) {
+        if(data.vectorizedRowBatch != nullptr && data.vectorizedRowBatch->isEndOfFile()) {
             data.vectorizedRowBatch = nullptr;
         }
         if(data.vectorizedRowBatch == nullptr) {
-            currPixelsRecordReader->asyncReadComplete(data.column_names.size());
-            if(!data.is_last_state) {
-                nextPixelsRecordReader->read();
-            }
             data.vectorizedRowBatch = currPixelsRecordReader->readBatch(false);
-            data.rowOffset = 0;
         }
+        uint64_t currentLoc = data.vectorizedRowBatch->position();
         std::shared_ptr<TypeDescription> resultSchema = data.currPixelsRecordReader->getResultSchema();
-        auto thisOutputChunkRows = MinValue<idx_t>(STANDARD_VECTOR_SIZE, data.vectorizedRowBatch->rowCount - data.rowOffset);
+        uint64_t remaining = data.vectorizedRowBatch->rowCount - currentLoc;
+        assert(remaining > 0);
+        auto thisOutputChunkRows = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
         output.SetCardinality(thisOutputChunkRows);
         std::shared_ptr<pixelsFilterMask> filterMask =
                 std::static_pointer_cast<PixelsRecordReaderImpl>(data.currPixelsRecordReader)->getFilterMask();
@@ -113,14 +94,13 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
             SelectionVector sel;
             sel.Initialize(thisOutputChunkRows);
             for (idx_t i = 0; i < thisOutputChunkRows; i++) {
-                if (filterMask->get(i + data.rowOffset)) {
+                if (filterMask->get(i + currentLoc)) {
                     sel.set_index(sel_size++, i);
                 }
             }
             output.Slice(sel, sel_size);
         }
 
-        data.rowOffset += thisOutputChunkRows;
         if(output.size() > 0) {
             return;
         } else {
@@ -193,42 +173,18 @@ unique_ptr<LocalTableFunctionState> PixelsScanFunction::PixelsScanInitLocal(
 
 	result->column_ids = input.column_ids;
 
-
 	auto fieldNames = bind_data.fileSchema->getFieldNames();
-
 
 	for(column_t column_id : input.column_ids) {
 		if (!IsRowIdColumnId(column_id)) {
 			result->column_names.emplace_back(fieldNames.at(column_id));
 		}
 	}
-    result->is_first_state = true;
-    result->is_last_state = false;
-    result->next_file_index = 0;
-    result->next_batch_index = 0;
-    result->curr_file_index = 0;
-    result->curr_batch_index = 0;
-	if(!PixelsParallelStateNext(context.client, bind_data, *result, gstate)) {
+
+    ::DirectUringRandomAccessFile::Initialize();
+	if(!PixelsParallelStateNext(context.client, bind_data, *result, gstate, true)) {
 		return nullptr;
 	}
-	PixelsReaderOption option;
-	option.setSkipCorruptRecords(true);
-	option.setTolerantSchemaEvolution(true);
-	option.setEnableEncodedColumnVector(true);
-	option.setEnabledFilterPushDown(enable_filter_pushdown);
-    option.setFilter(gstate.filters);
-	// includeCols comes from the caller of PixelsPageSource
-	option.setIncludeCols(result->column_names);
-	option.setRGRange(0, result->nextReader->getRowGroupNum());
-	option.setQueryId(1);
-
-//    option.setBatchSize(STANDARD_VECTOR_SIZE);
-	result->nextPixelsRecordReader = result->nextReader->read(option);
-
-    result->vectorizedRowBatch = nullptr;
-	::DirectUringRandomAccessFile::Initialize();
-    auto nextPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(result->nextPixelsRecordReader);
-    nextPixelsRecordReader->read();
 	return std::move(result);
 }
 
@@ -287,7 +243,6 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
                                               uint64_t thisOutputChunkRows) {
 
 	int row_batch_id = 0;
-	int row_offset = data.rowOffset;
 	auto column_ids = data.column_ids;
 	auto vectorizedRowBatch = data.vectorizedRowBatch;
 	for(uint64_t col_id = 0; col_id < column_ids.size(); col_id++) {
@@ -307,7 +262,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 			case TypeDescription::INT: {
 			    auto intCol = std::static_pointer_cast<LongColumnVector>(col);
                 Vector vector(LogicalType::INTEGER,
-                              (data_ptr_t)(intCol->intVector + row_offset));
+                              (data_ptr_t)(intCol->current()));
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<int>(output.data.at(col_id));
 //			    memcpy(result_ptr, intCol->intVector + row_offset, thisOutputChunkRows * sizeof(int));
@@ -320,7 +275,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 			case TypeDescription::LONG: {
 				auto longCol = std::static_pointer_cast<LongColumnVector>(col);
                 Vector vector(LogicalType::BIGINT,
-                              (data_ptr_t)(longCol->longVector + row_offset));
+                              (data_ptr_t)(longCol->current()));
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<long>(output.data.at(col_id));
 //			    memcpy(result_ptr, longCol->longVector + row_offset, thisOutputChunkRows * sizeof(long));
@@ -336,7 +291,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 		    case TypeDescription::DECIMAL:{
 			    auto decimalCol = std::static_pointer_cast<DecimalColumnVector>(col);
                 Vector vector(LogicalType::DECIMAL(colSchema->getPrecision(), colSchema->getScale()),
-                              (data_ptr_t)(decimalCol->vector + row_offset));
+                              (data_ptr_t)(decimalCol->current()));
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<long>(output.data.at(col_id));
 //			    memcpy(result_ptr, decimalCol->vector + row_offset, thisOutputChunkRows * sizeof(long));
@@ -351,7 +306,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 			case TypeDescription::DATE:{
 			    auto dateCol = std::static_pointer_cast<DateColumnVector>(col);
                 Vector vector(LogicalType::DATE,
-                              (data_ptr_t)(dateCol->dates + row_offset));
+                              (data_ptr_t)(dateCol->current()));
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<int>(output.data.at(col_id));
 //			    memcpy(result_ptr, dateCol->dates + row_offset, thisOutputChunkRows * sizeof(int));
@@ -374,7 +329,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 		    {
 			    auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
                 Vector vector(LogicalType::VARCHAR,
-                              (data_ptr_t)(binaryCol->vector + row_offset));
+                              (data_ptr_t)(binaryCol->current()));
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<duckdb::string_t>(output.data.at(col_id));
 //                memcpy(result_ptr, binaryCol->vector + row_offset, thisOutputChunkRows * sizeof(string_t));
@@ -385,13 +340,15 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 //			default:
 //				throw InvalidArgumentException("bad column type " + std::to_string(colSchema->getCategory()));
 		}
+        col->increment(thisOutputChunkRows);
 		row_batch_id++;
 	}
 }
 
 bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
                                                   PixelsReadLocalState &scan_data,
-                                                  PixelsReadGlobalState &parallel_state) {
+                                                  PixelsReadGlobalState &parallel_state,
+                                                  bool is_init_state) {
     unique_lock<mutex> parallel_lock(parallel_state.lock);
     if (parallel_state.error_opening_file) {
         throw InvalidArgumentException("PixelsScanInitLocal: file open error.");
@@ -403,8 +360,8 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     // 2. When PixelsScanImplementation invokes this function (scan_data.next_file_index > -1), if
     // scan_data.next_file_index >= (int) parallel_state.readers.size(), it means the current file is already
     // done, so the function return false.
-    if ((scan_data.is_first_state && parallel_state.file_index >= parallel_state.readers.size()) ||
-            scan_data.is_last_state) {
+    if ((is_init_state && parallel_state.file_index >= parallel_state.readers.size()) ||
+            scan_data.next_file_index >= parallel_state.readers.size()) {
 		::BufferPool::Reset();
 		// if async io is enabled, we need to unregister uring buffer
 		if(ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io")) {
@@ -423,18 +380,24 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     scan_data.next_file_index = parallel_state.file_index;
     scan_data.next_batch_index = scan_data.next_file_index;
     scan_data.curr_file_name = scan_data.next_file_name;
-    scan_data.is_first_state = false;
     parallel_state.file_index++;
     parallel_lock.unlock();
     // The below code uses global state but no race happens, so we don't need the lock anymore
     
 
-    if(scan_data.currReader.get() != nullptr) {
+    if(scan_data.currReader != nullptr) {
         scan_data.currReader->close();
     }
 
+    ::BufferPool::Switch();
+
     scan_data.currReader = scan_data.nextReader;
     scan_data.currPixelsRecordReader = scan_data.nextPixelsRecordReader;
+    // asyncReadComplete is not invoked in the first run (is_init_state = true)
+    if (scan_data.currPixelsRecordReader != nullptr) {
+        auto currPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(scan_data.currPixelsRecordReader);
+        currPixelsRecordReader->asyncReadComplete((int)scan_data.column_names.size());
+    }
     if(scan_data.next_file_index < parallel_state.readers.size()) {
         if (parallel_state.readers[scan_data.next_file_index]) {
             scan_data.next_file_name = bind_data.files.at(scan_data.next_file_index);
@@ -450,13 +413,32 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
                     ->build();
             parallel_state.readers[scan_data.next_file_index] = scan_data.nextReader;
         }
+
+        PixelsReaderOption option = GetPixelsReaderOption(scan_data, parallel_state);
+        scan_data.nextPixelsRecordReader = scan_data.nextReader->read(option);
+        auto nextPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(scan_data.nextPixelsRecordReader);
+        nextPixelsRecordReader->read();
     } else {
-        scan_data.is_last_state = true;
         scan_data.nextReader = nullptr;
         scan_data.nextPixelsRecordReader = nullptr;
     }
-    ::BufferPool::Switch();
+
+
     return true;
+}
+
+PixelsReaderOption PixelsScanFunction::GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state) {
+    PixelsReaderOption option;
+    option.setSkipCorruptRecords(true);
+    option.setTolerantSchemaEvolution(true);
+    option.setEnableEncodedColumnVector(true);
+    option.setFilter(global_state.filters);
+    option.setEnabledFilterPushDown(enable_filter_pushdown);
+    // includeCols comes from the caller of PixelsPageSource
+    option.setIncludeCols(local_state.column_names);
+    option.setRGRange(0, local_state.nextReader->getRowGroupNum());
+    option.setQueryId(1);
+    return option;
 }
 
 
