@@ -147,8 +147,7 @@ public class StringRedBlackTree extends RedBlackTree implements Dictionary
      * @throws IOException
      */
     @Override
-    public void visit(Visitor visitor)
-            throws IOException
+    public void visit(Visitor visitor) throws IOException
     {
         /*
          * Issue #498:

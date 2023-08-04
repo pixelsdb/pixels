@@ -30,6 +30,7 @@ import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * pixels time column reader
@@ -95,6 +96,8 @@ public class TimeColumnReader extends ColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             isNullOffset = inputBuffer.position() + (int) chunkIndex.getIsNullOffset();

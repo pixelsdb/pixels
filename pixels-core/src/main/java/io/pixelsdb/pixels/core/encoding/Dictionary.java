@@ -67,7 +67,8 @@ public interface Dictionary
      * This method prepares a {@link VisitorContext} instance for each item (key) in this dictionary,
      * and calls {@link Visitor#visit(VisitorContext)} to visit the item.
      * <p>
-     * The items <b>MUST</b> be visited in the ascending order of the item's key position, i.e., the encoded id of the item in this dictionary.
+     * The items <b>MUST</b> be visited in the ascending order of the item's key position, i.e.,
+     * the encoded id of the item in this dictionary.
      * The visitor can write (serialize) the dictionary item to an output stream.
      * </p>
      * @param visitor the visitor that is going to serialize the dictionary to an output stream.

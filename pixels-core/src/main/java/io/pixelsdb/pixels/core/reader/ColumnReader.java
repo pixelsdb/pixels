@@ -87,7 +87,7 @@ public abstract class ColumnReader implements Closeable
 
     /**
      * Read values from input buffer.
-     * Values after specified offset are gonna be put into the specified vector.
+     * Values after specified offset are going to be put into the specified vector.
      *
      * @param input    input buffer
      * @param encoding encoding type

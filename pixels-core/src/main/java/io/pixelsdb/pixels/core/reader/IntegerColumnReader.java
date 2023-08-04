@@ -106,7 +106,8 @@ public class IntegerColumnReader extends ColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
-            this.inputBuffer.order(chunkIndex.getLittleEndian() ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull

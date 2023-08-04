@@ -108,6 +108,7 @@ public class TimeColumnWriter extends BaseColumnWriter
         {
             ByteBuffer curVecPartitionBuffer =
                     ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
+            curVecPartitionBuffer.order(byteOrder);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 curVecPartitionBuffer.putInt(curPixelVector[i]);

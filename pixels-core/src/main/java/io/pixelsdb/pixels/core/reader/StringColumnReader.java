@@ -33,6 +33,7 @@ import io.pixelsdb.pixels.core.vector.DictionaryColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -154,6 +155,8 @@ public class StringColumnReader extends ColumnReader
             }
             // no memory copy
             inputBuffer = Unpooled.wrappedBuffer(input);
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             readContent(input.remaining(), encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             bufferOffset = 0;
