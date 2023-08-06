@@ -11,6 +11,7 @@ PixelsReaderOption::PixelsReaderOption() {
     enableEncodedColumnVector = true;
     enableFilterPushDown = false;
     queryId = -1L;
+    batchSize = 0;
     rgStart = 0;
     rgLen = -1;  // -1 means reading to the end of the file
 }
@@ -82,6 +83,14 @@ void PixelsReaderOption::setFilter(duckdb::TableFilterSet * filter) {
 
 duckdb::TableFilterSet * PixelsReaderOption::getFilter() {
     return this->filter;
+}
+
+void PixelsReaderOption::setBatchSize(int batchSize) {
+    this->batchSize = batchSize;
+}
+
+int PixelsReaderOption::getBatchSize() const {
+    return batchSize;
 }
 
 

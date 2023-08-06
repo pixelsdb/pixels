@@ -18,6 +18,8 @@
 #include <immintrin.h>
 #include <avxintrin.h>
 
+#define ENABLE_SIMD_FILTER
+
 class PixelsFilter {
 public:
     static void ApplyFilter(std::shared_ptr<ColumnVector> vector, duckdb::TableFilter &filter,

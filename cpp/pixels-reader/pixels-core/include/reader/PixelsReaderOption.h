@@ -27,7 +27,7 @@ public:
     duckdb::TableFilterSet * getFilter();
     int getRGStart();
     int getRGLen();
-    int getBatchSize();
+    int getBatchSize() const;
     void setTolerantSchemaEvolution(bool t);
     bool isTolerantSchemaEvolution();
     void setEnableEncodedColumnVector(bool enabled);
