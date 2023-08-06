@@ -42,7 +42,7 @@ public:
                       int offset, int size, int pixelStride,
                       int vectorIndex, std::shared_ptr<ColumnVector> vector,
                       pixels::proto::ColumnChunkIndex & chunkIndex,
-                      std::shared_ptr<pixelsFilterMask> filterMask) = 0;
+                      std::shared_ptr<PixelsBitMask> filterMask) = 0;
 private:
 	bool hasNull;
 protected:

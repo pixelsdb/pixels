@@ -12,7 +12,7 @@
 #include "duckdb/planner/filter/null_filter.hpp"
 #include "duckdb/planner/filter/conjunction_filter.hpp"
 #include "duckdb/common/operator/comparison_operators.hpp"
-#include "PixelsFilterMask.h"
+#include "PixelsBitMask.h"
 #include "vector/ColumnVector.h"
 #include "TypeDescription.h"
 #include <immintrin.h>
@@ -23,7 +23,7 @@
 class PixelsFilter {
 public:
     static void ApplyFilter(std::shared_ptr<ColumnVector> vector, duckdb::TableFilter &filter,
-                            pixelsFilterMask& filterMask,
+                            PixelsBitMask& filterMask,
                             std::shared_ptr<TypeDescription> type);
 
     template <class T, class OP>
@@ -31,12 +31,12 @@ public:
 
     template <class T, class OP>
     static void TemplatedFilterOperation(std::shared_ptr<ColumnVector> vector,
-                            const duckdb::Value &constant, pixelsFilterMask &filter_mask,
+                            const duckdb::Value &constant, PixelsBitMask &filter_mask,
                             std::shared_ptr<TypeDescription> type);
 
     template <class OP>
     static void FilterOperationSwitch(std::shared_ptr<ColumnVector> vector, duckdb::Value &constant,
-                                      pixelsFilterMask &filter_mask, std::shared_ptr<TypeDescription> type);
+                                      PixelsBitMask &filter_mask, std::shared_ptr<TypeDescription> type);
 
 };
 #endif //DUCKDB_PIXELSFILTER_H

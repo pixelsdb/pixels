@@ -49,7 +49,7 @@ public:
     std::shared_ptr<VectorizedRowBatch> readBatch(bool reuse) override;
 	std::shared_ptr<TypeDescription> getResultSchema() override;
     bool read();
-	std::shared_ptr<pixelsFilterMask> getFilterMask();
+	std::shared_ptr<PixelsBitMask> getFilterMask();
 	bool isEndOfFile() override;
     ~PixelsRecordReaderImpl();
 	void close() override;
@@ -79,7 +79,7 @@ private:
 	bool endOfFile;
 	int curRGRowCount;
     bool enabledFilterPushDown;
-    std::shared_ptr<pixelsFilterMask> filterMask;
+    std::shared_ptr<PixelsBitMask> filterMask;
 	std::shared_ptr<pixels::proto::RowGroupFooter> curRGFooter;
 	std::vector<std::shared_ptr<pixels::proto::ColumnEncoding>> curEncoding;
 	std::vector<int> curChunkBufferIndex;

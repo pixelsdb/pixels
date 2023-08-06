@@ -83,7 +83,7 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
         assert(remaining > 0);
         auto thisOutputChunkRows = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
         output.SetCardinality(thisOutputChunkRows);
-        std::shared_ptr<pixelsFilterMask> filterMask =
+        std::shared_ptr<PixelsBitMask> filterMask =
                 std::static_pointer_cast<PixelsRecordReaderImpl>(data.currPixelsRecordReader)->getFilterMask();
 
         TransformDuckdbChunk(data, output, resultSchema, thisOutputChunkRows);
@@ -100,7 +100,6 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
             }
             output.Slice(sel, sel_size);
         }
-
         if (output.size() > 0) {
             return;
         } else {

@@ -16,7 +16,7 @@ void StringColumnReader::close() {
 
 void StringColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::ColumnEncoding & encoding, int offset,
                               int size, int pixelStride, int vectorIndex, std::shared_ptr<ColumnVector> vector,
-                              pixels::proto::ColumnChunkIndex & chunkIndex, std::shared_ptr<pixelsFilterMask> filterMask) {
+                              pixels::proto::ColumnChunkIndex & chunkIndex, std::shared_ptr<PixelsBitMask> filterMask) {
     if(offset == 0) {
         elementIndex = 0;
         bufferOffset = 0;

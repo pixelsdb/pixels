@@ -18,7 +18,7 @@ public:
               int offset, int size, int pixelStride,
               int vectorIndex, std::shared_ptr<ColumnVector> vector,
               pixels::proto::ColumnChunkIndex & chunkIndex,
-			  std::shared_ptr<pixelsFilterMask> filterMask) override;
+			  std::shared_ptr<PixelsBitMask> filterMask) override;
 
 private:
     /**

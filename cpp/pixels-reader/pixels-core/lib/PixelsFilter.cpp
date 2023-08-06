@@ -73,7 +73,7 @@ int PixelsFilter::CompareAvx2(void * data, T constant) {
 
 template <class T, class OP>
 void PixelsFilter::TemplatedFilterOperation(std::shared_ptr<ColumnVector> vector,
-                              const duckdb::Value &constant, pixelsFilterMask &filter_mask,
+                              const duckdb::Value &constant, PixelsBitMask &filter_mask,
                                             std::shared_ptr<TypeDescription> type) {
     T constant_value = constant.template GetValueUnsafe<T>();
     switch (type->getCategory()) {
@@ -155,7 +155,7 @@ void PixelsFilter::TemplatedFilterOperation(std::shared_ptr<ColumnVector> vector
 
 template <class OP>
 void PixelsFilter::FilterOperationSwitch(std::shared_ptr<ColumnVector> vector, duckdb::Value &constant,
-                                         pixelsFilterMask &filter_mask,
+                                         PixelsBitMask &filter_mask,
                                          std::shared_ptr<TypeDescription> type) {
     if (filter_mask.isNone()) {
         return;
@@ -185,13 +185,13 @@ void PixelsFilter::FilterOperationSwitch(std::shared_ptr<ColumnVector> vector, d
 }
 
 void PixelsFilter::ApplyFilter(std::shared_ptr<ColumnVector> vector, duckdb::TableFilter &filter,
-                               pixelsFilterMask& filterMask,
+                               PixelsBitMask& filterMask,
                                std::shared_ptr<TypeDescription> type) {
     switch (filter.filter_type) {
         case duckdb::TableFilterType::CONJUNCTION_AND: {
             auto &conjunction = (duckdb::ConjunctionAndFilter &)filter;
             for (auto &child_filter : conjunction.child_filters) {
-                pixelsFilterMask childMask(filterMask.maskLength);
+                PixelsBitMask childMask(filterMask.maskLength);
                 ApplyFilter(vector, *child_filter, childMask, type);
                 filterMask.And(childMask);
             }
@@ -199,9 +199,9 @@ void PixelsFilter::ApplyFilter(std::shared_ptr<ColumnVector> vector, duckdb::Tab
         }
         case duckdb::TableFilterType::CONJUNCTION_OR: {
             auto &conjunction = (duckdb::ConjunctionOrFilter &)filter;
-            pixelsFilterMask orMask(filterMask.maskLength);
+            PixelsBitMask orMask(filterMask.maskLength);
             for (auto &childFilter : conjunction.child_filters) {
-                pixelsFilterMask childMask(filterMask);
+                PixelsBitMask childMask(filterMask);
                 ApplyFilter(vector, *childFilter, childMask, type);
                 orMask.Or(childMask);
             }
