@@ -73,6 +73,7 @@ private:
     int targetRGNum;
     int curRGIdx;
     int curRowInRG;
+    int batchSize;
 	int curRowInStride;
     std::string fileName;
 	bool endOfFile;

@@ -4,6 +4,7 @@
 
 #include "reader/PixelsRecordReaderImpl.h"
 #include "physical/io/PhysicalLocalReader.h"
+#include "profiler/CountProfiler.h"
 
 PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr<PhysicalReader> reader,
                                                const pixels::proto::PostScript& pixelsPostScript,
@@ -19,7 +20,9 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr<PhysicalReader> r
     queryId = option.getQueryId();
     RGStart = option.getRGStart();
     RGLen = option.getRGLen();
-
+    batchSize = option.getBatchSize();
+    // batchSize must be larger than STANDARD_VECTOR_SIZE
+    assert(batchSize >= STANDARD_VECTOR_SIZE);
     enabledFilterPushDown = option.isEnabledFilterPushDown();
     if(enabledFilterPushDown) {
         filter = option.getFilter();
@@ -116,7 +119,8 @@ void PixelsRecordReaderImpl::UpdateRowGroupInfo() {
 	curRGRowCount = (int) footer.rowgroupinfos(targetRGs.at(curRGIdx)).numberofrows();
 
     if(enabledFilterPushDown) {
-        filterMask = std::make_shared<pixelsFilterMask>(curRGRowCount);
+        int length = std::min(batchSize, curRGRowCount);
+        filterMask = std::make_shared<pixelsFilterMask>(length);
     }
 
 	curRGFooter = rowGroupFooters.at(curRGIdx);
@@ -158,9 +162,14 @@ std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse
 
 
     // update current batch size
-    int curBatchSize = curRGRowCount;
+    int curBatchSize = std::min(curRGRowCount - curRowInRG, std::min(batchSize, curRGRowCount));
     if(resultRowBatch == nullptr) {
         resultRowBatch = resultSchema->createRowBatch(curBatchSize, resultColumnsEncoded);
+    } else {
+        resultRowBatch->reset();
+        if(curBatchSize != resultRowBatch->maxSize) {
+            resultRowBatch->resize(curBatchSize);
+        }
     }
 
     auto columnVectors = resultRowBatch->cols;
@@ -423,6 +432,5 @@ void PixelsRecordReaderImpl::close() {
 	rowGroupFooters.clear();
 	includedColumnTypes.clear();
 	endOfFile = true;
-    // TODO: we should use pointer for filterMask
 }
 

@@ -81,10 +81,12 @@ void PixelsFilter::TemplatedFilterOperation(std::shared_ptr<ColumnVector> vector
         case TypeDescription::INT: {
             auto longColumnVector = std::static_pointer_cast<LongColumnVector>(vector);
             int i = 0;
+#ifdef  ENABLE_SIMD_FILTER
             for (; i < vector->length - vector->length % 8; i += 8) {
                 uint8_t mask = CompareAvx2<T, OP>(longColumnVector->intVector + i, constant_value);
                 filter_mask.setByteAligned(i, mask);
             }
+#endif
             for (; i < vector->length; i++) {
                 filter_mask.set(i, OP::Operation((T)longColumnVector->intVector[i],
                                                                  constant_value));
@@ -94,10 +96,12 @@ void PixelsFilter::TemplatedFilterOperation(std::shared_ptr<ColumnVector> vector
         case TypeDescription::LONG: {
             auto longColumnVector = std::static_pointer_cast<LongColumnVector>(vector);
             int i = 0;
+#ifdef ENABLE_SIMD_FILTER
             for (; i < vector->length - vector->length % 8; i += 8) {
                 uint8_t mask = CompareAvx2<T, OP>(longColumnVector->longVector + i, constant_value);
                 filter_mask.setByteAligned(i, mask);
             }
+#endif
             for(; i < vector->length; i++) {
                 filter_mask.set(i, OP::Operation((T)longColumnVector->longVector[i],
                                                  constant_value));
@@ -107,10 +111,12 @@ void PixelsFilter::TemplatedFilterOperation(std::shared_ptr<ColumnVector> vector
         case TypeDescription::DATE: {
             auto dateColumnVector = std::static_pointer_cast<DateColumnVector>(vector);
             int i = 0;
+#ifdef ENABLE_SIMD_FILTER
             for (; i < vector->length - vector->length % 8; i += 8) {
                 uint8_t mask = CompareAvx2<T, OP>(dateColumnVector->dates + i, constant_value);
                 filter_mask.setByteAligned(i, mask);
             }
+#endif
             for (; i < vector->length; i++) {
                 filter_mask.set(i, OP::Operation((T)dateColumnVector->dates[i],
                                                                  constant_value));
@@ -120,10 +126,12 @@ void PixelsFilter::TemplatedFilterOperation(std::shared_ptr<ColumnVector> vector
         case TypeDescription::DECIMAL: {
             auto decimalColumnVector = std::static_pointer_cast<DecimalColumnVector>(vector);
             int i = 0;
+#ifdef ENABLE_SIMD_FILTER
             for (; i < vector->length - vector->length % 8; i += 8) {
                 uint8_t mask = CompareAvx2<T, OP>(decimalColumnVector->vector + i, constant_value);
                 filter_mask.setByteAligned(i, mask);
             }
+#endif
             for (; i < vector->length; i++) {
                 filter_mask.set(i, OP::Operation((T)decimalColumnVector->vector[i],
                                                                  constant_value));

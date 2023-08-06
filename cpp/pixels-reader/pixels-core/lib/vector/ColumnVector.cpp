@@ -43,6 +43,14 @@ uint64_t ColumnVector::position() {
     return readIndex;
 }
 
+void ColumnVector::resize(int size) {
+    if(this->length < size) {
+        throw InvalidArgumentException("column vector can only be resized to a smaller vector. ");
+    } else {
+        this->length = size;
+    }
+}
+
 
 
 

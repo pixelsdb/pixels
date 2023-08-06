@@ -3,7 +3,7 @@
 //
 
 #include "PixelsScanFunction.hpp"
-#include "profiler/TimeProfiler.h"
+#include "profiler/CountProfiler.h"
 namespace duckdb {
 
 bool PixelsScanFunction::enable_filter_pushdown = false;
@@ -59,7 +59,7 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
     auto &bind_data = (PixelsReadBindData &)*data_p.bind_data;
 
     do {
-        if(data.currPixelsRecordReader == nullptr ||
+        if (data.currPixelsRecordReader == nullptr ||
            (data.currPixelsRecordReader->isEndOfFile() && data.vectorizedRowBatch->isEndOfFile())) {
             if(data.currPixelsRecordReader != nullptr) {
                 data.currPixelsRecordReader.reset();
@@ -71,10 +71,10 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
         auto currPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(data.currPixelsRecordReader);
         auto nextPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(data.nextPixelsRecordReader);
 
-        if(data.vectorizedRowBatch != nullptr && data.vectorizedRowBatch->isEndOfFile()) {
+        if (data.vectorizedRowBatch != nullptr && data.vectorizedRowBatch->isEndOfFile()) {
             data.vectorizedRowBatch = nullptr;
         }
-        if(data.vectorizedRowBatch == nullptr) {
+        if (data.vectorizedRowBatch == nullptr) {
             data.vectorizedRowBatch = currPixelsRecordReader->readBatch(false);
         }
         uint64_t currentLoc = data.vectorizedRowBatch->position();
@@ -89,7 +89,7 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
         TransformDuckdbChunk(data, output, resultSchema, thisOutputChunkRows);
 
         // apply the filter operation
-        if(enable_filter_pushdown) {
+        if (enable_filter_pushdown) {
             idx_t sel_size = 0;
             SelectionVector sel;
             sel.Initialize(thisOutputChunkRows);
@@ -101,7 +101,7 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
             output.Slice(sel, sel_size);
         }
 
-        if(output.size() > 0) {
+        if (output.size() > 0) {
             return;
         } else {
             output.Reset();
@@ -237,11 +237,11 @@ void PixelsScanFunction::TransformDuckdbType(const std::shared_ptr<TypeDescripti
 		}
 	}
 }
+
 void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
                                               DataChunk & output,
                                               const std::shared_ptr<TypeDescription> & schema,
                                               uint64_t thisOutputChunkRows) {
-
 	int row_batch_id = 0;
 	auto column_ids = data.column_ids;
 	auto vectorizedRowBatch = data.vectorizedRowBatch;
@@ -422,8 +422,6 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
         scan_data.nextReader = nullptr;
         scan_data.nextPixelsRecordReader = nullptr;
     }
-
-
     return true;
 }
 
@@ -438,8 +436,8 @@ PixelsReaderOption PixelsScanFunction::GetPixelsReaderOption(PixelsReadLocalStat
     option.setIncludeCols(local_state.column_names);
     option.setRGRange(0, local_state.nextReader->getRowGroupNum());
     option.setQueryId(1);
+    int stride = std::stoi(ConfigFactory::Instance().getProperty("pixel.stride"));
+    option.setBatchSize(stride);
     return option;
 }
-
-
 }
