@@ -51,6 +51,7 @@ public:
     void increment(uint64_t size);              // increment the readIndex
     bool isFull();                         // if the readIndex reaches length
     uint64_t position();                   // return readIndex
+    void resize(int size);                 // resize the column vector to a smaller one
     virtual void close();
     virtual void reset();
     virtual void * current() = 0;              // get the pointer in the current location

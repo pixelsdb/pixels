@@ -3,7 +3,7 @@
 //
 
 #include "PixelsScanFunction.hpp"
-#include "profiler/TimeProfiler.h"
+#include "profiler/CountProfiler.h"
 namespace duckdb {
 
 bool PixelsScanFunction::enable_filter_pushdown = false;

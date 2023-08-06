@@ -100,3 +100,17 @@ uint64_t VectorizedRowBatch::position() {
     return position;
 }
 
+void VectorizedRowBatch::reset() {
+    for(auto col: cols) {
+        col->reset();
+    }
+    rowCount = 0;
+}
+
+void VectorizedRowBatch::resize(int size) {
+    for(auto col: cols) {
+        col->resize(size);
+    }
+    maxSize = size;
+}
+

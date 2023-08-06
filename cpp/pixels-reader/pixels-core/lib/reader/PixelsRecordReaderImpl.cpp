@@ -4,6 +4,7 @@
 
 #include "reader/PixelsRecordReaderImpl.h"
 #include "physical/io/PhysicalLocalReader.h"
+#include "profiler/CountProfiler.h"
 
 PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr<PhysicalReader> reader,
                                                const pixels::proto::PostScript& pixelsPostScript,
@@ -162,9 +163,14 @@ std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse
 
     // update current batch size
     int curBatchSize = std::min(curRGRowCount - curRowInRG, std::min(batchSize, curRGRowCount));
-//    if(resultRowBatch == nullptr) {
+    if(resultRowBatch == nullptr) {
         resultRowBatch = resultSchema->createRowBatch(curBatchSize, resultColumnsEncoded);
-//    }
+    } else {
+        resultRowBatch->reset();
+        if(curBatchSize != resultRowBatch->maxSize) {
+            resultRowBatch->resize(curBatchSize);
+        }
+    }
 
     auto columnVectors = resultRowBatch->cols;
     if(filterMask != nullptr) {

@@ -32,6 +32,8 @@ public:
 	~VectorizedRowBatch();
 	void close();
     int getMaxSize();
+    void reset();
+    void resize(int size);
     uint64_t position();
     int count();
     bool isEmpty();
