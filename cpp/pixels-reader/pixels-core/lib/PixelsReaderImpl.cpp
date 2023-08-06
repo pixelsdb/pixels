@@ -65,7 +65,7 @@ int PixelsReaderImpl::getRowGroupNum() {
 }
 
 bool PixelsReaderImpl::isPartitioned() {
-	return footer.has_partitioned() && footer.partitioned();
+	return postScript.has_partitioned() && postScript.partitioned();
 }
 
 ColumnStatisticList PixelsReaderImpl::getColumnStats() {
