@@ -120,7 +120,7 @@ void PixelsRecordReaderImpl::UpdateRowGroupInfo() {
 
     if(enabledFilterPushDown) {
         int length = std::min(batchSize, curRGRowCount);
-        filterMask = std::make_shared<pixelsFilterMask>(length);
+        filterMask = std::make_shared<PixelsBitMask>(length);
     }
 
 	curRGFooter = rowGroupFooters.at(curRGIdx);
@@ -330,7 +330,7 @@ void PixelsRecordReaderImpl::asyncReadComplete(int requestSize) {
 }
 
 
-std::shared_ptr<pixelsFilterMask> PixelsRecordReaderImpl::getFilterMask() {
+std::shared_ptr<PixelsBitMask> PixelsRecordReaderImpl::getFilterMask() {
     return filterMask;
 }
 

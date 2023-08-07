@@ -5,7 +5,7 @@
 #include <iostream>
 #include <thread>
 #include <string>
-#include "PixelsFilterMask.h"
+#include "PixelsBitMask.h"
 using namespace std;
 //
 //
@@ -583,7 +583,7 @@ using namespace std;
 //	}
 //}
 TEST(reader, filterMaskTest) {
-	pixelsFilterMask filterMask(1025);
+    PixelsBitMask filterMask(1025);
 	filterMask.set(0, 1);
 	filterMask.set(66, 1);
 	filterMask.set(1023, 1);

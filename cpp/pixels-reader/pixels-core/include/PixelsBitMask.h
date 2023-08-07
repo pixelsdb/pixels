@@ -2,8 +2,8 @@
 // Created by liyu on 7/6/23.
 //
 
-#ifndef DUCKDB_PIXELSFILTERMASK_H
-#define DUCKDB_PIXELSFILTERMASK_H
+#ifndef DUCKDB_PIXELSBITMASK_H
+#define DUCKDB_PIXELSBITMASK_H
 
 #include <bitset>
 #include "duckdb/planner/table_filter.hpp"
@@ -16,16 +16,16 @@
 #include "vector/ColumnVector.h"
 #include "TypeDescription.h"
 
-class pixelsFilterMask {
+class PixelsBitMask {
 public:
     uint8_t * mask;
     long maskLength;
     long arrayLength;
-    pixelsFilterMask(long length);
-    pixelsFilterMask(pixelsFilterMask & other);
-    ~pixelsFilterMask();
-    void Or(pixelsFilterMask & other);
-    void And(pixelsFilterMask & other);
+    PixelsBitMask(long length);
+    PixelsBitMask(PixelsBitMask & other);
+    ~PixelsBitMask();
+    void Or(PixelsBitMask & other);
+    void And(PixelsBitMask & other);
     void Or(long index, uint8_t value);
     void And(long index, uint8_t value);
     bool isNone();
@@ -35,4 +35,4 @@ public:
     uint8_t get(long index);
 };
 
-#endif //DUCKDB_PIXELSFILTERMASK_H
+#endif //DUCKDB_PIXELSBITMASK_H
