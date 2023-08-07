@@ -213,7 +213,6 @@ public class EncodingUtils
 
     /**
      * Write a long value into the output in little endian.
-     * TODO: the value is not encoded.
      *
      * @param output the output
      * @param value the long value
@@ -245,8 +244,39 @@ public class EncodingUtils
     }
 
     /**
-     * Write a int value into the output in little endian.
-     * TODO: the value is not encoded.
+     * Write a long value into the output in big endian.
+     *
+     * @param output the output
+     * @param value the long value
+     * @throws IOException
+     */
+    public void writeLongBE(OutputStream output, long value) throws IOException
+    {
+        writeBuffer[7] = (byte) ((value) & 0xff);
+        writeBuffer[6] = (byte) ((value >> 8) & 0xff);
+        writeBuffer[5] = (byte) ((value >> 16) & 0xff);
+        writeBuffer[4] = (byte) ((value >> 24) & 0xff);
+        writeBuffer[3] = (byte) ((value >> 32) & 0xff);
+        writeBuffer[2] = (byte) ((value >> 40) & 0xff);
+        writeBuffer[1] = (byte) ((value >> 48) & 0xff);
+        writeBuffer[0] = (byte) ((value >> 56) & 0xff);
+        output.write(writeBuffer, 0, 8);
+    }
+
+    public long readLongBE(byte[] inputBytes, int offset)
+    {
+        return (((inputBytes[7+ offset] & 0xff))
+                + ((inputBytes[6 + offset] & 0xff) << 8)
+                + ((inputBytes[5 + offset] & 0xff) << 16)
+                + ((long) (inputBytes[4 + offset] & 0xff) << 24)
+                + ((long) (inputBytes[3 + offset] & 0xff) << 32)
+                + ((long) (inputBytes[2 + offset] & 0xff) << 40)
+                + ((long) (inputBytes[1 + offset] & 0xff) << 48)
+                + ((long) (inputBytes[offset] & 0xff) << 56));
+    }
+
+    /**
+     * Write an int value into the output in little endian.
      *
      * @param output the output
      * @param value the long value
@@ -267,6 +297,31 @@ public class EncodingUtils
                 + ((inputBytes[1 + offset] & 0xff) << 8)
                 + ((inputBytes[2 + offset] & 0xff) << 16)
                 + ((inputBytes[3 + offset] & 0xff) << 24)
+        );
+    }
+
+    /**
+     * Write an int value into the output in big endian.
+     *
+     * @param output the output
+     * @param value the long value
+     * @throws IOException
+     */
+    public void writeIntBE(OutputStream output, int value) throws IOException
+    {
+        writeBuffer[3] = (byte) ((value) & 0xff);
+        writeBuffer[2] = (byte) ((value >> 8) & 0xff);
+        writeBuffer[1] = (byte) ((value >> 16) & 0xff);
+        writeBuffer[0] = (byte) ((value >> 24) & 0xff);
+        output.write(writeBuffer, 0, 4);
+    }
+
+    public int readIntBE(byte[] inputBytes, int offset)
+    {
+        return (((inputBytes[3 + offset] & 0xff))
+                + ((inputBytes[2 + offset] & 0xff) << 8)
+                + ((inputBytes[1 + offset] & 0xff) << 16)
+                + ((inputBytes[offset] & 0xff) << 24)
         );
     }
 
@@ -1092,8 +1147,7 @@ public class EncodingUtils
             encoder.onMalformedInput(CodingErrorAction.REPLACE);
             encoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
         }
-        ByteBuffer bytes =
-                encoder.encode(CharBuffer.wrap(string.toCharArray()));
+        ByteBuffer bytes = encoder.encode(CharBuffer.wrap(string.toCharArray()));
         if (replace)
         {
             encoder.onMalformedInput(CodingErrorAction.REPORT);
