@@ -29,6 +29,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * pixels
@@ -45,6 +46,12 @@ public class TestByteBuf
         ByteBuffer buffer1 = DirectIoLib.allocateBuffer(10).getBuffer();
         System.out.println(buffer1.order());
         assert buffer1.order() == buffer.order();
+        ByteBuf buf = Unpooled.wrappedBuffer(buffer);
+        System.out.println(buf.order());
+        buf = buf.order(ByteOrder.LITTLE_ENDIAN);
+        System.out.println(buf.order());
+        ByteBuf buf1 = buf.slice(0, 5);
+        System.out.println(buf1.order());
     }
 
     @Test

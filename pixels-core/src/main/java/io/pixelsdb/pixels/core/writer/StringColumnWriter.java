@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.core.encoding.Dictionary;
 import io.pixelsdb.pixels.core.encoding.HashTableDictionary;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
+import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
@@ -56,8 +57,10 @@ import java.nio.ByteOrder;
 public class StringColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
-    private final DynamicIntArray lensArray = new DynamicIntArray();  // lengths of each string when un-encoded
+    private final DynamicIntArray startsArray = new DynamicIntArray();  // lengths of each string when un-encoded
     private final Dictionary dictionary = new HashTableDictionary(Constants.INIT_DICT_SIZE);
+    private final EncodingUtils encodingUtils;
+    private int startOffset = 0; // the start offset for the current string when un-encoded
     private boolean futureUseDictionaryEncoding;
     private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
@@ -67,6 +70,7 @@ public class StringColumnWriter extends BaseColumnWriter
         super(type, pixelStride, isEncoding, byteOrder);
         this.futureUseDictionaryEncoding = isEncoding;
         this.currentUseDictionaryEncoding = isEncoding;
+        this.encodingUtils = new EncodingUtils();
         encoder = new RunLenIntEncoder(false, true);
     }
 
@@ -120,7 +124,9 @@ public class StringColumnWriter extends BaseColumnWriter
         for (int i = 0; i < curPartLength; i++)
         {
             curPixelEleIndex++;
-            if (columnVector.isNull[i + curPartOffset])
+            // add starts even if the current value is null, this is for random access
+            startsArray.add(startOffset);
+            if (columnVector.isNull[curPartOffset + i])
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
@@ -128,7 +134,7 @@ public class StringColumnWriter extends BaseColumnWriter
             else
             {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
-                lensArray.add(vLens[curPartOffset + i]);
+                startOffset += vLens[curPartOffset + i];
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i],
                         vLens[curPartOffset + i], 1);
             }
@@ -190,7 +196,7 @@ public class StringColumnWriter extends BaseColumnWriter
         }
         else
         {
-            flushLens();
+            flushStarts();
         }
     }
 
@@ -210,22 +216,31 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void close() throws IOException
     {
-        lensArray.clear();
+        startsArray.clear();
         dictionary.clear();
         encoder.close();
         super.close();
     }
 
-    private void flushLens() throws IOException
+    private void flushStarts() throws IOException
     {
         int lensFieldOffset = outputStream.size();
-        long[] tmpLens = new long[lensArray.size()];
-        for (int i = 0; i < lensArray.size(); i++)
+        startsArray.add(startOffset); // add the last start offset
+        if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
         {
-            tmpLens[i] = lensArray.get(i);
+            for (int i = 0; i < startsArray.size(); i++)
+            {
+                encodingUtils.writeIntLE(outputStream, startsArray.get(i));
+            }
         }
-        lensArray.clear();
-        outputStream.write(encoder.encode(tmpLens));
+        else
+        {
+            for (int i = 0; i < startsArray.size(); i++)
+            {
+                encodingUtils.writeIntBE(outputStream, startsArray.get(i));
+            }
+        }
+        startsArray.clear();
 
         ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
         offsetBuf.order(byteOrder);

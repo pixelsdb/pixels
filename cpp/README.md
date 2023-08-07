@@ -23,7 +23,7 @@ make pull
 
 Then set the `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels).
 
-Finally compile the code:
+Finally, compile the code:
 
 ```
 make -j
@@ -31,7 +31,7 @@ make -j
 
 ### Example
 
-Here is an pixels reader example in the directory `duckdb/examples/pixels-example`. This example validates the correctness of compilation and gives you an idea how to load the pixels data. 
+Here is a pixels reader example in the directory `duckdb/examples/pixels-example`. This example validates the correctness of compilation and gives you an idea how to load the pixels data. 
 
 To run this binary:
 
@@ -47,8 +47,6 @@ set `CMake options` as:
 ```shell
 -DDUCKDB_OOT_EXTENSION_NAMES="pixels" -DDUCKDB_OOT_EXTENSION_PIXELS_PATH=${PIXELS_HOME}/cpp -DDUCKDB_OOT_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_OOT_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_HOME}/cpp/include
 ```
-
-
 
 ### Benchmark
 
@@ -70,7 +68,7 @@ cd duckdb
 python scripts/run_benchmark.py --help
 ```
 
-Run TPCH 1 benchmarks:
+Run TPC-H 1 benchmarks:
 
 ```
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" --parquet "benchmark/tpch/parquet/tpch_1/" -v --repeat-time-disk 1
@@ -117,7 +115,7 @@ Here are two important parameters in `pixels.properties`:
 
 * `localfs.enable.async.io`: use async IO or sync IO
 
-Currently the following configuration has the best performance in pixels C++ reader:
+Currently, the following configuration has the best performance in pixels C++ reader:
 
 ```
 localfs.enable.direct.io=true
@@ -131,7 +129,7 @@ localfs.enable.async.io=true
 
 `pixels reader` and `duckdb` will be updated frequently in the next few months, so please keep the two submodules updated. 
 
-To fetch the lastest pixels reader and duckdb:
+To fetch the latest pixels reader and duckdb:
 
 ```
 make update
@@ -145,7 +143,7 @@ Please make sure you don't use the official `duckdb` repository. The official `d
 
 ### 3. I can't load the pixels data via pixels C++ reader
 
-Currently the pixels Java writer and reader uses big endian to write/read pixels data. We find that small endian is more efficient for pixels c++ reader. Therefore, in order to generate the pixels data with small endian, please use Pixels in [little-endian branch](https://github.com/pixelsdb/pixels/tree/little-endian). We will merge the small endian to pixels java reader in the future. 
+Currently, the pixels Java writer and reader uses big endian to write/read pixels data. We find that small endian is more efficient for pixels c++ reader. Therefore, in order to generate the pixels data with small endian, please use Pixels in [little-endian branch](https://github.com/pixelsdb/pixels/tree/little-endian). We will merge the small endian to pixels java reader in the future. 
 
 
 ### 4. I fail to run the pixels and parquet benchmark

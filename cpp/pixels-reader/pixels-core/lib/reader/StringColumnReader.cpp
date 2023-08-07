@@ -123,7 +123,7 @@ void StringColumnReader::readContent(std::shared_ptr<ByteBuffer> input,
 			}
 			starts[i] = bufferStart + startsOffset - originsOffset;
 		} else {
-            throw InvalidArgumentException("StringColumnReader::readContent: dictionary size must  be defined. ");
+            throw InvalidArgumentException("StringColumnReader::readContent: dictionary size must be defined.");
 		}
 		contentDecoder = std::make_shared<RunLenIntDecoder>(contentBuf, false);
     } else {
