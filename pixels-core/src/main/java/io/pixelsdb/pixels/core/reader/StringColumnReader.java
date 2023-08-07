@@ -242,6 +242,8 @@ public class StringColumnReader extends ColumnReader
                     }
                     if (hasNull && isNull[isNullBitIndex] == 1)
                     {
+                        // skip the repeated starts for null values
+                        startsBuf.skipBytes(Integer.BYTES);
                         columnVector.isNull[i + vectorIndex] = true;
                         columnVector.noNulls = false;
                     } else
@@ -408,6 +410,7 @@ public class StringColumnReader extends ColumnReader
             else
             {
                 contentBuf = inputBuffer.slice(0, startsOffset);
+                bufferOffset = contentBuf.arrayOffset();
             }
             /*
              * Issue #539:
@@ -416,6 +419,7 @@ public class StringColumnReader extends ColumnReader
              * However, for safety, we still explicitly set the byte order for startsBuf.
              */
             startsBuf = inputBuffer.slice(startsOffset, inputLength - Integer.BYTES - startsOffset).order(byteOrder);
+            nextStart = startsBuf.readInt(); // read out the first start offset, which is 0
         }
     }
 }
