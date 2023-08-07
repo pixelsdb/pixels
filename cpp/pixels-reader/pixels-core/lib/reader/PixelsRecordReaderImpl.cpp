@@ -357,6 +357,9 @@ bool PixelsRecordReaderImpl::read() {
 	for(int colId: targetColumns) {
 		const pixels::proto::ColumnChunkIndex& chunkIndex =
 				rowGroupIndex.columnchunkindexentries(colId);
+        if (!chunkIndex.littleendian()) {
+            throw InvalidArgumentException("Pixels C++ reader only supports little endianness. ");
+        }
 		ChunkId chunk(curRGIdx, colId, chunkIndex.chunkoffset(), chunkIndex.chunklength());
 		diskChunks.emplace_back(chunk);
 	}

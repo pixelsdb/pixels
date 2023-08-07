@@ -25,15 +25,25 @@ private:
      * RLE decoder of string content element length if no dictionary encoded.
      */
     std::shared_ptr<ByteBuffer> contentBuf;
-	std::shared_ptr<ByteBuffer> originsBuf;
+    // The string content in dictionary.
+	std::shared_ptr<ByteBuffer> dictContentBuf;
 
-    std::shared_ptr<RunLenIntDecoder> lensDecoder;
+    std::shared_ptr<ByteBuffer> startsBuf;
+    /**
+     * The start offset of the current element in the content if not dictionary encoded.
+     */
+    int currentStart;
+    /**
+     * The next element in the content if not dictionary encoded.
+     */
+    int nextStart;
+
 	std::shared_ptr<RunLenIntDecoder> contentDecoder;
     int bufferOffset;
-    int originsOffset;
-    int startsOffset;
+    int dictContentOffset;
+    int dictStartsOffset;
 
-	int * starts;
+	int * dictStarts;
     int startsLength;
     /**
      * In this method, we have reduced most of significant memory copies.
