@@ -24,8 +24,8 @@ import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
@@ -51,7 +51,7 @@ import static io.pixelsdb.pixels.common.utils.JvmUtils.JavaVersion;
  */
 public class DirectIoLib
 {
-    private static final Logger logger = LoggerFactory.getLogger(DirectIoLib.class);
+    private static final Logger logger = LogManager.getLogger(DirectIoLib.class);
     /**
      * The soft block size for use with transfer multiples and memory alignment multiples
      */
