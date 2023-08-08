@@ -141,6 +141,7 @@
                                     <mainClass>${mainClass}</mainClass>
                                     <manifestEntries>
                                         <Add-Opens>java.base/sun.nio.ch java.base/java.nio</Add-Opens>
+                                        <Multi-Release>true</Multi-Release>
                                     </manifestEntries>
                                 </transformer>
                             </transformers>
