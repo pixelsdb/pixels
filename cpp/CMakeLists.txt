@@ -13,6 +13,8 @@ set(EXTENSION_SOURCES
         )
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 
+find_package(Protobuf REQUIRED)
+include_directories(${Protobuf_INCLUDE_DIRS})
 
 include_directories(pixels-reader/pixels-common/include)
 include_directories(pixels-reader/pixels-core/include)
