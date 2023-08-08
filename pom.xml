@@ -255,10 +255,6 @@
                         <groupId>io.grpc</groupId>
                         <artifactId>grpc-core</artifactId>
                     </exclusion>
-                    <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>slf4j-api</artifactId>
-                    </exclusion>
                 </exclusions>
             </dependency>
 
@@ -302,10 +298,6 @@
                     <exclusion>
                         <groupId>org.slf4j</groupId>
                         <artifactId>slf4j-log4j12</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>slf4j-api</artifactId>
                     </exclusion>
                     <exclusion>
                         <groupId>javax.servlet</groupId>
@@ -428,10 +420,10 @@
                 <artifactId>jedis</artifactId>
                 <version>${dep.jedis.version}</version>
                 <exclusions>
-                    <exclusion>
+                    <!--<exclusion>
                         <groupId>org.slf4j</groupId>
                         <artifactId>slf4j-api</artifactId>
-                    </exclusion>
+                    </exclusion>-->
                 </exclusions>
             </dependency>
 
@@ -546,6 +538,11 @@
                 <artifactId>log4j-api</artifactId>
                 <version>${dep.log4j.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-slf4j-impl</artifactId>
+                <version>${dep.log4j.version}</version>
+            </dependency>
 
             <!--profiling-->
             <dependency>
@@ -593,6 +590,12 @@
             <artifactId>log4j-api</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- testing -->
         <dependency>
             <groupId>junit</groupId>
