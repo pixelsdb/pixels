@@ -99,7 +99,6 @@
         <dep.log4j.version>2.17.1</dep.log4j.version>
         <!-- we only use log4j in pixels, the following are for third-party libs -->
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
-        <dep.slf4j.version>1.7.32</dep.slf4j.version>
 
         <!-- testing -->
         <dep.junit.version>4.13.1</dep.junit.version>
@@ -553,12 +552,6 @@
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-slf4j-impl</artifactId>
                 <version>${dep.log4j.version}</version>
-            </dependency>
-            <dependency>
-                <!-- this is only for third-party libs that use slf4j -->
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>${dep.slf4j.version}</version>
             </dependency>
 
             <!--profiling-->
