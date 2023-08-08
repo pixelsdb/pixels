@@ -255,10 +255,15 @@ message RowGroupFooter {
 message ColumnEncoding {
     enum Kind {
         NONE = 0;
+        // pixels cascades delta encoding adaptively on run-length encoding, so there is no explicit delta encoding
         RUNLENGTH = 1;
+        // since v0.2.0, dictionary encoding does not cascade other encoding schemes such as run-length by default
         DICTIONARY = 2;
+        // pixels applies bit-packing automatically on all boolean data, so there is no explicit bit-packing encoding
     }
 
     required Kind kind = 1;
     optional uint32 dictionarySize = 2;
+    // the explicit cascade encoding scheme specified by pixels writer
+    optional ColumnEncoding cascadeEncoding = 3;
 }
