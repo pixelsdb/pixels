@@ -2,24 +2,11 @@
 
 ## Usage
 
-
-### Prerequisites
-
-
-Install protobuf:
-```shell
-sudo apt-get install -y protobuf-compiler
-```
-
 ### Compilation
 
-The repository relies on [duckdb](https://github.com/yuly16/duckdb). It is refered from [pixels reader](https://github.com/yuly16/pixels-reader-cxx). 
-
-First fetch `duckdb` submodules from github:
-
-```
-make pull
-```
+The repository relies on [duckdb](https://github.com/yuly16/duckdb), It is refered from [pixels reader](https://github.com/yuly16/pixels-reader-cxx). 
+It also relies on protobuf and liburing. We don't need to manually install these prerequisites, since our compilation code would 
+automatically download them. 
 
 Then set the `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels).
 
@@ -45,7 +32,7 @@ In order to run the code in CLion, we should set the cmake configuration in CLio
 In `"setting"`->`"Build,Execution,Deployment"`->`"CMake"`, set `"Generator"` as `"Let CMake decide"`, and
 set `CMake options` as:
 ```shell
--DDUCKDB_OOT_EXTENSION_NAMES="pixels" -DDUCKDB_OOT_EXTENSION_PIXELS_PATH=${PIXELS_HOME}/cpp -DDUCKDB_OOT_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_OOT_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_HOME}/cpp/include
+-DDUCKDB_OOT_EXTENSION_NAMES="pixels" -DDUCKDB_OOT_EXTENSION_PIXELS_PATH=${PIXELS_HOME}/cpp -DDUCKDB_OOT_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_OOT_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_HOME}/cpp/include -DCMAKE_PREFIX_PATH=${PIXELS_HOME}/cpp/third_party/protobuf/cmake/build
 ```
 
 ### Benchmark
@@ -173,3 +160,6 @@ def clean_page_cache():
         print(cmd)
     os.system(cmd)
 ```
+
+### The version if protobuf
+I use protobuf [v3.21.6](https://github.com/protocolbuffers/protobuf/releases/tag/v3.21.6). The latest protobuf version doesn't work for pixels c++ reader. 
