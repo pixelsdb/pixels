@@ -11,14 +11,15 @@ ConfigFactory & ConfigFactory::Instance() {
 
 ConfigFactory::ConfigFactory() {
 	if(std::getenv("PIXELS_HOME") == nullptr) {
-		throw InvalidArgumentException("The environment variable 'PIXELS_CXX_HOME' is not set. ");
+		throw InvalidArgumentException("The environment variable 'PIXELS_HOME' is not set. ");
 	}
 	pixelsHome = std::string(std::getenv("PIXELS_HOME"));
 	std::cout<<"PIXELS_HOME is "<<pixelsHome<<std::endl;
 	if(pixelsHome.back() != '/') {
 		pixelsHome += "/";
 	}
-	std::ifstream infile(pixelsHome + "pixels.properties");
+	std::ifstream infile(pixelsHome + "cpp/pixels-cxx.properties");
+	std::cout<<"pixels properties file is "<<pixelsHome + "cpp/pixels-cxx.properties"<<std::endl;
 	std::string line;
 	while (std::getline(infile, line)) {
 		if (line.find('=') != std::string::npos && line.at(0) != '#') {
