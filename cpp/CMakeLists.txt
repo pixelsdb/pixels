@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 2.8.12)
-
+cmake_minimum_required(VERSION 3.16)
+set(CMAKE_CXX_STANDARD 14)
 # Set extension name here
 set(TARGET_NAME pixels)
 
@@ -16,12 +16,17 @@ add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 
-include_directories(pixels-reader/pixels-common/include)
-include_directories(pixels-reader/pixels-core/include)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/pixels-reader)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/pixels-reader/pixels-common/liburing/src/include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-add_subdirectory(pixels-reader)
+add_subdirectory(pixels-common)
+add_subdirectory(pixels-core)
+add_subdirectory(tests)
+
+include_directories(pixels-common/include)
+include_directories(pixels-core/include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/pixels-common/liburing/src/include)
+
 
 
 target_link_libraries(
@@ -34,7 +39,7 @@ set(PARAMETERS "-warnings")
 build_loadable_extension(${TARGET_NAME} ${PARAMETERS} ${EXTENSION_SOURCES})
 
 install(
-  TARGETS ${EXTENSION_NAME} pixels-core pixels-common
-  EXPORT "${DUCKDB_EXPORT_SET}"
-  LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
-  ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")
+        TARGETS ${EXTENSION_NAME} pixels-core pixels-common
+        EXPORT "${DUCKDB_EXPORT_SET}"
+        LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
+        ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")
