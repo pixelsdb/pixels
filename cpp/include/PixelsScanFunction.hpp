@@ -41,6 +41,8 @@
 #include "vector/ColumnVector.h"
 #include "vector/LongColumnVector.h"
 #include "physical/BufferPool.h"
+#include "profiler/TimeProfiler.h"
+#include "physical/natives/DirectUringRandomAccessFile.h"
 #ifndef DUCKDB_AMALGAMATION
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/common/constants.hpp"
@@ -62,8 +64,7 @@
 #include "duckdb/planner/operator/logical_get.hpp"
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
-#include "profiler/TimeProfiler.h"
-#include "physical/natives/DirectUringRandomAccessFile.h"
+#include "duckdb/common/multi_file_reader.hpp"
 #endif
 
 using namespace std;

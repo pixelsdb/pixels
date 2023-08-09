@@ -51,56 +51,110 @@ The benchmark script is `run_benchmark.py` in `duckdb/scripts` directory.
 Check the usage:
 
 ```
-cd duckdb
+cd pixels-duckdb
 python scripts/run_benchmark.py --help
 ```
 
 Run TPC-H 1 benchmarks:
 
 ```
+cd pixels-duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" --parquet "benchmark/tpch/parquet/tpch_1/" -v --repeat-time-disk 1
 ```
 
 or enabling the encoding of pixels:
 
 ```
+cd pixels-duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1_encoding/" --parquet "benchmark/tpch/parquet/tpch_1/" -v --repeat-time-disk 1
 ```
 
 Run TPCH 300 benchmark:
 
 ```
+cd pixels-duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_300/" --parquet "benchmark/tpch/parquet/tpch_300/" -v --repeat-time-disk 1
 ```
 
 or enabling the encoding of pixels:
 
 ```
+cd pixels-duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_300_encoding/" --parquet "benchmark/tpch/parquet/tpch_300/" -v --repeat-time-disk 1
 ```
 
 We also support to just run pixels or parquet:
 
 ```
+cd pixels-duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" -v --repeat-time-disk 1
 ```
 
 We also offer self-defined queries:
 
 ```
+cd pixels-duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/micro-benchmark/tpch_1/" -v  --repeat-time-disk 1
 ```
 
-The execution time plot is generated in `plot` directory.
+The execution time plot is generated in `cpp/plot` directory.
 
+
+### SSD array experiment
+
+SSD array needs pixels data to be in multiple directories. The following instructions show an example to run benchmarks on SSD array:
+
+#### 1. split pixels data to multiple SSDs
+
+We offer a convenient python script to distribute the pixels data in a single directory to multiple directories. For example:
+
+```
+cd pixels-duckdb
+python scripts/multidir-generator.py -i /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian \
+-o /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1 \
+/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2 \
+/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3 \
+/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4 -v
+```
+
+In this example we only show the usage of the python script. Remember to replace the output directory to the directories in different SSDs.
+
+The python script copies files from the input directory to all output paths. The pixels file names are collected from the input directory, sorted by the file index 
+(e.g. the file index of `20230809035030_4630.pxl` is 4630) and then copied to the output paths in the round-rubin fashion. Pixels C++ reader reads 
+the pixels data sorted by the file index, so all SSDs can be utilized simultaneously.
+
+#### 2. Modity the benchmark
+
+The above python script outputs the following queries:
+
+```shell
+----------Copy the below commands to the benchmark template ----------
+CREATE VIEW orders AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1/orders/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2/orders/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3/orders/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4/orders/v-0-ordered/*.pxl"]);
+CREATE VIEW customer AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1/customer/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2/customer/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3/customer/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4/customer/v-0-ordered/*.pxl"]);
+CREATE VIEW nation AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1/nation/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2/nation/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3/nation/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4/nation/v-0-ordered/*.pxl"]);
+CREATE VIEW part AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1/part/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2/part/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3/part/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4/part/v-0-ordered/*.pxl"]);
+CREATE VIEW partsupp AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1/partsupp/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2/partsupp/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3/partsupp/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4/partsupp/v-0-ordered/*.pxl"]);
+CREATE VIEW lineitem AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1/lineitem/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2/lineitem/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3/lineitem/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4/lineitem/v-0-ordered/*.pxl"]);
+CREATE VIEW supplier AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1/supplier/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2/supplier/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3/supplier/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4/supplier/v-0-ordered/*.pxl"]);
+CREATE VIEW region AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1/region/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2/region/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3/region/v-0-ordered/*.pxl","/data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition4/region/v-0-ordered/*.pxl"]);
+```
+
+We replace these `CREATE` queries in `pixels_tpch_template.benchmark.in`, and run the benchmark:
+
+```
+cd pixels-duckdb
+python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" -v --repeat-time-disk 1
+```
 
 ## Parameters
 
-Here are two important parameters in `pixels.properties`: 
+Here are two important parameters in `pixels-cxx.properties`:
 
 * `localfs.enable.direct.io`: use DIRECT IO or buffer IO
 
 * `localfs.enable.async.io`: use async IO or sync IO
+
+* `pixel.stride`: pixels stride. Pixels C++ reader uses this number as the batch size, so make sure it is the same as the pixels stride in the pixels java writer.
 
 Currently, the following configuration has the best performance in pixels C++ reader:
 
@@ -135,7 +189,7 @@ Currently, the pixels Java writer and reader uses big endian to write/read pixel
 
 ### 4. I fail to run the pixels and parquet benchmark
 
-This code is tested in diascld31 server. I hardcode the pixels data path and parquet data path in `parquet_tpch_template.benchmark.in`, `parquet_tpch_template_no_verification.benchmark.in`, `pixels_tpch_template.benchmark.in` and `pixels_tpch_template_no_verification.benchmark.in`. If you want to run this benchmark in another machine, make sure to modify the pixels and parquet path to the correct location. `TODO`: In the future I will rewrite this to a more user-friendly benchmark.
+This code is tested in diascld31 server. I hardcode the pixels data directory and parquet data directory in `parquet_tpch_template.benchmark.in`, `parquet_tpch_template_no_verification.benchmark.in`, `pixels_tpch_template.benchmark.in` and `pixels_tpch_template_no_verification.benchmark.in`. If you want to run this benchmark in another machine, make sure to modify the pixels and parquet directory to the correct location. `TODO`: In the future I will rewrite this to a more user-friendly benchmark.
 
 Also, since I have no sudo permission on diascld31 server, I have to clean the page cache by running the command:
 
