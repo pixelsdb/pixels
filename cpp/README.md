@@ -5,8 +5,31 @@
 ### Compilation
 
 The repository relies on [duckdb](https://github.com/yuly16/duckdb), It is refered from [pixels reader](https://github.com/yuly16/pixels-reader-cxx). 
-It also relies on protobuf and liburing. We don't need to manually install these prerequisites, since our compilation code would 
-automatically download them. 
+It also relies on protobuf and liburing. We don't need to manually install these prerequisites, since our compilation code would
+automatically download them.
+
+Pixels C++ reader uses `iouring` system call. You can use the following command to check if iouring is supported in your system:
+
+```shell
+grep io_uring_setup /proc/kallsyms
+```
+
+If the command outputs the following information, it means your system supports `iouring`. Otherwise, please upgrade the system.
+```shell
+0000000000000000 t io_uring_setup
+0000000000000000 T __x64_sys_io_uring_setup
+0000000000000000 T __ia32_sys_io_uring_setup
+0000000000000000 d event_exit__io_uring_setup
+0000000000000000 d event_enter__io_uring_setup
+0000000000000000 d __syscall_meta__io_uring_setup
+0000000000000000 d args__io_uring_setup
+0000000000000000 d types__io_uring_setup
+0000000000000000 d __event_exit__io_uring_setup
+0000000000000000 d __event_enter__io_uring_setup
+0000000000000000 d __p_syscall_meta__io_uring_setup
+0000000000000000 d _eil_addr___ia32_sys_io_uring_setup
+0000000000000000 d _eil_addr___x64_sys_io_uring_setup
+```
 
 Then set the `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels).
 
