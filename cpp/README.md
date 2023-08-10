@@ -10,6 +10,12 @@ automatically download them.
 
 Then set the `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels).
 
+Pull the dependency code:
+
+```
+make pull
+```
+
 Finally, compile the code:
 
 ```
