@@ -18,7 +18,7 @@ ifeq ($(GEN),ninja)
 	FORCE_COLOR=-DFORCE_COLORED_OUTPUT=1
 endif
 
-PROTOBUF_DIR=third_party/protobuf
+PROTOBUF_DIR=third-party/protobuf
 BUILD_FLAGS=-DEXTENSION_STATIC_BUILD=1 -DBUILD_TPCH_EXTENSION=1 -DBUILD_BENCHMARKS=1 -DBUILD_PARQUET_EXTENSION=1 \
 ${OSX_BUILD_UNIVERSAL_FLAG} ${STATIC_LIBCPP}
 
@@ -27,7 +27,7 @@ CLIENT_FLAGS :=
 # These flags will make DuckDB build the extension
 EXTENSION_FLAGS=-DDUCKDB_OOT_EXTENSION_NAMES="pixels" -DDUCKDB_OOT_EXTENSION_PIXELS_PATH="$(PROJ_DIR)" \
 -DDUCKDB_OOT_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_OOT_EXTENSION_PIXELS_INCLUDE_PATH="$(PROJ_DIR)include" \
--DCMAKE_PREFIX_PATH=$(PROJ_DIR)third_party/protobuf/cmake/build
+-DCMAKE_PREFIX_PATH=$(PROJ_DIR)third-party/protobuf/cmake/build
 
 pull:
 	git submodule init
@@ -37,22 +37,22 @@ update:
 	git submodule update --remote --merge
 
 deps: pull
-	mkdir -p "${PROTOBUF_DIR}/cmake/build" && cd "third_party/protobuf/cmake/build" && \
+	mkdir -p "${PROTOBUF_DIR}/cmake/build" && cd "third-party/protobuf/cmake/build" && \
 	cmake -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release ../.. -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
 		-Dprotobuf_BUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=./ && \
 	make -j install
 
 clean:
 	rm -rf build
-	cd third_party/duckdb && make clean
+	cd pixels-duckdb && make clean
 
 # Main build
 debug: deps
 	mkdir -p  build/debug && \
-	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Debug ${BUILD_FLAGS} -S third_party/duckdb/ -B build/debug && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Debug ${BUILD_FLAGS} -S pixels-duckdb/ -B build/debug && \
 	cmake --build build/debug --config Debug
 
 release: deps
 	mkdir -p build/release && \
-	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S third_party/duckdb/ -B build/release && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S pixels-duckdb/ -B build/release && \
 	cmake --build build/release --config Release

@@ -1,6 +1,6 @@
 [submodule "cpp/duckdb"]
-	path = cpp/third_party/duckdb
+	path = cpp/pixels-duckdb
 	url = https://github.com/yuly16/duckdb
 [submodule "cpp/third_party/protobuf"]
-	path = cpp/third_party/protobuf
+	path = cpp/third-party/protobuf
 	url = https://github.com/protocolbuffers/protobuf
