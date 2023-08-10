@@ -32,19 +32,18 @@ static unique_ptr<NodeStatistics> PixelsCardinality(ClientContext &context, cons
 }
 
 TableFunctionSet PixelsScanFunction::GetFunctionSet() {
-	TableFunctionSet set("pixels_scan");
-	TableFunction table_function({LogicalType::VARCHAR}, PixelsScanImplementation, PixelsScanBind,
+    TableFunction table_function("pixels_scan", {LogicalType::VARCHAR}, PixelsScanImplementation, PixelsScanBind,
 	                             PixelsScanInitGlobal, PixelsScanInitLocal);
 	table_function.projection_pushdown = true;
 	table_function.filter_pushdown = true;
+    //table_function.filter_prune = true;
     enable_filter_pushdown = table_function.filter_pushdown;
-//	table_function.filter_prune = true;
+    MultiFileReader::AddParameters(table_function);
 	table_function.get_batch_index = PixelsScanGetBatchIndex;
 	table_function.cardinality = PixelsCardinality;
 	table_function.table_scan_progress = PixelsProgress;
-	// TODO: maybe we need other code here. Refer parquet-extension.cpp
-	set.AddFunction(table_function);
-	return set;
+	// TODO: maybe we need other code here later. Refer parquet-extension.cpp
+    return MultiFileReader::CreateFunctionSet(table_function);
 }
 
 void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
@@ -108,16 +107,35 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
     } while (true);
 }
 
+struct compare_file_name {
+    inline bool operator() (const string& path1, const string& path2) {
+        int num1 = filename2num(path1);
+        int num2 = filename2num(path2);
+        return num1 < num2;
+    }
+
+    // the pixels file name format is xxxxx_${number}.pxl. We transfer this name to ${number}
+    static int filename2num(const string & filename) {
+        string filename_without_suffix = filename.substr(0, filename.rfind('.'));
+        int number = std::stoi(filename_without_suffix.substr(filename_without_suffix.rfind('_') + 1));
+        return number;
+    }
+};
+
 unique_ptr<FunctionData> PixelsScanFunction::PixelsScanBind(
     						ClientContext &context, TableFunctionBindInput &input,
                             vector<LogicalType> &return_types, vector<string> &names) {
 	if (input.inputs[0].IsNull()) {
 		throw ParserException("Pixels reader cannot take NULL list as parameter");
 	}
-	auto file_name = StringValue::Get(input.inputs[0]);
-	FileSystem &fs = FileSystem::GetFileSystem(context);
-	auto files = fs.GlobFiles(file_name, context);
-	sort(files.begin(), files.end());
+    auto files = MultiFileReader::GetFileList(context, input.inputs[0], "Pixels", FileGlobOptions::ALLOW_EMPTY);
+    if (files.empty()) {
+        throw InvalidArgumentException("The number of pxl file should be positive. ");
+    }
+
+    // sort the pxl file by file name, so that all SSD arrays can be fully utilized
+    sort(files.begin(), files.end(), compare_file_name());
+
 	auto footerCache = std::make_shared<PixelsFooterCache>();
 	auto builder = std::make_shared<PixelsReaderBuilder>();
 
