@@ -1,0 +1,25 @@
+project(benchmark)
+
+add_executable(
+        benchmark
+        benchmark.cpp
+)
+
+target_include_directories(
+        benchmark PRIVATE
+        ../worker/include
+        "${CMAKE_CURRENT_BINARY_DIR}/../worker/generated"
+        "/duckdb"
+)
+
+add_library(duckdb SHARED IMPORTED)
+set_target_properties(duckdb PROPERTIES IMPORTED_LOCATION "/duckdb/libduckdb.so")
+
+target_link_libraries(
+        benchmark
+        worker
+        duckdb
+        yaml-cpp
+        spdlog::spdlog
+        nlohmann_json::nlohmann_json
+)
