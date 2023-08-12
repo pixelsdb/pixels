@@ -22,7 +22,6 @@
 #include <filesystem>
 #include <iostream>
 
-#include "aws/core/Aws.h"
 #include "db/duckdb_manager.h"
 #include "duckdb.hpp"
 #include "exception/grpc_transpile_exception.h"
@@ -30,7 +29,6 @@
 #include "grpc/transpile_sql_client.h"
 #include "grpc/trino_query_client.h"
 #include "spdlog/spdlog.h"
-#include "utils/aws_utils.h"
 #include "yaml-cpp/yaml.h"
 
 YAML::Node config = YAML::LoadFile("../../config.yaml");
@@ -198,48 +196,4 @@ TEST(DuckDBManager, executeQueryTpchSampleTest) {
   EXPECT_EQ(nation_conditional_query->RowCount(), 1);
   EXPECT_EQ(nation_conditional_query->GetValue(1, 0), "ARGENTINA");
   spdlog::info("Conditional query should result in ARGENTINA in n_name.");
-}
-
-TEST(DuckDBManager, readTpchParquetTest) {
-  DuckDBManager db_manager(":memory:");
-
-  Aws::SDKOptions options;
-  Aws::InitAPI(options);
-  Aws::Client::ClientConfiguration clientConfig;
-
-  awsutils::GetObject("region/000000_0", "parquet-tpch", "./data",
-                      clientConfig);
-  spdlog::info("Get object of region parquet file from s3.");
-
-  // duckdb requires explicit parquet file name
-  std::filesystem::path object_file_path =
-      "./data/parquet-tpch/region/000000_0";
-  std::filesystem::path parquet_file_path =
-      "./data/parquet-tpch/region/000000_0.parquet";
-
-  if (!std::filesystem::exists(object_file_path)) {
-    spdlog::error("Failed to retrieve parquet file from s3: {}",
-                  object_file_path.string());
-  }
-  std::filesystem::rename(object_file_path, parquet_file_path);
-
-  auto select_from_region_query = db_manager.executeQuery(
-      "SELECT * FROM '" + parquet_file_path.string() + "'");
-  select_from_region_query->Print();
-  spdlog::info("Query from parquet file in local file system.");
-}
-
-TEST(aws, s3UtilTest) {
-  Aws::SDKOptions options;
-  Aws::InitAPI(options);
-  Aws::Client::ClientConfiguration clientConfig;
-
-  awsutils::ListBuckets(clientConfig);
-  awsutils::ListObjects("pixels-tpch1g", clientConfig);
-
-  awsutils::GetObject("nation/v-0-order/20230529201449_12.pxl", "pixels-tpch1g",
-                      "./data", clientConfig);
-  spdlog::info("Get object of nation pxl file from s3.");
-
-  Aws::ShutdownAPI(options);
 }

@@ -26,7 +26,6 @@ and `pixels-amphi/downloader`, the worker can produce a cache plan and download 
 - `yaml-cpp-0.7.0` for configuration
 - `cli-2.0` for interactive cli
 - `nlohmann_json-3.11.2` for parsing json files
-- `aws-sdk-cpp-1.11.90` for calling aws api
 
 ## Quick start
 ```

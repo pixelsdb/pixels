@@ -20,14 +20,12 @@
 #include <iostream>
 #include <string>
 
-#include "aws/core/Aws.h"
 #include "cli/cli.h"
 #include "cli/clifilesession.h"
 #include "db/duckdb_manager.h"
 #include "grpc/transpile_sql_client.h"
 #include "grpc/trino_query_client.h"
 #include "spdlog/spdlog.h"
-#include "utils/aws_utils.h"
 #include "yaml-cpp/yaml.h"
 
 using namespace cli;
@@ -38,11 +36,6 @@ int main() {
 
   // Init an in-memory DuckDB instance
   DuckDBManager db_manager(":memory:");
-
-  // Configure aws sdk
-  Aws::SDKOptions options;
-  Aws::InitAPI(options);
-  Aws::Client::ClientConfiguration clientConfig;
 
   // Configure disk cache
   std::string cache_dir = config["cache_dir_path"].as<std::string>();
@@ -127,28 +120,6 @@ int main() {
       },
       "Disable colors in the cli");
 
-  // AWS CLI
-  auto awsMenu = std::make_unique<Menu>("aws");
-  awsMenu->Insert(
-      "buckets",
-      [&clientConfig](std::ostream& out) {
-        awsutils::ListBuckets(clientConfig);
-      },
-      "List accessible S3 buckets.");
-  awsMenu->Insert(
-      "objects",
-      [&clientConfig](std::ostream& out, std::string bucket_name) {
-        awsutils::ListObjects(bucket_name, clientConfig);
-      },
-      "List objects of the selected bucket.");
-  awsMenu->Insert(
-      "download",
-      [&clientConfig, &cache_dir](std::ostream& out, std::string bucket_name,
-                                  std::string object_name) {
-        awsutils::GetObject(object_name, bucket_name, cache_dir, clientConfig);
-      },
-      "Download an object from s3, specified with bucket name & object name.");
-
   // DuckDB CLI
   auto duckdbMenu = std::make_unique<Menu>("duckdb");
   duckdbMenu->Insert(
@@ -174,13 +145,11 @@ int main() {
       "Import SQL file in DuckDB instance");
 
   rootMenu->Insert(std::move(duckdbMenu));
-  rootMenu->Insert(std::move(awsMenu));
 
   Cli cli(std::move(rootMenu));
 
   // Global exit action
-  cli.ExitAction([&options](auto& out) {
-    Aws::ShutdownAPI(options);
+  cli.ExitAction([](auto& out) {
     out << "bye~" << std::endl;
   });
 
