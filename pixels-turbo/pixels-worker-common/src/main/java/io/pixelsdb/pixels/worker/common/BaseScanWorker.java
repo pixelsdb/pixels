@@ -81,7 +81,9 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
+            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
+                    new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
             requireNonNull(event.getTableInfo(), "even.tableInfo is null");
@@ -153,9 +155,8 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                             scanOutput.addOutput(outputPath, rowGroupNum);
                         }
                     }
-                    catch (Exception e)
+                    catch (Throwable e)
                     {
-                        logger.error(String.format("error during scan: %s", e));
                         throw new WorkerException("error during scan", e);
                     }
                 });
@@ -166,8 +167,12 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error(String.format("interrupted while waiting for the termination of scan: %s", e));
                 throw new WorkerException("interrupted while waiting for the termination of scan", e);
+            }
+
+            if (exceptionHandler.hasException())
+            {
+                throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
             }
 
             logger.info("start write aggregation result");
@@ -197,7 +202,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             scanOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(scanOutput, workerMetrics);
             return scanOutput;
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             logger.error("error during scan", e);
             scanOutput.setSuccessful(false);
@@ -289,9 +294,8 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 readCostTimer.add(recordReader.getReadTimeNanos());
                 readBytes += recordReader.getCompletedBytes();
                 numReadRequests += recordReader.getNumReadRequests();
-            } catch (Exception e)
+            } catch (Throwable e)
             {
-                logger.error(String.format("failed to scan the file '%s' and output the result: %s", inputInfo.getPath(), e));
                 throw new WorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the result", e);
             }
@@ -328,9 +332,8 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
             workerMetrics.addNumReadRequests(numReadRequests);
             workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
             return numRowGroup;
-        } catch (Exception e)
+        } catch (Throwable e)
         {
-            logger.error(String.format("failed finish writing and close the output file '%s': %s", outputPath, e));
             throw new WorkerException(
                     "failed finish writing and close the output file '" + outputPath + "'", e);
         }

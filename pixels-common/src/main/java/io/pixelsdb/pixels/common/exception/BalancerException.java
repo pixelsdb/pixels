@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.exception;
 
 /**
- * Created at: 18-12-2
- * Author: hank
+ * @author hank
+ * @create 2018-12-02
  */
 public class BalancerException extends Exception
 {

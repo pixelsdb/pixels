@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Integer column writer.
@@ -38,18 +39,17 @@ import java.nio.ByteBuffer;
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
-    private final boolean isLong;                                       // current column type is long or int
+    private final boolean isLong;                                       // current column type is long or int, used for the first pixel
 
-    public IntegerColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public IntegerColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         encoder = new RunLenIntEncoder();
         this.isLong = type.getCategory() == TypeDescription.Category.LONG;
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
@@ -94,8 +94,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    void newPixel()
-            throws IOException
+    void newPixel() throws IOException
     {
         // update stats
         for (int i = 0; i < curPixelVectorIndex; i++)
@@ -113,8 +112,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
             ByteBuffer curVecPartitionBuffer;
             if (isLong)
             {
-                curVecPartitionBuffer = ByteBuffer.allocate((curPixelVectorIndex + 1) * Long.BYTES);
-                curVecPartitionBuffer.putLong(1);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
+                curVecPartitionBuffer.order(byteOrder);
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
@@ -122,8 +121,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
             }
             else
             {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES + Long.BYTES);
-                curVecPartitionBuffer.putLong(0);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
+                curVecPartitionBuffer.order(byteOrder);
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -33,8 +34,21 @@ public interface PhysicalReader extends Closeable
 {
     long getFileLength() throws IOException;
 
+    /**
+     * Set the current offset to the desired value.
+     * @param desired the desired offset
+     * @throws IOException
+     */
     void seek(long desired) throws IOException;
 
+    /**
+     * Read a byte buffer of the given length from the current offset. The byte order
+     * of the byte buffer is default byte order of {@link ByteBuffer}. Please check and
+     * reset it if necessary.
+     * @param length the number of bytes to read
+     * @return the byte buffer been read
+     * @throws IOException
+     */
     ByteBuffer readFully(int length) throws IOException;
 
     void readFully(byte[] buffer) throws IOException;
@@ -61,9 +75,21 @@ public interface PhysicalReader extends Closeable
         throw new UnsupportedOperationException("asynchronous read is not supported for " + getStorageScheme().name());
     }
 
-    long readLong() throws IOException;
+    /**
+     * Read an eight-byte signed integer from the current offset using the specified byte order.
+     * @param byteOrder the byte order
+     * @return the integer been read
+     * @throws IOException
+     */
+    long readLong(ByteOrder byteOrder) throws IOException;
 
-    int readInt() throws IOException;
+    /**
+     * Read a four-byte signed integer from the current offset using the specified byte order.
+     * @param byteOrder the byte order
+     * @return the integer been read
+     * @throws IOException
+     */
+    int readInt(ByteOrder byteOrder) throws IOException;
 
     void close() throws IOException;
 
@@ -78,7 +104,7 @@ public interface PhysicalReader extends Closeable
     /**
      * For a file or object in the storage, it may have one or more
      * blocks. Each block has its unique id. This method returns the
-     * block id of the current block that is been reading.
+     * block id of the current block that is being reading.
      *
      * For local fs, each file has only one block id, which is also
      * the file id.

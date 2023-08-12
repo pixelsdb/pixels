@@ -35,8 +35,8 @@ import java.util.concurrent.CompletableFuture;
  * If the reader supports asynchronous read, noop scheduler will do asynchronous read.
  * Request sort and request merge are not implemented in noop.
  *
- * Created at: 9/10/21
- * Author: hank
+ * @author hank
+ * @create 2021-09-10
  */
 public class NoopScheduler implements Scheduler
 {

@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.DateColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Date column writer.
@@ -40,16 +41,15 @@ public class DateColumnWriter extends BaseColumnWriter
 {
     private final int[] curPixelVector = new int[pixelStride];
 
-    public DateColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public DateColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         // Issue #94: Date.getTime() can be negative if the date is before 1970-1-1.
         encoder = new RunLenIntEncoder(true, true);
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         DateColumnVector columnVector = (DateColumnVector) vector;
         int[] dates = columnVector.dates;
@@ -92,8 +92,7 @@ public class DateColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel()
-            throws IOException
+    public void newPixel() throws IOException
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {
@@ -110,6 +109,7 @@ public class DateColumnWriter extends BaseColumnWriter
         {
             ByteBuffer curVecPartitionBuffer =
                     ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
+            curVecPartitionBuffer.order(byteOrder);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 curVecPartitionBuffer.putInt(curPixelVector[i]);

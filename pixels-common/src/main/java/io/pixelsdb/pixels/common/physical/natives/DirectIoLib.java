@@ -24,8 +24,8 @@ import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
@@ -46,12 +46,12 @@ import static io.pixelsdb.pixels.common.utils.JvmUtils.JavaVersion;
  * We replaced the complex buffer implementation with java direct byte buffer, thus we
  * can directly return the byte buffer to the calling program without memory copying.
  * <p>
- * Created at: 02/02/2023
- * Author: hank
+ * @author hank
+ * @create 2023-02-02
  */
 public class DirectIoLib
 {
-    private static final Logger logger = LoggerFactory.getLogger(DirectIoLib.class);
+    private static final Logger logger = LogManager.getLogger(DirectIoLib.class);
     /**
      * The soft block size for use with transfer multiples and memory alignment multiples
      */

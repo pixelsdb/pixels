@@ -21,27 +21,30 @@ package io.pixelsdb.pixels.common.layout;
 
 import java.util.*;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * @author hank
+ * @create 2018-02
  */
 public class InvertedSplitsIndex implements SplitsIndex
 {
-    private int version;
-
+    private final long version;
     private final int maxSplitSize;
 
     /**
      * key: column name;
      * value: bit map
      */
-    private Map<String, BitSet> bitMapIndex;
+    private final Map<String, BitSet> bitMapIndex;
 
-    private List<SplitPattern> querySplitPatterns;
+    private final List<SplitPattern> querySplitPatterns;
 
     private List<String> columnOrder;
 
-    public InvertedSplitsIndex(List<String> columnOrder, List<SplitPattern> patterns, int maxSplitSize)
+    public InvertedSplitsIndex(long version, List<String> columnOrder, List<SplitPattern> patterns, int maxSplitSize)
     {
+        this.version = version;
         this.maxSplitSize = maxSplitSize;
         this.columnOrder = new ArrayList<>(columnOrder);
         this.querySplitPatterns = new ArrayList<>(patterns);
@@ -52,7 +55,7 @@ public class InvertedSplitsIndex implements SplitsIndex
             BitSet bitMap = new BitSet(this.querySplitPatterns.size());
             for (int i = 0; i < this.querySplitPatterns.size(); ++i)
             {
-                if (this.querySplitPatterns.get(i).contaiansColumn(column))
+                if (this.querySplitPatterns.get(i).containsColumn(column))
                 {
                     bitMap.set(i, true);
                 }
@@ -93,12 +96,12 @@ public class InvertedSplitsIndex implements SplitsIndex
             int minPatternSize = Integer.MAX_VALUE;
             int temp;
 
-            for (int i = 0; i < this.querySplitPatterns.size(); ++i)
+            for (SplitPattern querySplitPattern : this.querySplitPatterns)
             {
-                temp = Math.abs(this.querySplitPatterns.get(i).size() - numColumns);
+                temp = Math.abs(querySplitPattern.size() - numColumns);
                 if (temp < minPatternSize)
                 {
-                    bestPattern = this.querySplitPatterns.get(i);
+                    bestPattern = querySplitPattern;
                     minPatternSize = temp;
                 }
             }
@@ -117,6 +120,7 @@ public class InvertedSplitsIndex implements SplitsIndex
             }
         }
 
+        requireNonNull(bestPattern, "best pattern is not found");
         if (bestPattern.getSplitSize() > maxSplitSize)
         {
             bestPattern.setSplitSize(maxSplitSize);
@@ -126,7 +130,7 @@ public class InvertedSplitsIndex implements SplitsIndex
     }
 
     @Override
-    public int getVersion()
+    public long getVersion()
     {
         return version;
     }
@@ -135,10 +139,5 @@ public class InvertedSplitsIndex implements SplitsIndex
     public int getMaxSplitSize()
     {
         return maxSplitSize;
-    }
-
-    public void setVersion(int version)
-    {
-        this.version = version;
     }
 }

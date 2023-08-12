@@ -32,8 +32,7 @@ import java.nio.ByteOrder;
 /**
  * @author guodong
  */
-public class FloatColumnReader
-        extends ColumnReader
+public class FloatColumnReader extends ColumnReader
 {
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;

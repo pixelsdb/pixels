@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.compactor;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.*;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsVersion;
@@ -33,6 +34,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.TimeZone;
@@ -58,6 +60,14 @@ public class PixelsCompactor
     private final TimeZone timeZone;
     private final long fileContentLength;
     private final int fileRowNum;
+    /**
+     * The number of bytes that each column chunk is aligned to.
+     */
+    private final int chunkAlignment;
+    /**
+     * The byte buffer padded to each column chunk for alignment.
+     */
+    private final byte[] chunkPaddingBuffer;
 
     private final Storage inputStorage;
     private final PhysicalWriter fsWriter;
@@ -93,6 +103,9 @@ public class PixelsCompactor
         checkArgument(compressionBlockSize > 0, "compression block size is not positive");
         this.compressionBlockSize = compressionBlockSize;
         this.timeZone = requireNonNull(timeZone);
+        this.chunkAlignment = Integer.parseInt(ConfigFactory.Instance().getProperty("column.chunk.alignment"));
+        checkArgument(this.chunkAlignment >= 0, "column.chunk.alignment must >= 0");
+        this.chunkPaddingBuffer = new byte[this.chunkAlignment];
         checkArgument(fileContentLength > 0, "file content length is not positive");
         this.fileContentLength = fileContentLength;
         checkArgument(fileRowNum > 0, "file row number is not positive");
@@ -103,7 +116,7 @@ public class PixelsCompactor
 
         this.fileColStatRecorders = requireNonNull(fileColStatRecorders, "file column stat reader is null");
 
-        checkArgument(!requireNonNull(rowGroupFooterBuilderList).isEmpty());
+        checkArgument(!requireNonNull(rowGroupInfoBuilderList).isEmpty());
         checkArgument(!requireNonNull(rowGroupStatBuilderList).isEmpty());
         checkArgument(!requireNonNull(rowGroupFooterBuilderList).isEmpty());
         checkArgument(!requireNonNull(rowGroupPaths).isEmpty());
@@ -238,7 +251,7 @@ public class PixelsCompactor
                 // get FileTail
                 long fileLen = fsReader.getFileLength();
                 fsReader.seek(fileLen - Long.BYTES);
-                long fileTailOffset = fsReader.readLong();
+                long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
                 int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
                 fsReader.seek(fileTailOffset);
                 byte[] fileTailBuffer = new byte[fileTailLength];
@@ -369,10 +382,34 @@ public class PixelsCompactor
                 fsReader.seek(columnChunkOffset);
                 byte[] chunkBuffer = new byte[(int) columnChunkLength];
                 fsReader.readFully(chunkBuffer);
-                fsWriter.prepare((int) columnChunkLength);
-                long offset = this.fsWriter.append(chunkBuffer, 0, (int) columnChunkLength);
-                columnChunkIndexBuilder.setChunkOffset(offset);
-                // this.fsWriter.flush(); // Issue #192: no need to flush as writing has not finished.
+
+                // Issue #521: prepare for writing the column chunk, and make sure the start offset is aligned.
+                long chunkStartOffset = fsWriter.prepare((int) columnChunkLength);
+                int tryAlign = 0;
+                while (chunkAlignment != 0 && chunkStartOffset % chunkAlignment != 0 && tryAlign++ < 2)
+                {
+                    int alignBytes = (int) (chunkAlignment - chunkStartOffset % chunkAlignment);
+                    this.fsWriter.append(chunkPaddingBuffer, 0, alignBytes);
+                    chunkStartOffset = this.fsWriter.prepare((int) columnChunkLength);
+                }
+                if (tryAlign > 2)
+                {
+                    LOGGER.warn("failed to align the start offset of the column chunk");
+                    throw new IOException("failed to align the start offset of the column chunk");
+                }
+
+                this.fsWriter.append(chunkBuffer, 0, (int) columnChunkLength);
+                /*
+                 * Issue #521:
+                 * It is not necessary pad the column chunk here, as additional bytes are already padded before
+                 * writing this column chunk to ensure chunkStartOffset is aligned. For the last column chunk,
+                 * there is no need to ensure its length is aligned. We only need aligned start offsets.
+                 *
+                 * Also, there is no need to update the column chunk length, pixels reader needs the real length
+                 * of the column chunk.
+                 */
+                columnChunkIndexBuilder.setChunkOffset(chunkStartOffset);
+                // Issue #192: no need to flush fsWriter as writing has not finished.
             }
             catch (IOException e)
             {
@@ -417,8 +454,8 @@ public class PixelsCompactor
 
     private void writeFileTail()
     {
-        PixelsProto.Footer footer = writeFooter();
-        PixelsProto.PostScript postScript = writePostScript();
+        PixelsProto.Footer footer = buildFileFooter();
+        PixelsProto.PostScript postScript = buildPostScript();
 
         PixelsProto.FileTail fileTail =
                 PixelsProto.FileTail.newBuilder()
@@ -447,7 +484,7 @@ public class PixelsCompactor
         }
     }
 
-    private PixelsProto.Footer writeFooter()
+    private PixelsProto.Footer buildFileFooter()
     {
         PixelsProto.Footer.Builder footerBuilder =
                 PixelsProto.Footer.newBuilder();
@@ -468,7 +505,7 @@ public class PixelsCompactor
         return footerBuilder.build();
     }
 
-    private PixelsProto.PostScript writePostScript()
+    private PixelsProto.PostScript buildPostScript()
     {
         return PixelsProto.PostScript.newBuilder()
                 .setVersion(Constants.VERSION)
@@ -478,6 +515,8 @@ public class PixelsCompactor
                 .setCompressionBlockSize(compressionBlockSize)
                 .setPixelStride(pixelStride)
                 .setWriterTimezone(timeZone.getDisplayName())
+                .setPartitioned(false) // Issue #521: we do not compact partitioned files.
+                .setColumnChunkAlignment(chunkAlignment)
                 .setMagic(Constants.MAGIC)
                 .build();
     }

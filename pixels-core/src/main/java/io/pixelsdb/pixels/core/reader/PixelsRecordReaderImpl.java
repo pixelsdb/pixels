@@ -64,7 +64,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private final List<String> cacheOrder;
     private final PixelsCacheReader cacheReader;
     private final PixelsFooterCache pixelsFooterCache;
-    private final String fileName;
+    private final String filePath;
     private final List<PixelsProto.Type> includedColumnTypes;
 
     private TypeDescription fileSchema = null;
@@ -114,7 +114,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ByteBuffer[] chunkBuffers;
     private ColumnReader[] readers;      // column readers for each target columns
-    private boolean enableEncodedVector;
+    private final boolean enableEncodedVector;
 
     private long diskReadBytes = 0L;
     private long cacheReadBytes = 0L;
@@ -147,7 +147,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.cacheOrder = cacheOrder;
         this.cacheReader = cacheReader;
         this.pixelsFooterCache = pixelsFooterCache;
-        this.fileName = this.physicalReader.getName();
+        this.filePath = this.physicalReader.getPath();
         this.includedColumnTypes = new ArrayList<>();
         // Issue #175: this check is currently not necessary.
         // requireNonNull(TransContextCache.Instance().getQueryTransInfo(this.transId),
@@ -451,7 +451,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
-            String rgCacheId = fileName + "-" + rgId;
+            String rgCacheId = filePath + "-" + rgId;
             PixelsProto.RowGroupFooter rowGroupFooter = pixelsFooterCache.getRGFooter(rgCacheId);
             // cache miss, read from disk and put it into cache
             if (rowGroupFooter == null)

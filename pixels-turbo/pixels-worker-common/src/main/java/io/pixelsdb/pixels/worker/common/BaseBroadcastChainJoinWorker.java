@@ -80,7 +80,9 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
+            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
+                    new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
             List<BroadcastTableInfo> chainTables = event.getChainTables();
@@ -167,9 +169,8 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                                     BaseBroadcastJoinWorker.joinWithRightTable(transId, joiner, inputs,
                                             rightInputStorageInfo.getScheme(), !rightTable.isBase(), rightCols,
                                             rightFilter, result.get(0), workerMetrics);
-                        } catch (Exception e)
+                        } catch (Throwable e)
                         {
-                            logger.error(String.format("error during broadcast join: %s", e));
                             throw new WorkerException("error during broadcast join", e);
                         }
                     });
@@ -180,8 +181,12 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                     while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
                 } catch (InterruptedException e)
                 {
-                    logger.error(String.format("interrupted while waiting for the termination of join: e", e));
                     throw new WorkerException("interrupted while waiting for the termination of join", e);
+                }
+
+                if (exceptionHandler.hasException())
+                {
+                    throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
                 }
             }
 
@@ -233,9 +238,8 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
                 workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
                 workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-            } catch (Exception e)
+            } catch (Throwable e)
             {
-                logger.error(String.format("failed to finish writing and close the join result file '%s': %s", outputPath, e));
                 throw new WorkerException(
                         "failed to finish writing and close the join result file '" + outputPath + "'", e);
             }
@@ -243,7 +247,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(joinOutput, workerMetrics);
             return joinOutput;
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             logger.error("error during join", e);
             joinOutput.setSuccessful(false);
@@ -307,7 +311,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             chainJoin(transId, executor, currJoiner, finalJoiner, lastLeftTable, workerMetrics);
             workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
             return finalJoiner;
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             throw new WorkerException("failed to join left tables", e);
         }
@@ -354,7 +358,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                     BaseBroadcastJoinWorker.buildHashTable(transId, joiner, inputs, t1.getStorageInfo().getScheme(),
                             !t1.isBase(), t1.getColumnsToRead(), t1Filter, workerMetrics);
                 }
-                catch (Exception e)
+                catch (Throwable e)
                 {
                     throw new WorkerException("error during hash table construction", e);
                 }
@@ -396,7 +400,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                             currRightTable.getStorageInfo().getScheme(), !currRightTable.isBase(),
                             currRightTable.getColumnsToRead(), currRightFilter, workerMetrics);
                 }
-                catch (Exception e)
+                catch (Throwable e)
                 {
                     throw new WorkerException("error during broadcast join", e);
                 }
@@ -481,7 +485,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                     readBytes += recordReader.getCompletedBytes();
                     numReadRequests += recordReader.getNumReadRequests();
                     it.remove();
-                } catch (Exception e)
+                } catch (Throwable e)
                 {
                     if (checkExistence && e instanceof IOException)
                     {

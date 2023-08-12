@@ -66,7 +66,7 @@ public class SplitPattern
         return splitSize;
     }
 
-    public boolean contaiansColumn(String column)
+    public boolean containsColumn(String column)
     {
         return this.columnSet.contains(column);
     }

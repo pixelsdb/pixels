@@ -32,8 +32,7 @@ import java.nio.ByteOrder;
 /**
  * @author guodong
  */
-public class DoubleColumnReader
-        extends ColumnReader
+public class DoubleColumnReader extends ColumnReader
 {
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;

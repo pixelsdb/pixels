@@ -67,7 +67,7 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
                     TimeUnit.MILLISECONDS.sleep(10);
                 } catch (InterruptedException e)
                 {
-                    log.error("interrupted while waiting for enqueue adaptively.");
+                    log.error("interrupted while waiting for enqueue adaptively");
                 }
             }
         }
@@ -105,6 +105,18 @@ public class QueryScheduleServiceImpl extends QueryScheduleServiceGrpc.QuerySche
         int cfSlots = QueryScheduleQueues.Instance().getCfSlots();
         TurboProto.GetQuerySlotsResponse response = TurboProto.GetQuerySlotsResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS).setMppSlots(mppSlots).setCfSlots(cfSlots).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getQueryConcurrency(TurboProto.GetQueryConcurrencyRequest request,
+                                    StreamObserver<TurboProto.GetQueryConcurrencyResponse> responseObserver)
+    {
+        int mppConcurrency = QueryScheduleQueues.Instance().getMppConcurrency();
+        int cfConcurrency = QueryScheduleQueues.Instance().getCfConcurrency();
+        TurboProto.GetQueryConcurrencyResponse response = TurboProto.GetQueryConcurrencyResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS).setMppConcurrency(mppConcurrency).setCfConcurrency(cfConcurrency).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

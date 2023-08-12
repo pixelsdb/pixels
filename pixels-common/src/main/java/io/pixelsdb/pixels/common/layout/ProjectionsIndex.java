@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.layout;
 
 /**
- * Created at: 20/10/2021
- * Author: hank
+ * @author hank
+ * @create 2021-10-20
  */
 public interface ProjectionsIndex
 {

@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.exception;
 
 /**
- * Created at: 2020-09-10 @ Chavannes.
- * Author: hank
+ * @author hank
+ * @create 2020-09-10 @ Chavannes
  */
 public class CacheException extends Exception
 {

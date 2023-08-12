@@ -29,11 +29,14 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author guodong
@@ -164,17 +167,31 @@ public class PhysicalHDFSReader implements PhysicalReader
     }
 
     @Override
-    public long readLong() throws IOException
+    public long readLong(ByteOrder byteOrder) throws IOException
     {
         numRequests.incrementAndGet();
-        return rawReader.readLong();
+        if (requireNonNull(byteOrder).equals(ByteOrder.BIG_ENDIAN))
+        {
+            return rawReader.readLong();
+        }
+        else
+        {
+            return Long.reverseBytes(rawReader.readLong());
+        }
     }
 
     @Override
-    public int readInt() throws IOException
+    public int readInt(ByteOrder byteOrder) throws IOException
     {
         numRequests.incrementAndGet();
-        return rawReader.readInt();
+        if (requireNonNull(byteOrder).equals(ByteOrder.BIG_ENDIAN))
+        {
+            return rawReader.readInt();
+        }
+        else
+        {
+            return Integer.reverseBytes(rawReader.readInt());
+        }
     }
 
     @Override

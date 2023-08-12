@@ -30,7 +30,8 @@ public class RestUrlPath
     public static final String GET_COLUMNS = "/api/metadata/get-columns";
     public static final String GET_VIEWS = "/api/metadata/get-views";
 
-    public static final String ESTIMATE_COST = "/api/query/estimate-cost";
+    public static final String ESTIMATE_QUERY_COST = "/api/query/estimate-query-cost";
     public static final String SUBMIT_QUERY = "/api/query/submit-query";
-    public static final String GET_RESULT = "/api/query/get-result";
+    public static final String GET_QUERY_STATUS = "/api/query/get-query-status";
+    public static final String GET_QUERY_RESULT = "/api/query/get-query-result";
 }

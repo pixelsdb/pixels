@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.daemon;
 
 /**
- * Created at: 19-7-28
- * Author: hank
+ * @author hank
+ * @create 2019-07-28
  */
 public class PixelsCoordinator
 {

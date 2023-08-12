@@ -41,7 +41,7 @@ public class SchedulerFactory
         return instance;
     }
 
-    private Scheduler scheduler;
+    private final Scheduler scheduler;
 
     private SchedulerFactory()
     {

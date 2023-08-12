@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.core.vector.ByteColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 /**
  * Boolean column writer.
@@ -36,14 +37,13 @@ public class BooleanColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
 
-    public BooleanColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public BooleanColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         ByteColumnVector columnVector = (ByteColumnVector) vector;
         byte[] values = columnVector.vector;
@@ -86,8 +86,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel()
-            throws IOException
+    public void newPixel() throws IOException
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {

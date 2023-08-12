@@ -48,6 +48,15 @@ public final class Constants
     public static final int MAX_BLOCK_ID_LEN = 20480;
 
     /**
+     * The time in seconds that a relaxed query can be postponed for execution.
+     */
+    public static final int RELAXED_EXECUTION_MAX_POSTPONE_SEC = 300;
+    /**
+     * The interval in seconds that the postponed relaxed queries are retried.
+     */
+    public static final int RELAXED_EXECUTION_RETRY_INTERVAL_SEC = 30;
+
+    /**
      * Issue #108:
      * The prefix for read-write lock used in etcd auto-increment id.
      */

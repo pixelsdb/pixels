@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.common.exception;
 
 /**
  * @author hank
- * @date 5/10/22
+ * @create 2022-05-10
  */
 public class InvalidArgumentException extends RuntimeException
 {

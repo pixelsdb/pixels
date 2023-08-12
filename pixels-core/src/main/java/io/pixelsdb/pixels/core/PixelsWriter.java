@@ -29,8 +29,7 @@ import java.io.IOException;
  *
  * @author guodong
  */
-public interface PixelsWriter
-        extends Closeable
+public interface PixelsWriter extends Closeable
 {
     /**
      * Add row batch into the file that is not hash partitioned.
