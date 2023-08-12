@@ -170,7 +170,12 @@ unique_ptr<GlobalTableFunctionState> PixelsScanFunction::PixelsScanInitGlobal(
 	result->readers[0] = bind_data.initialPixelsReader;
 
 	result->file_index = 0;
-	result->max_threads = bind_data.files.size();
+
+    int max_threads = std::stoi(ConfigFactory::Instance().getProperty("pixel.threads"));
+    if (max_threads <= 0) {
+        max_threads = (int) bind_data.files.size();
+    }
+	result->max_threads = max_threads;
 
 	result->batch_index = 0;
 
