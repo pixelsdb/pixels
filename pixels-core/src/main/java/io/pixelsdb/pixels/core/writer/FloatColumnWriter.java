@@ -47,6 +47,7 @@ public class FloatColumnWriter extends BaseColumnWriter
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         long[] values = columnVector.vector;
+        boolean littleEndian = this.byteOrder.equals(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < length; i++)
         {
             isNull[curPixelIsNullIndex++] = columnVector.isNull[i];
@@ -59,7 +60,14 @@ public class FloatColumnWriter extends BaseColumnWriter
             else
             {
                 int v = (int) values[i];
-                encodingUtils.writeIntLE(outputStream, v);
+                if (littleEndian)
+                {
+                    encodingUtils.writeIntLE(outputStream, v);
+                }
+                else
+                {
+                    encodingUtils.writeLongBE(outputStream, v);
+                }
                 pixelStatRecorder.updateFloat(Float.intBitsToFloat(v));
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one

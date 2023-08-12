@@ -71,11 +71,9 @@ public abstract class BaseColumnWriter implements ColumnWriter
         this.byteOrder = requireNonNull(byteOrder, "byteOrder is null");
         this.isNull = new boolean[pixelStride];
 
-        this.columnChunkIndex =
-                PixelsProto.ColumnChunkIndex.newBuilder()
-                        .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN));
-        this.columnChunkStat =
-                PixelsProto.ColumnStatistic.newBuilder();
+        this.columnChunkIndex = PixelsProto.ColumnChunkIndex.newBuilder()
+                .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN));
+        this.columnChunkStat = PixelsProto.ColumnStatistic.newBuilder();
         this.pixelStatRecorder = StatsRecorder.create(type);
         this.columnChunkStatRecorder = StatsRecorder.create(type);
 

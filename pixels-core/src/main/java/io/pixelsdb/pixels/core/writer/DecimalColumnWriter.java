@@ -48,6 +48,7 @@ public class DecimalColumnWriter extends BaseColumnWriter
     {
         DecimalColumnVector columnVector = (DecimalColumnVector) vector;
         long[] values = columnVector.vector;
+        boolean littleEndian = this.byteOrder.equals(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < length; i++)
         {
             isNull[curPixelIsNullIndex++] = vector.isNull[i];
@@ -59,7 +60,14 @@ public class DecimalColumnWriter extends BaseColumnWriter
             }
             else
             {
-                encodingUtils.writeLongLE(outputStream, values[i]);
+                if (littleEndian)
+                {
+                    encodingUtils.writeLongLE(outputStream, values[i]);
+                }
+                else
+                {
+                    encodingUtils.writeLongBE(outputStream, values[i]);
+                }
                 pixelStatRecorder.updateInteger(values[i], 1);
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one

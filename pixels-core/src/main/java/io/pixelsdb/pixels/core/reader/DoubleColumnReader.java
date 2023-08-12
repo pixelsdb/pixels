@@ -88,8 +88,8 @@ public class DoubleColumnReader extends ColumnReader
         if (offset == 0)
         {
             this.inputBuffer = input;
-            // using little endian, for that the long values were written in little endian
-            this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputIndex = inputBuffer.position();
             // isNull
             isNullOffset = inputIndex + (int) chunkIndex.getIsNullOffset();

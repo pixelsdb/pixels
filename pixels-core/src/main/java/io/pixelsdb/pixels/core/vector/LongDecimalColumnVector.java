@@ -36,7 +36,9 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * This class is similar to {@link DecimalColumnVector}, but supports long decimals
- * with max precision and scale 38.
+ * with max precision and scale 38. Each long decimal is stored as two continuous
+ * 64-bit integers in the vector, with the high 64 bits in the lower index. This is
+ * not affected by the endianness of the column reader or writer.
  *
  * Created at: 01/07/2022
  * Author: hank
