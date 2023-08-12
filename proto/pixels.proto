@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 PixelsDB.
+ * Copyright 2017-2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -27,15 +27,16 @@ package pixels.proto;
 option java_package = "io.pixelsdb.pixels.core";
 option java_outer_classname = "PixelsProto";
 
-// Row Group: A logical horizontal partitioning of the data into rows. There is no physical
-//            structure that is guaranteed for a row group. A row group consists of a column
-//            chunk for each column in the dataset.
-// Column Chunk: A chunk of the data for a particular column. These live in a particular row group and is guaranteed to
-//               be contiguous in the file.
-// Pixel: A column chunk is divided into several pixels. A pixel is conceptually an smallest indivisible unit in terms
-//        of indexing. Each pixel contains a fixed num (e.g., 10000) of values inside.
+// Row Group: A logical and horizontal partition of a table. Row group has no physical boundaries in the file.
+//            Data in a row group is stored in columns.
+// Column Chunk: The chunk of data for a column in a row group. A column chunk is stored sequentially in the file.
+// Pixel: Each column chunk contains a sequence of 'pixels'. Each pixel contains a number (e.g., 10000) of values.
 
-// The contents of the file tail that must be serialized.
+// Layout configurations: file level configurations are in the PostScript, row group level configurations are in
+// the RowGroupInformation, column chunk level configurations are in the ColumnChunkIndex.
+
+// The content of the file tail that must be serialized and stored at the end of each file,
+// followed by an eight-byte integer in big endian indicating the start offset of the file tail.
 message FileTail {
     optional Footer footer = 1;
     optional PostScript postscript = 2;
@@ -44,22 +45,26 @@ message FileTail {
 }
 
 // PostScript
-// version: pixels file version
-// contentLength: file content length (everything except FileTail)
-// number of rows: number of rows in the file
-// compression: compression kind. currently USELESS
-// compressionBlockSize: compression block size. currently USELESS
-// pixelStride: the maximum number of rows in a pixel
-// magic: "PIXELS"
 message PostScript {
+    // Pixels file version
     optional uint32 version = 1;
+    // file content length (everything except FileTail)
     optional uint64 contentLength = 2;
+    // number of rows in the file
     optional uint32 numberOfRows = 3;
+    // compression kind, currently NOT USED
     optional CompressionKind compression = 4;
+    // compression block size, currently NOT USED
     optional uint32 compressionBlockSize = 5;
+    // the maximum number of rows in a pixel
     optional uint32 pixelStride = 6;
+    // the timezone in which the file was written
     optional string writerTimezone = 7;
-    // Leave this last in the record
+    // whether this is a hash partitioned file, each row group is a hash partition if it is true
+    optional bool partitioned = 8;
+    // the number of bytes the start offsets of the column chunks are align to
+    optional uint32 columnChunkAlignment = 9;
+    // it is always "PIXELS", leave this last in the record
     optional string magic = 8000;
 }
 
@@ -72,21 +77,16 @@ enum CompressionKind {
     ZSTD = 5;
 }
 
-// Footer
-// types: file schema
-// columnStats: file level column statistics
-// rowGroupInfos: row group information
-// rowGroupStats: row group statistics
-// partitioned: whether this is a hash partitioned file
+// File Footer
 message Footer {
-    // schema
+    // data schema of this file
     repeated Type types = 1;
     // file level column statistics
     repeated ColumnStatistic columnStats = 2;
+    // row group information
     repeated RowGroupInformation rowGroupInfos = 3;
+    // row group statistics
     repeated RowGroupStatistic rowGroupStats = 4;
-    // if the file is hash partitioned, then each row group is a hash partition.
-    optional bool partitioned = 5;
 }
 
 message Type {
@@ -121,32 +121,30 @@ message Type {
 
 // The information about a data hash partition.
 // Each row group can be used to store a hash partition of the data in the file.
-// columnIds: the id (index in Footer.types) of the columns that are used as the partition key.
-// hashValue: the hash value of the partition keys in this partition.
 message PartitionInformation {
+    // the id (index in Footer.types) of the columns that are used as the partition key
     repeated uint32 columnIds = 1;
+    // the hash value of the partition keys in this partition
     optional int32 hashValue = 2;
 }
 
-// Row group information.
-// offset: row group start offset
-// dataLength: row group serialized content length
-// footerLength: serialized RowGroupFooter length
-// numberOfRows: number of rows in this row group
-// partitionInfo: the information of the hash partition, if Footer.partitioned is true.
+// Row group information
 message RowGroupInformation {
+    // row group start offset
     optional uint64 footerOffset = 1;
+    // row group serialized content length
     optional uint32 dataLength = 2;
+    // serialized RowGroupFooter length
     optional uint32 footerLength = 3;
+    // number of rows in this row group
     optional uint64 numberOfRows = 4;
+    // the information of the hash partition, if Footer.partitioned is true
     optional PartitionInformation partitionInfo = 5;
 }
 
 // Row group statistic
-// columnChunkStats: statistic for each column chunk.
-// for example, min/max for col0 in this row group
-// this can be used to filter row groups.
 message RowGroupStatistic {
+    // statistic for each column chunk that can be used to filter row groups
     repeated ColumnStatistic columnChunkStats = 1;
 }
 
@@ -228,14 +226,17 @@ message PixelStatistic {
 }
 
 // ColumnChunk index
-// pixelPositions: starting offsets of each pixel in this column chunk
 message ColumnChunkIndex {
-//    optional ColumnStatistic columnStatistic = 1;
     optional uint64 chunkOffset = 1;
     optional uint64 chunkLength = 2;
     optional uint64 isNullOffset = 3;
+    // starting offsets of each pixel in this column chunk
     repeated uint64 pixelPositions = 4 [packed=true];
     repeated PixelStatistic pixelStatistics = 5;
+    // whether this column chunk is stored in little endian
+    optional bool littleEndian = 6;
+    // whether the null positions are padded with arbitrary value, only valid non-encoded column chunks
+    optional bool nullsPadded = 7;
 }
 
 message RowGroupIndex {

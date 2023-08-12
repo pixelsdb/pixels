@@ -79,7 +79,9 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
+            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
+                    new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
             AggregationInfo aggregationInfo = requireNonNull(event.getAggregationInfo(),
@@ -171,9 +173,8 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                         aggregate(transId, files, columnsToRead, inputStorageInfo.getScheme(),
                                 hashValues, numPartition, aggregator, workerMetrics);
                     }
-                    catch (Exception e)
+                    catch (Throwable e)
                     {
-                        logger.error(String.format("error during scan: %s", e));
                         throw new WorkerException("error during scan", e);
                     }
                 });
@@ -184,8 +185,12 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error(String.format("interrupted while waiting for the termination of aggregation: %s", e));
                 throw new WorkerException("interrupted while waiting for the termination of aggregation", e);
+            }
+
+            if (exceptionHandler.hasException())
+            {
+                throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
             }
 
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
@@ -209,7 +214,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
             aggregationOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(aggregationOutput, workerMetrics);
             return aggregationOutput;
-        } catch (Exception e)
+        } catch (Throwable e)
         {
             logger.error("error during aggregation", e);
             aggregationOutput.setSuccessful(false);
@@ -322,13 +327,12 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                         }
                     }
                     it.remove();
-                } catch (Exception e)
+                } catch (Throwable e)
                 {
                     if (e instanceof IOException)
                     {
                         continue;
                     }
-                    logger.error(String.format("failed to read the input partial aggregation file '%s' and perform aggregation: %s", inputFile, e));
                     throw new WorkerException("failed to read the input partial aggregation file '" +
                             inputFile + "' and perform aggregation", e);
                 }
@@ -340,7 +344,6 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                     TimeUnit.MILLISECONDS.sleep(100);
                 } catch (InterruptedException e)
                 {
-                    logger.error(String.format("interrupted while waiting for the input files: %s", e));
                     throw new WorkerException("interrupted while waiting for the input files");
                 }
             }

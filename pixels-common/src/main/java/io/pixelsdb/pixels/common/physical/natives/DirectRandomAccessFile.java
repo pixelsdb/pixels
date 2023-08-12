@@ -28,8 +28,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * The random accessible file that can be opened with o_direct flag.
  *
- * Created at: 02/02/2023
- * Author: hank
+ * @author hank
+ * @create 2023-02-02
  */
 public class DirectRandomAccessFile implements PixelsRandomAccessFile
 {

@@ -25,11 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CodingErrorAction;
+import java.nio.charset.*;
 
 /**
  * pixels
@@ -58,8 +54,7 @@ public class EncodingUtils
     }
 
     public void unrolledBitPack1(long[] input, int offset, int len,
-                                 OutputStream output)
-            throws IOException
+                                 OutputStream output) throws IOException
     {
         final int numHops = 8;
         final int remainder = len % numHops;
@@ -93,8 +88,7 @@ public class EncodingUtils
     }
 
     public void unrolledBitPack2(long[] input, int offset, int len,
-                                 OutputStream output)
-            throws IOException
+                                 OutputStream output) throws IOException
     {
         final int numHops = 4;
         final int remainder = len % numHops;
@@ -124,8 +118,7 @@ public class EncodingUtils
     }
 
     public void unrolledBitPack4(long[] input, int offset, int len,
-                                 OutputStream output)
-            throws IOException
+                                 OutputStream output) throws IOException
     {
         final int numHops = 2;
         final int remainder = len % numHops;
@@ -152,57 +145,49 @@ public class EncodingUtils
     }
 
     public void unrolledBitPack8(long[] input, int offset, int len,
-                                 OutputStream output)
-            throws IOException
+                                 OutputStream output) throws IOException
     {
         unrolledBitPackBytes(input, offset, len, output, 1);
     }
 
     public void unrolledBitPack16(long[] input, int offset, int len,
-                                  OutputStream output)
-            throws IOException
+                                  OutputStream output) throws IOException
     {
         unrolledBitPackBytes(input, offset, len, output, 2);
     }
 
     public void unrolledBitPack24(long[] input, int offset, int len,
-                                  OutputStream output)
-            throws IOException
+                                  OutputStream output) throws IOException
     {
         unrolledBitPackBytes(input, offset, len, output, 3);
     }
 
     public void unrolledBitPack32(long[] input, int offset, int len,
-                                  OutputStream output)
-            throws IOException
+                                  OutputStream output) throws IOException
     {
         unrolledBitPackBytes(input, offset, len, output, 4);
     }
 
     public void unrolledBitPack40(long[] input, int offset, int len,
-                                  OutputStream output)
-            throws IOException
+                                  OutputStream output) throws IOException
     {
         unrolledBitPackBytes(input, offset, len, output, 5);
     }
 
     public void unrolledBitPack48(long[] input, int offset, int len,
-                                  OutputStream output)
-            throws IOException
+                                  OutputStream output) throws IOException
     {
         unrolledBitPackBytes(input, offset, len, output, 6);
     }
 
     public void unrolledBitPack56(long[] input, int offset, int len,
-                                  OutputStream output)
-            throws IOException
+                                  OutputStream output) throws IOException
     {
         unrolledBitPackBytes(input, offset, len, output, 7);
     }
 
     public void unrolledBitPack64(long[] input, int offset, int len,
-                                  OutputStream output)
-            throws IOException
+                                  OutputStream output) throws IOException
     {
         unrolledBitPackBytes(input, offset, len, output, 8);
     }
@@ -228,14 +213,12 @@ public class EncodingUtils
 
     /**
      * Write a long value into the output in little endian.
-     * TODO: the value is not encoded.
      *
      * @param output the output
      * @param value the long value
      * @throws IOException
      */
-    public void writeLongLE(OutputStream output, long value)
-            throws IOException
+    public void writeLongLE(OutputStream output, long value) throws IOException
     {
         writeBuffer[0] = (byte) ((value) & 0xff);
         writeBuffer[1] = (byte) ((value >> 8) & 0xff);
@@ -261,15 +244,45 @@ public class EncodingUtils
     }
 
     /**
-     * Write a int value into the output in little endian.
-     * TODO: the value is not encoded.
+     * Write a long value into the output in big endian.
      *
      * @param output the output
      * @param value the long value
      * @throws IOException
      */
-    public void writeIntLE(OutputStream output, int value)
-            throws IOException
+    public void writeLongBE(OutputStream output, long value) throws IOException
+    {
+        writeBuffer[7] = (byte) ((value) & 0xff);
+        writeBuffer[6] = (byte) ((value >> 8) & 0xff);
+        writeBuffer[5] = (byte) ((value >> 16) & 0xff);
+        writeBuffer[4] = (byte) ((value >> 24) & 0xff);
+        writeBuffer[3] = (byte) ((value >> 32) & 0xff);
+        writeBuffer[2] = (byte) ((value >> 40) & 0xff);
+        writeBuffer[1] = (byte) ((value >> 48) & 0xff);
+        writeBuffer[0] = (byte) ((value >> 56) & 0xff);
+        output.write(writeBuffer, 0, 8);
+    }
+
+    public long readLongBE(byte[] inputBytes, int offset)
+    {
+        return (((inputBytes[7+ offset] & 0xff))
+                + ((inputBytes[6 + offset] & 0xff) << 8)
+                + ((inputBytes[5 + offset] & 0xff) << 16)
+                + ((long) (inputBytes[4 + offset] & 0xff) << 24)
+                + ((long) (inputBytes[3 + offset] & 0xff) << 32)
+                + ((long) (inputBytes[2 + offset] & 0xff) << 40)
+                + ((long) (inputBytes[1 + offset] & 0xff) << 48)
+                + ((long) (inputBytes[offset] & 0xff) << 56));
+    }
+
+    /**
+     * Write an int value into the output in little endian.
+     *
+     * @param output the output
+     * @param value the long value
+     * @throws IOException
+     */
+    public void writeIntLE(OutputStream output, int value) throws IOException
     {
         writeBuffer[0] = (byte) ((value) & 0xff);
         writeBuffer[1] = (byte) ((value >> 8) & 0xff);
@@ -284,6 +297,31 @@ public class EncodingUtils
                 + ((inputBytes[1 + offset] & 0xff) << 8)
                 + ((inputBytes[2 + offset] & 0xff) << 16)
                 + ((inputBytes[3 + offset] & 0xff) << 24)
+        );
+    }
+
+    /**
+     * Write an int value into the output in big endian.
+     *
+     * @param output the output
+     * @param value the long value
+     * @throws IOException
+     */
+    public void writeIntBE(OutputStream output, int value) throws IOException
+    {
+        writeBuffer[3] = (byte) ((value) & 0xff);
+        writeBuffer[2] = (byte) ((value >> 8) & 0xff);
+        writeBuffer[1] = (byte) ((value >> 16) & 0xff);
+        writeBuffer[0] = (byte) ((value >> 24) & 0xff);
+        output.write(writeBuffer, 0, 4);
+    }
+
+    public int readIntBE(byte[] inputBytes, int offset)
+    {
+        return (((inputBytes[3 + offset] & 0xff))
+                + ((inputBytes[2 + offset] & 0xff) << 8)
+                + ((inputBytes[1 + offset] & 0xff) << 16)
+                + ((inputBytes[offset] & 0xff) << 24)
         );
     }
 
@@ -481,8 +519,7 @@ public class EncodingUtils
     }
 
     private void writeRemainingLongs(OutputStream output, int offset, long[] input, int remainder,
-                                     int numBytes)
-            throws IOException
+                                     int numBytes) throws IOException
     {
         final int numHops = remainder;
 
@@ -562,8 +599,7 @@ public class EncodingUtils
     }
 
     public void unrolledUnPack1(long[] buffer, int offset, int len,
-                                InputStream input)
-            throws IOException
+                                InputStream input) throws IOException
     {
         final int numHops = 8;
         final int remainder = len % numHops;
@@ -596,8 +632,7 @@ public class EncodingUtils
     }
 
     public void unrolledUnPack2(long[] buffer, int offset, int len,
-                                InputStream input)
-            throws IOException
+                                InputStream input) throws IOException
     {
         final int numHops = 4;
         final int remainder = len % numHops;
@@ -626,8 +661,7 @@ public class EncodingUtils
     }
 
     public void unrolledUnPack4(long[] buffer, int offset, int len,
-                                InputStream input)
-            throws IOException
+                                InputStream input) throws IOException
     {
         final int numHops = 2;
         final int remainder = len % numHops;
@@ -654,57 +688,49 @@ public class EncodingUtils
     }
 
     public void unrolledUnPack8(long[] buffer, int offset, int len,
-                                InputStream input)
-            throws IOException
+                                InputStream input) throws IOException
     {
         unrolledUnPackBytes(buffer, offset, len, input, 1);
     }
 
     public void unrolledUnPack16(long[] buffer, int offset, int len,
-                                 InputStream input)
-            throws IOException
+                                 InputStream input) throws IOException
     {
         unrolledUnPackBytes(buffer, offset, len, input, 2);
     }
 
     public void unrolledUnPack24(long[] buffer, int offset, int len,
-                                 InputStream input)
-            throws IOException
+                                 InputStream input) throws IOException
     {
         unrolledUnPackBytes(buffer, offset, len, input, 3);
     }
 
     public void unrolledUnPack32(long[] buffer, int offset, int len,
-                                 InputStream input)
-            throws IOException
+                                 InputStream input) throws IOException
     {
         unrolledUnPackBytes(buffer, offset, len, input, 4);
     }
 
     public void unrolledUnPack40(long[] buffer, int offset, int len,
-                                 InputStream input)
-            throws IOException
+                                 InputStream input) throws IOException
     {
         unrolledUnPackBytes(buffer, offset, len, input, 5);
     }
 
     public void unrolledUnPack48(long[] buffer, int offset, int len,
-                                 InputStream input)
-            throws IOException
+                                 InputStream input) throws IOException
     {
         unrolledUnPackBytes(buffer, offset, len, input, 6);
     }
 
     public void unrolledUnPack56(long[] buffer, int offset, int len,
-                                 InputStream input)
-            throws IOException
+                                 InputStream input) throws IOException
     {
         unrolledUnPackBytes(buffer, offset, len, input, 7);
     }
 
     public void unrolledUnPack64(long[] buffer, int offset, int len,
-                                 InputStream input)
-            throws IOException
+                                 InputStream input) throws IOException
     {
         unrolledUnPackBytes(buffer, offset, len, input, 8);
     }
@@ -729,8 +755,7 @@ public class EncodingUtils
     }
 
     private void readRemainingLongs(long[] buffer, int offset, InputStream input, int remainder,
-                                    int numBytes)
-            throws IOException
+                                    int numBytes) throws IOException
     {
         final int toRead = remainder * numBytes;
         // bulk read to buffer
@@ -1102,14 +1127,14 @@ public class EncodingUtils
     }
 
     /** Derived from org.apache.hadoop.io.Text.ENCODER_FACTORY */
-    private static ThreadLocal<CharsetEncoder> ENCODER_FACTORY =
-            ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newEncoder().
+    private static final ThreadLocal<CharsetEncoder> ENCODER_FACTORY =
+            ThreadLocal.withInitial(() -> StandardCharsets.UTF_8.newEncoder().
                     onMalformedInput(CodingErrorAction.REPORT).
                     onUnmappableCharacter(CodingErrorAction.REPORT));
 
     /** Derived from org.apache.hadoop.io.Text.DECODER_FACTORY */
-    private static ThreadLocal<CharsetDecoder> DECODER_FACTORY =
-            ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newDecoder().
+    private static final ThreadLocal<CharsetDecoder> DECODER_FACTORY =
+            ThreadLocal.withInitial(() -> StandardCharsets.UTF_8.newDecoder().
                     onMalformedInput(CodingErrorAction.REPORT).
                     onUnmappableCharacter(CodingErrorAction.REPORT));
 
@@ -1122,8 +1147,7 @@ public class EncodingUtils
             encoder.onMalformedInput(CodingErrorAction.REPLACE);
             encoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
         }
-        ByteBuffer bytes =
-                encoder.encode(CharBuffer.wrap(string.toCharArray()));
+        ByteBuffer bytes = encoder.encode(CharBuffer.wrap(string.toCharArray()));
         if (replace)
         {
             encoder.onMalformedInput(CodingErrorAction.REPORT);

@@ -38,6 +38,7 @@ import org.apache.logging.log4j.Logger;
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -51,8 +52,7 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  */
 @NotThreadSafe
-public class PixelsReaderImpl
-        implements PixelsReader
+public class PixelsReaderImpl implements PixelsReader
 {
     private static final Logger LOGGER = LogManager.getLogger(PixelsReaderImpl.class);
 
@@ -159,8 +159,8 @@ public class PixelsReaderImpl
             // get PhysicalReader
             PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderStorage, builderPath);
             // try to get file tail from cache
-            String fileName = fsReader.getName();
-            PixelsProto.FileTail fileTail = builderPixelsFooterCache.getFileTail(fileName);
+            String filePath = fsReader.getPath();
+            PixelsProto.FileTail fileTail = builderPixelsFooterCache.getFileTail(filePath);
             if (fileTail == null)
             {
                 if (fsReader == null)
@@ -172,12 +172,12 @@ public class PixelsReaderImpl
                 // get FileTail
                 long fileLen = fsReader.getFileLength();
                 fsReader.seek(fileLen - Long.BYTES);
-                long fileTailOffset = fsReader.readLong();
+                long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
                 int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
                 fsReader.seek(fileTailOffset);
                 ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
                 fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
-                builderPixelsFooterCache.putFileTail(fileName, fileTail);
+                builderPixelsFooterCache.putFileTail(filePath, fileTail);
             }
 
             // check file MAGIC and file version
@@ -344,7 +344,7 @@ public class PixelsReaderImpl
     @Override
     public boolean isPartitioned()
     {
-        return this.footer.hasPartitioned() && this.footer.getPartitioned();
+        return this.postScript.hasPartitioned() && this.postScript.getPartitioned();
     }
 
     /**

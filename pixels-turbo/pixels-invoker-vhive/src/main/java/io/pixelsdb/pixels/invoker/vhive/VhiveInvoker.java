@@ -82,9 +82,7 @@ public abstract class VhiveInvoker implements Invoker
             } else
             {
                 throw new RuntimeException("failed to execute the request, function: " +
-                        this.getFunctionName() +
-                        " with error: " +
-                        err);
+                        this.getFunctionName(), err);
             }
         });
     }

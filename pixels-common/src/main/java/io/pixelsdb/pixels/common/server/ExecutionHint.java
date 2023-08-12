@@ -25,6 +25,7 @@ package io.pixelsdb.pixels.common.server;
  */
 public enum ExecutionHint
 {
-    COST_EFFECTIVE, // prefer lower monetary cost
+    BEST_EFFORT, // execute the query at best effort, without any guarantee of timeliness or performance
+    RELAXED, // the query can be postponed a few minutes for execution
     IMMEDIATE, // execute the query immediately using Pixel-Turbo
 }

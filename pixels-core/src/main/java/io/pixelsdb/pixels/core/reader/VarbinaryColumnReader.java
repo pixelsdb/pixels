@@ -22,11 +22,10 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.TypeDescription;
 
 /**
- * Created at: 04/03/2022
+ * Created at: 2022-03-04
  * Author: hank
  */
-public class VarbinaryColumnReader
-        extends BinaryColumnReader
+public class VarbinaryColumnReader extends BinaryColumnReader
 {
     VarbinaryColumnReader(TypeDescription type)
     {

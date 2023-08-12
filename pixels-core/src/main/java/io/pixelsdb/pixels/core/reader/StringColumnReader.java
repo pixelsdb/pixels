@@ -33,6 +33,7 @@ import io.pixelsdb.pixels.core.vector.DictionaryColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -40,44 +41,46 @@ import static com.google.common.base.Preconditions.checkArgument;
  * @author guodong
  * @author hank
  */
-public class StringColumnReader
-        extends ColumnReader
+public class StringColumnReader extends ColumnReader
 {
-    private int originsOffset;
+    private int dictContentOffset;
 
-    private int startsOffset;
+    private int dictStartsOffset;
 
     private ByteBuf inputBuffer = null;
     /**
-     * The origin string content in dictionary.
-     * It is copied into heap from inputBuffer and has a backing array.
+     * The string content in dictionary. It is backed by an on-heap array.
+     * If inputBuffer is direct (has no backing array), bytes are copied from
+     * inputBuffer into dictContentBuf.
      */
-    private ByteBuf originsBuf = null;
+    private ByteBuf dictContentBuf = null;
     /**
-     * Mapping encoded dictionary id to element index in origins.
+     * elements' ABSOLUTE start offsets in dictContentBuf.
      */
-    private int[] orders = null;
-    /**
-     * elements' ABSOLUTE start offsets in originsBuf.
-     */
-    private int[] starts = null;
-    /**
-     * Number of origin elements in dictionary.
-     */
-    private int originNum;
+    private int[] dictStarts = null;
 
     private byte[] isNull = new byte[8];
     /**
      * The encoded dictionary id (if dictionary encoded) or
      * the origin string content (if not dictionary encoded).
-     * In case of not dictionary encoded, it is copied into heap from inputBuffer
-     * and has a backing array.
+     * In case of not dictionary encoded, we ensure it is backed by an on-heap array.
+     * If inputBuffer is direct (has no backing array), bytes are copied from
+     * inputBuffer into dictContentBuf.
      */
     private ByteBuf contentBuf = null;
     /**
-     * RLE decoder of string content element length if no dictionary encoded.
+     * The start offsets of the elements in the content if not dictionary encoded.
+     * The first start offset is 0, and the last start offset of the length of the content.
      */
-    private RunLenIntDecoder lensDecoder = null;
+    private ByteBuf startsBuf = null;
+    /**
+     * The start offset of the current element in the content if not dictionary encoded.
+     */
+    private int currentStart = 0;
+    /**
+     * The next element in the content if not dictionary encoded.
+     */
+    private int nextStart = 0;
     /**
      * RLE decoder of dictionary encoded ids if dictionary encoded.
      */
@@ -119,21 +122,18 @@ public class StringColumnReader
     @Override
     public void close() throws IOException
     {
-        this.contentBuf = null;
         this.inputBuffer = null;
-        this.originsBuf = null;
-        this.orders = null;
-        this.starts = null;
+        this.contentBuf = null;
+        this.startsBuf = null;
+        this.currentStart = 0;
+        this.nextStart = 0;
+        this.dictContentBuf = null;
+        this.dictStarts = null;
         this.isNull = null;
         if (this.contentDecoder != null)
         {
             this.contentDecoder.close();
             this.contentDecoder = null;
-        }
-        if (this.lensDecoder != null)
-        {
-            this.lensDecoder.close();
-            this.lensDecoder = null;
         }
     }
 
@@ -163,8 +163,10 @@ public class StringColumnReader
                 inputBuffer.release();
             }
             // no memory copy
-            inputBuffer = Unpooled.wrappedBuffer(input);
-            readContent(input.remaining(), encoding);
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            ByteOrder byteOrder = littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
+            inputBuffer = Unpooled.wrappedBuffer(input).order(byteOrder);
+            readContent(input.remaining(), encoding, byteOrder);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             bufferOffset = 0;
             hasNull = true;
@@ -179,7 +181,7 @@ public class StringColumnReader
             {
                 // read original bytes
                 // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
-                byte[] buffer = originsBuf.array();
+                byte[] buffer = dictContentBuf.array();
                 for (int i = 0; i < size; i++)
                 {
                     if (elementIndex % pixelStride == 0)
@@ -203,10 +205,10 @@ public class StringColumnReader
                         columnVector.noNulls = false;
                     } else
                     {
-                        int originId = orders[(int) contentDecoder.next()];
-                        int tmpLen = starts[originId + 1] - starts[originId];
+                        int originId = (int) contentDecoder.next();
+                        int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
                         // use setRef instead of setVal to reduce memory copy.
-                        columnVector.setRef(i + vectorIndex, buffer, starts[originId], tmpLen);
+                        columnVector.setRef(i + vectorIndex, buffer, dictStarts[originId], tmpLen);
                     }
                     if (hasNull)
                     {
@@ -240,11 +242,15 @@ public class StringColumnReader
                     }
                     if (hasNull && isNull[isNullBitIndex] == 1)
                     {
+                        // skip the repeated starts for null values
+                        startsBuf.skipBytes(Integer.BYTES);
                         columnVector.isNull[i + vectorIndex] = true;
                         columnVector.noNulls = false;
                     } else
                     {
-                        int len = (int) lensDecoder.next();
+                        currentStart = nextStart;
+                        nextStart = startsBuf.readInt();
+                        int len = nextStart - currentStart;
                         // use setRef instead of setVal to reduce memory copy.
                         columnVector.setRef(i + vectorIndex, buffer, bufferOffset, len);
                         bufferOffset += len;
@@ -259,13 +265,15 @@ public class StringColumnReader
         }
         else if (vector instanceof DictionaryColumnVector)
         {
+            checkArgument(encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY),
+                    "dictionary column vector can only be used on dictionary encoded column chunks");
             DictionaryColumnVector columnVector = (DictionaryColumnVector) vector;
             if (columnVector.dictArray == null)
             {
-                columnVector.dictArray = originsBuf.array();
-                columnVector.dictOffsets = starts;
+                columnVector.dictArray = dictContentBuf.array();
+                columnVector.dictOffsets = dictStarts;
             }
-            checkArgument(columnVector.dictArray == originsBuf.array(),
+            checkArgument(columnVector.dictArray == dictContentBuf.array(),
                     "dictionaries from the column vector and the origins buffer are not consistent");
 
             for (int i = 0; i < size; i++)
@@ -291,7 +299,7 @@ public class StringColumnReader
                     columnVector.noNulls = false;
                 } else
                 {
-                    int originId = orders[(int) contentDecoder.next()];
+                    int originId = (int) contentDecoder.next();
                     columnVector.setId(i + vectorIndex, originId);
                 }
                 if (hasNull)
@@ -310,23 +318,21 @@ public class StringColumnReader
     /**
      * In this method, we have reduced most of significant memory copies.
      */
-    private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding)
-            throws IOException
+    private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding, ByteOrder byteOrder) throws IOException
     {
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
             // read offsets
             inputBuffer.markReaderIndex();
-            inputBuffer.skipBytes(inputLength - 3 * Integer.BYTES);
-            originsOffset = inputBuffer.readInt();
-            startsOffset = inputBuffer.readInt();
-            int ordersOffset = inputBuffer.readInt();
+            inputBuffer.skipBytes(inputLength - 2 * Integer.BYTES);
+            dictContentOffset = inputBuffer.readInt();
+            dictStartsOffset = inputBuffer.readInt();
             inputBuffer.resetReaderIndex();
             // read buffers
-            contentBuf = inputBuffer.slice(0, originsOffset);
+            contentBuf = inputBuffer.slice(0, dictContentOffset);
             if (this.inputBuffer.hasArray())
             {
-                originsBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
+                dictContentBuf = inputBuffer.slice(dictContentOffset, dictStartsOffset - dictContentOffset);
             }
             else
             {
@@ -340,19 +346,18 @@ public class StringColumnReader
                  * int the direct inputBuffer into a byte array.
                  * TODO: support ByteBuffer for string types.
                  */
-                byte[] bytes = new byte[startsOffset - originsOffset];
-                inputBuffer.getBytes(originsOffset, bytes, 0, startsOffset - originsOffset);
-                originsBuf = Unpooled.wrappedBuffer(bytes);
+                byte[] bytes = new byte[dictStartsOffset - dictContentOffset];
+                inputBuffer.getBytes(dictContentOffset, bytes, 0, dictStartsOffset - dictContentOffset);
+                dictContentBuf = Unpooled.wrappedBuffer(bytes);
             }
-            // read starts and orders
-            ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
-            ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, inputLength - ordersOffset);
+            // read starts, the last two integers (8 bytes) are the origin offset and starts offset
+            ByteBuf startsBuf = inputBuffer.slice(dictStartsOffset, inputLength - dictStartsOffset - 2 * Integer.BYTES);
 
             // DO NOT use originsOffset as bufferStart, as multiple input buffers read
             // from disk (not from pixels cache) may share the same backing array, each starting
             // from different offsets. originsOffset equals to originsBuf.arrayOffset() only when the
             // input buffer starts from the first byte of backing array.
-            int bufferStart = originsBuf.arrayOffset();
+            int bufferStart = dictContentBuf.arrayOffset();
             RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
             /**
              * Issue #124:
@@ -360,13 +365,13 @@ public class StringColumnReader
              */
             if (encoding.hasDictionarySize())
             {
-                starts = new int[encoding.getDictionarySize() + 1];
+                dictStarts = new int[encoding.getDictionarySize() + 1];
                 int i = 0;
                 while (startsDecoder.hasNext())
                 {
-                    starts[i++] = bufferStart + (int) startsDecoder.next();
+                    dictStarts[i++] = bufferStart + (int) startsDecoder.next();
                 }
-                starts[i] = bufferStart + startsOffset - originsOffset;
+                dictStarts[i] = bufferStart + dictStartsOffset - dictContentOffset;
             }
             else
             {
@@ -376,17 +381,16 @@ public class StringColumnReader
                 {
                     startsArray.add(bufferStart + (int) startsDecoder.next());
                 }
-                startsArray.add(bufferStart + startsOffset - originsOffset);
-                starts = startsArray.toArray();
+                startsArray.add(bufferStart + dictStartsOffset - dictContentOffset);
+                dictStarts = startsArray.toArray();
             }
 
-            this.originNum = starts.length - 1;
-            RunLenIntDecoder ordersDecoder = new RunLenIntDecoder(new ByteBufInputStream(ordersBuf), false);
-            orders = new int[originNum];
-            for (int i = 0; i < originNum && ordersDecoder.hasNext(); i++)
-            {
-                orders[i] = (int) ordersDecoder.next();
-            }
+            /*
+             * Issue #498:
+             * We no longer read the orders array (encoded-id to key-index mapping) from files.
+             * Encoded id is exactly the index of the key in the dictionary.
+             */
+
             contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
         }
         else
@@ -394,22 +398,28 @@ public class StringColumnReader
             // read lens field offset
             inputBuffer.markReaderIndex();
             inputBuffer.skipBytes(inputLength - Integer.BYTES);
-            int lensOffset = inputBuffer.readInt();
+            int startsOffset = inputBuffer.readInt();
             inputBuffer.resetReaderIndex();
             // read strings
             if (this.inputBuffer.isDirect())
             {
-                byte[] bytes = new byte[lensOffset];
-                inputBuffer.getBytes(0, bytes, 0, lensOffset);
+                byte[] bytes = new byte[startsOffset];
+                inputBuffer.getBytes(0, bytes, 0, startsOffset);
                 contentBuf = Unpooled.wrappedBuffer(bytes);
             }
             else
             {
-                contentBuf = inputBuffer.slice(0, lensOffset);
+                contentBuf = inputBuffer.slice(0, startsOffset);
+                bufferOffset = contentBuf.arrayOffset();
             }
-            // read lens field
-            ByteBuf lensBuf = inputBuffer.slice(lensOffset, inputLength - Integer.BYTES - lensOffset);
-            lensDecoder = new RunLenIntDecoder(new ByteBufInputStream(lensBuf), false);
+            /*
+             * Issue #539:
+             * Read the starts field.
+             * In the current version (4.1.77-Final) of netty, ByteBuf.slice() extends the byte order from inputBuffer.
+             * However, for safety, we still explicitly set the byte order for startsBuf.
+             */
+            startsBuf = inputBuffer.slice(startsOffset, inputLength - Integer.BYTES - startsOffset).order(byteOrder);
+            nextStart = startsBuf.readInt(); // read out the first start offset, which is 0
         }
     }
 }

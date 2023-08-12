@@ -27,8 +27,8 @@ import org.apache.logging.log4j.Logger;
 import static io.pixelsdb.pixels.common.utils.Constants.AI_LOCK_PATH_PREFIX;
 
 /**
- * @create 2021-08-29
  * @author hank
+ * @create 2021-08-29
  */
 public class EtcdAutoIncrement
 {

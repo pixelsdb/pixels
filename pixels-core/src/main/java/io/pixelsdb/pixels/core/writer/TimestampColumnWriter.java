@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Timestamp column writer.
@@ -38,16 +39,15 @@ public class TimestampColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];
 
-    public TimestampColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public TimestampColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         // Issue #94: time can be negative if it is before 1970-1-1 0:0:0.
         encoder = new RunLenIntEncoder(true, true);
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
         long[] times = columnVector.times;
@@ -90,8 +90,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel()
-            throws IOException
+    public void newPixel() throws IOException
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {
@@ -108,6 +107,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
         {
             ByteBuffer curVecPartitionBuffer =
                     ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
+            curVecPartitionBuffer.order(byteOrder);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 curVecPartitionBuffer.putLong(curPixelVector[i]);
@@ -131,8 +131,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void close()
-            throws IOException
+    public void close() throws IOException
     {
         encoder.close();
         super.close();

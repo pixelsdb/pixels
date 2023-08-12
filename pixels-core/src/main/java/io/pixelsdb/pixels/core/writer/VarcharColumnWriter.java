@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 /**
  * pixels column writer for <code>Varchar</code>
@@ -41,9 +42,9 @@ public class VarcharColumnWriter extends StringColumnWriter
     private final int maxLength;
     private int numTruncated;
 
-    public VarcharColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public VarcharColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         this.maxLength = type.getMaxLength();
         this.numTruncated = 0;
     }

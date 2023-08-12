@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 /**
  * pixels binary column writer.
@@ -40,16 +41,15 @@ public class BinaryColumnWriter extends BaseColumnWriter
     private final int maxLength;
     private int numTruncated;
 
-    public BinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public BinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
         this.maxLength = type.getMaxLength();
         this.numTruncated = 0;
     }
 
     @Override
-    public int write(ColumnVector vector, int size)
-            throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         byte[][] values = columnVector.vector;
@@ -72,8 +72,8 @@ public class BinaryColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartBinary(BinaryColumnVector columnVector, byte[][] values, int curPartLength, int curPartOffset)
-            throws IOException
+    private void writeCurPartBinary(BinaryColumnVector columnVector, byte[][] values,
+                                    int curPartLength, int curPartOffset) throws IOException
     {
         for (int i = 0; i < curPartLength; i++)
         {

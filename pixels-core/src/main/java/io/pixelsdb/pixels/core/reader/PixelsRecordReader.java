@@ -26,9 +26,9 @@ import java.io.IOException;
 
 /**
  * @author guodong
+ * @author hank
  */
-public interface PixelsRecordReader
-        extends AutoCloseable
+public interface PixelsRecordReader extends AutoCloseable
 {
     /**
      * Prepare for the next row batch. This method is independent from readBatch().
@@ -45,11 +45,10 @@ public interface PixelsRecordReader
      * @return vectorized row batch
      * @throws java.io.IOException
      */
-    VectorizedRowBatch readBatch(int batchSize, boolean reuse)
-            throws IOException;
+    VectorizedRowBatch readBatch(int batchSize, boolean reuse) throws IOException;
 
     /**
-     * Read the next row batch. This method is thread-safe and independent from prepareBatch().
+     * Read the next row batch. This method is thread-safe and independent of prepareBatch().
      * The returned row batch is not reused across multiple calls. It is equivalent
      * to readBatch(batchSize, false).
      *
@@ -57,29 +56,26 @@ public interface PixelsRecordReader
      * @return vectorized row batch
      * @throws java.io.IOException
      */
-    VectorizedRowBatch readBatch(int batchSize)
-            throws IOException;
+    VectorizedRowBatch readBatch(int batchSize) throws IOException;
 
     /**
-     * Read the next row batch. This method is thread-safe and independent from prepareBatch().
+     * Read the next row batch. This method is thread-safe and independent of prepareBatch().
      * It is equivalent to readBatch(DEFAULT_SIZE, reuse).
      *
      * @return row batch
      * @throws java.io.IOException
      */
-    VectorizedRowBatch readBatch(boolean reuse)
-            throws IOException;
+    VectorizedRowBatch readBatch(boolean reuse) throws IOException;
 
     /**
-     * Read the next row batch. This method is thread-safe and independent from prepareBatch().
+     * Read the next row batch. This method is thread-safe and independent of prepareBatch().
      * The returned row batch is not reused across multiple calls. It is equivalent
      * to readBatch(DEFAULT_SIZE, false).
      *
      * @return row batch
      * @throws java.io.IOException
      */
-    VectorizedRowBatch readBatch()
-            throws IOException;
+    VectorizedRowBatch readBatch() throws IOException;
 
     /**
      * Get the schema of the included columns in the read option.
@@ -117,8 +113,7 @@ public interface PixelsRecordReader
      * @return seek success
      * @throws java.io.IOException
      */
-    boolean seekToRow(long rowIndex)
-            throws IOException;
+    boolean seekToRow(long rowIndex) throws IOException;
 
     /**
      * Skip specified number of rows
@@ -127,8 +122,7 @@ public interface PixelsRecordReader
      * @return skip success
      * @throws java.io.IOException
      */
-    boolean skip(long rowNum)
-            throws IOException;
+    boolean skip(long rowNum) throws IOException;
 
     /**
      * @return the number of the rows have been read
@@ -148,7 +142,7 @@ public interface PixelsRecordReader
     long getReadTimeNanos();
 
     /**
-     * Get the approximate (may be slightly lower than actual)
+     * Get the approximate (maybe slightly lower than actual)
      * <b>cumulative</b> memory usage, which is more meaningful for GC
      * performance tuning.
      * @return

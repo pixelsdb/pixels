@@ -29,8 +29,7 @@ import java.nio.ByteBuffer;
 /**
  * @author guodong
  */
-public class ByteColumnReader
-        extends ColumnReader
+public class ByteColumnReader extends ColumnReader
 {
     ByteColumnReader(TypeDescription type)
     {

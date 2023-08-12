@@ -27,18 +27,18 @@ public class SubmitQueryResponse
 {
     private int errorCode;
     private String errorMessage;
-    private String callbackToken;
+    private String traceToken;
 
     /**
      * Default constructor for Jackson.
      */
     public SubmitQueryResponse() { }
 
-    public SubmitQueryResponse(int errorCode, String errorMessage, String callbackToken)
+    public SubmitQueryResponse(int errorCode, String errorMessage, String traceToken)
     {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
-        this.callbackToken = callbackToken;
+        this.traceToken = traceToken;
     }
 
     public int getErrorCode()
@@ -61,13 +61,13 @@ public class SubmitQueryResponse
         this.errorMessage = errorMessage;
     }
 
-    public String getCallbackToken()
+    public String getTraceToken()
     {
-        return callbackToken;
+        return traceToken;
     }
 
-    public void setCallbackToken(String callbackToken)
+    public void setTraceToken(String traceToken)
     {
-        this.callbackToken = callbackToken;
+        this.traceToken = traceToken;
     }
 }

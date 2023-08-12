@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsProto;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 /**
  * @author guodong
@@ -48,7 +49,7 @@ public class PixelsPhysicalReader
             {
                 long fileLen = physicalReader.getFileLength();
                 physicalReader.seek(fileLen - Long.BYTES);
-                long fileTailOffset = physicalReader.readLong();
+                long fileTailOffset = physicalReader.readLong(ByteOrder.BIG_ENDIAN);
                 int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
                 physicalReader.seek(fileTailOffset);
                 byte[] fileTailBuffer = new byte[fileTailLength];

@@ -28,8 +28,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Created at: 19-7-28
- * Author: hank
+ * @author hank
+ * @create 2019-07-28
  */
 public class ReplicaBalancer extends Balancer
 {

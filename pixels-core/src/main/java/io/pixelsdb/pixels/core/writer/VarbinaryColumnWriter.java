@@ -21,14 +21,16 @@ package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
 
+import java.nio.ByteOrder;
+
 /**
  * Created at: 04/03/2022
  * Author: hank
  */
 public class VarbinaryColumnWriter extends BinaryColumnWriter
 {
-    public VarbinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public VarbinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding, byteOrder);
     }
 }

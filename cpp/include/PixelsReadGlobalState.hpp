@@ -37,6 +37,8 @@ struct PixelsReadGlobalState : public GlobalTableFunctionState {
 
 	idx_t max_threads;
 
+    TableFilterSet * filters;
+
 	idx_t MaxThreads() const override {
 		return max_threads;
 	}

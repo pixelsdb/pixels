@@ -26,6 +26,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 
 /**
  * This is only used by pixels-turbo to queue the running queries and choose the query executor.
+ *
  * @author hank
  * @create 2022-10-24
  */
@@ -85,6 +86,16 @@ public class QueryScheduleQueues
             return this.cfQueue.remove(transId);
         }
         return false;
+    }
+
+    public int getMppConcurrency()
+    {
+        return this.mppQueue.size();
+    }
+
+    public int getCfConcurrency()
+    {
+        return this.cfQueue.size();
     }
 
     public int getMppSlots()

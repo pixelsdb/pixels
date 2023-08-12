@@ -86,20 +86,20 @@ Pixels is an academic system aims at providing production-grade quality. It supp
 is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
-> `SIGMOD'23` Using Cloud Function as Accelerator for Elastic Data Analytics\
+> `SIGMOD'23` [Using Cloud Functions as Accelerator for Elastic Data Analytics](https://doi.org/10.1145/3589306)\
 > Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki
 
-> `EDBT'22` Columnar Storage Optimization and Caching for Data Lakes (short) [[BibTeX]](https://dblp.org/rec/conf/edbt/JinBC022.html?view=bibtex)\
+> `EDBT'22` [Columnar Storage Optimization and Caching for Data Lakes (short)](https://doi.org/10.48786/edbt.2022.33)\
 > Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du
 
-> `ICDE'22` Pixels: An Efficient Column Store for Cloud Data Lakes [[BibTeX]](https://dblp.org/rec/conf/icde/BianA22.html?view=bibtex)\
+> `ICDE'22` [Pixels: An Efficient Column Store for Cloud Data Lakes](https://doi.org/10.1109/ICDE53745.2022.00276)\
 > Haoqiong Bian, Anastasia Ailamaki
 
-> `CIDR'20` Pixels: Multiversion Wide Table Store for Data Lakes (abstract) [[BibTeX]](https://dblp.org/rec/conf/cidr/Bian20.html?view=bibtex)\
+> `CIDR'20` [Pixels: Multiversion Wide Table Store for Data Lakes (abstract)](https://www.cidrdb.org/cidr2020/gongshow2020/gongshow/abstracts/cidr2020_abstract74.pdf)\
 > Haoqiong Bian
 
-> `ICDE'18` Rainbow: Adaptive Layout Optimization for Wide Tables (demo) [[BibTeX]](https://dblp.org/rec/conf/icde/BianTJCQD18.html?view=bibtex)\
+> `ICDE'18` [Rainbow: Adaptive Layout Optimization for Wide Tables (demo)](https://doi.org/10.1109/ICDE.2018.00200)\
 > Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du
 
-> `SIGMOD'17` Wide Table Layout Optimization by Column Ordering and Duplication [[BibTeX]](https://dblp.org/rec/conf/sigmod/BianYTCCDM17.html?view=bibtex)\
+> `SIGMOD'17` [Wide Table Layout Optimization by Column Ordering and Duplication](https://doi.org/10.1145/3035918.3035930)\
 > Haoqiong Bian, Ying Yan, Wenbo Tao, Liang Jeff Chen, Yueguo Chen, Xiaoyong Du, Thomas Moscibroda

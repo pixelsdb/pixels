@@ -30,6 +30,7 @@ import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.sql.Timestamp;
 
 /**
@@ -39,8 +40,7 @@ import java.sql.Timestamp;
  * @author guodong
  * @author hank
  */
-public class TimestampColumnReader
-        extends ColumnReader
+public class TimestampColumnReader extends ColumnReader
 {
     private ByteBuffer inputBuffer = null;
     private InputStream inputStream = null;
@@ -70,7 +70,6 @@ public class TimestampColumnReader
     @Override
     public void close() throws IOException
     {
-
     }
 
     /**
@@ -89,8 +88,7 @@ public class TimestampColumnReader
     @Override
     public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
-                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
-            throws IOException
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
         if (offset == 0)
@@ -100,6 +98,8 @@ public class TimestampColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             isNullOffset = inputBuffer.position() + (int) chunkIndex.getIsNullOffset();

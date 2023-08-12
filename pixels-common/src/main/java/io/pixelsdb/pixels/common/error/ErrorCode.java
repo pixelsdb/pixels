@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.error;
 
 /**
- * Created at: 19-4-19
- * Author: hank
+ * @author hank
+ * @create 2019-04-19
  */
 public class ErrorCode
 {
@@ -92,9 +92,11 @@ public class ErrorCode
 
     // begin error code for query server
     private static final int ERROR_QUERY_SERVER = ERROR_BASE + 400;
-    public static final int QUERY_SERVER_PENDING_INTERRUPTED = (ERROR_QUERY_SERVER + 2);
-    public static final int QUERY_SERVER_EXECUTE_FAILED = (ERROR_QUERY_SERVER + 1);
-    public static final int QUERY_SERVER_NOT_SUPPORTED = (ERROR_QUERY_SERVER + 2);
+    public static final int QUERY_SERVER_PENDING_INTERRUPTED = (ERROR_QUERY_SERVER + 1);
+    public static final int QUERY_SERVER_EXECUTE_FAILED = (ERROR_QUERY_SERVER + 2);
+    public static final int QUERY_SERVER_NOT_SUPPORTED = (ERROR_QUERY_SERVER + 3);
+    public static final int QUERY_SERVER_BAD_REQUEST = (ERROR_QUERY_SERVER + 4);
+    public static final int QUERY_SERVER_QUERY_NOT_FINISHED = (ERROR_QUERY_SERVER + 5);
 
     // end error code for transactions
 }

@@ -41,6 +41,8 @@
 #include "vector/ColumnVector.h"
 #include "vector/LongColumnVector.h"
 #include "physical/BufferPool.h"
+#include "profiler/TimeProfiler.h"
+#include "physical/natives/DirectUringRandomAccessFile.h"
 #ifndef DUCKDB_AMALGAMATION
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/common/constants.hpp"
@@ -62,8 +64,7 @@
 #include "duckdb/planner/operator/logical_get.hpp"
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
-#include "profiler/TimeProfiler.h"
-#include "physical/natives/DirectUringRandomAccessFile.h"
+#include "duckdb/common/multi_file_reader.hpp"
 #endif
 
 using namespace std;
@@ -82,7 +83,9 @@ public:
 	static unique_ptr<LocalTableFunctionState>
 	PixelsScanInitLocal(ExecutionContext &context, TableFunctionInitInput &input, GlobalTableFunctionState *gstate_p);
 	static bool PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
-	                                     PixelsReadLocalState &scan_data, PixelsReadGlobalState &parallel_state);
+	                                     PixelsReadLocalState &scan_data, PixelsReadGlobalState &parallel_state,
+                                         bool is_init_state = false);
+    static PixelsReaderOption GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state);
 private:
 	static void TransformDuckdbType(const std::shared_ptr<TypeDescription>& type,
 	                         vector<LogicalType> &return_types);
@@ -90,6 +93,7 @@ private:
 	                            DataChunk &output,
 	                            const std::shared_ptr<TypeDescription> & schema,
 	                            unsigned long thisOutputChunkRows);
+    static bool enable_filter_pushdown;
 };
 
 } // namespace duckdb

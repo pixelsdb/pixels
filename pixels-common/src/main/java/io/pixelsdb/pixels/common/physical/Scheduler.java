@@ -42,8 +42,7 @@ public interface Scheduler
      * @param transId
      * @throws IOException
      */
-    void executeBatch(PhysicalReader reader, RequestBatch batch, long transId)
-            throws IOException;
+    void executeBatch(PhysicalReader reader, RequestBatch batch, long transId) throws IOException;
 
     class Request implements Comparable<Request>
     {

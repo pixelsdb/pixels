@@ -20,6 +20,9 @@
 package io.pixelsdb.pixels.core.utils;
 
 import io.pixelsdb.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.core.encoding.Dictionary;
+import io.pixelsdb.pixels.core.encoding.HashTableDictionary;
+import io.pixelsdb.pixels.core.encoding.StringRedBlackTree;
 import org.junit.Test;
 
 import java.lang.management.GarbageCollectorMXBean;

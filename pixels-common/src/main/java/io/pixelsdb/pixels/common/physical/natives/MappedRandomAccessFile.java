@@ -28,8 +28,8 @@ import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeIsLittleEndian;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
 
 /**
- * Created at: 2/21/23
- * Author: hank
+ * @author hank
+ * @create 2023-02-21
  */
 public class MappedRandomAccessFile implements PixelsRandomAccessFile
 {

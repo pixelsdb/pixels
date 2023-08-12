@@ -25,9 +25,12 @@ import redis.clients.jedis.JedisPooled;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * The physical reader for Redis.
@@ -122,16 +125,16 @@ public class PhysicalRedisReader implements PhysicalReader
     }
 
     @Override
-    public long readLong() throws IOException
+    public long readLong(ByteOrder byteOrder) throws IOException
     {
-        ByteBuffer buffer = readFully(Long.BYTES);
+        ByteBuffer buffer = readFully(Long.BYTES).order(requireNonNull(byteOrder));
         return buffer.getLong();
     }
 
     @Override
-    public int readInt() throws IOException
+    public int readInt(ByteOrder byteOrder) throws IOException
     {
-        ByteBuffer buffer = readFully(Integer.BYTES);
+        ByteBuffer buffer = readFully(Integer.BYTES).order(requireNonNull(byteOrder));
         return buffer.getInt();
     }
 

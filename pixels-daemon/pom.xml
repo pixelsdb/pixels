@@ -5,7 +5,7 @@
     <parent>
         <artifactId>pixels</artifactId>
         <groupId>io.pixelsdb</groupId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.2.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -98,6 +98,13 @@
             <artifactId>grpc-stub</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <dependency>
+            <!-- this is only for third-party libs that use slf4j -->
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 
     <build>
@@ -141,6 +148,7 @@
                                     <mainClass>${mainClass}</mainClass>
                                     <manifestEntries>
                                         <Add-Opens>java.base/sun.nio.ch java.base/java.nio</Add-Opens>
+                                        <Multi-Release>true</Multi-Release>
                                     </manifestEntries>
                                 </transformer>
                             </transformers>

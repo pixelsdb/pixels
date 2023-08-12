@@ -30,12 +30,12 @@ import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * @author guodong
  */
-public class IntegerColumnReader
-        extends ColumnReader
+public class IntegerColumnReader extends ColumnReader
 {
     private RunLenIntDecoder decoder;
     private ByteBuffer inputBuffer;
@@ -95,8 +95,7 @@ public class IntegerColumnReader
     @Override
     public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
-                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
-            throws IOException
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         // if read from start, init the stream and decoder
@@ -107,6 +106,8 @@ public class IntegerColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull
@@ -122,7 +123,7 @@ public class IntegerColumnReader
                  * The position should not be pushed, because the first byte will be read
                  * again for the first pixel (stride).
                  */
-                isLong = inputBuffer.getLong(0) == 1;
+                isLong = type.getCategory() == TypeDescription.Category.LONG;
             }
         }
         // if run length encoded
@@ -176,8 +177,6 @@ public class IntegerColumnReader
                     {
                         int pixelId = elementIndex / pixelStride;
                         hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-                        // Read the first byte of the pixels (stride).
-                        isLong = inputBuffer.getLong() == 1;
                         if (hasNull && isNullBitIndex > 0)
                         {
                             BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
@@ -214,8 +213,6 @@ public class IntegerColumnReader
                     {
                         int pixelId = elementIndex / pixelStride;
                         hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-                        // Read the first byte of the pixels (stride).
-                        isLong = inputBuffer.getLong() == 1;
                         if (hasNull && isNullBitIndex > 0)
                         {
                             BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);

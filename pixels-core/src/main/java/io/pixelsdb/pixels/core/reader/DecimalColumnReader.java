@@ -34,8 +34,7 @@ import java.nio.ByteOrder;
  * <p><b>Note: it only supports short decimals with max precision and scale 18.</b></p>
  * @author hank
  */
-public class DecimalColumnReader
-        extends ColumnReader
+public class DecimalColumnReader extends ColumnReader
 {
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;

@@ -38,13 +38,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
- * @create 2018-10-14
  * @author hank
+ * @create 2018-10-14
  */
 public class EtcdUtil
 {
-    private static Logger logger = LogManager.getLogger(EtcdUtil.class);
-    private static EtcdUtil instance = new EtcdUtil();
+    private static final Logger logger = LogManager.getLogger(EtcdUtil.class);
+    private static final EtcdUtil instance = new EtcdUtil();
     private Client client = null;
     private boolean lockHeld;
 
@@ -174,7 +174,7 @@ public class EtcdUtil
     }
 
     /**
-     * put key-value into etcd with an expire time (by etcd lease).
+     * put key-value into etcd with an expiry time (by etcd lease).
      *
      * @param key
      * @param value

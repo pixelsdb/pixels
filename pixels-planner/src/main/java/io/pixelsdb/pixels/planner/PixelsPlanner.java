@@ -162,7 +162,7 @@ public class PixelsPlanner
         partialAggregationInfo.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
         partialAggregationInfo.setAggregateColumnIds(aggregation.getAggregateColumnIds());
         partialAggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
-        int numPartitions = PlanOptimizer.Instance().getAggrNumPartitions(aggregatedTable);
+        int numPartitions = PlanOptimizer.Instance().getAggrNumPartitions(this.transId, aggregatedTable);
         partialAggregationInfo.setPartition(numPartitions > 1);
         partialAggregationInfo.setNumPartition(numPartitions);
 
@@ -324,6 +324,7 @@ public class PixelsPlanner
                     // Note: we must use the parent to calculate the number of partitions for post partitioning.
                     postPartition = true;
                     int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
+                            this.transId,
                             parent.get().getJoin().getLeftTable(),
                             parent.get().getJoin().getRightTable(),
                             parent.get().getJoin().getJoinEndian());
@@ -457,7 +458,8 @@ public class PixelsPlanner
                     rightIsBase ? InputStorageInfo : IntermediateStorageInfo,
                     rightPartitionedFiles, IntraWorkerParallelism, rightKeyColumnIds);
 
-            int numPartition = PlanOptimizer.Instance().getJoinNumPartition(leftTable, rightTable, join.getJoinEndian());
+            int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
+                    this.transId, leftTable, rightTable, join.getJoinEndian());
             List<JoinInput> joinInputs = getPartitionedJoinInputs(
                     joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
                     null, null);
@@ -621,6 +623,7 @@ public class PixelsPlanner
                         // Note: we must use the parent to calculate the number of partitions for post partitioning.
                         postPartition = true;
                         int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
+                                this.transId,
                                 parent.get().getJoin().getLeftTable(),
                                 parent.get().getJoin().getRightTable(),
                                 parent.get().getJoin().getJoinEndian());
@@ -718,6 +721,7 @@ public class PixelsPlanner
                 postPartition = true;
                 // Note: we must use the parent to calculate the number of partitions for post partitioning.
                 int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
+                        this.transId,
                         parent.get().getJoin().getLeftTable(),
                         parent.get().getJoin().getRightTable(),
                         parent.get().getJoin().getJoinEndian());
@@ -859,7 +863,8 @@ public class PixelsPlanner
         {
             // process partitioned join.
             PartitionedJoinOperator joinOperator;
-            int numPartition = PlanOptimizer.Instance().getJoinNumPartition(leftTable, rightTable, join.getJoinEndian());
+            int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
+                    this.transId, leftTable, rightTable, join.getJoinEndian());
             if (childOperator != null)
             {
                 // left side is post partitioned, thus we only partition the right table.
@@ -1236,6 +1241,7 @@ public class PixelsPlanner
             postPartition = true;
             // Note: DO NOT use numPartition as the number of partitions for post partitioning.
             int numPostPartition = PlanOptimizer.Instance().getJoinNumPartition(
+                    this.transId,
                     parent.get().getJoin().getLeftTable(),
                     parent.get().getJoin().getRightTable(),
                     parent.get().getJoin().getJoinEndian());
@@ -1306,8 +1312,8 @@ public class PixelsPlanner
      * @throws InvalidProtocolBufferException
      * @throws MetadataException
      */
-    private List<InputSplit> adjustInputSplitsForBroadcastJoin(Table smallTable, Table largeTable,
-                                                               List<InputSplit> largeInputSplits)
+    private List<InputSplit> adjustInputSplitsForBroadcastJoin(
+            Table smallTable, Table largeTable, List<InputSplit> largeInputSplits)
             throws InvalidProtocolBufferException, MetadataException
     {
         int numWorkers = largeInputSplits.size() / IntraWorkerParallelism;
@@ -1316,8 +1322,8 @@ public class PixelsPlanner
             // There are less than 32 workers, they are not likely to affect the performance.
             return largeInputSplits;
         }
-        double smallSelectivity = PlanOptimizer.Instance().getTableSelectivity(smallTable);
-        double largeSelectivity = PlanOptimizer.Instance().getTableSelectivity(largeTable);
+        double smallSelectivity = PlanOptimizer.Instance().getTableSelectivity(this.transId, smallTable);
+        double largeSelectivity = PlanOptimizer.Instance().getTableSelectivity(this.transId, largeTable);
         if (smallSelectivity >= 0 && largeSelectivity > 0 && smallSelectivity < largeSelectivity)
         {
             // Adjust the input split size if the small table has a lower selectivity.
@@ -1399,20 +1405,20 @@ public class PixelsPlanner
                 if (splitsIndex == null)
                 {
                     logger.debug("splits index not exist in factory, building index...");
-                    splitsIndex = buildSplitsIndex(ordered, splits, schemaTableName);
+                    splitsIndex = buildSplitsIndex(version, ordered, splits, schemaTableName);
                 } else
                 {
-                    int indexVersion = splitsIndex.getVersion();
+                    long indexVersion = splitsIndex.getVersion();
                     if (indexVersion < version)
                     {
                         logger.debug("splits index version is not up-to-date, updating index...");
-                        splitsIndex = buildSplitsIndex(ordered, splits, schemaTableName);
+                        splitsIndex = buildSplitsIndex(version, ordered, splits, schemaTableName);
                     }
                 }
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
                 splitSize = bestSplitPattern.getSplitSize();
                 logger.debug("split size for table '" + table.getTableName() + "': " + splitSize + " from splits index");
-                double selectivity = PlanOptimizer.Instance().getTableSelectivity(table);
+                double selectivity = PlanOptimizer.Instance().getTableSelectivity(this.transId, table);
                 if (selectivity >= 0)
                 {
                     // Increasing split size according to the selectivity.
@@ -1517,7 +1523,7 @@ public class PixelsPlanner
         return splitsBuilder.build();
     }
 
-    private SplitsIndex buildSplitsIndex(Ordered ordered, Splits splits, SchemaTableName schemaTableName)
+    private SplitsIndex buildSplitsIndex(long version, Ordered ordered, Splits splits, SchemaTableName schemaTableName)
             throws MetadataException
     {
         List<String> columnOrder = ordered.getColumnOrder();
@@ -1527,11 +1533,11 @@ public class PixelsPlanner
         switch (indexType)
         {
             case INVERTED:
-                index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
-                        splits.getNumRowGroupInFile());
+                index = new InvertedSplitsIndex(version, columnOrder,
+                        SplitPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInFile());
                 break;
             case COST_BASED:
-                index = new CostBasedSplitsIndex(this.metadataService, schemaTableName,
+                index = new CostBasedSplitsIndex(this.transId, version, this.metadataService, schemaTableName,
                         splits.getNumRowGroupInFile(), splits.getNumRowGroupInFile());
                 break;
             default:
@@ -1542,7 +1548,8 @@ public class PixelsPlanner
         return index;
     }
 
-    private ProjectionsIndex buildProjectionsIndex(Ordered ordered, Projections projections, SchemaTableName schemaTableName) {
+    private ProjectionsIndex buildProjectionsIndex(Ordered ordered, Projections projections, SchemaTableName schemaTableName)
+    {
         List<String> columnOrder = ordered.getColumnOrder();
         ProjectionsIndex index;
         index = new InvertedProjectionsIndex(columnOrder, ProjectionPattern.buildPatterns(columnOrder, projections));

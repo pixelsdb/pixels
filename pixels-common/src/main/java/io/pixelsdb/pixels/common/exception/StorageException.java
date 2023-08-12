@@ -22,8 +22,8 @@ package io.pixelsdb.pixels.common.exception;
 import java.io.IOException;
 
 /**
- * Created at: 4/1/22
- * Author: hank
+ * @author hank
+ * @create 2022-04-01
  */
 public class StorageException extends IOException
 {
