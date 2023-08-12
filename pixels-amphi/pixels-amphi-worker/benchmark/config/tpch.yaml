@@ -12,6 +12,7 @@ table_stat_path: schema/tpch_stat.json
 workload_path: workload/tpch.txt
 cache_plan_path: results/tpch_plan.json
 workload_cost_path: stats/tpch_cost.json
+
 # Strategy options
 strategy: cost_optimal_columns
 storage_restriction: 1541191900

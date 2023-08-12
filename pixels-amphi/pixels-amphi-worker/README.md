@@ -58,16 +58,3 @@ root@aebf1e57cbe0:/pixels-worker-amphi# >> make
 
 worker-cli > 
 ```
-
-TODO: update Dockerfile and specify dependency version
-
-## CLI Usage
-
-The system is designed with a user-friendly interactive command line interface,
-where the user can view the metadata and execute queries.
-
-## Test and benchmark
-
-In the current stage, we are still focusing on the separate functionality
-and test them with unit tests. After the project built, find the executable
-`build/tests/unit_tests` to run all unit tests.
