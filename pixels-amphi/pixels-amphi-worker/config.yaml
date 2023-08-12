@@ -1,0 +1,22 @@
+# pixels server configuration
+server_address: ec2-3-15-25-74.us-east-2.compute.amazonaws.com
+server_port: 18892
+metadata_service_port: 18888
+
+# trino configuration
+trino_url: ec2-3-15-25-74.us-east-2.compute.amazonaws.com
+trino_port: 8080
+trino_default_catalog: pixels
+trino_default_schema: tpch
+
+# worker configuration
+worker_name: worker42
+worker_location: epfl
+worker_port: 8081
+
+# cache configuration
+cache_dir_path: /home/ubuntu/data
+
+# database configuration
+local_engine: duckdb
+remote_engine: trino

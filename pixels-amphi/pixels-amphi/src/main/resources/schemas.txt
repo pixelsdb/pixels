@@ -1,0 +1,9 @@
+schema/tpch/customer.avsc
+schema/tpch/lineitem.avsc
+schema/tpch/nation.avsc
+schema/tpch/orders.avsc
+schema/tpch/part.avsc
+schema/tpch/partsupp.avsc
+schema/tpch/region.avsc
+schema/tpch/supplier.avsc
+schema/clickbench/hits.avsc

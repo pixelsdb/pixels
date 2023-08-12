@@ -44,6 +44,7 @@
         <module>pixels-parser</module>
         <module>pixels-planner</module>
         <module>pixels-server</module>
+        <module>pixels-amphi/pixels-amphi</module>
         <module>pixels-storage/pixels-storage-s3</module>
         <module>pixels-storage/pixels-storage-hdfs</module>
         <module>pixels-storage/pixels-storage-gcs</module>
@@ -90,6 +91,7 @@
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
         <dep.apache-calcite.version>1.32.0</dep.apache-calcite.version>
+        <dep.apache-parquet.version>1.13.0</dep.apache-parquet.version>
 
         <!--profiling-->
         <dep.async-profiler.version>2.9</dep.async-profiler.version>
@@ -207,6 +209,11 @@
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-daemon</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-amphi</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -380,10 +387,10 @@
                         <groupId>org.apache.hadoop</groupId>
                         <artifactId>hadoop-yarn-client</artifactId>
                     </exclusion>
-                    <exclusion>
-                        <groupId>org.apache.hadoop</groupId>
-                        <artifactId>hadoop-mapreduce-client-core</artifactId>
-                    </exclusion>
+<!--                    <exclusion>-->
+<!--                        <groupId>org.apache.hadoop</groupId>-->
+<!--                        <artifactId>hadoop-mapreduce-client-core</artifactId>-->
+<!--                    </exclusion>-->
                     <exclusion>
                         <groupId>org.apache.hadoop</groupId>
                         <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
@@ -397,6 +404,18 @@
                         <artifactId>hadoop-annotations</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+
+            <!-- hadoop-common -->
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-common</artifactId>
+                <version>${dep.hadoop.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-mapreduce-client-core</artifactId>
+                <version>${dep.hadoop.version}</version>
             </dependency>
 
             <!-- amazon aws -->
@@ -527,6 +546,33 @@
                 <groupId>org.apache.calcite</groupId>
                 <artifactId>calcite-plus</artifactId>
                 <version>${dep.apache-calcite.version}</version>
+            </dependency>
+
+            <!-- apache-parquet -->
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-common</artifactId>
+                <version>${dep.apache-parquet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-encoding</artifactId>
+                <version>${dep.apache-parquet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-column</artifactId>
+                <version>${dep.apache-parquet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-hadoop</artifactId>
+                <version>${dep.apache-parquet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-avro</artifactId>
+                <version>${dep.apache-parquet.version}</version>
             </dependency>
 
             <!-- javax-annotation -->

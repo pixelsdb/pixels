@@ -1,0 +1,31 @@
+{
+  "type": "record",
+  "name": "partsupp",
+  "fields": [
+    {
+      "name": "ps_partkey",
+      "type": "long"
+    },
+    {
+      "name": "ps_suppkey",
+      "type": "long"
+    },
+    {
+      "name": "ps_availqty",
+      "type": "int"
+    },
+    {
+      "name": "ps_supplycost",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 15,
+        "scale": 2
+      }
+    },
+    {
+      "name": "ps_comment",
+      "type": "string"
+    }
+  ]
+}

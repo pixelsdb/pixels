@@ -48,6 +48,16 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-amphi</artifactId>
+        </dependency>
+
+        <!-- trino-jdbc -->
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-jdbc</artifactId>
+        </dependency>
 
         <!-- protobuf -->
         <dependency>
@@ -112,6 +122,18 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <!-- apache calcite -->
+        <dependency>
+            <groupId>org.apache.calcite</groupId>
+            <artifactId>calcite-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.calcite</groupId>
+            <artifactId>calcite-plus</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- spring boot -->

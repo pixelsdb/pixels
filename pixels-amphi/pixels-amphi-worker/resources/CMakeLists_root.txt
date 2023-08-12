@@ -1,0 +1,53 @@
+# CMake for Docker
+cmake_minimum_required(VERSION 3.15)
+project(pixels_worker_amphi)
+
+set(CMAKE_CXX_STANDARD 17)
+
+# find dependencies
+find_package(Protobuf REQUIRED)
+find_package(gRPC CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(yaml-cpp REQUIRED)
+find_package(spdlog REQUIRED)
+
+include(FetchContent)
+FetchContent_Declare(
+  cli
+  GIT_REPOSITORY https://github.com/daniele77/cli.git
+  GIT_TAG v2.1.0
+)
+FetchContent_MakeAvailable(cli)
+
+include(FetchContent)
+
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.2/json.tar.xz)
+FetchContent_MakeAvailable(json)
+
+add_subdirectory(worker)
+add_subdirectory(tests)
+add_subdirectory(benchmark)
+
+add_executable(${PROJECT_NAME} worker_cli.cpp)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+        ${Protobuf_INCLUDE_DIRS}
+        "${CMAKE_CURRENT_BINARY_DIR}/worker/generated"
+        "/duckdb"
+        ${gRPC_INCLUDE_DIRS}
+        worker/include
+)
+
+add_library(duckdb SHARED IMPORTED)
+set_target_properties(duckdb PROPERTIES IMPORTED_LOCATION "/duckdb/libduckdb.so")
+
+target_link_libraries(${PROJECT_NAME}
+        worker
+        ${Protobuf_LIBRARIES}
+        duckdb
+        gRPC::grpc++
+        yaml-cpp
+        spdlog::spdlog
+        cli::cli
+        nlohmann_json::nlohmann_json
+)

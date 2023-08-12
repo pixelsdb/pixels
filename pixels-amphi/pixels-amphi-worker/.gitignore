@@ -1,0 +1,8 @@
+!CMakeLists_*.txt
+*.ipynb
+*.json
+.ipynb_checkpoints/
+logs/
+results/
+imgs
+build
