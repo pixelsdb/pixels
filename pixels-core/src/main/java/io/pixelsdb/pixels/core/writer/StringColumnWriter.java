@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.Dictionary;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.HashTableDictionary;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
@@ -61,15 +62,15 @@ public class StringColumnWriter extends BaseColumnWriter
     private final Dictionary dictionary = new HashTableDictionary(Constants.INIT_DICT_SIZE);
     private final EncodingUtils encodingUtils;
     private int startOffset = 0; // the start offset for the current string when un-encoded
-    private boolean futureUseDictionaryEncoding;
-    private boolean currentUseDictionaryEncoding;
+    private EncodingLevel futureEncodingLevel;
+    private EncodingLevel currentEncodingLevel;
     private boolean doneDictionaryEncodingCheck = false;
 
-    public StringColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public StringColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
-        this.futureUseDictionaryEncoding = isEncoding;
-        this.currentUseDictionaryEncoding = isEncoding;
+        super(type, pixelStride, encodingLevel, byteOrder);
+        this.futureEncodingLevel = encodingLevel;
+        this.currentEncodingLevel = encodingLevel;
         this.encodingUtils = new EncodingUtils();
         encoder = new RunLenIntEncoder(false, true);
     }
@@ -77,7 +78,7 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public int write(ColumnVector vector, int size) throws IOException
     {
-        currentUseDictionaryEncoding = futureUseDictionaryEncoding;
+        currentEncodingLevel = futureEncodingLevel;
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         byte[][] values = columnVector.vector;
         int[] vLens = columnVector.lens;
@@ -86,7 +87,7 @@ public class StringColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        if (currentUseDictionaryEncoding)
+        if (currentEncodingLevel.ge(EncodingLevel.EL1))
         {
             while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
             {
@@ -169,7 +170,7 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        if (currentUseDictionaryEncoding)
+        if (currentEncodingLevel.ge(EncodingLevel.EL1))
         {
             // for dictionary encoding. run length encode again.
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
@@ -190,7 +191,7 @@ public class StringColumnWriter extends BaseColumnWriter
             checkDictionaryEncoding();
         }
         // flush out other fields
-        if (currentUseDictionaryEncoding)
+        if (currentEncodingLevel.ge(EncodingLevel.EL1))
         {
             flushDictionary();
         }
@@ -203,7 +204,7 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (currentUseDictionaryEncoding)
+        if (currentEncodingLevel.ge(EncodingLevel.EL1))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY)
@@ -295,7 +296,7 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         int valueNum = outputStream.size() / Integer.BYTES;
         float ratio = valueNum > 0 ? (float) dictionary.size() / valueNum : 0.0f;
-        futureUseDictionaryEncoding = ratio <= Constants.DICT_KEY_SIZE_THRESHOLD;
+        futureEncodingLevel = ratio <= Constants.DICT_KEY_SIZE_THRESHOLD ? EncodingLevel.EL1 : EncodingLevel.EL0;
         doneDictionaryEncodingCheck = true;
     }
 }

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.executor.aggregation;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
@@ -82,7 +83,7 @@ public class TestAggregator
                 .setPath("/home/hank/Desktop/final_aggr.pxl")
                 .setRowGroupSize(268435456)
                 .setPixelStride(10000)
-                .setEncoding(true)
+                .setEncodingLevel(EncodingLevel.EL2)
                 .setPartitioned(false)
                 .setOverwrite(true).build();
 

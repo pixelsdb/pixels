@@ -23,6 +23,7 @@ import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
@@ -178,7 +179,7 @@ public class TestPredicate
                 .setReplication(replication)
                 .setBlockPadding(true)
                 .setOverwrite(true) // set overwrite to true to avoid existence checking.
-                .setEncoding(true) // it is worth to do encoding
+                .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
                 .setCompressionBlockSize(1)
                 .build();
 

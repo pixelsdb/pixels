@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
@@ -384,7 +385,7 @@ public class WorkerCommon
                 .setStorage(storage)
                 .setPath(filePath)
                 .setOverwrite(true) // set overwrite to true to avoid existence checking.
-                .setEncoding(encoding)
+                .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
                 .setPartitioned(isPartitioned);
         if (isPartitioned)
         {

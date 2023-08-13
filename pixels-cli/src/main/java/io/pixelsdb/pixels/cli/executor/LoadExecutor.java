@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import net.sourceforge.argparse4j.inf.Namespace;
 
 import java.util.List;
@@ -50,8 +51,8 @@ public class LoadExecutor implements CommandExecutor
         String regex = ns.getString("row_regex");
         String paths = ns.getString("loading_data_paths");
         int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
-        boolean enableEncoding = Boolean.parseBoolean(ns.getString("enable_encoding"));
-        System.out.println("enable encoding: " + enableEncoding);
+        EncodingLevel encodingLevel = EncodingLevel.from(Integer.parseInt(ns.getString("encoding_level")));
+        System.out.println("encoding level: " + encodingLevel);
         String[] loadingDataPaths = null;
         if (paths != null)
         {
@@ -69,7 +70,7 @@ public class LoadExecutor implements CommandExecutor
 
         Storage storage = StorageFactory.Instance().getStorage(origin);
 
-        Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex, enableEncoding, loadingDataPaths);
+        Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex, encodingLevel, loadingDataPaths);
 
         // source already exist, producer option is false, add list of source to the queue
         List<String> fileList = storage.listPaths(origin);

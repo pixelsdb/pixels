@@ -122,7 +122,7 @@ public class Main
                         .help("Specify the split regex of each row in a file");
                 argumentParser.addArgument("-c", "--consumer_thread_num").setDefault("4").required(true)
                         .help("specify the number of consumer threads used for data generation");
-                argumentParser.addArgument("-e", "--enable_encoding").setDefault(true)
+                argumentParser.addArgument("-e", "--encoding_level").setDefault(true)
                         .help("specify the option of enabling encoding or not");
                 argumentParser.addArgument("-l", "--loading_data_paths")
                         .help("specify the path of loading data");

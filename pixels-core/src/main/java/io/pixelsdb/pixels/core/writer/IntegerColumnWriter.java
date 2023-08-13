@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
@@ -41,9 +42,9 @@ public class IntegerColumnWriter extends BaseColumnWriter
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
     private final boolean isLong;                                       // current column type is long or int, used for the first pixel
 
-    public IntegerColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public IntegerColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
+        super(type, pixelStride, encodingLevel, byteOrder);
         encoder = new RunLenIntEncoder();
         this.isLong = type.getCategory() == TypeDescription.Category.LONG;
     }
@@ -103,7 +104,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
         }
 
         // write out current pixel vector
-        if (isEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
@@ -137,7 +138,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (isEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);

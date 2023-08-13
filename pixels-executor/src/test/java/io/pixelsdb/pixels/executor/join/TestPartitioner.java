@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
@@ -116,7 +117,7 @@ public class TestPartitioner
 
         PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder().setStorage(storage)
                 .setPath("/home/hank/Desktop/part-0").setPartitioned(true)
-                .setEncoding(true).setPixelStride(10000).setOverwrite(true)
+                .setEncodingLevel(EncodingLevel.EL2).setPixelStride(10000).setOverwrite(true)
                 .setPartKeyColumnIds(Arrays.asList(0))
                 .setRowGroupSize(268435456).setSchema(rowBatchSchema).build();
 
@@ -282,7 +283,7 @@ public class TestPartitioner
 
         PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder().setStorage(storage)
                 .setPath("/home/hank/Desktop/part-0").setPartitioned(true)
-                .setEncoding(true).setPixelStride(10000).setOverwrite(true)
+                .setEncodingLevel(EncodingLevel.EL2).setPixelStride(10000).setOverwrite(true)
                 .setPartKeyColumnIds(Arrays.asList(0))
                 .setRowGroupSize(268435456).setSchema(rowBatchSchema).build();
 

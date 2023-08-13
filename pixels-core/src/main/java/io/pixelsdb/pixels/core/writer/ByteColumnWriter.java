@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.RunLenByteEncoder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
@@ -37,9 +38,9 @@ public class ByteColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
 
-    public ByteColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public ByteColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
+        super(type, pixelStride, encodingLevel, byteOrder);
         encoder = new RunLenByteEncoder();
     }
 
@@ -99,7 +100,7 @@ public class ByteColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
 
-        if (isEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
@@ -114,7 +115,7 @@ public class ByteColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (isEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
