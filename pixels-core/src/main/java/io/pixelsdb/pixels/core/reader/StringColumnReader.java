@@ -25,6 +25,7 @@ import io.netty.buffer.Unpooled;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntDecoder;
+import io.pixelsdb.pixels.core.exception.PixelsReaderException;
 import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
@@ -179,6 +180,12 @@ public class StringColumnReader extends ColumnReader
             // if dictionary encoded
             if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
             {
+                boolean cascadeRLE = false;
+                if (encoding.hasCascadeEncoding() && encoding.getCascadeEncoding().getKind()
+                        .equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
+                {
+                    cascadeRLE = true;
+                }
                 // read original bytes
                 // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
                 byte[] buffer = dictContentBuf.array();
@@ -205,7 +212,7 @@ public class StringColumnReader extends ColumnReader
                         columnVector.noNulls = false;
                     } else
                     {
-                        int originId = (int) contentDecoder.next();
+                        int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
                         int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
                         // use setRef instead of setVal to reduce memory copy.
                         columnVector.setRef(i + vectorIndex, buffer, dictStarts[originId], tmpLen);
@@ -336,7 +343,7 @@ public class StringColumnReader extends ColumnReader
             }
             else
             {
-                /**
+                /*
                  * Issue #374:
                  * If inputBuffer is read from pixels-cache or LocalFS (using direct read),
                  * in this case, it would be direct and is not backed by an array.
@@ -351,47 +358,69 @@ public class StringColumnReader extends ColumnReader
                 dictContentBuf = Unpooled.wrappedBuffer(bytes);
             }
             // read starts, the last two integers (8 bytes) are the origin offset and starts offset
-            ByteBuf startsBuf = inputBuffer.slice(dictStartsOffset, inputLength - dictStartsOffset - 2 * Integer.BYTES);
+            int startsBufLength = inputLength - dictStartsOffset - 2 * Integer.BYTES;
+            ByteBuf startsBuf = inputBuffer.slice(dictStartsOffset, startsBufLength);
 
-            // DO NOT use originsOffset as bufferStart, as multiple input buffers read
-            // from disk (not from pixels cache) may share the same backing array, each starting
-            // from different offsets. originsOffset equals to originsBuf.arrayOffset() only when the
-            // input buffer starts from the first byte of backing array.
-            int bufferStart = dictContentBuf.arrayOffset();
-            RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
-            /**
-             * Issue #124:
-             * Try to avoid using dynamic array if dictionary size is known, so that to reduce GC.
+            /*
+             * DO NOT use dictContentOffset as bufferStart, as multiple input buffers read from disk (not from pixels cache)
+             * may share the same backing array, each starting from different offsets. dictContentOffset equals to
+             * dictContentBuf.arrayOffset() only when the input buffer starts from the first byte of backing array.
              */
-            if (encoding.hasDictionarySize())
+            int bufferStart = dictContentBuf.arrayOffset();
+
+            if (encoding.hasCascadeEncoding() && encoding.getCascadeEncoding().getKind()
+                    .equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
             {
-                dictStarts = new int[encoding.getDictionarySize() + 1];
-                int i = 0;
-                while (startsDecoder.hasNext())
+                RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
+                /*
+                 * Issue #124:
+                 * Try to avoid using dynamic array if dictionary size is known, so that to reduce GC.
+                 */
+                if (encoding.hasDictionarySize())
                 {
-                    dictStarts[i++] = bufferStart + (int) startsDecoder.next();
+                    dictStarts = new int[encoding.getDictionarySize() + 1];
+                    int i = 0;
+                    while (startsDecoder.hasNext())
+                    {
+                        dictStarts[i++] = bufferStart + (int) startsDecoder.next();
+                    }
+                } else
+                {
+                    DynamicIntArray startsArray;
+                    startsArray = new DynamicIntArray(DEFAULT_STARTS_SIZE);
+                    while (startsDecoder.hasNext())
+                    {
+                        startsArray.add(bufferStart + (int) startsDecoder.next());
+                    }
+                    dictStarts = startsArray.toArray();
                 }
-                dictStarts[i] = bufferStart + dictStartsOffset - dictContentOffset;
+
+                /*
+                 * Issue #498:
+                 * We no longer read the orders array (encoded-id to key-index mapping) from files.
+                 * Encoded id is exactly the index of the key in the dictionary.
+                 */
+
+                contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
             }
             else
             {
-                DynamicIntArray startsArray;
-                startsArray = new DynamicIntArray(DEFAULT_STARTS_SIZE);
-                while (startsDecoder.hasNext())
+                if (startsBufLength % Integer.BYTES != 0)
                 {
-                    startsArray.add(bufferStart + (int) startsDecoder.next());
+                    throw new PixelsReaderException("the length of the starts array buffer is invalid");
                 }
-                startsArray.add(bufferStart + dictStartsOffset - dictContentOffset);
-                dictStarts = startsArray.toArray();
+                int startsSize = startsBufLength / Integer.BYTES;
+                if (encoding.hasDictionarySize() && encoding.getDictionarySize() + 1 != startsSize)
+                {
+                    throw new PixelsReaderException("the dictionary size is inconsistent with the size of the starts array");
+                }
+                dictStarts = new int[startsSize];
+                for (int i = 0; i < startsSize; ++i)
+                {
+                    dictStarts[i++] = bufferStart + startsBuf.readInt();
+                }
+                contentDecoder = null;
             }
-
-            /*
-             * Issue #498:
-             * We no longer read the orders array (encoded-id to key-index mapping) from files.
-             * Encoded id is exactly the index of the key in the dictionary.
-             */
-
-            contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
         }
         else
         {
