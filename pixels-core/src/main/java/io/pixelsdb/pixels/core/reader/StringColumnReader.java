@@ -174,18 +174,18 @@ public class StringColumnReader extends ColumnReader
             elementIndex = 0;
             isNullBitIndex = 8;
         }
-        if (vector instanceof BinaryColumnVector)
+        // if dictionary encoded
+        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
-            BinaryColumnVector columnVector = (BinaryColumnVector) vector;
-            // if dictionary encoded
-            if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
+            boolean cascadeRLE = false;
+            if (encoding.hasCascadeEncoding() && encoding.getCascadeEncoding().getKind()
+                    .equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
             {
-                boolean cascadeRLE = false;
-                if (encoding.hasCascadeEncoding() && encoding.getCascadeEncoding().getKind()
-                        .equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
-                {
-                    cascadeRLE = true;
-                }
+                cascadeRLE = true;
+            }
+            if (vector instanceof BinaryColumnVector)
+            {
+                BinaryColumnVector columnVector = (BinaryColumnVector) vector;
                 // read original bytes
                 // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
                 byte[] buffer = dictContentBuf.array();
@@ -224,12 +224,17 @@ public class StringColumnReader extends ColumnReader
                     elementIndex++;
                 }
             }
-            // if un-encoded
-            else
+            else if (vector instanceof DictionaryColumnVector)
             {
-                // read values
-                // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
-                byte[] buffer = contentBuf.array();
+                DictionaryColumnVector columnVector = (DictionaryColumnVector) vector;
+                if (columnVector.dictArray == null)
+                {
+                    columnVector.dictArray = dictContentBuf.array();
+                    columnVector.dictOffsets = dictStarts;
+                }
+                checkArgument(columnVector.dictArray == dictContentBuf.array(),
+                        "dictionaries from the column vector and the origins buffer are not consistent");
+
                 for (int i = 0; i < size; i++)
                 {
                     if (elementIndex % pixelStride == 0)
@@ -249,18 +254,12 @@ public class StringColumnReader extends ColumnReader
                     }
                     if (hasNull && isNull[isNullBitIndex] == 1)
                     {
-                        // skip the repeated starts for null values
-                        startsBuf.skipBytes(Integer.BYTES);
                         columnVector.isNull[i + vectorIndex] = true;
                         columnVector.noNulls = false;
                     } else
                     {
-                        currentStart = nextStart;
-                        nextStart = startsBuf.readInt();
-                        int len = nextStart - currentStart;
-                        // use setRef instead of setVal to reduce memory copy.
-                        columnVector.setRef(i + vectorIndex, buffer, bufferOffset, len);
-                        bufferOffset += len;
+                        int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
+                        columnVector.setId(i + vectorIndex, originId);
                     }
                     if (hasNull)
                     {
@@ -269,20 +268,18 @@ public class StringColumnReader extends ColumnReader
                     elementIndex++;
                 }
             }
-        }
-        else if (vector instanceof DictionaryColumnVector)
-        {
-            checkArgument(encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY),
-                    "dictionary column vector can only be used on dictionary encoded column chunks");
-            DictionaryColumnVector columnVector = (DictionaryColumnVector) vector;
-            if (columnVector.dictArray == null)
+            else
             {
-                columnVector.dictArray = dictContentBuf.array();
-                columnVector.dictOffsets = dictStarts;
+                throw new IllegalArgumentException("unsupported column vector type: " + vector.getClass().getName());
             }
-            checkArgument(columnVector.dictArray == dictContentBuf.array(),
-                    "dictionaries from the column vector and the origins buffer are not consistent");
-
+        }
+        // if un-encoded
+        else
+        {
+            BinaryColumnVector columnVector = (BinaryColumnVector) vector;
+            // read values
+            // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
+            byte[] buffer = contentBuf.array();
             for (int i = 0; i < size; i++)
             {
                 if (elementIndex % pixelStride == 0)
@@ -302,12 +299,18 @@ public class StringColumnReader extends ColumnReader
                 }
                 if (hasNull && isNull[isNullBitIndex] == 1)
                 {
+                    // skip the repeated starts for null values
+                    startsBuf.skipBytes(Integer.BYTES);
                     columnVector.isNull[i + vectorIndex] = true;
                     columnVector.noNulls = false;
                 } else
                 {
-                    int originId = (int) contentDecoder.next();
-                    columnVector.setId(i + vectorIndex, originId);
+                    currentStart = nextStart;
+                    nextStart = startsBuf.readInt();
+                    int len = nextStart - currentStart;
+                    // use setRef instead of setVal to reduce memory copy.
+                    columnVector.setRef(i + vectorIndex, buffer, bufferOffset, len);
+                    bufferOffset += len;
                 }
                 if (hasNull)
                 {
@@ -315,10 +318,6 @@ public class StringColumnReader extends ColumnReader
                 }
                 elementIndex++;
             }
-        }
-        else
-        {
-            throw new IllegalArgumentException("unexpected column vector type: " + vector.getClass().getName());
         }
     }
 
