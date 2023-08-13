@@ -359,7 +359,13 @@ public class StringColumnReader extends ColumnReader
 
             // read starts, the last two integers (8 bytes) are the origin offset and starts offset
             int startsBufLength = inputLength - dictStartsOffset - 2 * Integer.BYTES;
-            ByteBuf startsBuf = inputBuffer.slice(dictStartsOffset, startsBufLength).order(byteOrder);
+            inputBuffer.markReaderIndex();
+            inputBuffer.readerIndex(dictStartsOffset);
+            byte[] b = new byte[startsBufLength];
+            inputBuffer.readBytes(b, 0, startsBufLength);
+            ByteBuf startsBuf = Unpooled.wrappedBuffer(b).order(byteOrder);
+            inputBuffer.resetReaderIndex();
+            //ByteBuf startsBuf = inputBuffer.slice(dictStartsOffset, startsBufLength).order(byteOrder);
 
             /*
              * DO NOT use dictContentOffset as bufferStart, as multiple input buffers read from disk (not from pixels cache)
