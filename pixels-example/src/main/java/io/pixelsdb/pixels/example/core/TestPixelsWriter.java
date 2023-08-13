@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
 import io.pixelsdb.pixels.core.vector.*;
 
@@ -64,7 +65,7 @@ public class TestPixelsWriter
                             .setBlockSize(256 * 1024 * 1024)
                             .setReplication((short) 3)
                             .setBlockPadding(true)
-                            .setEncoding(true)
+                            .setEncodingLevel(EncodingLevel.EL2)
                             .setCompressionBlockSize(1)
                             .build();
 

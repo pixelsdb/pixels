@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
@@ -41,9 +42,9 @@ public class BinaryColumnWriter extends BaseColumnWriter
     private final int maxLength;
     private int numTruncated;
 
-    public BinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public BinaryColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
+        super(type, pixelStride, encodingLevel, byteOrder);
         this.maxLength = type.getMaxLength();
         this.numTruncated = 0;
     }

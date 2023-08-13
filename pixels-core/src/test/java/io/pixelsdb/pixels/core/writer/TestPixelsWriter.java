@@ -89,7 +89,7 @@ public class TestPixelsWriter
                             .setBlockSize(TestParams.blockSize)
                             .setReplication(TestParams.blockReplication)
                             .setBlockPadding(TestParams.blockPadding)
-                            .setEncoding(TestParams.encoding)
+                            .setEncodingLevel(TestParams.encodingLevel)
                             .setCompressionBlockSize(TestParams.compressionBlockSize)
                             .build();
 
@@ -193,7 +193,7 @@ public class TestPixelsWriter
                             .setBlockSize(TestParams.blockSize)
                             .setReplication(TestParams.blockReplication)
                             .setBlockPadding(TestParams.blockPadding)
-                            .setEncoding(TestParams.encoding)
+                            .setEncodingLevel(TestParams.encodingLevel)
                             .setCompressionBlockSize(TestParams.compressionBlockSize)
                             .build();
 

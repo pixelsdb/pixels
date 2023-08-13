@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.Dictionary;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.HashTableDictionary;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
@@ -56,20 +57,19 @@ import java.nio.ByteOrder;
  */
 public class StringColumnWriter extends BaseColumnWriter
 {
-    private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
+    /**
+     * current vector holding encoded values of string
+     */
+    private final int[] curPixelVector;
     private final DynamicIntArray startsArray = new DynamicIntArray();  // lengths of each string when un-encoded
     private final Dictionary dictionary = new HashTableDictionary(Constants.INIT_DICT_SIZE);
     private final EncodingUtils encodingUtils;
     private int startOffset = 0; // the start offset for the current string when un-encoded
-    private boolean futureUseDictionaryEncoding;
-    private boolean currentUseDictionaryEncoding;
-    private boolean doneDictionaryEncodingCheck = false;
 
-    public StringColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public StringColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
-        this.futureUseDictionaryEncoding = isEncoding;
-        this.currentUseDictionaryEncoding = isEncoding;
+        super(type, pixelStride, encodingLevel, byteOrder);
+        this.curPixelVector = new int[pixelStride];
         this.encodingUtils = new EncodingUtils();
         encoder = new RunLenIntEncoder(false, true);
     }
@@ -77,7 +77,6 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public int write(ColumnVector vector, int size) throws IOException
     {
-        currentUseDictionaryEncoding = futureUseDictionaryEncoding;
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         byte[][] values = columnVector.vector;
         int[] vLens = columnVector.lens;
@@ -86,7 +85,7 @@ public class StringColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        if (currentUseDictionaryEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
             {
@@ -169,10 +168,27 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        if (currentUseDictionaryEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
-            // for dictionary encoding. run length encode again.
+            // for encoding level 2 or higher, cascade run length encode on dictionary encoding
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
+        }
+        else if (encodingLevel == EncodingLevel.EL1)
+        {
+            if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
+            {
+                for (int i = 0; i < curPixelVectorIndex; ++i)
+                {
+                    encodingUtils.writeIntLE(outputStream, curPixelVector[i]);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < curPixelVectorIndex; ++i)
+                {
+                    encodingUtils.writeIntBE(outputStream, curPixelVector[i]);
+                }
+            }
         }
         // else ignore outputStream
 
@@ -184,13 +200,8 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         // flush out pixels field
         super.flush();
-        // check if continue using dictionary encoding or not in the coming chunks
-        if (!doneDictionaryEncodingCheck)
-        {
-            checkDictionaryEncoding();
-        }
         // flush out other fields
-        if (currentUseDictionaryEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             flushDictionary();
         }
@@ -203,11 +214,18 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (currentUseDictionaryEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
-            return PixelsProto.ColumnEncoding.newBuilder()
+            PixelsProto.ColumnEncoding.Builder builder =
+                    PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY)
                     .setDictionarySize(dictionary.size());
+            if (encodingLevel.ge(EncodingLevel.EL2))
+            {
+                builder.setCascadeEncoding(PixelsProto.ColumnEncoding.newBuilder()
+                        .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH));
+            }
+            return builder;
         }
         return PixelsProto.ColumnEncoding.newBuilder()
                 .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
@@ -250,12 +268,12 @@ public class StringColumnWriter extends BaseColumnWriter
 
     private void flushDictionary() throws IOException
     {
-        int originsFieldOffset;
-        int startsFieldOffset;
+        int dictContentOffset;
+        int dictStartsOffset;
         int size = dictionary.size();
-        long[] starts = new long[size];
+        int[] starts = new int[size + 1];
 
-        originsFieldOffset = outputStream.size();
+        dictContentOffset = outputStream.size();
 
         // recursively visit the red black tree, and fill origins field, get starts array and orders array
         dictionary.visit(new Dictionary.Visitor()
@@ -273,10 +291,31 @@ public class StringColumnWriter extends BaseColumnWriter
             }
         });
 
-        startsFieldOffset = outputStream.size();
+        dictStartsOffset = outputStream.size();
+        starts[size] = dictStartsOffset - dictContentOffset;
 
         // write out run length starts array
-        outputStream.write(encoder.encode(starts));
+        if (encodingLevel.ge(EncodingLevel.EL2))
+        {
+            outputStream.write(encoder.encode(starts));
+        }
+        else
+        {
+            if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
+            {
+                for (int start : starts)
+                {
+                    encodingUtils.writeIntLE(outputStream, start);
+                }
+            }
+            else
+            {
+                for (int start : starts)
+                {
+                    encodingUtils.writeIntBE(outputStream, start);
+                }
+            }
+        }
 
         /*
          * Issue #498:
@@ -286,16 +325,8 @@ public class StringColumnWriter extends BaseColumnWriter
 
         ByteBuffer offsetsBuf = ByteBuffer.allocate(2 * Integer.BYTES);
         offsetsBuf.order(byteOrder);
-        offsetsBuf.putInt(originsFieldOffset);
-        offsetsBuf.putInt(startsFieldOffset);
+        offsetsBuf.putInt(dictContentOffset);
+        offsetsBuf.putInt(dictStartsOffset);
         outputStream.write(offsetsBuf.array());
-    }
-
-    private void checkDictionaryEncoding()
-    {
-        int valueNum = outputStream.size() / Integer.BYTES;
-        float ratio = valueNum > 0 ? (float) dictionary.size() / valueNum : 0.0f;
-        futureUseDictionaryEncoding = ratio <= Constants.DICT_KEY_SIZE_THRESHOLD;
-        doneDictionaryEncodingCheck = true;
     }
 }

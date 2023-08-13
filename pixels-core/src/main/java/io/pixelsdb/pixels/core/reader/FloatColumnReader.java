@@ -87,8 +87,8 @@ public class FloatColumnReader extends ColumnReader
         if (offset == 0)
         {
             this.inputBuffer = input;
-            // using little endian, for that float is encoded into int by little endian
-            this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputIndex = inputBuffer.position();
             isNullOffset = inputIndex + (int) chunkIndex.getIsNullOffset();
             hasNull = true;

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
@@ -39,9 +40,9 @@ public class TimestampColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];
 
-    public TimestampColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public TimestampColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
+        super(type, pixelStride, encodingLevel, byteOrder);
         // Issue #94: time can be negative if it is before 1970-1-1 0:0:0.
         encoder = new RunLenIntEncoder(true, true);
     }
@@ -97,7 +98,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateTimestamp(curPixelVector[i]);
         }
 
-        if (isEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             long[] values = new long[curPixelVectorIndex];
             System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
@@ -121,7 +122,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (isEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);

@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
@@ -36,9 +37,9 @@ public class FloatColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public FloatColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public FloatColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
+        super(type, pixelStride, encodingLevel, byteOrder);
         encodingUtils = new EncodingUtils();
     }
 
@@ -47,6 +48,7 @@ public class FloatColumnWriter extends BaseColumnWriter
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         long[] values = columnVector.vector;
+        boolean littleEndian = this.byteOrder.equals(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < length; i++)
         {
             isNull[curPixelIsNullIndex++] = columnVector.isNull[i];
@@ -59,7 +61,14 @@ public class FloatColumnWriter extends BaseColumnWriter
             else
             {
                 int v = (int) values[i];
-                encodingUtils.writeIntLE(outputStream, v);
+                if (littleEndian)
+                {
+                    encodingUtils.writeIntLE(outputStream, v);
+                }
+                else
+                {
+                    encodingUtils.writeLongBE(outputStream, v);
+                }
                 pixelStatRecorder.updateFloat(Float.intBitsToFloat(v));
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one

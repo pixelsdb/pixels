@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.utils.DateUtil;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
@@ -70,7 +71,7 @@ public class PixelsConsumer extends Consumer
             int[] orderMapping = parameters.getOrderMapping();
             int maxRowNum = parameters.getMaxRowNum();
             String regex = parameters.getRegex();
-            boolean enableEncoding = parameters.isEnableEncoding();
+            EncodingLevel encodingLevel = parameters.getEncodingLevel();
             if (regex.equals("\\s"))
             {
                 regex = " ";
@@ -136,7 +137,7 @@ public class PixelsConsumer extends Consumer
                                     .setBlockSize(blockSize)
                                     .setReplication(replication)
                                     .setBlockPadding(true)
-                                    .setEncoding(enableEncoding)
+                                    .setEncodingLevel(encodingLevel)
                                     .setCompressionBlockSize(1)
                                     .build();
                         }

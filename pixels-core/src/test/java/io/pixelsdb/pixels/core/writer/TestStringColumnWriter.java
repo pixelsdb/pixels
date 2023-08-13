@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import org.junit.Test;
 
@@ -44,7 +45,7 @@ public class TestStringColumnWriter
             stringColumnVector.add(UUID.randomUUID().toString());
         }
         StringColumnWriter stringColumnWriter = new StringColumnWriter(
-                TypeDescription.createString(), 10000, true, ByteOrder.BIG_ENDIAN);
+                TypeDescription.createString(), 10000, EncodingLevel.EL2, ByteOrder.BIG_ENDIAN);
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < 1000; ++i)
         {

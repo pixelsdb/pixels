@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DateColumnVector;
@@ -41,9 +42,9 @@ public class DateColumnWriter extends BaseColumnWriter
 {
     private final int[] curPixelVector = new int[pixelStride];
 
-    public DateColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public DateColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
+        super(type, pixelStride, encodingLevel, byteOrder);
         // Issue #94: Date.getTime() can be negative if the date is before 1970-1-1.
         encoder = new RunLenIntEncoder(true, true);
     }
@@ -99,7 +100,7 @@ public class DateColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateDate(curPixelVector[i]);
         }
 
-        if (isEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             int[] values = new int[curPixelVectorIndex];
             System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
@@ -123,7 +124,7 @@ public class DateColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (isEncoding)
+        if (encodingLevel.ge(EncodingLevel.EL1))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);

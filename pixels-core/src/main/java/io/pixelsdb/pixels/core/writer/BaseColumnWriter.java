@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.writer;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.Encoder;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
@@ -40,7 +41,7 @@ import static java.util.Objects.requireNonNull;
 public abstract class BaseColumnWriter implements ColumnWriter
 {
     final int pixelStride;                     // indicate num of elements in a pixel
-    final boolean isEncoding;                  // indicate if encoding enabled during writing
+    final EncodingLevel encodingLevel;         // indicate the encoding level during writing
     final ByteOrder byteOrder;                 // indicate the endianness used during writing
     final boolean[] isNull;
     private final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
@@ -63,19 +64,17 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final ByteArrayOutputStream outputStream;  // column chunk content
     private final ByteArrayOutputStream isNullStream;  // column chunk isNull
 
-    public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public BaseColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
         this.type = requireNonNull(type, "type is null");
         this.pixelStride = pixelStride;
-        this.isEncoding = isEncoding;
+        this.encodingLevel = encodingLevel;
         this.byteOrder = requireNonNull(byteOrder, "byteOrder is null");
         this.isNull = new boolean[pixelStride];
 
-        this.columnChunkIndex =
-                PixelsProto.ColumnChunkIndex.newBuilder()
-                        .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN));
-        this.columnChunkStat =
-                PixelsProto.ColumnStatistic.newBuilder();
+        this.columnChunkIndex = PixelsProto.ColumnChunkIndex.newBuilder()
+                .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN));
+        this.columnChunkStat = PixelsProto.ColumnStatistic.newBuilder();
         this.pixelStatRecorder = StatsRecorder.create(type);
         this.columnChunkStatRecorder = StatsRecorder.create(type);
 

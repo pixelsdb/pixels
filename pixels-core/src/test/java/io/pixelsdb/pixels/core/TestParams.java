@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.core;
 
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+
 public class TestParams {
     public static String filePath = "";
     public static int rowNum = 10;
@@ -31,7 +33,7 @@ public class TestParams {
 
     public final static short blockReplication = 4;
     public final static boolean blockPadding = true;
-    public final static boolean encoding = true;
+    public final static EncodingLevel encodingLevel = EncodingLevel.EL0;
 
     public final static int compressionBlockSize = 16;
 }

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
@@ -39,49 +40,49 @@ public interface ColumnWriter
     /**
      * Create a column writer according to the data type.
      * @param type the data type.
-     * @param pixelStride
-     * @param isEncoding set true if enable data encoding.
+     * @param pixelStride the pixel stride in the column
+     * @param encodingLevel the encoding level to be applied on the column
      * @return
      */
     static ColumnWriter newColumnWriter(TypeDescription type, int pixelStride,
-                                        boolean isEncoding, ByteOrder byteOrder)
+                                        EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
         switch (type.getCategory())
         {
             case BOOLEAN:
-                return new BooleanColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new BooleanColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case BYTE:
-                return new ByteColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new ByteColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case SHORT:
             case INT:
             case LONG:
-                return new IntegerColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new IntegerColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case FLOAT:
-                return new FloatColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new FloatColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case DOUBLE:
-                return new DoubleColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new DoubleColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case DECIMAL: // Issue #196: precision and scale are passed through type.
                 if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
-                    return new DecimalColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                    return new DecimalColumnWriter(type, pixelStride, encodingLevel, byteOrder);
                 else
-                    return new LongDecimalColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                    return new LongDecimalColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case STRING:
-                return new StringColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new StringColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             // Issue #196: max length of char, varchar, binary, and varbinary, are passed through type.
             case CHAR:
-                return new CharColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new CharColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case VARCHAR:
-                return new VarcharColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new VarcharColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case BINARY:
-                return new BinaryColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new BinaryColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case VARBINARY:
-                return new VarbinaryColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new VarbinaryColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case DATE:
-                return new DateColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new DateColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case TIME:
-                return new TimeColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new TimeColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             case TIMESTAMP:
-                return new TimestampColumnWriter(type, pixelStride, isEncoding, byteOrder);
+                return new TimestampColumnWriter(type, pixelStride, encodingLevel, byteOrder);
             default:
                 throw new IllegalArgumentException("Bad schema type: " + type.getCategory());
         }

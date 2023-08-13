@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongDecimalColumnVector;
@@ -31,16 +32,16 @@ import java.nio.ByteOrder;
  * The column writer of long decimals.
  * <p><b>Note: it supports decimals with max precision and scale 38.</b></p>
  *
- * @date 01.07.2022
+ * @create 2022-07-01
  * @author hank
  */
 public class LongDecimalColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public LongDecimalColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding, ByteOrder byteOrder)
+    public LongDecimalColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
     {
-        super(type, pixelStride, isEncoding, byteOrder);
+        super(type, pixelStride, encodingLevel, byteOrder);
         encodingUtils = new EncodingUtils();
     }
 
@@ -49,6 +50,7 @@ public class LongDecimalColumnWriter extends BaseColumnWriter
     {
         LongDecimalColumnVector columnVector = (LongDecimalColumnVector) vector;
         long[] values = columnVector.vector;
+        boolean littleEndian = this.byteOrder.equals(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < length; i++)
         {
             isNull[curPixelIsNullIndex++] = vector.isNull[i];
@@ -60,8 +62,16 @@ public class LongDecimalColumnWriter extends BaseColumnWriter
             }
             else
             {
-                encodingUtils.writeLongLE(outputStream, values[i*2]);
-                encodingUtils.writeLongLE(outputStream, values[i*2+1]);
+                if (littleEndian)
+                {
+                    encodingUtils.writeLongLE(outputStream, values[i * 2]);
+                    encodingUtils.writeLongLE(outputStream, values[i * 2 + 1]);
+                }
+                else
+                {
+                    encodingUtils.writeLongBE(outputStream, values[i * 2]);
+                    encodingUtils.writeLongBE(outputStream, values[i * 2 + 1]);
+                }
                 pixelStatRecorder.updateInteger128(values[i*2], values[i*2+1], 1);
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
