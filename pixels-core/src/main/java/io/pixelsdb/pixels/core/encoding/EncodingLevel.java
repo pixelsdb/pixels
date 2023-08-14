@@ -66,6 +66,11 @@ public enum EncodingLevel
         return level >= 0 && level <= 2;
     }
 
+    /**
+     * Grater than or equal to.
+     * @param level the other encoding level
+     * @return true if this encoding level is greater than or equal to the other encoding level
+     */
     public boolean ge(int level)
     {
         checkArgument(isValid(level), "leve is invalid");
