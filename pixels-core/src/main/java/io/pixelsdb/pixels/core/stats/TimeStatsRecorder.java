@@ -107,7 +107,7 @@ public class TimeStatsRecorder
     @Override
     public void merge(StatsRecorder other)
     {
-        if (other instanceof TimestampColumnStats)
+        if (other instanceof TimeColumnStats)
         {
             TimeStatsRecorder tStat = (TimeStatsRecorder) other;
             if (tStat.hasMinimum)
