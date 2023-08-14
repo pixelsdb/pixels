@@ -154,9 +154,9 @@ public class DatetimeUtils
     }
 
     /**
-     * Convert a string representation of the time in the current local timezone to the
-     * milliseconds since the start of the day in UTC time.
-     * @param localTime the string representation of local time, in the format of HH:mm:ss[.SSS]
+     * Convert a string representation of the time to the milliseconds since the start of the day.
+     * Timezone is not considered and does not have any effect on the conversion.
+     * @param localTime the string representation of the time, in the format of HH:mm:ss[.SSS]
      * @return the milliseconds in the day
      */
     public static int parseTime(String localTime)
