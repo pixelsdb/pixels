@@ -78,7 +78,7 @@ public class DateColumnVector extends ColumnVector
         super(len);
 
         dates = new int[len];
-        memoryUsage += Integer.BYTES * len;
+        memoryUsage += (long) Integer.BYTES * len;
 
         scratchDate = new Date(0);
     }
@@ -342,7 +342,7 @@ public class DateColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        set(writeIndex++, stringToDay(value));
+        set(writeIndex++, stringDateToDay(value));
     }
 
     /**

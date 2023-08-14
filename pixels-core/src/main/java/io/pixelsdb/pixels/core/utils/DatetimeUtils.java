@@ -22,6 +22,12 @@ package io.pixelsdb.pixels.core.utils;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.util.Locale;
 import java.util.TimeZone;
 
 /**
@@ -45,12 +51,6 @@ public class DatetimeUtils
     public static int microsToFracNanos(long micros)
     {
         return (int) (micros % MICROS_PER_SEC * NANOS_PER_MICROS);
-    }
-
-    public static long timestampToMicros(Timestamp timestamp)
-    {
-        return timestamp.getTime() * MICROS_PER_MILLIS +
-                timestamp.getNanos() % NANOS_PER_MILLIS / NANOS_PER_MICROS;
     }
 
     private static final long[] PRECISION_ROUND_FACTOR_FOR_MICROS = {
@@ -117,7 +117,7 @@ public class DatetimeUtils
      * @param date
      * @return
      */
-    public static int stringToDay (String date)
+    public static int stringDateToDay(String date)
     {
         return (int) LocalDate.parse(date).toEpochDay();
     }
@@ -150,52 +150,52 @@ public class DatetimeUtils
      */
     public static int millisInDay(long millis)
     {
-        return (int)(millis % 86400000);
+        return (int)(millis % 86400000L);
     }
 
     /**
      * Convert a string representation of the time to the milliseconds since the start of the day.
-     * Timezone is not considered and does not have any effect on the conversion.
-     * @param localTime the string representation of the time, in the format of HH:mm:ss[.SSS]
+     * Timezone is not considered and has no effect on the conversion.
+     * @param time the string representation of the time, in the format of HH:mm:ss[.S*]
      * @return the milliseconds in the day
      */
-    public static int parseTime(String localTime)
+    public static int stringTimeToMillis(String time)
     {
-        int hour;
-        int minute;
-        int second;
-        int millis;
-        int firstColon;
-        int secondColon;
-        int decimalPoint;
+        return (int) (LocalTime.parse(time).toNanoOfDay() / NANOS_PER_MILLIS);
+    }
 
-        if (localTime == null)
-        {
-            throw new IllegalArgumentException("the input string is null");
-        }
+    public static final DateTimeFormatter SQL_LOCAL_DATE_TIME;
+    static
+    {
+        SQL_LOCAL_DATE_TIME = new DateTimeFormatterBuilder()
+                .parseCaseInsensitive()
+                .append(DateTimeFormatter.ISO_LOCAL_DATE)
+                .appendLiteral(' ')
+                .append(DateTimeFormatter.ISO_LOCAL_TIME)
+                .toFormatter(Locale.ENGLISH);
+    }
 
-        firstColon = localTime.indexOf(':');
-        secondColon = localTime.indexOf(':', firstColon+1);
-        decimalPoint = localTime.indexOf('.', secondColon + 1);
-        if ((firstColon > 0) && (secondColon > 0) && (secondColon < localTime.length()-1))
-        {
-            hour = Integer.parseInt(localTime.substring(0, firstColon));
-            minute = Integer.parseInt(localTime.substring(firstColon+1, secondColon));
+    /**
+     * Convert a string representation of the timestamp to the microseconds since the epoch
+     * (1970-01-01 00:00:00 UTC). Timezone is not considered and has no effect on the conversion.
+     * @param timestamp string representation of the timestamp, in the format of yyy-MM-dd HH:mm:ss[.S*]
+     * @return the microseconds since the epoch
+     */
+    public static long stringTimestampToMicros(String timestamp)
+    {
+        LocalDateTime dateTime = LocalDateTime.parse(timestamp, SQL_LOCAL_DATE_TIME);
+        return dateTime.toEpochSecond(ZoneOffset.UTC) * MICROS_PER_SEC + dateTime.getNano() / NANOS_PER_MICROS;
+    }
 
-            if (decimalPoint > 0 && decimalPoint < localTime.length()-1)
-            {
-                second = Integer.parseInt(localTime.substring(secondColon+1, decimalPoint));
-                millis = Integer.parseInt(localTime.substring(decimalPoint+1));
-            }
-            else
-            {
-                second = Integer.parseInt(localTime.substring(secondColon+1));
-                millis = 0;
-            }
-        } else {
-            throw new java.lang.IllegalArgumentException();
-        }
-
-        return hour * 3600000 + minute * 60000 + second * 1000 + millis;
+    /**
+     * Convert {@link java.sql.Timestamp} to microseconds since the epoch (1970-01-01 00:00:00 UTC).
+     * Be careful of the timezone used in the timestamp.
+     * @param timestamp the timestamp
+     * @return the microseconds since the epoch
+     */
+    public static long timestampToMicros(Timestamp timestamp)
+    {
+        return timestamp.getTime() * MICROS_PER_MILLIS +
+                timestamp.getNanos() % NANOS_PER_MILLIS / NANOS_PER_MICROS;
     }
 }

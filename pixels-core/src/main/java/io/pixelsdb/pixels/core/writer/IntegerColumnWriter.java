@@ -97,15 +97,13 @@ public class IntegerColumnWriter extends BaseColumnWriter
     @Override
     void newPixel() throws IOException
     {
-        // update stats
-        for (int i = 0; i < curPixelVectorIndex; i++)
-        {
-            pixelStatRecorder.updateInteger(curPixelVector[i], 1);
-        }
-
         // write out current pixel vector
         if (encodingLevel.ge(EncodingLevel.EL1))
         {
+            for (int i = 0; i < curPixelVectorIndex; i++)
+            {
+                pixelStatRecorder.updateInteger(curPixelVector[i], 1);
+            }
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
         else
@@ -118,6 +116,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
+                    pixelStatRecorder.updateInteger(curPixelVector[i], 1);
                 }
             }
             else
@@ -127,6 +126,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);
+                    pixelStatRecorder.updateInteger(curPixelVector[i], 1);
                 }
             }
             outputStream.write(curVecPartitionBuffer.array());

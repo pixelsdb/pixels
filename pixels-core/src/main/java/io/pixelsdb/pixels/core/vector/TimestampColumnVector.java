@@ -381,7 +381,7 @@ public class TimestampColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        set(writeIndex++, Timestamp.valueOf(value));
+        set(writeIndex++, stringTimestampToMicros(value));
     }
 
     /**

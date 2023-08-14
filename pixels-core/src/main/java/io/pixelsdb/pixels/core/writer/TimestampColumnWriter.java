@@ -93,13 +93,12 @@ public class TimestampColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        for (int i = 0; i < curPixelVectorIndex; i++)
-        {
-            pixelStatRecorder.updateTimestamp(curPixelVector[i]);
-        }
-
         if (encodingLevel.ge(EncodingLevel.EL1))
         {
+            for (int i = 0; i < curPixelVectorIndex; i++)
+            {
+                pixelStatRecorder.updateTimestamp(curPixelVector[i]);
+            }
             long[] values = new long[curPixelVectorIndex];
             System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
             outputStream.write(encoder.encode(values));
@@ -112,6 +111,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 curVecPartitionBuffer.putLong(curPixelVector[i]);
+                pixelStatRecorder.updateTimestamp(curPixelVector[i]);
             }
             outputStream.write(curVecPartitionBuffer.array());
         }
