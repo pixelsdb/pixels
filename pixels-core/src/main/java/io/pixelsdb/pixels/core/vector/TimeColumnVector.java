@@ -26,6 +26,7 @@ import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisInDay;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.parseTime;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -415,7 +416,7 @@ public class TimeColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        set(writeIndex++, Time.valueOf(value));
+        set(writeIndex++, parseTime(value));
     }
 
     /**

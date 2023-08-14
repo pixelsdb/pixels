@@ -22,7 +22,10 @@ package io.pixelsdb.pixels.core.utils;
 import org.junit.Test;
 
 import java.sql.Date;
+import java.sql.Time;
 import java.util.TimeZone;
+
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.parseTime;
 
 /**
  * @author hank
@@ -30,6 +33,14 @@ import java.util.TimeZone;
  */
 public class TestDateTimeUtils
 {
+    @Test
+    public void testTimeFormat()
+    {
+        Time time = parseTime("15:36:59.123");
+        System.out.println(time);
+        System.out.println(time.getTime());
+    }
+
     @Test
     public void testGetDaysSinceEpoch()
     {

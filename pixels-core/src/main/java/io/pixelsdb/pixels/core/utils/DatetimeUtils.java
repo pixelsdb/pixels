@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.utils;
 
 import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.TimeZone;
@@ -151,5 +152,45 @@ public class DatetimeUtils
     public static int millisInDay(long millis)
     {
         return (int)(millis % 86400000);
+    }
+
+    public static Time parseTime(String s)
+    {
+        long hour;
+        long minute;
+        long second;
+        long millis;
+        int firstColon;
+        int secondColon;
+        int decimalPoint;
+
+        if (s == null)
+        {
+            throw new IllegalArgumentException("the input string is null");
+        }
+
+        firstColon = s.indexOf(':');
+        secondColon = s.indexOf(':', firstColon+1);
+        decimalPoint = s.indexOf('.', secondColon + 1);
+        if ((firstColon > 0) && (secondColon > 0) && (secondColon < s.length()-1))
+        {
+            hour = Integer.parseInt(s.substring(0, firstColon));
+            minute = Integer.parseInt(s.substring(firstColon+1, secondColon));
+
+            if (decimalPoint > 0 && decimalPoint < s.length()-1)
+            {
+                second = Integer.parseInt(s.substring(secondColon+1, decimalPoint));
+                millis = Integer.parseInt(s.substring(decimalPoint+1));
+            }
+            else
+            {
+                second = Integer.parseInt(s.substring(secondColon+1));
+                millis = 0;
+            }
+        } else {
+            throw new java.lang.IllegalArgumentException();
+        }
+
+        return new Time(hour * 3600000L + minute * 60000L + second * 1000L + millis + TIMEZONE_OFFSET);
     }
 }
