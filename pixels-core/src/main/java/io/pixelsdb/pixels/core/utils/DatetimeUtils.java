@@ -196,6 +196,6 @@ public class DatetimeUtils
             throw new java.lang.IllegalArgumentException();
         }
 
-        return (int) ((hour * 3600000L + minute * 60000L + second * 1000L + millis - TIMEZONE_OFFSET) % 86400000);
+        return hour * 3600000 + minute * 60000 + second * 1000 + millis;
     }
 }
