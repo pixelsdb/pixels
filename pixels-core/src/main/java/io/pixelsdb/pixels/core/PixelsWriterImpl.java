@@ -88,12 +88,10 @@ public class PixelsWriterImpl implements PixelsWriter
     }
 
     private final TypeDescription schema;
-    private final int pixelStride;
     private final int rowGroupSize;
     private final CompressionKind compressionKind;
     private final int compressionBlockSize;
     private final TimeZone timeZone;
-    private final EncodingLevel encodingLevel;
     /**
      * The writer option for the column writers.
      */
@@ -142,19 +140,18 @@ public class PixelsWriterImpl implements PixelsWriter
             TimeZone timeZone,
             PhysicalWriter physicalWriter,
             EncodingLevel encodingLevel,
+            boolean nullsPadding,
             boolean partitioned,
             Optional<List<Integer>> partKeyColumnIds)
     {
         this.schema = requireNonNull(schema, "schema is null");
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
-        this.pixelStride = pixelStride;
         checkArgument(rowGroupSize > 0, "row group size is not positive");
         this.rowGroupSize = rowGroupSize;
         this.compressionKind = requireNonNull(compressionKind, "compressionKind is null");
         checkArgument(compressionBlockSize > 0, "compression block size is not positive");
         this.compressionBlockSize = compressionBlockSize;
         this.timeZone = requireNonNull(timeZone);
-        this.encodingLevel = encodingLevel;
         this.partitioned = partitioned;
         this.partKeyColumnIds = requireNonNull(partKeyColumnIds, "partKeyColumnIds is null");
         this.chunkAlignment = Integer.parseInt(ConfigFactory.Instance().getProperty("column.chunk.alignment"));
@@ -165,7 +162,10 @@ public class PixelsWriterImpl implements PixelsWriter
         this.columnWriters = new ColumnWriter[children.size()];
         this.fileColStatRecorders = new StatsRecorder[children.size()];
         this.columnWriterOption = new PixelsWriterOption()
-                .pixelStride(pixelStride).encodingLevel(encodingLevel).byteOrder(WRITER_ENDIAN);
+                .pixelStride(pixelStride)
+                .encodingLevel(requireNonNull(encodingLevel, "encodingLevel is null"))
+                .byteOrder(WRITER_ENDIAN)
+                .nullsPadding(nullsPadding);
         for (int i = 0; i < children.size(); ++i)
         {
             columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
@@ -194,6 +194,7 @@ public class PixelsWriterImpl implements PixelsWriter
         private boolean builderBlockPadding = true;
         private boolean builderOverwrite = false;
         private boolean builderPartitioned = false;
+        private boolean builderNullsPadding = false;
         private Optional<List<Integer>> builderPartKeyColumnIds = Optional.empty();
 
         private Builder()
@@ -274,6 +275,12 @@ public class PixelsWriterImpl implements PixelsWriter
             return this;
         }
 
+        public Builder setNullsPadding(boolean nullsPadding)
+        {
+            this.builderNullsPadding = nullsPadding;
+            return this;
+        }
+
         public Builder setEncodingLevel(EncodingLevel encodingLevel)
         {
             this.builderEncodingLevel = encodingLevel;
@@ -308,7 +315,6 @@ public class PixelsWriterImpl implements PixelsWriter
             PhysicalWriter fsWriter = null;
             try
             {
-
                 fsWriter = PhysicalWriterUtil.newPhysicalWriter(
                         this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
                         this.builderBlockPadding, this.builderOverwrite);
@@ -335,6 +341,7 @@ public class PixelsWriterImpl implements PixelsWriter
                     builderTimeZone,
                     fsWriter,
                     builderEncodingLevel,
+                    builderNullsPadding,
                     builderPartitioned,
                     builderPartKeyColumnIds);
         }
@@ -374,7 +381,7 @@ public class PixelsWriterImpl implements PixelsWriter
 
     public int getPixelStride()
     {
-        return pixelStride;
+        return columnWriterOption.getPixelStride();
     }
 
     public int getRowGroupSize()
@@ -399,7 +406,7 @@ public class PixelsWriterImpl implements PixelsWriter
 
     public EncodingLevel getEncodingLevel()
     {
-        return encodingLevel;
+        return columnWriterOption.getEncodingLevel();
     }
 
     public boolean isPartitioned()
@@ -697,7 +704,7 @@ public class PixelsWriterImpl implements PixelsWriter
                 .setNumberOfRows(fileRowNum)
                 .setCompression(compressionKind)
                 .setCompressionBlockSize(compressionBlockSize)
-                .setPixelStride(pixelStride)
+                .setPixelStride(columnWriterOption.getPixelStride())
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(partitioned)
                 .setColumnChunkAlignment(chunkAlignment)

@@ -38,7 +38,7 @@ public class PixelsWriterOption
     /**
      * Whether nulls positions in column are padded by arbitrary values and occupy storage and memory space.
      */
-    private boolean nullsPadded;
+    private boolean nullsPadding;
 
     public PixelsWriterOption() { }
 
@@ -75,14 +75,14 @@ public class PixelsWriterOption
         return this;
     }
 
-    public boolean isNullsPadded()
+    public boolean isNullsPadding()
     {
-        return nullsPadded;
+        return nullsPadding;
     }
 
-    public PixelsWriterOption nullsPadded(boolean nullsPadded)
+    public PixelsWriterOption nullsPadding(boolean nullsPadding)
     {
-        this.nullsPadded = nullsPadded;
+        this.nullsPadding = nullsPadding;
         return this;
     }
 }

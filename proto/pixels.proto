@@ -236,7 +236,7 @@ message ColumnChunkIndex {
     // whether this column chunk is stored in little endian
     optional bool littleEndian = 6;
     // whether the null positions are padded with arbitrary value, only valid non-encoded column chunks
-    optional bool nullsPadded = 7;
+    optional bool nullsPadding = 7;
 }
 
 message RowGroupIndex {
