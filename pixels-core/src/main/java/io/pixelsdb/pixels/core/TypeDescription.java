@@ -46,40 +46,44 @@ public final class TypeDescription
      * Issue #196: support short decimal of which the max precision is 18.
      * Issue #203: support long decimal of which the max precision is 38.
      */
-    public static final int SHORT_DECIMAL_MAX_PRECISION = 18;
-    public static final int LONG_DECIMAL_MAX_PRECISION = 38;
+    public static final int MAX_SHORT_DECIMAL_PRECISION = 18;
+    public static final int MAX_LONG_DECIMAL_PRECISION = 38;
     /**
      * In SQL standard, the max scale of decimal is 38.
      * Issue #196: support short decimal of which the max scale is 18.
      * Issue #203: support long decimal of which the max scale is 38.
      */
-    public static final int SHORT_DECIMAL_MAX_SCALE = 18;
-    public static final int LONG_DECIMAL_MAX_SCALE = 38;
+    public static final int MAX_SHORT_DECIMAL_SCALE = 18;
+    public static final int MAX_LONG_DECIMAL_SCALE = 38;
     /**
      * In SQL standard, the default precision of decimal is 38.
      * Issue #196: support short decimal of which the default precision is 18.
      * Issue #203: support long decimal of which the default precision is 38.
      */
-    public static final int SHORT_DECIMAL_DEFAULT_PRECISION = 18;
-    public static final int LONG_DECIMAL_DEFAULT_PRECISION = 38;
+    public static final int DEFAULT_SHORT_DECIMAL_PRECISION = 18;
+    public static final int DEFAULT_LONG_DECIMAL_PRECISION = 38;
     /**
-     * It is a standard that the default scale of decimal is 0.
+     * In SQL standard, the default scale of decimal is 0.
      */
-    public static final int SHORT_DECIMAL_DEFAULT_SCALE = 0;
-    public static final int LONG_DECIMAL_DEFAULT_SCALE = 0;
+    public static final int DEFAULT_DECIMAL_SCALE = 0;
     /**
      * The default length of varchar, binary, and varbinary.
      */
-    public static final int DEFAULT_LENGTH = 65535;
+    public static final int DEFAULT_VARCHAR_OR_BINARY_LENGTH = 65535;
     /**
      * It is a standard that the default length of char is 1.
      */
     public static final int DEFAULT_CHAR_LENGTH = 1;
     /**
-     * In SQL standard, the default precision of timestamp is 6 (i.e., microseconds),
-     * however, in Pixels, we use default precision 3 to be compatible with Trino.
+     * In SQL standard, the default precision of timestamp is 6 (i.e., microseconds), however,
+     * in Pixels, we use the default precision 3 (i.e., milliseconds), which is consistent with Trino.
      */
     public static final int DEFAULT_TIMESTAMP_PRECISION = 3;
+    /**
+     * In SQL standard, the default precision of time is 6 (i.e., microseconds), however,
+     * in Pixels, we use the default precision 3 (i.e., milliseconds), which is consistent with Trino.
+     */
+    public static final int DEFAULT_TIME_PRECISION = 3;
     /**
      * 9 = nanosecond, 6 = microsecond, 3 = millisecond, 0 = second.
      * <p>Although 64-bit long is enough to encode the nanoseconds for now, it is
@@ -88,6 +92,12 @@ public final class TypeDescription
      * Therefore, we also set the max precision of long encoded timestamp to 6 in Pixels.</p>
      */
     public static final int MAX_TIMESTAMP_PRECISION = 6;
+    /**
+     * 9 = nanosecond, 6 = microsecond, 3 = millisecond, 0 = second.
+     * <p>In Pixels, we use 32-bit integer to store time, thus we can support time precision up to 4.
+     * For simplicity and compatibility to {@link java.sql.Time}, we further limit the precision to 3.</p>
+     */
+    public static final int MAX_TIME_PRECISION = 3;
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
 
     @Override
@@ -114,6 +124,7 @@ public final class TypeDescription
                     case VARCHAR:
                         result = maxLength - other.maxLength;
                         break;
+                    case TIME:
                     case TIMESTAMP:
                         result = precision - other.precision;
                         break;
@@ -263,12 +274,9 @@ public final class TypeDescription
 
     public static TypeDescription createDecimal(int precision, int scale)
     {
-        checkArgument(precision >= scale && scale >= 0 &&
-                        precision > 0 && precision <= LONG_DECIMAL_MAX_PRECISION,
-                "invalid precision and scale (" + precision + "," + scale + ")");
         TypeDescription type = new TypeDescription(Category.DECIMAL);
-        type.precision = precision;
-        type.scale = scale;
+        type.withPrecision(precision);
+        type.withScale(scale);
         return type;
     }
 
@@ -282,34 +290,47 @@ public final class TypeDescription
         return new TypeDescription(Category.DATE);
     }
 
-    public static TypeDescription createTime()
+    public static TypeDescription createTime(int precision)
     {
-        return new TypeDescription(Category.TIME);
+        TypeDescription type = new TypeDescription(Category.TIME);
+        type.withPrecision(precision);
+        return type;
+
     }
 
-    public static TypeDescription createTimestamp()
+    public static TypeDescription createTimestamp(int precision)
     {
-        return new TypeDescription(Category.TIMESTAMP);
+        TypeDescription type = new TypeDescription(Category.TIMESTAMP);
+        type.withPrecision(precision);
+        return type;
     }
 
-    public static TypeDescription createVarbinary()
+    public static TypeDescription createVarbinary(int maxLength)
     {
-        return new TypeDescription(Category.VARBINARY);
+        TypeDescription type = new TypeDescription(Category.VARBINARY);
+        type.withMaxLength(maxLength);
+        return type;
     }
 
-    public static TypeDescription createBinary()
+    public static TypeDescription createBinary(int maxLength)
     {
-        return new TypeDescription(Category.BINARY);
+        TypeDescription type = new TypeDescription(Category.BINARY);
+        type.withMaxLength(maxLength);
+        return type;
     }
 
-    public static TypeDescription createVarchar()
+    public static TypeDescription createVarchar(int maxLength)
     {
-        return new TypeDescription(Category.VARCHAR);
+        TypeDescription type = new TypeDescription(Category.VARCHAR);
+        type.withMaxLength(maxLength);
+        return type;
     }
 
-    public static TypeDescription createChar()
+    public static TypeDescription createChar(int maxLength)
     {
-        return new TypeDescription(Category.CHAR);
+        TypeDescription type = new TypeDescription(Category.CHAR);
+        type.withMaxLength(maxLength);
+        return type;
     }
 
     public static TypeDescription createStruct()
@@ -352,12 +373,12 @@ public final class TypeDescription
                             type.getPrecision(), type.getScale());
                     break;
                 case VARCHAR:
-                    fieldType = TypeDescription.createVarchar();
-                    fieldType.maxLength = type.getMaximumLength();
+                    fieldType = TypeDescription.createVarchar(
+                            type.getMaximumLength());
                     break;
                 case CHAR:
-                    fieldType = TypeDescription.createChar();
-                    fieldType.maxLength = type.getMaximumLength();
+                    fieldType = TypeDescription.createChar(
+                            type.getMaximumLength());
                     break;
                 case STRING:
                     fieldType = TypeDescription.createString();
@@ -366,19 +387,20 @@ public final class TypeDescription
                     fieldType = TypeDescription.createDate();
                     break;
                 case TIME:
-                    fieldType = TypeDescription.createTime();
+                    fieldType = TypeDescription.createTime(
+                            type.getPrecision());
                     break;
                 case TIMESTAMP:
-                    fieldType = TypeDescription.createTimestamp();
-                    fieldType.precision = type.getPrecision();
+                    fieldType = TypeDescription.createTimestamp(
+                            type.getPrecision());
                     break;
                 case VARBINARY:
-                    fieldType = TypeDescription.createVarbinary();
-                    fieldType.maxLength = type.getMaximumLength();
+                    fieldType = TypeDescription.createVarbinary(
+                            type.getMaximumLength());
                     break;
                 case BINARY:
-                    fieldType = TypeDescription.createBinary();
-                    fieldType.maxLength = type.getMaximumLength();
+                    fieldType = TypeDescription.createBinary(
+                            type.getMaximumLength());
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown type: " +
@@ -590,7 +612,6 @@ public final class TypeDescription
             case BOOLEAN:
             case BYTE:
             case DATE:
-            case TIME:
             case DOUBLE:
             case FLOAT:
             case INT:
@@ -598,10 +619,21 @@ public final class TypeDescription
             case SHORT:
             case STRING:
                 break;
+            case TIME:
+                if (consumeChar(source, '('))
+                {
+                    // with precision specified
+                    result.withPrecision(parseInt(source));
+                    requireChar(source, ')');
+                }
+                else
+                {
+                    result.withPrecision(DEFAULT_TIME_PRECISION);
+                }
             case TIMESTAMP:
                 if (consumeChar(source, '('))
                 {
-                    // with precision specified.
+                    // with precision specified
                     result.withPrecision(parseInt(source));
                     requireChar(source, ')');
                 }
@@ -616,25 +648,25 @@ public final class TypeDescription
             case VARCHAR:
                 if (consumeChar(source, '('))
                 {
-                    // with length specified.
+                    // with length specified
                     result.withMaxLength(parseInt(source));
                     requireChar(source, ')');
                 }
                 else if (result.getCategory() == Category.CHAR)
                 {
-                    // It is a standard that the default length of char is 1.
+                    // default char length of 1 is from SQL standard
                     result.withMaxLength(DEFAULT_CHAR_LENGTH);
                 }
                 else
                 {
-                    result.withMaxLength(DEFAULT_LENGTH);
+                    result.withMaxLength(DEFAULT_VARCHAR_OR_BINARY_LENGTH);
                 }
                 break;
             case DECIMAL:
                 if (consumeChar(source, '('))
                 {
                     int precision = parseInt(source);
-                    // It is a standard that scale is 0 by default.
+                    // default scale of 0 is from SQL standard
                     int scale = 0;
                     if (consumeChar(source, ','))
                     {
@@ -648,7 +680,13 @@ public final class TypeDescription
                     }
                     result.withPrecision(precision);
                     result.withScale(scale);
-                } // precision is 38 by default, while scale is 0 by default.
+                }
+                else
+                {
+                    // precision is 38 by default, while scale is 0 by default
+                    result.withPrecision(DEFAULT_LONG_DECIMAL_PRECISION);
+                    result.withScale(DEFAULT_DECIMAL_SCALE);
+                }
                 break;
             case STRUCT:
                 parseStruct(result, source);
@@ -777,6 +815,7 @@ public final class TypeDescription
                     break;
                 case TIME:
                     tmpType.setKind(PixelsProto.Type.Kind.TIME);
+                    tmpType.setPrecision(child.getPrecision());
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown category: " +
@@ -794,19 +833,38 @@ public final class TypeDescription
      */
     public TypeDescription withPrecision(int precision)
     {
-        if (precision < 1)
+        if (category == Category.DECIMAL)
         {
-            throw new IllegalArgumentException("precision " + precision + " is negative");
+            if (precision < 1 || precision > MAX_LONG_DECIMAL_PRECISION)
+            {
+                throw new IllegalArgumentException("precision " + precision +
+                        " is out of the valid range 1 .. " + MAX_LONG_DECIMAL_PRECISION);
+            } else if (scale > precision)
+            {
+                throw new IllegalArgumentException("precision " + precision +
+                        " is smaller that scale " + scale);
+            }
         }
-        else if (category == Category.DECIMAL && precision > LONG_DECIMAL_MAX_PRECISION)
+        else if (category == Category.TIMESTAMP)
         {
-            throw new IllegalArgumentException("precision " + precision +
-                    " is out of the max precision " + LONG_DECIMAL_MAX_PRECISION);
+            if (precision < 0 || precision > MAX_TIMESTAMP_PRECISION)
+            {
+                throw new IllegalArgumentException("precision " + precision +
+                        " is out of the valid range 0 .. " + MAX_TIMESTAMP_PRECISION);
+            }
         }
-        else if (scale > precision)
+        else if (category == Category.TIME)
         {
-            throw new IllegalArgumentException("precision " + precision +
-                    " is smaller that scale " + scale);
+            if (precision < 0 || precision > MAX_TIME_PRECISION)
+            {
+                throw new IllegalArgumentException("precision " + precision +
+                        " is out of the valid range 0 .. " + MAX_TIME_PRECISION);
+            }
+        }
+        else
+        {
+            throw new IllegalArgumentException("precision is only valid on decimal" +
+                    ", time, and timestamp, but not " + category.primaryName);
         }
         this.precision = precision;
         return this;
@@ -820,19 +878,22 @@ public final class TypeDescription
      */
     public TypeDescription withScale(int scale)
     {
-        if (scale < 0)
+        if (category == Category.DECIMAL)
         {
-            throw new IllegalArgumentException("scale " + scale + " is negative");
+            if (scale < 0 || scale > MAX_LONG_DECIMAL_SCALE)
+            {
+                throw new IllegalArgumentException("scale " + scale +
+                        " is out of the valid range 0 .. " + MAX_LONG_DECIMAL_SCALE);
+            } else if (scale > precision)
+            {
+                throw new IllegalArgumentException("scale " + scale +
+                        " is out of the valid range 0 .. " + precision);
+            }
         }
-        else if (category == Category.DECIMAL && scale > LONG_DECIMAL_MAX_SCALE)
+        else
         {
-            throw new IllegalArgumentException("scale " + scale +
-                    " is out of the max scale " + LONG_DECIMAL_MAX_SCALE);
-        }
-        else if (scale > precision)
-        {
-            throw new IllegalArgumentException("scale " + scale +
-                    " is out of range 0 .. " + precision);
+            throw new IllegalArgumentException("scale is only valid on decimal" +
+                    ", but not " + category.primaryName);
         }
         this.scale = scale;
         return this;
@@ -852,6 +913,10 @@ public final class TypeDescription
             throw new IllegalArgumentException("maxLength is only allowed on char" +
                     ", varchar, binary, and varbinary, but not " + category.primaryName);
         }
+        if (maxLength < 1)
+        {
+            throw new IllegalArgumentException("maxLength " + maxLength + " is not positive");
+        }
         this.maxLength = maxLength;
         return this;
     }
@@ -870,22 +935,22 @@ public final class TypeDescription
             throw new IllegalArgumentException("Can only add fields to struct type" +
                     " but not " + category);
         }
-        fieldNames.add(field);
-        children.add(fieldType);
+        fieldNames.add(requireNonNull(field, "filed is null"));
+        children.add(requireNonNull(fieldType, "filedType is null"));
         fieldType.parent = this;
         return this;
     }
 
     /**
      * Get the id for this type.
-     * The first call will cause all of the the ids in tree to be assigned, so
+     * The first call will cause all the ids in tree to be assigned, so
      * it should not be called before the type is completely built.
      *
      * @return the sequential id
      */
     public int getId()
     {
-        // if the id hasn't been assigned, assign all of the ids from the root
+        // if the id hasn't been assigned, assign all the ids from the root
         if (id == -1)
         {
             TypeDescription root = this;
@@ -912,7 +977,7 @@ public final class TypeDescription
         {
             for (TypeDescription child : children)
             {
-                TypeDescription clone = child.clone();
+                TypeDescription clone = requireNonNull(child.clone(), "failed to clone child");
                 clone.parent = result;
                 result.children.add(clone);
             }
@@ -923,7 +988,7 @@ public final class TypeDescription
     @Override
     public int hashCode()
     {
-        long result = category.ordinal() * 4241 + maxLength + precision * 13 + scale;
+        long result = category.ordinal() * 4241L + maxLength + precision * 13L + scale;
         if (children != null)
         {
             for (TypeDescription child : children)
@@ -937,7 +1002,7 @@ public final class TypeDescription
     @Override
     public boolean equals(Object other)
     {
-        if (other == null || !(other instanceof TypeDescription))
+        if (!(other instanceof TypeDescription))
         {
             return false;
         }
@@ -982,14 +1047,14 @@ public final class TypeDescription
 
     /**
      * Get the maximum id assigned to this type or its children.
-     * The first call will cause all of the the ids in tree to be assigned, so
+     * The first call will cause all the ids in tree to be assigned, so
      * it should not be called before the type is completely built.
      *
      * @return the maximum id assigned under this type
      */
     public int getMaximumId()
     {
-        // if the id hasn't been assigned, assign all of the ids from the root
+        // if the id hasn't been assigned, assign all the ids from the root
         if (maxId == -1)
         {
             TypeDescription root = this;
@@ -1018,14 +1083,14 @@ public final class TypeDescription
             case DATE:
                 return new DateColumnVector(maxSize);
             case TIME:
-                return new TimeColumnVector(maxSize);
+                return new TimeColumnVector(maxSize, precision);
             case TIMESTAMP:
                 return new TimestampColumnVector(maxSize, precision);
             case FLOAT:
             case DOUBLE:
                 return new DoubleColumnVector(maxSize);
             case DECIMAL:
-                if (precision <= SHORT_DECIMAL_MAX_PRECISION)
+                if (precision <= MAX_SHORT_DECIMAL_PRECISION)
                     return new DecimalColumnVector(maxSize, precision, scale);
                 else
                     return new LongDecimalColumnVector(maxSize, precision, scale);
@@ -1146,7 +1211,7 @@ public final class TypeDescription
      */
     public List<String> getFieldNames()
     {
-        return Collections.unmodifiableList(fieldNames);
+        return Collections.unmodifiableList(requireNonNull(fieldNames, "filedNames is null"));
     }
 
     /**
@@ -1160,7 +1225,7 @@ public final class TypeDescription
     }
 
     /**
-     * Assign ids to all of the nodes under this one.
+     * Assign ids to all the nodes under this one.
      *
      * @param startId the lowest id to assign
      * @return the next available id
@@ -1206,9 +1271,9 @@ public final class TypeDescription
     private final Category category;
     private final List<TypeDescription> children;
     private final List<String> fieldNames;
-    private int maxLength = DEFAULT_LENGTH;
-    private int precision = SHORT_DECIMAL_DEFAULT_PRECISION;
-    private int scale = SHORT_DECIMAL_DEFAULT_SCALE;
+    private int maxLength = DEFAULT_VARCHAR_OR_BINARY_LENGTH;
+    private int precision = DEFAULT_SHORT_DECIMAL_PRECISION;
+    private int scale = DEFAULT_DECIMAL_SCALE;
 
     static void printFieldName(StringBuilder buffer, String name)
     {
@@ -1244,6 +1309,7 @@ public final class TypeDescription
                 buffer.append(scale);
                 buffer.append(')');
                 break;
+            case TIME:
             case TIMESTAMP:
                 buffer.append('(');
                 buffer.append(precision);
@@ -1304,6 +1370,7 @@ public final class TypeDescription
                 buffer.append(", \"scale\": ");
                 buffer.append(scale);
                 break;
+            case TIME:
             case TIMESTAMP:
                 buffer.append(", \"precision\": ");
                 buffer.append(precision);

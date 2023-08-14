@@ -27,7 +27,7 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.MAX_SHORT_DECIMAL_PRECISION;
 
 /**
  * This is a base class for recording (updating) all kinds of column statistics during file writing.
@@ -211,7 +211,7 @@ public class StatsRecorder
                  * needed in other places, integer statistics can be converted to double
                  * using the precision and scale from the type in the file footer.
                  */
-                if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
+                if (type.getPrecision() <= MAX_SHORT_DECIMAL_PRECISION)
                     return new IntegerStatsRecorder();
                 else
                     return new Integer128StatsRecorder();
@@ -255,7 +255,7 @@ public class StatsRecorder
                  * needed in other places, integer statistics can be converted to double
                  * using the precision and scale from the type in the file footer.
                  */
-                if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
+                if (type.getPrecision() <= MAX_SHORT_DECIMAL_PRECISION)
                     return new IntegerStatsRecorder(statistic);
                 else
                     return new Integer128StatsRecorder(statistic);
@@ -341,7 +341,7 @@ public class StatsRecorder
             case LONG:
                 return GeneralRangeStats.fromStatsRecorder(type, (IntegerStatsRecorder) rangeStats);
             case DECIMAL:
-                if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
+                if (type.getPrecision() <= MAX_SHORT_DECIMAL_PRECISION)
                     return GeneralRangeStats.fromStatsRecorder(type, (IntegerStatsRecorder) rangeStats);
                 else
                     return GeneralRangeStats.fromStatsRecorder(type, (Integer128StatsRecorder) rangeStats);

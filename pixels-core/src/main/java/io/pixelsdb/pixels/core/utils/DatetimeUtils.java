@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.utils;
 
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.TimeZone;
 
@@ -30,6 +31,45 @@ import java.util.TimeZone;
 public class DatetimeUtils
 {
     private static long TIMEZONE_OFFSET = TimeZone.getDefault().getRawOffset();
+
+    private static final long MICROS_PER_MILLIS = 1000L;
+    private static final long NANOS_PER_MILLIS = 1000_000L;
+    private static final long MICROS_PER_SEC = 1000_000L;
+    private static final long NANOS_PER_MICROS = 1000L;
+
+    public static long microsToMillis(long micros)
+    {
+        return micros / MICROS_PER_MILLIS;
+    }
+
+    public static int microsToFracNanos(long micros)
+    {
+        return (int) (micros % MICROS_PER_SEC * NANOS_PER_MICROS);
+    }
+
+    public static long timestampToMicros(Timestamp timestamp)
+    {
+        return timestamp.getTime() * MICROS_PER_MILLIS +
+                timestamp.getNanos() % NANOS_PER_MILLIS / NANOS_PER_MICROS;
+    }
+
+    private static final long[] PRECISION_ROUND_FACTOR_FOR_MICROS = {
+            1000_000L, 100_000L, 10_000L, 1000L, 100L, 10L, 1L};
+
+    private static final int[] PRECISION_ROUND_FACTOR_FOR_MILLIS = {
+            1000, 100, 10, 1};
+
+    public static long roundMicrosToPrecision(long micros, int precision)
+    {
+        long roundFactor = PRECISION_ROUND_FACTOR_FOR_MICROS[precision];
+        return micros / roundFactor * roundFactor;
+    }
+
+    public static int roundMillisToPrecision(int millis, int precision)
+    {
+        int roundFactor = PRECISION_ROUND_FACTOR_FOR_MILLIS[precision];
+        return millis / roundFactor * roundFactor;
+    }
 
     public static void resetTimezoneOffset()
     {

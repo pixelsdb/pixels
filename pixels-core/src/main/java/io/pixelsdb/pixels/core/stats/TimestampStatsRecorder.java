@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import java.sql.Timestamp;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.vector.TimestampColumnVector.timestampToMicros;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.timestampToMicros;
 
 /**
  * pixels

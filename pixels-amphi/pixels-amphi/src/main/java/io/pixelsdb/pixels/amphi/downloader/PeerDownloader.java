@@ -48,7 +48,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.MAX_SHORT_DECIMAL_PRECISION;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -383,7 +383,7 @@ public class PeerDownloader
                     record.put(columns.get(i).getName(), dbcv.vector[rowIdx]);
                     break;
                 case DECIMAL:
-                    if (typeDesc.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION) {
+                    if (typeDesc.getPrecision() <= MAX_SHORT_DECIMAL_PRECISION) {
                         DecimalColumnVector decv = (DecimalColumnVector) columnVectors.get(i);
                         StringBuilder sb = new StringBuilder();
                         decv.stringifyValue(sb, rowIdx);

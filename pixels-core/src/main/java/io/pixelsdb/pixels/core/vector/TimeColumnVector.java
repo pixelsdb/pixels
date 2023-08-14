@@ -42,13 +42,15 @@ import static java.util.Objects.requireNonNull;
  * Generally, the caller will fill in a scratch time object with values from a row, work
  * using the scratch time, and then perhaps update the column vector row with a result.
  *
- * 2021-04-25
+ * @create 2021-04-25
  * @author hank
  */
 public class TimeColumnVector extends ColumnVector
 {
     public int[] times;
     // The values from Time.getTime().
+
+    private int precision;
 
     /*
      * Scratch objects.
@@ -59,9 +61,9 @@ public class TimeColumnVector extends ColumnVector
      * Use this constructor by default. All column vectors
      * should normally be the default size.
      */
-    public TimeColumnVector()
+    public TimeColumnVector(int precision)
     {
-        this(VectorizedRowBatch.DEFAULT_SIZE);
+        this(VectorizedRowBatch.DEFAULT_SIZE, precision);
     }
 
     /**
@@ -69,14 +71,18 @@ public class TimeColumnVector extends ColumnVector
      *
      * @param len the number of rows
      */
-    public TimeColumnVector(int len)
+    public TimeColumnVector(int len, int precision)
     {
         super(len);
-
-        times = new int[len];
-        memoryUsage += Integer.BYTES * len;
-
-        scratchTime = new Time(0);
+        if (precision != 3)
+        {
+            // TODO: support more precisions.
+            throw new UnsupportedOperationException("Time type currently only supports precision 3");
+        }
+        this.times = new int[len];
+        this.precision = precision;
+        this.memoryUsage += (long) Integer.BYTES * len;
+        this.scratchTime = new Time(0);
     }
 
     /**
@@ -163,6 +169,11 @@ public class TimeColumnVector extends ColumnVector
     {
         scratchTime.setTime(times[elementNum]);
         return scratchTime;
+    }
+
+    public int getPrecision()
+    {
+        return precision;
     }
 
     /**
@@ -306,6 +317,7 @@ public class TimeColumnVector extends ColumnVector
         {
             TimeColumnVector srcVector = (TimeColumnVector) inputVector;
             this.times = srcVector.times;
+            this.precision = srcVector.precision;
             this.isNull = srcVector.isNull;
             this.noNulls = srcVector.noNulls;
             this.isRepeating = srcVector.isRepeating;
