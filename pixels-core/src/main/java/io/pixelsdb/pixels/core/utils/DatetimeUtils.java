@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.core.utils;
 
 import java.sql.Date;
-import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.TimeZone;
@@ -154,12 +153,12 @@ public class DatetimeUtils
         return (int)(millis % 86400000);
     }
 
-    public static Time parseTime(String s)
+    public static int parseTime(String s)
     {
-        long hour;
-        long minute;
-        long second;
-        long millis;
+        int hour;
+        int minute;
+        int second;
+        int millis;
         int firstColon;
         int secondColon;
         int decimalPoint;
@@ -191,6 +190,6 @@ public class DatetimeUtils
             throw new java.lang.IllegalArgumentException();
         }
 
-        return new Time(hour * 3600000L + minute * 60000L + second * 1000L + millis + TIMEZONE_OFFSET);
+        return hour * 3600000 + minute * 60000 + second * 1000 + millis;
     }
 }

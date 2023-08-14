@@ -36,7 +36,7 @@ public class TestDateTimeUtils
     @Test
     public void testTimeFormat()
     {
-        Time time = parseTime("15:36:59.123");
+        Time time = new Time(parseTime("15:36:59.123"));
         System.out.println(time);
         System.out.println(time.getTime());
     }
