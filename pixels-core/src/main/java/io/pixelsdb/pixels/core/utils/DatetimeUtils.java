@@ -153,7 +153,13 @@ public class DatetimeUtils
         return (int)(millis % 86400000);
     }
 
-    public static int parseTime(String s)
+    /**
+     * Convert a string representation of the time in the current local timezone to the
+     * milliseconds since the start of the day in UTC time.
+     * @param localTime the string representation of local time, in the format of HH:mm:ss[.SSS]
+     * @return the milliseconds in the day
+     */
+    public static int parseTime(String localTime)
     {
         int hour;
         int minute;
@@ -163,33 +169,33 @@ public class DatetimeUtils
         int secondColon;
         int decimalPoint;
 
-        if (s == null)
+        if (localTime == null)
         {
             throw new IllegalArgumentException("the input string is null");
         }
 
-        firstColon = s.indexOf(':');
-        secondColon = s.indexOf(':', firstColon+1);
-        decimalPoint = s.indexOf('.', secondColon + 1);
+        firstColon = localTime.indexOf(':');
+        secondColon = localTime.indexOf(':', firstColon+1);
+        decimalPoint = localTime.indexOf('.', secondColon + 1);
         if ((firstColon > 0) && (secondColon > 0) && (secondColon < s.length()-1))
         {
-            hour = Integer.parseInt(s.substring(0, firstColon));
-            minute = Integer.parseInt(s.substring(firstColon+1, secondColon));
+            hour = Integer.parseInt(localTime.substring(0, firstColon));
+            minute = Integer.parseInt(localTime.substring(firstColon+1, secondColon));
 
-            if (decimalPoint > 0 && decimalPoint < s.length()-1)
+            if (decimalPoint > 0 && decimalPoint < localTime.length()-1)
             {
-                second = Integer.parseInt(s.substring(secondColon+1, decimalPoint));
-                millis = Integer.parseInt(s.substring(decimalPoint+1));
+                second = Integer.parseInt(localTime.substring(secondColon+1, decimalPoint));
+                millis = Integer.parseInt(localTime.substring(decimalPoint+1));
             }
             else
             {
-                second = Integer.parseInt(s.substring(secondColon+1));
+                second = Integer.parseInt(localTime.substring(secondColon+1));
                 millis = 0;
             }
         } else {
             throw new java.lang.IllegalArgumentException();
         }
 
-        return hour * 3600000 + minute * 60000 + second * 1000 + millis;
+        return (int) ((hour * 3600000L + minute * 60000L + second * 1000L + millis - TIMEZONE_OFFSET) % 86400000);
     }
 }
