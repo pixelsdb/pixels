@@ -25,6 +25,7 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.*;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -43,37 +44,6 @@ import static java.util.Objects.requireNonNull;
  */
 public class TimestampColumnVector extends ColumnVector
 {
-    private static final long MICROS_PER_MILLIS = 1000L;
-    private static final long NANOS_PER_MILLIS = 1000_000L;
-    private static final long MICROS_PER_SEC = 1000_000L;
-    private static final long NANOS_PER_MICROS = 1000L;
-
-    private static long microsToMillis(long micros)
-    {
-        return micros / MICROS_PER_MILLIS;
-    }
-
-    private static int microsToFracNanos(long micros)
-    {
-        return (int) (micros % MICROS_PER_SEC * NANOS_PER_MICROS);
-    }
-
-    public static long timestampToMicros(Timestamp timestamp)
-    {
-        return timestamp.getTime() * MICROS_PER_MILLIS +
-                timestamp.getNanos() % NANOS_PER_MILLIS / NANOS_PER_MICROS;
-    }
-
-    private static final long[] PRECISION_ROUND_FACTOR = {
-            1000_000L, 100_000L, 10_000L, 1000L, 100L, 10L, 1L
-    };
-
-    private long roundToPrecision(long micros)
-    {
-        long roundFactor = PRECISION_ROUND_FACTOR[precision];
-        return micros / roundFactor * roundFactor;
-    }
-
     private int precision;
 
     /*
@@ -411,7 +381,7 @@ public class TimestampColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        set(writeIndex++, Timestamp.valueOf(value));
+        set(writeIndex++, stringTimestampToMicros(value));
     }
 
     /**
@@ -435,7 +405,7 @@ public class TimestampColumnVector extends ColumnVector
         else
         {
             this.isNull[elementNum] = false;
-            this.times[elementNum] = roundToPrecision(timestampToMicros(timestamp));
+            this.times[elementNum] = roundMicrosToPrecision(timestampToMicros(timestamp), precision);
         }
     }
 
@@ -490,7 +460,7 @@ public class TimestampColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        times[0] = roundToPrecision(timestampToMicros(timestamp));
+        times[0] = roundMicrosToPrecision(timestampToMicros(timestamp), precision);
     }
 
     @Override

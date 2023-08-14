@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.sql.Timestamp;
 
 /**
  * pixels timestamp column reader
@@ -169,7 +168,7 @@ public class TimestampColumnReader extends ColumnReader
                 }
                 else
                 {
-                    columnVector.set(i + vectorIndex, new Timestamp(inputBuffer.getLong()));
+                    columnVector.set(i + vectorIndex, inputBuffer.getLong());
                 }
                 if (hasNull)
                 {

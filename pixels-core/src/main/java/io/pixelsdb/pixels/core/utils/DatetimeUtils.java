@@ -20,7 +20,14 @@
 package io.pixelsdb.pixels.core.utils;
 
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.util.Locale;
 import java.util.TimeZone;
 
 /**
@@ -30,6 +37,39 @@ import java.util.TimeZone;
 public class DatetimeUtils
 {
     private static long TIMEZONE_OFFSET = TimeZone.getDefault().getRawOffset();
+
+    private static final long MICROS_PER_MILLIS = 1000L;
+    private static final long NANOS_PER_MILLIS = 1000_000L;
+    private static final long MICROS_PER_SEC = 1000_000L;
+    private static final long NANOS_PER_MICROS = 1000L;
+
+    public static long microsToMillis(long micros)
+    {
+        return micros / MICROS_PER_MILLIS;
+    }
+
+    public static int microsToFracNanos(long micros)
+    {
+        return (int) (micros % MICROS_PER_SEC * NANOS_PER_MICROS);
+    }
+
+    private static final long[] PRECISION_ROUND_FACTOR_FOR_MICROS = {
+            1000_000L, 100_000L, 10_000L, 1000L, 100L, 10L, 1L};
+
+    private static final int[] PRECISION_ROUND_FACTOR_FOR_MILLIS = {
+            1000, 100, 10, 1};
+
+    public static long roundMicrosToPrecision(long micros, int precision)
+    {
+        long roundFactor = PRECISION_ROUND_FACTOR_FOR_MICROS[precision];
+        return micros / roundFactor * roundFactor;
+    }
+
+    public static int roundMillisToPrecision(int millis, int precision)
+    {
+        int roundFactor = PRECISION_ROUND_FACTOR_FOR_MILLIS[precision];
+        return millis / roundFactor * roundFactor;
+    }
 
     public static void resetTimezoneOffset()
     {
@@ -77,7 +117,7 @@ public class DatetimeUtils
      * @param date
      * @return
      */
-    public static int stringToDay (String date)
+    public static int stringDateToDay(String date)
     {
         return (int) LocalDate.parse(date).toEpochDay();
     }
@@ -110,6 +150,52 @@ public class DatetimeUtils
      */
     public static int millisInDay(long millis)
     {
-        return (int)(millis % 86400000);
+        return (int)(millis % 86400000L);
+    }
+
+    /**
+     * Convert a string representation of the time to the milliseconds since the start of the day.
+     * Timezone is not considered and has no effect on the conversion.
+     * @param time the string representation of the time, in the format of HH:mm:ss[.S*]
+     * @return the milliseconds in the day
+     */
+    public static int stringTimeToMillis(String time)
+    {
+        return (int) (LocalTime.parse(time).toNanoOfDay() / NANOS_PER_MILLIS);
+    }
+
+    public static final DateTimeFormatter SQL_LOCAL_DATE_TIME;
+    static
+    {
+        SQL_LOCAL_DATE_TIME = new DateTimeFormatterBuilder()
+                .parseCaseInsensitive()
+                .append(DateTimeFormatter.ISO_LOCAL_DATE)
+                .appendLiteral(' ')
+                .append(DateTimeFormatter.ISO_LOCAL_TIME)
+                .toFormatter(Locale.ENGLISH);
+    }
+
+    /**
+     * Convert a string representation of the timestamp to the microseconds since the epoch
+     * (1970-01-01 00:00:00 UTC). Timezone is not considered and has no effect on the conversion.
+     * @param timestamp string representation of the timestamp, in the format of yyy-MM-dd HH:mm:ss[.S*]
+     * @return the microseconds since the epoch
+     */
+    public static long stringTimestampToMicros(String timestamp)
+    {
+        LocalDateTime dateTime = LocalDateTime.parse(timestamp, SQL_LOCAL_DATE_TIME);
+        return dateTime.toEpochSecond(ZoneOffset.UTC) * MICROS_PER_SEC + dateTime.getNano() / NANOS_PER_MICROS;
+    }
+
+    /**
+     * Convert {@link java.sql.Timestamp} to microseconds since the epoch (1970-01-01 00:00:00 UTC).
+     * Be careful of the timezone used in the timestamp.
+     * @param timestamp the timestamp
+     * @return the microseconds since the epoch
+     */
+    public static long timestampToMicros(Timestamp timestamp)
+    {
+        return timestamp.getTime() * MICROS_PER_MILLIS +
+                timestamp.getNanos() % NANOS_PER_MILLIS / NANOS_PER_MICROS;
     }
 }

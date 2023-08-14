@@ -94,13 +94,12 @@ public class TimeColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        for (int i = 0; i < curPixelVectorIndex; i++)
-        {
-            pixelStatRecorder.updateTime(curPixelVector[i]);
-        }
-
         if (encodingLevel.ge(EncodingLevel.EL1))
         {
+            for (int i = 0; i < curPixelVectorIndex; i++)
+            {
+                pixelStatRecorder.updateTime(curPixelVector[i]);
+            }
             int[] values = new int[curPixelVectorIndex];
             System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
             outputStream.write(encoder.encode(values));
@@ -113,6 +112,7 @@ public class TimeColumnWriter extends BaseColumnWriter
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 curVecPartitionBuffer.putInt(curPixelVector[i]);
+                pixelStatRecorder.updateTime(curPixelVector[i]);
             }
             outputStream.write(curVecPartitionBuffer.array());
         }

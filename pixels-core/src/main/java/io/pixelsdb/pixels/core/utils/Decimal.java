@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.core.utils;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.MAX_SHORT_DECIMAL_PRECISION;
 
 /**
  * Created at: 08/04/2022
@@ -59,7 +59,7 @@ public class Decimal implements Comparable<Decimal>
 
     public Decimal(long value, int precision, int scale)
     {
-        checkArgument(precision > 0 && scale >= 0 && precision >= scale && precision <= SHORT_DECIMAL_MAX_PRECISION,
+        checkArgument(precision > 0 && scale >= 0 && precision >= scale && precision <= MAX_SHORT_DECIMAL_PRECISION,
                 "invalid precision and scale (" + precision + "," + scale + ")");
         checkArgument(value < SCALE_FACTOR[precision], "overflow");
         this.value = value;
