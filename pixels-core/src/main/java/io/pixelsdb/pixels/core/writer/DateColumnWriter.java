@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.core.vector.DateColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * Date column writer.
@@ -42,9 +41,9 @@ public class DateColumnWriter extends BaseColumnWriter
 {
     private final int[] curPixelVector = new int[pixelStride];
 
-    public DateColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public DateColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         // Issue #94: Date.getTime() can be negative if the date is before 1970-1-1.
         encoder = new RunLenIntEncoder(true, true);
     }

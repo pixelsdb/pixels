@@ -20,13 +20,11 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.vector.ByteColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 
 /**
  * Boolean column writer.
@@ -38,9 +36,9 @@ public class BooleanColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
 
-    public BooleanColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public BooleanColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
     }
 
     @Override

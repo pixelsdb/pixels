@@ -20,12 +20,10 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 
 /**
  * pixels column writer for <code>Varchar</code>
@@ -43,9 +41,9 @@ public class VarcharColumnWriter extends StringColumnWriter
     private final int maxLength;
     private int numTruncated;
 
-    public VarcharColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public VarcharColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         this.maxLength = type.getMaxLength();
         this.numTruncated = 0;
     }

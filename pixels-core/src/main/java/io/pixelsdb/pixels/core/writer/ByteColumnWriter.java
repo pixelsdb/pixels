@@ -27,7 +27,6 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 
 /**
  * pixels byte column writer
@@ -38,9 +37,9 @@ public class ByteColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
 
-    public ByteColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public ByteColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         encoder = new RunLenByteEncoder();
     }
 

@@ -263,6 +263,7 @@ message ColumnEncoding {
     }
 
     required Kind kind = 1;
+    // the number of distinct elements in the dictionary, only valid when dictionary encoding is in use
     optional uint32 dictionarySize = 2;
     // the explicit cascade encoding scheme specified by pixels writer
     optional ColumnEncoding cascadeEncoding = 3;

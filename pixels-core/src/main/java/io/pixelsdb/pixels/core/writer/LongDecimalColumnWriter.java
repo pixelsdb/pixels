@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongDecimalColumnVector;
@@ -39,9 +38,9 @@ public class LongDecimalColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public LongDecimalColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public LongDecimalColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         encodingUtils = new EncodingUtils();
     }
 

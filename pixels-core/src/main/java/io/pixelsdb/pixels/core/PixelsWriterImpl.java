@@ -33,6 +33,7 @@ import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.core.writer.ColumnWriter;
+import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -93,6 +94,10 @@ public class PixelsWriterImpl implements PixelsWriter
     private final int compressionBlockSize;
     private final TimeZone timeZone;
     private final EncodingLevel encodingLevel;
+    /**
+     * The writer option for the column writers.
+     */
+    private final PixelsWriterOption columnWriterOption;
     private final boolean partitioned;
     private final Optional<List<Integer>> partKeyColumnIds;
     /**
@@ -155,13 +160,15 @@ public class PixelsWriterImpl implements PixelsWriter
         this.chunkAlignment = Integer.parseInt(ConfigFactory.Instance().getProperty("column.chunk.alignment"));
         checkArgument(this.chunkAlignment >= 0, "column.chunk.alignment must >= 0");
         this.chunkPaddingBuffer = new byte[this.chunkAlignment];
-        children = schema.getChildren();
+        this.children = schema.getChildren();
         checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
         this.columnWriters = new ColumnWriter[children.size()];
-        fileColStatRecorders = new StatsRecorder[children.size()];
+        this.fileColStatRecorders = new StatsRecorder[children.size()];
+        this.columnWriterOption = new PixelsWriterOption()
+                .pixelStride(pixelStride).encodingLevel(encodingLevel).byteOrder(WRITER_ENDIAN);
         for (int i = 0; i < children.size(); ++i)
         {
-            columnWriters[i] = newColumnWriter(children.get(i), pixelStride, encodingLevel, WRITER_ENDIAN);
+            columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
             fileColStatRecorders[i] = StatsRecorder.create(children.get(i));
         }
 
@@ -613,7 +620,7 @@ public class PixelsWriterImpl implements PixelsWriter
              * We temporarily fix this problem by creating a new column writer for each row group.
              */
             // writer.reset();
-            columnWriters[i] = newColumnWriter(children.get(i), pixelStride, encodingLevel, WRITER_ENDIAN);
+            columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
         }
 
         // put curRowGroupIndex into rowGroupFooter

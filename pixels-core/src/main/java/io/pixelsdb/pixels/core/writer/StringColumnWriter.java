@@ -66,9 +66,9 @@ public class StringColumnWriter extends BaseColumnWriter
     private final EncodingUtils encodingUtils;
     private int startOffset = 0; // the start offset for the current string when un-encoded
 
-    public StringColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public StringColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         this.curPixelVector = new int[pixelStride];
         this.encodingUtils = new EncodingUtils();
         encoder = new RunLenIntEncoder(false, true);

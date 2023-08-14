@@ -20,21 +20,19 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-
-import java.nio.ByteOrder;
 
 /**
  * pixels column writer for <code>Char</code>
  * It is the same as VarcharColumnWriter, which means it never pads zero
  * at the end when writing a value. This is for performance reasons.
+ *
  * @author guodong
  * @author hank
  */
 public class CharColumnWriter extends VarcharColumnWriter
 {
-    public CharColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public CharColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
     }
 }

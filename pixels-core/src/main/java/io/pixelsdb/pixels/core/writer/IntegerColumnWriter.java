@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * Integer column writer.
@@ -42,9 +41,9 @@ public class IntegerColumnWriter extends BaseColumnWriter
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
     private final boolean isLong;                                       // current column type is long or int, used for the first pixel
 
-    public IntegerColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public IntegerColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         encoder = new RunLenIntEncoder();
         this.isLong = type.getCategory() == TypeDescription.Category.LONG;
     }

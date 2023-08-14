@@ -72,6 +72,11 @@ public enum EncodingLevel
         return this.level >= level;
     }
 
+    /**
+     * Grater than or equal to.
+     * @param encodingLevel the other encoding level
+     * @return true if this encoding level is greater than or equal to the other encoding level
+     */
     public boolean ge(EncodingLevel encodingLevel)
     {
         requireNonNull(level, "level is null");

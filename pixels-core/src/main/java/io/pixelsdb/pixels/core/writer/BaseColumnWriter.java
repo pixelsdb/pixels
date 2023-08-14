@@ -64,12 +64,12 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final ByteArrayOutputStream outputStream;  // column chunk content
     private final ByteArrayOutputStream isNullStream;  // column chunk isNull
 
-    public BaseColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public BaseColumnWriter(TypeDescription type, PixelsWriterOption writerOption)
     {
         this.type = requireNonNull(type, "type is null");
-        this.pixelStride = pixelStride;
-        this.encodingLevel = encodingLevel;
-        this.byteOrder = requireNonNull(byteOrder, "byteOrder is null");
+        this.pixelStride = writerOption.getPixelStride();
+        this.encodingLevel = writerOption.getEncodingLevel();
+        this.byteOrder = requireNonNull(writerOption.getByteOrder(), "byteOrder is null");
         this.isNull = new boolean[pixelStride];
 
         this.columnChunkIndex = PixelsProto.ColumnChunkIndex.newBuilder()

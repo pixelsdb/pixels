@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * Timestamp column writer.
@@ -40,9 +39,9 @@ public class TimestampColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];
 
-    public TimestampColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public TimestampColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         // Issue #94: time can be negative if it is before 1970-1-1 0:0:0.
         encoder = new RunLenIntEncoder(true, true);
     }
