@@ -177,7 +177,7 @@ public class DatetimeUtils
         firstColon = localTime.indexOf(':');
         secondColon = localTime.indexOf(':', firstColon+1);
         decimalPoint = localTime.indexOf('.', secondColon + 1);
-        if ((firstColon > 0) && (secondColon > 0) && (secondColon < s.length()-1))
+        if ((firstColon > 0) && (secondColon > 0) && (secondColon < localTime.length()-1))
         {
             hour = Integer.parseInt(localTime.substring(0, firstColon));
             minute = Integer.parseInt(localTime.substring(firstColon+1, secondColon));
