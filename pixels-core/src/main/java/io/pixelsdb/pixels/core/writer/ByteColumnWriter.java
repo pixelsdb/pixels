@@ -100,7 +100,7 @@ public class ByteColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
 
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
@@ -115,7 +115,7 @@ public class ByteColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);

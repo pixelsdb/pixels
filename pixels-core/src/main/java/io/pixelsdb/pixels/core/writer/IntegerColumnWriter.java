@@ -98,7 +98,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     void newPixel() throws IOException
     {
         // write out current pixel vector
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
@@ -138,7 +138,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);

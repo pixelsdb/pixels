@@ -255,7 +255,7 @@ message RowGroupFooter {
 message ColumnEncoding {
     enum Kind {
         NONE = 0;
-        // pixels cascades delta encoding adaptively on run-length encoding, so there is no explicit delta encoding
+        // pixels adaptively cascades delta encoding on run-length encoding, so there is no explicit delta encoding
         RUNLENGTH = 1;
         // since v0.2.0, dictionary encoding does not cascade other encoding schemes such as run-length by default
         DICTIONARY = 2;

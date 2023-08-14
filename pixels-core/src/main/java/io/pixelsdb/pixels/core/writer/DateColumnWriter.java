@@ -100,7 +100,7 @@ public class DateColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateDate(curPixelVector[i]);
         }
 
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
             int[] values = new int[curPixelVectorIndex];
             System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
@@ -124,7 +124,7 @@ public class DateColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);

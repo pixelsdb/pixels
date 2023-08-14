@@ -25,8 +25,8 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import java.nio.ByteOrder;
 
 /**
- * Created at: 04/03/2022
- * Author: hank
+ * @create 2022-03-04
+ * @author hank
  */
 public class VarbinaryColumnWriter extends BinaryColumnWriter
 {

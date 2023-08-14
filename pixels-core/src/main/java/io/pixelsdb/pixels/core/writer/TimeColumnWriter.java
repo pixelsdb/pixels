@@ -94,7 +94,7 @@ public class TimeColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
@@ -123,7 +123,7 @@ public class TimeColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (encodingLevel.ge(EncodingLevel.EL2))
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
