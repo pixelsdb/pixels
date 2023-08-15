@@ -43,6 +43,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final int pixelStride;                     // indicate num of elements in a pixel
     final EncodingLevel encodingLevel;         // indicate the encoding level during writing
     final ByteOrder byteOrder;                 // indicate the endianness used during writing
+    final boolean nullsPadding;                // indicate whether nulls are padded by arbitrary value
     final boolean[] isNull;
     private final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
     private final PixelsProto.ColumnStatistic.Builder columnChunkStat;
@@ -67,9 +68,10 @@ public abstract class BaseColumnWriter implements ColumnWriter
     public BaseColumnWriter(TypeDescription type, PixelsWriterOption writerOption)
     {
         this.type = requireNonNull(type, "type is null");
-        this.pixelStride = writerOption.getPixelStride();
-        this.encodingLevel = writerOption.getEncodingLevel();
+        this.pixelStride = requireNonNull(writerOption, "writerOption is null").getPixelStride();
+        this.encodingLevel = requireNonNull(writerOption.getEncodingLevel(), "encodingLevel is null");
         this.byteOrder = requireNonNull(writerOption.getByteOrder(), "byteOrder is null");
+        this.nullsPadding = writerOption.isNullsPadding();
         this.isNull = new boolean[pixelStride];
 
         this.columnChunkIndex = PixelsProto.ColumnChunkIndex.newBuilder()

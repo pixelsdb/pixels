@@ -56,6 +56,11 @@ public class DoubleColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 for nulls, no need to update statistics
+                    encodingUtils.writeLongLE(outputStream, 0L);
+                }
             }
             else
             {

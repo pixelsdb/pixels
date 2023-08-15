@@ -56,6 +56,11 @@ public class FloatColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 for nulls, no need to update statistics
+                    encodingUtils.writeIntLE(outputStream, 0);
+                }
             }
             else
             {

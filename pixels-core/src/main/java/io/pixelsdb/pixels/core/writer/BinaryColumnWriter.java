@@ -28,6 +28,7 @@ import java.io.IOException;
 /**
  * pixels binary column writer.
  * each element consists of content length and content binary.
+ * <p>TODO: this class is not yet finished.</p>
  *
  * @author guodong
  * @author hank

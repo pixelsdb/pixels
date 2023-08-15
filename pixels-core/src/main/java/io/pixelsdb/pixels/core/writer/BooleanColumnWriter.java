@@ -74,6 +74,19 @@ public class BooleanColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 or previous value for nulls, this is friendly for run-length encoding
+                    if (curPixelVectorIndex <= 0)
+                    {
+                        curPixelVector[curPixelVectorIndex] = 0x00;
+                    }
+                    else
+                    {
+                        curPixelVector[curPixelVectorIndex] = curPixelVector[curPixelVectorIndex-1];
+                    }
+                    curPixelVectorIndex ++;
+                }
             }
             else
             {

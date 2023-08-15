@@ -58,19 +58,20 @@ public class TimestampColumnWriter extends BaseColumnWriter
         while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
         {
             curPartLength = pixelStride - curPixelIsNullIndex;
-            writeCurPartTime(columnVector, times, curPartLength, curPartOffset);
+            writeCurPartTimestamp(columnVector, times, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
 
         curPartLength = nextPartLength;
-        writeCurPartTime(columnVector, times, curPartLength, curPartOffset);
+        writeCurPartTimestamp(columnVector, times, curPartLength, curPartOffset);
 
         return outputStream.size();
     }
 
-    private void writeCurPartTime(TimestampColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    private void writeCurPartTimestamp(TimestampColumnVector columnVector,
+                                       long[] values, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -79,6 +80,19 @@ public class TimestampColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 or previous value for nulls, this is friendly for run-length encoding
+                    if (curPixelVectorIndex <= 0)
+                    {
+                        curPixelVector[curPixelVectorIndex] = 0L;
+                    }
+                    else
+                    {
+                        curPixelVector[curPixelVectorIndex] = curPixelVector[curPixelVectorIndex-1];
+                    }
+                    curPixelVectorIndex ++;
+                }
             }
             else
             {

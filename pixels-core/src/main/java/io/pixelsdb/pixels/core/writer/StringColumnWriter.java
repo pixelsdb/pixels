@@ -123,8 +123,11 @@ public class StringColumnWriter extends BaseColumnWriter
         for (int i = 0; i < curPartLength; i++)
         {
             curPixelEleIndex++;
-            // add starts even if the current value is null, this is for random access
-            startsArray.add(startOffset);
+            if (nullsPadding)
+            {
+                // add starts even if the current value is null, this is for random access
+                startsArray.add(startOffset);
+            }
             if (columnVector.isNull[curPartOffset + i])
             {
                 hasNull = true;
@@ -152,6 +155,19 @@ public class StringColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 or previous value for nulls, this is friendly for run-length encoding
+                    if (curPixelVectorIndex <= 0)
+                    {
+                        curPixelVector[curPixelVectorIndex] = 0;
+                    }
+                    else
+                    {
+                        curPixelVector[curPixelVectorIndex] = curPixelVector[curPixelVectorIndex-1];
+                    }
+                    curPixelVectorIndex ++;
+                }
             }
             else
             {
