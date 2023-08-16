@@ -90,6 +90,8 @@ public interface ColumnWriter
 
     int getColumnChunkSize();
 
+    boolean decideNullsPadding(PixelsWriterOption writerOption);
+
     PixelsProto.ColumnChunkIndex.Builder getColumnChunkIndex();
 
     PixelsProto.ColumnStatistic.Builder getColumnChunkStat();

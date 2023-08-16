@@ -98,6 +98,7 @@ public class BooleanColumnReader extends ColumnReader
             elementIndex = 0;
             isNullBitIndex = 8;
         }
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         for (int i = 0; i < size; i++)
         {
             if (elementIndex % pixelStride == 0)

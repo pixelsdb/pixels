@@ -235,7 +235,8 @@ message ColumnChunkIndex {
     repeated PixelStatistic pixelStatistics = 5;
     // whether this column chunk is stored in little endian
     optional bool littleEndian = 6;
-    // whether the null positions are padded with arbitrary value, only valid non-encoded column chunks
+    // whether the null positions are padded with arbitrary value,
+    // only take effects if non-random-accessible encoding (i.e., run-length) is not used
     optional bool nullsPadding = 7;
 }
 

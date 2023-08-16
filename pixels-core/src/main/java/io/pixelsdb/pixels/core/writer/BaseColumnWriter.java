@@ -71,11 +71,11 @@ public abstract class BaseColumnWriter implements ColumnWriter
         this.pixelStride = requireNonNull(writerOption, "writerOption is null").getPixelStride();
         this.encodingLevel = requireNonNull(writerOption.getEncodingLevel(), "encodingLevel is null");
         this.byteOrder = requireNonNull(writerOption.getByteOrder(), "byteOrder is null");
-        this.nullsPadding = writerOption.isNullsPadding();
+        this.nullsPadding = decideNullsPadding(writerOption);
         this.isNull = new boolean[pixelStride];
-
         this.columnChunkIndex = PixelsProto.ColumnChunkIndex.newBuilder()
-                .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN));
+                .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
+                .setNullsPadding(nullsPadding);
         this.columnChunkStat = PixelsProto.ColumnStatistic.newBuilder();
         this.pixelStatRecorder = StatsRecorder.create(type);
         this.columnChunkStatRecorder = StatsRecorder.create(type);
@@ -84,6 +84,9 @@ public abstract class BaseColumnWriter implements ColumnWriter
         this.outputStream = new ByteArrayOutputStream(pixelStride);
         this.isNullStream = new ByteArrayOutputStream(pixelStride);
     }
+
+    @Override
+    public abstract boolean decideNullsPadding(PixelsWriterOption writerOption);
 
     /**
      * Write ColumnVector

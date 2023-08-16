@@ -39,12 +39,17 @@ import java.nio.ByteBuffer;
 public class TimeColumnWriter extends BaseColumnWriter
 {
     private final int[] curPixelVector = new int[pixelStride];
+    private final boolean runlengthEncoding;
 
     public TimeColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
         super(type, writerOption);
-        // time is likely to be negative according to different time zone.
-        encoder = new RunLenIntEncoder(true, true);
+        runlengthEncoding = encodingLevel.ge(EncodingLevel.EL2);
+        if (runlengthEncoding)
+        {
+            // time is likely to be negative according to different time zone.
+            encoder = new RunLenIntEncoder(true, true);
+        }
     }
 
     @Override
@@ -82,16 +87,8 @@ public class TimeColumnWriter extends BaseColumnWriter
                 pixelStatRecorder.increment();
                 if (nullsPadding)
                 {
-                    // padding 0 or previous value for nulls, this is friendly for run-length encoding
-                    if (curPixelVectorIndex <= 0)
-                    {
-                        curPixelVector[curPixelVectorIndex] = 0;
-                    }
-                    else
-                    {
-                        curPixelVector[curPixelVectorIndex] = curPixelVector[curPixelVectorIndex-1];
-                    }
-                    curPixelVectorIndex ++;
+                    // padding 0 for nulls
+                    curPixelVector[curPixelVectorIndex++] = 0;
                 }
             }
             else
@@ -106,20 +103,17 @@ public class TimeColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        if (encodingLevel.ge(EncodingLevel.EL2))
+        if (runlengthEncoding)
         {
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 pixelStatRecorder.updateTime(curPixelVector[i]);
             }
-            int[] values = new int[curPixelVectorIndex];
-            System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
-            outputStream.write(encoder.encode(values));
+            outputStream.write(encoder.encode(curPixelVector));
         }
         else
         {
-            ByteBuffer curVecPartitionBuffer =
-                    ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
+            ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
             curVecPartitionBuffer.order(byteOrder);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
@@ -135,7 +129,7 @@ public class TimeColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (encodingLevel.ge(EncodingLevel.EL2))
+        if (runlengthEncoding)
         {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
@@ -147,7 +141,20 @@ public class TimeColumnWriter extends BaseColumnWriter
     @Override
     public void close() throws IOException
     {
-        encoder.close();
+        if (runlengthEncoding)
+        {
+            encoder.close();
+        }
         super.close();
+    }
+
+    @Override
+    public boolean decideNullsPadding(PixelsWriterOption writerOption)
+    {
+        if (writerOption.getEncodingLevel().ge(EncodingLevel.EL2))
+        {
+            return false;
+        }
+        return writerOption.isNullsPadding();
     }
 }

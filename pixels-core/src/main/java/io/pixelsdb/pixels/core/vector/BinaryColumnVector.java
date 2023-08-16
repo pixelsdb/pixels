@@ -37,7 +37,7 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
  * explicitly present, as opposed to provided by a dictionary reference.
  * In some cases, all the values will be in the same byte array to begin with,
  * but this need not be the case. If each value is in a separate byte
- * array to start with, or not all of the values are in the same original
+ * array to start with, or not all the values are in the same original
  * byte array, you can still assign data by reference into this column vector.
  * This gives flexibility to use this in multiple situations.
  * <p>

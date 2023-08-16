@@ -61,17 +61,34 @@ public class StringColumnWriter extends BaseColumnWriter
      * current vector holding encoded values of string
      */
     private final int[] curPixelVector;
-    private final DynamicIntArray startsArray = new DynamicIntArray();  // lengths of each string when un-encoded
-    private final Dictionary dictionary = new HashTableDictionary(Constants.INIT_DICT_SIZE);
+    private final DynamicIntArray startsArray;  // lengths of each string when un-encoded
+    private final Dictionary dictionary;
     private final EncodingUtils encodingUtils;
+    private final boolean runlengthEncoding;
+    private final boolean dictionaryEncoding;
     private int startOffset = 0; // the start offset for the current string when un-encoded
 
     public StringColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
         super(type, writerOption);
-        this.curPixelVector = new int[pixelStride];
-        this.encodingUtils = new EncodingUtils();
-        encoder = new RunLenIntEncoder(false, true);
+        curPixelVector = new int[pixelStride];
+        encodingUtils = new EncodingUtils();
+        runlengthEncoding = encodingLevel.ge(EncodingLevel.EL2);
+        if (runlengthEncoding)
+        {
+            encoder = new RunLenIntEncoder(false, true);
+        }
+        dictionaryEncoding = encodingLevel.ge(EncodingLevel.EL1);
+        if (dictionaryEncoding)
+        {
+            dictionary = new HashTableDictionary(Constants.INIT_DICT_SIZE);
+            startsArray = null;
+        }
+        else
+        {
+            dictionary = null;
+            startsArray = new DynamicIntArray();
+        }
     }
 
     @Override
@@ -85,7 +102,7 @@ public class StringColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (dictionaryEncoding)
         {
             while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
             {
@@ -157,16 +174,8 @@ public class StringColumnWriter extends BaseColumnWriter
                 pixelStatRecorder.increment();
                 if (nullsPadding)
                 {
-                    // padding 0 or previous value for nulls, this is friendly for run-length encoding
-                    if (curPixelVectorIndex <= 0)
-                    {
-                        curPixelVector[curPixelVectorIndex] = 0;
-                    }
-                    else
-                    {
-                        curPixelVector[curPixelVectorIndex] = curPixelVector[curPixelVectorIndex-1];
-                    }
-                    curPixelVectorIndex ++;
+                    // padding 0 for nulls
+                    curPixelVector[curPixelVectorIndex++] = 0;
                 }
             }
             else
@@ -184,12 +193,12 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        if (encodingLevel.ge(EncodingLevel.EL2))
+        if (runlengthEncoding)
         {
             // for encoding level 2 or higher, cascade run length encode on dictionary encoding
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
-        else if (encodingLevel == EncodingLevel.EL1)
+        else if (dictionaryEncoding)
         {
             if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
             {
@@ -206,7 +215,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 }
             }
         }
-        // else ignore outputStream
+        // else write nothing to outputStream
 
         super.newPixel();
     }
@@ -217,7 +226,7 @@ public class StringColumnWriter extends BaseColumnWriter
         // flush out pixels field
         super.flush();
         // flush out other fields
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (dictionaryEncoding)
         {
             flushDictionary();
         }
@@ -230,13 +239,13 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (dictionaryEncoding)
         {
             PixelsProto.ColumnEncoding.Builder builder =
                     PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY)
                     .setDictionarySize(dictionary.size());
-            if (encodingLevel.ge(EncodingLevel.EL2))
+            if (runlengthEncoding)
             {
                 builder.setCascadeEncoding(PixelsProto.ColumnEncoding.newBuilder()
                         .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH));
@@ -250,9 +259,18 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void close() throws IOException
     {
-        startsArray.clear();
-        dictionary.clear();
-        encoder.close();
+        if (dictionaryEncoding)
+        {
+            dictionary.clear();
+        }
+        else
+        {
+            startsArray.clear();
+        }
+        if (runlengthEncoding)
+        {
+            encoder.close();
+        }
         super.close();
     }
 
@@ -311,7 +329,7 @@ public class StringColumnWriter extends BaseColumnWriter
         starts[size] = dictStartsOffset - dictContentOffset;
 
         // write out run length starts array
-        if (encodingLevel.ge(EncodingLevel.EL2))
+        if (runlengthEncoding)
         {
             outputStream.write(encoder.encode(starts));
         }
@@ -344,5 +362,15 @@ public class StringColumnWriter extends BaseColumnWriter
         offsetsBuf.putInt(dictContentOffset);
         offsetsBuf.putInt(dictStartsOffset);
         outputStream.write(offsetsBuf.array());
+    }
+
+    @Override
+    public boolean decideNullsPadding(PixelsWriterOption writerOption)
+    {
+        if (writerOption.getEncodingLevel().ge(EncodingLevel.EL2))
+        {
+            return false;
+        }
+        return writerOption.isNullsPadding();
     }
 }

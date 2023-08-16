@@ -28,7 +28,7 @@ import java.io.IOException;
 /**
  * pixels binary column writer.
  * each element consists of content length and content binary.
- * <p>TODO: this class is not yet finished.</p>
+ * TODO: this class is not yet finished.
  *
  * @author guodong
  * @author hank
@@ -102,5 +102,11 @@ public class BinaryColumnWriter extends BaseColumnWriter
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
         curPixelIsNullIndex += curPartLength;
+    }
+
+    @Override
+    public boolean decideNullsPadding(PixelsWriterOption writerOption)
+    {
+        return writerOption.isNullsPadding();
     }
 }

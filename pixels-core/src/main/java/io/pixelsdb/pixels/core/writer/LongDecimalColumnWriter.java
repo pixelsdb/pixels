@@ -60,7 +60,7 @@ public class LongDecimalColumnWriter extends BaseColumnWriter
                 pixelStatRecorder.increment();
                 if (nullsPadding)
                 {
-                    // padding 0 for nulls, no need to update statistics
+                    // padding 0 for nulls
                     encodingUtils.writeLongLE(outputStream, 0L);
                 }
             }
@@ -85,5 +85,11 @@ public class LongDecimalColumnWriter extends BaseColumnWriter
             }
         }
         return outputStream.size();
+    }
+
+    @Override
+    public boolean decideNullsPadding(PixelsWriterOption writerOption)
+    {
+        return writerOption.isNullsPadding();
     }
 }
