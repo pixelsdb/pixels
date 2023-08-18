@@ -92,10 +92,8 @@ public abstract class ColumnVector implements AutoCloseable
     public ColumnVector(int len)
     {
         this.length = len;
-        // Issue #545: round isNull capacity to a multiple of 8 for direct de-compaction without copying
-        int isNullCapacity = (len + 7) / 8 * 8;
-        isNull = new boolean[isNullCapacity];
-        memoryUsage += isNullCapacity + Integer.BYTES * 3 + 4;
+        isNull = new boolean[len];
+        memoryUsage += len + Integer.BYTES * 3 + 4;
         noNulls = true;
         isRepeating = false;
         preFlattenNoNulls = true;
