@@ -257,7 +257,7 @@ public class BitUtils
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.get(i);
-            while (bitsIndex < bitsEnd)
+            while (bitsLeft > 0 && bitsIndex < bitsEnd)
             {
                 bitsLeft --;
                 bits[bitsIndex++] = (byte) (0x01 & (b >> bitsLeft));
@@ -284,7 +284,7 @@ public class BitUtils
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.get(i);
-            while (bitsIndex < bitsEnd)
+            while (bitsLeft > 0 && bitsIndex < bitsEnd)
             {
                 bitsLeft --;
                 bits[bitsIndex++] = (0x01 & (b >> bitsLeft)) == 1;
@@ -311,7 +311,7 @@ public class BitUtils
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.getByte(i);
-            while (bitsIndex < bitsEnd)
+            while (bitsLeft > 0 && bitsIndex < bitsEnd)
             {
                 bitsLeft --;
                 bits[bitsIndex++] = (0x01 & (b >> bitsLeft)) == 1;

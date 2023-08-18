@@ -140,6 +140,7 @@ public class BooleanColumnReader extends ColumnReader
                 {
                     BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
                     isNullOffset += bytesToDeCompact;
+                    columnVector.noNulls = false;
                 }
                 else
                 {
