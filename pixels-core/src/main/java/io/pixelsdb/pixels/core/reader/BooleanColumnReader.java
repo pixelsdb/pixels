@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * @author guodong
@@ -35,8 +36,12 @@ public class BooleanColumnReader extends ColumnReader
 {
     private ByteBuffer inputBuffer;
     private byte[] bits;
-    private byte[] isNull = new byte[8];
-    private int bitsIndex = 0;
+    private byte[] isNull;
+    /**
+     * The index of {@link #bits} if the column chunk is not nulls-padded,
+     * or the index of {@link #inputBuffer} if the column chunk is nulls-padded.
+     */
+    private int bitsOrInputIndex = 0;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
 
@@ -84,54 +89,107 @@ public class BooleanColumnReader extends ColumnReader
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         ByteColumnVector columnVector = (ByteColumnVector) vector;
+        int bytesToDeCompact;
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         if (offset == 0)
         {
-            bits = new byte[input.remaining() * 8];
             // read content
             this.inputBuffer = input;
-            BitUtils.bitWiseDeCompact(bits, input, input.position(), input.remaining());
+            if (!nullsPadding)
+            {
+                // Issue #545: de-compact the byte before isNullOffset instead of the whole chunk
+                bytesToDeCompact = chunkIndex.getIsNullOffset();
+                bits = new byte[bytesToDeCompact * 8];
+                BitUtils.bitWiseDeCompact(bits, input, input.position(), bytesToDeCompact);
+                isNull = new byte[8];
+            }
+            else
+            {
+                // we will try to de-compact directly into the vector of the column chunk
+                bits = null;
+                isNull = null;
+            }
             // read isNull
-            isNullOffset = input.position() + (int) chunkIndex.getIsNullOffset();
+            isNullOffset = input.position() + chunkIndex.getIsNullOffset();
             // re-init
-            bitsIndex = 0;
+            bitsOrInputIndex = 0;
             hasNull = true;
             elementIndex = 0;
             isNullBitIndex = 8;
         }
-        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
-        for (int i = 0; i < size; i++)
+        if (nullsPadding)
         {
-            if (elementIndex % pixelStride == 0)
+            // read without copying the de-compacted content and isNull
+            int numLeft = size, numToRead;
+            for (int i = vectorIndex; numLeft > 0;)
             {
+                if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+                {
+                    // read to the end of the current pixel
+                    numToRead = pixelStride - elementIndex % pixelStride;
+                }
+                else
+                {
+                    numToRead = numLeft;
+                }
+                bytesToDeCompact = (numToRead + 7) / 8;
+                // read isNull
                 int pixelId = elementIndex / pixelStride;
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-                // skip padding bits
-                bitsIndex = (int) Math.ceil((double) bitsIndex / 8.0d) * 8;
-                if (hasNull && isNullBitIndex > 0)
+                if (hasNull)
+                {
+                    BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                    isNullOffset += bytesToDeCompact;
+                }
+                else
+                {
+                    Arrays.fill(columnVector.isNull, i, i + numToRead, false);
+                }
+                // read content
+                BitUtils.bitWiseDeCompact(columnVector.vector, i, numToRead, inputBuffer, bitsOrInputIndex);
+                // update variables
+                numLeft -= numToRead;
+                elementIndex += numToRead;
+                i += numToRead;
+                bitsOrInputIndex += bytesToDeCompact;
+            }
+        }
+        else
+        {
+            for (int i = 0; i < size; i++)
+            {
+                if (elementIndex % pixelStride == 0)
+                {
+                    int pixelId = elementIndex / pixelStride;
+                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                    // skip the padding bits at the end of the previous pixel
+                    bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
+                    if (hasNull && isNullBitIndex > 0)
+                    {
+                        BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
+                        isNullBitIndex = 0;
+                    }
+                }
+                if (hasNull && isNullBitIndex >= 8)
                 {
                     BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
+                if (hasNull && isNull[isNullBitIndex] == 1)
+                {
+                    columnVector.isNull[i + vectorIndex] = true;
+                    columnVector.noNulls = false;
+                }
+                else
+                {
+                    columnVector.vector[i + vectorIndex] = bits[bitsOrInputIndex++];
+                }
+                if (hasNull)
+                {
+                    isNullBitIndex++;
+                }
+                elementIndex++;
             }
-            if (hasNull && isNullBitIndex >= 8)
-            {
-                BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
-                isNullBitIndex = 0;
-            }
-            if (hasNull && isNull[isNullBitIndex] == 1)
-            {
-                columnVector.isNull[i + vectorIndex] = true;
-                columnVector.noNulls = false;
-            }
-            else
-            {
-                columnVector.vector[i + vectorIndex] = bits[bitsIndex++];
-            }
-            if (hasNull)
-            {
-                isNullBitIndex++;
-            }
-            elementIndex++;
         }
     }
 }

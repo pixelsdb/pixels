@@ -68,6 +68,7 @@ public class TimeColumnReader extends ColumnReader
     @Override
     public void close() throws IOException
     {
+        isNull = null;
     }
 
     /**
@@ -100,7 +101,7 @@ public class TimeColumnReader extends ColumnReader
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
-            isNullOffset = inputBuffer.position() + (int) chunkIndex.getIsNullOffset();
+            isNullOffset = inputBuffer.position() + chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
             isNullBitIndex = 8;

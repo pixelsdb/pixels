@@ -111,7 +111,7 @@ public class IntegerColumnReader extends ColumnReader
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull
-            isNullOffset = inputBuffer.position() + (int) chunkIndex.getIsNullOffset();
+            isNullOffset = inputBuffer.position() + chunkIndex.getIsNullOffset();
             // re-init
             hasNull = true;
             elementIndex = 0;

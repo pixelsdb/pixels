@@ -372,13 +372,12 @@ public class TestPixelsWriter
                     PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(cacheRGId);
                     PixelsProto.ColumnChunkIndex chunkIndex =
                             rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(cacheColId);
-                    int chunkLen = (int) chunkIndex.getChunkLength();
+                    int chunkLen = chunkIndex.getChunkLength();
                     long chunkOffset = chunkIndex.getChunkOffset();
                     cacheLength += chunkLen;
-                    byte[] columnlet = pixelsPhysicalReader.read(chunkOffset, chunkLen);
-//                  byte[] columnlet = new byte[0];
+                    byte[] columnChunk = pixelsPhysicalReader.read(chunkOffset, chunkLen);
                     PixelsCacheKey cacheKey = new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), cacheRGId, cacheColId);
-                    cacheWriter.write(cacheKey, columnlet);
+                    cacheWriter.write(cacheKey, columnChunk);
                 }
             }
             long endNano = System.nanoTime();

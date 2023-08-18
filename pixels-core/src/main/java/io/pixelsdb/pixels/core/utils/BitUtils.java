@@ -130,9 +130,9 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, byte[] input)
     {
-        /**
+        /*
          * Issue #99:
-         * Use as least as variables as possible to reduce stack footprint
+         * Use as fewer variables as possible to reduce stack footprint
          * and thus improve performance.
          */
          byte bitsLeft = 8;
@@ -151,6 +151,7 @@ public class BitUtils
     /**
      * Bit de-compaction
      *
+     * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
      * @param input  input byte array
      * @param offset starting offset of the input
      * @param length byte length of the input
@@ -158,9 +159,9 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, byte[] input, int offset, int length)
     {
-        /**
+        /*
          * Issue #99:
-         * Use as least as variables as possible to reduce stack footprint
+         * Use as fewer variables as possible to reduce stack footprint
          * and thus improve performance.
          */
         byte bitsLeft = 8;
@@ -187,9 +188,9 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, ByteBuffer input, int offset, int length)
     {
-        /**
+        /*
          * Issue #99:
-         * Use as least variables as possible to reduce stack footprint
+         * Use as fewer variables as possible to reduce stack footprint
          * and thus improve performance.
          */
         byte bitsLeft = 8, b;
@@ -210,6 +211,7 @@ public class BitUtils
     /**
      * Bit de-compaction, this method does not modify the current position in input byte buffer.
      *
+     * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
      * @param input input byte buffer, which can be direct.
      * @param offset starting offset of the input
      * @param length byte length of the input
@@ -217,7 +219,7 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, ByteBuf input, int offset, int length)
     {
-        /**
+        /*
          * Issue #99:
          * Use as fewer variables as possible to reduce stack footprint
          * and thus improve performance.
@@ -232,6 +234,87 @@ public class BitUtils
             {
                 bitsLeft --;
                 bits[index++] = (byte) (0x01 & (b >> bitsLeft));
+            }
+            bitsLeft = 8;
+        }
+    }
+
+    /**
+     * Bit de-compaction, this method does not modify the current position in input byte buffer.
+     * It always starts from the first bit of a byte in the input.
+     *
+     * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
+     * @param bitsOffset the index in bits to start de-compact into
+     * @param bitsLength the number of bits to de-compact
+     * @param input input byte buffer, which can be direct
+     * @param offset starting offset of the input
+     * @return de-compacted bits
+     */
+    public static void bitWiseDeCompact(byte[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    {
+        byte bitsLeft = 8, b;
+        int bitsEnd = bitsOffset + bitsLength;
+        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        {
+            b = input.get(i);
+            while (bitsIndex < bitsEnd)
+            {
+                bitsLeft --;
+                bits[bitsIndex++] = (byte) (0x01 & (b >> bitsLeft));
+            }
+            bitsLeft = 8;
+        }
+    }
+
+    /**
+     * Bit de-compaction, this method does not modify the current position in input byte buffer.
+     * It always starts from the first bit of a byte in the input.
+     *
+     * @param bits the de-compact (decode) result, each element is true if the corresponding bit is 1
+     * @param bitsOffset the index in bits to start de-compact into
+     * @param bitsLength the number of bits to de-compact
+     * @param input input byte buffer, which can be direct
+     * @param offset starting offset of the input
+     * @return de-compacted bits
+     */
+    public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    {
+        byte bitsLeft = 8, b;
+        int bitsEnd = bitsOffset + bitsLength;
+        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        {
+            b = input.get(i);
+            while (bitsIndex < bitsEnd)
+            {
+                bitsLeft --;
+                bits[bitsIndex++] = (0x01 & (b >> bitsLeft)) == 1;
+            }
+            bitsLeft = 8;
+        }
+    }
+
+    /**
+     * Bit de-compaction, this method does not modify the current position in input byte buffer.
+     * It always starts from the first bit of a byte in the input.
+     *
+     * @param bits the de-compact (decode) result, each element is true if the corresponding bit is 1
+     * @param bitsOffset the index in bits to start de-compact into
+     * @param bitsLength the number of bits to de-compact
+     * @param input input byte buffer, which can be direct
+     * @param offset starting offset of the input
+     * @return de-compacted bits
+     */
+    public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset)
+    {
+        byte bitsLeft = 8, b;
+        int bitsEnd = bitsOffset + bitsLength;
+        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        {
+            b = input.getByte(i);
+            while (bitsIndex < bitsEnd)
+            {
+                bitsLeft --;
+                bits[bitsIndex++] = (0x01 & (b >> bitsLeft)) == 1;
             }
             bitsLeft = 8;
         }

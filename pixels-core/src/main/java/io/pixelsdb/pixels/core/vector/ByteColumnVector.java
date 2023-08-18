@@ -47,8 +47,10 @@ public class ByteColumnVector extends ColumnVector
     public ByteColumnVector(int len)
     {
         super(len);
-        vector = new byte[len];
-        memoryUsage += Byte.BYTES * len;
+        // Issue #545: round vector capacity to a multiple of 8 for boolean columns with nulls padding enabled
+        int vectorCapacity = (len + 7) / 8 * 8;
+        vector = new byte[vectorCapacity];
+        memoryUsage += Byte.BYTES * vectorCapacity;
     }
 
     @Override

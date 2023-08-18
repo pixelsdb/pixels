@@ -168,7 +168,7 @@ public class StringColumnReader extends ColumnReader
             ByteOrder byteOrder = littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
             inputBuffer = Unpooled.wrappedBuffer(input).order(byteOrder);
             readContent(input.remaining(), encoding, byteOrder);
-            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNullOffset = chunkIndex.getIsNullOffset();
             bufferOffset = 0;
             hasNull = true;
             elementIndex = 0;

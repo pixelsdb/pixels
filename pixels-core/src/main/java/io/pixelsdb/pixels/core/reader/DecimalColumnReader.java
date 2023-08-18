@@ -100,7 +100,7 @@ public class DecimalColumnReader extends ColumnReader
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputIndex = this.inputBuffer.position();
             // isNull
-            isNullOffset = inputIndex + (int) chunkIndex.getIsNullOffset();
+            isNullOffset = inputIndex + chunkIndex.getIsNullOffset();
             // re-init
             hasNull = true;
             elementIndex = 0;

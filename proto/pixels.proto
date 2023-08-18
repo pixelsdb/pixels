@@ -228,10 +228,13 @@ message PixelStatistic {
 // ColumnChunk index
 message ColumnChunkIndex {
     optional uint64 chunkOffset = 1;
-    optional uint64 chunkLength = 2;
-    optional uint64 isNullOffset = 3;
+    // the number of bytes of this column chunk (including the isNull bitmap) in the storage
+    optional uint32 chunkLength = 2;
+    // the offset of the isNull bitmap within this column chunk
+    optional uint32 isNullOffset = 3;
     // starting offsets of each pixel in this column chunk
-    repeated uint64 pixelPositions = 4 [packed=true];
+    repeated uint32 pixelPositions = 4 [packed=true];
+    // the statistics of the pixels in this column chunk
     repeated PixelStatistic pixelStatistics = 5;
     // whether this column chunk is stored in little endian
     optional bool littleEndian = 6;

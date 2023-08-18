@@ -90,7 +90,7 @@ public class FloatColumnReader extends ColumnReader
             boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputIndex = inputBuffer.position();
-            isNullOffset = inputIndex + (int) chunkIndex.getIsNullOffset();
+            isNullOffset = inputIndex + chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
             isNullBitIndex = 8;
