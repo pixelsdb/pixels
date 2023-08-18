@@ -23,8 +23,8 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.RunLenByteEncoder;
+import io.pixelsdb.pixels.core.vector.ByteColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
 import java.io.IOException;
 
@@ -51,8 +51,8 @@ public class ByteColumnWriter extends BaseColumnWriter
     @Override
     public int write(ColumnVector vector, int size) throws IOException
     {
-        LongColumnVector columnVector = (LongColumnVector) vector;
-        long[] values = columnVector.vector;
+        ByteColumnVector columnVector = (ByteColumnVector) vector;
+        byte[] values = columnVector.vector;
         int curPartLength;
         int curPartOffset = 0;
         int nextPartLength = size;
@@ -72,7 +72,7 @@ public class ByteColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartByte(LongColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    private void writeCurPartByte(ByteColumnVector columnVector, byte[] values, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -88,7 +88,7 @@ public class ByteColumnWriter extends BaseColumnWriter
                 }
             } else
             {
-                curPixelVector[curPixelVectorIndex++] = (byte) values[i + curPartOffset];
+                curPixelVector[curPixelVectorIndex++] = values[i + curPartOffset];
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
