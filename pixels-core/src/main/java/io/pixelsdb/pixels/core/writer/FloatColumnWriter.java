@@ -28,9 +28,10 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 
 /**
- * pixels
+ * The column writer of float.
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class FloatColumnWriter extends BaseColumnWriter
 {

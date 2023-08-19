@@ -39,21 +39,20 @@ import java.nio.ByteOrder;
  * String column writer.
  * <p>
  * The string column chunk consists of seven fields:
- * 1. pixels field (run length encoded pixels after dictionary encoding or un-encoded string values)
- * 2. lengths field (run length encoded raw string length)
- * 3. origins field (distinct string bytes array)
- * 4. starts field (starting offsets indicating starting points of each string in the origins field)
- * 5. orders field (dumped orders array mapping dictionary encoded value to final sorted order)
- * 6. lengths field offset (an integer value indicating offset of the lengths field in the chunk)
- * 7. origins field offset (an integer value indicating offset of the origins field in the chunk)
- * 8. starts field offset (an integer value indicating offset of the starts field in the chunk)
- * 9. orders field offset (an integer value indicating offset of the orders field in the chunk)
+ * 1. content field (ids in the dictionary or un-encoded string values)
+ * 2. starts field (start offset of each un-encoded string values)
+ * 3. dictionary content field (distinct string bytes array)
+ * 4. dictionary starts field (starting offsets indicating starting points of each string in the dictionary)
+ * 5. starts field offset (an integer value indicating offset of the starts field in the chunk)
+ * 6. dictionary content field offset (an integer value indicating offset of the dictionary content field in the chunk)
+ * 7. dictionary starts field offset (an integer value indicating offset of the dictionary starts field in the chunk)
  * <p>
- * Pixels field is necessary in all cases.
- * Lengths field only exists when un-encoded.
- * Other fields only exist when dictionary encoding is enabled.
+ * Content field is necessary in all cases.
+ * Starts field, starts field offset only exist if the column is not encoded at all.
+ * Other fields only exist when dictionary encoding is dictionary enabled.
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class StringColumnWriter extends BaseColumnWriter
 {
@@ -276,7 +275,7 @@ public class StringColumnWriter extends BaseColumnWriter
 
     private void flushStarts() throws IOException
     {
-        int lensFieldOffset = outputStream.size();
+        int startsFieldOffset = outputStream.size();
         startsArray.add(startOffset); // add the last start offset
         if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
         {
@@ -296,7 +295,7 @@ public class StringColumnWriter extends BaseColumnWriter
 
         ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
         offsetBuf.order(byteOrder);
-        offsetBuf.putInt(lensFieldOffset);
+        offsetBuf.putInt(startsFieldOffset);
         outputStream.write(offsetBuf.array());
     }
 

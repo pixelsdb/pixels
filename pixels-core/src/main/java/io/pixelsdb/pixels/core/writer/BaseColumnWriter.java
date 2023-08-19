@@ -36,7 +36,9 @@ import static java.util.Objects.requireNonNull;
 /**
  * pixels
  *
- * @author guodong
+ * @author guodong, hank
+ * @create 2017-08-09
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public abstract class BaseColumnWriter implements ColumnWriter
 {

@@ -26,8 +26,8 @@ import io.pixelsdb.pixels.core.TypeDescription;
  * It is the same as VarcharColumnWriter, which means it never pads zero
  * at the end when writing a value. This is for performance reasons.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class CharColumnWriter extends VarcharColumnWriter
 {

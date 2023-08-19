@@ -30,8 +30,8 @@ import java.io.IOException;
  * each element consists of content length and content binary.
  * TODO: this class is not yet finished.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class BinaryColumnWriter extends BaseColumnWriter
 {

@@ -30,11 +30,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * Integer column writer.
- * If encoding, use RunLength;
- * Else isLong(1 byte) + content
+ * The column writer for integers.
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class IntegerColumnWriter extends BaseColumnWriter
 {

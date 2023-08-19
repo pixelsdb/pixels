@@ -23,21 +23,26 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
+import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Timestamp column writer.
  * All timestamp values are converted to standard UTC time before they are stored as long values.
  *
- * @author hank
+ * @author hank, guodong
+ * @create 2017-08-06
+ * @update 2023-08-16 Chamonix: support nulls padding
+ * @update 2023-08-19 Zermatt: reduce memory copy and fix curPixelsVector encoding when the current pixel contains nulls
  */
 public class TimestampColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];
+    private final EncodingUtils encodingUtils = new EncodingUtils();
     private final boolean runlengthEncoding;
 
     public TimestampColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
@@ -109,20 +114,24 @@ public class TimestampColumnWriter extends BaseColumnWriter
             {
                 pixelStatRecorder.updateTimestamp(curPixelVector[i]);
             }
-            outputStream.write(encoder.encode(curPixelVector));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
         else
         {
-            ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
-            curVecPartitionBuffer.order(byteOrder);
+            boolean littleEndian = byteOrder.equals(ByteOrder.LITTLE_ENDIAN);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
-                curVecPartitionBuffer.putLong(curPixelVector[i]);
+                if (littleEndian)
+                {
+                    encodingUtils.writeLongLE(outputStream, curPixelVector[i]);
+                }
+                else
+                {
+                    encodingUtils.writeLongBE(outputStream, curPixelVector[i]);
+                }
                 pixelStatRecorder.updateTimestamp(curPixelVector[i]);
             }
-            outputStream.write(curVecPartitionBuffer.array());
         }
-
         super.newPixel();
     }
 

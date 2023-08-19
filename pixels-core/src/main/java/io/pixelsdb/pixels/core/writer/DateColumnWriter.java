@@ -23,23 +23,27 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
+import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DateColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Date column writer.
  * All date values are converted to the number of days from
  * UTC 1970-1-1 0:0：0 before they are stored as int values.
  *
- * 2021-04-25
  * @author hank
+ * @create 2021-04-25
+ * @update 2023-08-16 Chamonix: support nulls padding
+ * @update 2023-08-19 Zermatt: reduce memory copy and fix curPixelsVector encoding when the current pixel contains nulls
  */
 public class DateColumnWriter extends BaseColumnWriter
 {
     private final int[] curPixelVector = new int[pixelStride];
+    private final EncodingUtils encodingUtils = new EncodingUtils();
     private final boolean runlengthEncoding;
 
     public DateColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
@@ -110,20 +114,24 @@ public class DateColumnWriter extends BaseColumnWriter
             {
                 pixelStatRecorder.updateDate(curPixelVector[i]);
             }
-            outputStream.write(encoder.encode(curPixelVector));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
         else
         {
-            ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
-            curVecPartitionBuffer.order(byteOrder);
+            boolean littleEndian = byteOrder.equals(ByteOrder.LITTLE_ENDIAN);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
-                curVecPartitionBuffer.putInt(curPixelVector[i]);
+                if (littleEndian)
+                {
+                    encodingUtils.writeIntLE(outputStream, curPixelVector[i]);
+                }
+                else
+                {
+                    encodingUtils.writeIntBE(outputStream, curPixelVector[i]);
+                }
                 pixelStatRecorder.updateDate(curPixelVector[i]);
             }
-            outputStream.write(curVecPartitionBuffer.array());
         }
-
         super.newPixel();
     }
 

@@ -31,7 +31,8 @@ import static io.pixelsdb.pixels.core.TypeDescription.MAX_SHORT_DECIMAL_PRECISIO
 /**
  * Interface for Pixels column writer.
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public interface ColumnWriter
 {

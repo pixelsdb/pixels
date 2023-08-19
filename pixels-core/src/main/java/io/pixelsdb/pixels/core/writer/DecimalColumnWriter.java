@@ -32,6 +32,7 @@ import java.nio.ByteOrder;
  * <p><b>Note: it only supports short decimals with max precision and scale 18.</b></p>
  *
  * @author hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class DecimalColumnWriter extends BaseColumnWriter
 {

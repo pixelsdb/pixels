@@ -31,7 +31,8 @@ import java.io.IOException;
 /**
  * pixels byte column writer
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class ByteColumnWriter extends BaseColumnWriter
 {

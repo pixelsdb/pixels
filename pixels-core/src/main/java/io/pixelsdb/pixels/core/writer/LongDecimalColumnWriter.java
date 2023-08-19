@@ -31,8 +31,9 @@ import java.nio.ByteOrder;
  * The column writer of long decimals.
  * <p><b>Note: it supports decimals with max precision and scale 38.</b></p>
  *
- * @create 2022-07-01
  * @author hank
+ * @create 2022-07-01
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class LongDecimalColumnWriter extends BaseColumnWriter
 {

@@ -30,7 +30,8 @@ import java.io.IOException;
  * Boolean column writer.
  * Boolean values are compacted using bit-wise bytes, and then these integers are written out.
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class BooleanColumnWriter extends BaseColumnWriter
 {
