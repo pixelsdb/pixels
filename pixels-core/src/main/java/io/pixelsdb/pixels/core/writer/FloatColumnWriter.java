@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.core.writer;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.FloatColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -32,6 +32,7 @@ import java.nio.ByteOrder;
  *
  * @author guodong, hank
  * @update 2023-08-16 Chamonix: support nulls padding
+ * @update 2023-08-20 Palezieux: use FloatColumnVector instead of DoubleColumnVector
  */
 public class FloatColumnWriter extends BaseColumnWriter
 {
@@ -46,8 +47,8 @@ public class FloatColumnWriter extends BaseColumnWriter
     @Override
     public int write(ColumnVector vector, int length) throws IOException
     {
-        DoubleColumnVector columnVector = (DoubleColumnVector) vector;
-        long[] values = columnVector.vector;
+        FloatColumnVector columnVector = (FloatColumnVector) vector;
+        int[] values = columnVector.vector;
         boolean littleEndian = this.byteOrder.equals(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < length; i++)
         {
@@ -65,16 +66,15 @@ public class FloatColumnWriter extends BaseColumnWriter
             }
             else
             {
-                int v = (int) values[i];
                 if (littleEndian)
                 {
-                    encodingUtils.writeIntLE(outputStream, v);
+                    encodingUtils.writeIntLE(outputStream, values[i]);
                 }
                 else
                 {
-                    encodingUtils.writeIntBE(outputStream, v);
+                    encodingUtils.writeIntBE(outputStream, values[i]);
                 }
-                pixelStatRecorder.updateFloat(Float.intBitsToFloat(v));
+                pixelStatRecorder.updateFloat(Float.intBitsToFloat(values[i]));
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleIndex >= pixelStride)

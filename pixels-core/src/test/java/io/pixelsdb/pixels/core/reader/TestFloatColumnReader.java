@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.FloatColumnVector;
 import io.pixelsdb.pixels.core.writer.FloatColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import org.junit.Test;
@@ -45,47 +45,47 @@ public class TestFloatColumnReader
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         FloatColumnWriter columnWriter = new FloatColumnWriter(
                 TypeDescription.createFloat(), writerOption);
-        DoubleColumnVector doubleColumnVector = new DoubleColumnVector(22);
-        doubleColumnVector.add(100.22F);
-        doubleColumnVector.add(103.32F);
-        doubleColumnVector.add(106.43F);
-        doubleColumnVector.add(34.10F);
-        doubleColumnVector.addNull();
-        doubleColumnVector.add(54.09F);
-        doubleColumnVector.add(55.00F);
-        doubleColumnVector.add(67.23F);
-        doubleColumnVector.addNull();
-        doubleColumnVector.add(34.58F);
-        doubleColumnVector.add(555.98F);
-        doubleColumnVector.add(565.76F);
-        doubleColumnVector.add(234.11F);
-        doubleColumnVector.add(675.34F);
-        doubleColumnVector.add(235.58F);
-        doubleColumnVector.add(32434.68F);
-        doubleColumnVector.add(3.58F);
-        doubleColumnVector.add(6.66F);
-        doubleColumnVector.add(7.77F);
-        doubleColumnVector.add(65656565.20F);
-        doubleColumnVector.add(3434.11F);
-        doubleColumnVector.add(54578.22F);
-        columnWriter.write(doubleColumnVector, 22);
+        FloatColumnVector floatColumnVector = new FloatColumnVector(22);
+        floatColumnVector.add(100.22F);
+        floatColumnVector.add(103.32F);
+        floatColumnVector.add(106.43F);
+        floatColumnVector.add(34.10F);
+        floatColumnVector.addNull();
+        floatColumnVector.add(54.09F);
+        floatColumnVector.add(55.00F);
+        floatColumnVector.add(67.23F);
+        floatColumnVector.addNull();
+        floatColumnVector.add(34.58F);
+        floatColumnVector.add(555.98F);
+        floatColumnVector.add(565.76F);
+        floatColumnVector.add(234.11F);
+        floatColumnVector.add(675.34F);
+        floatColumnVector.add(235.58F);
+        floatColumnVector.add(32434.68F);
+        floatColumnVector.add(3.58F);
+        floatColumnVector.add(6.66F);
+        floatColumnVector.add(7.77F);
+        floatColumnVector.add(65656565.20F);
+        floatColumnVector.add(3434.11F);
+        floatColumnVector.add(54578.22F);
+        columnWriter.write(floatColumnVector, 22);
         columnWriter.flush();
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         FloatColumnReader columnReader = new FloatColumnReader(TypeDescription.createFloat());
-        DoubleColumnVector doubleColumnVector1 = new DoubleColumnVector(22);
+        FloatColumnVector floatColumnVector1 = new FloatColumnVector(22);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
-                10, 0, doubleColumnVector1, chunkIndex);
+                10, 0, floatColumnVector1, chunkIndex);
         for (int i = 0; i < 22; ++i)
         {
-            if (!doubleColumnVector1.noNulls && doubleColumnVector1.isNull[i])
+            if (!floatColumnVector1.noNulls && floatColumnVector1.isNull[i])
             {
-                assert !doubleColumnVector.noNulls && doubleColumnVector.isNull[i];
+                assert !floatColumnVector.noNulls && floatColumnVector.isNull[i];
             }
             else
             {
-                assert doubleColumnVector1.vector[i] == doubleColumnVector.vector[i];
+                assert floatColumnVector1.vector[i] == floatColumnVector.vector[i];
             }
         }
     }

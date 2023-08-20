@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.FloatColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -86,7 +86,7 @@ public class FloatColumnReader extends ColumnReader
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
-        DoubleColumnVector columnVector = (DoubleColumnVector) vector;
+        FloatColumnVector columnVector = (FloatColumnVector) vector;
         if (offset == 0)
         {
             this.inputBuffer = input;

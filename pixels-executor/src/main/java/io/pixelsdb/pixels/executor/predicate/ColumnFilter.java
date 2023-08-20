@@ -337,6 +337,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 doFilter(decv.vector, decv.noNulls ? null : decv.isNull, start, length, result);
                 return;
             case FLOAT:
+                FloatColumnVector fcv = (FloatColumnVector) columnVector;
+                doFilter(fcv.vector, fcv.noNulls ? null : fcv.isNull, start, length, result);
+                return;
             case DOUBLE:
                 DoubleColumnVector dcv = (DoubleColumnVector) columnVector;
                 doFilter(dcv.vector, dcv.noNulls ? null : dcv.isNull, start, length, result);

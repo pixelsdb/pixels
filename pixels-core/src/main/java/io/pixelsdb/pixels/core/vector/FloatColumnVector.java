@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -27,46 +27,48 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * DoubleColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
  * <p>
- * This class represents a nullable double precision floating point column vector.
- * This class uses a 64-bit double value to hold the biggest possible value.
- * Double values in this ColumnVector are stored as a long array by default.
+ * This class represents a nullable single precision floating point column vector.
+ * This class uses a 32-bit double value to hold the biggest possible value.
+ * Float values in this ColumnVector are stored as an int array by default.
  * <p>
  * The vector[] field is public by design for high-performance access in the inner
  * loop of query execution.
+ *
+ * @author hank
+ * @create 2023-08-20 Avry
  */
-public class DoubleColumnVector extends ColumnVector
+public class FloatColumnVector extends ColumnVector
 {
-    public long[] vector;
-    public static final double NULL_VALUE = Double.NaN;
+    public int[] vector;
+    public static final float NULL_VALUE = Float.NaN;
 
     /**
      * Use this constructor by default. All column vectors
      * should normally be the default size.
      */
-    public DoubleColumnVector()
+    public FloatColumnVector()
     {
         this(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
-    public DoubleColumnVector(int len)
+    public FloatColumnVector(int len)
     {
         super(len);
-        vector = new long[len];
-        Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
-        memoryUsage += (long) Long.BYTES * len;
+        vector = new int[len];
+        Arrays.fill(vector, Float.floatToIntBits(NULL_VALUE));
+        memoryUsage += (long) Integer.BYTES * len;
     }
 
     /**
-     * Fill the column vector with the provided value
-     * @param value
+     * Fill the column vector with the provided value.
+     * @param value the value used to fill
      */
-    public void fill(double value)
+    public void fill(float value)
     {
         noNulls = true;
         isRepeating = true;
-        vector[0] = Double.doubleToLongBits(value);
+        vector[0] = Float.floatToIntBits(value);
     }
 
     /**
@@ -83,7 +85,7 @@ public class DoubleColumnVector extends ColumnVector
         if (isRepeating)
         {
             isRepeating = false;
-            long repeatVal = vector[0];
+            int repeatVal = vector[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
@@ -105,14 +107,19 @@ public class DoubleColumnVector extends ColumnVector
     @Override
     public void add(String value)
     {
-        Double v = Double.parseDouble(value);
-        add(v);
+        add(Float.parseFloat(value));
     }
 
     @Override
     public void add(float value)
     {
-        add((double) value);
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        int index = writeIndex++;
+        vector[index] = Float.floatToIntBits(value);
+        isNull[index] = false;
     }
 
     @Override
@@ -122,8 +129,12 @@ public class DoubleColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
+        if (value < Float.MIN_VALUE || value > Float.MAX_VALUE)
+        {
+            throw new IllegalArgumentException("value " + value + " is out of the range of a float");
+        }
         int index = writeIndex++;
-        vector[index] = Double.doubleToLongBits(value);
+        vector[index] = Float.floatToIntBits((float) value);
         isNull[index] = false;
     }
 
@@ -134,7 +145,7 @@ public class DoubleColumnVector extends ColumnVector
         if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
             isNull[index] = false;
-            vector[index] = ((DoubleColumnVector) inputVector).vector[inputIndex];
+            vector[index] = ((FloatColumnVector) inputVector).vector[inputIndex];
         }
         else
         {
@@ -148,7 +159,7 @@ public class DoubleColumnVector extends ColumnVector
     {
         // isRepeating should be false and src should be an instance of DoubleColumnVector.
         // However, we do not check these for performance considerations.
-        DoubleColumnVector source = (DoubleColumnVector) src;
+        FloatColumnVector source = (FloatColumnVector) src;
 
         for (int i = offset; i < offset + length; i++)
         {
@@ -178,7 +189,7 @@ public class DoubleColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 16));
+            hashCode[i] = 31 * hashCode[i] + (this.vector[i] ^ (this.vector[i] >>> 16));
         }
         return hashCode;
     }
@@ -186,7 +197,7 @@ public class DoubleColumnVector extends ColumnVector
     @Override
     public boolean elementEquals(int index, int otherIndex, ColumnVector other)
     {
-        DoubleColumnVector otherVector = (DoubleColumnVector) other;
+        FloatColumnVector otherVector = (FloatColumnVector) other;
         if (!this.isNull[index] && !otherVector.isNull[otherIndex])
         {
             return this.vector[index] == otherVector.vector[otherIndex];
@@ -197,10 +208,10 @@ public class DoubleColumnVector extends ColumnVector
     @Override
     public int compareElement(int index, int otherIndex, ColumnVector other)
     {
-        DoubleColumnVector otherVector = (DoubleColumnVector) other;
+        FloatColumnVector otherVector = (FloatColumnVector) other;
         if (!this.isNull[index] && !otherVector.isNull[otherIndex])
         {
-            return Long.compare(this.vector[index], otherVector.vector[otherIndex]);
+            return Integer.compare(this.vector[index], otherVector.vector[otherIndex]);
         }
         return this.isNull[index] ? -1 : 1;
     }
@@ -208,9 +219,9 @@ public class DoubleColumnVector extends ColumnVector
     @Override
     public void duplicate(ColumnVector inputVector)
     {
-        if (inputVector instanceof DoubleColumnVector)
+        if (inputVector instanceof FloatColumnVector)
         {
-            DoubleColumnVector srcVector = (DoubleColumnVector) inputVector;
+            FloatColumnVector srcVector = (FloatColumnVector) inputVector;
             this.vector = srcVector.vector;
             this.isNull = srcVector.isNull;
             this.writeIndex = srcVector.writeIndex;
@@ -277,7 +288,7 @@ public class DoubleColumnVector extends ColumnVector
     {
         super.reset();
         // Issue #367: We should not rely on the vector to distinguish null values.
-        // Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
+        // Arrays.fill(vector, Float.floatToIntBits(NULL_VALUE));
     }
 
     @Override
@@ -286,10 +297,10 @@ public class DoubleColumnVector extends ColumnVector
         super.ensureSize(size, preserveData);
         if (size > vector.length)
         {
-            long[] oldArray = vector;
-            vector = new long[size];
-            Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
-            memoryUsage += Long.BYTES * size;
+            int[] oldArray = vector;
+            vector = new int[size];
+            Arrays.fill(vector, Float.floatToIntBits(NULL_VALUE));
+            memoryUsage += (long) Integer.BYTES * size;
             length = size;
             if (preserveData)
             {
