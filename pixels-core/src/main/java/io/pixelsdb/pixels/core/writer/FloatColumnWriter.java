@@ -72,7 +72,7 @@ public class FloatColumnWriter extends BaseColumnWriter
                 }
                 else
                 {
-                    encodingUtils.writeLongBE(outputStream, v);
+                    encodingUtils.writeIntBE(outputStream, v);
                 }
                 pixelStatRecorder.updateFloat(Float.intBitsToFloat(v));
             }

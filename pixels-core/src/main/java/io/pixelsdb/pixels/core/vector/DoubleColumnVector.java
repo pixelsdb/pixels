@@ -119,7 +119,13 @@ public class DoubleColumnVector extends ColumnVector
     @Override
     public void add(float value)
     {
-        add((double) value);
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        int index = writeIndex++;
+        vector[index] = Float.floatToIntBits(value);
+        isNull[index] = false;
     }
 
     @Override

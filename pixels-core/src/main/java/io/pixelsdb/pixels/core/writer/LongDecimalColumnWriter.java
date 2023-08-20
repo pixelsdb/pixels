@@ -63,21 +63,22 @@ public class LongDecimalColumnWriter extends BaseColumnWriter
                 {
                     // padding 0 for nulls
                     encodingUtils.writeLongLE(outputStream, 0L);
+                    encodingUtils.writeLongLE(outputStream, 0L);
                 }
             }
             else
             {
                 if (littleEndian)
                 {
-                    encodingUtils.writeLongLE(outputStream, values[i * 2]);
-                    encodingUtils.writeLongLE(outputStream, values[i * 2 + 1]);
+                    encodingUtils.writeLongLE(outputStream, values[i << 1]);
+                    encodingUtils.writeLongLE(outputStream, values[(i << 1) + 1]);
                 }
                 else
                 {
-                    encodingUtils.writeLongBE(outputStream, values[i * 2]);
-                    encodingUtils.writeLongBE(outputStream, values[i * 2 + 1]);
+                    encodingUtils.writeLongBE(outputStream, values[i << 1]);
+                    encodingUtils.writeLongBE(outputStream, values[(i << 1) + 1]);
                 }
-                pixelStatRecorder.updateInteger128(values[i*2], values[i*2+1], 1);
+                pixelStatRecorder.updateInteger128(values[i << 1], values[(i << 1) + 1], 1);
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleIndex >= pixelStride)
