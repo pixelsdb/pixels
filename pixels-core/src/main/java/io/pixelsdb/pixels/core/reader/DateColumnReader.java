@@ -36,7 +36,7 @@ import java.util.Arrays;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * Pixels date column reader
+ * Pixels date column reader.
  * All date values are translated to the specified time zone after read from file.
  *
  * @author hank

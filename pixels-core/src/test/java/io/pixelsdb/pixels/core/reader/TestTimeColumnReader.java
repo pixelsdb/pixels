@@ -22,9 +22,9 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-import io.pixelsdb.pixels.core.vector.DateColumnVector;
-import io.pixelsdb.pixels.core.writer.DateColumnWriter;
+import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
+import io.pixelsdb.pixels.core.writer.TimeColumnWriter;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -33,9 +33,9 @@ import java.nio.ByteOrder;
 
 /**
  * @author hank
- * @create 2023-08-19 Zermatt
+ * @create 2023-08-20 Zermatt
  */
-public class TestDateColumnReader
+public class TestTimeColumnReader
 {
     @Test
     public void test() throws IOException
@@ -43,49 +43,49 @@ public class TestDateColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        DateColumnWriter columnWriter = new DateColumnWriter(
-                TypeDescription.createDate(), writerOption);
-        DateColumnVector dateColumnVector = new DateColumnVector(22);
-        dateColumnVector.add(100);
-        dateColumnVector.add(103);
-        dateColumnVector.add(106);
-        dateColumnVector.add(34);
-        dateColumnVector.addNull();
-        dateColumnVector.add(54);
-        dateColumnVector.add(55);
-        dateColumnVector.add(67);
-        dateColumnVector.addNull();
-        dateColumnVector.add(34);
-        dateColumnVector.add(555);
-        dateColumnVector.add(565);
-        dateColumnVector.add(234);
-        dateColumnVector.add(675);
-        dateColumnVector.add(235);
-        dateColumnVector.add(32434);
-        dateColumnVector.add(3);
-        dateColumnVector.add(6);
-        dateColumnVector.add(7);
-        dateColumnVector.add(65656565);
-        dateColumnVector.add(3434);
-        dateColumnVector.add(54578);
-        columnWriter.write(dateColumnVector, 22);
+        TimeColumnWriter columnWriter = new TimeColumnWriter(
+                TypeDescription.createTime(3), writerOption);
+        TimeColumnVector timeColumnVector = new TimeColumnVector(22, 3);
+        timeColumnVector.add(100);
+        timeColumnVector.add(103);
+        timeColumnVector.add(106);
+        timeColumnVector.add(34);
+        timeColumnVector.addNull();
+        timeColumnVector.add(54);
+        timeColumnVector.add(55);
+        timeColumnVector.add(67);
+        timeColumnVector.addNull();
+        timeColumnVector.add(34);
+        timeColumnVector.add(555);
+        timeColumnVector.add(565);
+        timeColumnVector.add(234);
+        timeColumnVector.add(675);
+        timeColumnVector.add(235);
+        timeColumnVector.add(32434);
+        timeColumnVector.add(3);
+        timeColumnVector.add(6);
+        timeColumnVector.add(7);
+        timeColumnVector.add(65656565);
+        timeColumnVector.add(3434);
+        timeColumnVector.add(54578);
+        columnWriter.write(timeColumnVector, 22);
         columnWriter.flush();
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        DateColumnReader columnReader = new DateColumnReader(TypeDescription.createDate());
-        DateColumnVector dateColumnVector1 = new DateColumnVector(22);
+        TimeColumnReader columnReader = new TimeColumnReader(TypeDescription.createTime(3));
+        TimeColumnVector timeColumnVector1 = new TimeColumnVector(22, 3);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
-                10, 0, dateColumnVector1, chunkIndex);
+                10, 0, timeColumnVector1, chunkIndex);
         for (int i = 0; i < 22; ++i)
         {
-            if (!dateColumnVector1.noNulls && dateColumnVector1.isNull[i])
+            if (!timeColumnVector1.noNulls && timeColumnVector1.isNull[i])
             {
-                assert !dateColumnVector.noNulls && dateColumnVector.isNull[i];
+                assert !timeColumnVector.noNulls && timeColumnVector.isNull[i];
             }
             else
             {
-                assert dateColumnVector1.dates[i] == dateColumnVector.dates[i];
+                assert timeColumnVector1.times[i] == timeColumnVector.times[i];
             }
         }
     }

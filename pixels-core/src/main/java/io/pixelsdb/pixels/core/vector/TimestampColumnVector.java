@@ -365,6 +365,16 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(long micros)
+    {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        set(writeIndex++, micros);
+    }
+
+    @Override
     public void add(Timestamp value)
     {
         if (writeIndex >= getLength())

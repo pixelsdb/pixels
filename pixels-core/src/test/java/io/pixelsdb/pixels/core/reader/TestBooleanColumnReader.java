@@ -43,7 +43,8 @@ public class TestBooleanColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        BooleanColumnWriter columnWriter = new BooleanColumnWriter(TypeDescription.createBoolean(), writerOption);
+        BooleanColumnWriter columnWriter = new BooleanColumnWriter(
+                TypeDescription.createBoolean(), writerOption);
         ByteColumnVector byteColumnVector = new ByteColumnVector(22);
         byteColumnVector.add(false);
         byteColumnVector.add(false);
@@ -74,7 +75,8 @@ public class TestBooleanColumnReader
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         BooleanColumnReader columnReader = new BooleanColumnReader(TypeDescription.createBoolean());
         ByteColumnVector byteColumnVector1 = new ByteColumnVector(22);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22, 10, 0, byteColumnVector1, chunkIndex);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
+                10, 0, byteColumnVector1, chunkIndex);
         for (int i = 0; i < 22; ++i)
         {
             if (!byteColumnVector1.noNulls && byteColumnVector1.isNull[i])

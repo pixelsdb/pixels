@@ -30,7 +30,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
- * @author guodong
+ * @author guodong, hank
  */
 public class BooleanColumnReader extends ColumnReader
 {
