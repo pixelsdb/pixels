@@ -39,8 +39,9 @@ import java.nio.ByteOrder;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * @author guodong
- * @author hank
+ * @author guodong, hank
+ * @create 2018-01-22
+ * @update 2023-08-21 support nulls padding
  */
 public class StringColumnReader extends ColumnReader
 {
@@ -174,6 +175,7 @@ public class StringColumnReader extends ColumnReader
             elementIndex = 0;
             isNullBitIndex = 8;
         }
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         // if dictionary encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
@@ -182,6 +184,10 @@ public class StringColumnReader extends ColumnReader
                     .equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
             {
                 cascadeRLE = true;
+            }
+            if (nullsPadding && cascadeRLE)
+            {
+                throw new IllegalArgumentException("nulls padding is invalid when run-length encoding is cascaded");
             }
             if (vector instanceof BinaryColumnVector)
             {
