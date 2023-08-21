@@ -198,11 +198,12 @@ std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse
 
     // read vectors
     for(int i = 0; i < resultColumns.size(); i++) {
-        if(filterMask != nullptr) {
-            if(filterMask->isNone()) {
-                break;
-            }
-        }
+        // TODO: Refer to Issue #564. Disable data skipping
+        //if(filterMask != nullptr) {
+        //    if(filterMask->isNone()) {
+        //        break;
+        //    }
+        //}
         // Skip the columns that calculate the filter mask, since they are already processed
         int index = curChunkBufferIndex.at(i);
         if(std::find(filterColumnIndex.begin(), filterColumnIndex.end(), index) != filterColumnIndex.end()) {
