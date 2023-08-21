@@ -193,7 +193,7 @@ public class StringColumnReader extends ColumnReader
             {
                 BinaryColumnVector columnVector = (BinaryColumnVector) vector;
                 // read original bytes
-                // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
+                // we get bytes here to reduce memory copies and avoid creating many small byte arrays
                 byte[] buffer = dictContentBuf.array();
                 for (int i = 0; i < size; i++)
                 {
@@ -216,7 +216,12 @@ public class StringColumnReader extends ColumnReader
                     {
                         columnVector.isNull[i + vectorIndex] = true;
                         columnVector.noNulls = false;
-                    } else
+                        if (nullsPadding)
+                        {
+                            contentBuf.skipBytes(Integer.BYTES);
+                        }
+                    }
+                    else
                     {
                         int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
                         int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
@@ -262,7 +267,12 @@ public class StringColumnReader extends ColumnReader
                     {
                         columnVector.isNull[i + vectorIndex] = true;
                         columnVector.noNulls = false;
-                    } else
+                        if (nullsPadding)
+                        {
+                            contentBuf.skipBytes(Integer.BYTES);
+                        }
+                    }
+                    else
                     {
                         int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
                         columnVector.setId(i + vectorIndex, originId);
@@ -309,12 +319,22 @@ public class StringColumnReader extends ColumnReader
                     startsBuf.skipBytes(Integer.BYTES);
                     columnVector.isNull[i + vectorIndex] = true;
                     columnVector.noNulls = false;
-                } else
+                    if (nullsPadding)
+                    {
+                        currentStart = nextStart;
+                        nextStart = startsBuf.readInt();
+                        if (currentStart != nextStart)
+                        {
+                            throw new PixelsReaderException("corrupt start offsets detected while nulls padding is enabled");
+                        }
+                    }
+                }
+                else
                 {
                     currentStart = nextStart;
                     nextStart = startsBuf.readInt();
                     int len = nextStart - currentStart;
-                    // use setRef instead of setVal to reduce memory copy.
+                    // use setRef instead of setVal to reduce memory copy
                     columnVector.setRef(i + vectorIndex, buffer, bufferOffset, len);
                     bufferOffset += len;
                 }
@@ -390,7 +410,8 @@ public class StringColumnReader extends ColumnReader
                     {
                         dictStarts[i++] = bufferStart + (int) startsDecoder.next();
                     }
-                } else
+                }
+                else
                 {
                     DynamicIntArray startsArray;
                     startsArray = new DynamicIntArray(DEFAULT_STARTS_SIZE);
