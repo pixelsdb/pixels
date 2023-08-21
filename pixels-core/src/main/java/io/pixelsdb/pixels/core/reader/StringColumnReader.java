@@ -244,7 +244,7 @@ public class StringColumnReader extends ColumnReader
                     columnVector.dictOffsets = dictStarts;
                 }
                 checkArgument(columnVector.dictArray == dictContentBuf.array(),
-                        "dictionaries from the column vector and the origins buffer are not consistent");
+                        "dictionaries in the column vector and the input buffer are inconsistent");
 
                 for (int i = 0; i < size; i++)
                 {
@@ -315,8 +315,6 @@ public class StringColumnReader extends ColumnReader
                 }
                 if (hasNull && isNull[isNullBitIndex] == 1)
                 {
-                    // skip the repeated starts for null values
-                    startsBuf.skipBytes(Integer.BYTES);
                     columnVector.isNull[i + vectorIndex] = true;
                     columnVector.noNulls = false;
                     if (nullsPadding)

@@ -139,19 +139,20 @@ public class StringColumnWriter extends BaseColumnWriter
         for (int i = 0; i < curPartLength; i++)
         {
             curPixelEleIndex++;
-            if (nullsPadding)
-            {
-                // add starts even if the current value is null, this is for random access
-                startsArray.add(startOffset);
-            }
             if (columnVector.isNull[curPartOffset + i])
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // add starts even if the current value is null, this is for random access
+                    startsArray.add(startOffset);
+                }
             }
             else
             {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                startsArray.add(startOffset);
                 startOffset += vLens[curPartOffset + i];
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i],
                         vLens[curPartOffset + i], 1);
