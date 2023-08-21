@@ -100,6 +100,18 @@ public class LongColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(int v)
+    {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        int index = writeIndex++;
+        vector[index] = v;
+        isNull[index] = false;
+    }
+
+    @Override
     public int[] accumulateHashCode(int[] hashCode)
     {
         requireNonNull(hashCode, "hashCode is null");
