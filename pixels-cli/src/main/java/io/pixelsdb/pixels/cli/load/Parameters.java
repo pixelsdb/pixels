@@ -43,6 +43,7 @@ public class Parameters
     private String schema;
     private int[] orderMapping;
     private final EncodingLevel encodingLevel;
+    private final boolean nullsPadding;
 
     public String[] getLoadingPaths()
     {
@@ -74,8 +75,13 @@ public class Parameters
         return encodingLevel;
     }
 
+    public boolean isNullsPadding()
+    {
+        return nullsPadding;
+    }
+
     public Parameters(String dbName, String tableName, int maxRowNum, String regex,
-                      EncodingLevel encodingLevel, @Nullable String[] loadingPaths)
+                      EncodingLevel encodingLevel, boolean nullsPadding, @Nullable String[] loadingPaths)
     {
         this.dbName = dbName;
         this.tableName = tableName;
@@ -83,6 +89,7 @@ public class Parameters
         this.regex = regex;
         this.loadingPaths = loadingPaths;
         this.encodingLevel = encodingLevel;
+        this.nullsPadding = nullsPadding;
     }
 
     /**

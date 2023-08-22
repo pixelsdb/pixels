@@ -72,6 +72,7 @@ public class PixelsConsumer extends Consumer
             int maxRowNum = parameters.getMaxRowNum();
             String regex = parameters.getRegex();
             EncodingLevel encodingLevel = parameters.getEncodingLevel();
+            boolean nullsPadding = parameters.isNullsPadding();
             if (regex.equals("\\s"))
             {
                 regex = " ";
@@ -138,6 +139,7 @@ public class PixelsConsumer extends Consumer
                                     .setReplication(replication)
                                     .setBlockPadding(true)
                                     .setEncodingLevel(encodingLevel)
+                                    .setNullsPadding(nullsPadding)
                                     .setCompressionBlockSize(1)
                                     .build();
                         }

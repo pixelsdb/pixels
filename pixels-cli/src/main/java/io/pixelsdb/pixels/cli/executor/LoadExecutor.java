@@ -53,6 +53,7 @@ public class LoadExecutor implements CommandExecutor
         int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
         EncodingLevel encodingLevel = EncodingLevel.from(Integer.parseInt(ns.getString("encoding_level")));
         System.out.println("encoding level: " + encodingLevel);
+        boolean nullsPadding = Boolean.parseBoolean(ns.getString("nulls_padding"));
         String[] loadingDataPaths = null;
         if (paths != null)
         {
@@ -70,7 +71,8 @@ public class LoadExecutor implements CommandExecutor
 
         Storage storage = StorageFactory.Instance().getStorage(origin);
 
-        Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex, encodingLevel, loadingDataPaths);
+        Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex,
+                encodingLevel, nullsPadding, loadingDataPaths);
 
         // source already exist, producer option is false, add list of source to the queue
         List<String> fileList = storage.listPaths(origin);
