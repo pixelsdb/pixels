@@ -115,7 +115,6 @@ public class DateColumnReader extends ColumnReader
 
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
         {
-            checkArgument(!nullsPadding, "nullsPadding should not be enabled for encoded column chunk");
             for (int i = 0; i < size; i++)
             {
                 if (elementIndex % pixelStride == 0)
