@@ -43,9 +43,8 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
  * <p>
  * When setting data by reference, the caller
  * is responsible for allocating the byte arrays used to hold the data.
- * You can also set data by value, as long as you call the initBuffer() method first.
- * You can mix "by value" and "by reference" in the same column vector,
- * though that use is probably not typical.
+ * You can also set data by value. You can mix "by value" and "by reference" in the
+ * same column vector, though that use is probably not typical.
  */
 public class BinaryColumnVector extends ColumnVector
 {
