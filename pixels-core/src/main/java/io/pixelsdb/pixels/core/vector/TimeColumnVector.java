@@ -43,8 +43,8 @@ import static java.util.Objects.requireNonNull;
  * Generally, the caller will fill in a scratch time object with values from a row, work
  * using the scratch time, and then perhaps update the column vector row with a result.
  *
- * @create 2021-04-25
  * @author hank
+ * @create 2021-04-25
  */
 public class TimeColumnVector extends ColumnVector
 {
