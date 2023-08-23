@@ -44,8 +44,6 @@ public class IntegerColumnReader extends ColumnReader
     private ByteBuffer inputBuffer;
     private InputStream inputStream;
     private int isNullOffset = 0;
-    private int isNullBitIndex = 0;
-    private byte[] isNull = new byte[8];
 
     /**
      * True if the data type of the values is long (int64), otherwise the data type is int32.
@@ -80,7 +78,6 @@ public class IntegerColumnReader extends ColumnReader
             this.decoder = null;
         }
         this.inputBuffer = null;
-        this.isNull = null;
     }
 
     /**
@@ -118,7 +115,6 @@ public class IntegerColumnReader extends ColumnReader
             // re-init
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 8;
             if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.NONE))
             {
                 isLong = type.getCategory() == TypeDescription.Category.LONG;
