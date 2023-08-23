@@ -47,8 +47,6 @@ public class TimestampColumnReader extends ColumnReader
     private InputStream inputStream = null;
     private RunLenIntDecoder decoder = null;
     private int isNullOffset = 0;
-    private int isNullBitIndex = 0;
-    private byte[] isNull = new byte[8];
 
     TimestampColumnReader(TypeDescription type)
     {
@@ -71,7 +69,10 @@ public class TimestampColumnReader extends ColumnReader
     @Override
     public void close() throws IOException
     {
-        isNull = null;
+        if (inputStream != null)
+        {
+            inputStream.close();
+        }
     }
 
     /**
@@ -108,7 +109,6 @@ public class TimestampColumnReader extends ColumnReader
             isNullOffset = inputBuffer.position() + chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 8;
         }
 
         boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);

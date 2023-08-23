@@ -39,9 +39,7 @@ public class DoubleColumnReader extends ColumnReader
 {
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;
-    private byte[] isNull = new byte[8];
     private int isNullOffset = 0;
-    private int isNullBitIndex = 0;
     private int inputIndex = 0;
 
     DoubleColumnReader(TypeDescription type)
@@ -67,7 +65,6 @@ public class DoubleColumnReader extends ColumnReader
     public void close() throws IOException
     {
         this.inputBuffer = null;
-        this.isNull = null;
     }
 
     /**
@@ -99,83 +96,56 @@ public class DoubleColumnReader extends ColumnReader
             // re-init
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 8;
         }
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
-        if (nullsPadding)
+        // read without copying the de-compacted content and isNull
+        int numLeft = size, numToRead, bytesToDeCompact;
+        for (int i = vectorIndex; numLeft > 0; )
         {
-            // read without copying the de-compacted content and isNull
-            int numLeft = size, numToRead, bytesToDeCompact;
-            for (int i = vectorIndex; numLeft > 0; )
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
-                if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
-                {
-                    // read to the end of the current pixel
-                    numToRead = pixelStride - elementIndex % pixelStride;
-                } else
-                {
-                    numToRead = numLeft;
-                }
-                bytesToDeCompact = (numToRead + 7) / 8;
-                // read isNull
-                int pixelId = elementIndex / pixelStride;
-                hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-                if (hasNull)
-                {
-                    BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
-                    isNullOffset += bytesToDeCompact;
-                    columnVector.noNulls = false;
-                } else
-                {
-                    Arrays.fill(columnVector.isNull, i, i + numToRead, false);
-                }
-                // read content
+                // read to the end of the current pixel
+                numToRead = pixelStride - elementIndex % pixelStride;
+            } else
+            {
+                numToRead = numLeft;
+            }
+            bytesToDeCompact = (numToRead + 7) / 8;
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            if (hasNull)
+            {
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                isNullOffset += bytesToDeCompact;
+                columnVector.noNulls = false;
+            } else
+            {
+                Arrays.fill(columnVector.isNull, i, i + numToRead, false);
+            }
+            // read content
+            if (nullsPadding)
+            {
                 for (int j = i; j < i + numToRead; ++j)
                 {
                     columnVector.vector[j] = inputBuffer.getLong(inputIndex);
                     inputIndex += Long.BYTES;
                 }
-                // update variables
-                numLeft -= numToRead;
-                elementIndex += numToRead;
-                i += numToRead;
-            }
-        }
-        else
-        {
-            for (int i = 0; i < size; i++)
+            } else
             {
-                if (elementIndex % pixelStride == 0)
+                for (int j = i; j < i + numToRead; ++j)
                 {
-                    int pixelId = elementIndex / pixelStride;
-                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-                    if (hasNull && isNullBitIndex > 0)
+                    if (!(hasNull && columnVector.isNull[j]))
                     {
-                        BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
-                        isNullBitIndex = 0;
+                        columnVector.vector[j] = this.inputBuffer.getLong(inputIndex);
+                        inputIndex += Long.BYTES;
                     }
                 }
-                if (hasNull && isNullBitIndex >= 8)
-                {
-                    BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
-                    isNullBitIndex = 0;
-                }
-                if (hasNull && isNull[isNullBitIndex] == 1)
-                {
-                    columnVector.isNull[i + vectorIndex] = true;
-                    columnVector.noNulls = false;
-                } else
-                {
-                    // columnVector.vector[i + vectorIndex] = encodingUtils.readLongLE(this.input, inputIndex);
-                    columnVector.vector[i + vectorIndex] = this.inputBuffer.getLong(inputIndex);
-                    inputIndex += Long.BYTES;
-                }
-                if (hasNull)
-                {
-                    isNullBitIndex++;
-                }
-                elementIndex++;
             }
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
         }
     }
 }
