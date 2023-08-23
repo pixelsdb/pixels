@@ -85,6 +85,11 @@ public abstract class ColumnReader implements Closeable
         }
     }
 
+    public ColumnReader(TypeDescription type)
+    {
+        this.type = requireNonNull(type, "type is null");
+    }
+
     /**
      * Read values from input buffer.
      * Values after specified offset are going to be put into the specified vector.
@@ -103,11 +108,6 @@ public abstract class ColumnReader implements Closeable
                               int offset, int size, int pixelStride, final int vectorIndex,
                               ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException;
 
-    public ColumnReader(TypeDescription type)
-    {
-        this.type = requireNonNull(type, "type is null");
-    }
-
     /**
      * Closes this column reader and releases any resources associated
      * with it. If the column reader is already closed then invoking this
@@ -122,5 +122,5 @@ public abstract class ColumnReader implements Closeable
      * @throws IOException if an I/O error occurs
      */
     @Override
-    abstract public void close() throws IOException;
+    public abstract void close() throws IOException;
 }

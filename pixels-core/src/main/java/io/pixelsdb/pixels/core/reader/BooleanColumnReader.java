@@ -36,14 +36,12 @@ public class BooleanColumnReader extends ColumnReader
 {
     private ByteBuffer inputBuffer;
     private byte[] bits;
-    private byte[] isNull;
     /**
      * The index of {@link #bits} if the column chunk is not nulls-padded,
      * or the index of {@link #inputBuffer} if the column chunk is nulls-padded.
      */
     private int bitsOrInputIndex = 0;
     private int isNullOffset = 0;
-    private int isNullBitIndex = 0;
 
     BooleanColumnReader(TypeDescription type)
     {
@@ -68,7 +66,6 @@ public class BooleanColumnReader extends ColumnReader
     {
         this.inputBuffer = null;
         this.bits = null;
-        this.isNull = null;
     }
 
     /**
@@ -101,13 +98,11 @@ public class BooleanColumnReader extends ColumnReader
                 bytesToDeCompact = chunkIndex.getIsNullOffset();
                 bits = new byte[bytesToDeCompact * 8];
                 BitUtils.bitWiseDeCompact(bits, input, input.position(), bytesToDeCompact);
-                isNull = new byte[8];
             }
             else
             {
                 // we will try to de-compact directly into the vector of the column chunk
                 bits = null;
-                isNull = null;
             }
             // read isNull
             isNullOffset = input.position() + chunkIndex.getIsNullOffset();
@@ -115,82 +110,56 @@ public class BooleanColumnReader extends ColumnReader
             bitsOrInputIndex = 0;
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 8;
         }
-        if (nullsPadding)
+
+        // read without copying the de-compacted content and isNull
+        int numLeft = size, numToRead;
+        for (int i = vectorIndex; numLeft > 0;)
         {
-            // read without copying the de-compacted content and isNull
-            int numLeft = size, numToRead;
-            for (int i = vectorIndex; numLeft > 0;)
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
-                if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
-                {
-                    // read to the end of the current pixel
-                    numToRead = pixelStride - elementIndex % pixelStride;
-                }
-                else
-                {
-                    numToRead = numLeft;
-                }
-                bytesToDeCompact = (numToRead + 7) / 8;
-                // read isNull
-                int pixelId = elementIndex / pixelStride;
-                hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-                if (hasNull)
-                {
-                    BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
-                    isNullOffset += bytesToDeCompact;
-                    columnVector.noNulls = false;
-                }
-                else
-                {
-                    Arrays.fill(columnVector.isNull, i, i + numToRead, false);
-                }
-                // read content
+                // read to the end of the current pixel
+                numToRead = pixelStride - elementIndex % pixelStride;
+            }
+            else
+            {
+                numToRead = numLeft;
+            }
+            bytesToDeCompact = (numToRead + 7) / 8;
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            if (hasNull)
+            {
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                isNullOffset += bytesToDeCompact;
+                columnVector.noNulls = false;
+            }
+            else
+            {
+                Arrays.fill(columnVector.isNull, i, i + numToRead, false);
+            }
+            // read content
+            if (nullsPadding)
+            {
                 BitUtils.bitWiseDeCompact(columnVector.vector, i, numToRead, inputBuffer, bitsOrInputIndex);
-                // update variables
-                numLeft -= numToRead;
-                elementIndex += numToRead;
-                i += numToRead;
                 bitsOrInputIndex += bytesToDeCompact;
             }
-        }
-        else
-        {
-            for (int i = 0; i < size; i++)
+            else
             {
-                if (elementIndex % pixelStride == 0)
+                bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
+                for (int j = i; j < i + numToRead; ++j)
                 {
-                    int pixelId = elementIndex / pixelStride;
-                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-                    // skip the padding bits at the end of the previous pixel
-                    bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
-                    if (hasNull && isNullBitIndex > 0)
+                    if (!(hasNull && columnVector.isNull[j]))
                     {
-                        BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
-                        isNullBitIndex = 0;
+                        columnVector.vector[j] = bits[bitsOrInputIndex++];
                     }
                 }
-                if (hasNull && isNullBitIndex >= 8)
-                {
-                    BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
-                    isNullBitIndex = 0;
-                }
-                if (hasNull && isNull[isNullBitIndex] == 1)
-                {
-                    columnVector.isNull[i + vectorIndex] = true;
-                    columnVector.noNulls = false;
-                }
-                else
-                {
-                    columnVector.vector[i + vectorIndex] = bits[bitsOrInputIndex++];
-                }
-                if (hasNull)
-                {
-                    isNullBitIndex++;
-                }
-                elementIndex++;
             }
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
         }
     }
 }
