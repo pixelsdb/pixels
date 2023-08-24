@@ -40,8 +40,8 @@ import static java.util.Objects.requireNonNull;
  * 64-bit integers in the vector, with the high 64 bits in the lower index. This is
  * not affected by the endianness of the column reader or writer.
  *
- * Created at: 01/07/2022
- * Author: hank
+ * @author hank
+ * @create 2022-07-01
  */
 public class LongDecimalColumnVector extends ColumnVector
 {

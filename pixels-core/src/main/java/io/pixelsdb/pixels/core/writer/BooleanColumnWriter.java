@@ -20,27 +20,26 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.vector.ByteColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 
 /**
  * Boolean column writer.
  * Boolean values are compacted using bit-wise bytes, and then these integers are written out.
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class BooleanColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
 
-    public BooleanColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public BooleanColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
     }
 
     @Override
@@ -76,6 +75,11 @@ public class BooleanColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 for nulls
+                    curPixelVector[curPixelVectorIndex++] = 0x00;
+                }
             }
             else
             {
@@ -97,5 +101,11 @@ public class BooleanColumnWriter extends BaseColumnWriter
         outputStream.write(BitUtils.bitWiseCompact(curPixelVector, curPixelVectorIndex));
 
         super.newPixel();
+    }
+
+    @Override
+    public boolean decideNullsPadding(PixelsWriterOption writerOption)
+    {
+        return writerOption.isNullsPadding();
     }
 }

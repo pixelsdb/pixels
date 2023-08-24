@@ -1087,6 +1087,7 @@ public final class TypeDescription
             case TIMESTAMP:
                 return new TimestampColumnVector(maxSize, precision);
             case FLOAT:
+                return new FloatColumnVector(maxSize);
             case DOUBLE:
                 return new DoubleColumnVector(maxSize);
             case DECIMAL:

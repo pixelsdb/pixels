@@ -123,7 +123,9 @@ public class Main
                 argumentParser.addArgument("-c", "--consumer_thread_num").setDefault("4").required(true)
                         .help("specify the number of consumer threads used for data generation");
                 argumentParser.addArgument("-e", "--encoding_level").setDefault("2")
-                        .help("specify the the encoding level for data loading");
+                        .help("specify the encoding level for data loading");
+                argumentParser.addArgument("-p", "--nulls_padding").setDefault(false)
+                        .help("specify whether nulls padding is enabled");
                 argumentParser.addArgument("-l", "--loading_data_paths")
                         .help("specify the paths where the data is loaded into");
 

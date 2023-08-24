@@ -93,7 +93,7 @@ public abstract class ColumnVector implements AutoCloseable
     {
         this.length = len;
         isNull = new boolean[len];
-        memoryUsage += len + Integer.BYTES*3 + 4;
+        memoryUsage += len + Integer.BYTES * 3 + 4;
         noNulls = true;
         isRepeating = false;
         preFlattenNoNulls = true;
@@ -203,7 +203,7 @@ public abstract class ColumnVector implements AutoCloseable
     }
 
     /**
-     * Get the approximate (may be slightly lower than actual)
+     * Get the approximate (maybe slightly lower than actual)
      * cumulative memory usage, which is more meaningful for GC
      * performance tuning.
      *

@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
@@ -33,14 +32,15 @@ import java.nio.ByteOrder;
  * <p><b>Note: it only supports short decimals with max precision and scale 18.</b></p>
  *
  * @author hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class DecimalColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public DecimalColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public DecimalColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         encodingUtils = new EncodingUtils();
     }
 
@@ -58,6 +58,11 @@ public class DecimalColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 for nulls
+                    encodingUtils.writeLongLE(outputStream, 0L);
+                }
             }
             else
             {
@@ -78,5 +83,11 @@ public class DecimalColumnWriter extends BaseColumnWriter
             }
         }
         return outputStream.size();
+    }
+
+    @Override
+    public boolean decideNullsPadding(PixelsWriterOption writerOption)
+    {
+        return writerOption.isNullsPadding();
     }
 }

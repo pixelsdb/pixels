@@ -37,13 +37,12 @@ public class PixelsReaderOption
     private int rgStart = 0;
     private int rgLen = -1;     // -1 means reading to the end of the file
 
-    public PixelsReaderOption()
-    {
-    }
+    public PixelsReaderOption() { }
 
-    public void includeCols(String[] columnNames)
+    public PixelsReaderOption includeCols(String[] columnNames)
     {
         this.includedCols = columnNames;
+        return this;
     }
 
     public String[] getIncludedCols()
@@ -51,9 +50,10 @@ public class PixelsReaderOption
         return includedCols;
     }
 
-    public void predicate(PixelsPredicate predicate)
+    public PixelsReaderOption predicate(PixelsPredicate predicate)
     {
         this.predicate = predicate;
+        return this;
     }
 
     public Optional<PixelsPredicate> getPredicate()
@@ -65,9 +65,10 @@ public class PixelsReaderOption
         return Optional.of(predicate);
     }
 
-    public void skipCorruptRecords(boolean skipCorruptRecords)
+    public PixelsReaderOption skipCorruptRecords(boolean skipCorruptRecords)
     {
         this.skipCorruptRecords = skipCorruptRecords;
+        return this;
     }
 
     public boolean isSkipCorruptRecords()
@@ -75,9 +76,10 @@ public class PixelsReaderOption
         return skipCorruptRecords;
     }
 
-    public void transId(long transId)
+    public PixelsReaderOption transId(long transId)
     {
         this.transId = transId;
+        return this;
     }
 
     public long getTransId()
@@ -85,10 +87,11 @@ public class PixelsReaderOption
         return this.transId;
     }
 
-    public void rgRange(int rgStart, int rgLen)
+    public PixelsReaderOption rgRange(int rgStart, int rgLen)
     {
         this.rgStart = rgStart;
         this.rgLen = rgLen;
+        return this;
     }
 
     public int getRGStart()
@@ -101,9 +104,10 @@ public class PixelsReaderOption
         return this.rgLen;
     }
 
-    public void tolerantSchemaEvolution(boolean tolerantSchemaEvolution)
+    public PixelsReaderOption tolerantSchemaEvolution(boolean tolerantSchemaEvolution)
     {
         this.tolerantSchemaEvolution = tolerantSchemaEvolution;
+        return this;
     }
 
     public boolean isTolerantSchemaEvolution()
@@ -111,9 +115,10 @@ public class PixelsReaderOption
         return tolerantSchemaEvolution;
     }
 
-    public void enableEncodedColumnVector(boolean enableEncodedColumnVector)
+    public PixelsReaderOption enableEncodedColumnVector(boolean enableEncodedColumnVector)
     {
         this.enableEncodedColumnVector = enableEncodedColumnVector;
+        return this;
     }
 
     public boolean isEnableEncodedColumnVector()

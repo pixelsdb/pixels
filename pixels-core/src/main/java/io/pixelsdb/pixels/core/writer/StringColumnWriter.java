@@ -39,21 +39,20 @@ import java.nio.ByteOrder;
  * String column writer.
  * <p>
  * The string column chunk consists of seven fields:
- * 1. pixels field (run length encoded pixels after dictionary encoding or un-encoded string values)
- * 2. lengths field (run length encoded raw string length)
- * 3. origins field (distinct string bytes array)
- * 4. starts field (starting offsets indicating starting points of each string in the origins field)
- * 5. orders field (dumped orders array mapping dictionary encoded value to final sorted order)
- * 6. lengths field offset (an integer value indicating offset of the lengths field in the chunk)
- * 7. origins field offset (an integer value indicating offset of the origins field in the chunk)
- * 8. starts field offset (an integer value indicating offset of the starts field in the chunk)
- * 9. orders field offset (an integer value indicating offset of the orders field in the chunk)
+ * 1. content field (ids in the dictionary or un-encoded string values)
+ * 2. starts field (start offset of each un-encoded string values)
+ * 3. dictionary content field (distinct string bytes array)
+ * 4. dictionary starts field (starting offsets indicating starting points of each string in the dictionary)
+ * 5. starts field offset (an integer value indicating offset of the starts field in the chunk)
+ * 6. dictionary content field offset (an integer value indicating offset of the dictionary content field in the chunk)
+ * 7. dictionary starts field offset (an integer value indicating offset of the dictionary starts field in the chunk)
  * <p>
- * Pixels field is necessary in all cases.
- * Lengths field only exists when un-encoded.
- * Other fields only exist when dictionary encoding is enabled.
+ * Content field is necessary in all cases.
+ * Starts field, starts field offset only exist if the column is not encoded at all.
+ * Other fields only exist when dictionary encoding is dictionary enabled.
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public class StringColumnWriter extends BaseColumnWriter
 {
@@ -61,17 +60,34 @@ public class StringColumnWriter extends BaseColumnWriter
      * current vector holding encoded values of string
      */
     private final int[] curPixelVector;
-    private final DynamicIntArray startsArray = new DynamicIntArray();  // lengths of each string when un-encoded
-    private final Dictionary dictionary = new HashTableDictionary(Constants.INIT_DICT_SIZE);
+    private final DynamicIntArray startsArray;  // lengths of each string when un-encoded
+    private final Dictionary dictionary;
     private final EncodingUtils encodingUtils;
+    private final boolean runlengthEncoding;
+    private final boolean dictionaryEncoding;
     private int startOffset = 0; // the start offset for the current string when un-encoded
 
-    public StringColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public StringColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
-        this.curPixelVector = new int[pixelStride];
-        this.encodingUtils = new EncodingUtils();
-        encoder = new RunLenIntEncoder(false, true);
+        super(type, writerOption);
+        curPixelVector = new int[pixelStride];
+        encodingUtils = new EncodingUtils();
+        runlengthEncoding = encodingLevel.ge(EncodingLevel.EL2);
+        if (runlengthEncoding)
+        {
+            encoder = new RunLenIntEncoder(false, true);
+        }
+        dictionaryEncoding = encodingLevel.ge(EncodingLevel.EL1);
+        if (dictionaryEncoding)
+        {
+            dictionary = new HashTableDictionary(Constants.INIT_DICT_SIZE);
+            startsArray = null;
+        }
+        else
+        {
+            dictionary = null;
+            startsArray = new DynamicIntArray();
+        }
     }
 
     @Override
@@ -85,7 +101,7 @@ public class StringColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (dictionaryEncoding)
         {
             while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
             {
@@ -123,16 +139,20 @@ public class StringColumnWriter extends BaseColumnWriter
         for (int i = 0; i < curPartLength; i++)
         {
             curPixelEleIndex++;
-            // add starts even if the current value is null, this is for random access
-            startsArray.add(startOffset);
             if (columnVector.isNull[curPartOffset + i])
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // add starts even if the current value is null, this is for random access
+                    startsArray.add(startOffset);
+                }
             }
             else
             {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                startsArray.add(startOffset);
                 startOffset += vLens[curPartOffset + i];
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i],
                         vLens[curPartOffset + i], 1);
@@ -152,6 +172,11 @@ public class StringColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 for nulls
+                    curPixelVector[curPixelVectorIndex++] = 0;
+                }
             }
             else
             {
@@ -168,12 +193,12 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        if (encodingLevel.ge(EncodingLevel.EL2))
+        if (runlengthEncoding)
         {
             // for encoding level 2 or higher, cascade run length encode on dictionary encoding
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
-        else if (encodingLevel == EncodingLevel.EL1)
+        else if (dictionaryEncoding)
         {
             if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
             {
@@ -190,7 +215,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 }
             }
         }
-        // else ignore outputStream
+        // else write nothing to outputStream
 
         super.newPixel();
     }
@@ -201,7 +226,7 @@ public class StringColumnWriter extends BaseColumnWriter
         // flush out pixels field
         super.flush();
         // flush out other fields
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (dictionaryEncoding)
         {
             flushDictionary();
         }
@@ -214,13 +239,13 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (encodingLevel.ge(EncodingLevel.EL1))
+        if (dictionaryEncoding)
         {
             PixelsProto.ColumnEncoding.Builder builder =
                     PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY)
                     .setDictionarySize(dictionary.size());
-            if (encodingLevel.ge(EncodingLevel.EL2))
+            if (runlengthEncoding)
             {
                 builder.setCascadeEncoding(PixelsProto.ColumnEncoding.newBuilder()
                         .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH));
@@ -234,15 +259,24 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void close() throws IOException
     {
-        startsArray.clear();
-        dictionary.clear();
-        encoder.close();
+        if (dictionaryEncoding)
+        {
+            dictionary.clear();
+        }
+        else
+        {
+            startsArray.clear();
+        }
+        if (runlengthEncoding)
+        {
+            encoder.close();
+        }
         super.close();
     }
 
     private void flushStarts() throws IOException
     {
-        int lensFieldOffset = outputStream.size();
+        int startsFieldOffset = outputStream.size();
         startsArray.add(startOffset); // add the last start offset
         if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
         {
@@ -262,7 +296,7 @@ public class StringColumnWriter extends BaseColumnWriter
 
         ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
         offsetBuf.order(byteOrder);
-        offsetBuf.putInt(lensFieldOffset);
+        offsetBuf.putInt(startsFieldOffset);
         outputStream.write(offsetBuf.array());
     }
 
@@ -295,7 +329,7 @@ public class StringColumnWriter extends BaseColumnWriter
         starts[size] = dictStartsOffset - dictContentOffset;
 
         // write out run length starts array
-        if (encodingLevel.ge(EncodingLevel.EL2))
+        if (runlengthEncoding)
         {
             outputStream.write(encoder.encode(starts));
         }
@@ -328,5 +362,15 @@ public class StringColumnWriter extends BaseColumnWriter
         offsetsBuf.putInt(dictContentOffset);
         offsetsBuf.putInt(dictStartsOffset);
         outputStream.write(offsetsBuf.array());
+    }
+
+    @Override
+    public boolean decideNullsPadding(PixelsWriterOption writerOption)
+    {
+        if (writerOption.getEncodingLevel().ge(EncodingLevel.EL2))
+        {
+            return false;
+        }
+        return writerOption.isNullsPadding();
     }
 }

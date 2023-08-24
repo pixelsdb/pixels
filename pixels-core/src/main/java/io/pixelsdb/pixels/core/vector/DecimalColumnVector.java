@@ -41,8 +41,8 @@ import static java.util.Objects.requireNonNull;
  * <p><b>Note: it only supports short decimals with max precision
  * and scale 18.</b></p>
  *
- * Created at: 05/03/2022
- * Author: hank
+ * @author hank
+ * @create 2022-03-05
  */
 public class DecimalColumnVector extends ColumnVector
 {

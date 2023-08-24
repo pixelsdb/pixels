@@ -30,15 +30,8 @@ import static java.util.Objects.requireNonNull;
  * DoubleColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
  * <p>
  * This class represents a nullable double precision floating point column vector.
- * This class will be used for operations on all floating point types (float, double)
- * and as such will use a 64-bit double value to hold the biggest possible value.
- * During copy-in/copy-out, smaller types (i.e. float) will be converted as needed. This will
- * reduce the amount of code that needs to be generated and also will run fast since the
- * machine operates with 64-bit words.
- *
- * Double values in this ColumnVector are stored int a long array by default.
- * Call <code>toDoubleValues()</code> to fill <code>dValues</code> array before reading double values.
- *
+ * This class uses a 64-bit double value to hold the biggest possible value.
+ * Double values in this ColumnVector are stored as a long array by default.
  * <p>
  * The vector[] field is public by design for high-performance access in the inner
  * loop of query execution.
@@ -62,7 +55,7 @@ public class DoubleColumnVector extends ColumnVector
         super(len);
         vector = new long[len];
         Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
-        memoryUsage += Long.BYTES * len;
+        memoryUsage += (long) Long.BYTES * len;
     }
 
     /**

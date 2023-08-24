@@ -20,34 +20,35 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.FloatColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
 
 /**
- * pixels
+ * The column writer of float.
  *
- * @author guodong
+ * @author guodong, hank
+ * @update 2023-08-16 Chamonix: support nulls padding
+ * @update 2023-08-20 Palezieux: use FloatColumnVector instead of DoubleColumnVector
  */
 public class FloatColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public FloatColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public FloatColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
-        super(type, pixelStride, encodingLevel, byteOrder);
+        super(type, writerOption);
         encodingUtils = new EncodingUtils();
     }
 
     @Override
     public int write(ColumnVector vector, int length) throws IOException
     {
-        DoubleColumnVector columnVector = (DoubleColumnVector) vector;
-        long[] values = columnVector.vector;
+        FloatColumnVector columnVector = (FloatColumnVector) vector;
+        int[] values = columnVector.vector;
         boolean littleEndian = this.byteOrder.equals(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < length; i++)
         {
@@ -57,19 +58,23 @@ public class FloatColumnWriter extends BaseColumnWriter
             {
                 hasNull = true;
                 pixelStatRecorder.increment();
+                if (nullsPadding)
+                {
+                    // padding 0 for nulls
+                    encodingUtils.writeIntLE(outputStream, 0);
+                }
             }
             else
             {
-                int v = (int) values[i];
                 if (littleEndian)
                 {
-                    encodingUtils.writeIntLE(outputStream, v);
+                    encodingUtils.writeIntLE(outputStream, values[i]);
                 }
                 else
                 {
-                    encodingUtils.writeLongBE(outputStream, v);
+                    encodingUtils.writeIntBE(outputStream, values[i]);
                 }
-                pixelStatRecorder.updateFloat(Float.intBitsToFloat(v));
+                pixelStatRecorder.updateFloat(Float.intBitsToFloat(values[i]));
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleIndex >= pixelStride)
@@ -78,5 +83,11 @@ public class FloatColumnWriter extends BaseColumnWriter
             }
         }
         return outputStream.size();
+    }
+
+    @Override
+    public boolean decideNullsPadding(PixelsWriterOption writerOption)
+    {
+        return writerOption.isNullsPadding();
     }
 }

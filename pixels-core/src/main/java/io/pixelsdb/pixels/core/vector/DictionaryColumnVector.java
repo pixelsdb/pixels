@@ -36,8 +36,8 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
  * because only one dictionary is supported in this column vector.
  * </p>
  *
- * Created at: 28/01/2023
- * Author: hank
+ * @author hank
+ * @create 2023-01-28
  */
 public class DictionaryColumnVector extends ColumnVector
 {

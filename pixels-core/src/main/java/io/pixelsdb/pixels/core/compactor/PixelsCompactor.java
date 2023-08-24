@@ -371,7 +371,7 @@ public class PixelsCompactor
                     this.rowGroupFooterBuilderList.get(rowGroupId).getRowGroupIndexEntryBuilder()
                             .getColumnChunkIndexEntriesBuilder(columnId);
             long columnChunkOffset = columnChunkIndexBuilder.getChunkOffset();
-            long columnChunkLength = columnChunkIndexBuilder.getChunkLength();
+            int columnChunkLength = columnChunkIndexBuilder.getChunkLength();
             String path = this.rowGroupPaths.get(rowGroupId);
             try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(inputStorage, path))
             {
@@ -380,17 +380,17 @@ public class PixelsCompactor
                     throw new IOException("read file failed.");
                 }
                 fsReader.seek(columnChunkOffset);
-                byte[] chunkBuffer = new byte[(int) columnChunkLength];
+                byte[] chunkBuffer = new byte[columnChunkLength];
                 fsReader.readFully(chunkBuffer);
 
                 // Issue #521: prepare for writing the column chunk, and make sure the start offset is aligned.
-                long chunkStartOffset = fsWriter.prepare((int) columnChunkLength);
+                long chunkStartOffset = fsWriter.prepare(columnChunkLength);
                 int tryAlign = 0;
                 while (chunkAlignment != 0 && chunkStartOffset % chunkAlignment != 0 && tryAlign++ < 2)
                 {
                     int alignBytes = (int) (chunkAlignment - chunkStartOffset % chunkAlignment);
                     this.fsWriter.append(chunkPaddingBuffer, 0, alignBytes);
-                    chunkStartOffset = this.fsWriter.prepare((int) columnChunkLength);
+                    chunkStartOffset = this.fsWriter.prepare(columnChunkLength);
                 }
                 if (tryAlign > 2)
                 {
@@ -398,7 +398,7 @@ public class PixelsCompactor
                     throw new IOException("failed to align the start offset of the column chunk");
                 }
 
-                this.fsWriter.append(chunkBuffer, 0, (int) columnChunkLength);
+                this.fsWriter.append(chunkBuffer, 0, columnChunkLength);
                 /*
                  * Issue #521:
                  * It is not necessary pad the column chunk here, as additional bytes are already padded before

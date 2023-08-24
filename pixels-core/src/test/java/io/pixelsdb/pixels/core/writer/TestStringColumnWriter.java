@@ -30,7 +30,7 @@ import java.util.UUID;
 
 /**
  * @author hank
- * @date 8/13/22
+ * @create 2022-08-13
  */
 public class TestStringColumnWriter
 {
@@ -44,8 +44,10 @@ public class TestStringColumnWriter
         {
             stringColumnVector.add(UUID.randomUUID().toString());
         }
+        PixelsWriterOption pixelsWriterOption = new PixelsWriterOption()
+                .pixelStride(10000).encodingLevel(EncodingLevel.EL2).byteOrder(ByteOrder.BIG_ENDIAN);
         StringColumnWriter stringColumnWriter = new StringColumnWriter(
-                TypeDescription.createString(), 10000, EncodingLevel.EL2, ByteOrder.BIG_ENDIAN);
+                TypeDescription.createString(), pixelsWriterOption);
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < 1000; ++i)
         {

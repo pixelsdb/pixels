@@ -37,15 +37,14 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
  * explicitly present, as opposed to provided by a dictionary reference.
  * In some cases, all the values will be in the same byte array to begin with,
  * but this need not be the case. If each value is in a separate byte
- * array to start with, or not all of the values are in the same original
+ * array to start with, or not all the values are in the same original
  * byte array, you can still assign data by reference into this column vector.
  * This gives flexibility to use this in multiple situations.
  * <p>
  * When setting data by reference, the caller
  * is responsible for allocating the byte arrays used to hold the data.
- * You can also set data by value, as long as you call the initBuffer() method first.
- * You can mix "by value" and "by reference" in the same column vector,
- * though that use is probably not typical.
+ * You can also set data by value. You can mix "by value" and "by reference" in the
+ * same column vector, though that use is probably not typical.
  */
 public class BinaryColumnVector extends ColumnVector
 {

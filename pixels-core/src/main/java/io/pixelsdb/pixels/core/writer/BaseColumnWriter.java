@@ -36,13 +36,16 @@ import static java.util.Objects.requireNonNull;
 /**
  * pixels
  *
- * @author guodong
+ * @author guodong, hank
+ * @create 2017-08-09
+ * @update 2023-08-16 Chamonix: support nulls padding
  */
 public abstract class BaseColumnWriter implements ColumnWriter
 {
     final int pixelStride;                     // indicate num of elements in a pixel
     final EncodingLevel encodingLevel;         // indicate the encoding level during writing
     final ByteOrder byteOrder;                 // indicate the endianness used during writing
+    final boolean nullsPadding;                // indicate whether nulls are padded by arbitrary value
     final boolean[] isNull;
     private final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
     private final PixelsProto.ColumnStatistic.Builder columnChunkStat;
@@ -64,16 +67,17 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final ByteArrayOutputStream outputStream;  // column chunk content
     private final ByteArrayOutputStream isNullStream;  // column chunk isNull
 
-    public BaseColumnWriter(TypeDescription type, int pixelStride, EncodingLevel encodingLevel, ByteOrder byteOrder)
+    public BaseColumnWriter(TypeDescription type, PixelsWriterOption writerOption)
     {
         this.type = requireNonNull(type, "type is null");
-        this.pixelStride = pixelStride;
-        this.encodingLevel = encodingLevel;
-        this.byteOrder = requireNonNull(byteOrder, "byteOrder is null");
+        this.pixelStride = requireNonNull(writerOption, "writerOption is null").getPixelStride();
+        this.encodingLevel = requireNonNull(writerOption.getEncodingLevel(), "encodingLevel is null");
+        this.byteOrder = requireNonNull(writerOption.getByteOrder(), "byteOrder is null");
+        this.nullsPadding = decideNullsPadding(writerOption);
         this.isNull = new boolean[pixelStride];
-
         this.columnChunkIndex = PixelsProto.ColumnChunkIndex.newBuilder()
-                .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN));
+                .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
+                .setNullsPadding(nullsPadding);
         this.columnChunkStat = PixelsProto.ColumnStatistic.newBuilder();
         this.pixelStatRecorder = StatsRecorder.create(type);
         this.columnChunkStatRecorder = StatsRecorder.create(type);
@@ -82,6 +86,9 @@ public abstract class BaseColumnWriter implements ColumnWriter
         this.outputStream = new ByteArrayOutputStream(pixelStride);
         this.isNullStream = new ByteArrayOutputStream(pixelStride);
     }
+
+    @Override
+    public abstract boolean decideNullsPadding(PixelsWriterOption writerOption);
 
     /**
      * Write ColumnVector

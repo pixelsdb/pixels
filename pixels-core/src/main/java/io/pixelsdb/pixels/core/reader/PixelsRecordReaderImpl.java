@@ -722,7 +722,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                  * readCost.setMs(readTimeMs);
                  * readPerfMetrics.addSeqRead(readCost);
                  */
-                actionFutures.add(requestBatch.add(transId, chunk.offset, (int)chunk.length)
+                actionFutures.add(requestBatch.add(transId, chunk.offset, chunk.length)
                         .thenAccept(resp ->
                 {
                     if (resp != null)
@@ -1204,9 +1204,9 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         public final int rowGroupId;
         public final int columnId;
         public final long offset;
-        public final long length;
+        public final int length;
 
-        public ChunkId(int rowGroupId, int columnId, long offset, long length)
+        public ChunkId(int rowGroupId, int columnId, long offset, int length)
         {
             this.rowGroupId = rowGroupId;
             this.columnId = columnId;

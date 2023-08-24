@@ -378,6 +378,9 @@ public class PeerDownloader
                     record.put(columns.get(i).getName(), tscv.times[rowIdx]);
                     break;
                 case FLOAT:
+                    FloatColumnVector fcv = (FloatColumnVector) columnVectors.get(i);
+                    record.put(columns.get(i).getName(), fcv.vector[rowIdx]);
+                    break;
                 case DOUBLE:
                     DoubleColumnVector dbcv = (DoubleColumnVector) columnVectors.get(i);
                     record.put(columns.get(i).getName(), dbcv.vector[rowIdx]);
