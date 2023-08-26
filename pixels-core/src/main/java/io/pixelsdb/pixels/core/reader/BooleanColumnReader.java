@@ -97,7 +97,7 @@ public class BooleanColumnReader extends ColumnReader
                 // Issue #545: de-compact the byte before isNullOffset instead of the whole chunk
                 bytesToDeCompact = chunkIndex.getIsNullOffset();
                 bits = new byte[bytesToDeCompact * 8];
-                BitUtils.bitWiseDeCompact(bits, input, input.position(), bytesToDeCompact);
+                BitUtils.bitWiseDeCompactBE(bits, input, input.position(), bytesToDeCompact);
             }
             else
             {
@@ -131,7 +131,7 @@ public class BooleanColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                BitUtils.bitWiseDeCompactBE(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
                 isNullOffset += bytesToDeCompact;
                 columnVector.noNulls = false;
             }
@@ -142,7 +142,7 @@ public class BooleanColumnReader extends ColumnReader
             // read content
             if (nullsPadding)
             {
-                BitUtils.bitWiseDeCompact(columnVector.vector, i, numToRead, inputBuffer, bitsOrInputIndex);
+                BitUtils.bitWiseDeCompactBE(columnVector.vector, i, numToRead, inputBuffer, bitsOrInputIndex);
                 bitsOrInputIndex += bytesToDeCompact;
             }
             else

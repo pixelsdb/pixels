@@ -115,11 +115,11 @@ public class TestEncoding
             cur[i] = i > 25;
             exp[i] = i > 25;
         }
-        byte[] input = BitUtils.bitWiseCompact(cur, TestParams.rowNum);
+        byte[] input = BitUtils.bitWiseCompactBE(cur, TestParams.rowNum);
 
         boolean[] res = new boolean[TestParams.rowNum];
         byte[] bytesRes = new byte[input.length * 8];
-        BitUtils.bitWiseDeCompact(bytesRes, input);
+        BitUtils.bitWiseDeCompactBE(bytesRes, input);
         for (int i = 0; i < TestParams.rowNum; i++)
         {
             res[i] = bytesRes[i] == 1;
@@ -128,7 +128,7 @@ public class TestEncoding
 
         bytesRes = new byte[8];
         res = new boolean[8];
-        BitUtils.bitWiseDeCompact(bytesRes, input, 3, 1);
+        BitUtils.bitWiseDeCompactBE(bytesRes, input, 3, 1);
         for (int i = 0; i < 8; i++)
         {
             res[i] = bytesRes[i] == 1;
@@ -149,9 +149,9 @@ public class TestEncoding
             exp[i] = i > 25 ? (byte)1  : (byte) 0;
         }
 
-        byte[] compactedBytes = BitUtils.bitWiseCompact(cur, TestParams.rowNum);
+        byte[] compactedBytes = BitUtils.bitWiseCompactBE(cur, TestParams.rowNum);
         byte[] bytesRes = new byte[compactedBytes.length * 8];
-        BitUtils.bitWiseDeCompact(bytesRes, compactedBytes);
+        BitUtils.bitWiseDeCompactBE(bytesRes, compactedBytes);
         byte[] bytes = new byte[TestParams.rowNum];
         System.arraycopy(bytesRes, 0, bytes, 0, TestParams.rowNum);
         assertArrayEquals(exp, bytes);

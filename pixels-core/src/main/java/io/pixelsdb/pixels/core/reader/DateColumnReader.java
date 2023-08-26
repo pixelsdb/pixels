@@ -131,7 +131,7 @@ public class DateColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                BitUtils.bitWiseDeCompactBE(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
                 isNullOffset += bytesToDeCompact;
                 columnVector.noNulls = false;
             }
