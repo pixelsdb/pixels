@@ -160,7 +160,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
         // isNull
         if (hasNull)
         {
-            isNullStream.write(BitUtils.bitWiseCompactBE(isNull, curPixelIsNullIndex));
+            isNullStream.write(BitUtils.bitWiseCompact(isNull, curPixelIsNullIndex, byteOrder));
             pixelStatRecorder.setHasNull();
         }
         // update position of current pixel

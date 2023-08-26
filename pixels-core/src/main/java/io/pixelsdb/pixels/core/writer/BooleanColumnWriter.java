@@ -98,7 +98,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateBoolean(curPixelVector[i] != 0, 1);
         }
 
-        outputStream.write(BitUtils.bitWiseCompactBE(curPixelVector, curPixelVectorIndex));
+        outputStream.write(BitUtils.bitWiseCompact(curPixelVector, curPixelVectorIndex, byteOrder));
 
         super.newPixel();
     }

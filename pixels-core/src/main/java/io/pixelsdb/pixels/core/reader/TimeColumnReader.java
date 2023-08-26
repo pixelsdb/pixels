@@ -95,6 +95,8 @@ public class TimeColumnReader extends ColumnReader
     {
         TimeColumnVector columnVector = (TimeColumnVector) vector;
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
         if (offset == 0)
         {
             if (inputStream != null)
@@ -102,7 +104,6 @@ public class TimeColumnReader extends ColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
-            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
@@ -111,7 +112,6 @@ public class TimeColumnReader extends ColumnReader
             elementIndex = 0;
         }
 
-        boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
         for (int i = vectorIndex; numLeft > 0;)
@@ -131,7 +131,7 @@ public class TimeColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompactBE(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
                 isNullOffset += bytesToDeCompact;
                 columnVector.noNulls = false;
             }
