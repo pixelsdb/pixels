@@ -80,7 +80,7 @@ public class TestBitUtils
         {
             for (int j = 0; j < 100; ++j)
             {
-                BitUtils.bitWiseDeCompact(bits, buffer, j, 1);
+                BitUtils.bitWiseDeCompact(bits, buffer, j, 1, false);
             }
         }
 

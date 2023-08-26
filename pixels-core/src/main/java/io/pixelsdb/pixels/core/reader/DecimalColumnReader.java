@@ -94,10 +94,11 @@ public class DecimalColumnReader extends ColumnReader
                     ") does not match the column vector of decimal(" + columnVector.getPrecision() + "," +
                     columnVector.getScale() + ")");
         }
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
         if (offset == 0)
         {
             this.inputBuffer = input;
-            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputIndex = this.inputBuffer.position();
             // isNull
@@ -106,7 +107,7 @@ public class DecimalColumnReader extends ColumnReader
             hasNull = true;
             elementIndex = 0;
         }
-        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
         for (int i = vectorIndex; numLeft > 0; )
@@ -125,7 +126,7 @@ public class DecimalColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
                 isNullOffset += bytesToDeCompact;
                 columnVector.noNulls = false;
             } else

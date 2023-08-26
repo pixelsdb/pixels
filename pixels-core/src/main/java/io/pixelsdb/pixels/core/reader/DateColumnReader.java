@@ -95,6 +95,7 @@ public class DateColumnReader extends ColumnReader
     {
         DateColumnVector columnVector = (DateColumnVector) vector;
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
         if (offset == 0)
         {
             if (inputStream != null)
@@ -102,7 +103,6 @@ public class DateColumnReader extends ColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
-            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
@@ -131,7 +131,7 @@ public class DateColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
                 isNullOffset += bytesToDeCompact;
                 columnVector.noNulls = false;
             }

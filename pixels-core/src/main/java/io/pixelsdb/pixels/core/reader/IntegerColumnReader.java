@@ -98,6 +98,9 @@ public class IntegerColumnReader extends ColumnReader
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
+        boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
         // if read from start, init the stream and decoder
         if (offset == 0)
         {
@@ -106,7 +109,6 @@ public class IntegerColumnReader extends ColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
-            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
@@ -121,8 +123,6 @@ public class IntegerColumnReader extends ColumnReader
             }
         }
 
-        boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
-        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
         for (int i = vectorIndex; numLeft > 0; )
@@ -141,7 +141,7 @@ public class IntegerColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
                 isNullOffset += bytesToDeCompact;
                 columnVector.noNulls = false;
             } else

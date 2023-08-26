@@ -25,6 +25,7 @@ import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.Random;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -115,11 +116,11 @@ public class TestEncoding
             cur[i] = i > 25;
             exp[i] = i > 25;
         }
-        byte[] input = BitUtils.bitWiseCompact(cur, TestParams.rowNum);
+        byte[] input = BitUtils.bitWiseCompact(cur, TestParams.rowNum, ByteOrder.BIG_ENDIAN);
 
         boolean[] res = new boolean[TestParams.rowNum];
         byte[] bytesRes = new byte[input.length * 8];
-        BitUtils.bitWiseDeCompact(bytesRes, input);
+        BitUtils.bitWiseDeCompact(bytesRes, input, false);
         for (int i = 0; i < TestParams.rowNum; i++)
         {
             res[i] = bytesRes[i] == 1;
@@ -128,7 +129,7 @@ public class TestEncoding
 
         bytesRes = new byte[8];
         res = new boolean[8];
-        BitUtils.bitWiseDeCompact(bytesRes, input, 3, 1);
+        BitUtils.bitWiseDeCompact(bytesRes, input, 3, 1, false);
         for (int i = 0; i < 8; i++)
         {
             res[i] = bytesRes[i] == 1;
@@ -149,9 +150,9 @@ public class TestEncoding
             exp[i] = i > 25 ? (byte)1  : (byte) 0;
         }
 
-        byte[] compactedBytes = BitUtils.bitWiseCompact(cur, TestParams.rowNum);
+        byte[] compactedBytes = BitUtils.bitWiseCompact(cur, TestParams.rowNum, ByteOrder.BIG_ENDIAN);
         byte[] bytesRes = new byte[compactedBytes.length * 8];
-        BitUtils.bitWiseDeCompact(bytesRes, compactedBytes);
+        BitUtils.bitWiseDeCompact(bytesRes, compactedBytes, false);
         byte[] bytes = new byte[TestParams.rowNum];
         System.arraycopy(bytesRes, 0, bytes, 0, TestParams.rowNum);
         assertArrayEquals(exp, bytes);

@@ -23,20 +23,40 @@ import io.netty.buffer.ByteBuf;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
- * pixels
+ * The bit compaction and de-compaction utils.
  *
  * @author guodong
  * @author hank
+ * @update 2023-08-26 Beijing: support endianness
  */
 public class BitUtils
 {
-    private BitUtils()
+    private BitUtils() { }
+
+    /**
+     * Compact the values into bytes in the byte order. For big endian, the elements with low indexes in values
+     * are compacted into the high bits in each byte, and vice versa.
+     * @param values the boolean values to compact into bytes
+     * @param length the number of elements in values to compact
+     * @param byteOrder the byte order of the compact result
+     * @return the compact result
+     */
+    public static byte[] bitWiseCompact(boolean[] values, int length, ByteOrder byteOrder)
     {
+        if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
+        {
+            return bitWiseCompactLE(values, length);
+        }
+        else
+        {
+            return bitWiseCompactBE(values, length);
+        }
     }
 
-    public static byte[] bitWiseCompact(boolean[] values, int length)
+    private static byte[] bitWiseCompactBE(boolean[] values, int length)
     {
         ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
         // Issue #99: remove to improve performance.
@@ -65,35 +85,54 @@ public class BitUtils
         return bitWiseOutput.toByteArray();
     }
 
-//    public static byte[] bitWiseCompact(long[] values, int length)
-//    {
-//        ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
-//        int bitsToWrite = 1;
-//        int bitsLeft = 8;
-//        byte current = 0;
-//
-//        for (int i = 0; i < length; i++)
-//        {
-//            long v = values[i];
-//            bitsLeft -= bitsToWrite;
-//            current |= v << bitsLeft;
-//            if (bitsLeft == 0)
-//            {
-//                bitWiseOutput.write(current);
-//                current = 0;
-//                bitsLeft = 8;
-//            }
-//        }
-//
-//        if (bitsLeft != 8)
-//        {
-//            bitWiseOutput.write(current);
-//        }
-//
-//        return bitWiseOutput.toByteArray();
-//    }
+    private static byte[] bitWiseCompactLE(boolean[] values, int length)
+    {
+        ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
+        int currBit = 0;
+        byte current = 0;
 
-    public static byte[] bitWiseCompact(byte[] values, int length)
+        for (int i = 0; i < length; i++)
+        {
+            byte v = values[i] ? (byte) 1 : (byte) 0;
+            current |= v << currBit;
+            currBit ++;
+            if (currBit == 8)
+            {
+                bitWiseOutput.write(current);
+                current = 0;
+                currBit = 0;
+            }
+        }
+
+        if (currBit != 0)
+        {
+            bitWiseOutput.write(current);
+        }
+
+        return bitWiseOutput.toByteArray();
+    }
+
+    /**
+     * Compact the values into bytes in the byte order. For big endian, the elements with low indexes in values
+     * are compacted into the high bits in each byte, and vice versa.
+     * @param values the boolean values to compact into bytes, each element should be 0 (false) or 1 (true)
+     * @param length the number of elements in values to compact
+     * @param byteOrder the byte order of the compact result
+     * @return the compact result
+     */
+    public static byte[] bitWiseCompact(byte[] values, int length, ByteOrder byteOrder)
+    {
+        if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
+        {
+            return bitWiseCompactLE(values, length);
+        }
+        else
+        {
+            return bitWiseCompactBE(values, length);
+        }
+    }
+
+    private static byte[] bitWiseCompactBE(byte[] values, int length)
     {
         ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
         // Issue #99: remove to improve performance.
@@ -122,13 +161,54 @@ public class BitUtils
         return bitWiseOutput.toByteArray();
     }
 
+    private static byte[] bitWiseCompactLE(byte[] values, int length)
+    {
+        ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
+        int currBit = 0;
+        byte current = 0;
+
+        for (int i = 0; i < length; i++)
+        {
+            byte v = values[i];
+            current |= v << currBit;
+            currBit ++;
+            if (currBit == 8)
+            {
+                bitWiseOutput.write(current);
+                current = 0;
+                currBit = 0;
+            }
+        }
+
+        if (currBit != 0)
+        {
+            bitWiseOutput.write(current);
+        }
+
+        return bitWiseOutput.toByteArray();
+    }
+
     /**
-     * Bit de-compaction
+     * Bit de-compaction.
      *
+     * @param bits de-compacted bits
      * @param input input byte array
-     * @return de-compacted bits
+     * @param littleEndian whether the byte order of input is little endian
      */
-    public static void bitWiseDeCompact(byte[] bits, byte[] input)
+    public static void bitWiseDeCompact(byte[] bits, byte[] input, boolean littleEndian)
+    {
+        if (littleEndian)
+        {
+            bitWiseDeCompactLE(bits, input);
+        }
+        else
+        {
+            bitWiseDeCompactBE(bits, input);
+        }
+    }
+
+
+    private static void bitWiseDeCompactBE(byte[] bits, byte[] input)
     {
         /*
          * Issue #99:
@@ -148,16 +228,43 @@ public class BitUtils
         }
     }
 
+    private static void bitWiseDeCompactLE(byte[] bits, byte[] input)
+    {
+        byte currBit = 0;
+        int index = 0;
+        for (byte b : input)
+        {
+            while (currBit < 8)
+            {
+                bits[index++] = (byte) (0x01 & (b >> currBit));
+                currBit ++;
+            }
+            currBit = 0;
+        }
+    }
+
     /**
-     * Bit de-compaction
+     * Bit de-compaction.
      *
      * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
      * @param input  input byte array
      * @param offset starting offset of the input
      * @param length byte length of the input
-     * @return de-compacted bits
+     * @param littleEndian whether the byte order of input is little endian
      */
-    public static void bitWiseDeCompact(byte[] bits, byte[] input, int offset, int length)
+    public static void bitWiseDeCompact(byte[] bits, byte[] input, int offset, int length, boolean littleEndian)
+    {
+        if (littleEndian)
+        {
+            bitWiseDeCompactLE(bits, input, offset, length);
+        }
+        else
+        {
+            bitWiseDeCompactBE(bits, input, offset, length);
+        }
+    }
+
+    private static void bitWiseDeCompactBE(byte[] bits, byte[] input, int offset, int length)
     {
         /*
          * Issue #99:
@@ -177,6 +284,21 @@ public class BitUtils
         }
     }
 
+    private static void bitWiseDeCompactLE(byte[] bits, byte[] input, int offset, int length)
+    {
+        byte currBit = 0;
+        int index = 0;
+        for (int i = offset; i < offset + length; i++)
+        {
+            while (currBit < 8)
+            {
+                bits[index++] = (byte)(0x01 & (input[i] >> currBit));
+                currBit ++;
+            }
+            currBit = 0;
+        }
+    }
+
     /**
      * Bit de-compaction, this method does not modify the current position in input byte buffer.
      *
@@ -184,9 +306,21 @@ public class BitUtils
      * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
      * @param length byte length of the input
-     * @return de-compacted bits
+     * @param littleEndian whether the byte order of input is little endian
      */
-    public static void bitWiseDeCompact(byte[] bits, ByteBuffer input, int offset, int length)
+    public static void bitWiseDeCompact(byte[] bits, ByteBuffer input, int offset, int length, boolean littleEndian)
+    {
+        if (littleEndian)
+        {
+            bitWiseDeCompactLE(bits, input, offset, length);
+        }
+        else
+        {
+            bitWiseDeCompactBE(bits, input, offset, length);
+        }
+    }
+
+    private static void bitWiseDeCompactBE(byte[] bits, ByteBuffer input, int offset, int length)
     {
         /*
          * Issue #99:
@@ -208,16 +342,44 @@ public class BitUtils
         }
     }
 
+    private static void bitWiseDeCompactLE(byte[] bits, ByteBuffer input, int offset, int length)
+    {
+        byte currBit = 0, b;
+        int index = 0;
+        for (int i = offset; i < offset + length; ++i)
+        {
+            b = input.get(i);
+            while (currBit < 8)
+            {
+                bits[index++] = (byte) (0x01 & (b >> currBit));
+                currBit ++;
+            }
+            currBit = 0;
+        }
+    }
+
     /**
      * Bit de-compaction, this method does not modify the current position in input byte buffer.
      *
      * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
-     * @param input input byte buffer, which can be direct.
+     * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
      * @param length byte length of the input
-     * @return de-compacted bits
+     * @param littleEndian whether the byte order of input is little endian
      */
-    public static void bitWiseDeCompact(byte[] bits, ByteBuf input, int offset, int length)
+    public static void bitWiseDeCompact(byte[] bits, ByteBuf input, int offset, int length, boolean littleEndian)
+    {
+        if (littleEndian)
+        {
+            bitWiseDeCompactLE(bits, input, offset, length);
+        }
+        else
+        {
+            bitWiseDeCompactBE(bits, input, offset, length);
+        }
+    }
+
+    private static void bitWiseDeCompactBE(byte[] bits, ByteBuf input, int offset, int length)
     {
         /*
          * Issue #99:
@@ -239,6 +401,22 @@ public class BitUtils
         }
     }
 
+    private static void bitWiseDeCompactLE(byte[] bits, ByteBuf input, int offset, int length)
+    {
+        byte currBit = 0, b;
+        int index = 0;
+        for (int i = offset; i < offset + length; ++i)
+        {
+            b = input.getByte(i);
+            while (currBit < 8)
+            {
+                bits[index++] = (byte) (0x01 & (b >> currBit));
+                currBit ++;
+            }
+            currBit = 0;
+        }
+    }
+
     /**
      * Bit de-compaction, this method does not modify the current position in input byte buffer.
      * It always starts from the first bit of a byte in the input.
@@ -248,9 +426,22 @@ public class BitUtils
      * @param bitsLength the number of bits to de-compact
      * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
-     * @return de-compacted bits
+     * @param littleEndian whether the byte order of input is little endian
      */
-    public static void bitWiseDeCompact(byte[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    public static void bitWiseDeCompact(byte[] bits, int bitsOffset, int bitsLength,
+                                        ByteBuffer input, int offset, boolean littleEndian)
+    {
+        if (littleEndian)
+        {
+            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset);
+        }
+        else
+        {
+            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset);
+        }
+    }
+
+    private static void bitWiseDeCompactBE(byte[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
     {
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
@@ -266,18 +457,47 @@ public class BitUtils
         }
     }
 
+    private static void bitWiseDeCompactLE(byte[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    {
+        byte currBit = 0, b;
+        int bitsEnd = bitsOffset + bitsLength;
+        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        {
+            b = input.get(i);
+            while (currBit < 8 && bitsIndex < bitsEnd)
+            {
+                bits[bitsIndex++] = (byte) (0x01 & (b >> currBit));
+                currBit ++;
+            }
+            currBit = 0;
+        }
+    }
+
     /**
      * Bit de-compaction, this method does not modify the current position in input byte buffer.
      * It always starts from the first bit of a byte in the input.
      *
-     * @param bits the de-compact (decode) result, each element is true if the corresponding bit is 1
+     * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
      * @param bitsOffset the index in bits to start de-compact into
      * @param bitsLength the number of bits to de-compact
      * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
-     * @return de-compacted bits
+     * @param littleEndian whether the byte order of input is little endian
      */
-    public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength,
+                                        ByteBuffer input, int offset, boolean littleEndian)
+    {
+        if (littleEndian)
+        {
+            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset);
+        }
+        else
+        {
+            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset);
+        }
+    }
+
+    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
     {
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
@@ -293,18 +513,47 @@ public class BitUtils
         }
     }
 
+    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    {
+        byte currBit = 0, b;
+        int bitsEnd = bitsOffset + bitsLength;
+        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        {
+            b = input.get(i);
+            while (currBit < 8 && bitsIndex < bitsEnd)
+            {
+                bits[bitsIndex++] = (0x01 & (b >> currBit)) == 1;
+                currBit ++;
+            }
+            currBit = 0;
+        }
+    }
+
     /**
      * Bit de-compaction, this method does not modify the current position in input byte buffer.
      * It always starts from the first bit of a byte in the input.
      *
-     * @param bits the de-compact (decode) result, each element is true if the corresponding bit is 1
+     * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
      * @param bitsOffset the index in bits to start de-compact into
      * @param bitsLength the number of bits to de-compact
      * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
-     * @return de-compacted bits
+     * @param littleEndian whether the byte order of input is little endian
      */
-    public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset)
+    public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength,
+                                        ByteBuf input, int offset, boolean littleEndian)
+    {
+        if (littleEndian)
+        {
+            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset);
+        }
+        else
+        {
+            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset);
+        }
+    }
+
+    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset)
     {
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
@@ -317,6 +566,22 @@ public class BitUtils
                 bits[bitsIndex++] = (0x01 & (b >> bitsLeft)) == 1;
             }
             bitsLeft = 8;
+        }
+    }
+
+    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset)
+    {
+        byte currBit = 0, b;
+        int bitsEnd = bitsOffset + bitsLength;
+        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        {
+            b = input.getByte(i);
+            while (currBit < 8 && bitsIndex < bitsEnd)
+            {
+                bits[bitsIndex++] = (0x01 & (b >> currBit)) == 1;
+                currBit ++;
+            }
+            currBit = 0;
         }
     }
 

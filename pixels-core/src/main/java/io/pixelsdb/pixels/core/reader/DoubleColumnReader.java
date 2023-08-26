@@ -85,10 +85,11 @@ public class DoubleColumnReader extends ColumnReader
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
         if (offset == 0)
         {
             this.inputBuffer = input;
-            boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputIndex = inputBuffer.position();
             // isNull
@@ -97,7 +98,7 @@ public class DoubleColumnReader extends ColumnReader
             hasNull = true;
             elementIndex = 0;
         }
-        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
         for (int i = vectorIndex; numLeft > 0; )
@@ -116,7 +117,7 @@ public class DoubleColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset);
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
                 isNullOffset += bytesToDeCompact;
                 columnVector.noNulls = false;
             } else
