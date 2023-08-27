@@ -28,14 +28,12 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Pixels file reader.
- * This interface is for reading pixels content as
- * {@link VectorizedRowBatch}.
+ * The interface of Pixels file reader.
+ * It is for reading pixels content into {@link VectorizedRowBatch}.
  *
- * @author guodong
+ * @author guodong, hank
  */
-public interface PixelsReader
-        extends Closeable
+public interface PixelsReader extends Closeable
 {
     /**
      * Get a <code>PixelsRecordReader</code>

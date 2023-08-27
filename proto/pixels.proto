@@ -241,6 +241,8 @@ message ColumnChunkIndex {
     // whether the null positions are padded with arbitrary value,
     // only take effects if non-random-accessible encoding (i.e., run-length) is not used
     optional bool nullsPadding = 7;
+    // the number of bytes the isNullOffset is align to
+    optional uint32 isNullAlignment = 8;
 }
 
 message RowGroupIndex {
