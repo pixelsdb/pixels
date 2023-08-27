@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.core.writer;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.Encoder;
@@ -31,6 +32,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -39,9 +41,26 @@ import static java.util.Objects.requireNonNull;
  * @author guodong, hank
  * @create 2017-08-09
  * @update 2023-08-16 Chamonix: support nulls padding
+ * @update 2023-08-27 Beijing: support isNull alignment
  */
 public abstract class BaseColumnWriter implements ColumnWriter
 {
+    /**
+     * The number of bytes that the start offset of the isNull bitmap is aligned to.
+     */
+    private static final int ISNULL_ALIGNMENT;
+    /**
+     * The byte buffer padded before the isNull bitmap for alignment.
+     */
+    private static final byte[] ISNULL_PADDING_BUFFER;
+
+    static
+    {
+        ISNULL_ALIGNMENT = Integer.parseInt(ConfigFactory.Instance().getProperty("isnull.bitmap.alignment"));
+        checkArgument(ISNULL_ALIGNMENT >= 0, "isnull.bitmap.alignment must >= 0");
+        ISNULL_PADDING_BUFFER = new byte[ISNULL_ALIGNMENT];
+    }
+
     final int pixelStride;                     // indicate num of elements in a pixel
     final EncodingLevel encodingLevel;         // indicate the encoding level during writing
     final ByteOrder byteOrder;                 // indicate the endianness used during writing
@@ -77,12 +96,13 @@ public abstract class BaseColumnWriter implements ColumnWriter
         this.isNull = new boolean[pixelStride];
         this.columnChunkIndex = PixelsProto.ColumnChunkIndex.newBuilder()
                 .setLittleEndian(byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
-                .setNullsPadding(nullsPadding);
+                .setNullsPadding(nullsPadding)
+                .setIsNullAlignment(ISNULL_ALIGNMENT);
         this.columnChunkStat = PixelsProto.ColumnStatistic.newBuilder();
         this.pixelStatRecorder = StatsRecorder.create(type);
         this.columnChunkStatRecorder = StatsRecorder.create(type);
 
-        // todo a good estimation of chunk size is needed as the initial size of output stream
+        // TODO: a good estimation of chunk size is needed as the initial size of output stream
         this.outputStream = new ByteArrayOutputStream(pixelStride);
         this.isNullStream = new ByteArrayOutputStream(pixelStride);
     }
@@ -138,8 +158,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        return PixelsProto.ColumnEncoding.newBuilder()
-                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+        return PixelsProto.ColumnEncoding.newBuilder().setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override
@@ -149,8 +168,16 @@ public abstract class BaseColumnWriter implements ColumnWriter
         {
             newPixel();
         }
+        int isNullOffset = outputStream.size();
+        if (ISNULL_ALIGNMENT != 0 && isNullOffset % ISNULL_ALIGNMENT != 0)
+        {
+            // Issue #548: align the start offset of the isNull bitmap for the compatibility of DuckDB
+            int alignBytes =  ISNULL_ALIGNMENT - isNullOffset % ISNULL_ALIGNMENT;
+            outputStream.write(ISNULL_PADDING_BUFFER, 0, alignBytes);
+            isNullOffset += alignBytes;
+        }
         // record isNull offset in the column chunk
-        columnChunkIndex.setIsNullOffset(outputStream.size());
+        columnChunkIndex.setIsNullOffset(isNullOffset);
         // flush out isNullStream
         isNullStream.writeTo(outputStream);
     }
@@ -199,8 +226,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     }
 
     @Override
-    public void close()
-            throws IOException
+    public void close() throws IOException
     {
         outputStream.close();
         isNullStream.close();

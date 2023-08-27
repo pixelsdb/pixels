@@ -25,9 +25,9 @@ import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * pixels
+ * The interface of Pixels file writer.
  *
- * @author guodong
+ * @author guodong, hank
  */
 public interface PixelsWriter extends Closeable
 {
@@ -37,8 +37,7 @@ public interface PixelsWriter extends Closeable
      * @param rowBatch the row batch to be written.
      * @return if the file adds a new row group, returns false. Otherwise, returns true.
      */
-    boolean addRowBatch(VectorizedRowBatch rowBatch)
-            throws IOException;
+    boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException;
 
     /**
      * Add row batch into the file that is hash partitioned.
@@ -46,9 +45,7 @@ public interface PixelsWriter extends Closeable
      * @param rowBatch the row batch to be written.
      * @param hashValue the hashValue of the partition that the row batch is belong to.
      */
-    void addRowBatch(VectorizedRowBatch rowBatch, int hashValue)
-            throws IOException;
-
+    void addRowBatch(VectorizedRowBatch rowBatch, int hashValue) throws IOException;
 
     /**
      * Get schema of this file.
