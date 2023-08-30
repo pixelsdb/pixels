@@ -74,6 +74,11 @@
             <artifactId>pixels-worker-common</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-localfs</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <!-- google -->
         <dependency>
@@ -119,6 +124,18 @@
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- asynchttpclient -->
+        <dependency>
+            <groupId>org.asynchttpclient</groupId>
+            <artifactId>async-http-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
             <optional>true</optional>
         </dependency>
 
