@@ -80,6 +80,7 @@
         <!-- common libraries -->
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
         <dep.netty.version>4.1.77.Final</dep.netty.version>
+        <dep.asynchttpclient.version>2.12.3</dep.asynchttpclient.version>
         <dep.fastjson.version>1.2.83</dep.fastjson.version>
         <dep.commons-cli.version>1.5.0</dep.commons-cli.version>
         <dep.guava.version>29.0-jre</dep.guava.version>
@@ -521,6 +522,13 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty-buffer</artifactId>
                 <version>${dep.netty.version}</version>
+            </dependency>
+
+            <!-- asynchttpclient -->
+            <dependency>
+                <groupId>org.asynchttpclient</groupId>
+                <artifactId>async-http-client</artifactId>
+                <version>${dep.asynchttpclient.version}</version>
             </dependency>
 
             <dependency>

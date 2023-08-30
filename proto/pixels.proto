@@ -274,3 +274,12 @@ message ColumnEncoding {
     // the explicit cascade encoding scheme specified by pixels writer
     optional ColumnEncoding cascadeEncoding = 3;
 }
+
+message PipeliningMetadata {
+    required uint32 version = 1;
+    repeated Type types = 2;
+    required uint32 bodyLength = 3;
+    repeated bool isNull = 4;  // boolean[]
+    optional bool noNulls = 5;
+    required uint32 numberOfRows = 6;
+}
