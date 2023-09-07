@@ -276,10 +276,25 @@ message ColumnEncoding {
 }
 
 message PipeliningMetadata {
+    // Pixels file version
     required uint32 version = 1;
+    // data schema of this file
     repeated Type types = 2;
-    required uint32 bodyLength = 3;
-    repeated bool isNull = 4;  // boolean[]
-    optional bool noNulls = 5;
-    required uint32 numberOfRows = 6;
+    // the maximum number of rows in a pixel
+    optional uint32 pixelStride = 6;
+    // the timezone in which the file was written
+    optional string writerTimezone = 7;
+    // whether this is a hash partitioned file, each row group is a hash partition if it is true
+    optional bool partitioned = 8;
+    // the number of bytes the start offsets of the column chunks are align to
+    optional uint32 columnChunkAlignment = 9;
+    // it is always "PIXELS", leave this last in the record
+    optional string magic = 8000;
+}
+
+message PipeliningFooter {
+    // number of rows in the file
+    optional uint32 numberOfRows = 2;
+    // row group information
+    repeated RowGroupInformation rowGroupInfos = 3;
 }

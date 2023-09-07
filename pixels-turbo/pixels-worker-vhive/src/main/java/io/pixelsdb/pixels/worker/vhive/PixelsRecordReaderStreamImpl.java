@@ -23,8 +23,8 @@ import java.util.*;
 public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
 
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
-    private final PixelsProto.PostScript postScript;
-    private final PixelsProto.Footer footer;
+    private final PixelsProto.PipeliningMetadata pipeliningMetadata;
+    private final PixelsProto.PipeliningFooter pipeliningFooter;
     private final PixelsReaderOption option;
     private final long transId;
     private final int RGStart;
@@ -87,13 +87,13 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     private long memoryUsage = 0L;
 
     public PixelsRecordReaderStreamImpl(ByteBuf bufReader,
-                                        PixelsProto.PostScript postScript,
-                                  PixelsProto.Footer footer,
+                                        PixelsProto.PipeliningMetadata pipeliningMetadata,
+                                  PixelsProto.PipeliningFooter pipeliningFooter,
                                   PixelsReaderOption option) throws IOException
     {
         this.bufReader = bufReader;
-        this.postScript = postScript;
-        this.footer = footer;
+        this.pipeliningMetadata = pipeliningMetadata;
+        this.pipeliningFooter = pipeliningFooter;
         this.option = option;
         this.transId = option.getTransId();
         this.RGStart = option.getRGStart();
@@ -109,7 +109,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     private void checkBeforeRead() throws IOException
     {
         // get file schema
-        List<PixelsProto.Type> fileColTypes = footer.getTypesList();
+        List<PixelsProto.Type> fileColTypes = pipeliningMetadata.getTypesList();
         if (fileColTypes == null || fileColTypes.isEmpty())
         {
             checkValid = false;
@@ -123,7 +123,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
         }
 
         // check RGStart and RGLen are within the range of actual number of row groups
-        int rgNum = footer.getRowGroupInfosCount();
+        // to be deprecated in streaming mode
+        int rgNum = pipeliningFooter.getRowGroupInfosCount();
 
         if (rgNum == 0)
         {
@@ -235,8 +236,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             return false;
         }
 
-        List<PixelsProto.RowGroupStatistic> rowGroupStatistics
-                = footer.getRowGroupStatsList();
         boolean[] includedRGs = new boolean[RGLen];
         if (includedRGs.length == 0)
         {
@@ -250,100 +249,10 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
          */
         int includedRowNum = 0;
         // read row group statistics and find target row groups
-        if (option.getPredicate().isPresent())
+        for (int i = 0; i < RGLen; i++)
         {
-            PixelsPredicate predicate = option.getPredicate().get();
-            if (option.getIncludedCols().length == 0)
-            {
-                /**
-                 * Issue #103:
-                 * If there is no included columns while predicate is present,
-                 * The predicate(s) should be constant expressions.
-                 */
-                if (predicate.matchesAll())
-                {
-                    for (int i = 0; i < RGLen; i++)
-                    {
-                        includedRGs[i] = true;
-                        includedRowNum += footer.getRowGroupInfos(RGStart + i).getNumberOfRows();
-                    }
-                }
-                else if (predicate.matchesNone())
-                {
-                    for (int i = 0; i < RGLen; i++)
-                    {
-                        includedRGs[i] = false;
-                    }
-                }
-                else
-                {
-                    throw new IOException(
-                            "predicate does not match none or all while included columns is empty, predicate=" +
-                                    predicate.toString());
-                }
-            }
-            else
-            {
-                Map<Integer, ColumnStats> columnStatsMap = new HashMap<>();
-                List<TypeDescription> columnSchemas = fileSchema.getChildren();
-
-                // first, get file level column statistic, if not matches, skip this file
-                List<PixelsProto.ColumnStatistic> fileColumnStatistics = footer.getColumnStatsList();
-                for (int id : targetColumns)
-                {
-                    columnStatsMap.put(id,
-                            StatsRecorder.create(columnSchemas.get(id), fileColumnStatistics.get(id)));
-                }
-                if (!predicate.matches(postScript.getNumberOfRows(), columnStatsMap))
-                {
-                    /**
-                     * Issue #103:
-                     * 1. PixelsTupleDomainPredicate.matches() is fixed in this issue, but there could be
-                     * other problems in it, as the related TupleDomain APIs in presto spi is mysterious.
-                     *
-                     * 2. Whenever predicate does not match any column statistics, we should not return
-                     * false. Instead, we must make sure that includedRGs are filled in by false values.
-                     * By this way, the subsequent methods such as read() an readBatch() can skip all row
-                     * groups of this record reader without additional overheads, as targetRGs would be
-                     * empty (has no valid element) and targetRGNum would be 0.
-                     */
-                    //return false;
-                    for (int i = 0; i < RGLen; i++)
-                    {
-                        includedRGs[i] = false;
-                    }
-                }
-                else
-                {
-                    // second, get row group statistics, if not matches, skip the row group
-                    for (int i = 0; i < RGLen; i++)
-                    {
-                        // Issue #103: columnStatsMap should be cleared for each row group.
-                        columnStatsMap.clear();
-                        PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
-                        List<PixelsProto.ColumnStatistic> rgColumnStatistics =
-                                rowGroupStatistic.getColumnChunkStatsList();
-                        for (int id : targetColumns)
-                        {
-                            columnStatsMap.put(id,
-                                    StatsRecorder.create(columnSchemas.get(id), rgColumnStatistics.get(id)));
-                        }
-                        includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
-                        if (includedRGs[i])
-                        {
-                            includedRowNum += footer.getRowGroupInfos(RGStart + i).getNumberOfRows();
-                        }
-                    }
-                }
-            }
-        }
-        else
-        {
-            for (int i = 0; i < RGLen; i++)
-            {
-                includedRGs[i] = true;
-                includedRowNum += footer.getRowGroupInfos(RGStart + i).getNumberOfRows();
-            }
+            includedRGs[i] = true;
+            includedRowNum += pipeliningFooter.getRowGroupInfos(RGStart + i).getNumberOfRows();
         }
 
         if (includedColumnNum == 0)
@@ -403,13 +312,13 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             {
                 int rgId = targetRGs[i];
                 PixelsProto.RowGroupInformation rowGroupInformation =
-                        footer.getRowGroupInfos(rgId);
+                        pipeliningFooter.getRowGroupInfos(rgId);
                 long footerOffset = rowGroupInformation.getFooterOffset();
                 long footerLength = rowGroupInformation.getFooterLength();
                 int fi = i;
                 ByteBuf resp = Unpooled.buffer((int) footerLength);
                 bufReader.readerIndex((int) footerOffset);
-                bufReader.readBytes(resp, (int) footerLength);
+                bufReader.readBytes(resp, (int) footerLength); // getBytes()
                     PixelsProto.RowGroupFooter parsed = PixelsProto.RowGroupFooter.parseFrom(resp.nioBuffer());
                     rowGroupFooters[fi] = parsed;
             }
@@ -638,7 +547,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
         int curBatchSize = -preRowInRG;
         for (int rgIdx = preRGIdx; rgIdx < targetRGNum; ++rgIdx)
         {
-            int rgRowCount = (int) footer.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
+            int rgRowCount = (int) pipeliningFooter.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
             curBatchSize += rgRowCount;
             if (curBatchSize <= 0)
             {
@@ -761,7 +670,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
 
         if (curRGIdx < targetRGNum)
         {
-            rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+            rgRowCount = (int) pipeliningFooter.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
         while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
@@ -785,7 +694,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
                     readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
-                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                            pipeliningMetadata.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
             }
 
@@ -802,7 +711,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
                 // if not end of file, update row count
                 if (curRGIdx < targetRGNum)
                 {
-                    rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                    rgRowCount = (int) pipeliningFooter.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
                     // refresh resultColumnsEncoded for reading the column vectors in the next row group.
                     PixelsProto.RowGroupEncoding rgEncoding = rowGroupFooters[curRGIdx].getRowGroupEncoding();
                     for (int i = 0; i < includedColumnNum; i++)
