@@ -8,7 +8,6 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
-import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.core.writer.ColumnWriter;
@@ -31,10 +30,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
-import static io.pixelsdb.pixels.core.TypeDescription.writeTypes;
 import static io.pixelsdb.pixels.core.writer.ColumnWriter.newColumnWriter;
 import static java.util.Objects.requireNonNull;
+
+import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 
 /**
  * PixelsWriterStreamImpl is an implementation of {@link PixelsWriter} that writes
@@ -80,15 +79,15 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     private final Optional<List<Integer>> partKeyColumnIds;
 
     private final ColumnWriter[] columnWriters;
-    private final StatsRecorder[] fileColStatRecorders;
     private long fileContentLength;
     private int fileRowNum;
 
     private long writtenBytes = 0L;
+    private boolean isFirstRowGroup = true;
     private long curRowGroupOffset = 0L;
     private long curRowGroupFooterOffset = 0L;
     private long curRowGroupNumOfRows = 0L;
-    private int curRowGroupDataLength = 0;
+    private int curRowGroupDataLength = 0;  // curPacketDataLength
     /**
      * Whether any current hash value has been set.
      */
@@ -96,9 +95,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     private int currHashValue = 0;
 
     private final List<PixelsProto.RowGroupInformation> rowGroupInfoList;    // row group information in footer
-    private final List<PixelsProto.RowGroupStatistic> rowGroupStatisticList; // row group statistic in footer
 
-    private final ByteBuf bufWriter;
+    private final ByteBuf bufWriter;  // file structure: [rowGroup + rowGroupFooter]* + fileTail + tailOffset
+    // private int bufWriterIdx;
+    // private final ByteBuf[] bufWriters;
     private final List<TypeDescription> children;
 
     private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
@@ -128,7 +128,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         this.children = schema.getChildren();
         checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
         this.columnWriters = new ColumnWriter[children.size()];
-        this.fileColStatRecorders = new StatsRecorder[children.size()];
         this.columnWriterOption = new PixelsWriterOption()
                 .pixelStride(pixelStride)
                 .encodingLevel(requireNonNull(encodingLevel, "encodingLevel is null"))
@@ -136,13 +135,12 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 .nullsPadding(nullsPadding);
         for (int i = 0; i < children.size(); ++i) {
             columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
-            fileColStatRecorders[i] = StatsRecorder.create(children.get(i));
         }
 
         this.rowGroupInfoList = new LinkedList<>();
-        this.rowGroupStatisticList = new LinkedList<>();
 
         this.bufWriter = bufWriter;
+        // this.bufWriterIdx = 0;
     }
 
     public static class Builder {
@@ -328,6 +326,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             // As the current hash value is set, at lease one row batch has been added.
             if (currHashValue != hashValue) {
                 // Write the current partition (row group) and add the row batch to a new partition.
+//                bufWriterIdx++;
                 writeRowGroup();
                 curRowGroupNumOfRows = 0L;
             }
@@ -370,7 +369,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             if (curRowGroupNumOfRows != 0) {
                 writeRowGroup();
             }
-            writeFileTail();  // We might have to do it in the beginning because we are using a HTTP stream.
+            writeStreamTail();
 //            physicalWriter.close();
             for (ColumnWriter cw : columnWriters) {
                 cw.close();
@@ -384,10 +383,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     }
 
     private void writeRowGroup() throws IOException {
+        // Stream structure: Metadata + [len + rowGroup]*
+        if (isFirstRowGroup) {writeStreamHead(); isFirstRowGroup = false;}  // xxx: If we never call addRowBatch(), we will never write stream head
+
         int rowGroupDataLength = 0;
 
-        PixelsProto.RowGroupStatistic.Builder curRowGroupStatistic =
-                PixelsProto.RowGroupStatistic.newBuilder();
         PixelsProto.RowGroupInformation.Builder curRowGroupInfo =
                 PixelsProto.RowGroupInformation.newBuilder();
         PixelsProto.RowGroupIndex.Builder curRowGroupIndex =
@@ -472,19 +472,15 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             }
             // collect columnChunkIndex from every column chunk into curRowGroupIndex
             curRowGroupIndex.addColumnChunkIndexEntries(chunkIndexBuilder.build());
-            // collect columnChunkStatistic into rowGroupStatistic
-            curRowGroupStatistic.addColumnChunkStats(writer.getColumnChunkStat().build());
             // collect columnChunkEncoding
             curRowGroupEncoding.addColumnChunkEncodings(writer.getColumnChunkEncoding().build());
-            // update file column statistic
-            fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
             /* TODO: writer.reset() does not work for partitioned file writing, fix it later.
              * The possible reason is that: when the file is partitioned, the last stride of a row group
              * (a.k.a., partition) is likely not full (length < pixelsStride), thus if the writer is not
              * reset correctly, the strides of the next row group will not be written correctly.
              * We temporarily fix this problem by creating a new column writer for each row group.
              */
-            // writer.reset();
+            writer.reset();
             columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
         }
 
@@ -519,67 +515,134 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             curRowGroupInfo.setPartitionInfo(partitionInfo.build());
         }
         rowGroupInfoList.add(curRowGroupInfo.build());
-        // put curRowGroupStatistic into rowGroupStatisticList
-        rowGroupStatisticList.add(curRowGroupStatistic.build());
 
         this.fileRowNum += curRowGroupNumOfRows;
         this.fileContentLength += rowGroupDataLength;
     }
 
-    private void writeFileTail() throws IOException {
-        PixelsProto.Footer footer;
-        PixelsProto.PostScript postScript;
+    static void writeTypes(PixelsProto.PipeliningMetadata.Builder builder, TypeDescription schema)
+    {
+        List<TypeDescription> children = schema.getChildren();
+        List<String> names = schema.getFieldNames();
+        if (children == null || children.isEmpty())
+        {
+            return;
+        }
+        for (int i = 0; i < children.size(); i++)
+        {
+            TypeDescription child = children.get(i);
+            PixelsProto.Type.Builder tmpType = PixelsProto.Type.newBuilder();
+            tmpType.setName(names.get(i));
+            switch (child.getCategory())
+            {
+                case BOOLEAN:
+                    tmpType.setKind(PixelsProto.Type.Kind.BOOLEAN);
+                    break;
+                case BYTE:
+                    tmpType.setKind(PixelsProto.Type.Kind.BYTE);
+                    break;
+                case SHORT:
+                    tmpType.setKind(PixelsProto.Type.Kind.SHORT);
+                    break;
+                case INT:
+                    tmpType.setKind(PixelsProto.Type.Kind.INT);
+                    break;
+                case LONG:
+                    tmpType.setKind(PixelsProto.Type.Kind.LONG);
+                    break;
+                case FLOAT:
+                    tmpType.setKind(PixelsProto.Type.Kind.FLOAT);
+                    break;
+                case DOUBLE:
+                    tmpType.setKind(PixelsProto.Type.Kind.DOUBLE);
+                    break;
+                case DECIMAL:
+                    tmpType.setKind(PixelsProto.Type.Kind.DECIMAL);
+                    tmpType.setPrecision(child.getPrecision());
+                    tmpType.setScale(child.getScale());
+                    break;
+                case STRING:
+                    tmpType.setKind(PixelsProto.Type.Kind.STRING);
+                    break;
+                case CHAR:
+                    tmpType.setKind(PixelsProto.Type.Kind.CHAR);
+                    tmpType.setMaximumLength(child.getMaxLength());
+                    break;
+                case VARCHAR:
+                    tmpType.setKind(PixelsProto.Type.Kind.VARCHAR);
+                    tmpType.setMaximumLength(child.getMaxLength());
+                    break;
+                case BINARY:
+                    tmpType.setKind(PixelsProto.Type.Kind.BINARY);
+                    tmpType.setMaximumLength(child.getMaxLength());
+                    break;
+                case VARBINARY:
+                    tmpType.setKind(PixelsProto.Type.Kind.VARBINARY);
+                    tmpType.setMaximumLength(child.getMaxLength());
+                    break;
+                case TIMESTAMP:
+                    tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);
+                    tmpType.setPrecision(child.getPrecision());
+                    break;
+                case DATE:
+                    tmpType.setKind(PixelsProto.Type.Kind.DATE);
+                    break;
+                case TIME:
+                    tmpType.setKind(PixelsProto.Type.Kind.TIME);
+                    tmpType.setPrecision(child.getPrecision());
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown category: " +
+                            schema.getCategory());
+            }
+            builder.addTypes(tmpType.build());
+        }
+    }
 
-        // build Footer
-        PixelsProto.Footer.Builder footerBuilder =
-                PixelsProto.Footer.newBuilder();
-        writeTypes(footerBuilder, schema);
-        for (StatsRecorder recorder : fileColStatRecorders) {
-            footerBuilder.addColumnStats(recorder.serialize().build());
-        }
-        for (PixelsProto.RowGroupInformation rowGroupInformation : rowGroupInfoList) {
-            footerBuilder.addRowGroupInfos(rowGroupInformation);
-        }
-        for (PixelsProto.RowGroupStatistic rowGroupStatistic : rowGroupStatisticList) {
-            footerBuilder.addRowGroupStats(rowGroupStatistic);
-        }
-        footer = footerBuilder.build();
-
-        // build PostScript
-        postScript = PixelsProto.PostScript.newBuilder()
-                .setVersion(Constants.VERSION)
-                .setContentLength(fileContentLength)
-                .setNumberOfRows(fileRowNum)
-                .setCompression(compressionKind)
-                .setCompressionBlockSize(compressionBlockSize)
+    private void writeStreamHead() {
+        // build Metadata
+        PixelsProto.PipeliningMetadata.Builder metadataBuilder =
+                PixelsProto.PipeliningMetadata.newBuilder();
+        writeTypes(metadataBuilder, schema);
+        metadataBuilder.setVersion(Constants.VERSION)
                 .setPixelStride(columnWriterOption.getPixelStride())
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(partitioned)
                 .setColumnChunkAlignment(CHUNK_ALIGNMENT)
                 .setMagic(Constants.MAGIC)
                 .build();
+        PixelsProto.PipeliningMetadata metadata = metadataBuilder.build();
+        int MetadataLength = metadata.getSerializedSize();
 
-        // build FileTail
-        PixelsProto.FileTail fileTail =
-                PixelsProto.FileTail.newBuilder()
-                        .setFooter(footer)
-                        .setPostscript(postScript)
-                        .setFooterLength(footer.getSerializedSize())
-                        .setPostscriptLength(postScript.getSerializedSize())
-                        .build();
+        // write and flush Metadata
+        ByteBuffer metadataLengthBuffer = ByteBuffer.allocate(Integer.BYTES);
+        metadataLengthBuffer.putInt(MetadataLength);
+        metadataLengthBuffer.flip(); // Flip the buffer to change its position to the beginning
 
-        // write and flush FileTail plus FileTail physical offset at the end of the file
-        int fileTailLen = fileTail.getSerializedSize() + Long.BYTES;
-        // physicalWriter.prepare(fileTailLen);
-        long tailOffset = bufWriter.writerIndex();
-        bufWriter.writeBytes(fileTail.toByteArray(), 0, fileTail.getSerializedSize());
-        // System.out.println("tailOffset: " + tailOffset);
-        // long tailOffset = physicalWriter.append(fileTail.toByteArray(), 0, fileTail.getSerializedSize());
-        ByteBuffer tailOffsetBuffer = ByteBuffer.allocate(Long.BYTES);
-        tailOffsetBuffer.putLong(tailOffset);
-        tailOffsetBuffer.flip(); // Flip the buffer to change its position to the beginning
-        bufWriter.writeBytes(tailOffsetBuffer);  // physicalWriter.append(tailOffsetBuffer);
-        writtenBytes += fileTailLen;
+        byte[] magicBytes = MAGIC.getBytes();
+        bufWriter.writeBytes(magicBytes);
+        bufWriter.writeBytes(metadataLengthBuffer);
+        bufWriter.writeBytes(metadata.toByteArray());
+        writtenBytes += MetadataLength + Integer.BYTES;
+
+        int paddingLength = (8 - (magicBytes.length + Integer.BYTES + MetadataLength) % 8) % 8;  // Can use '&7'
+        byte[] paddingBytes = new byte[paddingLength];
+        bufWriter.writeBytes(paddingBytes);
         // physicalWriter.flush();
+    }
+
+    private void writeStreamTail() {
+        PixelsProto.PipeliningFooter.Builder footerBuilder = PixelsProto.PipeliningFooter.newBuilder();
+        footerBuilder.setNumberOfRows(fileRowNum);
+        for (PixelsProto.RowGroupInformation rowGroupInformation : rowGroupInfoList) {
+            footerBuilder.addRowGroupInfos(rowGroupInformation);
+        }
+        PixelsProto.PipeliningFooter footer = footerBuilder.build();
+
+        byte[] footerIndicatorBytes = ByteBuffer.allocate(Integer.BYTES).putInt(0).array();  // 0x00000000
+        bufWriter.writeBytes(footerIndicatorBytes);
+        byte[] footerOffsetBytes = ByteBuffer.allocate(Integer.BYTES).putInt(bufWriter.writerIndex()).array();
+        bufWriter.writeBytes(footer.toByteArray());
+        bufWriter.writeBytes(footerOffsetBytes);
     }
 }

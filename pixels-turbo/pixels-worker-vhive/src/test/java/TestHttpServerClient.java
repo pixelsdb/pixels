@@ -1,4 +1,3 @@
-import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -10,15 +9,11 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.HttpServer;
 import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
-import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DictionaryColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.worker.common.WorkerException;
 import io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl;
@@ -27,12 +22,9 @@ import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.Dsl;
 import org.asynchttpclient.Request;
 import org.asynchttpclient.Response;
-import org.asynchttpclient.request.body.multipart.Part;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -41,7 +33,6 @@ import java.util.concurrent.Executors;
 import static io.netty.handler.codec.http.HttpHeaderNames.*;
 import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
-import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 // import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 
 public class TestHttpServerClient {
@@ -58,38 +49,11 @@ public class TestHttpServerClient {
 
                 // if (req.method() != HttpMethod.POST) {sendHttpResponse(ctx, HttpResponseStatus.OK);}
                 ByteBuf content = req.content();
-                byte[] bytes = new byte[content.readableBytes()];
-                content.readBytes(bytes);
-                System.out.println("HTTP request object body total length: " + bytes.length);
-
+                System.out.println("HTTP request object body total length: " + content.readableBytes());
                 if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf")) { return; }
-                int magicLength = MAGIC.getBytes().length;
-                String magic = new String(bytes, 0, magicLength);
-                System.out.println("Parsed magic: " + magic);
-
-                int metadataLength = content.getInt(magicLength);  // getInt(int index)
-                System.out.println("Parsed metadataLength: " + metadataLength);
-
-                PixelsProto.PipeliningMetadata metadata = null;
-                try {
-                    metadata = PixelsProto.PipeliningMetadata.parseFrom(
-                        Arrays.copyOfRange(bytes,
-                            magicLength + Integer.BYTES,
-                            magicLength + Integer.BYTES + metadataLength));
-                } catch (InvalidProtocolBufferException e) {
-                    throw new RuntimeException(e);
-                }
-                int messageBodyOffset = calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8);
-                    // todo consume the padding bytes
-                    System.out.println("Parsed messageBodyOffset: " + messageBodyOffset);
-                    System.out.println("Parsed metadata object: " + metadata);
-
-                    final int rowCount = metadata.getNumberOfRows();
-                    ByteBuf messageBodyByteBuf = Unpooled.wrappedBuffer(bytes, messageBodyOffset, metadata.getBodyLength());
 
                     PixelsReaderStreamImpl.Builder reader = PixelsReaderStreamImpl.newBuilder()
-                            .setBuilderBufReader(messageBodyByteBuf)
-                            .setBuilderTotalBufLen(metadata.getBodyLength());
+                            .setBuilderBufReader(content);
                     PixelsReaderOption option = new PixelsReaderOption();
                     option.skipCorruptRecords(true);
                     option.tolerantSchemaEvolution(true);
@@ -234,25 +198,6 @@ public class TestHttpServerClient {
         VectorizedRowBatch rowBatch = recordReader.readBatch(1000);
         System.out.println(rowBatch.size + " rows read from tpch nation.pxl");
 
-        PixelsProto.PipeliningMetadata.Builder message = PixelsProto.PipeliningMetadata.newBuilder();
-        PixelsProto.Type.Builder typeBuild = PixelsProto.Type.newBuilder();
-        // 似乎把Pixels文件读到内存里的时候丢弃了column names (PixelsRecordReaderImpl.java: 215)。
-        // 所以这里只能依靠前面的option.includeCols(new String[]{"n_nationkey", "n_name", "n_regionkey"});
-        // 作为列名。
-        for (int i = 0; i < rowBatch.cols.length; i++) {
-            ColumnVector col = rowBatch.cols[i];
-            typeBuild.setName(colNames[i]);
-            if (col instanceof LongColumnVector) {
-                typeBuild.setKind(PixelsProto.Type.Kind.LONG).build();
-            } else if (col instanceof DictionaryColumnVector) {
-                typeBuild.setKind(PixelsProto.Type.Kind.STRING).build();
-                // 我们没有StringColumnVector，所以只能用DictionaryColumnVector代替？
-            } else {
-                typeBuild.setKind(PixelsProto.Type.Kind.INT).build();
-            }
-            message.addTypes(typeBuild.build());
-        }
-
         buffer.clear();
         PixelsWriter pixelsWriter = PixelsWriterStreamImpl.newBuilder()
                 .setSchema(recordReader.getResultSchema())
@@ -271,33 +216,18 @@ public class TestHttpServerClient {
             throw new WorkerException("failed to scan the file and output the result", e);
         }
 
-        byte[] magicBytes = MAGIC.getBytes();
-        byte[] messageBytes = message.setBodyLength(buffer.readableBytes())
-                .setVersion(0)
-                .setNumberOfRows(rowBatch.size)
-                .build().toByteArray();
-        int messageLength = messageBytes.length;
-        byte[] messageLengthBytes = ByteBuffer.allocate(Integer.BYTES).putInt(messageLength).array();
-        int paddingLength = (8 - (magicBytes.length + messageLengthBytes.length + messageLength) % 8) % 8;  // Can use '&7'
-        byte[] paddingBytes = new byte[paddingLength];
-        ByteBuf fullBody = Unpooled.wrappedBuffer(2,
-                Unpooled.wrappedBuffer(magicBytes, messageLengthBytes, messageBytes, paddingBytes),
-                buffer);
-
         try (AsyncHttpClient httpClient = Dsl.asyncHttpClient()) {
             String serverIpAddress = "127.0.0.1";
             int serverPort = 8080;
             Request req = httpClient.preparePost("http://" + serverIpAddress + ":" + serverPort + "/")
                     .addFormParam("param1", "value1")
-                    .setBody(fullBody.nioBuffer())
+                    .setBody(buffer.nioBuffer())
                     .addHeader(CONTENT_TYPE, "application/x-protobuf")
-                    .addHeader(CONTENT_LENGTH, fullBody.readableBytes())
+                    .addHeader(CONTENT_LENGTH, buffer.readableBytes())
                     .addHeader(CONNECTION, CLOSE)
                     .build();
-            // cannot use Unpooled.wrappedBuffer(magicBytes, messageLengthBytes, messageBytes, paddingBytes, buffer.array())
-            //  because buffer.array() adds unsolicited padding bytes to the end of the actual buffer. (gets an array of 1024 bytes on my machine)
 
-            Response response = httpClient.executeRequest(req).get();
+            Response response = httpClient.executeRequest(req).get();  // todo: Does this keep the connection open?
             System.out.println("HTTP response status code: " + response.getStatusCode());
 
         } catch (Exception e) {

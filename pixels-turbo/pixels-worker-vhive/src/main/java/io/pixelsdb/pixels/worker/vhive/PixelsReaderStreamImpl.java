@@ -20,6 +20,8 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Random;
 
+import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
+
 @NotThreadSafe
 public class PixelsReaderStreamImpl implements PixelsReader
 {
@@ -27,18 +29,19 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
     private final TypeDescription fileSchema;
     private final ByteBuf bufReader;
-    private final PixelsProto.PostScript postScript;
-    private final PixelsProto.Footer footer;
+    private final PixelsProto.PipeliningMetadata pipeliningMetadata;
+    private final PixelsProto.PipeliningFooter pipeliningFooter;
     private final Random random;
 
     private PixelsReaderStreamImpl(TypeDescription fileSchema,
                              ByteBuf bufReader,
-                             PixelsProto.FileTail fileTail)
+                             PixelsProto.PipeliningMetadata pipeliningMetadata,
+                                   PixelsProto.PipeliningFooter pipeliningFooter)
     {
         this.fileSchema = fileSchema;
         this.bufReader = bufReader;
-        this.postScript = fileTail.getPostscript();
-        this.footer = fileTail.getFooter();
+        this.pipeliningMetadata = pipeliningMetadata;
+        this.pipeliningFooter = pipeliningFooter;
         this.random = new Random();
     }
 
@@ -64,32 +67,50 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
         public PixelsReader build() throws IllegalArgumentException, IOException
         {
-            // get FileTail (moved to the beginning)
-            int fileLen = builderBufReader.readableBytes();
-            long fileTailOffset = builderBufReader.getLong(fileLen - Long.BYTES);
-            int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
-            // System.out.println("fileLen: " + fileLen + ", fileTailLength: " + fileTailLength + ", fileTailOffset: " + fileTailOffset);
-            ByteBuf fileTailBuf = Unpooled.buffer(fileTailLength);
-            builderBufReader.getBytes((int) fileTailOffset, fileTailBuf, fileTailLength);
-            PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuf.nioBuffer());
+            // parse pipeliningFooter
+            int totLen = builderBufReader.readableBytes();
+            int streamFooterOffset = builderBufReader.getInt(totLen - Integer.BYTES);
+            int streamFooterLength = totLen - streamFooterOffset - Integer.BYTES;
+//            System.out.println("totLen: " + totLen + ", streamFooterOffset: " + streamFooterOffset + ", streamFooterLength: " + streamFooterLength);
+            ByteBuf streamFooterBuf = Unpooled.buffer(streamFooterLength);
+            builderBufReader.getBytes(streamFooterOffset, streamFooterBuf);
+            PixelsProto.PipeliningFooter pipeliningFooter = PixelsProto.PipeliningFooter.parseFrom(streamFooterBuf.nioBuffer());
+            // PixelsProto.PipeliningFooter pipeliningFooter = PixelsProto.PipeliningFooter.parseFrom(builderBufReader.array(), streamFooterOffset, streamFooterLength);
+            //            this API seems unsupported in protobuf 2
+//            System.out.println("Parsed pipeliningFooter: ");
+//            System.out.println(pipeliningFooter);
 
-            // check file MAGIC and file version
-            PixelsProto.PostScript postScript = fileTail.getPostscript();
-            int fileVersion = postScript.getVersion();
-            String fileMagic = postScript.getMagic();
+            // check MAGIC
+            int magicLength = MAGIC.getBytes().length;
+            byte[] magicBytes = new byte[magicLength];
+            builderBufReader.getBytes(0, magicBytes);
+            String magic = new String(magicBytes);
+            if (!magic.contentEquals(Constants.MAGIC))
+            {
+                throw new PixelsFileMagicInvalidException(magic);
+            }
+
+            // parse metadata
+            int metadataLength = builderBufReader.getInt(magicLength);  // getInt(int index)
+            // System.out.println("Parsed metadataLength: " + metadataLength);
+            ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
+            builderBufReader.getBytes(magicLength + Integer.BYTES, metadataBuf);
+            PixelsProto.PipeliningMetadata metadata = PixelsProto.PipeliningMetadata.parseFrom(metadataBuf.nioBuffer());
+//            System.out.println("Parsed metadata object: ");
+//            System.out.println(metadata);
+
+            // check file version
+            int fileVersion = metadata.getVersion();
             if (!PixelsVersion.matchVersion(fileVersion))
             {
                 throw new PixelsFileVersionInvalidException(fileVersion);
             }
-            if (!fileMagic.contentEquals(Constants.MAGIC))
-            {
-                throw new PixelsFileMagicInvalidException(fileMagic);
-            }
 
-            builderSchema = TypeDescription.createSchema(fileTail.getFooter().getTypesList());
+            // consume the padding bytes?
 
             // create a default PixelsReader
-            return new io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl(builderSchema, builderBufReader, fileTail);
+            builderSchema = TypeDescription.createSchema(metadata.getTypesList());
+            return new io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl(builderSchema, builderBufReader, metadata, pipeliningFooter);
         }
     }
 
@@ -101,10 +122,10 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId)
             throws IOException
     {
-        long footerOffset = footer.getRowGroupInfos(rowGroupId).getFooterOffset();
-        int footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
-//        physicalReader.seek(footerOffset);
-//        ByteBuffer footer = physicalReader.readFully(footerLength);
+        long footerOffset = pipeliningFooter.getRowGroupInfos(rowGroupId).getFooterOffset();
+        int footerLength = pipeliningFooter.getRowGroupInfos(rowGroupId).getFooterLength();
+        // physicalReader.seek(footerOffset);
+        // ByteBuffer footer = physicalReader.readFully(footerLength);
         bufReader.readerIndex((int) footerOffset);
         ByteBuffer footer = bufReader.readBytes(footerLength).nioBuffer();
         return PixelsProto.RowGroupFooter.parseFrom(footer);
@@ -120,7 +141,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
     {
         float diceValue = random.nextFloat();
 //        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
-        return new PixelsRecordReaderStreamImpl(bufReader, postScript, footer, option);
+        return new PixelsRecordReaderStreamImpl(bufReader, pipeliningMetadata, pipeliningFooter, option);
+        // Note that it is still possible to append data to the bufReader while reading.
     }
 
     /**
@@ -131,7 +153,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public PixelsVersion getFileVersion()
     {
-        return PixelsVersion.from(this.postScript.getVersion());
+        return PixelsVersion.from(this.pipeliningMetadata.getVersion());
     }
 
     /**
@@ -139,32 +161,35 @@ public class PixelsReaderStreamImpl implements PixelsReader
      *
      * @return num of rows
      */
+    // In streaming mode, the number of rows cannot be determined in advance.
+    // 用到numberOfRows的有三种情况：数组大小；判断rgIdx是否越界；作为循环条件
+    // 在之后要实现的streaming模式下，需要通过其他方式实现
     @Override
     public long getNumberOfRows()
     {
-        return this.postScript.getNumberOfRows();
+        return this.pipeliningFooter.getNumberOfRows();
     }
 
     /**
-     * Get the compression codec used in this file
+     * Get the compression codec used in this file. Currently unused and thus unsupported
      *
      * @return compression codec
      */
     @Override
     public PixelsProto.CompressionKind getCompressionKind()
     {
-        return this.postScript.getCompression();
+        return null;
     }
 
     /**
-     * Get the compression block size
+     * Get the compression block size. Currently unused and thus unsupported
      *
      * @return compression block size
      */
     @Override
     public long getCompressionBlockSize()
     {
-        return this.postScript.getCompressionBlockSize();
+        return 0;
     }
 
     /**
@@ -175,7 +200,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public long getPixelStride()
     {
-        return this.postScript.getPixelStride();
+        return this.pipeliningMetadata.getPixelStride();
     }
 
     /**
@@ -186,7 +211,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public String getWriterTimeZone()
     {
-        return this.postScript.getWriterTimezone();
+        return this.pipeliningMetadata.getWriterTimezone();
     }
 
     /**
@@ -208,24 +233,23 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public int getRowGroupNum()
     {
-        return this.footer.getRowGroupInfosCount();
+        return this.pipeliningFooter.getRowGroupInfosCount();
     }
 
     @Override
     public boolean isPartitioned()
     {
-        return this.postScript.hasPartitioned() && this.postScript.getPartitioned();
+        return this.pipeliningMetadata.hasPartitioned() && this.pipeliningMetadata.getPartitioned();
     }
 
     /**
-     * Get file level statistics of each column
+     * Get file level statistics of each column. Not required in streaming mode
      *
      * @return array of column stat
      */
     @Override
-    public List<PixelsProto.ColumnStatistic> getColumnStats()
-    {
-        return this.footer.getColumnStatsList();
+    public List<PixelsProto.ColumnStatistic> getColumnStats() {
+        return null;
     }
 
     /**
@@ -235,15 +259,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * @return column stat
      */
     @Override
-    public PixelsProto.ColumnStatistic getColumnStat(String columnName)
-    {
-        List<String> fieldNames = fileSchema.getFieldNames();
-        int fieldId = fieldNames.indexOf(columnName);
-        if (fieldId == -1)
-        {
-            return null;
-        }
-        return this.footer.getColumnStats(fieldId);
+    public PixelsProto.ColumnStatistic getColumnStat(String columnName) {
+        return null;
     }
 
     /**
@@ -251,10 +268,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
      *
      * @return array of row group information
      */
+    // todo: rowGroupInfo在WorkerCommon里读hashValue时需要用到。之后再考虑streaming模式下怎么实现
     @Override
     public List<PixelsProto.RowGroupInformation> getRowGroupInfos()
     {
-        return this.footer.getRowGroupInfosList();
+        return this.pipeliningFooter.getRowGroupInfosList();
     }
 
     /**
@@ -270,7 +288,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         {
             return null;
         }
-        return this.footer.getRowGroupInfos(rowGroupId);
+        return this.pipeliningFooter.getRowGroupInfos(rowGroupId);
     }
 
     /**
@@ -280,13 +298,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * @return row group statistics
      */
     @Override
-    public PixelsProto.RowGroupStatistic getRowGroupStat(int rowGroupId)
-    {
-        if (rowGroupId < 0)
-        {
-            return null;
-        }
-        return this.footer.getRowGroupStats(rowGroupId);
+    public PixelsProto.RowGroupStatistic getRowGroupStat(int rowGroupId) {
+        return null;
     }
 
     /**
@@ -295,19 +308,28 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * @return row groups statistics
      */
     @Override
-    public List<PixelsProto.RowGroupStatistic> getRowGroupStats()
-    {
-        return this.footer.getRowGroupStatsList();
+    public List<PixelsProto.RowGroupStatistic> getRowGroupStats() {
+        return null;
     }
 
-    public PixelsProto.PostScript getPostScript()
-    {
-        return postScript;
+    @Override
+    public PixelsProto.PostScript getPostScript() {
+        return null;
     }
 
-    public PixelsProto.Footer getFooter()
+    @Override
+    public PixelsProto.Footer getFooter() {
+        return null;
+    }
+
+    public PixelsProto.PipeliningMetadata getPipeliningMetadata()
     {
-        return footer;
+        return pipeliningMetadata;
+    }
+
+    public PixelsProto.PipeliningFooter getPipeliningFooter()
+    {
+        return pipeliningFooter;
     }
 
     /**
@@ -319,10 +341,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public void close()
             throws IOException
     {
-//        this.physicalReader.close();
-        /* no need to close the pixelsCacheReader, because it is usually maintained
-           as a global singleton instance and shared across different PixelsReaders.
-         */
-
+        // this.physicalReader.close();
     }
 }
