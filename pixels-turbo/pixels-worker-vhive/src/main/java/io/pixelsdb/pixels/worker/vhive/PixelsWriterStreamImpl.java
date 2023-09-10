@@ -415,6 +415,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 int rowGroupDataLenPos = bufWriter.writerIndex();
 //                System.out.println("rowGroupDataLenPos: " + rowGroupDataLenPos);
                 bufWriter.writeInt(0); // write a placeholder for row group data length
+                writtenBytes += Integer.BYTES;
                 curRowGroupOffset = bufWriter.writerIndex();
 
                 while (CHUNK_ALIGNMENT != 0 && curRowGroupOffset % CHUNK_ALIGNMENT != 0 && tryAlign++ < 2) {
