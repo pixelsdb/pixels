@@ -41,6 +41,21 @@ public class TestHttpServerClient {
     public void testServerSimple() throws Exception {
 
         HttpServer h;
+        ByteBuf buffer = Unpooled.buffer();
+        PixelsReaderStreamImpl.Builder reader = PixelsReaderStreamImpl.newBuilder()
+                .setBuilderBufReader(buffer);
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.enableEncodedColumnVector(false);
+        String[] colNames = new String[]{"n_nationkey", "n_name", "n_regionkey", "n_comment"};
+//            String[] colNames = new String[]{"c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"};
+        option.includeCols(colNames);
+        // option.rgRange(0, 1);
+        // option.transId(1);
+        final PixelsRecordReader[] recordReader = {null};
+        // use an array of readers, to support multiple streams (relies on
+        //  a service framework to map endpoints to IDs. todo)
         h = new HttpServer(new HttpServerHandler() {
             @Override
             public void channelRead0(ChannelHandlerContext ctx, HttpObject msg) {
@@ -48,25 +63,15 @@ public class TestHttpServerClient {
                 FullHttpRequest req = (FullHttpRequest) msg;
 
                 // if (req.method() != HttpMethod.POST) {sendHttpResponse(ctx, HttpResponseStatus.OK);}
-                ByteBuf content = req.content();
-                System.out.println("HTTP request object body total length: " + content.readableBytes());
+//                System.out.println("HTTP request object body total length: " + req.content().readableBytes());
                 if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf")) { return; }
+                buffer.writeBytes(req.content());
 
-                    PixelsReaderStreamImpl.Builder reader = PixelsReaderStreamImpl.newBuilder()
-                            .setBuilderBufReader(content);
-                    PixelsReaderOption option = new PixelsReaderOption();
-                    option.skipCorruptRecords(true);
-                    option.tolerantSchemaEvolution(true);
-                    option.enableEncodedColumnVector(false);
-                    String[] colNames = new String[]{"n_nationkey", "n_name", "n_regionkey", "n_comment"};
-//            String[] colNames = new String[]{"c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"};
-                    option.includeCols(colNames);
-                    // option.rgRange(0, 1);
-                    // option.transId(1);
-                PixelsRecordReader recordReader = null;
                 try {
-                    recordReader = reader.build().read(option);
-                    VectorizedRowBatch rowBatch = recordReader.readBatch(1000);
+                    if (recordReader[0] == null) recordReader[0] = reader.build().read(option);
+                    VectorizedRowBatch rowBatch = recordReader[0].readBatch(7);
+                    buffer.clear();  // todo: only clear the buffer and send the HTTP response after this row group is fully read
+
                     System.out.println("Parsed rowBatch: ");
                     System.out.println(rowBatch);
                 } catch (IOException e) {
@@ -82,10 +87,11 @@ public class TestHttpServerClient {
                         }
                     });
                     f.addListener(ChannelFutureListener.CLOSE);
-                            // .addListener(future -> {
-                            //     // Gracefully shutdown the server after the channel is closed
-                            //     ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
-                            // }); // serve only once, so that we pass the test instead of hanging
+                    if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()))
+                             f.addListener(future -> {
+                                 // Gracefully shutdown the server
+                                 ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
+                             });
             }
         });
         h.serve();
@@ -147,23 +153,6 @@ public class TestHttpServerClient {
         }, 1);
     }
 
-    static int calculateCeiling(int value, int multiple) {
-        // to calculate padding length in HttpClient
-
-        if (value <= 0 || multiple <= 0) {
-            throw new IllegalArgumentException("Both value and multiple must be positive.");
-        }
-
-        int remainder = value % multiple;
-        if (remainder == 0) {
-            // No need to adjust, value is already a multiple of multiple
-            return value;
-        }
-
-        int difference = multiple - remainder;
-        return value + difference;
-    }
-
     @Test
     public void testClientSimple() throws IOException {
         final ByteBuf buffer = Unpooled.buffer(); // ??? Unpooled.directBuffer();
@@ -195,10 +184,7 @@ public class TestHttpServerClient {
         // option.rgRange(0, 1);
         // option.transId(1);
         PixelsRecordReader recordReader = reader.build().read(option);
-        VectorizedRowBatch rowBatch = recordReader.readBatch(1000);
-        System.out.println(rowBatch.size + " rows read from tpch nation.pxl");
 
-        buffer.clear();
         PixelsWriter pixelsWriter = PixelsWriterStreamImpl.newBuilder()
                 .setSchema(recordReader.getResultSchema())
                 .setPixelStride(10000)
@@ -208,30 +194,37 @@ public class TestHttpServerClient {
                 .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
                 .setPartitioned(false)
                 .build();
-        try {
-            pixelsWriter.addRowBatch(rowBatch);
-            pixelsWriter.close();
-        } catch (Throwable e)
-        {
-            throw new WorkerException("failed to scan the file and output the result", e);
-        }
+        // XXX: now we can send multiple rowBatches in one rowGroup in one packet, but have not tested to send multiple rowGroups (not necessary, though)
+        for (int i = 0; i < 5; i++) {
+            VectorizedRowBatch rowBatch = recordReader.readBatch(7 - i);
+            System.out.println(rowBatch.size + " rows read from tpch nation.pxl");
 
-        try (AsyncHttpClient httpClient = Dsl.asyncHttpClient()) {
-            String serverIpAddress = "127.0.0.1";
-            int serverPort = 8080;
-            Request req = httpClient.preparePost("http://" + serverIpAddress + ":" + serverPort + "/")
-                    .addFormParam("param1", "value1")
-                    .setBody(buffer.nioBuffer())
-                    .addHeader(CONTENT_TYPE, "application/x-protobuf")
-                    .addHeader(CONTENT_LENGTH, buffer.readableBytes())
-                    .addHeader(CONNECTION, CLOSE)
-                    .build();
+            buffer.clear();
+            try {
+                pixelsWriter.addRowBatch(rowBatch);
+                if (i == 5 - 1)
+                    pixelsWriter.close();
+            } catch (Throwable e) {
+                throw new WorkerException("failed to scan the file and output the result", e);
+            }
 
-            Response response = httpClient.executeRequest(req).get();  // todo: Does this keep the connection open?
-            System.out.println("HTTP response status code: " + response.getStatusCode());
+            try (AsyncHttpClient httpClient = Dsl.asyncHttpClient()) {
+                String serverIpAddress = "127.0.0.1";
+                int serverPort = 8080;
+                Request req = httpClient.preparePost("http://" + serverIpAddress + ":" + serverPort + "/")
+                        .addFormParam("param1", "value1")
+                        .setBody(buffer.nioBuffer())
+                        .addHeader(CONTENT_TYPE, "application/x-protobuf")
+                        .addHeader(CONTENT_LENGTH, buffer.readableBytes())
+                        .addHeader(CONNECTION, i == 5 - 1 ? CLOSE : "keep-alive")
+                        .build();
 
-        } catch (Exception e) {
-            e.printStackTrace();
+                Response response = httpClient.executeRequest(req).get();  // todo: Does this API keep the connection open after returning?
+                System.out.println("HTTP response status code: " + response.getStatusCode());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
 //        buffer.retain();  // ???

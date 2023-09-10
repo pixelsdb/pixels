@@ -275,7 +275,26 @@ message ColumnEncoding {
     optional ColumnEncoding cascadeEncoding = 3;
 }
 
-message PipeliningMetadata {
+// create another file and include pixels.proto
+
+// In streaming mode, the whole message flow is like:
+// ------------------------------------------------------------------
+// | magic | streamHeaderLen | streamHeader | rowGroup | rowGroup | ... |
+// ------------------------------------------------------------------
+// where each rowGroup is sent like:
+// -----------------------------------------------------------------------
+// | rowGroupHeaderLen | rowGroupHeader | rowGroupDataLen | rowGroupData |
+// -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
+// | rowGroupDataLen | rowGroupData | rowGroupFooterLen | rowGroupFooter |
+// -----------------------------------------------------------------------
+// and the end of the stream is done by simply closing the stream.
+// Note that there is not a footer in the stream, so the workers need to
+//  allocate their arrays etc. in a dynamic fashion
+
+// XXX: should we use int or long for the lengths fields above?
+
+message StreamHeader {
     // Pixels file version
     required uint32 version = 1;
     // data schema of this file
@@ -292,9 +311,9 @@ message PipeliningMetadata {
     optional string magic = 8000;
 }
 
-message PipeliningFooter {
-    // number of rows in the file
-    optional uint32 numberOfRows = 2;
-    // row group information
-    repeated RowGroupInformation rowGroupInfos = 3;
+message StreamRowGroupFooter {
+    optional RowGroupIndex rowGroupIndexEntry = 1;
+    optional RowGroupEncoding rowGroupEncoding = 2;
+    // number of rows in this row group
+    optional uint64 numberOfRows = 4;
 }
