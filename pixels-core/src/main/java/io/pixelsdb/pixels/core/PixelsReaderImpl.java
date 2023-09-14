@@ -46,7 +46,7 @@ import java.util.Random;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Pixels file reader default implementation
+ * Pixels file reader default implementation.
  *
  * @author guodong, hank
  */
