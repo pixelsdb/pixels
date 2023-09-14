@@ -36,7 +36,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class MetadataServer implements Server
 {
-    private static Logger log = LogManager.getLogger(MetadataServer.class);
+    private static final Logger log = LogManager.getLogger(MetadataServer.class);
 
     private boolean running = false;
     private final io.grpc.Server rpcServer;
@@ -44,7 +44,6 @@ public class MetadataServer implements Server
     public MetadataServer(int port)
     {
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
-        checkArgument(port > 0 && port <= 65535, "illegal http port");
         this.rpcServer = ServerBuilder.forPort(port)
                 .addService(new MetadataServiceImpl()).build();
     }
@@ -64,7 +63,7 @@ public class MetadataServer implements Server
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e)
         {
-            log.error("Interrupted when shutdown rpc server.", e);
+            log.error("interrupted when shutdown rpc server", e);
         }
         MetaDBUtil.Instance().close();
     }
@@ -79,10 +78,10 @@ public class MetadataServer implements Server
             this.rpcServer.awaitTermination();
         } catch (IOException e)
         {
-            log.error("I/O error when running.", e);
+            log.error("I/O error when running", e);
         } catch (InterruptedException e)
         {
-            log.error("Interrupted when running.", e);
+            log.error("interrupted when running", e);
         } finally
         {
             this.shutdown();
