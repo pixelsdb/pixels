@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.daemon.metrics;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.daemon.Server;
+import io.pixelsdb.pixels.common.server.Server;
 import org.junit.Test;
 
 import java.util.concurrent.TimeUnit;

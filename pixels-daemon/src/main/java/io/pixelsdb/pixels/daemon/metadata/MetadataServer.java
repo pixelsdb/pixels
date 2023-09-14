@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.daemon.metadata;
 
 import io.grpc.ServerBuilder;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
-import io.pixelsdb.pixels.daemon.Server;
+import io.pixelsdb.pixels.common.server.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

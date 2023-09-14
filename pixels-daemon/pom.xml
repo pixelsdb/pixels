@@ -118,7 +118,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.2</version>
+                <version>${maven.plugin.shade.version}</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -160,7 +160,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
-                <version>2.8.2</version>
+                <version>${maven.plugin.deploy.version}</version>
                 <configuration>
                     <altDeploymentRepository>
                         local.mvn.repo::default::file://${project.parent.basedir}/mvn
@@ -171,7 +171,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.1.0</version>
+                <version>${maven.plugin.source.version}</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -183,5 +183,4 @@
             </plugin>
         </plugins>
     </build>
-
 </project>

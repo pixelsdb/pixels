@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon;
 
+import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

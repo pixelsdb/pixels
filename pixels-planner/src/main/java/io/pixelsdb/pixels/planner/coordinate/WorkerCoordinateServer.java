@@ -19,10 +19,29 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import io.pixelsdb.pixels.common.server.Server;
+
 /**
  * @author hank
  * @create 2023-08-02
  */
-public class WorkerCoordinateServer
+public class WorkerCoordinateServer implements Server
 {
+    @Override
+    public boolean isRunning()
+    {
+        return false;
+    }
+
+    @Override
+    public void shutdown()
+    {
+
+    }
+
+    @Override
+    public void run()
+    {
+
+    }
 }
