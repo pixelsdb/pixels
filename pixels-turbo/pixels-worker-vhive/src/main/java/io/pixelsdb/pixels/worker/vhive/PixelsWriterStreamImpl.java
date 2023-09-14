@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -14,6 +15,10 @@ import io.pixelsdb.pixels.core.writer.ColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.asynchttpclient.AsyncHttpClient;
+import org.asynchttpclient.Dsl;
+import org.asynchttpclient.Request;
+import org.asynchttpclient.Response;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
@@ -29,6 +34,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.netty.handler.codec.http.HttpHeaderNames.*;
+import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
 import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 import static io.pixelsdb.pixels.core.writer.ColumnWriter.newColumnWriter;
 import static java.util.Objects.requireNonNull;
@@ -92,11 +99,13 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     private boolean hashValueIsSet = false;
     private int currHashValue = 0;
 
-    private final ByteBuf bufWriter;  // file structure (NOT stream structure): [rowGroup + rowGroupFooter]* + fileTail + tailOffset
+    private final ByteBuf byteBuf;  // file structure (NOT stream structure): [rowGroup + rowGroupFooter]* + fileTail + tailOffset
     // private int bufWriterIdx;
     // private final ByteBuf[] bufWriters;
-    private final List<TypeDescription> children;
+    private final String endpoint;  // IP:port
+    private final AsyncHttpClient httpClient;
 
+    private final List<TypeDescription> children;
     private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
 
     private PixelsWriterStreamImpl(
@@ -106,11 +115,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             PixelsProto.CompressionKind compressionKind,
             int compressionBlockSize,
             TimeZone timeZone,
-            ByteBuf bufWriter,
             EncodingLevel encodingLevel,
             boolean nullsPadding,
             boolean partitioned,
-            Optional<List<Integer>> partKeyColumnIds) {
+            Optional<List<Integer>> partKeyColumnIds,
+            String endpoint) {
         this.schema = requireNonNull(schema, "schema is null");
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
         checkArgument(rowGroupSize > 0, "row group size is not positive");
@@ -133,8 +142,9 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
         }
 
-        this.bufWriter = bufWriter;
-        // this.bufWriterIdx = 0;
+        this.byteBuf = Unpooled.buffer(); // ??? Unpooled.directBuffer();
+        this.endpoint = endpoint;
+        this.httpClient = Dsl.asyncHttpClient();
     }
 
     public static class Builder {
@@ -148,7 +158,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         private boolean builderPartitioned = false;
         private boolean builderNullsPadding = false;
         private Optional<List<Integer>> builderPartKeyColumnIds = Optional.empty();
-        private ByteBuf builderBufWriter = null;
+        private String builderEndpoint = null;
 
         private Builder() {
         }
@@ -204,8 +214,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             return this;
         }
 
-        public io.pixelsdb.pixels.worker.vhive.PixelsWriterStreamImpl.Builder setBufWriter(ByteBuf bufWriter) {
-            this.builderBufWriter = requireNonNull(bufWriter);
+        public io.pixelsdb.pixels.worker.vhive.PixelsWriterStreamImpl.Builder setEndpoint(String endpoint) {
+            this.builderEndpoint = requireNonNull(endpoint);
             return this;
         }
 
@@ -218,7 +228,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             checkArgument(this.builderPartitioned ==
                             (this.builderPartKeyColumnIds.isPresent() && !this.builderPartKeyColumnIds.get().isEmpty()),
                     "partition column ids are present while partitioned is false, or vice versa");
-
+            // todo: check the other arguments
 
 
             return new io.pixelsdb.pixels.worker.vhive.PixelsWriterStreamImpl(
@@ -228,11 +238,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                     builderCompressionKind,
                     builderCompressionBlockSize,
                     builderTimeZone,
-                    builderBufWriter,
                     builderEncodingLevel,
                     builderNullsPadding,
                     builderPartitioned,
-                    builderPartKeyColumnIds);
+                    builderPartKeyColumnIds,
+                    builderEndpoint);
         }
     }
 
@@ -309,7 +319,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             curRowGroupNumOfRows = 0L;
             return false;
         }
-        writeRowGroup();  // todo: currently, in streaming mode, we have to flush on every row batch
+        writeRowGroup();  // todo: For testing purposes, currently we have to flush on every row batch
         curRowGroupNumOfRows = 0L;
         return true;
     }
@@ -357,7 +367,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     }
 
     /**
-     * Close PixelsWriterStreamImpl, indicating the end of file.
+     * Close PixelsWriterStreamImpl, indicating the end of stream.
      */
     @Override
     public void close() {
@@ -365,7 +375,23 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             if (curRowGroupNumOfRows != 0) {
                 writeRowGroup();
             }
-            // physicalWriter.close();
+
+            // close the HTTP connection
+            Request req = httpClient.preparePost(endpoint)
+                    .addHeader(CONTENT_TYPE, "application/x-protobuf")
+                    .addHeader(CONTENT_LENGTH, 0)
+                    .addHeader(CONNECTION, CLOSE)
+                    .build();
+            try {
+                Response response = httpClient.executeRequest(req).get();
+                if (response.getStatusCode() != 200) {
+                    throw new IOException("Failed to send close request to server, status code: " + response.getStatusCode());
+                }
+            } catch (Throwable e) {
+                LOGGER.error(e.getMessage());
+                e.printStackTrace();
+            }
+
             for (ColumnWriter cw : columnWriters) {
                 cw.close();
             }
@@ -378,6 +404,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     }
 
     private void writeRowGroup() throws IOException {
+        // Maybe use Unpooled.wrappedBuffer() instead of ByteBuf.writeBytes()
         if (isFirstRowGroup) {writeStreamHeader(); isFirstRowGroup = false;}  // xxx: If we never call addRowBatch(), we will never write stream head
 
         int rowGroupDataLength = 0;
@@ -407,22 +434,22 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
 
         // write and flush row group content
         try {
-            curRowGroupOffset = bufWriter.writerIndex();  // physicalWriter.prepare(rowGroupDataLength);
+            curRowGroupOffset = byteBuf.writerIndex();  // physicalWriter.prepare(rowGroupDataLength);
             if (curRowGroupOffset != -1) {
                 // Issue #519: make sure to start writing the column chunks in the row group from an aligned offset.
                 int tryAlign = 0;
                 long writtenBytesBefore = writtenBytes;
-                int rowGroupDataLenPos = bufWriter.writerIndex();
+                int rowGroupDataLenPos = byteBuf.writerIndex();
 //                System.out.println("rowGroupDataLenPos: " + rowGroupDataLenPos);
-                bufWriter.writeInt(0); // write a placeholder for row group data length
+                byteBuf.writeInt(0); // write a placeholder for row group data length
                 writtenBytes += Integer.BYTES;
-                curRowGroupOffset = bufWriter.writerIndex();
+                curRowGroupOffset = byteBuf.writerIndex();
 
                 while (CHUNK_ALIGNMENT != 0 && curRowGroupOffset % CHUNK_ALIGNMENT != 0 && tryAlign++ < 2) {
                     int alignBytes = (int) (CHUNK_ALIGNMENT - curRowGroupOffset % CHUNK_ALIGNMENT);
-                    bufWriter.writeBytes(CHUNK_PADDING_BUFFER, 0, alignBytes);  // physicalWriter.append(CHUNK_PADDING_BUFFER, 0, alignBytes);
+                    byteBuf.writeBytes(CHUNK_PADDING_BUFFER, 0, alignBytes);  // physicalWriter.append(CHUNK_PADDING_BUFFER, 0, alignBytes);
                     writtenBytes += alignBytes;
-                    curRowGroupOffset = bufWriter.writerIndex();  // physicalWriter.prepare(rowGroupDataLength);
+                    curRowGroupOffset = byteBuf.writerIndex();  // physicalWriter.prepare(rowGroupDataLength);
                 }
                 if (tryAlign > 2) {
                     LOGGER.warn("failed to align the start offset of the column chunks in the row group");
@@ -433,24 +460,24 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                     byte[] columnChunkBuffer = writer.getColumnChunkContent();
                     // System.out.println("Column offset: " + bufWriter.writerIndex() + ", size: " + columnChunkBuffer.length);
 //                    System.out.println("Column position in bufWriter: " + bufWriter.writerIndex());
-                    bufWriter.writeBytes(
+                    byteBuf.writeBytes(
                             columnChunkBuffer,
                             0, columnChunkBuffer.length);  // physicalWriter.append(columnChunkBuffer, 0, columnChunkBuffer.length);
                     writtenBytes += columnChunkBuffer.length;
                     // add align bytes to make sure the column size is the multiple of fsBlockSize
                     if (CHUNK_ALIGNMENT != 0 && columnChunkBuffer.length % CHUNK_ALIGNMENT != 0) {
                         int alignBytes = CHUNK_ALIGNMENT - columnChunkBuffer.length % CHUNK_ALIGNMENT;
-                        bufWriter.writeBytes(CHUNK_PADDING_BUFFER, 0, alignBytes);  // physicalWriter.append(CHUNK_PADDING_BUFFER, 0, alignBytes);
+                        byteBuf.writeBytes(CHUNK_PADDING_BUFFER, 0, alignBytes);  // physicalWriter.append(CHUNK_PADDING_BUFFER, 0, alignBytes);
                         writtenBytes += alignBytes;
                     }
                 }
 
                 // write row group data len
-                int rowGroupDataLen = bufWriter.writerIndex() - rowGroupDataLenPos - Integer.BYTES;
+                int rowGroupDataLen = byteBuf.writerIndex() - rowGroupDataLenPos - Integer.BYTES;
                 if (rowGroupDataLen == writtenBytes - writtenBytesBefore) {
                     throw new IOException("Calculated rowGroupDataLen is not equal to recorded writtenBytes");
                 }
-                bufWriter.setInt(rowGroupDataLenPos, rowGroupDataLen);
+                byteBuf.setInt(rowGroupDataLenPos, rowGroupDataLen);
 
                 // physicalWriter.flush();
             } else {
@@ -509,10 +536,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         // write and flush row group footer
         byte[] footerBuffer = rowGroupFooter.toByteArray();
         // physicalWriter.prepare(footerBuffer.length);
-        curRowGroupFooterOffset = bufWriter.writerIndex();
+        curRowGroupFooterOffset = byteBuf.writerIndex();
 //        System.out.println("position before writing rowGroupFooter: " + bufWriter.writerIndex());
-        bufWriter.writeInt(footerBuffer.length);
-        bufWriter.writeBytes(footerBuffer, 0, footerBuffer.length);
+        byteBuf.writeInt(footerBuffer.length);
+        byteBuf.writeBytes(footerBuffer, 0, footerBuffer.length);
 //        System.out.println("position after writing rowGroupFooter: " + bufWriter.writerIndex());
         // System.out.println("curRowGroupFooterOffset: " + curRowGroupFooterOffset);
         // curRowGroupFooterOffset = physicalWriter.append(footerBuffer, 0, footerBuffer.length);
@@ -535,6 +562,26 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
 
         this.fileRowNum += curRowGroupNumOfRows;
         this.fileContentLength += rowGroupDataLength;
+
+        // Added: Send row group to server
+        Request req = httpClient.preparePost(endpoint)
+                .addFormParam("param1", "value1")  // can use this to record the hashValue
+                .setBody(byteBuf.nioBuffer())
+                .addHeader(CONTENT_TYPE, "application/x-protobuf")
+                .addHeader(CONTENT_LENGTH, byteBuf.readableBytes())
+                .addHeader(CONNECTION, "keep-alive")
+                .build();
+        try {
+            Response response = httpClient.executeRequest(req).get();  // todo: Does this API keep the connection open after returning?
+            // XXX: It remains questionable whether it's good to use a blocking call in the writer.
+            if (response.getStatusCode() != 200) {
+                throw new IOException("Failed to send row group to server, status code: " + response.getStatusCode());
+            }
+        } catch (Throwable e) {
+            LOGGER.error(e.getMessage());
+            e.printStackTrace();
+        }
+        byteBuf.clear();
     }
 
     static void writeTypes(PixelsProto.StreamHeader.Builder builder, TypeDescription schema)
@@ -637,14 +684,14 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         metadataLengthBuffer.flip(); // Flip the buffer to change its position to the beginning
 
         byte[] magicBytes = MAGIC.getBytes();
-        bufWriter.writeBytes(magicBytes);
-        bufWriter.writeBytes(metadataLengthBuffer);
-        bufWriter.writeBytes(streamHeader.toByteArray());
+        byteBuf.writeBytes(magicBytes);
+        byteBuf.writeBytes(metadataLengthBuffer);
+        byteBuf.writeBytes(streamHeader.toByteArray());
         writtenBytes += magicBytes.length + streamHeaderLength + Integer.BYTES;
 
         int paddingLength = (8 - (magicBytes.length + Integer.BYTES + streamHeaderLength) % 8) % 8;  // Can use '&7'
         byte[] paddingBytes = new byte[paddingLength];
-        bufWriter.writeBytes(paddingBytes);
+        byteBuf.writeBytes(paddingBytes);
 //        System.out.println("position after writing streamHeader: " + bufWriter.writerIndex());
         // physicalWriter.flush();
     }
