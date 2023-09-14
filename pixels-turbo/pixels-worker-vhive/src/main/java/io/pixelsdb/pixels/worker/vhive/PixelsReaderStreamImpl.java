@@ -1,8 +1,15 @@
 package io.pixelsdb.pixels.worker.vhive;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.*;
 import io.pixelsdb.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.common.utils.HttpServer;
+import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsVersion;
@@ -16,10 +23,14 @@ import org.apache.logging.log4j.Logger;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
+import java.util.Objects;
+import java.util.concurrent.*;
 
+import static io.netty.handler.codec.http.HttpHeaderNames.CONNECTION;
+import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
+import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 
 @NotThreadSafe
@@ -27,100 +38,139 @@ public class PixelsReaderStreamImpl implements PixelsReader
 {
     private static final Logger LOGGER = LogManager.getLogger(io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl.class);
 
-    private final TypeDescription fileSchema;
-    private final ByteBuf bufReader;
-    private final PixelsProto.StreamHeader streamHeader;
-    private final Random random;
+    private TypeDescription fileSchema;
+    private final String endpoint;  // IP:port
+    private final HttpServer httpServer;
+    private final CompletableFuture<Void> httpServerFuture;
+    BlockingQueue<ByteBuf> byteBufSharedQueue;
+    private final List<PixelsRecordReaderStreamImpl> recordReaders;
 
-    private PixelsReaderStreamImpl(TypeDescription fileSchema,
-                             ByteBuf bufReader,
-                             PixelsProto.StreamHeader streamHeader)
-    {
-        this.fileSchema = fileSchema;
-        this.bufReader = bufReader;
-        this.streamHeader = streamHeader;
-        this.random = new Random();
+    private PixelsProto.StreamHeader streamHeader;
+
+    // todo: can just merge our PixelsReaderStreamImpl into our PixelsRecordReaderStreamImpl
+    public PixelsReaderStreamImpl(String endpoint) throws Exception {
+        this.fileSchema = null;
+        this.streamHeader = null;
+        this.endpoint = endpoint;
+        this.byteBufSharedQueue = new LinkedBlockingQueue<>(1);
+        this.recordReaders = new LinkedList<>();  // new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        // WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
+        ExecutorService executorService = Executors.newFixedThreadPool(1);  // , new ThreadFactoryBuilder().setUncaughtExceptionHandler(exceptionHandler).build());
+            this.httpServer = new HttpServer(new HttpServerHandler() {
+            @Override
+            public void channelRead0(ChannelHandlerContext ctx, HttpObject msg) {
+                if (!(msg instanceof HttpRequest)) return;
+                FullHttpRequest req = (FullHttpRequest) msg;
+                // if (req.method() != HttpMethod.POST) {sendHttpResponse(ctx, HttpResponseStatus.OK);}
+//                System.out.println("HTTP request object body total length: " + req.content().readableBytes());
+                if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf")) {
+                    return;
+                }
+                // if (req.content().isReadable(Integer.BYTES * 2)) ;  // in case of empty body
+
+                ByteBuf byteBuf = req.content();
+                if (streamHeader == null) {
+                    try {
+                        streamHeader = parseStreamHeader(byteBuf);
+                        for (PixelsRecordReaderStreamImpl recordReader: recordReaders) {
+                            recordReader.streamHeader = streamHeader;
+                            recordReader.checkBeforeRead();
+                            // Currently, we allow creating a RecordReader instance first and initialize it later,
+                            //  because the first package (which contains the StreamHeader) might have not arrived
+                        }
+                    } catch (InvalidProtocolBufferException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                try {
+                    byteBuf.retain();
+                    byteBufSharedQueue.put(byteBuf);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }  // todo: I ignored a lot of exceptions because the method signature is inherited and I cannot throw them out
+
+                FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), OK);
+                ChannelFuture f = ctx.writeAndFlush(response);
+                f.addListener(future -> {
+                    if (!future.isSuccess()) {
+                        System.out.println("Failed to write response: " + future.cause());
+//                        throw
+                        // ctx.close(); // Close the channel on error
+                    }
+                });
+                f.addListener(ChannelFutureListener.CLOSE);
+                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString())) {
+                    f.addListener(future -> {
+                        // Gracefully shutdown the server
+                        ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
+                    });
+                }
+            }
+            });
+            this.httpServerFuture = CompletableFuture.runAsync(() -> {
+                try {
+                    this.httpServer.serve();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }, executorService);
     }
 
-    public static class Builder
-    {
-        private TypeDescription builderSchema = null;
-        private ByteBuf builderBufReader = null;
-        private int builderTotalBufLen = 0;
+    static int calculateCeiling(int value, int multiple) {
+        // to calculate padding length in HttpClient
 
-        private Builder()
+        if (value <= 0 || multiple <= 0) {
+            throw new IllegalArgumentException("Both value and multiple must be positive.");
+        }
+
+        int remainder = value % multiple;
+        if (remainder == 0) {
+            // No need to adjust, value is already a multiple of multiple
+            return value;
+        }
+
+        int difference = multiple - remainder;
+        return value + difference;
+    }
+
+    private PixelsProto.StreamHeader parseStreamHeader(ByteBuf byteBuf) throws InvalidProtocolBufferException {
+        // check MAGIC
+        int magicLength = MAGIC.getBytes().length;
+        byte[] magicBytes = new byte[magicLength];
+        byteBuf.getBytes(0, magicBytes);
+        String magic = new String(magicBytes);
+        if (!magic.contentEquals(Constants.MAGIC))
         {
+            throw new PixelsFileMagicInvalidException(magic);
         }
 
-        public Builder setBuilderBufReader(ByteBuf builderBufReader) {
-            this.builderBufReader = builderBufReader;
-            return this;
-        }
-
-        public Builder setBuilderTotalBufLen(int builderTotalBufLen) {
-            this.builderTotalBufLen = builderTotalBufLen;
-            return this;
-        }
-
-        static int calculateCeiling(int value, int multiple) {
-            // to calculate padding length in HttpClient
-
-            if (value <= 0 || multiple <= 0) {
-                throw new IllegalArgumentException("Both value and multiple must be positive.");
-            }
-
-            int remainder = value % multiple;
-            if (remainder == 0) {
-                // No need to adjust, value is already a multiple of multiple
-                return value;
-            }
-
-            int difference = multiple - remainder;
-            return value + difference;
-        }
-
-        public PixelsReader build() throws IllegalArgumentException, IOException
-        {
-            // check MAGIC
-            int magicLength = MAGIC.getBytes().length;
-            byte[] magicBytes = new byte[magicLength];
-            builderBufReader.getBytes(0, magicBytes);
-            String magic = new String(magicBytes);
-            if (!magic.contentEquals(Constants.MAGIC))
-            {
-                throw new PixelsFileMagicInvalidException(magic);
-            }
-
-            // parse streamHeader
-            int metadataLength = builderBufReader.getInt(magicLength);  // getInt(int index)
+        // parse streamHeader
+        int metadataLength = byteBuf.getInt(magicLength);  // getInt(int index)
 //            System.out.println("Parsed metadataLength: " + metadataLength);
-            ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
-            builderBufReader.getBytes(magicLength + Integer.BYTES, metadataBuf);
-            PixelsProto.StreamHeader streamHeader = PixelsProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
+        ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
+        byteBuf.getBytes(magicLength + Integer.BYTES, metadataBuf);
+        PixelsProto.StreamHeader streamHeader = PixelsProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
 //            System.out.println("Parsed streamHeader object: ");
 //            System.out.println(streamHeader);
 
-            // check file version
-            int fileVersion = streamHeader.getVersion();
-            if (!PixelsVersion.matchVersion(fileVersion))
-            {
-                throw new PixelsFileVersionInvalidException(fileVersion);
-            }
+        // check file version
+        int fileVersion = streamHeader.getVersion();
+        if (!PixelsVersion.matchVersion(fileVersion))
+        {
+            throw new PixelsFileVersionInvalidException(fileVersion);
+        }
 
-            // consume the padding bytes
-            builderBufReader.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8));
+        // consume the padding bytes
+        byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8));
 //            System.out.println("streamHeader length incl padding: " + builderBufReader.readerIndex());
 
-            // create a default PixelsReader
-            // To this point, the readerIndex of bufReader is at the start of the actual rowGroups.
-            builderSchema = TypeDescription.createSchema(streamHeader.getTypesList());
-            return new io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl(builderSchema, builderBufReader, streamHeader);
-        }
-    }
-
-    public static io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl.Builder newBuilder()
-    {
-        return new io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl.Builder();
+        // create a default PixelsReader
+        // To this point, the readerIndex of bufReader is at the start of the actual rowGroups.
+        this.fileSchema = TypeDescription.createSchema(streamHeader.getTypesList());
+        return streamHeader;
     }
 
     public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) {
@@ -135,10 +185,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public PixelsRecordReader read(PixelsReaderOption option) throws IOException
     {
-        float diceValue = random.nextFloat();
-//        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
-        return new PixelsRecordReaderStreamImpl(bufReader, streamHeader, option);
+//        LOGGER.debug("create a recordReader");
+        PixelsRecordReaderStreamImpl recordReader = new PixelsRecordReaderStreamImpl(byteBufSharedQueue, streamHeader, option);
         // Theoretically, it is still possible to append data to the bufReader while reading.
+        recordReaders.add(recordReader);
+        return recordReader;
     }
 
     /**
@@ -328,6 +379,10 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public void close()
             throws IOException
     {
-        // this.physicalReader.close();
+        this.httpServerFuture.join();  //.cancel(true);
+        for (PixelsRecordReader recordReader : recordReaders)
+        {
+            recordReader.close();
+        }
     }
 }
