@@ -70,7 +70,7 @@ public abstract class Operator
      * Execute the previous stages (if any) before the last stage, recursively.
      * And return the completable future that completes when the previous states are complete.
      *
-     * @return empty array if the previous stages do not exist or do not need to be wait for
+     * @return empty array if the previous stages do not exist or do not need to be waited for
      */
     public abstract CompletableFuture<Void> executePrev();
 
