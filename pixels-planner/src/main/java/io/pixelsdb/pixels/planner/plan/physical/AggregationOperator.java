@@ -20,15 +20,12 @@
 package io.pixelsdb.pixels.planner.plan.physical;
 
 import com.google.common.collect.ImmutableList;
-import io.pixelsdb.pixels.common.turbo.InvokerFactory;
-import io.pixelsdb.pixels.common.turbo.WorkerType;
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
-import io.pixelsdb.pixels.common.turbo.Output;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -38,31 +35,31 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @create 2022-07-05
  */
-public class AggregationOperator extends Operator
+public abstract class AggregationOperator extends Operator
 {
     /**
      * The inputs of the final aggregation workers that aggregate the
      * partial aggregation results produced by the child or the scan workers.
      */
-    private final List<AggregationInput> finalAggrInputs;
+    protected final List<AggregationInput> finalAggrInputs;
     /**
      * The scan inputs of the scan workers that produce the partial aggregation
      * results. It should be empty if child is not null.
      */
-    private final List<ScanInput> scanInputs;
+    protected final List<ScanInput> scanInputs;
     /**
      * The child operator that produce the partial aggregation results. It
      * should be null if scanInputs is not empty.
      */
-    private Operator child = null;
+    protected Operator child = null;
     /**
      * The outputs of the scan workers.
      */
-    private CompletableFuture<?>[] scanOutputs = null;
+    protected CompletableFuture<?>[] scanOutputs = null;
     /**
      * The outputs of the final aggregation workers.
      */
-    private CompletableFuture<?>[] finalAggrOutputs = null;
+    protected CompletableFuture<?>[] finalAggrOutputs = null;
 
     public AggregationOperator(String name, List<AggregationInput> finalAggrInputs, List<ScanInput> scanInputs)
     {
@@ -113,81 +110,6 @@ public class AggregationOperator extends Operator
                     "scanInputs must be empty if child is set to non-null");
             this.child = child;
         }
-    }
-
-    @Override
-    public CompletableFuture<CompletableFuture<?>[]> execute()
-    {
-        return executePrev().handle((result, exception) ->
-        {
-            if (exception != null)
-            {
-                throw new CompletionException("failed to complete the previous stages", exception);
-            }
-
-            try
-            {
-                this.finalAggrOutputs = new CompletableFuture[this.finalAggrInputs.size()];
-                int i = 0;
-                for (AggregationInput preAggrInput : this.finalAggrInputs)
-                {
-                    this.finalAggrOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
-                }
-                waitForCompletion(this.finalAggrOutputs);
-            } catch (InterruptedException e)
-            {
-                throw new CompletionException("interrupted when waiting for the completion of this operator", e);
-            }
-
-            return this.finalAggrOutputs;
-        });
-    }
-
-    @Override
-    public CompletableFuture<Void> executePrev()
-    {
-        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
-        operatorService.execute(() ->
-        {
-            try
-            {
-                CompletableFuture<CompletableFuture<?>[]> childFuture = null;
-                if (this.child != null)
-                {
-                    checkArgument(this.scanInputs.isEmpty(), "scanInputs is not empty");
-                    this.scanOutputs = new CompletableFuture[0];
-                    childFuture = this.child.execute();
-                } else
-                {
-                    checkArgument(!this.scanInputs.isEmpty(), "scanInputs is empty");
-                    this.scanOutputs = new CompletableFuture[this.scanInputs.size()];
-                    int i = 0;
-                    for (ScanInput scanInput : this.scanInputs)
-                    {
-                        this.scanOutputs[i++] = InvokerFactory.Instance()
-                                .getInvoker(WorkerType.SCAN).invoke(scanInput);
-                    }
-                }
-
-                if (childFuture != null)
-                {
-                    waitForCompletion(childFuture.join());
-                }
-                if (this.scanOutputs.length > 0)
-                {
-                    waitForCompletion(this.scanOutputs);
-                }
-
-                prevStagesFuture.complete(null);
-            }
-            catch (InterruptedException e)
-            {
-                throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
-            }
-        });
-
-        return prevStagesFuture;
     }
 
     @Override

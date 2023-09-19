@@ -348,7 +348,7 @@ public class StarlingPlanner
                 joinInputs.add(joinInput);
             }
 
-            SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
+            SingleStageJoinOperator joinOperator = new SingleStageJoinBatchOperator(
                     joinedTable.getTableName(), true, joinInputs.build(), JoinAlgorithm.BROADCAST);
             joinOperator.setSmallChild(leftOperator);
             joinOperator.setLargeChild(rightOperator);
@@ -378,7 +378,7 @@ public class StarlingPlanner
             List<JoinInput> joinInputs = getPartitionedJoinInputs(
                     joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
                     null, null);
-            PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
+            PartitionedJoinOperator joinOperator = new PartitionedJoinBatchOperator(
                     joinedTable.getTableName(), null, null, joinInputs, joinAlgo);
 
             joinOperator.setSmallChild(leftOperator);
@@ -610,8 +610,8 @@ public class StarlingPlanner
                     joinInputs.add(joinInput);
                 }
             }
-            SingleStageJoinOperator joinOperator =
-                    new SingleStageJoinOperator(joinedTable.getTableName(), true, joinInputs.build(), joinAlgo);
+            SingleStageJoinOperator joinOperator = new SingleStageJoinBatchOperator(
+                    joinedTable.getTableName(), true, joinInputs.build(), joinAlgo);
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 joinOperator.setSmallChild(childOperator);
@@ -653,13 +653,13 @@ public class StarlingPlanner
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
-                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
+                    joinOperator = new PartitionedJoinBatchOperator(joinedTable.getTableName(),
                             null, rightPartitionInputs, joinInputs, joinAlgo);
                     joinOperator.setSmallChild(childOperator);
                 }
                 else
                 {
-                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
+                    joinOperator = new PartitionedJoinBatchOperator(joinedTable.getTableName(),
                             rightPartitionInputs, null, joinInputs, joinAlgo);
                     joinOperator.setLargeChild(childOperator);
                 }
@@ -689,12 +689,12 @@ public class StarlingPlanner
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
-                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
+                    joinOperator = new PartitionedJoinBatchOperator(joinedTable.getTableName(),
                             leftPartitionInputs, rightPartitionInputs, joinInputs, joinAlgo);
                 }
                 else
                 {
-                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
+                    joinOperator = new PartitionedJoinBatchOperator(joinedTable.getTableName(),
                             rightPartitionInputs, leftPartitionInputs, joinInputs, joinAlgo);
                 }
             }

@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
+import static io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.waitForCompletion;
 
 /**
  * @author hank
