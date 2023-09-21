@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.planner.coordinate;
 import io.pixelsdb.pixels.common.task.WorkerInfo;
 import io.pixelsdb.pixels.turbo.TurboProto;
 
+import java.util.List;
+
 /**
  * @author hank
  * @create 2023-08-02
@@ -29,18 +31,18 @@ import io.pixelsdb.pixels.turbo.TurboProto;
 public class ServerlessWorkerInfo implements WorkerInfo
 {
     private final String ip;
-    private final int streamPort;
+    private final int port;
     private final long transId;
     private final String operatorName;
-    private final int hashBucketId;
+    private final List<Integer> hashValues;
 
-    public ServerlessWorkerInfo(String ip, int streamPort, long transId, String operatorName, int hashBucketId)
+    public ServerlessWorkerInfo(String ip, int port, long transId, String operatorName, List<Integer> hashValues)
     {
         this.ip = ip;
-        this.streamPort = streamPort;
+        this.port = port;
         this.transId = transId;
         this.operatorName = operatorName;
-        this.hashBucketId = hashBucketId;
+        this.hashValues = hashValues;
     }
 
     public String getIp()
@@ -48,9 +50,9 @@ public class ServerlessWorkerInfo implements WorkerInfo
         return ip;
     }
 
-    public int getStreamPort()
+    public int getPort()
     {
-        return streamPort;
+        return port;
     }
 
     public long getTransId()
@@ -63,19 +65,19 @@ public class ServerlessWorkerInfo implements WorkerInfo
         return operatorName;
     }
 
-    public int getHashBucketId()
+    public List<Integer> getHashValues()
     {
-        return hashBucketId;
+        return hashValues;
     }
 
     public TurboProto.WorkerInfo toProto()
     {
         TurboProto.WorkerInfo.Builder builder = TurboProto.WorkerInfo.newBuilder()
-                .setIp(this.ip).setStreamPort(this.streamPort)
+                .setIp(this.ip).setPort(this.port)
                 .setTransId(this.transId).setOperatorName(this.operatorName);
-        if (this.hashBucketId >= 0)
+        if (this.hashValues != null && !this.hashValues.isEmpty())
         {
-            builder.setHashBucketId(this.hashBucketId);
+            builder.addAllHashValues(this.hashValues);
         }
         return builder.build();
     }
