@@ -63,7 +63,7 @@ public class TaskQueue<E extends Task<?>>
         return this.pendingQueue.addAll(tasks);
     }
 
-    private  void checkPendingTasks(Collection<E> tasks)
+    private void checkPendingTasks(Collection<E> tasks)
     {
         checkArgument(tasks != null && !tasks.isEmpty(), "tasks should not be null or empty");
         for (E task : tasks)
@@ -102,6 +102,11 @@ public class TaskQueue<E extends Task<?>>
         {
             return null;
         }
+    }
+
+    public boolean hasPending()
+    {
+        return !this.pendingQueue.isEmpty();
     }
 
     /**

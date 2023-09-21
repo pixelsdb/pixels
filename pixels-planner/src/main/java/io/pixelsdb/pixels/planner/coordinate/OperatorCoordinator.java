@@ -23,9 +23,9 @@ import java.util.Map;
 
 /**
  * @author hank
- * @create 2023-07-31
+ * @create 2023-09-22
  */
-public class PlanCoordinator
+public class OperatorCoordinator
 {
-    private Map<String, OperatorCoordinator> operatorCoordinators;
+    private Map<Integer, StageCoordinator> stageCoordinators;
 }

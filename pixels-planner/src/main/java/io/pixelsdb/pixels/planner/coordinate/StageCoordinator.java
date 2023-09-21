@@ -19,13 +19,26 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import io.pixelsdb.pixels.common.task.Task;
+import io.pixelsdb.pixels.common.task.TaskQueue;
+import io.pixelsdb.pixels.common.task.Worker;
+import io.pixelsdb.pixels.common.turbo.Input;
+import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
+
 import java.util.Map;
 
 /**
  * @author hank
- * @create 2023-07-31
+ * @create 2023-09-22
  */
-public class PlanCoordinator
+public class StageCoordinator
 {
-    private Map<String, OperatorCoordinator> operatorCoordinators;
+    private TaskQueue<Task<? extends Input>> taskQueue;
+    private Map<Long, Worker> workers;
+
+    public StageCoordinator()
+    {
+        taskQueue = new TaskQueue<>();
+        taskQueue.offerPending(new Task<>("", new PartitionInput()));
+    }
 }

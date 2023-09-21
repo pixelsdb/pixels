@@ -104,7 +104,6 @@ public class Task<T>
         }
     }
 
-
     public Status getStatus()
     {
         return status;

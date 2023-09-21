@@ -28,20 +28,23 @@ import java.util.List;
  * @author hank
  * @create 2023-08-02
  */
-public class ServerlessWorkerInfo implements WorkerInfo
+public class FunctionWorkerInfo implements WorkerInfo
 {
     private final String ip;
     private final int port;
     private final long transId;
     private final String operatorName;
+    private final int stageId;
     private final List<Integer> hashValues;
 
-    public ServerlessWorkerInfo(String ip, int port, long transId, String operatorName, List<Integer> hashValues)
+    public FunctionWorkerInfo(String ip, int port, long transId, String operatorName,
+                              int stageId, List<Integer> hashValues)
     {
         this.ip = ip;
         this.port = port;
         this.transId = transId;
         this.operatorName = operatorName;
+        this.stageId = stageId;
         this.hashValues = hashValues;
     }
 
@@ -65,6 +68,11 @@ public class ServerlessWorkerInfo implements WorkerInfo
         return operatorName;
     }
 
+    public int getStageId()
+    {
+        return stageId;
+    }
+
     public List<Integer> getHashValues()
     {
         return hashValues;
@@ -73,8 +81,8 @@ public class ServerlessWorkerInfo implements WorkerInfo
     public TurboProto.WorkerInfo toProto()
     {
         TurboProto.WorkerInfo.Builder builder = TurboProto.WorkerInfo.newBuilder()
-                .setIp(this.ip).setPort(this.port)
-                .setTransId(this.transId).setOperatorName(this.operatorName);
+                .setIp(this.ip).setPort(this.port).setTransId(this.transId)
+                .setOperatorName(this.operatorName).setStageId(this.stageId);
         if (this.hashValues != null && !this.hashValues.isEmpty())
         {
             builder.addAllHashValues(this.hashValues);

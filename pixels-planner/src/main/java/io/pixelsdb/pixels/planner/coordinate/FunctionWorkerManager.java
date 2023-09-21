@@ -19,13 +19,15 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import io.pixelsdb.pixels.common.task.Worker;
+
 import java.util.Map;
 
 /**
  * @author hank
- * @create 2023-07-31
+ * @create 2023-09-21
  */
-public class PlanCoordinator
+public class FunctionWorkerManager
 {
-    private Map<String, OperatorCoordinator> operatorCoordinators;
+    private Map<Long, Worker> workerIdToWorker;
 }
