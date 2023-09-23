@@ -23,9 +23,10 @@ import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.task.TaskQueue;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.turbo.Input;
-import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author hank
@@ -33,12 +34,28 @@ import java.util.Map;
  */
 public class StageCoordinator
 {
-    private TaskQueue<Task<? extends Input>> taskQueue;
-    private Map<Long, Worker> workers;
+    private final TaskQueue<Task<? extends Input>> taskQueue;
+    private final Map<Long, Worker<CFWorkerInfo>> workers;
 
     public StageCoordinator()
     {
-        taskQueue = new TaskQueue<>();
-        taskQueue.offerPending(new Task<>("", new PartitionInput()));
+        this.taskQueue = new TaskQueue<>();
+        this.workers = new ConcurrentHashMap<>();
+    }
+
+    public StageCoordinator(List<Task<? extends Input>> tasks)
+    {
+        this.taskQueue = new TaskQueue<>(tasks);
+        this.workers = new ConcurrentHashMap<>();
+    }
+
+    public void addPendingTask(Task<? extends Input> task)
+    {
+        this.taskQueue.offerPending(task);
+    }
+
+    public void addWorker(long workerId, Worker<CFWorkerInfo> worker)
+    {
+        this.workers.put(workerId, worker);
     }
 }

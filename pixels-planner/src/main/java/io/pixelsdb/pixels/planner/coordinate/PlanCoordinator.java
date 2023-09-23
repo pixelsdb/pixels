@@ -20,6 +20,10 @@
 package io.pixelsdb.pixels.planner.coordinate;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -27,5 +31,21 @@ import java.util.Map;
  */
 public class PlanCoordinator
 {
-    private Map<String, OperatorCoordinator> operatorCoordinators;
+    private final Map<Integer, StageCoordinator> stageCoordinators;
+
+    public PlanCoordinator()
+    {
+        this.stageCoordinators = new ConcurrentHashMap<>();
+    }
+
+    public void addStageCoordinator(int stageId, StageCoordinator stageCoordinator)
+    {
+        checkArgument(!this.stageCoordinators.containsKey(stageId), "stageId already exists");
+        this.stageCoordinators.put(stageId, requireNonNull(stageCoordinator, "stageCoordinator is null"));
+    }
+
+    public StageCoordinator getStageCoordinator(int stageId)
+    {
+        return this.stageCoordinators.get(stageId);
+    }
 }

@@ -95,8 +95,8 @@ message WorkerInfo {
   string ip = 1; // the ip address of the worker
   int32 port = 2; // the tcp port that the worker receives data streams from
   int64 transId = 3; // the id of the transaction (query)
-  string operatorName = 4; // the name of the operator in the transaction (query)
-  int32 stageId = 5; // the id of the stage in the operator this worker is working for
+  int32 stageId = 4; // the id of the stage in the operator this worker is working for
+  string operatorName = 5; // the name of the operator this stage belongs to
   repeated int32 hashValues = 6; // in a hash-partitioned shuffle, the hash values to be processed by this worker
 }
 

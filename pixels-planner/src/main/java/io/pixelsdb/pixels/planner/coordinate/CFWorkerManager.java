@@ -22,12 +22,33 @@ package io.pixelsdb.pixels.planner.coordinate;
 import io.pixelsdb.pixels.common.task.Worker;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author hank
  * @create 2023-09-21
  */
-public class FunctionWorkerManager
+public class CFWorkerManager
 {
-    private Map<Long, Worker> workerIdToWorker;
+    private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorker;
+    private final AtomicLong workerId;
+
+    public CFWorkerManager()
+    {
+        this.workerIdToWorker = new ConcurrentHashMap<>();
+        this.workerId = new AtomicLong(0);
+    }
+
+    public long registerCFWorker(Worker<CFWorkerInfo> worker)
+    {
+        long id = this.workerId.getAndIncrement();
+        this.workerIdToWorker.put(id, worker);
+        return id;
+    }
+
+    public Worker<CFWorkerInfo> getCFWorker(long workerId)
+    {
+        return this.workerIdToWorker.get(workerId);
+    }
 }

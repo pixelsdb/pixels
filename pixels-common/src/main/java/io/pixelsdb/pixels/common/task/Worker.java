@@ -27,13 +27,13 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @create 2023-07-29
  */
-public class Worker
+public class Worker<WI extends WorkerInfo>
 {
     private final long workerId;
     private final Lease lease;
-    private final WorkerInfo workerInfo;
+    private final WI workerInfo;
 
-    public Worker(long workerId, Lease lease, WorkerInfo workerInfo)
+    public Worker(long workerId, Lease lease, WI workerInfo)
     {
         this.workerId = workerId;
         this.lease = requireNonNull(lease, "lease is null");
@@ -45,7 +45,7 @@ public class Worker
         return workerId;
     }
 
-    public WorkerInfo getWorkerInfo()
+    public WI getWorkerInfo()
     {
         return workerInfo;
     }

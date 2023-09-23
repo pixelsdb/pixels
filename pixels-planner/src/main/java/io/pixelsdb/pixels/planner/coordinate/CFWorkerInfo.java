@@ -28,23 +28,23 @@ import java.util.List;
  * @author hank
  * @create 2023-08-02
  */
-public class FunctionWorkerInfo implements WorkerInfo
+public class CFWorkerInfo implements WorkerInfo
 {
     private final String ip;
     private final int port;
     private final long transId;
-    private final String operatorName;
     private final int stageId;
+    private final String operatorName;
     private final List<Integer> hashValues;
 
-    public FunctionWorkerInfo(String ip, int port, long transId, String operatorName,
-                              int stageId, List<Integer> hashValues)
+    public CFWorkerInfo(String ip, int port, long transId, int stageId,
+                        String operatorName, List<Integer> hashValues)
     {
         this.ip = ip;
         this.port = port;
         this.transId = transId;
-        this.operatorName = operatorName;
         this.stageId = stageId;
+        this.operatorName = operatorName;
         this.hashValues = hashValues;
     }
 
