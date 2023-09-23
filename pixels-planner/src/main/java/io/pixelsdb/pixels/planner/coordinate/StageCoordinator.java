@@ -34,17 +34,20 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class StageCoordinator
 {
+    private final int stageId;
     private final TaskQueue<Task<? extends Input>> taskQueue;
     private final Map<Long, Worker<CFWorkerInfo>> workers;
 
-    public StageCoordinator()
+    public StageCoordinator(int stageId)
     {
+        this.stageId = stageId;
         this.taskQueue = new TaskQueue<>();
         this.workers = new ConcurrentHashMap<>();
     }
 
-    public StageCoordinator(List<Task<? extends Input>> tasks)
+    public StageCoordinator(int stageId, List<Task<? extends Input>> tasks)
     {
+        this.stageId = stageId;
         this.taskQueue = new TaskQueue<>(tasks);
         this.workers = new ConcurrentHashMap<>();
     }
@@ -57,5 +60,15 @@ public class StageCoordinator
     public void addWorker(long workerId, Worker<CFWorkerInfo> worker)
     {
         this.workers.put(workerId, worker);
+    }
+
+    public int getStageId()
+    {
+        return stageId;
+    }
+
+    public Worker<CFWorkerInfo> getWorker(long workerId)
+    {
+        return this.workers.get(workerId);
     }
 }

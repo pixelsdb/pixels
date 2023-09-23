@@ -31,21 +31,38 @@ import static java.util.Objects.requireNonNull;
  */
 public class PlanCoordinator
 {
+    private final long transId;
     private final Map<Integer, StageCoordinator> stageCoordinators;
+    private final Map<Integer, StageDependency> stageDependencies;
 
-    public PlanCoordinator()
+    public PlanCoordinator(long transId)
     {
+        this.transId = transId;
         this.stageCoordinators = new ConcurrentHashMap<>();
+        this.stageDependencies = new ConcurrentHashMap<>();
     }
 
-    public void addStageCoordinator(int stageId, StageCoordinator stageCoordinator)
+    public void addStageCoordinator(StageCoordinator stageCoordinator, StageDependency stageDependency)
     {
+        int stageId = requireNonNull(stageCoordinator, "stageCoordinator is null").getStageId();
+        requireNonNull(stageDependency, "stageDependency is null");
         checkArgument(!this.stageCoordinators.containsKey(stageId), "stageId already exists");
-        this.stageCoordinators.put(stageId, requireNonNull(stageCoordinator, "stageCoordinator is null"));
+        this.stageCoordinators.put(stageId, stageCoordinator);
+        this.stageDependencies.put(stageId, stageDependency);
     }
 
     public StageCoordinator getStageCoordinator(int stageId)
     {
         return this.stageCoordinators.get(stageId);
+    }
+
+    public StageDependency getStageDependency(int stageId)
+    {
+        return this.stageDependencies.get(stageId);
+    }
+
+    public long getTransId()
+    {
+        return transId;
     }
 }
