@@ -25,4 +25,37 @@ package io.pixelsdb.pixels.planner.coordinate;
  */
 public class StageDependency
 {
+    private final int currentStageId;
+    private final int downStreamStageId;
+    private final boolean isWideDep;
+    private final long downStreamWorkerId; // only valid when this is a narrow dependency
+
+    public StageDependency(int currentStageId, int downStreamStageId,
+                           boolean isWideDep, long downStreamWorkerId)
+    {
+        this.currentStageId = currentStageId;
+        this.downStreamStageId = downStreamStageId;
+        this.isWideDep = isWideDep;
+        this.downStreamWorkerId = downStreamWorkerId;
+    }
+
+    public int getCurrentStageId()
+    {
+        return currentStageId;
+    }
+
+    public int getDownStreamStageId()
+    {
+        return downStreamStageId;
+    }
+
+    public boolean isWideDep()
+    {
+        return isWideDep;
+    }
+
+    public long getDownStreamWorkerId()
+    {
+        return downStreamWorkerId;
+    }
 }
