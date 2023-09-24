@@ -28,15 +28,12 @@ public class StageDependency
     private final int currentStageId;
     private final int downStreamStageId;
     private final boolean isWideDep;
-    private final long downStreamWorkerId; // only valid when this is a narrow dependency
 
-    public StageDependency(int currentStageId, int downStreamStageId,
-                           boolean isWideDep, long downStreamWorkerId)
+    public StageDependency(int currentStageId, int downStreamStageId, boolean isWideDep)
     {
         this.currentStageId = currentStageId;
         this.downStreamStageId = downStreamStageId;
         this.isWideDep = isWideDep;
-        this.downStreamWorkerId = downStreamWorkerId;
     }
 
     public int getCurrentStageId()
@@ -52,10 +49,5 @@ public class StageDependency
     public boolean isWideDep()
     {
         return isWideDep;
-    }
-
-    public long getDownStreamWorkerId()
-    {
-        return downStreamWorkerId;
     }
 }

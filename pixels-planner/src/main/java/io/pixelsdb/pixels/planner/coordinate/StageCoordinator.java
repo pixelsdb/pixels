@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.task.TaskQueue;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.turbo.Input;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,20 +37,23 @@ public class StageCoordinator
 {
     private final int stageId;
     private final TaskQueue<Task<? extends Input>> taskQueue;
-    private final Map<Long, Worker<CFWorkerInfo>> workers;
+    private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers;
+    private final List<Worker<CFWorkerInfo>> workers;
 
     public StageCoordinator(int stageId)
     {
         this.stageId = stageId;
         this.taskQueue = new TaskQueue<>();
-        this.workers = new ConcurrentHashMap<>();
+        this.workerIdToWorkers = new ConcurrentHashMap<>();
+        this.workers = new ArrayList<>(); // used for dependency checking, no concurrent reads and writes
     }
 
     public StageCoordinator(int stageId, List<Task<? extends Input>> tasks)
     {
         this.stageId = stageId;
         this.taskQueue = new TaskQueue<>(tasks);
-        this.workers = new ConcurrentHashMap<>();
+        this.workerIdToWorkers = new ConcurrentHashMap<>();
+        this.workers = new ArrayList<>(); // used for dependency checking, no concurrent reads and writes
     }
 
     public void addPendingTask(Task<? extends Input> task)
@@ -57,9 +61,9 @@ public class StageCoordinator
         this.taskQueue.offerPending(task);
     }
 
-    public void addWorker(long workerId, Worker<CFWorkerInfo> worker)
+    public void addWorker(Worker<CFWorkerInfo> worker)
     {
-        this.workers.put(workerId, worker);
+        this.workerIdToWorkers.put(worker.getWorkerId(), worker);
     }
 
     public int getStageId()
@@ -69,6 +73,11 @@ public class StageCoordinator
 
     public Worker<CFWorkerInfo> getWorker(long workerId)
     {
-        return this.workers.get(workerId);
+        return this.workerIdToWorkers.get(workerId);
+    }
+
+    public List<Worker<CFWorkerInfo>> getWorkers()
+    {
+        return this.workers;
     }
 }

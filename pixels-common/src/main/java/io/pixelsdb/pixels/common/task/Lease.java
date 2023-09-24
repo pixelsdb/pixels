@@ -30,10 +30,10 @@ public class Lease
     private final long periodMs;
     private long startTimeMs;
 
-    public Lease(long periodMs)
+    public Lease(long periodMs, long startTimeMs)
     {
         this.periodMs = periodMs;
-        this.startTimeMs = 0L;
+        this.startTimeMs = startTimeMs;
     }
 
     public long getPeriodMs()

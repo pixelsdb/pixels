@@ -19,46 +19,33 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
-import io.pixelsdb.pixels.common.task.Worker;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author hank
- * @create 2023-09-21
+ * @create 2023-09-25
  */
-public class CFWorkerManager
+public class PlanCoordinatorFactory
 {
-    private static final CFWorkerManager instance = new CFWorkerManager();
+    private static final PlanCoordinatorFactory instance = new PlanCoordinatorFactory();
 
-    public static CFWorkerManager Instance()
+    public static PlanCoordinatorFactory Instance()
     {
         return instance;
     }
 
-    private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorker;
-    private final AtomicLong workerId;
+    private final Map<Long, PlanCoordinator> transIdToPlanCoordinator;
 
-    private CFWorkerManager()
+    private PlanCoordinatorFactory()
     {
-        this.workerIdToWorker = new ConcurrentHashMap<>();
-        this.workerId = new AtomicLong(0);
+        this.transIdToPlanCoordinator = new ConcurrentHashMap<>();
     }
 
-    public long createWorkerId()
-    {
-        return workerId.getAndIncrement();
-    }
+    // TODO: create plan coordinator given a query plan
 
-    public void registerCFWorker(Worker<CFWorkerInfo> worker)
+    public PlanCoordinator getPlanCoordinator(long transId)
     {
-        this.workerIdToWorker.put(worker.getWorkerId(), worker);
-    }
-
-    public Worker<CFWorkerInfo> getCFWorker(long workerId)
-    {
-        return this.workerIdToWorker.get(workerId);
+        return this.transIdToPlanCoordinator.get(transId);
     }
 }

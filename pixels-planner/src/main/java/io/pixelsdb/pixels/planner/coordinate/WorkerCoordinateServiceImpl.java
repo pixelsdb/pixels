@@ -20,8 +20,13 @@
 package io.pixelsdb.pixels.planner.coordinate;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.task.Lease;
+import io.pixelsdb.pixels.common.task.Worker;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import io.pixelsdb.pixels.turbo.WorkerCoordinateServiceGrpc;
+
+import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
 /**
  * @author hank
@@ -29,10 +34,30 @@ import io.pixelsdb.pixels.turbo.WorkerCoordinateServiceGrpc;
  */
 public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.WorkerCoordinateServiceImplBase
 {
-    @Override
-    public void registerWorker(TurboProto.RegisterWorkerRequest request, StreamObserver<TurboProto.RegisterWorkerResponse> responseObserver)
+    private static final long WorkerLeasePeriodMs;
+
+    static
     {
-        super.registerWorker(request, responseObserver);
+        WorkerLeasePeriodMs = Long.parseLong(ConfigFactory.Instance().getProperty("executor.worker.lease.period.ms"));
+    }
+
+    @Override
+    public void registerWorker(TurboProto.RegisterWorkerRequest request,
+                               StreamObserver<TurboProto.RegisterWorkerResponse> responseObserver)
+    {
+        CFWorkerInfo workerInfo = new CFWorkerInfo(request.getWorkerInfo());
+        Lease lease = new Lease(WorkerLeasePeriodMs, System.currentTimeMillis());
+        long workerId = CFWorkerManager.Instance().createWorkerId();
+        Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, workerInfo);
+        CFWorkerManager.Instance().registerCFWorker(worker);
+        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
+        StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
+        stageCoordinator.addWorker(worker);
+        TurboProto.RegisterWorkerResponse response = TurboProto.RegisterWorkerResponse.newBuilder()
+                .setErrorCode(SUCCESS).setWorkerId(workerId).setLeasePeriodMs(lease.getPeriodMs())
+                .setLeaseStartTimeMs(lease.getStartTimeMs()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override

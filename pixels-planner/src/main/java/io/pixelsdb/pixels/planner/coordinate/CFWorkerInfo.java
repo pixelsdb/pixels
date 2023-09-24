@@ -48,6 +48,16 @@ public class CFWorkerInfo implements WorkerInfo
         this.hashValues = hashValues;
     }
 
+    public CFWorkerInfo(TurboProto.WorkerInfo workerInfo)
+    {
+        this.ip = workerInfo.getIp();
+        this.port = workerInfo.getPort();
+        this.transId = workerInfo.getTransId();
+        this.stageId = workerInfo.getStageId();
+        this.operatorName = workerInfo.getOperatorName();
+        this.hashValues = workerInfo.getHashValuesList();
+    }
+
     public String getIp()
     {
         return ip;
