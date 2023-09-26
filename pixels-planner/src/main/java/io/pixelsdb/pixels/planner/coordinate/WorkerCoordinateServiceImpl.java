@@ -26,7 +26,9 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import io.pixelsdb.pixels.turbo.WorkerCoordinateServiceGrpc;
 
-import static io.pixelsdb.pixels.common.error.ErrorCode.*;
+import java.util.List;
+
+import static io.pixelsdb.pixels.common.error.ErrorCode.SUCCESS;
 
 /**
  * @author hank
@@ -34,6 +36,7 @@ import static io.pixelsdb.pixels.common.error.ErrorCode.*;
  */
 public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.WorkerCoordinateServiceImplBase
 {
+
     private static final long WorkerLeasePeriodMs;
 
     static
@@ -61,8 +64,29 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
     }
 
     @Override
-    public void getDownStreamWorkers(TurboProto.GetDownStreamWorkersRequest request, StreamObserver<TurboProto.GetDownStreamWorkersResponse> responseObserver)
+    public void getDownStreamWorkers(TurboProto.GetDownStreamWorkersRequest request,
+                                     StreamObserver<TurboProto.GetDownStreamWorkersResponse> responseObserver)
     {
+        long workerId = request.getWorkerId();
+        Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
+        CFWorkerInfo workerInfo = worker.getWorkerInfo();
+        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
+        StageDependency dependency = planCoordinator.getStageDependency(workerInfo.getStageId());
+        if (dependency != null)
+        {
+            boolean isWide = dependency.isWide();
+            StageCoordinator dependentStage = planCoordinator.getStageCoordinator(dependency.getDownStreamStageId());
+            dependentStage.waitForAllWorkersReady();
+            List<Worker<CFWorkerInfo>> workers = dependentStage.getWorkers();
+            if (isWide)
+            {
+                // TODO: add workers to response
+            }
+            else
+            {
+                // TODO: add the corresponding worker to response
+            }
+        }
         super.getDownStreamWorkers(request, responseObserver);
     }
 

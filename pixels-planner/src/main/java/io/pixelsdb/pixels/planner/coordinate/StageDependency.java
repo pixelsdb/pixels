@@ -27,13 +27,13 @@ public class StageDependency
 {
     private final int currentStageId;
     private final int downStreamStageId;
-    private final boolean isWideDep;
+    private final boolean isWide;
 
-    public StageDependency(int currentStageId, int downStreamStageId, boolean isWideDep)
+    public StageDependency(int currentStageId, int downStreamStageId, boolean isWide)
     {
         this.currentStageId = currentStageId;
         this.downStreamStageId = downStreamStageId;
-        this.isWideDep = isWideDep;
+        this.isWide = isWide;
     }
 
     public int getCurrentStageId()
@@ -46,8 +46,8 @@ public class StageDependency
         return downStreamStageId;
     }
 
-    public boolean isWideDep()
+    public boolean isWide()
     {
-        return isWideDep;
+        return isWide;
     }
 }

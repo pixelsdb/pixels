@@ -23,11 +23,15 @@ import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.task.TaskQueue;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.turbo.Input;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author hank
@@ -35,45 +39,106 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class StageCoordinator
 {
+    private static final Logger log = LogManager.getLogger(StageCoordinator.class);
+
     private final int stageId;
+    private final boolean isQueued;
+    private final int fixedWorkerNum;
     private final TaskQueue<Task<? extends Input>> taskQueue;
     private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers;
     private final List<Worker<CFWorkerInfo>> workers;
+    private final Object lock = new Object();
 
-    public StageCoordinator(int stageId)
+    public StageCoordinator(int stageId, int workerNum)
     {
         this.stageId = stageId;
-        this.taskQueue = new TaskQueue<>();
+        this.isQueued = false;
+        this.fixedWorkerNum = workerNum;
+        this.taskQueue = null;
         this.workerIdToWorkers = new ConcurrentHashMap<>();
         this.workers = new ArrayList<>(); // used for dependency checking, no concurrent reads and writes
     }
 
-    public StageCoordinator(int stageId, List<Task<? extends Input>> tasks)
+    public StageCoordinator(int stageId, List<Task<? extends Input>> pendingTasks)
     {
         this.stageId = stageId;
-        this.taskQueue = new TaskQueue<>(tasks);
+        this.isQueued = true;
+        this.fixedWorkerNum = 0;
+        this.taskQueue = new TaskQueue<>(pendingTasks);
         this.workerIdToWorkers = new ConcurrentHashMap<>();
         this.workers = new ArrayList<>(); // used for dependency checking, no concurrent reads and writes
-    }
-
-    public void addPendingTask(Task<? extends Input> task)
-    {
-        this.taskQueue.offerPending(task);
     }
 
     public void addWorker(Worker<CFWorkerInfo> worker)
     {
         this.workerIdToWorkers.put(worker.getWorkerId(), worker);
+        if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
+        {
+            this.lock.notifyAll();
+        }
+    }
+
+    public Task<? extends Input> getTaskToRun(long workerId)
+    {
+        checkArgument(this.isQueued && this.taskQueue != null,
+                "can not get task to run on a non-queued stage");
+        Worker<CFWorkerInfo> worker = this.workerIdToWorkers.get(workerId);
+        if (worker != null)
+        {
+            Task<? extends Input> task = this.taskQueue.pollPendingAndRun(worker);
+            if (task == null || this.taskQueue.hasPending())
+            {
+                this.lock.notifyAll();
+            }
+            return task;
+        }
+        else
+        {
+            return null;
+        }
     }
 
     public int getStageId()
     {
-        return stageId;
+        return this.stageId;
     }
 
     public Worker<CFWorkerInfo> getWorker(long workerId)
     {
         return this.workerIdToWorkers.get(workerId);
+    }
+
+    void waitForAllWorkersReady()
+    {
+        synchronized (this.lock)
+        {
+            if (this.isQueued && this.taskQueue != null)
+            {
+                while (this.taskQueue.hasPending())
+                {
+                    try
+                    {
+                        this.lock.wait();
+                    } catch (InterruptedException e)
+                    {
+                        log.error("interrupted while waiting for the pending tasks to be executed");
+                    }
+                }
+            }
+            else
+            {
+                while (this.workers.size() < this.fixedWorkerNum)
+                {
+                    try
+                    {
+                        this.lock.wait();
+                    } catch (InterruptedException e)
+                    {
+                        log.error("interrupted while waiting workers to arrive");
+                    }
+                }
+            }
+        }
     }
 
     public List<Worker<CFWorkerInfo>> getWorkers()
