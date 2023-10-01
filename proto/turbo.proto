@@ -82,7 +82,7 @@ service WorkerCoordinateService {
   // get the downstream workers the execution outputs should be sent to
   rpc GetDownStreamWorkers (GetDownStreamWorkersRequest) returns (GetDownStreamWorkersResponse);
   // get a batch of tasks for the worker to execute
-  rpc ExecuteTasks (ExecuteTasksRequest) returns (ExecuteTasksResponse);
+  rpc GetTasks (GetTasksRequest) returns (GetTasksResponse);
   // tell the coordinator that the tasks are completed
   rpc CompleteTasks (CompleteTasksRequest) returns (CompleteTasksResponse);
   // report heartbeat and extend the lease for a worker
@@ -120,11 +120,11 @@ message GetDownStreamWorkersResponse {
   repeated WorkerInfo downStreamWorkers = 2;
 }
 
-message ExecuteTasksRequest {
+message GetTasksRequest {
   int64 workerId = 1;
 }
 
-message ExecuteTasksResponse {
+message GetTasksResponse {
   int32 errorCode = 1;
   repeated string taskInputs = 2; // the tasks in json string format
 }

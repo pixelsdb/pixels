@@ -91,9 +91,9 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
     }
 
     @Override
-    public void executeTasks(TurboProto.ExecuteTasksRequest request, StreamObserver<TurboProto.ExecuteTasksResponse> responseObserver)
+    public void getTasks(TurboProto.GetTasksRequest request, StreamObserver<TurboProto.GetTasksResponse> responseObserver)
     {
-        super.executeTasks(request, responseObserver);
+        super.getTasks(request, responseObserver);
     }
 
     @Override
