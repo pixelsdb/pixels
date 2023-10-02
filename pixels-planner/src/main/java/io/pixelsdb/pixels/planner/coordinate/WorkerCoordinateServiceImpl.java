@@ -28,6 +28,8 @@ import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import io.pixelsdb.pixels.turbo.WorkerCoordinateServiceGrpc;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 
@@ -39,7 +41,7 @@ import static io.pixelsdb.pixels.common.error.ErrorCode.SUCCESS;
  */
 public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.WorkerCoordinateServiceImplBase
 {
-
+    private static final Logger log = LogManager.getLogger(StageCoordinator.class);
     private static final long WorkerLeasePeriodMs;
 
     static
@@ -178,13 +180,33 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
     public void extendLease(TurboProto.ExtendLeaseRequest request,
                             StreamObserver<TurboProto.ExtendLeaseResponse> responseObserver)
     {
-        super.extendLease(request, responseObserver);
+        long workerId = request.getWorkerId();
+        Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
+        TurboProto.ExtendLeaseResponse.Builder builder = TurboProto.ExtendLeaseResponse.newBuilder();
+        try
+        {
+            long startTimeMs = worker.extendLease();
+            builder.setErrorCode(SUCCESS);
+            builder.setLeaseStartTimeMs(startTimeMs);
+        } catch (WorkerCoordinateException e)
+        {
+            log.error("failed to extend the lease as the worker is not alive");
+            builder.setErrorCode(ErrorCode.WORKER_COORDINATE_LEASE_EXPIRED);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void terminateWorker(TurboProto.TerminateWorkerRequest request,
                                 StreamObserver<TurboProto.TerminateWorkerResponse> responseObserver)
     {
-        super.terminateWorker(request, responseObserver);
+        long workerId = request.getWorkerId();
+        Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
+        TurboProto.TerminateWorkerResponse.Builder builder = TurboProto.TerminateWorkerResponse.newBuilder();
+        worker.termenate();
+        builder.setErrorCode(SUCCESS);
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 }

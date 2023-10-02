@@ -103,6 +103,7 @@ public class ErrorCode
     public static final int WORKER_COORDINATE_NO_DOWNSTREAM = ERROR_WORKER_COORDINATE + 1;
     public static final int WORKER_COORDINATE_WORKER_NOT_FOUND = ERROR_WORKER_COORDINATE + 2;
     public static final int WORKER_COORDINATE_END_OF_TASKS = ERROR_WORKER_COORDINATE + 3;
+    public static final int WORKER_COORDINATE_LEASE_EXPIRED = ERROR_WORKER_COORDINATE + 4;
 
     // end error code for transactions
 }

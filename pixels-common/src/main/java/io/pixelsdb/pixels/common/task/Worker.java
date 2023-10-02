@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.task;
 
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
 
 import static java.util.Objects.requireNonNull;
 
@@ -32,12 +33,14 @@ public class Worker<WI extends WorkerInfo>
     private final long workerId;
     private final Lease lease;
     private final WI workerInfo;
+    private boolean terminated;
 
     public Worker(long workerId, Lease lease, WI workerInfo)
     {
         this.workerId = workerId;
         this.lease = requireNonNull(lease, "lease is null");
         this.workerInfo = requireNonNull(workerInfo, "worker info is null");
+        this.terminated = false;
     }
 
     public long getWorkerId()
@@ -57,26 +60,39 @@ public class Worker<WI extends WorkerInfo>
     {
         synchronized (this.lease)
         {
+            if (this.terminated)
+            {
+                return false;
+            }
             long currentTimeMs = System.currentTimeMillis();
             return !this.lease.hasExpired(currentTimeMs);
         }
     }
 
+    public void termenate()
+    {
+        synchronized (this.lease)
+        {
+            this.terminated = true;
+        }
+    }
+
     /**
-     * Extent the lease of this worker if the lease is not expired.
-     * @return true if the lease is extended successfully, false if the lease has expired
+     * Extent the lease of this worker if the worker is alive.
+     * @return the new start time (milliseconds since the Unix epoch) of the extended lease
+     * @throws WorkerCoordinateException if the worker is terminated or the lease has already expired
      */
-    public boolean extendLease()
+    public long extendLease() throws WorkerCoordinateException
     {
         synchronized (this.lease)
         {
             long currentTimeMs = System.currentTimeMillis();
-            if (this.lease.hasExpired(currentTimeMs))
+            if (this.terminated || this.lease.hasExpired(currentTimeMs))
             {
-                return false;
+                throw new WorkerCoordinateException("worker is not alive, can not extend the lease");
             }
             this.lease.setStartTimeMs(currentTimeMs);
-            return true;
+            return currentTimeMs;
         }
     }
 
