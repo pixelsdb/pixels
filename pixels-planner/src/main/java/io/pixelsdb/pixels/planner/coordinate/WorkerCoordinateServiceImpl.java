@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner.coordinate;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.task.Lease;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -72,44 +73,74 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         CFWorkerInfo workerInfo = worker.getWorkerInfo();
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         StageDependency dependency = planCoordinator.getStageDependency(workerInfo.getStageId());
+        TurboProto.GetDownStreamWorkersResponse.Builder builder = TurboProto.GetDownStreamWorkersResponse.newBuilder();
         if (dependency != null)
         {
             boolean isWide = dependency.isWide();
             StageCoordinator dependentStage = planCoordinator.getStageCoordinator(dependency.getDownStreamStageId());
             dependentStage.waitForAllWorkersReady();
-            List<Worker<CFWorkerInfo>> workers = dependentStage.getWorkers();
+            List<Worker<CFWorkerInfo>> downStreamWorkers = dependentStage.getWorkers();
             if (isWide)
             {
-                // TODO: add workers to response
+                builder.setErrorCode(SUCCESS);
+                for (Worker<CFWorkerInfo> downStreamWorker : downStreamWorkers)
+                {
+                    builder.addDownStreamWorkers(downStreamWorker.getWorkerInfo().toProto());
+                }
             }
             else
             {
-                // TODO: add the corresponding worker to response
+                int workerIndex = planCoordinator.getStageCoordinator(workerInfo.getStageId()).getWorkerIndex(workerId);
+                if (workerIndex < 0)
+                {
+                    builder.setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND);
+                }
+                else
+                {
+                    if (workerIndex >= downStreamWorkers.size())
+                    {
+                        builder.setErrorCode(ErrorCode.WORKER_COORDINATE_NO_DOWNSTREAM);
+                    }
+                    else
+                    {
+                        // get the worker with the same index in the downstream stage as the downstream worker
+                        builder.setErrorCode(SUCCESS);
+                        builder.addDownStreamWorkers(downStreamWorkers.get(workerIndex).getWorkerInfo().toProto());
+                    }
+                }
             }
+        }
+        else
+        {
+            builder.setErrorCode(ErrorCode.WORKER_COORDINATE_NO_DOWNSTREAM);
         }
         super.getDownStreamWorkers(request, responseObserver);
     }
 
     @Override
-    public void getTasks(TurboProto.GetTasksRequest request, StreamObserver<TurboProto.GetTasksResponse> responseObserver)
+    public void getTasksToExecute(TurboProto.GetTasksToExecuteRequest request,
+                                  StreamObserver<TurboProto.GetTasksToExecuteResponse> responseObserver)
     {
-        super.getTasks(request, responseObserver);
+        super.getTasksToExecute(request, responseObserver);
     }
 
     @Override
-    public void completeTasks(TurboProto.CompleteTasksRequest request, StreamObserver<TurboProto.CompleteTasksResponse> responseObserver)
+    public void completeTasks(TurboProto.CompleteTasksRequest request,
+                              StreamObserver<TurboProto.CompleteTasksResponse> responseObserver)
     {
         super.completeTasks(request, responseObserver);
     }
 
     @Override
-    public void extendLease(TurboProto.ExtendLeaseRequest request, StreamObserver<TurboProto.ExtendLeaseResponse> responseObserver)
+    public void extendLease(TurboProto.ExtendLeaseRequest request,
+                            StreamObserver<TurboProto.ExtendLeaseResponse> responseObserver)
     {
         super.extendLease(request, responseObserver);
     }
 
     @Override
-    public void terminateWorker(TurboProto.TerminateWorkerRequest request, StreamObserver<TurboProto.TerminateWorkerResponse> responseObserver)
+    public void terminateWorker(TurboProto.TerminateWorkerRequest request,
+                                StreamObserver<TurboProto.TerminateWorkerResponse> responseObserver)
     {
         super.terminateWorker(request, responseObserver);
     }

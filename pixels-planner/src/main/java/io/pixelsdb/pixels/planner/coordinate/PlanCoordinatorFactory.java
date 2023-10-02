@@ -42,7 +42,7 @@ public class PlanCoordinatorFactory
         this.transIdToPlanCoordinator = new ConcurrentHashMap<>();
     }
 
-    // TODO: create plan coordinator given a query plan
+    // TODO: create plan coordinator given a query plan and add it into transIdToPlanCoordinator.
 
     public PlanCoordinator getPlanCoordinator(long transId)
     {

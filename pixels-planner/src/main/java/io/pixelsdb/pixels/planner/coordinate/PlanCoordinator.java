@@ -47,6 +47,8 @@ public class PlanCoordinator
         int stageId = requireNonNull(stageCoordinator, "stageCoordinator is null").getStageId();
         requireNonNull(stageDependency, "stageDependency is null");
         checkArgument(!this.stageCoordinators.containsKey(stageId), "stageId already exists");
+        checkArgument(stageCoordinator.getStageId() == stageDependency.getCurrentStageId(),
+                "the stageDependency does not belong to the stageCoordinator");
         this.stageCoordinators.put(stageId, stageCoordinator);
         this.stageDependencies.put(stageId, stageDependency);
     }

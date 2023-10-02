@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -45,8 +46,11 @@ public class StageCoordinator
     private final boolean isQueued;
     private final int fixedWorkerNum;
     private final TaskQueue<Task<? extends Input>> taskQueue;
-    private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers;
-    private final List<Worker<CFWorkerInfo>> workers;
+    private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers = new ConcurrentHashMap<>();
+    // this.workers is used for dependency checking, no concurrent reads and writes
+    private final List<Worker<CFWorkerInfo>> workers = new ArrayList<>();
+    private final Map<Long, Integer> workerIdToWorkerIndex = new ConcurrentHashMap<>();
+    private final AtomicInteger workerIndex = new AtomicInteger(0);
     private final Object lock = new Object();
 
     public StageCoordinator(int stageId, int workerNum)
@@ -55,8 +59,6 @@ public class StageCoordinator
         this.isQueued = false;
         this.fixedWorkerNum = workerNum;
         this.taskQueue = null;
-        this.workerIdToWorkers = new ConcurrentHashMap<>();
-        this.workers = new ArrayList<>(); // used for dependency checking, no concurrent reads and writes
     }
 
     public StageCoordinator(int stageId, List<Task<? extends Input>> pendingTasks)
@@ -65,13 +67,12 @@ public class StageCoordinator
         this.isQueued = true;
         this.fixedWorkerNum = 0;
         this.taskQueue = new TaskQueue<>(pendingTasks);
-        this.workerIdToWorkers = new ConcurrentHashMap<>();
-        this.workers = new ArrayList<>(); // used for dependency checking, no concurrent reads and writes
     }
 
     public void addWorker(Worker<CFWorkerInfo> worker)
     {
         this.workerIdToWorkers.put(worker.getWorkerId(), worker);
+        this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndex.getAndIncrement());
         if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
         {
             this.lock.notifyAll();
@@ -106,6 +107,21 @@ public class StageCoordinator
     public Worker<CFWorkerInfo> getWorker(long workerId)
     {
         return this.workerIdToWorkers.get(workerId);
+    }
+
+    /**
+     * Get the index of the worker in this stage, the index starts from 0.
+     * @param workerId the (global) id of the worker
+     * @return the index of the worker in this stage, or < 0 if the worker is not found
+     */
+    public int getWorkerIndex(long workerId)
+    {
+        Integer index = this.workerIdToWorkerIndex.get(workerId);
+        if (index != null)
+        {
+            return index;
+        }
+        return -1;
     }
 
     void waitForAllWorkersReady()

@@ -46,6 +46,11 @@ public class StageDependency
         return downStreamStageId;
     }
 
+    /**
+     * A wide dependency is an m:n dependency between the current and the downstream stages,
+     * whereas a narrow dependency is an 1:1 dependency between the current and the downstream stages.
+     * @return true if this is a wide dependency, and vice versa
+     */
     public boolean isWide()
     {
         return isWide;
