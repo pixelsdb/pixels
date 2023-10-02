@@ -19,10 +19,11 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
 import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.task.TaskQueue;
 import io.pixelsdb.pixels.common.task.Worker;
-import io.pixelsdb.pixels.common.turbo.Input;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -41,11 +42,18 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class StageCoordinator
 {
     private static final Logger log = LogManager.getLogger(StageCoordinator.class);
+    private static final int WorkerTaskParallelism;
+
+    static
+    {
+        WorkerTaskParallelism = Integer.parseInt(ConfigFactory.Instance()
+                .getProperty("executor.intra.worker.parallelism"));
+    }
 
     private final int stageId;
     private final boolean isQueued;
     private final int fixedWorkerNum;
-    private final TaskQueue<Task<? extends Input>> taskQueue;
+    private final TaskQueue<Task> taskQueue;
     private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers = new ConcurrentHashMap<>();
     // this.workers is used for dependency checking, no concurrent reads and writes
     private final List<Worker<CFWorkerInfo>> workers = new ArrayList<>();
@@ -61,7 +69,7 @@ public class StageCoordinator
         this.taskQueue = null;
     }
 
-    public StageCoordinator(int stageId, List<Task<? extends Input>> pendingTasks)
+    public StageCoordinator(int stageId, List<Task> pendingTasks)
     {
         this.stageId = stageId;
         this.isQueued = true;
@@ -79,24 +87,42 @@ public class StageCoordinator
         }
     }
 
-    public Task<? extends Input> getTaskToRun(long workerId)
+    public List<Task> getTasksToRun(long workerId) throws WorkerCoordinateException
     {
         checkArgument(this.isQueued && this.taskQueue != null,
                 "can not get task to run on a non-queued stage");
         Worker<CFWorkerInfo> worker = this.workerIdToWorkers.get(workerId);
         if (worker != null)
         {
-            Task<? extends Input> task = this.taskQueue.pollPendingAndRun(worker);
-            if (task == null || this.taskQueue.hasPending())
+            List<Task> tasks = new ArrayList<>(WorkerTaskParallelism);
+            for (int i = 0; i < WorkerTaskParallelism; ++i)
             {
-                this.lock.notifyAll();
+                Task task = this.taskQueue.pollPendingAndRun(worker);
+                if (!this.taskQueue.hasPending())
+                {
+                    this.lock.notifyAll();
+                }
+                if (task == null)
+                {
+                    break;
+                }
+                tasks.add(task);
             }
-            return task;
+            return tasks;
         }
         else
         {
-            return null;
+            String msg = "worker of id " + workerId + "does not exist";
+            log.error(msg);
+            throw new WorkerCoordinateException(msg);
         }
+    }
+
+    public void completeTask(String taskId, String output)
+    {
+        checkArgument(this.isQueued && this.taskQueue != null,
+                "can not complete task on a non-queued stage");
+        this.taskQueue.complete(taskId, output);
     }
 
     public int getStageId()

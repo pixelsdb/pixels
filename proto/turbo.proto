@@ -124,14 +124,24 @@ message GetTasksToExecuteRequest {
   int64 workerId = 1;
 }
 
+message TaskInput {
+  string taskId = 1;
+  string payload = 2;
+}
+
+message TaskOutput {
+  string taskId = 1;
+  string output = 2;
+}
+
 message GetTasksToExecuteResponse {
   int32 errorCode = 1;
-  repeated string taskInputs = 2; // the tasks in json string format
+  repeated TaskInput taskInputs = 2;
 }
 
 message CompleteTasksRequest {
   int64 workerId = 1;
-  repeated string taskOutputs = 2; // the task results in json string format
+  repeated TaskOutput taskOutputs = 2;
 }
 
 message CompleteTasksResponse {

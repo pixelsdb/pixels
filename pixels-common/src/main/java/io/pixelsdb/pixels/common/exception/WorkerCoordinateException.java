@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,21 +17,31 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.task;
-
-import org.junit.Test;
+package io.pixelsdb.pixels.common.exception;
 
 /**
  * @author hank
- * @create 2023-07-26
+ * @create 2023-10-03
  */
-public class TestQueue
+public class WorkerCoordinateException extends Exception
 {
-    @Test
-    public void testTaskConstruction()
+    public WorkerCoordinateException()
     {
-        Task task = new Task("123", "{\"id\":456}");
-        System.out.println(task.getTaskId());
-        System.out.println(task.getPayload());
+        super();
+    }
+
+    public WorkerCoordinateException(String message)
+    {
+        super(message);
+    }
+
+    public WorkerCoordinateException(Throwable cause)
+    {
+        super(cause);
+    }
+
+    public WorkerCoordinateException(String message, Throwable cause)
+    {
+        super(message, cause);
     }
 }

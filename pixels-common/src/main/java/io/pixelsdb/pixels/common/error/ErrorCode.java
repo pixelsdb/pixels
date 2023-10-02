@@ -102,6 +102,7 @@ public class ErrorCode
     private static final int ERROR_WORKER_COORDINATE = ERROR_BASE + 500;
     public static final int WORKER_COORDINATE_NO_DOWNSTREAM = ERROR_WORKER_COORDINATE + 1;
     public static final int WORKER_COORDINATE_WORKER_NOT_FOUND = ERROR_WORKER_COORDINATE + 2;
+    public static final int WORKER_COORDINATE_END_OF_TASKS = ERROR_WORKER_COORDINATE + 3;
 
     // end error code for transactions
 }

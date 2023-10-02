@@ -30,7 +30,7 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @create 2023-07-26
  */
-public class Task<T>
+public class Task
 {
     public enum Status
     {
@@ -38,11 +38,12 @@ public class Task<T>
     }
 
     private final String taskId;
-    private final T payload;
+    private final String payload;
+    private String output;
     private Status status;
-    private Worker worker;
+    private Worker<? extends WorkerInfo> worker;
 
-    public Task(String taskId, T payload)
+    public Task(String taskId, String payload)
     {
         this.taskId = taskId;
         this.payload = payload;
@@ -50,15 +51,7 @@ public class Task<T>
         this.worker = null;
     }
 
-    public Task(String taskId, String payloadJson, Class<T> clazz)
-    {
-        this.taskId = taskId;
-        this.payload = JSON.parseObject(payloadJson, clazz);
-        this.status = Status.PENDING;
-        this.worker = null;
-    }
-
-    protected boolean start(Worker worker)
+    protected boolean start(Worker<? extends WorkerInfo> worker)
     {
         requireNonNull(worker, "worker is null");
         synchronized (this.taskId)
@@ -78,7 +71,7 @@ public class Task<T>
         }
     }
 
-    protected boolean complete()
+    protected boolean complete(String output)
     {
         synchronized (this.taskId)
         {
@@ -87,6 +80,7 @@ public class Task<T>
                 return false;
             }
             this.status = Status.COMPLETE;
+            this.output = output;
             return true;
         }
     }
@@ -127,19 +121,19 @@ public class Task<T>
         return true;
     }
 
-    public String getPayloadJson()
-    {
-        return JSON.toJSONString(this.payload);
-    }
-
     public String getTaskId()
     {
         return taskId;
     }
 
-    protected T getPayload()
+    public String getPayload()
     {
         return payload;
+    }
+
+    public String getOutput()
+    {
+        return output;
     }
 
     @Override
@@ -159,10 +153,13 @@ public class Task<T>
         {
             return false;
         }
-        Task<?> that = (Task<?>) obj;
+        Task that = (Task) obj;
         return Objects.equals(this.taskId, that.taskId) && Objects.equals(this.payload, that.payload);
     }
 
+    /**
+     * @return the json string of this task, <b>DO NOT</b> use this as the payload of task execution requests
+     */
     @Override
     public String toString()
     {

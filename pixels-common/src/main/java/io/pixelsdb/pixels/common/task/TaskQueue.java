@@ -31,7 +31,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * @author hank
  * @create 2023-07-26
  */
-public class TaskQueue<E extends Task<?>>
+public class TaskQueue<E extends Task>
 {
     private final LinkedList<E> allTasks;
     private final ConcurrentLinkedQueue<E> pendingQueue;
@@ -85,11 +85,11 @@ public class TaskQueue<E extends Task<?>>
 
     /**
      * Poll one pending task from the head of the pending queue, set it as running,
-     * and put it into the list of running tasks.
+     * and put it into the list of running tasks. This method is non-blocking.
      * @param worker the worker who is responsible for running the task
      * @return the task that is started and with a lease hold by the lease hold, or null if not such task
      */
-    public E pollPendingAndRun(Worker worker)
+    public E pollPendingAndRun(Worker<? extends WorkerInfo> worker)
     {
         E task = this.pendingQueue.poll();
         if (task != null)
@@ -112,14 +112,15 @@ public class TaskQueue<E extends Task<?>>
     /**
      * Retrieve a running task and set its status to complete.
      * @param taskId the task id
+     * @param output the output (json) of the completed task
      * @return the task that is completed, or null if no such task
      */
-    public E complete(String taskId)
+    public E complete(String taskId, String output)
     {
         E task = this.runningTasks.remove(taskId);
         if (task != null)
         {
-            task.complete();
+            task.complete(output);
             return task;
         }
         else

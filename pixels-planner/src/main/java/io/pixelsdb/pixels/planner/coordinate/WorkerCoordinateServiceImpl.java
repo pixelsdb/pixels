@@ -21,7 +21,9 @@ package io.pixelsdb.pixels.planner.coordinate;
 
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
 import io.pixelsdb.pixels.common.task.Lease;
+import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.turbo.TurboProto;
@@ -114,21 +116,62 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         {
             builder.setErrorCode(ErrorCode.WORKER_COORDINATE_NO_DOWNSTREAM);
         }
-        super.getDownStreamWorkers(request, responseObserver);
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void getTasksToExecute(TurboProto.GetTasksToExecuteRequest request,
                                   StreamObserver<TurboProto.GetTasksToExecuteResponse> responseObserver)
     {
-        super.getTasksToExecute(request, responseObserver);
+        long workerId = request.getWorkerId();
+        Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
+        CFWorkerInfo workerInfo = worker.getWorkerInfo();
+        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
+        StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
+        TurboProto.GetTasksToExecuteResponse.Builder builder = TurboProto.GetTasksToExecuteResponse.newBuilder();
+        try
+        {
+            List<Task> tasks = stageCoordinator.getTasksToRun(workerId);
+            if (tasks.isEmpty())
+            {
+                builder.setErrorCode(ErrorCode.WORKER_COORDINATE_END_OF_TASKS);
+            }
+            else
+            {
+                builder.setErrorCode(SUCCESS);
+                for (Task task : tasks)
+                {
+                    builder.addTaskInputs(TurboProto.TaskInput.newBuilder()
+                            .setTaskId(task.getTaskId()).setPayload(task.getPayload()));
+                }
+            }
+        } catch (WorkerCoordinateException e)
+        {
+            builder.setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void completeTasks(TurboProto.CompleteTasksRequest request,
                               StreamObserver<TurboProto.CompleteTasksResponse> responseObserver)
     {
-        super.completeTasks(request, responseObserver);
+        long workerId = request.getWorkerId();
+        List<TurboProto.TaskOutput> taskOutputs = request.getTaskOutputsList();
+        Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
+        CFWorkerInfo workerInfo = worker.getWorkerInfo();
+        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
+        StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
+        TurboProto.CompleteTasksResponse.Builder builder = TurboProto.CompleteTasksResponse.newBuilder();
+        for (TurboProto.TaskOutput taskOutput : taskOutputs)
+        {
+            stageCoordinator.completeTask(taskOutput.getTaskId(), taskOutput.getOutput());
+        }
+        builder.setErrorCode(SUCCESS);
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
