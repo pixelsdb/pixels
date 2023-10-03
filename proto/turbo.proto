@@ -80,7 +80,7 @@ service WorkerCoordinateService {
   // also create a lease for the worker
   rpc RegisterWorker (RegisterWorkerRequest) returns (RegisterWorkerResponse);
   // get the downstream workers the execution outputs should be sent to
-  rpc GetDownStreamWorkers (GetDownStreamWorkersRequest) returns (GetDownStreamWorkersResponse);
+  rpc GetDownstreamWorkers (GetDownstreamWorkersRequest) returns (GetDownstreamWorkersResponse);
   // get a batch of tasks for the worker to execute
   rpc GetTasksToExecute (GetTasksToExecuteRequest) returns (GetTasksToExecuteResponse);
   // tell the coordinator that the tasks are completed
@@ -111,13 +111,13 @@ message RegisterWorkerResponse {
   int64 leasePeriodMs = 4; // the valid period in milliseconds of the lease
 }
 
-message GetDownStreamWorkersRequest {
+message GetDownstreamWorkersRequest {
   int64 workerId = 1;
 }
 
-message GetDownStreamWorkersResponse {
+message GetDownstreamWorkersResponse {
   int32 errorCode = 1;
-  repeated WorkerInfo downStreamWorkers = 2;
+  repeated WorkerInfo downstreamWorkers = 2;
 }
 
 message GetTasksToExecuteRequest {

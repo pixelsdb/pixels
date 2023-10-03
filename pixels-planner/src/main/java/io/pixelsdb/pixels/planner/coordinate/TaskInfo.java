@@ -19,43 +19,39 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
-import io.pixelsdb.pixels.common.task.Worker;
-
-import java.util.List;
-
 /**
  * @author hank
- * @create 2023-07-31
+ * @create 2023-10-04
  */
-public class WorkerCoordinateService
+public class TaskInfo
 {
-    public Worker<CFWorkerInfo> registerWorker(CFWorkerInfo workerInfo)
+    private final String taskId;
+    private final String payload;
+    private String output;
+
+    public TaskInfo(String taskId, String payload)
     {
-        return null;
+        this.taskId = taskId;
+        this.payload = payload;
     }
 
-    public List<CFWorkerInfo> getDownstreamWorkers(long workerId)
+    public String getTaskId()
     {
-        return null;
+        return taskId;
     }
 
-    public List<TaskInfo> getTasksToExecute(long workerId)
+    public String getPayload()
     {
-        return null;
+        return payload;
     }
 
-    public boolean completeTasks(long workerId, List<TaskInfo> tasks)
+    public String getOutput()
     {
-        return false;
+        return output;
     }
 
-    public long extendLease(long workerId)
+    public void setOutput(String output)
     {
-        return 0;
-    }
-
-    public boolean terminateWorker(long workerId)
-    {
-        return false;
+        this.output = output;
     }
 }

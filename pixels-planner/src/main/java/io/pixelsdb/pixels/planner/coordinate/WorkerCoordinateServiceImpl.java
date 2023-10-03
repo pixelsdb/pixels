@@ -69,15 +69,15 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
     }
 
     @Override
-    public void getDownStreamWorkers(TurboProto.GetDownStreamWorkersRequest request,
-                                     StreamObserver<TurboProto.GetDownStreamWorkersResponse> responseObserver)
+    public void getDownstreamWorkers(TurboProto.GetDownstreamWorkersRequest request,
+                                     StreamObserver<TurboProto.GetDownstreamWorkersResponse> responseObserver)
     {
         long workerId = request.getWorkerId();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
         CFWorkerInfo workerInfo = worker.getWorkerInfo();
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         StageDependency dependency = planCoordinator.getStageDependency(workerInfo.getStageId());
-        TurboProto.GetDownStreamWorkersResponse.Builder builder = TurboProto.GetDownStreamWorkersResponse.newBuilder();
+        TurboProto.GetDownstreamWorkersResponse.Builder builder = TurboProto.GetDownstreamWorkersResponse.newBuilder();
         if (dependency != null)
         {
             boolean isWide = dependency.isWide();
@@ -89,7 +89,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                 builder.setErrorCode(SUCCESS);
                 for (Worker<CFWorkerInfo> downStreamWorker : downStreamWorkers)
                 {
-                    builder.addDownStreamWorkers(downStreamWorker.getWorkerInfo().toProto());
+                    builder.addDownstreamWorkers(downStreamWorker.getWorkerInfo().toProto());
                 }
             }
             else
@@ -109,7 +109,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                     {
                         // get the worker with the same index in the downstream stage as the downstream worker
                         builder.setErrorCode(SUCCESS);
-                        builder.addDownStreamWorkers(downStreamWorkers.get(workerIndex).getWorkerInfo().toProto());
+                        builder.addDownstreamWorkers(downStreamWorkers.get(workerIndex).getWorkerInfo().toProto());
                     }
                 }
             }
