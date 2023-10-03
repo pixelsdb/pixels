@@ -28,7 +28,7 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
  * The input for the final aggregation.
  *
  * @author hank
- * @create 05/07/2022
+ * @create 2022-07-05
  * @update 2023-04-29 move some fields to {@link AggregatedTableInfo} and {@link AggregationInfo}
  */
 public class AggregationInput extends Input

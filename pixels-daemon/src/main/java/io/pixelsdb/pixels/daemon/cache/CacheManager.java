@@ -33,7 +33,7 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.daemon.Server;
+import io.pixelsdb.pixels.common.server.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -52,8 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author guodong
  * @author hank
  */
-public class CacheManager
-        implements Server
+public class CacheManager implements Server
 {
     enum CacheNodeStatus
     {

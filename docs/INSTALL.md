@@ -161,7 +161,7 @@ FLUSH PRIVILEGES;
 Ensure that MySQL server can be accessed remotely. Sometimes the default MySQL configuration
 binds the server to localhost thus declines remote connections.
 
-Use `scrpts/sql/metadata_schema.sql` to create tables in `pixels_metadata`.
+Use `scripts/sql/metadata_schema.sql` to create tables in `pixels_metadata`.
 
 ## Install etcd
 

@@ -43,7 +43,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.daemon.Server;
+import io.pixelsdb.pixels.common.server.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -67,8 +67,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author hank
  */
 // todo cache location compaction. Cache locations for older versions still exist after being used.
-public class CacheCoordinator
-        implements Server
+public class CacheCoordinator implements Server
 {
     enum CoordinatorStatus
     {

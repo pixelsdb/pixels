@@ -91,9 +91,9 @@ public class QueryManager
         }
     }
 
-    private final ArrayBlockingQueue<ReceivedQuery> pendingQueueRe = new ArrayBlockingQueue<>(1024 * 1024);
+    private final LinkedBlockingQueue<ReceivedQuery> pendingQueueRe = new LinkedBlockingQueue<>();
     private final ConcurrentLinkedQueue<ReceivedQuery> pendingQueueRe2nd = new ConcurrentLinkedQueue<>();
-    private final ArrayBlockingQueue<ReceivedQuery> pendingQueueBe = new ArrayBlockingQueue<>(1024 * 1024);
+    private final LinkedBlockingQueue<ReceivedQuery> pendingQueueBe = new LinkedBlockingQueue<>();
     private final ConcurrentHashMap<String, ReceivedQuery> runningQueries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, GetQueryResultResponse> queryResults = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Object> finishedQueries = new ConcurrentHashMap<>();
