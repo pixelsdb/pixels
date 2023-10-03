@@ -19,52 +19,30 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
-import io.pixelsdb.pixels.turbo.TurboProto;
+import java.util.List;
 
 /**
  * @author hank
  * @create 2023-10-04
  */
-public class TaskInfo
+public class TaskBatch
 {
-    private final String taskId;
-    private final String payload;
-    private String output;
+    private final boolean endOfTasks;
+    private final List<TaskInfo> tasks;
 
-    public TaskInfo(String taskId, String payload)
+    public TaskBatch(boolean endOfTasks, List<TaskInfo> tasks)
     {
-        this.taskId = taskId;
-        this.payload = payload;
+        this.endOfTasks = endOfTasks;
+        this.tasks = tasks;
     }
 
-    public TaskInfo(TurboProto.TaskInput taskInput)
+    public boolean isEndOfTasks()
     {
-        this.taskId = taskInput.getTaskId();
-        this.payload = taskInput.getPayload();
+        return endOfTasks;
     }
 
-    public String getTaskId()
+    public List<TaskInfo> getTasks()
     {
-        return taskId;
-    }
-
-    public String getPayload()
-    {
-        return payload;
-    }
-
-    public String getOutput()
-    {
-        return output;
-    }
-
-    public void setOutput(String output)
-    {
-        this.output = output;
-    }
-
-    public TurboProto.TaskOutput toTaskOutputProto()
-    {
-        return TurboProto.TaskOutput.newBuilder().setTaskId(this.taskId).setOutput(this.output).build();
+        return tasks;
     }
 }
