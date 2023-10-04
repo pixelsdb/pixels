@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.planner.plan.physical;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 
@@ -122,6 +123,12 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     public List<PartitionInput> getLargePartitionInputs()
     {
         return largePartitionInputs;
+    }
+
+    @Override
+    public void initPlanCoordinator(PlanCoordinator planCoordinator)
+    {
+        // TODO: implement
     }
 
     @Override

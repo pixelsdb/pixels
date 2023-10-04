@@ -149,7 +149,7 @@ public class WorkerCoordinateService
                 TurboProto.CompleteTasksRequest.newBuilder().setWorkerId(workerId);
         for (TaskInfo taskInfo : tasks)
         {
-            request.addTaskOutputs(taskInfo.toTaskOutputProto());
+            request.addTaskResults(taskInfo.toTaskResultProto());
         }
         TurboProto.CompleteTasksResponse response = this.stub.completeTasks(request.build());
         if (response.getErrorCode() != SUCCESS)

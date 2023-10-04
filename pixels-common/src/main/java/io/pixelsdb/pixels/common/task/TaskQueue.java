@@ -112,15 +112,15 @@ public class TaskQueue<E extends Task>
     /**
      * Retrieve a running task and set its status to complete.
      * @param taskId the task id
-     * @param output the output (json) of the completed task
+     * @param success true if the task completes successfully
      * @return the task that is completed, or null if no such task
      */
-    public E complete(String taskId, String output)
+    public E complete(String taskId, boolean success)
     {
         E task = this.runningTasks.remove(taskId);
         if (task != null)
         {
-            task.complete(output);
+            task.complete(success);
             return task;
         }
         else

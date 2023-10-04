@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.planner.plan.physical;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 
 import java.util.List;
@@ -96,6 +97,12 @@ public abstract class SingleStageJoinOperator extends JoinOperator
     public JoinOperator getLargeChild()
     {
         return this.largeChild;
+    }
+
+    @Override
+    public void initPlanCoordinator(PlanCoordinator planCoordinator)
+    {
+        // TODO: implement
     }
 
     @Override

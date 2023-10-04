@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.planner.plan.physical;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
@@ -110,6 +111,12 @@ public abstract class AggregationOperator extends Operator
                     "scanInputs must be empty if child is set to non-null");
             this.child = child;
         }
+    }
+
+    @Override
+    public void initPlanCoordinator(PlanCoordinator planCoordinator)
+    {
+        // TODO: implement
     }
 
     @Override

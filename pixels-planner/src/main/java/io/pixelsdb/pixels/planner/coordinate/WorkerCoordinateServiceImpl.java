@@ -161,15 +161,15 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                               StreamObserver<TurboProto.CompleteTasksResponse> responseObserver)
     {
         long workerId = request.getWorkerId();
-        List<TurboProto.TaskOutput> taskOutputs = request.getTaskOutputsList();
+        List<TurboProto.TaskResult> taskResults = request.getTaskResultsList();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
         CFWorkerInfo workerInfo = worker.getWorkerInfo();
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
         TurboProto.CompleteTasksResponse.Builder builder = TurboProto.CompleteTasksResponse.newBuilder();
-        for (TurboProto.TaskOutput taskOutput : taskOutputs)
+        for (TurboProto.TaskResult taskOutput : taskResults)
         {
-            stageCoordinator.completeTask(taskOutput.getTaskId(), taskOutput.getOutput());
+            stageCoordinator.completeTask(taskOutput.getTaskId(), taskOutput.getSuccess());
         }
         builder.setErrorCode(SUCCESS);
         responseObserver.onNext(builder.build());

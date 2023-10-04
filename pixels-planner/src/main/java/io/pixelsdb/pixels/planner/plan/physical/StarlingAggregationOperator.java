@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.planner.plan.physical;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.common.turbo.Output;
@@ -215,6 +216,12 @@ public class StarlingAggregationOperator extends Operator
             outputCollection.setFinalAggrOutputs(outputs);
         }
         return outputCollection;
+    }
+
+    @Override
+    public void initPlanCoordinator(PlanCoordinator planCoordinator)
+    {
+        // TODO: implement
     }
 
     public static class AggregationOutputCollection implements OutputCollection

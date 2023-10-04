@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner.plan.physical;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -55,4 +56,6 @@ public abstract class Operator implements OperatorExecutor
     {
         return name;
     }
+
+    public abstract void initPlanCoordinator(PlanCoordinator planCoordinator);
 }

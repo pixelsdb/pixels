@@ -19,8 +19,9 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -32,14 +33,22 @@ import static java.util.Objects.requireNonNull;
 public class PlanCoordinator
 {
     private final long transId;
-    private final Map<Integer, StageCoordinator> stageCoordinators;
-    private final Map<Integer, StageDependency> stageDependencies;
+    /**
+     * It is only modified during coordinator initialization, thus there is no read-write conflict.
+     */
+    private final Map<Integer, StageCoordinator> stageCoordinators = new HashMap<>();
+    /**
+     * It is only modified during coordinator initialization, thus there is no read-write conflict.
+     */
+    private final Map<Integer, StageDependency> stageDependencies = new HashMap<>();
+    /**
+     * The assigner of stage id.
+     */
+    private final AtomicInteger stageIdAssigner = new AtomicInteger(0);
 
     public PlanCoordinator(long transId)
     {
         this.transId = transId;
-        this.stageCoordinators = new ConcurrentHashMap<>();
-        this.stageDependencies = new ConcurrentHashMap<>();
     }
 
     public void addStageCoordinator(StageCoordinator stageCoordinator, StageDependency stageDependency)
@@ -66,5 +75,10 @@ public class PlanCoordinator
     public long getTransId()
     {
         return transId;
+    }
+
+    public int assignStageId()
+    {
+        return this.stageIdAssigner.getAndIncrement();
     }
 }

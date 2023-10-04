@@ -29,7 +29,7 @@ public class TaskInfo
 {
     private final String taskId;
     private final String payload;
-    private String output;
+    private boolean success;
 
     public TaskInfo(String taskId, String payload)
     {
@@ -53,18 +53,18 @@ public class TaskInfo
         return payload;
     }
 
-    public String getOutput()
+    public boolean isSuccess()
     {
-        return output;
+        return success;
     }
 
-    public void setOutput(String output)
+    public void setSuccess(boolean success)
     {
-        this.output = output;
+        this.success = success;
     }
 
-    public TurboProto.TaskOutput toTaskOutputProto()
+    public TurboProto.TaskResult toTaskResultProto()
     {
-        return TurboProto.TaskOutput.newBuilder().setTaskId(this.taskId).setOutput(this.output).build();
+        return TurboProto.TaskResult.newBuilder().setTaskId(this.taskId).setSuccess(this.success).build();
     }
 }
