@@ -94,9 +94,7 @@ public abstract class JoinOperator extends Operator
 
         public JoinOutputCollection() { }
 
-        public JoinOutputCollection(JoinAlgorithm joinAlgo,
-                                OutputCollection smallChild,
-                                OutputCollection largeChild)
+        public JoinOutputCollection(JoinAlgorithm joinAlgo, OutputCollection smallChild, OutputCollection largeChild)
         {
             this.joinAlgo = joinAlgo;
             this.smallChild = smallChild;
