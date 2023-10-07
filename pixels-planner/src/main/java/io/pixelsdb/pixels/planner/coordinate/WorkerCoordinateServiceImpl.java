@@ -78,7 +78,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         StageDependency dependency = planCoordinator.getStageDependency(workerInfo.getStageId());
         TurboProto.GetDownstreamWorkersResponse.Builder builder = TurboProto.GetDownstreamWorkersResponse.newBuilder();
-        if (dependency != null)
+        if (dependency.hasDownstreamStage())
         {
             boolean isWide = dependency.isWide();
             StageCoordinator dependentStage = planCoordinator.getStageCoordinator(dependency.getDownStreamStageId());

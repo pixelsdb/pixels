@@ -51,7 +51,7 @@ public class PlanCoordinator
         this.transId = transId;
     }
 
-    public void addStageCoordinator(StageCoordinator stageCoordinator, StageDependency stageDependency)
+    protected void addStageCoordinator(StageCoordinator stageCoordinator, StageDependency stageDependency)
     {
         int stageId = requireNonNull(stageCoordinator, "stageCoordinator is null").getStageId();
         requireNonNull(stageDependency, "stageDependency is null");
