@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.planner.plan.physical;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageDependency;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
@@ -114,8 +115,11 @@ public abstract class AggregationOperator extends Operator
     }
 
     @Override
-    public void initPlanCoordinator(PlanCoordinator planCoordinator)
+    public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId)
     {
+        int stageId = planCoordinator.assignStageId();
+        StageDependency dependency = new StageDependency(stageId, parentStageId, true);
+        // StageCoordinator coordinator = new StageCoordinator();
         // TODO: implement
     }
 

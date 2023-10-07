@@ -100,7 +100,7 @@ public abstract class SingleStageJoinOperator extends JoinOperator
     }
 
     @Override
-    public void initPlanCoordinator(PlanCoordinator planCoordinator)
+    public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId)
     {
         // TODO: implement
     }

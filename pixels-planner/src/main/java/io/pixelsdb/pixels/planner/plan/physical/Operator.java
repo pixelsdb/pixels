@@ -57,5 +57,14 @@ public abstract class Operator implements OperatorExecutor
         return name;
     }
 
-    public abstract void initPlanCoordinator(PlanCoordinator planCoordinator);
+    /**
+     * Initialize the query plan coordinator. This method should be invoked recursively to traverse all
+     * the operators in the query plan. Each operator added its own query execution stages into the plan
+     * coordinator. Therefore, the users only need to call this method on the root operator of the plan.
+     * @param planCoordinator the plan coordinator to be initialized
+     * @param parentStageId the stage id of the parent (i.e., downstream) stage of this operator, for the
+     *                      root operator, the parentStageId should be negative (e.g., -1), meaning the
+     *                      parent does not exist for root
+     */
+    public abstract void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId);
 }

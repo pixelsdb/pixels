@@ -219,7 +219,7 @@ public class StarlingAggregationOperator extends Operator
     }
 
     @Override
-    public void initPlanCoordinator(PlanCoordinator planCoordinator)
+    public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId)
     {
         // TODO: implement
     }

@@ -47,7 +47,7 @@ public class PlanCoordinatorFactory
     public void createPlanCoordinator(long transId, Operator planRootOperator)
     {
         PlanCoordinator planCoordinator = new PlanCoordinator(transId);
-        planRootOperator.initPlanCoordinator(planCoordinator);
+        planRootOperator.initPlanCoordinator(planCoordinator, -1);
         this.transIdToPlanCoordinator.put(transId, planCoordinator);
     }
 
