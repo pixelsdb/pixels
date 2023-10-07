@@ -30,7 +30,7 @@ public class TestQueue
     @Test
     public void testTaskConstruction()
     {
-        Task task = new Task("123", "{\"id\":456}");
+        Task task = new Task(123, "{\"id\":456}");
         System.out.println(task.getTaskId());
         System.out.println(task.getPayload());
     }

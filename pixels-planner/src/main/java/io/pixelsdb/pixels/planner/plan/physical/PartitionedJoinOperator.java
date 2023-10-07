@@ -126,7 +126,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     }
 
     @Override
-    public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId)
+    public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
         // TODO: implement
     }

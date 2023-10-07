@@ -65,6 +65,9 @@ public abstract class Operator implements OperatorExecutor
      * @param parentStageId the stage id of the parent (i.e., downstream) stage of this operator, for the
      *                      root operator, the parentStageId should be negative (e.g., -1), meaning the
      *                      parent does not exist for root
+     * @param wideDependOnParent true if this operator has a wide dependency on the parent (i.e., downstream)
+     *                          stage, for root operator, this parameter is ignored
      */
-    public abstract void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId);
+    public abstract void initPlanCoordinator(PlanCoordinator planCoordinator,
+                                             int parentStageId, boolean wideDependOnParent);
 }

@@ -37,12 +37,12 @@ public class Task
         PENDING, RUNNING, TIMEOUT, COMPLETE, ABORT, FAILED
     }
 
-    private final String taskId;
+    private final Integer taskId;
     private final String payload;
     private Status status;
     private Worker<? extends WorkerInfo> worker;
 
-    public Task(String taskId, String payload)
+    public Task(int taskId, String payload)
     {
         this.taskId = taskId;
         this.payload = payload;
@@ -126,7 +126,7 @@ public class Task
         return true;
     }
 
-    public String getTaskId()
+    public int getTaskId()
     {
         return taskId;
     }

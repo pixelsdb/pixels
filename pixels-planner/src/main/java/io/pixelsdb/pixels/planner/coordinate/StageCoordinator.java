@@ -118,7 +118,7 @@ public class StageCoordinator
         }
     }
 
-    public void completeTask(String taskId, boolean success)
+    public void completeTask(int taskId, boolean success)
     {
         checkArgument(this.isQueued && this.taskQueue != null,
                 "can not complete task on a non-queued stage");

@@ -27,11 +27,11 @@ import io.pixelsdb.pixels.turbo.TurboProto;
  */
 public class TaskInfo
 {
-    private final String taskId;
+    private final int taskId;
     private final String payload;
     private boolean success;
 
-    public TaskInfo(String taskId, String payload)
+    public TaskInfo(int taskId, String payload)
     {
         this.taskId = taskId;
         this.payload = payload;
@@ -43,7 +43,7 @@ public class TaskInfo
         this.payload = taskInput.getPayload();
     }
 
-    public String getTaskId()
+    public int getTaskId()
     {
         return taskId;
     }

@@ -35,7 +35,7 @@ public class TaskQueue<E extends Task>
 {
     private final LinkedList<E> allTasks;
     private final ConcurrentLinkedQueue<E> pendingQueue;
-    private final ConcurrentHashMap<String, E> runningTasks;
+    private final ConcurrentHashMap<Integer, E> runningTasks;
 
     public TaskQueue()
     {
@@ -115,7 +115,7 @@ public class TaskQueue<E extends Task>
      * @param success true if the task completes successfully
      * @return the task that is completed, or null if no such task
      */
-    public E complete(String taskId, boolean success)
+    public E complete(int taskId, boolean success)
     {
         E task = this.runningTasks.remove(taskId);
         if (task != null)
@@ -135,7 +135,7 @@ public class TaskQueue<E extends Task>
      */
     public E removeNextExpired()
     {
-        Iterator<Map.Entry<String, E>> iterator = this.runningTasks.entrySet().iterator();
+        Iterator<Map.Entry<Integer, E>> iterator = this.runningTasks.entrySet().iterator();
         while (iterator.hasNext())
         {
             E task = iterator.next().getValue();
