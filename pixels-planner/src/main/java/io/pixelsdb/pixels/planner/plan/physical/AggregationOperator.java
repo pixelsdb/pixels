@@ -126,25 +126,30 @@ public abstract class AggregationOperator extends Operator
         StageDependency aggrStageDependency = new StageDependency(aggrStageId, parentStageId, wideDependOnParent);
         StageCoordinator aggrStageCoordinator = new StageCoordinator(aggrStageId, this.finalAggrInputs.size());
         planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
-        int scanStageId = planCoordinator.assignStageId();
-        StageDependency scanStageDependency = new StageDependency(scanStageId, aggrStageId, true);
-        List<Task> tasks = new ArrayList<>();
-        int taskId = 0;
-        for (ScanInput scanInput : this.scanInputs)
+        if (this.scanInputs != null)
         {
-            List<InputSplit> inputSplits = scanInput.getTableInfo().getInputSplits();
-            for (InputSplit inputSplit : inputSplits)
+            checkArgument(this.child == null,
+                    "child operator should be null when base table scan exists");
+            int scanStageId = planCoordinator.assignStageId();
+            StageDependency scanStageDependency = new StageDependency(scanStageId, aggrStageId, true);
+            List<Task> tasks = new ArrayList<>();
+            int taskId = 0;
+            for (ScanInput scanInput : this.scanInputs)
             {
-                scanInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
-                tasks.add(new Task(taskId++, JSON.toJSONString(scanInput)));
+                List<InputSplit> inputSplits = scanInput.getTableInfo().getInputSplits();
+                for (InputSplit inputSplit : inputSplits)
+                {
+                    scanInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
+                    tasks.add(new Task(taskId++, JSON.toJSONString(scanInput)));
+                }
             }
+            StageCoordinator scanStageCoordinator = new StageCoordinator(scanStageId, tasks);
+            planCoordinator.addStageCoordinator(scanStageCoordinator, scanStageDependency);
         }
-        StageCoordinator scanStageCoordinator = new StageCoordinator(scanStageId, tasks);
-        planCoordinator.addStageCoordinator(scanStageCoordinator, scanStageDependency);
-        if (this.child != null)
+        else
         {
-            // TODO: for scan-based aggregation, there is no child hence this branch is never reached.
-            this.child.initPlanCoordinator(planCoordinator, scanStageId, false);
+            requireNonNull(this.child, "child operator should not be null");
+            this.child.initPlanCoordinator(planCoordinator, aggrStageId, true);
         }
     }
 
