@@ -19,13 +19,19 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageDependency;
+import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -128,7 +134,81 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     @Override
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
-        // TODO: implement
+        int joinStageId = planCoordinator.assignStageId();
+        StageDependency aggrStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
+        StageCoordinator aggrStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
+        planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
+        if (this.joinAlgo == JoinAlgorithm.PARTITIONED || this.joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
+        {
+            if (smallChild != null && largeChild != null)
+            {
+                // both children exist, we should execute both children and wait for the small child.
+                checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
+                checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+                this.smallChild.initPlanCoordinator(planCoordinator, joinStageId, true);
+                this.largeChild.initPlanCoordinator(planCoordinator, joinStageId, true);
+
+            } else if (smallChild != null)
+            {
+                // only small child exists, we should invoke the large table partitioning and wait for the small child.
+                checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
+                checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
+                this.smallChild.initPlanCoordinator(planCoordinator, joinStageId, true);
+
+            } else if (largeChild != null)
+            {
+                // only large child exists, we should invoke and wait for the small table partitioning.
+                checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
+                checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+                this.largeChild.initPlanCoordinator(planCoordinator, joinStageId, true);
+            } else
+            {
+                checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
+                checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
+            }
+
+            if (!smallPartitionInputs.isEmpty())
+            {
+                int partitionStageId = planCoordinator.assignStageId();
+                StageDependency partitionStageDependency = new StageDependency(partitionStageId, joinStageId, true);
+                List<Task> tasks = new ArrayList<>();
+                int taskId = 0;
+                for (PartitionInput partitionInput : this.smallPartitionInputs)
+                {
+                    List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
+                    for (InputSplit inputSplit : inputSplits)
+                    {
+                        partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
+                        tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
+                    }
+                }
+                StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks);
+                planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
+            }
+
+            if (!largePartitionInputs.isEmpty())
+            {
+                int partitionStageId = planCoordinator.assignStageId();
+                StageDependency partitionStageDependency = new StageDependency(partitionStageId, joinStageId, true);
+                List<Task> tasks = new ArrayList<>();
+                int taskId = 0;
+                for (PartitionInput partitionInput : this.largePartitionInputs)
+                {
+                    List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
+                    for (InputSplit inputSplit : inputSplits)
+                    {
+                        partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
+                        tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
+                    }
+                }
+                StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks);
+                planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
+            }
+        }
+        else
+        {
+            throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+        }
     }
 
     @Override

@@ -149,6 +149,8 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
                 } else
                 {
                     // no children exist, partition both tables and wait for the small table partitioning.
+                    checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
+                    checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
                     smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
                     int i = 0;
                     for (PartitionInput partitionInput : smallPartitionInputs)

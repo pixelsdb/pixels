@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageDependency;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 
 import java.util.List;
@@ -102,7 +104,26 @@ public abstract class SingleStageJoinOperator extends JoinOperator
     @Override
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
-        // TODO: implement
+        int joinStageId = planCoordinator.assignStageId();
+        StageDependency aggrStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
+        StageCoordinator aggrStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
+        planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
+        if (this.joinAlgo == JoinAlgorithm.BROADCAST || this.joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
+        {
+            if (this.smallChild != null)
+            {
+                // the intermediate results of the small child should be broadcast to all workers of this join stage
+                this.smallChild.initPlanCoordinator(planCoordinator, joinStageId, true);
+            }
+            if (this.largeChild != null)
+            {
+                this.largeChild.initPlanCoordinator(planCoordinator, joinStageId, false);
+            }
+        }
+        else
+        {
+            throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+        }
     }
 
     @Override
