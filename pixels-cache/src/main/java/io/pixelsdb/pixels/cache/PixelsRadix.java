@@ -209,9 +209,9 @@ public class PixelsRadix
     }
 
     /**
-     * @Deprecated DO NOT USE THIS
      * This method currently is only used in tests
      */
+    @Deprecated
     public PixelsCacheIdx get(long blockId, short rowGroupId, short columnId)
     {
         RadixNode root = nodes.get(0);

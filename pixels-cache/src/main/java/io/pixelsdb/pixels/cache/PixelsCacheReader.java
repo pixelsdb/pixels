@@ -119,20 +119,20 @@ public class PixelsCacheReader
     }
 
     /**
-     * Read specified columnlet from cache.
+     * Read specified column chunk from cache.
      * If cache is not hit, empty byte array is returned, and an access message is sent to the mq.
-     * If cache is hit, columnlet content is returned as byte array.
+     * If cache is hit, the column chunk content is returned as byte array.
      * This method may return NULL value. Be careful dealing with null!!!
      *
      * @param blockId    block id
      * @param rowGroupId row group id
      * @param columnId   column id
      * @param direct get direct byte buffer if true
-     * @return columnlet content, null if failed to read cache.
+     * @return the column chunk content, or null if failed to read the cache
      */
     public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct)
     {
-        // search index file for columnlet id
+        // search index file for column chunk id
         PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
         // check the rwFlag and increase readCount.

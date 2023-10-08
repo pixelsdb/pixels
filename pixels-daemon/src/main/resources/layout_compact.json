@@ -1,8 +1,8 @@
 {
-  "numRowGroupInBlock" : 3,
+  "numRowGroupInFile" : 3,
   "numColumn": 5,
   "cacheBorder": 8,
-  "columnletOrder":
+  "columnChunkOrder":
   [
     "0:2",
     "1:4",

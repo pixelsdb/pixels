@@ -366,9 +366,9 @@ public class TestPixelsWriter
                 PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
                 for (int i = 0; i < cacheBorder; i++)
                 {
-                    String[] cacheColumnletIdParts = cacheOrders.get(i).split(":");
-                    short cacheRGId = Short.parseShort(cacheColumnletIdParts[0]);
-                    short cacheColId = Short.parseShort(cacheColumnletIdParts[1]);
+                    String[] cacheColumnChunkIdParts = cacheOrders.get(i).split(":");
+                    short cacheRGId = Short.parseShort(cacheColumnChunkIdParts[0]);
+                    short cacheColId = Short.parseShort(cacheColumnChunkIdParts[1]);
                     PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(cacheRGId);
                     PixelsProto.ColumnChunkIndex chunkIndex =
                             rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(cacheColId);

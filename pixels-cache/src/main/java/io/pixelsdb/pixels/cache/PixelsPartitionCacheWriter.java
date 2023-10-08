@@ -413,10 +413,10 @@ public class PixelsPartitionCacheWriter {
 
     // let the files be a dependency, better for test
     // bulkload will set free and start to the init state
-    public int bulkLoad(int version, List<String> cacheColumnletOrders, String[] files) {
+    public int bulkLoad(int version, List<String> cacheColumnChunkOrders, String[] files) {
         try
         {
-            return internalUpdateAll(version, cacheColumnletOrders, files);
+            return internalUpdateAll(version, cacheColumnChunkOrders, files);
         }
         catch (IOException | InterruptedException e)
         {
@@ -425,10 +425,10 @@ public class PixelsPartitionCacheWriter {
         }
     }
     // incremental load will update the cache based on last free+start version
-    public int incrementalLoad(int version, List<String> cacheColumnletOrders, String[] files) {
+    public int incrementalLoad(int version, List<String> cacheColumnChunkOrders, String[] files) {
         try
         {
-            return internalUpdateIncremental(version, cacheColumnletOrders, files);
+            return internalUpdateIncremental(version, cacheColumnChunkOrders, files);
         }
         catch (IOException | InterruptedException e)
         {
@@ -437,7 +437,7 @@ public class PixelsPartitionCacheWriter {
         }
     }
 
-    public int internalUpdateIncremental(int version, List<String> cacheColumnletOrders, String[] files) throws IOException, InterruptedException {
+    public int internalUpdateIncremental(int version, List<String> cacheColumnChunkOrders, String[] files) throws IOException, InterruptedException {
         // now we need to consider the protocol
         int status = 0;
         List<List<Short>> partitionRgIds = new ArrayList<>(partitions);
@@ -449,7 +449,7 @@ public class PixelsPartitionCacheWriter {
             partitionColIds.add(new ArrayList<>());
         }
         // do a partition on layout+cacheColumnOrders by the hashcode
-        constructPartitionRgAndCols(cacheColumnletOrders, files, partitionRgIds, partitionColIds);
+        constructPartitionRgAndCols(cacheColumnChunkOrders, files, partitionRgIds, partitionColIds);
         logger.debug("partition counts = " + Arrays.toString(partitionRgIds.stream().map(List::size).toArray()));
 
         // fetch the current free and start
@@ -527,7 +527,7 @@ public class PixelsPartitionCacheWriter {
 //        int bandwidthLimit = 50; // 50 mib/s
         long startTime = System.currentTimeMillis();
         long windowWriteBytes = 0;
-        byte[] columnletBuf = new byte[1024 * 1024];
+        byte[] columnChunkBuf = new byte[1024 * 1024];
         for (String file : files)
         {
 //            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
@@ -544,14 +544,14 @@ public class PixelsPartitionCacheWriter {
                 short rowGroupId = rgIds.get(i);
                 short columnId = colIds.get(i);
                 long blockId = pixelsPhysicalReader.getCurrentBlockId();
-                int columnletLen = pixelsPhysicalReader.read(rowGroupId, columnId, columnletBuf);
+                int columnChunkLen = pixelsPhysicalReader.read(rowGroupId, columnId, columnChunkBuf);
 
-                while (columnletBuf.length < columnletLen) {
-                    columnletBuf = new byte[columnletBuf.length * 2];
-                    columnletLen = pixelsPhysicalReader.read(rowGroupId, columnId, columnletBuf);
-                    logger.debug("increase columnletBuf size");
+                while (columnChunkBuf.length < columnChunkLen) {
+                    columnChunkBuf = new byte[columnChunkBuf.length * 2];
+                    columnChunkLen = pixelsPhysicalReader.read(rowGroupId, columnId, columnChunkBuf);
+                    logger.debug("increase columnChunkBuf size");
                 }
-                physicalLen = columnletLen;
+                physicalLen = columnChunkLen;
                 if (currCacheOffset + physicalLen >= cachePartition.getSize())
                 {
                     logger.warn("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
@@ -561,8 +561,8 @@ public class PixelsPartitionCacheWriter {
                         new PixelsCacheIdx(currCacheOffset, physicalLen));
                 // TODO: uncomment it! we now test the index write first
                 if (writeContent) {
-                    cachePartition.setBytes(currCacheOffset, columnletBuf, 0, columnletLen); // sequential write pattern
-                    windowWriteBytes += columnletLen;
+                    cachePartition.setBytes(currCacheOffset, columnChunkBuf, 0, columnChunkLen); // sequential write pattern
+                    windowWriteBytes += columnChunkLen;
                     if (windowWriteBytes / 1024.0 / 1024 / ((System.currentTimeMillis() - startTime) / 1000.0) > bandwidthLimit) {
                         double writeMib = windowWriteBytes / 1024.0 / 1024;
                         double expectTimeMili = writeMib / bandwidthLimit * 1000;
@@ -574,7 +574,7 @@ public class PixelsPartitionCacheWriter {
                     }
                 }
                 logger.trace(
-                        "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnletLen);
+                        "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnChunkLen);
                 currCacheOffset += physicalLen;
             }
         }
@@ -605,13 +605,13 @@ public class PixelsPartitionCacheWriter {
 
     }
 
-    private void constructPartitionRgAndCols(List<String> cacheColumnletOrders, String[] files,
+    private void constructPartitionRgAndCols(List<String> cacheColumnChunkOrders, String[] files,
                                              List<List<Short>> partitionRgIds, List<List<Short>> partitionColIds) {
         ByteBuffer hashKeyBuf = ByteBuffer.allocate(2 + 2);
-        for (int i = 0; i < cacheColumnletOrders.size(); i++) {
-            String[] columnletIdStr = cacheColumnletOrders.get(i).split(":");
-            short rowGroupId = Short.parseShort(columnletIdStr[0]);
-            short columnId = Short.parseShort(columnletIdStr[1]);
+        for (int i = 0; i < cacheColumnChunkOrders.size(); i++) {
+            String[] columnChunkIdStr = cacheColumnChunkOrders.get(i).split(":");
+            short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
+            short columnId = Short.parseShort(columnChunkIdStr[1]);
             hashKeyBuf.putShort(0, rowGroupId);
             hashKeyBuf.putShort(2, columnId);
             int hash = hashcode(hashKeyBuf.array()) & 0x7fffffff;
@@ -622,7 +622,7 @@ public class PixelsPartitionCacheWriter {
     }
 
     // bulk load method, it will write all the partitions at once.
-    private int internalUpdateAll(int version, List<String> cacheColumnletOrders, String[] files)
+    private int internalUpdateAll(int version, List<String> cacheColumnChunkOrders, String[] files)
             throws IOException, InterruptedException {
         int status = 0;
         List<List<Short>> partitionRgIds = new ArrayList<>(partitions);
@@ -634,7 +634,7 @@ public class PixelsPartitionCacheWriter {
             partitionColIds.add(new ArrayList<>());
         }
         // do a partition on layout+cacheColumnOrders by the hashcode
-        constructPartitionRgAndCols(cacheColumnletOrders, files, partitionRgIds, partitionColIds);
+        constructPartitionRgAndCols(cacheColumnChunkOrders, files, partitionRgIds, partitionColIds);
         logger.debug("partition counts = " + Arrays.toString(partitionRgIds.stream().map(List::size).toArray()));
 
         // update region by region
