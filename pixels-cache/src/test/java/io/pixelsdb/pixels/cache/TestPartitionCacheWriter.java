@@ -157,9 +157,9 @@ public class TestPartitionCacheWriter {
         // construct the layout and files
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
         long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
@@ -212,9 +212,9 @@ public class TestPartitionCacheWriter {
         // construct the layout and files
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         PartitionCacheReader reader = PartitionCacheReader.newBuilder().setIndexType(indexType)
                 .setCacheLocation(cacheConfig.getCacheLocation()).setIndexLocation(cacheConfig.getIndexLocation()).build2();
@@ -260,9 +260,9 @@ public class TestPartitionCacheWriter {
         // construct the layout and files
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
         long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
@@ -330,9 +330,9 @@ public class TestPartitionCacheWriter {
         // construct the layout and files
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheLocation(cacheConfig.getCacheLocation())
                 .setIndexLocation(cacheConfig.getIndexLocation()).setIndexType(indexType).build2();
@@ -391,10 +391,10 @@ public class TestPartitionCacheWriter {
         // construct the layout and files
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-//        writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0]));
-        assert(writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+//        writer.bulkLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0]));
+        assert(writer.incrementalLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
         long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
@@ -491,9 +491,9 @@ public class TestPartitionCacheWriter {
 
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         finish.set(1);
     }
@@ -670,9 +670,9 @@ public class TestPartitionCacheWriter {
 
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         finish.set(1);
     }
@@ -755,9 +755,9 @@ public class TestPartitionCacheWriter {
 
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         finish.set(1);
     }

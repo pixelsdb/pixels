@@ -1,5 +1,5 @@
 {
-  "numRowGroupInBlock":4,
+  "numRowGroupInFile":4,
   "splitPatterns":
   [
     {

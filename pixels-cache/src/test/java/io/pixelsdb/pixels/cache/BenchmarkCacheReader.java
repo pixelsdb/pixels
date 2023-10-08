@@ -712,10 +712,10 @@ public class BenchmarkCacheReader {
 
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
         long startWrite = System.currentTimeMillis();
-        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         finish.set(1);
         finish.set(1);
@@ -808,13 +808,13 @@ public class BenchmarkCacheReader {
 
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
         long startWrite = System.currentTimeMillis();
 
-        assert (writer.incrementalLoad(900, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
-//        assert (writer.incrementalLoad(800, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
-//        assert (writer.incrementalLoad(801, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        assert (writer.incrementalLoad(900, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
+//        assert (writer.incrementalLoad(800, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
+//        assert (writer.incrementalLoad(801, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
 
         finish.set(1);
@@ -906,10 +906,10 @@ public class BenchmarkCacheReader {
 
         // build files
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        // build cacheColumnChunkOrders
+        Set<String> cacheColumnChunkOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
         long startWrite = System.currentTimeMillis();
-        assert (writer.incrementalLoad(800, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        assert (writer.incrementalLoad(800, new ArrayList<>(cacheColumnChunkOrders), files.toArray(new String[0])) == 0);
 
         finish.set(1);
         List<BenchmarkResult> results = new ArrayList<>(nReaders);
