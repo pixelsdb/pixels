@@ -41,7 +41,7 @@ public interface OperatorExecutor
      * @return the completable future that completes when this operator is complete, and
      * provides the computable futures of the outputs of this operator
      */
-    public abstract CompletableFuture<CompletableFuture<?>[]> execute();
+    CompletableFuture<CompletableFuture<?>[]> execute();
 
     /**
      * Execute the previous stages (if any) before the last stage, recursively.
@@ -49,7 +49,7 @@ public interface OperatorExecutor
      *
      * @return empty array if the previous stages do not exist or do not need to be waited for
      */
-    public abstract CompletableFuture<Void> executePrev();
+    CompletableFuture<Void> executePrev();
 
     /**
      * This method collects the outputs of the operator. It may block until the join
@@ -57,9 +57,9 @@ public interface OperatorExecutor
      * it will block the query execution.
      * @return the outputs of the workers in this operator
      */
-    public abstract OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
+    OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
 
-    public interface OutputCollection
+    interface OutputCollection
     {
         long getTotalGBMs();
 
@@ -78,12 +78,12 @@ public interface OperatorExecutor
         long getLayerOutputCostMs();
     }
 
-    public static void waitForCompletion(CompletableFuture<?>[] stageOutputs) throws InterruptedException
+    static void waitForCompletion(CompletableFuture<?>[] stageOutputs) throws InterruptedException
     {
         waitForCompletion(stageOutputs, StageCompletionRatio);
     }
 
-    public static void waitForCompletion(CompletableFuture<?>[] stageOutputs, double completionRatio)
+    static void waitForCompletion(CompletableFuture<?>[] stageOutputs, double completionRatio)
             throws InterruptedException
     {
         requireNonNull(stageOutputs, "stageOutputs is null");

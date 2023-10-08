@@ -125,13 +125,13 @@ message GetTasksToExecuteRequest {
 }
 
 message TaskInput {
-  string taskId = 1;
+  int32 taskId = 1;
   string payload = 2;
 }
 
-message TaskOutput {
-  string taskId = 1;
-  string output = 2;
+message TaskResult {
+  int32 taskId = 1;
+  bool success = 2;
 }
 
 message GetTasksToExecuteResponse {
@@ -141,7 +141,7 @@ message GetTasksToExecuteResponse {
 
 message CompleteTasksRequest {
   int64 workerId = 1;
-  repeated TaskOutput taskOutputs = 2;
+  repeated TaskResult taskResults = 2;
 }
 
 message CompleteTasksResponse {

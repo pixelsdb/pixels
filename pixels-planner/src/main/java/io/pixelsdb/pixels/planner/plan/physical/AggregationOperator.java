@@ -19,11 +19,18 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageDependency;
+import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -109,6 +116,40 @@ public abstract class AggregationOperator extends Operator
             checkArgument(this.scanInputs.isEmpty(),
                     "scanInputs must be empty if child is set to non-null");
             this.child = child;
+        }
+    }
+
+    @Override
+    public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
+    {
+        int aggrStageId = planCoordinator.assignStageId();
+        StageDependency aggrStageDependency = new StageDependency(aggrStageId, parentStageId, wideDependOnParent);
+        StageCoordinator aggrStageCoordinator = new StageCoordinator(aggrStageId, this.finalAggrInputs.size());
+        planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
+        if (this.scanInputs != null)
+        {
+            checkArgument(this.child == null,
+                    "child operator should be null when base table scan exists");
+            int scanStageId = planCoordinator.assignStageId();
+            StageDependency scanStageDependency = new StageDependency(scanStageId, aggrStageId, true);
+            List<Task> tasks = new ArrayList<>();
+            int taskId = 0;
+            for (ScanInput scanInput : this.scanInputs)
+            {
+                List<InputSplit> inputSplits = scanInput.getTableInfo().getInputSplits();
+                for (InputSplit inputSplit : inputSplits)
+                {
+                    scanInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
+                    tasks.add(new Task(taskId++, JSON.toJSONString(scanInput)));
+                }
+            }
+            StageCoordinator scanStageCoordinator = new StageCoordinator(scanStageId, tasks);
+            planCoordinator.addStageCoordinator(scanStageCoordinator, scanStageDependency);
+        }
+        else
+        {
+            requireNonNull(this.child, "child operator should not be null");
+            this.child.initPlanCoordinator(planCoordinator, aggrStageId, true);
         }
     }
 

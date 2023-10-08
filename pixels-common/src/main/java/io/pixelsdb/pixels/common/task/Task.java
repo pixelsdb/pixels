@@ -34,16 +34,15 @@ public class Task
 {
     public enum Status
     {
-        PENDING, RUNNING, TIMEOUT, COMPLETE, ABORT
+        PENDING, RUNNING, TIMEOUT, COMPLETE, ABORT, FAILED
     }
 
-    private final String taskId;
+    private final Integer taskId;
     private final String payload;
-    private String output;
     private Status status;
     private Worker<? extends WorkerInfo> worker;
 
-    public Task(String taskId, String payload)
+    public Task(int taskId, String payload)
     {
         this.taskId = taskId;
         this.payload = payload;
@@ -71,7 +70,7 @@ public class Task
         }
     }
 
-    protected boolean complete(String output)
+    protected boolean complete(boolean success)
     {
         synchronized (this.taskId)
         {
@@ -79,8 +78,14 @@ public class Task
             {
                 return false;
             }
-            this.status = Status.COMPLETE;
-            this.output = output;
+            if (success)
+            {
+                this.status = Status.COMPLETE;
+            }
+            else
+            {
+                this.status = Status.FAILED;
+            }
             return true;
         }
     }
@@ -121,7 +126,7 @@ public class Task
         return true;
     }
 
-    public String getTaskId()
+    public int getTaskId()
     {
         return taskId;
     }
@@ -129,11 +134,6 @@ public class Task
     public String getPayload()
     {
         return payload;
-    }
-
-    public String getOutput()
-    {
-        return output;
     }
 
     @Override

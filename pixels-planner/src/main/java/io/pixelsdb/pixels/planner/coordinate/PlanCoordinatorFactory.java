@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import io.pixelsdb.pixels.planner.plan.physical.Operator;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,7 +44,12 @@ public class PlanCoordinatorFactory
         this.transIdToPlanCoordinator = new ConcurrentHashMap<>();
     }
 
-    // TODO: create plan coordinator given a query plan and add it into transIdToPlanCoordinator.
+    public void createPlanCoordinator(long transId, Operator planRootOperator)
+    {
+        PlanCoordinator planCoordinator = new PlanCoordinator(transId);
+        planRootOperator.initPlanCoordinator(planCoordinator, -1, false);
+        this.transIdToPlanCoordinator.put(transId, planCoordinator);
+    }
 
     public PlanCoordinator getPlanCoordinator(long transId)
     {

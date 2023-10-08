@@ -58,7 +58,7 @@ public class StageCoordinator
     // this.workers is used for dependency checking, no concurrent reads and writes
     private final List<Worker<CFWorkerInfo>> workers = new ArrayList<>();
     private final Map<Long, Integer> workerIdToWorkerIndex = new ConcurrentHashMap<>();
-    private final AtomicInteger workerIndex = new AtomicInteger(0);
+    private final AtomicInteger workerIndexAssigner = new AtomicInteger(0);
     private final Object lock = new Object();
 
     public StageCoordinator(int stageId, int workerNum)
@@ -80,7 +80,7 @@ public class StageCoordinator
     public void addWorker(Worker<CFWorkerInfo> worker)
     {
         this.workerIdToWorkers.put(worker.getWorkerId(), worker);
-        this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndex.getAndIncrement());
+        this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndexAssigner.getAndIncrement());
         if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
         {
             this.lock.notifyAll();
@@ -118,11 +118,11 @@ public class StageCoordinator
         }
     }
 
-    public void completeTask(String taskId, String output)
+    public void completeTask(int taskId, boolean success)
     {
         checkArgument(this.isQueued && this.taskQueue != null,
                 "can not complete task on a non-queued stage");
-        this.taskQueue.complete(taskId, output);
+        this.taskQueue.complete(taskId, success);
     }
 
     public int getStageId()

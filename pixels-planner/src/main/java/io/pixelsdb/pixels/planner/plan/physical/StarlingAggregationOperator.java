@@ -19,21 +19,28 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageDependency;
+import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
-import io.pixelsdb.pixels.common.turbo.Output;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static java.util.Objects.requireNonNull;
 import static io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.waitForCompletion;
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -215,6 +222,40 @@ public class StarlingAggregationOperator extends Operator
             outputCollection.setFinalAggrOutputs(outputs);
         }
         return outputCollection;
+    }
+
+    @Override
+    public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
+    {
+        int aggrStageId = planCoordinator.assignStageId();
+        StageDependency aggrStageDependency = new StageDependency(aggrStageId, parentStageId, wideDependOnParent);
+        StageCoordinator aggrStageCoordinator = new StageCoordinator(aggrStageId, this.finalAggrInputs.size());
+        planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
+        if (this.partitionInputs != null)
+        {
+            checkArgument(this.child == null,
+                    "child operator should be null when base table partition exists");
+            int partitionStageId = planCoordinator.assignStageId();
+            StageDependency partitionStageDependency = new StageDependency(partitionStageId, aggrStageId, true);
+            List<Task> tasks = new ArrayList<>();
+            int taskId = 0;
+            for (PartitionInput partitionInput : this.partitionInputs)
+            {
+                List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
+                for (InputSplit inputSplit : inputSplits)
+                {
+                    partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
+                    tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
+                }
+            }
+            StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks);
+            planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
+        }
+        else
+        {
+            requireNonNull(this.child, "child operator should not be null");
+            this.child.initPlanCoordinator(planCoordinator, aggrStageId, true);
+        }
     }
 
     public static class AggregationOutputCollection implements OutputCollection

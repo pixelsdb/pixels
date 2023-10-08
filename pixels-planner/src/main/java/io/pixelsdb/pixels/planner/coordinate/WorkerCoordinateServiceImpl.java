@@ -78,7 +78,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         StageDependency dependency = planCoordinator.getStageDependency(workerInfo.getStageId());
         TurboProto.GetDownstreamWorkersResponse.Builder builder = TurboProto.GetDownstreamWorkersResponse.newBuilder();
-        if (dependency != null)
+        if (dependency.hasDownstreamStage())
         {
             boolean isWide = dependency.isWide();
             StageCoordinator dependentStage = planCoordinator.getStageCoordinator(dependency.getDownStreamStageId());
@@ -161,15 +161,15 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                               StreamObserver<TurboProto.CompleteTasksResponse> responseObserver)
     {
         long workerId = request.getWorkerId();
-        List<TurboProto.TaskOutput> taskOutputs = request.getTaskOutputsList();
+        List<TurboProto.TaskResult> taskResults = request.getTaskResultsList();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
         CFWorkerInfo workerInfo = worker.getWorkerInfo();
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
         TurboProto.CompleteTasksResponse.Builder builder = TurboProto.CompleteTasksResponse.newBuilder();
-        for (TurboProto.TaskOutput taskOutput : taskOutputs)
+        for (TurboProto.TaskResult taskOutput : taskResults)
         {
-            stageCoordinator.completeTask(taskOutput.getTaskId(), taskOutput.getOutput());
+            stageCoordinator.completeTask(taskOutput.getTaskId(), taskOutput.getSuccess());
         }
         builder.setErrorCode(SUCCESS);
         responseObserver.onNext(builder.build());

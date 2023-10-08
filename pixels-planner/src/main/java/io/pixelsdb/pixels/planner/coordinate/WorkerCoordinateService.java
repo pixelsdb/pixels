@@ -28,11 +28,11 @@ import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import io.pixelsdb.pixels.turbo.WorkerCoordinateServiceGrpc;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static io.pixelsdb.pixels.common.error.ErrorCode.SUCCESS;
-import static io.pixelsdb.pixels.common.error.ErrorCode.WORKER_COORDINATE_END_OF_TASKS;
+import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
 /**
  * The coordinate service for the cloud function workers that are involved in pipelining query execution.
@@ -83,8 +83,8 @@ public class WorkerCoordinateService
      * If this worker is not the end of the execution pipeline (i.e., belongs to the root of the query plan),
      * it must get the downstream worker or workers where it should send the intermediate results to.
      * @param workerId the id of this worker
-     * @return the basic information of the downstream workers
-     * @throws WorkerCoordinateException
+     * @return the basic information of the downstream worker(s), or empty list if there is no downstream worker(s)
+     * @throws WorkerCoordinateException if there are any other errors
      */
     public List<CFWorkerInfo> getDownstreamWorkers(long workerId) throws WorkerCoordinateException
     {
@@ -93,6 +93,10 @@ public class WorkerCoordinateService
         TurboProto.GetDownstreamWorkersResponse response = this.stub.getDownstreamWorkers(request);
         if (response.getErrorCode() != SUCCESS)
         {
+            if (response.getErrorCode() == WORKER_COORDINATE_NO_DOWNSTREAM)
+            {
+                return Collections.emptyList();
+            }
             throw new WorkerCoordinateException("failed to get downstream workers, error code=" + response.getErrorCode());
         }
         ImmutableList.Builder<CFWorkerInfo> builder = ImmutableList.builder();
@@ -149,7 +153,7 @@ public class WorkerCoordinateService
                 TurboProto.CompleteTasksRequest.newBuilder().setWorkerId(workerId);
         for (TaskInfo taskInfo : tasks)
         {
-            request.addTaskOutputs(taskInfo.toTaskOutputProto());
+            request.addTaskResults(taskInfo.toTaskResultProto());
         }
         TurboProto.CompleteTasksResponse response = this.stub.completeTasks(request.build());
         if (response.getErrorCode() != SUCCESS)

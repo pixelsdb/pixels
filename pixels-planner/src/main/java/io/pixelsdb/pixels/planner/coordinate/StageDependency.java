@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * @author hank
  * @create 2023-09-24
@@ -26,11 +28,15 @@ package io.pixelsdb.pixels.planner.coordinate;
 public class StageDependency
 {
     private final int currentStageId;
+    /**
+     * {@link #downStreamStageId} can be negative if there is no valid downstream stage
+     */
     private final int downStreamStageId;
     private final boolean isWide;
 
     public StageDependency(int currentStageId, int downStreamStageId, boolean isWide)
     {
+        checkArgument(currentStageId >= 0, "currentStageId must be non-negative");
         this.currentStageId = currentStageId;
         this.downStreamStageId = downStreamStageId;
         this.isWide = isWide;
@@ -44,6 +50,11 @@ public class StageDependency
     public int getDownStreamStageId()
     {
         return downStreamStageId;
+    }
+
+    public boolean hasDownstreamStage()
+    {
+        return this.downStreamStageId >= 0;
     }
 
     /**
