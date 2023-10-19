@@ -22,15 +22,13 @@ import org.asynchttpclient.Response;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Optional;
 import java.util.TimeZone;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -86,9 +84,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     private final ColumnWriter[] columnWriters;
     private long fileContentLength;
     private int fileRowNum;
+    private int rowGroupNum = 0;
 
     private long writtenBytes = 0L;
-    private boolean isFirstRowGroup = true;
+    private boolean isFirstRowGroup = true;  // private boolean streamHeaderSent = false;
     private long curRowGroupOffset = 0L;
     private long curRowGroupFooterOffset = 0L;
     private long curRowGroupNumOfRows = 0L;
@@ -256,7 +255,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
 
     @Override
     public int getNumRowGroup() {
-        throw new UnsupportedOperationException("getNumRowGroup is not supported in a stream");  // can modify it to display num of already written row groups
+        // returns the num of already written row groups
+        return rowGroupNum;
     }
 
     @Override
@@ -319,8 +319,9 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             curRowGroupNumOfRows = 0L;
             return false;
         }
-        writeRowGroup();  // todo: For testing purposes, currently we have to flush on every row batch
-        curRowGroupNumOfRows = 0L;
+//        writeRowGroup();
+//        curRowGroupNumOfRows = 0L;
+//        // XXX: In Junit tests, we have to flush on every row batch rather than row group. Add a parameter to control this.
         return true;
     }
 
@@ -382,13 +383,15 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                     .addHeader(CONTENT_LENGTH, 0)
                     .addHeader(CONNECTION, CLOSE)
                     .build();
+//            LOGGER.debug("Sending close request to server");
             try {
                 Response response = httpClient.executeRequest(req).get();
                 if (response.getStatusCode() != 200) {
-                    throw new IOException("Failed to send close request to server, status code: " + response.getStatusCode());
+                    throw new IOException("Failed to send close request to server. Is the server already closed? status code: " + response.getStatusCode());
                 }
             } catch (Throwable e) {
-                LOGGER.error(e.getMessage());
+                // warning that remote has already closed, but not throwing out the exception
+                LOGGER.warn(e.getMessage());
                 e.printStackTrace();
             }
 
@@ -403,9 +406,13 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         }
     }
 
-    private void writeRowGroup() throws IOException {
+    // XXX: In demo version, I have modified this method to be non-private, because StreamWorkerCommon::passSchemaToNextLevel() needs it.
+    //  This is a bad practice. todo Change it back.
+    void writeRowGroup() throws IOException {
+        LOGGER.debug("writeRowGroup() called");
         // Maybe use Unpooled.wrappedBuffer() instead of ByteBuf.writeBytes()
-        if (isFirstRowGroup) {writeStreamHeader(); isFirstRowGroup = false;}  // xxx: If we never call addRowBatch(), we will never write stream head
+        if (isFirstRowGroup) {writeStreamHeader(); isFirstRowGroup = false;}  // XXX: If we never call addRowBatch(), we will never write stream head
+        // if (!streamHeaderSent) {writeStreamHeader(); streamHeaderSent = true;} // XXX: Should we put it here or in the AddRowBatch()?
 
         int rowGroupDataLength = 0;
 
@@ -561,6 +568,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         }
 
         this.fileRowNum += curRowGroupNumOfRows;
+        this.rowGroupNum++;
         this.fileContentLength += rowGroupDataLength;
 
         // Added: Send row group to server
@@ -571,15 +579,30 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 .addHeader(CONTENT_LENGTH, byteBuf.readableBytes())
                 .addHeader(CONNECTION, "keep-alive")
                 .build();
-        try {
-            Response response = httpClient.executeRequest(req).get();  // todo: Does this API keep the connection open after returning?
-            // XXX: It remains questionable whether it's good to use a blocking call in the writer.
-            if (response.getStatusCode() != 200) {
-                throw new IOException("Failed to send row group to server, status code: " + response.getStatusCode());
+        while (true) {
+            // XXX: Currently, we retry forever in case the server started after the client attempted to send data.
+            //  active retry might not be a good solution. Change it later
+            try {
+                Response response = httpClient.executeRequest(req).get();  // todo: Does this API keep the connection open after returning?
+                // XXX: It remains questionable whether it's good to use a blocking call in the writer.
+                if (response.getStatusCode() != 200) {
+                    throw new IOException("Failed to send row group to server, status code: " + response.getStatusCode());
+                }
+                else break;
+            } catch (Throwable e) {
+                if (e instanceof ConnectException) {
+                    LOGGER.warn("Connection refused, retrying...");
+                    try {
+                        TimeUnit.MILLISECONDS.sleep(20);
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                else {
+                    LOGGER.error(e.getMessage());
+                    e.printStackTrace();
+                }
             }
-        } catch (Throwable e) {
-            LOGGER.error(e.getMessage());
-            e.printStackTrace();
         }
         byteBuf.clear();
     }
