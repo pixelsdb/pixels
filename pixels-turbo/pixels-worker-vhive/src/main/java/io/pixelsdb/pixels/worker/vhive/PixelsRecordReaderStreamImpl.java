@@ -74,6 +74,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;
 
+    // todo Have to be thread safe!
     public PixelsRecordReaderStreamImpl(BlockingQueue<ByteBuf> byteBufSharedQueue,
                                         PixelsProto.StreamHeader streamHeader,
                                   PixelsReaderOption option) throws IOException

@@ -17,9 +17,23 @@ import java.security.cert.CertificateException;
  * in a pretty plaintext form.
  */
 public final class HttpServer {
+    // Can do Dynamic Pipeline
+    /*
+    public class StreamHeaderHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+        @Override
+        protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
+            // Process the stream header
+            // ...
+
+            // Remove this handler and add the regular message handler
+            ctx.pipeline().remove(this);
+            ctx.pipeline().addLast(new StreamRegularMessageHandler());
+        }
+    }
+    */
 
     static final boolean SSL = System.getProperty("ssl") != null;
-    static final int PORT = Integer.parseInt(System.getProperty("port", SSL? "8443" : "8080"));
+//    static final int PORT = Integer.parseInt(System.getProperty("port", SSL? "8443" : "8080"));
     final HttpServerInitializer initializer;
 
     public HttpServer() throws CertificateException, SSLException {
@@ -30,10 +44,10 @@ public final class HttpServer {
     }
 
     public static void main(String[] args) throws Exception {
-        new HttpServer().serve();
+        new HttpServer().serve(8080);
     }
 
-    public void serve() throws Exception {
+    public void serve(int PORT) throws Exception {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
@@ -41,13 +55,13 @@ public final class HttpServer {
             b.option(ChannelOption.SO_BACKLOG, 1024);
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    .handler(new LoggingHandler(LogLevel.INFO))
+                    .handler(new LoggingHandler(LogLevel.DEBUG))
                     .childHandler(this.initializer);
 
             Channel ch = b.bind(PORT).sync().channel();
 
-            System.err.println("Open your web browser and navigate to " +
-                    (SSL? "https" : "http") + "://127.0.0.1:" + PORT + '/');
+            // System.err.println("Open your web browser and navigate to " +
+            //         (SSL? "https" : "http") + "://127.0.0.1:" + PORT + '/');
 
             ch.closeFuture().sync();
         } finally {
