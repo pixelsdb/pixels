@@ -2,6 +2,7 @@ package io.pixelsdb.pixels.worker.vhive;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.buffer.UnpooledHeapByteBuf;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.ColumnReader;
@@ -13,7 +14,9 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 
@@ -26,7 +29,9 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     private int RGLen;
     private final List<PixelsProto.Type> includedColumnTypes;
 
-    BlockingQueue<ByteBuf> byteBufSharedQueue;
+    private ByteBuf curRowGroupByteBuf;
+    BlockingQueue<ByteBuf> byteBufSharedQueue;  // If the curByteBuf is empty, we take the next ByteBuf from the byteBufSharedQueue; otherwise, we just read from curByteBuf
+    PixelsProto.StreamRowGroupFooter curStreamRowGroupFooter;
     private TypeDescription fileSchema = null;
     private TypeDescription resultSchema = null;
     private boolean everChecked = false;
@@ -74,7 +79,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;
 
-    // todo Have to be thread safe!
+    // todo Have to be thread safe (?)
     public PixelsRecordReaderStreamImpl(BlockingQueue<ByteBuf> byteBufSharedQueue,
                                         PixelsProto.StreamHeader streamHeader,
                                   PixelsReaderOption option) throws IOException
@@ -86,11 +91,30 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
         this.RGLen = option.getRGLen();  // In streaming mode, RGLen means max number of row groups to read
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
         this.includedColumnTypes = new ArrayList<>();
+        this.curRowGroupByteBuf = Unpooled.buffer();
         // Issue #175: this check is currently not necessary.
         // requireNonNull(TransContextCache.Instance().getQueryTransInfo(this.transId),
         //         "The transaction context does not contain query (trans) id '" + this.transId + "'");
         if (this.streamHeader != null) checkBeforeRead();
     }
+
+//    public PixelsRecordReaderStreamImpl(BlockingQueue<ByteBuf> byteBufSharedQueue,
+//                                        PixelsProto.StreamHeader streamHeader,
+//                                        PixelsReaderOption option,
+//                                        String endpoint) throws IOException
+//    {
+//        this.byteBufSharedQueue = byteBufSharedQueue;
+//        this.streamHeader = streamHeader;
+//        this.option = option;
+//        this.transId = option.getTransId();
+//        this.RGLen = option.getRGLen();  // In streaming mode, RGLen means max number of row groups to read
+//        this.enableEncodedVector = option.isEnableEncodedColumnVector();
+//        this.includedColumnTypes = new ArrayList<>();
+//        // Issue #175: this check is currently not necessary.
+//        // requireNonNull(TransContextCache.Instance().getQueryTransInfo(this.transId),
+//        //         "The transaction context does not contain query (trans) id '" + this.transId + "'");
+//        if (this.streamHeader != null) checkBeforeRead();
+//    }
 
     void checkBeforeRead() throws IOException
     {
@@ -301,18 +325,14 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
         // }
 
         int rowGroupsPosition = byteBuf.readerIndex();
-        byteBuf.readerIndex(rowGroupsPosition + byteBuf.readInt() + Integer.BYTES);  // skip row group data and row group data length
+        int rowGroupDataLength = byteBuf.readInt();
+        logger.debug("In prepareRead(), rowGroupsPosition = " + rowGroupsPosition + ", rowGroupDataLength = " + rowGroupDataLength + ", firstRgFooterPosition = " + (rowGroupsPosition + rowGroupDataLength));
+        byteBuf.readerIndex(rowGroupsPosition + rowGroupDataLength);  // skip row group data and row group data length
         byte[] firstRgFooterBytes = new byte[byteBuf.readInt()];
         byteBuf.readBytes(firstRgFooterBytes);
         PixelsProto.StreamRowGroupFooter firstRgFooter = PixelsProto.StreamRowGroupFooter.parseFrom(firstRgFooterBytes);
         byteBuf.readerIndex(rowGroupsPosition);
         this.resultColumnsEncoded = new boolean[includedColumnNum];
-        PixelsProto.RowGroupEncoding firstRgEncoding = firstRgFooter.getRowGroupEncoding();
-        for (int i = 0; i < includedColumnNum; i++)
-        {
-            this.resultColumnsEncoded[i] = firstRgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
-                    PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
-        }
 
         everPrepared = true;
         return true;
@@ -508,14 +528,64 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     public VectorizedRowBatch readBatch(int batchSize, boolean reuse)
             throws IOException
     {
-        ByteBuf byteBuf = null;
-        try {
-            byteBuf = byteBufSharedQueue.take();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        logger.debug("readBatch() called, batchSize = " + batchSize + ", reuse = " + reuse);
+        if (!curRowGroupByteBuf.isReadable() && !endOfFile) {
+            try {
+                curRowGroupByteBuf = byteBufSharedQueue.take();
+                if (!curRowGroupByteBuf.isReadable()) { this.endOfFile = true; }  // Not thread safe
+                else {
+
+                    if (!everRead)
+                    {
+                        long start = System.nanoTime();
+                        if (!read(curRowGroupByteBuf))
+                        {
+                            throw new IOException("failed to read stream.");
+                        }
+                        readTimeNanos += System.nanoTime() - start;
+                        if (endOfFile)
+                        {
+                            /**
+                             * Issue #388:
+                             * Check EOF again after reading.
+                             * As client may directly call this method without firstly calling {@link #prepareBatch(int)},
+                             * EOF may have not been set at the beginning of this method.
+                             *
+                             * Note that endOfFile == true means no row batches can be read from the chunk buffers. It does
+                             * not mean whether there is remaining data to be read from the file. We always read all the
+                             * column chunks into chunk buffers at once (in  {@link #read()}).
+                             */
+                            return createEmptyEOFRowBatch(qualifiedRowNum);
+                        }
+                    }
+
+                    logger.debug("In readBatch(), new row group " + curRGIdx);
+                    // if (rowGroupStartOffset != 0) System.out.println("rowGroupStartOffset: " + rowGroupStartOffset);
+                    // Only the first row group of a file (i.e., in a stream, or for a port) will be read for the StreamHeader, i.e. has rowGroupStartOffset != 0 (precisely, = 136)
+                    // So that the readerIndex is always 0 here, we create a slice() in PixelsReader and pass it here
+                    curRowGroupByteBuf.markReaderIndex();
+                    curRowGroupByteBuf.readerIndex(curRowGroupByteBuf.readerIndex() + curRowGroupByteBuf.readInt());  // skip row group data, including the row group length at the front
+                    logger.debug("rowGroupFooter position: " + curRowGroupByteBuf.readerIndex());
+                    byte[] rgFooterBytes = new byte[curRowGroupByteBuf.readInt()];
+                    curRowGroupByteBuf.readBytes(rgFooterBytes);
+                    curStreamRowGroupFooter = PixelsProto.StreamRowGroupFooter.parseFrom(rgFooterBytes);
+                    curRowGroupByteBuf.resetReaderIndex();
+                    // logger.debug("parsed streamRowGroupFooter: ");
+                    // logger.debug(curStreamRowGroupFooter);
+
+                    PixelsProto.RowGroupEncoding rowGroupEncoding = curStreamRowGroupFooter.getRowGroupEncoding();
+                    for (int i = 0; i < includedColumnNum; i++)
+                    {
+                        this.resultColumnsEncoded[i] = rowGroupEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
+                                PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
+                    }
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
-        if (!byteBuf.isReadable()) { this.endOfFile = true; }
-        // Currently, the client sends a separate CLOSE package to close the stream, inducing an empty ByteBuf
+
+        // Currently, the client sends a separate CLOSE package to close the stream, and the above program would read an empty ByteBuf
 
 //        if (!everChecked)
 //        {
@@ -527,30 +597,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
         {
             this.endOfFile = true;
             return createEmptyEOFRowBatch(0);
-        }
-
-        if (!everRead)
-        {
-            long start = System.nanoTime();
-            if (!read(byteBuf))
-            {
-                throw new IOException("failed to read file.");
-            }
-            readTimeNanos += System.nanoTime() - start;
-            if (endOfFile)
-            {
-                /**
-                 * Issue #388:
-                 * Check EOF again after reading.
-                 * As client may directly call this method without firstly calling {@link #prepareBatch(int)},
-                 * EOF may have not been set at the beginning of this method.
-                 *
-                 * Note that endOfFile == true means no row batches can be read from the chunk buffers. It does
-                 * not mean whether there is remaining data to be read from the file. We always read all the
-                 * column chunks into chunk buffers at once (in  {@link #read()}).
-                 */
-                return createEmptyEOFRowBatch(qualifiedRowNum);
-            }
         }
 
         // project nothing, must be count(*)
@@ -587,23 +633,15 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             resultRowBatch.projectionSize = includedColumnNum;
         }
 
-        int rgRowCount = 0;
-        int curBatchSize = 0;
+        int rgRowCount = (int) curStreamRowGroupFooter.getNumberOfRows();
+        int curBatchSize;
         ColumnVector[] columnVectors = resultRowBatch.cols;
-
-        int rowGroupStartOffset = byteBuf.readerIndex();
-        byteBuf.readerIndex(rowGroupStartOffset + byteBuf.readInt() + Integer.BYTES);  // skip row group data and row group data length
-//        System.out.println("rowGroupFooter position: " + bufReader.readerIndex());
-        byte[] rgFooterBytes = new byte[byteBuf.readInt()];
-        byteBuf.readBytes(rgFooterBytes);
-        PixelsProto.StreamRowGroupFooter rowGroupFooter = PixelsProto.StreamRowGroupFooter.parseFrom(rgFooterBytes);
-//        System.out.println("parsed rowGroupFooter: ");
-//        System.out.println(rowGroupFooter);
-        rgRowCount = (int) rowGroupFooter.getNumberOfRows();
-
 //        System.out.println(resultRowBatch.size + " " + batchSize);
 //        System.out.println(curRowInRG + " " + rgRowCount);
-        while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
+        while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)  // row group size ~200MB; packet size ~2MB; row batch size ~1MB (?)
+            // This means a readBatch() could span multiple row groups, and
+            // One packet = one curByteBuf = one row group. readBatch() could never encounter a row group boundary
+            // A cheat: In the current test, there is only 1 row group from each endpoint. Much simpler
         {
             // update current batch size
             curBatchSize = rgRowCount - curRowInRG;
@@ -617,14 +655,13 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             {
                 if (!columnVectors[i].duplicated)
                 {
-                    PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
+                    PixelsProto.ColumnEncoding encoding = curStreamRowGroupFooter.getRowGroupEncoding()
                             .getColumnChunkEncodings(resultColumns[i]);
                     int index = curRGIdx * includedColumns.length + resultColumns[i];
-                    PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                    PixelsProto.ColumnChunkIndex chunkIndex = curStreamRowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
-                    ByteBuf chunkBuffer = Unpooled.buffer(chunkIndex.getChunkLength());
-//                    System.out.println("chunkOffset: " + chunkIndex.getChunkOffset() + ", chunkLength: " + chunkIndex.getChunkLength());
-                    byteBuf.getBytes((int) (chunkIndex.getChunkOffset()), chunkBuffer);
+                    logger.debug("Reading column {} row {}, chunkOffset: {}, chunkLength: {}, row group total length: {} ", i, curRowInRG, chunkIndex.getChunkOffset(), chunkIndex.getChunkLength(),+ curRowGroupByteBuf.writerIndex());
+                    ByteBuf chunkBuffer = curRowGroupByteBuf.slice((int) chunkIndex.getChunkOffset(), chunkIndex.getChunkLength());
                     readers[i].read(chunkBuffer.nioBuffer(), encoding, curRowInRG, curBatchSize,
                             streamHeader.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                     // don't update statistics in whenComplete as it may be executed in other threads.
@@ -638,23 +675,35 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             //preRowInRG = curRowInRG; // keep in sync with curRowInRG.
             rowIndex += curBatchSize;
             resultRowBatch.size += curBatchSize;
-            // update row group index if current row index exceeds max row count in the row group
+            logger.debug("In readBatch(), resultRowBatch.size = " + resultRowBatch.size + ", batchSize = " + batchSize);
+            // If current row index exceeds max row count in the row group, prepare for the next row group
             if (curRowInRG >= rgRowCount)
             {
                 curRGIdx++;
-                if (byteBuf.isReadable()) byteBuf.readerIndex(byteBuf.readerIndex() + byteBuf.readInt() + Integer.BYTES);  // skip row group data and row group data length
-                //preRGIdx = curRGIdx; // keep in sync with curRGIdx
-                // if not end of file, update row count
-                // if (curRGIdx < targetRGNum)
-                if (byteBuf.isReadable())  // In streaming mode, we stop the loop when the buffer is fully read
-                {
-                    byte[] curRowGroupFooterBytes = new byte[byteBuf.readInt()];
-                    byteBuf.readBytes(curRowGroupFooterBytes);
-                    PixelsProto.StreamRowGroupFooter curRowGroupFooter = PixelsProto.StreamRowGroupFooter.parseFrom(curRowGroupFooterBytes);
-                    // XXX: duplicate code fragment, can be refactored into a function.
 
-                    rgRowCount = (int) curRowGroupFooter.getNumberOfRows();
-                    PixelsProto.RowGroupEncoding rgEncoding = curRowGroupFooter.getRowGroupEncoding();
+                if (!endOfFile) {
+                    try {
+                        curRowGroupByteBuf = byteBufSharedQueue.take();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                //preRGIdx = curRGIdx; // curRGIdx unused for now
+                // if not end of file, update row count
+                if (curRowGroupByteBuf.isReadable())  // if (curRGIdx < targetRGNum)
+                {
+                    logger.debug("In readBatch(), new row group " + curRGIdx);
+                    curRowGroupByteBuf.markReaderIndex();
+                    curRowGroupByteBuf.readerIndex(curRowGroupByteBuf.readerIndex() + curRowGroupByteBuf.readInt());  // skip row group data and row group data length
+                    byte[] curRowGroupFooterBytes = new byte[curRowGroupByteBuf.readInt()];
+                    curRowGroupByteBuf.readBytes(curRowGroupFooterBytes);
+                    curRowGroupByteBuf.resetReaderIndex();
+                    curStreamRowGroupFooter = PixelsProto.StreamRowGroupFooter.parseFrom(curRowGroupFooterBytes);
+                    // todo: duplicate code fragment, can be refactored into a function.
+
+                    rgRowCount = (int) curStreamRowGroupFooter.getNumberOfRows();
+                    PixelsProto.RowGroupEncoding rgEncoding = curStreamRowGroupFooter.getRowGroupEncoding();
                     // refresh resultColumnsEncoded for reading the column vectors in the next row group.
                     for (int i = 0; i < includedColumnNum; i++)
                     {
@@ -666,10 +715,9 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
                 else
                 {
                     // checkValid = false; // Issue #105: to reject continuous read.
-                    // resultRowBatch.endOfFile = true;
-                    // this.endOfFile = true;
-                    // In streaming mode, there is never an EOF, instead only closing of the stream. So commented out the above lines.
-                    curRowInRG = 0;
+                    resultRowBatch.endOfFile = true;
+                    this.endOfFile = true;
+                    // In streaming mode, there is never an EOF, instead only closing of the stream. But keep the above code for compatibility.
                     break;
                 }
                 //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
@@ -696,8 +744,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             }
         }
 
-        byteBuf.clear();  // todo: only clear the buffer and send the HTTP response after this row group is fully read (because segmentation is possible)
-        byteBuf.release();  // todo: use ResourceLeakDetector
+        // byteBuf.clear();  // todo: only clear the buffer and send the HTTP response after this row group is fully read (because segmentation is possible)
+        // curRowGroupByteBuf.release();  // todo: use ResourceLeakDetector
         return resultRowBatch;
     }
 

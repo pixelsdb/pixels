@@ -78,7 +78,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 if (!(msg instanceof HttpRequest)) return;
                 FullHttpRequest req = (FullHttpRequest) msg;
                 // if (req.method() != HttpMethod.POST) {sendHttpResponse(ctx, HttpResponseStatus.OK);}
-                logger.debug("Incoming packet, content_length header: " +  req.headers().get("content-length")
+                logger.debug("Incoming packet on port " + httpPort + ", content_length header: " +  req.headers().get("content-length")
                         + ", connection header: " + req.headers().get("connection") +
                         ", HTTP request object body total length: " + req.content().readableBytes());
                 if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf")) {
@@ -117,6 +117,9 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     // If it's the first packet and only contains a streamHeader, then don't put it into the queue.
                     // If it's the last packet (i.e. absolutely not the first packet), then whether it's empty or not, we must put it into the queue.
                     try {
+                        // ByteBuf byteBufReadableSlice = byteBuf.slice(byteBuf.readerIndex(), byteBuf.readableBytes());
+                        // byteBufReadableSlice.retain();
+                        // byteBufSharedQueue.put(byteBufReadableSlice);
                         byteBuf.retain();
                         byteBufSharedQueue.put(byteBuf);
                     } catch (InterruptedException e) {
@@ -218,6 +221,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public PixelsRecordReader read(PixelsReaderOption option) throws IOException
     {
+        assert(recordReaders.size() == 0);
         logger.debug("create a recordReader from Reader " + this.endpoint);
 //        // Let's block until we have received the StreamHeader from the first package. In this way,
 //        //  the PixelsRecordReaderStreamImpl instances are always properly initialized.
@@ -427,7 +431,15 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public void close()
             throws IOException
     {
-        this.httpServerFuture.join();  //.cancel(true);
+        try {
+            this.httpServerFuture.get(10, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            logger.warn("HTTP server did not shut down in 10 seconds, doing forceful shutdown");
+//            e.printStackTrace();
+            this.httpServerFuture.cancel(true);
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
         for (PixelsRecordReader recordReader : recordReaders)
         {
             recordReader.close();
