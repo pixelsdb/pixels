@@ -98,8 +98,7 @@ public class TestPixelsPlanner
         Operator joinOperator = joinExecutor.getRootOperator();
     }
 
-    @Test
-    public void testChainPartitionedBroadcastJoin() throws IOException, MetadataException
+    protected static Operator CreateChainPartitionedBroadcastJoinOperator() throws IOException, MetadataException
     {
         BaseTable region = new BaseTable(
                 "tpch", "region", "region",
@@ -186,7 +185,13 @@ public class TestPixelsPlanner
         PixelsPlanner joinExecutor = new PixelsPlanner(
                 123456, root, false, true, Optional.empty());
 
-        Operator joinOperator = joinExecutor.getRootOperator();
+        return joinExecutor.getRootOperator();
+    }
+
+    @Test
+    public void testChainPartitionedBroadcastJoin() throws IOException, MetadataException
+    {
+        Operator joinOperator = CreateChainPartitionedBroadcastJoinOperator();
     }
 
     @Test

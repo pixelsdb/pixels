@@ -19,13 +19,22 @@
  */
 package io.pixelsdb.pixels.planner;
 
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
+import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinatorFactory;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateServer;
+import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
+import io.pixelsdb.pixels.planner.plan.physical.Operator;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static io.pixelsdb.pixels.planner.TestPixelsPlanner.CreateChainPartitionedBroadcastJoinOperator;
 
 /**
  * @author hank
@@ -34,24 +43,31 @@ import java.util.concurrent.Executors;
 public class TestWorkerCoordinateServer
 {
     private WorkerCoordinateServer server;
-    private ExecutorService threadPool = Executors.newFixedThreadPool(1);
+    private WorkerCoordinateService service;
+    private final ExecutorService threadPool = Executors.newFixedThreadPool(1);
 
     @Before
-    public void startServer()
+    public void startServer() throws IOException, MetadataException
     {
         server = new WorkerCoordinateServer(8088);
+        service = new WorkerCoordinateService("localhost", 8088);
         threadPool.submit(server);
+        Operator joinOperator = CreateChainPartitionedBroadcastJoinOperator();
+        PlanCoordinatorFactory.Instance().createPlanCoordinator(1000, joinOperator);
     }
 
     @Test
-    public void test()
+    public void testRegisterWorker() throws WorkerCoordinateException
     {
-        
+        CFWorkerInfo workerInfo = new CFWorkerInfo(
+                "localhost", 8080, 1000, 1, "op1", null);
+        service.registerWorker(workerInfo);
     }
 
     @After
-    public void shutdownServer()
+    public void shutdownServer() throws InterruptedException
     {
+        this.service.shutdown();
         this.server.shutdown();
     }
 }
