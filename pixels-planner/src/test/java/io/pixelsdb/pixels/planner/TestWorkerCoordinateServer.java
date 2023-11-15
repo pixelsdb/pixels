@@ -42,16 +42,17 @@ import static io.pixelsdb.pixels.planner.TestPixelsPlanner.CreateChainPartitione
  */
 public class TestWorkerCoordinateServer
 {
-    private WorkerCoordinateServer server;
-    private WorkerCoordinateService service;
+    private WorkerCoordinateServer workerCoordinatorServer;
+    private WorkerCoordinateService workerCoordinatorService;
+
     private final ExecutorService threadPool = Executors.newFixedThreadPool(1);
 
     @Before
     public void startServer() throws IOException, MetadataException
     {
-        server = new WorkerCoordinateServer(8088);
-        service = new WorkerCoordinateService("localhost", 8088);
-        threadPool.submit(server);
+        workerCoordinatorServer = new WorkerCoordinateServer(8088);
+        workerCoordinatorService = new WorkerCoordinateService("localhost", 8088);
+        threadPool.submit(workerCoordinatorServer);
         Operator joinOperator = CreateChainPartitionedBroadcastJoinOperator();
         PlanCoordinatorFactory.Instance().createPlanCoordinator(1000, joinOperator);
     }
@@ -61,13 +62,13 @@ public class TestWorkerCoordinateServer
     {
         CFWorkerInfo workerInfo = new CFWorkerInfo(
                 "localhost", 8080, 1000, 1, "op1", null);
-        service.registerWorker(workerInfo);
+        workerCoordinatorService.registerWorker(workerInfo);
     }
 
     @After
     public void shutdownServer() throws InterruptedException
     {
-        this.service.shutdown();
-        this.server.shutdown();
+        this.workerCoordinatorService.shutdown();
+        this.workerCoordinatorServer.shutdown();
     }
 }
