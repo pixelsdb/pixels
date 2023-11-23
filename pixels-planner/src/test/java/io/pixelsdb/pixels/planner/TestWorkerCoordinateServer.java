@@ -51,8 +51,8 @@ public class TestWorkerCoordinateServer
     public void startServer() throws IOException, MetadataException
     {
         workerCoordinatorServer = new WorkerCoordinateServer(8088);
-        workerCoordinatorService = new WorkerCoordinateService("localhost", 8088);
         threadPool.submit(workerCoordinatorServer);
+        workerCoordinatorService = new WorkerCoordinateService("localhost", 8088);
         Operator joinOperator = CreateChainPartitionedBroadcastJoinOperator();
         PlanCoordinatorFactory.Instance().createPlanCoordinator(1000, joinOperator);
     }

@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.planner.plan.physical.Operator;
@@ -92,6 +93,7 @@ public class TestPixelsPlanner
                 "region_join_nation_join_supplier_join_lineitem",
                 "region_join_nation_join_supplier_join_lineitem", join3);
 
+        MetadataCache.Instance().initCache(123456);
         PixelsPlanner joinExecutor = new PixelsPlanner(
                 123456, root, false, true, Optional.empty());
 
@@ -182,6 +184,7 @@ public class TestPixelsPlanner
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer",
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer", join5);
 
+        MetadataCache.Instance().initCache(123456);
         PixelsPlanner joinExecutor = new PixelsPlanner(
                 123456, root, false, true, Optional.empty());
 
@@ -262,6 +265,7 @@ public class TestPixelsPlanner
                 "region_join_nation_join_supplier_join_lineitem_join_part",
                 "region_join_nation_join_supplier_join_lineitem_join_part", join4);
 
+        MetadataCache.Instance().initCache(123456);
         PixelsPlanner joinExecutor = new PixelsPlanner(
                 123456, root, false, true, Optional.empty());
 

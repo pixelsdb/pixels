@@ -135,9 +135,9 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
         int joinStageId = planCoordinator.assignStageId();
-        StageDependency aggrStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
-        StageCoordinator aggrStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
-        planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
+        StageDependency joinStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
+        StageCoordinator joinStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
+        planCoordinator.addStageCoordinator(joinStageCoordinator, joinStageDependency);
         if (this.joinAlgo == JoinAlgorithm.PARTITIONED || this.joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
         {
             if (smallChild != null && largeChild != null)
