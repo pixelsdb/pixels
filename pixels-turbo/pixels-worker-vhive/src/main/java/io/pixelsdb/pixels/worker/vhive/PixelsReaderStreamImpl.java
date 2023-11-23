@@ -25,8 +25,10 @@ import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.netty.handler.codec.http.HttpHeaderNames.CONNECTION;
 import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
@@ -36,7 +38,7 @@ import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 @NotThreadSafe
 public class PixelsReaderStreamImpl implements PixelsReader
 {
-    // TODO: currently, we assume the HTTP messages arrive in order. Implement a state machine to handle out-of-order messages
+    // Currently, we assume the HTTP messages arrive in order. TODO: Implement a state machine to handle out-of-order messages
     //  (maybe send a response to the client to ask for retransmission if the header is missing).
 
     private static final Logger logger = LogManager.getLogger(io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl.class);
@@ -46,15 +48,28 @@ public class PixelsReaderStreamImpl implements PixelsReader
     // todo: modify it into java.net.URI
     private final HttpServer httpServer;
     private final CompletableFuture<Void> httpServerFuture;
-    BlockingQueue<ByteBuf> byteBufSharedQueue;
+    private final BlockingQueue<ByteBuf> byteBufSharedQueue;
+    private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;
+    private final boolean partitioned;
+    private final int numHashes;
+    private final AtomicReference<Integer> numHashesReceived = new AtomicReference<>(0);
     private final List<PixelsRecordReaderStreamImpl> recordReaders;
 
     private PixelsProto.StreamHeader streamHeader;
 //    private final AtomicBoolean streamHeaderInitialized = new AtomicBoolean(false);
     private final CountDownLatch streamHeaderLatch = new CountDownLatch(1);
 
-    // todo: can just merge our PixelsReaderStreamImpl into our PixelsRecordReaderStreamImpl
+    // The PixelsReaderStreamImpl actually does nothing except booting the server. Can just merge our PixelsReaderStreamImpl into our PixelsRecordReaderStreamImpl.
+    // But keep the code for compatibility.
     public PixelsReaderStreamImpl(String endpoint) throws Exception {
+        this(endpoint, false, -1);
+    }
+
+    public PixelsReaderStreamImpl(int port) throws Exception {
+        this("http://localhost:" + port + "/");
+    }
+
+    public PixelsReaderStreamImpl(String endpoint, boolean partitioned, int numHashes) throws Exception {
         this.fileSchema = null;
         this.streamHeader = null;
         this.endpoint = endpoint;
@@ -62,11 +77,14 @@ public class PixelsReaderStreamImpl implements PixelsReader
         String IP = withoutProtocol.substring(0, withoutProtocol.indexOf(':'));
         String portString = withoutProtocol.substring(withoutProtocol.indexOf(':') + 1, withoutProtocol.indexOf('/'));
         int httpPort = Integer.parseInt(portString);
-        logger.debug("Constructor called, IP: " + IP + ", port: " + httpPort);
+        logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort + ", partitioned: " + partitioned + ", numHashes: " + numHashes);
         if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost")) {
             throw new UnsupportedOperationException("Currently, only localhost is supported as the server address");
         }
         this.byteBufSharedQueue = new LinkedBlockingQueue<>(1);
+        this.byteBufBlockingMap = new BlockingMap<>();
+        this.partitioned = partitioned;
+        this.numHashes = numHashes;
         this.recordReaders = new LinkedList<>();  // new java.util.concurrent.CopyOnWriteArrayList<>();
 
         // WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
@@ -80,6 +98,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 // if (req.method() != HttpMethod.POST) {sendHttpResponse(ctx, HttpResponseStatus.OK);}
                 logger.debug("Incoming packet on port " + httpPort + ", content_length header: " +  req.headers().get("content-length")
                         + ", connection header: " + req.headers().get("connection") +
+                        ", partition ID header: " + req.headers().get("X-Partition-Id") +
                         ", HTTP request object body total length: " + req.content().readableBytes());
                 if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf")) {
                     return;
@@ -91,6 +110,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
 //                if (!streamHeaderInitialized.get()) {
                     try {
                         streamHeader = parseStreamHeader(byteBuf);  // XXX
+                        // logger.debug("Parsed streamHeader object: " + streamHeader);
 //                        streamHeaderInitialized.set(true);
                         streamHeaderLatch.countDown();
                         // GPT-4:
@@ -102,9 +122,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
                             recordReader.streamHeader = streamHeader;
                             recordReader.checkBeforeRead();
                             // Currently, we allow creating a RecordReader instance first and initialize it later,
-                            //  because the first package (which contains the StreamHeader) might have not arrived.
-                            // Also, because of the blocking queue, all the `streamHeader`s must have been initialized
-                            //  before the first time we call `readBatch()` in any recordReader.
+                            //  because the first package (which contains the StreamHeader) might have not arrived
+                            //  by the time we create the RecordReader instance.
+                            // Also, because we only put the byteBuf into the blocking queue after initializing the `streamHeader`,
+                            //  it is safe to assume that the `streamHeader` has been initialized at or before the first time
+                            //  we call `readBatch()` in the recordReader.
                         }
                     } catch (InvalidProtocolBufferException e) {
                         e.printStackTrace();
@@ -112,8 +134,18 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         throw new RuntimeException(e);
                     }
                 }
+                else if (partitioned) {
+                    // In partitioned mode, every packet brings a streamHeader, so we need to parse it, but do not need
+                    //  its value except for the first incoming packet.
+                    try {
+                        parseStreamHeader(byteBuf);
+                    } catch (InvalidProtocolBufferException e) {
+                        e.printStackTrace();
+                    }
+                }
 //                else {  // The first packet does not need to be passed to the recordReader
-                if (byteBuf.isReadable() || httpPort != 50499) { // Objects.equals(req.headers().get(CONNECTION), CLOSE.toString())) {  // If byteBuf is not readable, it means it only contains a streamHeader with empty content, i.e. no rowgroups to read
+                if (httpPort >= 50100) { // Objects.equals(req.headers().get(CONNECTION), CLOSE.toString())) {
+                    // If it's a schemaWriter, we don't need to put anything into the queue.
                     // If it's the first packet and only contains a streamHeader, then don't put it into the queue.
                     // If it's the last packet (i.e. absolutely not the first packet), then whether it's empty or not, we must put it into the queue.
                     try {
@@ -121,7 +153,16 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         // byteBufReadableSlice.retain();
                         // byteBufSharedQueue.put(byteBufReadableSlice);
                         byteBuf.retain();
-                        byteBufSharedQueue.put(byteBuf);
+                        if (!partitioned) byteBufSharedQueue.put(byteBuf);
+                        else {
+                            int hash = Integer.parseInt(req.headers().get("X-Partition-Id"));
+                            byteBufBlockingMap.put(hash, byteBuf);
+                            numHashesReceived.getAndAccumulate(1, Integer::sum);
+                            if (numHashesReceived.get() == numHashes) {
+                                // We have to create an artificial empty ByteBuf to put into the queue, to pass the CLOSE to the RecordReader.
+                                byteBufBlockingMap.put(numHashes, Unpooled.buffer(0).retain());
+                            }
+                        }
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }  // todo: I ignored a lot of exceptions because the method signature is inherited and I cannot throw them out
@@ -138,10 +179,12 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     }
                 });
                 f.addListener(ChannelFutureListener.CLOSE);
-                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString())) {
+                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) || (partitioned && numHashesReceived.get() == numHashes)) {
                     f.addListener(future -> {
                         // Gracefully shutdown the server
                         ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
+                        // if (httpPort < 50100)
+                        //     StreamWorkerCommon.delPort(httpPort);
                     });
                 }
             }
@@ -153,6 +196,34 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     e.printStackTrace();
                 }
             }, executorService);
+    }
+
+    public static class BlockingMap<K, V> {
+        private final Map<K, ArrayBlockingQueue<V>> map = new ConcurrentHashMap<>();
+
+        private BlockingQueue<V> getQueue(K key) {
+            assert(key != null);
+            return map.computeIfAbsent(key, k -> new ArrayBlockingQueue<>(1));
+        }
+
+        public void put(K key, V value) {
+            // can also use offer(value) if you do not want an exception thrown
+            if ( !getQueue(key).add(value) ) {
+                System.err.println("Ignoring duplicate key");
+            }
+        }
+
+        public V get(K key) throws InterruptedException {
+            return getQueue(key).take();
+        }
+
+        public boolean exist(K key) throws InterruptedException {
+            return getQueue(key).peek() != null;
+        }
+
+//        public V get(K key, long timeout, TimeUnit unit) throws InterruptedException {
+//            return getQueue(key).poll(timeout, unit);
+//        }
     }
 
     static int calculateCeiling(int value, int multiple) {
@@ -173,6 +244,9 @@ public class PixelsReaderStreamImpl implements PixelsReader
     }
 
     private PixelsProto.StreamHeader parseStreamHeader(ByteBuf byteBuf) throws InvalidProtocolBufferException {
+        // Can use byteBuf.slice() instead of .getBytes() to avoid copying the bytes.
+        // But streamHeader is small (~128 bytes), so it doesn't matter.
+
         // check MAGIC
         int magicLength = MAGIC.getBytes().length;
         byte[] magicBytes = new byte[magicLength];
@@ -221,7 +295,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public PixelsRecordReader read(PixelsReaderOption option) throws IOException
     {
-        assert(recordReaders.size() == 0);
+        // todo: process hash values in the option
+        assert(recordReaders.size() == 0);  // Currently we only support 1 recordReader per Reader
         logger.debug("create a recordReader from Reader " + this.endpoint);
 //        // Let's block until we have received the StreamHeader from the first package. In this way,
 //        //  the PixelsRecordReaderStreamImpl instances are always properly initialized.
@@ -233,7 +308,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
 //            }
 //        }
 
-        PixelsRecordReaderStreamImpl recordReader = new PixelsRecordReaderStreamImpl(byteBufSharedQueue, streamHeader, option);
+        PixelsRecordReaderStreamImpl recordReader = new PixelsRecordReaderStreamImpl(partitioned, byteBufSharedQueue, byteBufBlockingMap, streamHeader, option);
         // Theoretically, it is still possible to append data to the bufReader while reading.
         recordReaders.add(recordReader);
         return recordReader;
@@ -338,6 +413,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public boolean isPartitioned()
     {
+        try {
+            streamHeaderLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         return this.streamHeader.hasPartitioned() && this.streamHeader.getPartitioned();
     }
 
@@ -427,6 +507,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
      *
      * @throws IOException
      */
+    // XXX: It's a bad practice to close an object in a blocking manner. Consider using a separate thread to close the object,
+    //  and throw an exception there if that thread fails.
     @Override
     public void close()
             throws IOException

@@ -105,7 +105,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                 TypeDescription inputSchema = StreamWorkerCommon.getSchemaFromSplits(StreamWorkerCommon.getStorage(inputStorageInfo.getScheme()),
                         inputSplits);  // XXX: The better way is to include the schema in the header of the first rowBatch
                 // maybe need to call a readBatch(0), which ensures the header is parsed
-                inputSchema = StreamWorkerCommon.getResultSchema(inputSchema, includeCols);
+                inputSchema = WorkerCommon.getResultSchema(inputSchema, includeCols);
 
                 PartialAggregationInfo partialAggregationInfo = event.getPartialAggregationInfo();
                 requireNonNull(partialAggregationInfo, "event.partialAggregationInfo is null");
@@ -122,7 +122,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                         partialAggregationInfo.isPartition(),
                         partialAggregationInfo.getNumPartition());
                 if (outputFolder.endsWith("_0"))  // Only one worker is responsible for passing the schema to the next level.
-                    StreamWorkerCommon.passSchemaToNextLevel(aggregator.getOutputSchema(), outputStorageInfo);
+                    StreamWorkerCommon.passSchemaToNextLevel(aggregator.getOutputSchema(), outputStorageInfo, event.getOutput());
             }
             else
             {
@@ -167,8 +167,10 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                 throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
             }
             // todo:
-            // We cannot await termination here. We should just start the next level workers in the operator - in this way
-            //  is the entire worker flow further pipelined. Instead, we should await termination in the end of this worker.
+            // We cannot await termination here. We should just start the next level workers in the Pixels operator - in this way
+            //  is the entire worker flow further pipelined. Instead, we should await termination in the end of this worker
+            //  (because the PixelsWriterStreamImpl is blocking and will not write until a scan thread finishes, and so
+            //  correctness can be guaranteed).
             // (即边写边发，不阻塞writer地发buffer)
             // Or alternatively, change AggregationOperator to not block on `executePrev()`, so that the worker thread
             //  remains running to manage these async threads.
@@ -182,7 +184,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                 PixelsWriter pixelsWriter =  // outputStorageInfo.getScheme() == mock ? this.pixelsWriter :
                         StreamWorkerCommon.getWriter(aggregator.getOutputSchema(),
                         StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                        aggregator.isPartition(), aggregator.getGroupKeyColumnIdsInResult());
+                        aggregator.isPartition(), -1, aggregator.getGroupKeyColumnIdsInResult());  // todo: if (aggregator.isPartition()) ...
                 aggregator.writeAggrOutput(pixelsWriter);
                 pixelsWriter.close();
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
@@ -205,7 +207,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
 //            }
 
             scanOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
-            WorkerCommon.setPerfMetrics(scanOutput, workerMetrics);
+            StreamWorkerCommon.setPerfMetrics(scanOutput, workerMetrics);
             return scanOutput;
         } catch (Throwable e)
         {
@@ -235,16 +237,9 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
         long readBytes = 0L;
         int numReadRequests = 0;
 
-        // Because we have ample free ports, we can start a PixelsReader for each file.
-        // // Under our current setting, in streaming mode one worker uses only one PixelsReader for all multiple files because
-        // //  they are all from the same endpoint. Or is it?
-        readCostTimer.start();
-//        PixelsReader pixelsReader = StreamWorkerCommon.getReader(scanInputs.get(0).getPath());
-        readCostTimer.stop();
-        // // Given that we can only alloc one port per worker, we can only start one PixelsReader instance per worker,
-        // //  so we have to make the PixelsReader thread-safe. However, for demo we can allow multiple ports per worker,
-        // //  and specifically, one port per endpoint.
-
+        // Because we have ample free ports, we can start a PixelsReader for each file, instead of using
+        //  only one PixelsStreamReader for all multiple files because they are all under the same directory (use it as endpoint).
+        // If we use only one PixelsStreamReader, we will have to make it thread-safe.
         for (InputInfo inputInfo : scanInputs)
         {
             logger.debug("creating a new pixelsReader on endpoint " + inputInfo.getPath());
@@ -267,14 +262,14 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                     logger.debug("creating a new pixelsWriter on endpoint " + outputEndpoint);
                     writeCostTimer.start();
                     pixelsWriter = StreamWorkerCommon.getWriter(scanner.getOutputSchema(), StreamWorkerCommon.getStorage(outputScheme),
-                            outputEndpoint, encoding, false, null);
+                            outputEndpoint, encoding);
                     writeCostTimer.stop();
                 }
 
                 computeCostTimer.start();
                 do
                 {
-                    rowBatch = scanner.filterAndProject(recordReader.readBatch(WorkerCommon.rowBatchSize));
+                    rowBatch = scanner.filterAndProject(recordReader.readBatch(StreamWorkerCommon.rowBatchSize));
 //                    logger.debug("recordReader readBatch on endpoint " + inputInfo.getPath());
                     if (rowBatch.size > 0)
                     {

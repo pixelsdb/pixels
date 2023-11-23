@@ -13,10 +13,10 @@ import io.pixelsdb.pixels.worker.vhive.PixelsWriterStreamImpl;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-// import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 
 public class TestHttpServerClient {
 
@@ -135,7 +135,7 @@ public class TestHttpServerClient {
         String serverIpAddress = "127.0.0.1";
         int serverPort = 8080;
         PixelsWriter pixelsWriter = PixelsWriterStreamImpl.newBuilder()
-                .setEndpoint("http://" + serverIpAddress + ":" + serverPort + "/")
+                .setUri(URI.create("http://" + serverIpAddress + ":" + serverPort + "/"))
                 .setSchema(recordReader.getResultSchema())
                 .setPixelStride(10000)
                 .setRowGroupSize(1048576)  // send a packet per 1MB (segmentation possible)

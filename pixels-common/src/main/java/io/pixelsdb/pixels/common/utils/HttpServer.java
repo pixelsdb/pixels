@@ -49,7 +49,7 @@ public final class HttpServer {
 
     public void serve(int PORT) throws Exception {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        EventLoopGroup workerGroup = new NioEventLoopGroup();  // todo: test how many threads are best
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.option(ChannelOption.SO_BACKLOG, 1024);
@@ -59,9 +59,6 @@ public final class HttpServer {
                     .childHandler(this.initializer);
 
             Channel ch = b.bind(PORT).sync().channel();
-
-            // System.err.println("Open your web browser and navigate to " +
-            //         (SSL? "https" : "http") + "://127.0.0.1:" + PORT + '/');
 
             ch.closeFuture().sync();
         } finally {

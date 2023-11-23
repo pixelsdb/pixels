@@ -23,9 +23,6 @@ import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
     private final byte[] payload = { 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd' };
 
-//    public HttpServerHandler() {}
-//    public HttpServerHandler(byte[] a) {payload = a;}
-
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) {
         ctx.flush();
@@ -49,7 +46,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
                     response.headers().set(CONNECTION, KEEP_ALIVE);
                 }
             } else {
-                // Tell the client we're going to close the connection.
                 response.headers().set(CONNECTION, CLOSE);
             }
 

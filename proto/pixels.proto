@@ -275,8 +275,9 @@ message ColumnEncoding {
     optional ColumnEncoding cascadeEncoding = 3;
 }
 
-// create another file and include pixels.proto
+// todo create another file and include pixels.proto
 
+// DESIGN: In streaming mode, we cannot determine all these footer fields until the end of the stream. So:
 // In streaming mode, the whole message flow is like:
 // ------------------------------------------------------------------
 // | magic | streamHeaderLen | streamHeader | rowGroup | rowGroup | ... |
@@ -314,6 +315,8 @@ message StreamHeader {
 message StreamRowGroupFooter {
     optional RowGroupIndex rowGroupIndexEntry = 1;
     optional RowGroupEncoding rowGroupEncoding = 2;
+
     // number of rows in this row group
     optional uint64 numberOfRows = 4;
+    optional PartitionInformation partitionInfo = 5;
 }
