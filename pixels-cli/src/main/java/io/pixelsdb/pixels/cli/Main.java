@@ -47,10 +47,10 @@ import static java.util.Objects.requireNonNull;
  *
  * <br>This should be run under root user to execute cache cleaning commands
  * <p>
- * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_1_compact_cache_2020.01.10-2.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
+ * QUERY -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_1_compact_cache_2020.01.10-2.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * </p>
  * <p> Local
- * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
+ * QUERY -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
  * </p>
  * <p>
  * COPY -p .pxl -s hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -d hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -n 3 -c 3
@@ -115,11 +115,11 @@ public class Main
                 argumentParser.addArgument("-s", "--schema").required(true)
                         .help("specify the name of database");
                 argumentParser.addArgument("-t", "--table").required(true)
-                        .help("Specify the name of table");
+                        .help("specify the name of table");
                 argumentParser.addArgument("-n", "--row_num").required(true)
-                        .help("Specify the max number of rows to write in a file");
+                        .help("specify the max number of rows to write in a file");
                 argumentParser.addArgument("-r", "--row_regex").required(true)
-                        .help("Specify the split regex of each row in a file");
+                        .help("specify the split regex of each row in a file");
                 argumentParser.addArgument("-c", "--consumer_thread_num").setDefault("4").required(true)
                         .help("specify the number of consumer threads used for data generation");
                 argumentParser.addArgument("-e", "--encoding_level").setDefault("2")
@@ -155,14 +155,12 @@ public class Main
                 ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels QUERY")
                         .defaultHelp(true);
 
-                argumentParser.addArgument("-t", "--type").required(true)
-                        .help("Specify the format of files");
                 argumentParser.addArgument("-w", "--workload").required(true)
-                        .help("specify the path of workload");
+                        .help("specify the path of workload file");
                 argumentParser.addArgument("-l", "--log").required(true)
-                        .help("Specify the path of log");
+                        .help("specify the path of query log files");
                 argumentParser.addArgument("-c", "--cache")
-                        .help("Specify the command of dropping cache");
+                        .help("specify the command of dropping cache");
 
                 Namespace ns = null;
                 try
@@ -191,13 +189,13 @@ public class Main
                         .defaultHelp(true);
 
                 argumentParser.addArgument("-p", "--postfix").required(true)
-                        .help("Specify the postfix of files to be copied");
+                        .help("specify the postfix of files to be copied");
                 argumentParser.addArgument("-s", "--source").required(true)
                         .help("specify the source directory");
                 argumentParser.addArgument("-d", "--destination").required(true)
-                        .help("Specify the destination directory");
+                        .help("specify the destination directory");
                 argumentParser.addArgument("-n", "--number").required(true)
-                        .help("Specify the number of copies");
+                        .help("specify the number of copies");
                 argumentParser.addArgument("-c", "--concurrency")
                         .setDefault("4").required(true)
                         .help("specify the number of threads used for data compaction");
@@ -230,11 +228,11 @@ public class Main
                         .defaultHelp(true);
 
                 argumentParser.addArgument("-s", "--schema").required(true)
-                        .help("Specify the name of schema.");
+                        .help("specify the name of schema.");
                 argumentParser.addArgument("-t", "--table").required(true)
                         .help("specify the name of table.");
                 argumentParser.addArgument("-n", "--naive").required(true)
-                        .help("Specify whether or not to create naive compact layout.");
+                        .help("specify whether or not to create naive compact layout.");
                 argumentParser.addArgument("-c", "--concurrency")
                         .setDefault("4").required(true)
                         .help("specify the number of threads used for data compaction");
@@ -267,13 +265,13 @@ public class Main
                         .defaultHelp(true);
 
                 argumentParser.addArgument("-s", "--schema").required(true)
-                        .help("Specify the schema name");
+                        .help("specify the schema name");
                 argumentParser.addArgument("-t", "--table").required(true)
-                        .help("Specify the table name");
+                        .help("specify the table name");
                 argumentParser.addArgument("-o", "--ordered_enabled").setDefault(false)
-                        .help("Specify whether the ordered path is enabled");
+                        .help("specify whether the ordered path is enabled");
                 argumentParser.addArgument("-c", "--compact_enabled").setDefault(true)
-                        .help("Specify whether the compact path is enabled");
+                        .help("specify whether the compact path is enabled");
 
                 Namespace ns = null;
                 try
