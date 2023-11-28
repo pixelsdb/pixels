@@ -148,7 +148,7 @@ public class StatExecutor implements CommandExecutor
                 .append("pixels.ordered_path_enabled:").append(orderedEnabled).append(";")
                 .append("pixels.compact_path_enabled:").append(compactEnabled);
         properties.setProperty("sessionProperties", builder.toString());
-        String jdbc = instance.getProperty("presto.pixels.jdbc.url");
+        String jdbc = instance.getProperty("presto.jdbc.url");
         try
         {
             DriverManager.registerDriver(new TrinoDriver());

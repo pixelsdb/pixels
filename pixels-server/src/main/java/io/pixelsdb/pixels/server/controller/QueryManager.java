@@ -126,7 +126,7 @@ public class QueryManager
             throw new QueryServerException("failed to initialize query schedule service", e);
         }
 
-        this.jdbcUrl = ConfigFactory.Instance().getProperty("presto.pixels.jdbc.url");
+        this.jdbcUrl = ConfigFactory.Instance().getProperty("presto.jdbc.url");
         boolean orderEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
         boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
         this.costEffectiveConnProp = new Properties();
