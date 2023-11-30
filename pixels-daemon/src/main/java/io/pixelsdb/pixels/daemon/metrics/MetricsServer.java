@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.daemon.metrics;
 import io.pixelsdb.pixels.common.metrics.ReadPerfHistogram;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.daemon.Server;
+import io.pixelsdb.pixels.common.server.Server;
 import com.alibaba.fastjson.JSON;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

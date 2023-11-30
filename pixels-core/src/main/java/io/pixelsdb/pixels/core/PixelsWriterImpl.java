@@ -58,7 +58,7 @@ import static io.pixelsdb.pixels.core.writer.ColumnWriter.newColumnWriter;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Pixels file writer default implementation
+ * Pixels file writer default implementation.
  * <p>
  * This writer is NOT thread safe!
  * </p>

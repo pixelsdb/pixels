@@ -91,9 +91,9 @@ public class QueryManager
         }
     }
 
-    private final ArrayBlockingQueue<ReceivedQuery> pendingQueueRe = new ArrayBlockingQueue<>(1024 * 1024);
+    private final LinkedBlockingQueue<ReceivedQuery> pendingQueueRe = new LinkedBlockingQueue<>();
     private final ConcurrentLinkedQueue<ReceivedQuery> pendingQueueRe2nd = new ConcurrentLinkedQueue<>();
-    private final ArrayBlockingQueue<ReceivedQuery> pendingQueueBe = new ArrayBlockingQueue<>(1024 * 1024);
+    private final LinkedBlockingQueue<ReceivedQuery> pendingQueueBe = new LinkedBlockingQueue<>();
     private final ConcurrentHashMap<String, ReceivedQuery> runningQueries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, GetQueryResultResponse> queryResults = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Object> finishedQueries = new ConcurrentHashMap<>();
@@ -126,7 +126,7 @@ public class QueryManager
             throw new QueryServerException("failed to initialize query schedule service", e);
         }
 
-        this.jdbcUrl = ConfigFactory.Instance().getProperty("presto.pixels.jdbc.url");
+        this.jdbcUrl = ConfigFactory.Instance().getProperty("presto.jdbc.url");
         boolean orderEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
         boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
         this.costEffectiveConnProp = new Properties();

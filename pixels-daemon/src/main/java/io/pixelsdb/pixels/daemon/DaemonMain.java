@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
  * */
 public class DaemonMain
 {
-    private static Logger log = LogManager.getLogger(DaemonMain.class);
+    private static final Logger log = LogManager.getLogger(DaemonMain.class);
     private static final String GuardScript = "bin/start-guard.sh";
     private static final String CoordinatorScript = "bin/start-coordinator.sh";
     private static final String DataNodeScript = "bin/start-datanode.sh";

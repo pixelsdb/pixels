@@ -20,17 +20,16 @@
 package io.pixelsdb.pixels.planner.plan.physical;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 
-import java.util.concurrent.*;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static java.util.Objects.requireNonNull;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * @author hank
  * @create 2022-07-05
  */
-public abstract class Operator
+public abstract class Operator implements OperatorExecutor
 {
     protected static final double StageCompletionRatio;
     protected static final ExecutorService operatorService = Executors.newCachedThreadPool();
@@ -59,83 +58,16 @@ public abstract class Operator
     }
 
     /**
-     * Execute this operator recursively.
-     *
-     * @return the completable future that completes when this operator is complete, and
-     * provides the computable futures of the outputs of this operator
+     * Initialize the query plan coordinator. This method should be invoked recursively to traverse all
+     * the operators in the query plan. Each operator added its own query execution stages into the plan
+     * coordinator. Therefore, the users only need to call this method on the root operator of the plan.
+     * @param planCoordinator the plan coordinator to be initialized
+     * @param parentStageId the stage id of the parent (i.e., downstream) stage of this operator, for the
+     *                      root operator, the parentStageId should be negative (e.g., -1), meaning the
+     *                      parent does not exist for root
+     * @param wideDependOnParent true if this operator has a wide dependency on the parent (i.e., downstream)
+     *                          stage, for root operator, this parameter is ignored
      */
-    public abstract CompletableFuture<CompletableFuture<?>[]> execute();
-
-    /**
-     * Execute the previous stages (if any) before the last stage, recursively.
-     * And return the completable future that completes when the previous states are complete.
-     *
-     * @return empty array if the previous stages do not exist or do not need to be wait for
-     */
-    public abstract CompletableFuture<Void> executePrev();
-
-    /**
-     * This method collects the outputs of the operator. It may block until the join
-     * completes, therefore it should not be called in the query execution thread. Otherwise,
-     * it will block the query execution.
-     * @return the outputs of the workers in this operator
-     */
-    public abstract OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
-
-    public interface OutputCollection
-    {
-        long getTotalGBMs();
-
-        int getTotalNumReadRequests();
-
-        int getTotalNumWriteRequests();
-
-        long getTotalReadBytes();
-
-        long getTotalWriteBytes();
-
-        long getLayerInputCostMs();
-
-        long getLayerComputeCostMs();
-
-        long getLayerOutputCostMs();
-    }
-
-    public static void waitForCompletion(CompletableFuture<?>[] stageOutputs) throws InterruptedException
-    {
-        waitForCompletion(stageOutputs, StageCompletionRatio);
-    }
-
-    public static void waitForCompletion(CompletableFuture<?>[] stageOutputs, double completionRatio)
-            throws InterruptedException
-    {
-        requireNonNull(stageOutputs, "stageOutputs is null");
-
-        if (stageOutputs.length == 0)
-        {
-            return;
-        }
-
-        while (true)
-        {
-            double completed = 0;
-            for (CompletableFuture<?> childOutput : stageOutputs)
-            {
-                if (childOutput.isDone())
-                {
-                    checkArgument(!childOutput.isCompletedExceptionally(),
-                            "worker in the stage is completed exceptionally");
-                    checkArgument(!childOutput.isCancelled(),
-                            "worker in the stage is cancelled");
-                    completed++;
-                }
-            }
-
-            if (completed / stageOutputs.length >= completionRatio)
-            {
-                break;
-            }
-            TimeUnit.MILLISECONDS.sleep(10);
-        }
-    }
+    public abstract void initPlanCoordinator(PlanCoordinator planCoordinator,
+                                             int parentStageId, boolean wideDependOnParent);
 }

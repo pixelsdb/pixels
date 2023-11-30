@@ -99,18 +99,18 @@ public class PixelsPhysicalReader
 
     }
 
-    public int read(short rowGroupId, short columnId, byte[] columnlet) throws IOException
+    public int read(short rowGroupId, short columnId, byte[] columnChunk) throws IOException
     {
         PixelsProto.RowGroupFooter rowGroupFooter = readRowGroupFooter(rowGroupId);
         PixelsProto.ColumnChunkIndex chunkIndex =
                 rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
-        int physicalLen = (int) chunkIndex.getChunkLength();
-        if (physicalLen > columnlet.length) {
+        int physicalLen = chunkIndex.getChunkLength();
+        if (physicalLen > columnChunk.length) {
             return physicalLen;
         }
         long physicalOffset = chunkIndex.getChunkOffset();
         physicalReader.seek(physicalOffset);
-        physicalReader.readFully(columnlet);
+        physicalReader.readFully(columnChunk);
         return physicalLen;
 
     }

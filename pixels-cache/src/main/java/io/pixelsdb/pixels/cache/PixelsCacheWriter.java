@@ -67,13 +67,13 @@ public class PixelsCacheWriter
     private long cacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET; // this is only used in the write() method.
     private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
-    private Set<String> cachedColumnlets = new HashSet<>();
+    private Set<String> cachedColumnChunks = new HashSet<>();
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
                               Storage storage,
                               PixelsRadix radix,
-                              Set<String> cachedColumnlets,
+                              Set<String> cachedColumnChunks,
                               EtcdUtil etcdUtil,
                               String host)
     {
@@ -84,9 +84,9 @@ public class PixelsCacheWriter
         this.etcdUtil = etcdUtil;
         this.host = host;
         this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
-        if (cachedColumnlets != null && cachedColumnlets.isEmpty() == false)
+        if (cachedColumnChunks != null && cachedColumnChunks.isEmpty() == false)
         {
-            cachedColumnlets.addAll(cachedColumnlets);
+            cachedColumnChunks.addAll(cachedColumnChunks);
         }
     }
 
@@ -252,12 +252,12 @@ public class PixelsCacheWriter
     public boolean isCacheEmpty ()
     {
         /**
-         * There will be not concurrent update on cache,
-         * thus we don't have to synchronize the access to cachedColumnlets.
+         * There are no concurrent updates on the cache,
+         * thus we don't have to synchronize the access to cachedColumnChunks.
          */
         return PixelsCacheUtil.getCacheStatus(this.cacheFile) == PixelsCacheUtil.CacheStatus.EMPTY.getId() &&
                 PixelsCacheUtil.getCacheSize(this.cacheFile) == 0;
-        // return cachedColumnlets == null || cachedColumnlets.isEmpty();
+        // return cachedColumnChunks == null || cachedColumnChunks.isEmpty();
     }
 
     /**
@@ -323,7 +323,7 @@ public class PixelsCacheWriter
         // get the new caching layout
         Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
-        List<String> cacheColumnletOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
+        List<String> cacheColumnChunkOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
         // set rwFlag as write
         logger.debug("Set index rwFlag as write");
         try
@@ -343,13 +343,13 @@ public class PixelsCacheWriter
         }
 
         // update cache content
-        if (cachedColumnlets == null || cachedColumnlets.isEmpty())
+        if (cachedColumnChunks == null || cachedColumnChunks.isEmpty())
         {
-            cachedColumnlets = new HashSet<>(cacheColumnletOrders.size());
+            cachedColumnChunks = new HashSet<>(cacheColumnChunkOrders.size());
         }
         else
         {
-            cachedColumnlets.clear();
+            cachedColumnChunks.clear();
         }
         radix.removeAll();
         long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
@@ -368,11 +368,11 @@ public class PixelsCacheWriter
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
-            for (int i = 0; i < cacheColumnletOrders.size(); i++)
+            for (int i = 0; i < cacheColumnChunkOrders.size(); i++)
             {
-                String[] columnletIdStr = cacheColumnletOrders.get(i).split(":");
-                short rowGroupId = Short.parseShort(columnletIdStr[0]);
-                short columnId = Short.parseShort(columnletIdStr[1]);
+                String[] columnChunkIdStr = cacheColumnChunkOrders.get(i).split(":");
+                short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
+                short columnId = Short.parseShort(columnChunkIdStr[1]);
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
@@ -388,17 +388,17 @@ public class PixelsCacheWriter
                 {
                     radix.put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
                             new PixelsCacheIdx(currCacheOffset, physicalLen));
-                    byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
-                    cacheFile.setBytes(currCacheOffset, columnlet);
+                    byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
+                    cacheFile.setBytes(currCacheOffset, columnChunk);
                     logger.debug(
-                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
+                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnChunk.length);
                     currCacheOffset += physicalLen;
                 }
             }
         }
-        for (String cachedColumnlet : cacheColumnletOrders)
+        for (String cachedColumnChunk : cacheColumnChunkOrders)
         {
-            cachedColumnlets.add(cachedColumnlet);
+            cachedColumnChunks.add(cachedColumnChunk);
         }
         logger.debug("Cache writer ends at offset: " + currCacheOffset);
         // flush index
@@ -435,33 +435,33 @@ public class PixelsCacheWriter
         /**
          * Prepare structures for the survived and new coming cache elements.
          */
-        List<String> survivedColumnlets = new ArrayList<>();
-        List<String> newCachedColumnlets = new ArrayList<>();
-        for (String columnlet : nextVersionCached)
+        List<String> survivedColumnChunks = new ArrayList<>();
+        List<String> newCachedColumnChunks = new ArrayList<>();
+        for (String columnChunk : nextVersionCached)
         {
-            if (this.cachedColumnlets.contains(columnlet))
+            if (this.cachedColumnChunks.contains(columnChunk))
             {
-                survivedColumnlets.add(columnlet);
+                survivedColumnChunks.add(columnChunk);
             }
             else
             {
-                newCachedColumnlets.add(columnlet);
+                newCachedColumnChunks.add(columnChunk);
             }
         }
-        this.cachedColumnlets.clear();
+        this.cachedColumnChunks.clear();
         PixelsRadix oldRadix = radix;
-        List<PixelsCacheEntry> survivedIdxes = new ArrayList<>(survivedColumnlets.size()*files.length);
+        List<PixelsCacheEntry> survivedIdxes = new ArrayList<>(survivedColumnChunks.size()*files.length);
         for (String file : files)
         {
             PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file);
-            // TODO: in case of block id was changed, the survived columnlets in this block can not survive in the cache update.
+            // TODO: in case of block id was changed, the survived column chunks in this block can not survive in the cache update.
             // This problem only affects the efficiency, but it is better to resolve it.
             long blockId = physicalReader.getCurrentBlockId();
-            for (String survivedColumnlet : survivedColumnlets)
+            for (String survivedColumnChunk : survivedColumnChunks)
             {
-                String[] columnletIdStr = survivedColumnlet.split(":");
-                short rowGroupId = Short.parseShort(columnletIdStr[0]);
-                short columnId = Short.parseShort(columnletIdStr[1]);
+                String[] columnChunkIdStr = survivedColumnChunk.split(":");
+                short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
+                short columnId = Short.parseShort(columnChunkIdStr[1]);
                 PixelsCacheIdx curCacheIdx = oldRadix.get(blockId, rowGroupId, columnId);
                 survivedIdxes.add(
                         new PixelsCacheEntry(new PixelsCacheKey(
@@ -507,11 +507,8 @@ public class PixelsCacheWriter
         oldRadix.removeAll();
         PixelsCacheUtil.setCacheStatus(cacheFile, PixelsCacheUtil.CacheStatus.OK.getId());
         PixelsCacheUtil.setCacheSize(cacheFile, newCacheOffset);
-        // save the survived columnlets into cachedColumnlets.
-        for (String survivedColumnlet : survivedColumnlets)
-        {
-            this.cachedColumnlets.add(survivedColumnlet);
-        }
+        // save the survived column chunks into cachedColumnChunks.
+        this.cachedColumnChunks.addAll(survivedColumnChunks);
         logger.debug("Cache compaction finished, index ends at offset: " + currentIndexOffset);
 
         /**
@@ -534,15 +531,15 @@ public class PixelsCacheWriter
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
-            for (int i = 0; i < newCachedColumnlets.size(); i++)
+            for (int i = 0; i < newCachedColumnChunks.size(); i++)
             {
-                String[] columnletIdStr = newCachedColumnlets.get(i).split(":");
-                short rowGroupId = Short.parseShort(columnletIdStr[0]);
-                short columnId = Short.parseShort(columnletIdStr[1]);
+                String[] columnChunkIdStr = newCachedColumnChunks.get(i).split(":");
+                short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
+                short columnId = Short.parseShort(columnChunkIdStr[1]);
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
-                physicalLen = (int) chunkIndex.getChunkLength();
+                physicalLen = chunkIndex.getChunkLength();
                 physicalOffset = chunkIndex.getChunkOffset();
                 if (newCacheOffset + physicalLen >= cacheFile.getSize())
                 {
@@ -555,13 +552,10 @@ public class PixelsCacheWriter
                     newIdxes.add(new PixelsCacheEntry(
                             new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
                             new PixelsCacheIdx(newCacheOffset, physicalLen)));
-                    // Do not put into radix, because it is using by other concurrent readers.
-                    //radix.put(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId,
-                    //        new PixelsCacheIdx(newCacheOffset, physicalLen));
-                    byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
-                    cacheFile.setBytes(newCacheOffset, columnlet);
+                    byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
+                    cacheFile.setBytes(newCacheOffset, columnChunk);
                     logger.debug(
-                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + newCacheOffset + ", length: " + columnlet.length);
+                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + newCacheOffset + ", length: " + columnChunk.length);
                     newCacheOffset += physicalLen;
                 }
             }
@@ -595,10 +589,10 @@ public class PixelsCacheWriter
         }
         // flush index
         flushIndex();
-        // save the new cached columnlets into cachedColumnlets.
-        for (String newColumnlet : newCachedColumnlets)
+        // save the new cached column chunks into cachedColumnChunks.
+        for (String newColumnChunk : newCachedColumnChunks)
         {
-            this.cachedColumnlets.add(newColumnlet);
+            this.cachedColumnChunks.add(newColumnChunk);
         }
         // update cache version
         PixelsCacheUtil.setIndexVersion(indexFile, version);
@@ -689,7 +683,7 @@ public class PixelsCacheWriter
     }
 
     /**
-     * Traverse radix to get all cached values, and put them into cachedColumnlets list.
+     * Traverse radix to get all cached values, and put them into cachedColumnChunks list.
      */
     private void traverseRadix(List<PixelsCacheIdx> cacheIdxes)
     {

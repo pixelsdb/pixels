@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2021-2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,14 +17,21 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon;
+package io.pixelsdb.pixels.common.task;
+
+import org.junit.Test;
 
 /**
  * @author hank
+ * @create 2023-07-26
  */
-public interface Server extends Runnable
+public class TestQueue
 {
-    public boolean isRunning();
-
-    public void shutdown();
+    @Test
+    public void testTaskConstruction()
+    {
+        Task task = new Task(123, "{\"id\":456}");
+        System.out.println(task.getTaskId());
+        System.out.println(task.getPayload());
+    }
 }

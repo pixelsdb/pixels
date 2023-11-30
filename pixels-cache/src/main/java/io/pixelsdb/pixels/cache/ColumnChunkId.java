@@ -25,7 +25,6 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * This is used to represent the cached column chunk inside a file.
- * In Pixels, columnlet = column chunk.
  *
  * @author guodong
  * @author hank

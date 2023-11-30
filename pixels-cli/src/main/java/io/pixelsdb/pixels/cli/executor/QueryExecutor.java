@@ -37,25 +37,20 @@ import static io.pixelsdb.pixels.cli.Main.executeSQL;
 public class QueryExecutor implements CommandExecutor
 {
     @Override
-    public void execute(Namespace ns, String command) throws Exception
+    public void execute(Namespace ns, String command)
     {
-        String type = ns.getString("type");
         String workload = ns.getString("workload");
         String log = ns.getString("log");
         String cache = ns.getString("cache");
 
-        if (type != null && workload != null && log != null)
+        if (workload != null && log != null)
         {
             ConfigFactory instance = ConfigFactory.Instance();
             Properties properties = new Properties();
             // String user = instance.getProperty("presto.user");
             String password = instance.getProperty("presto.password");
             String ssl = instance.getProperty("presto.ssl");
-            String jdbc = instance.getProperty("presto.pixels.jdbc.url");
-            if (type.equalsIgnoreCase("orc"))
-            {
-                jdbc = instance.getProperty("presto.orc.jdbc.url");
-            }
+            String jdbc = instance.getProperty("presto.jdbc.url");
 
             if (!password.equalsIgnoreCase("null"))
             {
@@ -76,7 +71,7 @@ public class QueryExecutor implements CommandExecutor
                     if (!line.contains("SELECT"))
                     {
                         defaultUser = line;
-                        properties.setProperty("user", type + "_" + defaultUser);
+                        properties.setProperty("user", "pixels-cli-" + defaultUser);
                     } else
                     {
                         if (cache != null)

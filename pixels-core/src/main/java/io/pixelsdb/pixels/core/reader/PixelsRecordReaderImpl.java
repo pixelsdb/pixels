@@ -593,7 +593,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                      */
                     // int rgId = rgIdx + RGStart;
                     int rgId = targetRGs[rgIdx];
-                    // TODO: not only columnlets in cacheOrder are cached.
+                    // TODO: not only the column chunks in cacheOrder are cached.
                     String cacheIdentifier = rgId + ":" + colId;
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier))
@@ -628,18 +628,18 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 short rgId = columnChunkId.rowGroupId;
                 short colId = columnChunkId.columnId;
 //                long getBegin = System.nanoTime();
-                ByteBuffer columnlet = cacheReader.get(blockId, rgId, colId, columnChunkId.direct);
-                memoryUsage += columnChunkId.direct ? 0 : columnlet.capacity();
+                ByteBuffer columnChunk = cacheReader.get(blockId, rgId, colId, columnChunkId.direct);
+                memoryUsage += columnChunkId.direct ? 0 : columnChunk.capacity();
 //                long getEnd = System.nanoTime();
-//                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
-                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
-                if (columnlet == null || columnlet.capacity() == 0)
+//                logger.debug("[cache get]: " + columnChunk.length + "," + (getEnd - getBegin));
+                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnChunk;
+                if (columnChunk == null || columnChunk.capacity() == 0)
                 {
                     /**
                      * Issue #67 (patch):
                      * Deal with null or empty cache chunk.
-                     * If cache read failed (e.g. cache read timeout), column chunk (columnlet) will be null.
-                     * In this condition, we have to read the column chunk (columnlet) from disk.
+                     * If cache read failed (e.g. cache read timeout), column chunk will be null.
+                     * In this condition, we have to read the column chunk from disk.
                      */
                     int rgIdx = rgId - RGStart;
                     PixelsProto.RowGroupIndex rowGroupIndex =
@@ -652,7 +652,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 }
                 else
                 {
-                    this.cacheReadBytes += columnlet.capacity();
+                    this.cacheReadBytes += columnChunk.capacity();
                 }
             }
         }

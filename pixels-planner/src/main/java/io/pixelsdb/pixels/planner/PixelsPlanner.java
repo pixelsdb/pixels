@@ -66,6 +66,7 @@ public class PixelsPlanner
     private static final StorageInfo IntermediateStorageInfo;
     private static final String IntermediateFolder;
     private static final int IntraWorkerParallelism;
+    private static final ExchangeMethod EnabledExchangeMethod;
 
     private final Table rootTable;
     private final ConfigFactory config;
@@ -94,6 +95,8 @@ public class PixelsPlanner
         IntermediateFolder = interStorageFolder;
         IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance()
                 .getProperty("executor.intra.worker.parallelism"));
+        EnabledExchangeMethod = ExchangeMethod.from(
+                ConfigFactory.Instance().getProperty("executor.exchange.method"));
     }
 
     /**
@@ -275,8 +278,11 @@ public class PixelsPlanner
             finalAggrInputsBuilder.add(finalAggrInput);
         }
 
-        AggregationOperator aggregationOperator = new AggregationOperator(aggregatedTable.getTableName(),
-                finalAggrInputsBuilder.build(), scanInputsBuilder.build());
+        AggregationOperator aggregationOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                new AggregationBatchOperator(aggregatedTable.getTableName(),
+                        finalAggrInputsBuilder.build(), scanInputsBuilder.build()) :
+                new AggregationStreamOperator(aggregatedTable.getTableName(),
+                        finalAggrInputsBuilder.build(), scanInputsBuilder.build());
         aggregationOperator.setChild(joinOperator);
 
         return aggregationOperator;
@@ -376,8 +382,11 @@ public class PixelsPlanner
                         joinInputs.add(complete);
                     }
 
-                    SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                            joinedTable.getTableName(), true, joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+                    SingleStageJoinOperator joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new SingleStageJoinBatchOperator(joinedTable.getTableName(), true,
+                                    joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN) :
+                            new SingleStageJoinStreamOperator(joinedTable.getTableName(), true,
+                                    joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                     // The right operator must be set as the large child.
                     joinOperator.setLargeChild(rightOperator);
                     return joinOperator;
@@ -415,11 +424,15 @@ public class PixelsPlanner
                         joinInputs.add(chainJoinInput);
                     }
 
-                    PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
-                            joinedTable.getTableName(),
-                            rightJoinOperator.getSmallPartitionInputs(),
-                            rightJoinOperator.getLargePartitionInputs(),
-                            joinInputs.build(), JoinAlgorithm.PARTITIONED_CHAIN);
+                    PartitionedJoinOperator joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new PartitionedJoinBatchOperator(joinedTable.getTableName(),
+                                    rightJoinOperator.getSmallPartitionInputs(),
+                                    rightJoinOperator.getLargePartitionInputs(),
+                                    joinInputs.build(), JoinAlgorithm.PARTITIONED_CHAIN) :
+                            new PartitionedJoinStreamOperator(joinedTable.getTableName(),
+                                    rightJoinOperator.getSmallPartitionInputs(),
+                                    rightJoinOperator.getLargePartitionInputs(),
+                                    joinInputs.build(), JoinAlgorithm.PARTITIONED_CHAIN);
                     // Set the children of the right operator as the children of the current join operator.
                     joinOperator.setSmallChild(rightJoinOperator.getSmallChild());
                     joinOperator.setLargeChild(rightJoinOperator.getLargeChild());
@@ -463,8 +476,11 @@ public class PixelsPlanner
             List<JoinInput> joinInputs = getPartitionedJoinInputs(
                     joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
                     null, null);
-            PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
-                    joinedTable.getTableName(), null, null, joinInputs, joinAlgo);
+            PartitionedJoinOperator joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                    new PartitionedJoinBatchOperator(joinedTable.getTableName(),
+                            null, null, joinInputs, joinAlgo) :
+                    new PartitionedJoinStreamOperator(joinedTable.getTableName(),
+                            null, null, joinInputs, joinAlgo);
 
             joinOperator.setSmallChild(leftOperator);
             joinOperator.setLargeChild(rightOperator);
@@ -577,8 +593,11 @@ public class PixelsPlanner
                 chainJoinInfos.add(chainJoinInfo);
                 broadcastChainJoinInput.setChainJoinInfos(chainJoinInfos);
 
-                return new SingleStageJoinOperator(joinedTable.getTableName(), false,
-                        broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN);
+                return EnabledExchangeMethod == ExchangeMethod.batch ?
+                        new SingleStageJoinBatchOperator(joinedTable.getTableName(), false,
+                                broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN) :
+                        new SingleStageJoinStreamOperator(joinedTable.getTableName(), false,
+                                broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN);
             }
         }
         else
@@ -688,8 +707,11 @@ public class PixelsPlanner
                         joinInputs.add(complete);
                     }
 
-                    return new SingleStageJoinOperator(joinedTable.getTableName(), true,
-                            joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+                    return EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new SingleStageJoinBatchOperator(joinedTable.getTableName(), true,
+                                    joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN) :
+                            new SingleStageJoinStreamOperator(joinedTable.getTableName(), true,
+                                    joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                 }
             }
             // get the leftInputSplits or leftPartitionedFiles from childJoinInputs.
@@ -847,8 +869,11 @@ public class PixelsPlanner
                     joinInputs.add(joinInput);
                 }
             }
-            SingleStageJoinOperator joinOperator =
-                    new SingleStageJoinOperator(joinedTable.getTableName(), true, joinInputs.build(), joinAlgo);
+            SingleStageJoinOperator joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                    new SingleStageJoinBatchOperator(joinedTable.getTableName(),
+                            true, joinInputs.build(), joinAlgo) :
+                    new SingleStageJoinStreamOperator(joinedTable.getTableName(),
+                            true, joinInputs.build(), joinAlgo);
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 joinOperator.setSmallChild(childOperator);
@@ -890,14 +915,20 @@ public class PixelsPlanner
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
-                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
-                            null, rightPartitionInputs, joinInputs, joinAlgo);
+                    joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new PartitionedJoinBatchOperator(joinedTable.getTableName(),
+                                    null, rightPartitionInputs, joinInputs, joinAlgo) :
+                            new PartitionedJoinStreamOperator(joinedTable.getTableName(),
+                                    null, rightPartitionInputs, joinInputs, joinAlgo);
                     joinOperator.setSmallChild(childOperator);
                 }
                 else
                 {
-                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
-                            rightPartitionInputs, null, joinInputs, joinAlgo);
+                    joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new PartitionedJoinBatchOperator(joinedTable.getTableName(),
+                                    rightPartitionInputs, null, joinInputs, joinAlgo) :
+                            new PartitionedJoinStreamOperator(joinedTable.getTableName(),
+                                    null, rightPartitionInputs, joinInputs, joinAlgo);
                     joinOperator.setLargeChild(childOperator);
                 }
             }
@@ -926,13 +957,19 @@ public class PixelsPlanner
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
-                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
-                            leftPartitionInputs, rightPartitionInputs, joinInputs, joinAlgo);
+                    joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new PartitionedJoinBatchOperator(joinedTable.getTableName(),
+                                    leftPartitionInputs, rightPartitionInputs, joinInputs, joinAlgo) :
+                            new PartitionedJoinStreamOperator(joinedTable.getTableName(),
+                                    leftPartitionInputs, rightPartitionInputs, joinInputs, joinAlgo);
                 }
                 else
                 {
-                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
-                            rightPartitionInputs, leftPartitionInputs, joinInputs, joinAlgo);
+                    joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new PartitionedJoinBatchOperator(joinedTable.getTableName(),
+                                    rightPartitionInputs, leftPartitionInputs, joinInputs, joinAlgo) :
+                            new PartitionedJoinStreamOperator(joinedTable.getTableName(),
+                                    rightPartitionInputs, leftPartitionInputs, joinInputs, joinAlgo);
                 }
             }
             return joinOperator;

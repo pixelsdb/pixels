@@ -283,7 +283,7 @@ public class StringColumnReader extends ColumnReader
                         else
                         {
                             int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
-                            columnVector.setId(i + vectorIndex, originId);
+                            columnVector.setId(j + vectorIndex, originId);
                         }
                     }
                     // update variables
