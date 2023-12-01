@@ -1,10 +1,13 @@
 #!/bin/bash
 
-# author: Tiannan Sha
+# author: Tiannan Sha, Haoqiong Bian
 # This script keep checking the state of the instance, if autoscaling group decides to terminate this instance
 # (due to e.g. rebalance recomendation (high spot interruption risk) or scaling), a termination hook will be
 # trigerred to gracefully shutdown trino.
 # usage: auto start executing this scrip when the instance is boot.
+
+pixels_asg_name=Pixels-Auto-Scaling-Group
+pixels_region=us-east-2
 
 function get_target_state {
     echo $(curl -s http://169.254.169.254/latest/meta-data/autoscaling/target-lifecycle-state)
@@ -16,16 +19,14 @@ function get_rebalance_recommendation_httpcode {
 
 function complete_lifecycle_action {
     instance_id=$(get_instance_id)
-    group_name='ASG-for-spot-vms'
-    region='us-east-2'
     hook_name='lifecycle_hook_for_gracefully_shutdown'
     token=`curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
     echo $instance_id
-    echo $region
+    echo pixels_region
     echo $(aws autoscaling complete-lifecycle-action \
       --lifecycle-token $token \
       --lifecycle-hook-name $hook_name \
-      --auto-scaling-group-name $group_name \
+      --auto-scaling-group-name $pixels_asg_name \
       --lifecycle-action-result CONTINUE)
 }
 
