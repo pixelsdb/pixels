@@ -66,4 +66,6 @@ In the next page, keep everything as default and click `Next`.
 
 In `Group size`, set the desired capacity to 0 instance.
 In `Scaling`, set the min and max capacity to 0 and the max number of instances your account can create (e.g., 100), respectively.
-In `Instance maintenance policy`, select `No policy`. Click `Next`.
+And select `No scaling policies` for `Automatic scaling` as we do not use `target tracking policy` in our auto-scaling group.
+In `Instance maintenance policy`, select `No policy`. Click `Next`. Add notifications if needed and click `Next`.
+Add tags if needed and click `Next`. Review the settings and click `Create Auto Scaling group`.
