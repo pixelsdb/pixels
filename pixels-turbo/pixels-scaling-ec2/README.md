@@ -102,7 +102,7 @@ as follows.
 CloudWatch alarm, and select take action `Remove 50 percent of group when 1 >= query concurrency > -Infinity` and `Remove instances in increments of at least 1 capacity units`.
 Click `Create` to create this scaling policy.
 
-(1) The scaling-out policy. Fill in scaling policy name `Pixels-MPP-Scaling-Out-Policy`, select `Step scaling` as policy type, select `Pixels-Query-Concurrency-Upper-Bound` as the
+(2) The scaling-out policy. Fill in scaling policy name `Pixels-MPP-Scaling-Out-Policy`, select `Step scaling` as policy type, select `Pixels-Query-Concurrency-Upper-Bound` as the
 CloudWatch alarm, and select take action `Add 100 percent of group when 3 <= query concurrency < +Infinity`, `Add capacity units in increments of at least 1 capacity units`, 
 and `Instance warmup 90 seconds`. Click `Create` to create this scaling policy.
 
