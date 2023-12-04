@@ -257,8 +257,8 @@ If Pixels Turbo is enabled, we also need to set the following settings in `PIXEL
 executor.input.storage.scheme=s3
 executor.intermediate.storage.scheme=s3
 executor.intermediate.folder=/pixels-turbo/intermediate/
-executor.output.storage.scheme=s3
-executor.output.folder=/pixels-turbo/output/
+executor.output.storage.scheme=output-storage-scheme-dummy
+executor.output.folder=output-folder-dummy
 ```
 Those storage schemes are used to access the input data (the storage scheme of the base tables defined by 
 `CREATE TABLE` statements), the intermediate data (intermediate results generated during query execution), and the 
@@ -274,7 +274,7 @@ redis.endpoint=localhost:6379
 redis.access.key=redis-user-dummy
 redis.secret.key=redis-password-dummy
 ```
-Ensure that they are valid so that the serverless workers can access the corresponding storage systems.
+Ensure they are valid so that the serverless workers can access the corresponding storage systems.
 Especially, the `executor.input.storage.scheme` must be consistent with the storage scheme of the base
 tables. This is checked during query-planning for Pixels Turbo.
 In addition, the `executor.intermediate.folder` and `executor.output.folder` are the base path where the intermediate
