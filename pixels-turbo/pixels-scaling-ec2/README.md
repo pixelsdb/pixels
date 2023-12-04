@@ -25,7 +25,10 @@ $PIXELS_HOME/bin/start-datanode.sh -daemon
 ```
 For Trino, set `coordinator=false` in `config.properties`, thus Trino will be started as a worker.
 
-Select this instance, click `Actions`-->`Image and templates`-->`Create Image`, fill in the image name (e.g., `Pixels-Worker-AMI`) and description, 
+Then, copy `termination-handler.sh` into `/root/` of this instance and give its `rwx` permissions to the root user.
+Set valid values for `pixels_asg_name` (`Pixels-ASG` in this document) and `pixels_aws_region`.
+
+After that, select this instance, click `Actions`-->`Image and templates`-->`Create Image`, fill in the image name (e.g., `Pixels-Worker-AMI`) and description, 
 select `Tag image and snapshots together` and then click `Create Image`.
 
 Go to `EC2`-->`Images`-->`AMIs`, you can see the created OS image. Wait for its status becoming `Available`.

@@ -6,8 +6,8 @@
 # trigerred to gracefully shutdown trino.
 # usage: auto start executing this scrip when the instance is boot.
 
-pixels_asg_name=Pixels-Auto-Scaling-Group
-pixels_region=us-east-2
+pixels_asg_name=Pixels-ASG
+pixels_aws_region=us-east-2
 
 function get_target_state {
     echo $(curl -s http://169.254.169.254/latest/meta-data/autoscaling/target-lifecycle-state)
@@ -22,7 +22,7 @@ function complete_lifecycle_action {
     hook_name='lifecycle_hook_for_gracefully_shutdown'
     token=`curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
     echo $instance_id
-    echo pixels_region
+    echo $pixels_aws_region
     echo $(aws autoscaling complete-lifecycle-action \
       --lifecycle-token $token \
       --lifecycle-hook-name $hook_name \
