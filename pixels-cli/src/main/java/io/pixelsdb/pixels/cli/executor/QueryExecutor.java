@@ -57,6 +57,12 @@ public class QueryExecutor implements CommandExecutor
                 properties.setProperty("password", password);
             }
             properties.setProperty("SSL", ssl);
+            boolean orderedEnabled = Boolean.parseBoolean(instance.getProperty("executor.ordered.layout.enabled"));
+            boolean compactEnabled = Boolean.parseBoolean(instance.getProperty("executor.compact.layout.enabled"));
+            StringBuilder builder = new StringBuilder()
+                    .append("pixels.ordered_path_enabled:").append(orderedEnabled).append(";")
+                    .append("pixels.compact_path_enabled:").append(compactEnabled);
+            properties.setProperty("sessionProperties", builder.toString());
 
             try (BufferedReader workloadReader = new BufferedReader(new FileReader(workload));
                  BufferedWriter timeWriter = new BufferedWriter(new FileWriter(log)))
@@ -68,7 +74,7 @@ public class QueryExecutor implements CommandExecutor
                 String defaultUser = null;
                 while ((line = workloadReader.readLine()) != null)
                 {
-                    if (!line.contains("SELECT"))
+                    if (!line.contains("SELECT") && !line.contains("select"))
                     {
                         defaultUser = line;
                         properties.setProperty("user", "pixels-cli-" + defaultUser);
