@@ -59,7 +59,7 @@ import static java.util.Objects.requireNonNull;
  * COMPACT -s pixels -t test_105 -n yes -c 8
  * </p>
  * <p>
- * STAT -s tpch -t region -o false -c true
+ * STAT -s tpch -t region
  * </p>
  */
 public class Main
@@ -268,10 +268,6 @@ public class Main
                         .help("specify the schema name");
                 argumentParser.addArgument("-t", "--table").required(true)
                         .help("specify the table name");
-                argumentParser.addArgument("-o", "--ordered_enabled").setDefault(false)
-                        .help("specify whether the ordered path is enabled");
-                argumentParser.addArgument("-c", "--compact_enabled").setDefault(true)
-                        .help("specify whether the compact path is enabled");
 
                 Namespace ns = null;
                 try
