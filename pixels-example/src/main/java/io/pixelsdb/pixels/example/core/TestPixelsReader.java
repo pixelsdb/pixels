@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.example.core;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -38,12 +39,16 @@ public class TestPixelsReader
 {
     public static void main(String[] args)
     {
-        String currentPath = "hdfs://localhost:9000/pixels/pixels/test_105/v_1_order/20190111212837_0.pxl";
+        // Note you may need to restart intellij to let it pick up the updated environment variable value
+        // example path: s3://bucket-name/test-file.pxl
+        String currentPath = System.getenv("PIXELS_WRITE_READ_TO_S3_TEST_FILE");
+        System.out.println(currentPath);
         try {
-            Storage storage = StorageFactory.Instance().getStorage("hdfs");
+            Storage storage = StorageFactory.Instance().getStorage("s3");
             PixelsReader reader = PixelsReaderImpl.newBuilder()
                     .setStorage(storage)
                     .setPath(currentPath)
+                    .setPixelsFooterCache(new PixelsFooterCache())
                     .build();
 
             TypeDescription schema = reader.getFileSchema();
@@ -58,26 +63,26 @@ public class TestPixelsReader
             option.tolerantSchemaEvolution(true);
             option.includeCols(cols);
             PixelsRecordReader recordReader = reader.read(option);
-            System.out.println(recordReader.getCompletedRows());
-            System.out.println(reader.getRowGroupInfo(0).getNumberOfRows());
+            System.out.println("recordReader.getCompletedRows():" + recordReader.getCompletedRows());
+            System.out.println("reader.getRowGroupInfo(0).getNumberOfRows():" + reader.getRowGroupInfo(0).getNumberOfRows());
             int batchSize = 10000;
             VectorizedRowBatch rowBatch;
             int len = 0;
-            int num = 0;
-            int row = 0;
+            int numRows = 0;
+            int numBatches = 0;
             while (true) {
                 rowBatch = recordReader.readBatch(batchSize);
-                row++;
+                numBatches++;
                 String result = rowBatch.toString();
                 len += result.length();
-                System.out.println("loop:" + row + "," + rowBatch.size);
+                System.out.println("loop:" + numBatches + ", rowBatchSize:" + rowBatch.size);
                 if (rowBatch.endOfFile) {
-                    num += rowBatch.size;
+                    numRows += rowBatch.size;
                     break;
                 }
-                num += rowBatch.size;
+                numRows += rowBatch.size;
             }
-            System.out.println(row + "," + num);
+            System.out.println("numBatches:" + numBatches + ", numRows:" + numRows);
             reader.close();
         } catch (IOException e) {
             System.out.println("Err path: " + currentPath.toString());

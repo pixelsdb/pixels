@@ -39,8 +39,8 @@ public class TestPixelsWriter
 {
     public static void main(String[] args) throws IOException
     {
-        String pixelsFile = "hdfs://localhost:9000//pixels/pixels/test_105/v_0_order/.pxl";
-        Storage storage = StorageFactory.Instance().getStorage("hdfs");
+        String pixelsFile = System.getenv("PIXELS_WRITE_READ_TO_S3_TEST_FILE");
+        Storage storage = StorageFactory.Instance().getStorage("s3");
 
         String schemaStr = "struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>";
 
@@ -49,10 +49,10 @@ public class TestPixelsWriter
             TypeDescription schema = TypeDescription.fromString(schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
-            DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // float
+            FloatColumnVector b = (FloatColumnVector) rowBatch.cols[1];          // float
             DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
             TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
-            LongColumnVector e = (LongColumnVector) rowBatch.cols[4];              // boolean
+            ByteColumnVector e = (ByteColumnVector) rowBatch.cols[4];              // boolean
             BinaryColumnVector z = (BinaryColumnVector) rowBatch.cols[5];            // string
 
             PixelsWriter pixelsWriter =
@@ -82,7 +82,7 @@ public class TestPixelsWriter
                 c.isNull[row] = false;
                 d.set(row, timestamp);
                 d.isNull[row] = false;
-                e.vector[row] = i > 25000 ? 1 : 0;
+                e.vector[row] = (byte) (i > 25000 ? 1 : 0);
                 e.isNull[row] = false;
                 z.setVal(row, String.valueOf(i).getBytes());
                 z.isNull[row] = false;
@@ -96,6 +96,7 @@ public class TestPixelsWriter
             if (rowBatch.size != 0)
             {
                 pixelsWriter.addRowBatch(rowBatch);
+                System.out.println("A rowBatch of size " + rowBatch.size + " has been written to " + pixelsFile);
                 rowBatch.reset();
             }
 
