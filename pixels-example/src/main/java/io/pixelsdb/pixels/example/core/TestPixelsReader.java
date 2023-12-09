@@ -53,6 +53,7 @@ public class TestPixelsReader
 
             TypeDescription schema = reader.getFileSchema();
             List<String> fieldNames = schema.getFieldNames();
+            System.out.println("fieldNames: " + fieldNames);
             String[] cols = new String[fieldNames.size()];
             for (int i = 0; i < fieldNames.size(); i++) {
                 cols[i] = fieldNames.get(i);
@@ -72,6 +73,7 @@ public class TestPixelsReader
             int numBatches = 0;
             while (true) {
                 rowBatch = recordReader.readBatch(batchSize);
+                System.out.println("rowBatch: " + rowBatch);
                 numBatches++;
                 String result = rowBatch.toString();
                 len += result.length();
