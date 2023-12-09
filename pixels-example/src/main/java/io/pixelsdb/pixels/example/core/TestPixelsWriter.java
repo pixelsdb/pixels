@@ -39,6 +39,8 @@ public class TestPixelsWriter
 {
     public static void main(String[] args) throws IOException
     {
+        // Note you may need to restart intellij to let it pick up the updated environment variable value
+        // example path: s3://bucket-name/test-file.pxl
         String pixelsFile = System.getenv("PIXELS_WRITE_READ_TO_S3_TEST_FILE");
         Storage storage = StorageFactory.Instance().getStorage("s3");
 

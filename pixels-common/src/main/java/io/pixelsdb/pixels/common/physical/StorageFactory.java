@@ -168,8 +168,7 @@ public class StorageFactory
         }
         catch (RuntimeException re)
         {
-            throw new IOException("Invalid s" +
-                    "torage scheme or path: " + schemeOrPath, re);
+            throw new IOException("Invalid storage scheme or path: " + schemeOrPath, re);
         }
     }
 
