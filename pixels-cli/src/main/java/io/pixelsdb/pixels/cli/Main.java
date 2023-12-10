@@ -155,12 +155,16 @@ public class Main
                 ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels QUERY")
                         .defaultHelp(true);
 
+                argumentParser.addArgument("-r", "--repeat").required(true)
+                        .help("specify whether run the queries in the workload file repeatedly");
                 argumentParser.addArgument("-w", "--workload").required(true)
                         .help("specify the path of workload file");
                 argumentParser.addArgument("-l", "--log").required(true)
                         .help("specify the path of query log files");
-                argumentParser.addArgument("-c", "--cache")
+                argumentParser.addArgument("-c", "--cache").required(false)
                         .help("specify the command of dropping cache");
+
+
 
                 Namespace ns = null;
                 try
