@@ -41,7 +41,7 @@ public class QueryExecutor implements CommandExecutor
     {
         String workload = ns.getString("workload");
         String log = ns.getString("log");
-        String cache = ns.getString("cache");
+        String cache = ns.getString("drop_cache");
 
         if (workload != null && log != null)
         {
