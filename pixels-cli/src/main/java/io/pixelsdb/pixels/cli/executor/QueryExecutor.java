@@ -42,8 +42,9 @@ public class QueryExecutor implements CommandExecutor
         String workload = ns.getString("workload");
         String log = ns.getString("log");
         String cache = ns.getString("drop_cache");
-        Boolean rateLimited = ns.getBoolean("rate_limited");
-        int queryPerMinute = ns.getInt("query_per_minute");
+        Boolean rateLimited = Boolean.parseBoolean(ns.getString("rate_limited"));
+        String qpmStr = ns.getString("query_per_minute");
+        int queryPerMinute = qpmStr != null ? Integer.parseInt(qpmStr) : 0;
         ExecutorService threadPool = null;
         if (rateLimited)
         {
