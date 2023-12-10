@@ -133,6 +133,7 @@ public class QueryExecutor implements CommandExecutor
 
                             System.out.println(i + "," + cost + "ms");
                             i++;
+                            Thread.sleep(1000); // wait for 1 second before submitting the next query
                         }
                     }
                 }
