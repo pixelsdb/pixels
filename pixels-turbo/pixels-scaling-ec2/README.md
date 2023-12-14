@@ -61,12 +61,12 @@ cloud.watch.metrics.dimension.value=01
 Go to `CloudWatch`-->`Alarms`-->`All Alarms`, create two alarms as follows.
 
 (1) The lower bound alarm. Select `Pixels/cluster/01` as the metric, then select `1 minute` as `Period` and 
-`Static, Lower than 1` as `Conditions`. In `additional configuration`, set `1 out of 1` for `datapoints to alarm` and select
+`Static, Lower/Equal than 0.75` as `Conditions`. In `additional configuration`, set `1 out of 1` for `datapoints to alarm` and select
 `Treat missing data as ignore (maintain the alarm state)` for `Missing data treatment`. In the next page, set notification if needed
 and keep other setting as default. In the next page, fill in the alarm name `Pixels-Query-Concurrency-Lower-Bound`, review the settings
 in the next page and click `Create alarm`.
 
-(2) The upper bound alarm. Select `Pixels/cluster/01` as the metric, then select `10 seconds` as `Period` and
+(2) The upper bound alarm. Select `Pixels/cluster/01` as the metric, then select `30 seconds` as `Period` and
 `Static, Greater/Equal than 3` as `Conditions`. The other settings are the same as above, except the alarm name should be
 `Pixels-Query-Concurrency-Upper-Bound`.
 
@@ -99,12 +99,12 @@ Click and enter `Pixels-ASG` in `EC2`-->`Auto Scaling`-->`Auto Scaling Groups`, 
 as follows.
 
 (1) The scaling-in policy. Fill in scaling policy name `Pixels-MPP-Scaling-In-Policy`, select `Step scaling` as policy type, select `Pixels-Query-Concurrency-Lower-Bound` as the
-CloudWatch alarm, and select take action `Remove 50 percent of group when 1 >= query concurrency > -Infinity` and `Remove instances in increments of at least 1 capacity units`.
+CloudWatch alarm, and select take action `Remove 50 percent of group when 0.75 >= query concurrency > -Infinity` and `Remove instances in increments of at least 1 capacity units`.
 Click `Create` to create this scaling policy.
 
 (2) The scaling-out policy. Fill in scaling policy name `Pixels-MPP-Scaling-Out-Policy`, select `Step scaling` as policy type, select `Pixels-Query-Concurrency-Upper-Bound` as the
 CloudWatch alarm, and select take action `Add 100 percent of group when 3 <= query concurrency < +Infinity`, `Add capacity units in increments of at least 1 capacity units`, 
-and `Instance warmup 90 seconds`. Click `Create` to create this scaling policy.
+and `Instance warmup 120 seconds`. Click `Create` to create this scaling policy.
 
 Now, the auto-scaling group has been set up for Pixels. You can execute the aforementioned unit test `testSingle` to update the query concurrency metric
 in CloudWatch, and it will trigger the scaling event to create or release EC2 instances for the MPP cluster if the metric value is beyond the range (1, 3).
