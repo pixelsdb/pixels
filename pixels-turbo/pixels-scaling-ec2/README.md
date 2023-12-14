@@ -107,4 +107,4 @@ CloudWatch alarm, and select take action `Add 100 percent of group when 3 <= que
 and `Instance warmup 120 seconds`. Click `Create` to create this scaling policy.
 
 Now, the auto-scaling group has been set up for Pixels. You can execute the aforementioned unit test `testSingle` to update the query concurrency metric
-in CloudWatch, and it will trigger the scaling event to create or release EC2 instances for the MPP cluster if the metric value is beyond the range (1, 3).
+in CloudWatch, and it will trigger the scaling event to create or release EC2 instances for the MPP cluster if the metric value is beyond the range (0.75, 3).
