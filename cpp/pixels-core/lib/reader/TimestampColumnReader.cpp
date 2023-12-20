@@ -22,7 +22,13 @@ void TimestampColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::prot
     if(offset == 0) {
         decoder = std::make_shared<RunLenIntDecoder>(input, true);
         ColumnReader::elementIndex = 0;
+        isNullOffset = chunkIndex.isnulloffset();
     }
+
+    int pixelId = elementIndex / pixelStride;
+    bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+    setValid(input, pixelStride, vector, pixelId, hasNull);
+
     if(encoding.kind() == pixels::proto::ColumnEncoding_Kind_RUNLENGTH) {
         for (int i = 0; i < size; i++) {
             if (elementIndex % pixelStride == 0) {
