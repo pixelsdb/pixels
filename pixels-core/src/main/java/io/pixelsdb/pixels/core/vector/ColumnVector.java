@@ -161,6 +161,8 @@ public abstract class ColumnVector implements AutoCloseable
         throw new UnsupportedOperationException("Adding timestamp is not supported");
     }
 
+    public void add(double[] vector) {throw new UnsupportedOperationException("Adding vector is not supported"); }
+
     public void addNull()
     {
         if (writeIndex >= getLength())

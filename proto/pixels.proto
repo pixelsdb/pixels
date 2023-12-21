@@ -110,6 +110,7 @@ message Type {
         VARCHAR = 16;
         CHAR = 17;
         TIME = 18;
+        VECTOR = 19;
     }
     optional Kind kind = 1;
     optional string name = 2;

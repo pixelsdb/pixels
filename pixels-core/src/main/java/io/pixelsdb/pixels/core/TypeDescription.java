@@ -182,7 +182,8 @@ public final class TypeDescription
         BINARY(true, byte[].class, byte[].class, "binary"),
         VARCHAR(true, byte[].class, byte[].class,"varchar"),
         CHAR(true, byte[].class, byte[].class,"char"),
-        STRUCT(false, Class.class, Class.class, "struct");
+        STRUCT(false, Class.class, Class.class, "struct"),
+        VECTOR(false, double[].class, double[].class, "vector");
 
         /**
          * Ensure that all elements in names are in <b>lowercase</b>.
@@ -338,6 +339,12 @@ public final class TypeDescription
         return new TypeDescription(Category.STRUCT);
     }
 
+    public static TypeDescription createVector()
+    {
+        // todo we will worry about enforcing the dimensiong contraint later
+        return new TypeDescription(Category.VECTOR);
+    }
+
     public static TypeDescription createSchema(List<PixelsProto.Type> types)
     {
         TypeDescription schema = TypeDescription.createStruct();
@@ -401,6 +408,10 @@ public final class TypeDescription
                 case BINARY:
                     fieldType = TypeDescription.createBinary(
                             type.getMaximumLength());
+                    break;
+                    //todo add vector here
+                case VECTOR:
+                    fieldType = TypeDescription.createVector();
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown type: " +
