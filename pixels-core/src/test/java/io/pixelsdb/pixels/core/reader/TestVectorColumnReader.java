@@ -13,6 +13,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 
 public class TestVectorColumnReader
 {
@@ -52,7 +53,7 @@ public class TestVectorColumnReader
             }
             else
             {
-                assert vectorColumnVector1.vector[i] == vectorColumnVector.vector[i];
+                assert Arrays.equals(vectorColumnVector1.vector[i], vectorColumnVector.vector[i]);
             }
         }
     }
@@ -62,7 +63,7 @@ public class TestVectorColumnReader
     {
         int length = 3;
         PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .pixelStride(10).byteOrder(ByteOrder.BIG_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         DoubleColumnWriter columnWriter = new DoubleColumnWriter(
                 TypeDescription.createDouble(), writerOption);
@@ -91,4 +92,16 @@ public class TestVectorColumnReader
             }
         }
     }
+
+    @Test
+    public void testBuffer()
+    {
+        byte[] byteArr = new byte[24];
+        ByteBuffer bb = ByteBuffer.wrap(byteArr);
+        bb.putDouble(1.0);
+        bb.putDouble(0.0);
+        bb.putDouble(1.0);
+        System.out.println(bb.getDouble(0));
+    }
+
 }

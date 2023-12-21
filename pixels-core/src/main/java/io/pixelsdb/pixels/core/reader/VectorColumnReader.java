@@ -49,7 +49,7 @@ public class VectorColumnReader extends ColumnReader {
         // initialize
         {
             this.inputBuffer = input;
-            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            //this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputIndex = inputBuffer.position();
             // isNull
             isNullOffset = inputIndex + chunkIndex.getIsNullOffset();
