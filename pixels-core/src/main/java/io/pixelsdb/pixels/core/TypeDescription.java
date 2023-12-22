@@ -71,6 +71,14 @@ public final class TypeDescription
      */
     public static final int DEFAULT_VARCHAR_OR_BINARY_LENGTH = 65535;
     /**
+     * The default dimension of vector
+     */
+    public static final int DEFAULT_VECTOR_DIMENSION = 256;
+    /**
+     * the supported maximum dimension
+     */
+    public static final int MAXIMUM_VECTOR_DIMENSION = 4096;
+    /**
      * It is a standard that the default length of char is 1.
      */
     public static final int DEFAULT_CHAR_LENGTH = 1;
@@ -339,10 +347,11 @@ public final class TypeDescription
         return new TypeDescription(Category.STRUCT);
     }
 
-    public static TypeDescription createVector()
+    public static TypeDescription createVector(int dimension)
     {
-        // todo we will worry about enforcing the dimensiong contraint later
-        return new TypeDescription(Category.VECTOR);
+        TypeDescription type = new TypeDescription(Category.VECTOR);
+        type.withDimension(dimension);
+        return type;
     }
 
     public static TypeDescription createSchema(List<PixelsProto.Type> types)
@@ -409,9 +418,10 @@ public final class TypeDescription
                     fieldType = TypeDescription.createBinary(
                             type.getMaximumLength());
                     break;
-                    //todo add vector here
                 case VECTOR:
-                    fieldType = TypeDescription.createVector();
+                    fieldType = TypeDescription.createVector(
+                            type.getDimension()
+                    );
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown type: " +
@@ -828,6 +838,9 @@ public final class TypeDescription
                     tmpType.setKind(PixelsProto.Type.Kind.TIME);
                     tmpType.setPrecision(child.getPrecision());
                     break;
+                case VECTOR:
+                    tmpType.setKind(PixelsProto.Type.Kind.VECTOR);
+                    tmpType.setDimension(child.getDimension());
                 default:
                     throw new IllegalArgumentException("Unknown category: " +
                             schema.getCategory());
@@ -929,6 +942,29 @@ public final class TypeDescription
             throw new IllegalArgumentException("maxLength " + maxLength + " is not positive");
         }
         this.maxLength = maxLength;
+        return this;
+    }
+
+    /**
+     * Set the dimension for the column of vector type
+     *
+     * @param dimension the dimension of the vector column
+     * @return this
+     */
+    public TypeDescription withDimension(int dimension)
+    {
+        if (category != Category.VECTOR)
+        {
+            throw new IllegalArgumentException("dimension is only allowed on vector type but not on " + category.primaryName);
+        }
+        if (dimension < 1)
+        {
+            throw new IllegalArgumentException("dimension " + dimension + " is not positive");
+        }
+        if (dimension > MAXIMUM_VECTOR_DIMENSION) {
+            throw new IllegalArgumentException("dimension" + dimension + "currently supported maximum dimension " + MAXIMUM_VECTOR_DIMENSION);
+        }
+        this.dimension = dimension;
         return this;
     }
 
@@ -1197,6 +1233,16 @@ public final class TypeDescription
     }
 
     /**
+     * Get the dimension of the vector type
+     *
+     * @return the dimension of the vector type
+     */
+    public int getDimension()
+    {
+        return dimension;
+    }
+
+    /**
      * Get the precision of the decimal type.
      *
      * @return the number of digits for the precision.
@@ -1286,6 +1332,7 @@ public final class TypeDescription
     private int maxLength = DEFAULT_VARCHAR_OR_BINARY_LENGTH;
     private int precision = DEFAULT_SHORT_DECIMAL_PRECISION;
     private int scale = DEFAULT_DECIMAL_SCALE;
+    private int dimension = DEFAULT_VECTOR_DIMENSION;
 
     static void printFieldName(StringBuilder buffer, String name)
     {

@@ -10,10 +10,10 @@ import static java.util.Objects.requireNonNull;
 
 public class VectorColumnVector extends ColumnVector
 {
-    // a vector of vectors. todo why in double column vector we use long[]? better performance?
+    // a vector of vectors. todo maybe worth try using long instead for better cpu performance because  some cpus don't handle float computations well
     public double[][] vector;
 
-    // dimension of vectors in this column
+    // dimension of vectors in this column todo enforce this in schema
     public int dimension;
 
     public VectorColumnVector(int len, int dimension) {

@@ -118,6 +118,7 @@ message Type {
     optional uint32 maximumLength = 4;
     optional uint32 precision = 5;
     optional uint32 scale = 6;
+    optional uint32 dimension = 7;
 }
 
 // The information about a data hash partition.

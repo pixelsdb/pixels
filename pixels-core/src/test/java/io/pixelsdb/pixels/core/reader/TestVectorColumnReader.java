@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Random;
 
 public class TestVectorColumnReader
 {
@@ -23,7 +24,7 @@ public class TestVectorColumnReader
         // build the vector
         int length = 3;
         int dimension = 1;
-        VectorColumnVector vectorColumnVector = new VectorColumnVector(length,dimension);
+        VectorColumnVector vectorColumnVector = new VectorColumnVector(length, dimension);
         vectorColumnVector.add(new double[]{1});
         vectorColumnVector.add(new double[]{0});
         vectorColumnVector.add(new double[]{1});
@@ -33,7 +34,7 @@ public class TestVectorColumnReader
                 .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         VectorColumnWriter columnWriter = new VectorColumnWriter(
-                TypeDescription.createVector(), writerOption);
+                TypeDescription.createVector(dimension), writerOption);
         columnWriter.write(vectorColumnVector, length);
         columnWriter.flush();
         byte[] content = columnWriter.getColumnChunkContent();
@@ -41,7 +42,7 @@ public class TestVectorColumnReader
         // build column reader and read
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        VectorColumnReader columnReader = new VectorColumnReader(TypeDescription.createVector(), dimension);
+        VectorColumnReader columnReader = new VectorColumnReader(TypeDescription.createVector(dimension));
         VectorColumnVector vectorColumnVector1 = new VectorColumnVector(length, dimension);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, length,
                 10, 0, vectorColumnVector1, chunkIndex);
@@ -59,49 +60,54 @@ public class TestVectorColumnReader
     }
 
     @Test
-    public void testDouble() throws IOException
+    public void testLargerVectors() throws IOException
     {
-        int length = 3;
+        // build the vector column vector
+        int length = 1000;
+        int dimension = 1024;
+        VectorColumnVector vectorColumnVector = new VectorColumnVector(length, dimension);
+        for (int i=0; i<length; i++) {
+            vectorColumnVector.add(getRandomVector(dimension));
+        }
+
+        // build column writer and write
         PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(10).byteOrder(ByteOrder.BIG_ENDIAN)
+                .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        DoubleColumnWriter columnWriter = new DoubleColumnWriter(
-                TypeDescription.createDouble(), writerOption);
-        DoubleColumnVector doubleColumnVector = new DoubleColumnVector(length);
-        doubleColumnVector.add(1.0);
-        doubleColumnVector.add(0.0);
-        doubleColumnVector.add(1.0);
-        columnWriter.write(doubleColumnVector, length);
+        VectorColumnWriter columnWriter = new VectorColumnWriter(
+                TypeDescription.createVector(dimension), writerOption);
+        columnWriter.write(vectorColumnVector, length);
         columnWriter.flush();
         byte[] content = columnWriter.getColumnChunkContent();
+
+        // build column reader and read
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        DoubleColumnReader columnReader = new DoubleColumnReader(TypeDescription.createDouble());
-        DoubleColumnVector doubleColumnVector1 = new DoubleColumnVector(length);
+        VectorColumnReader columnReader = new VectorColumnReader(TypeDescription.createVector(dimension));
+        VectorColumnVector vectorColumnVector1 = new VectorColumnVector(length, dimension);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, length,
-                10, 0, doubleColumnVector1, chunkIndex);
+                10, 0, vectorColumnVector1, chunkIndex);
         for (int i = 0; i < length; ++i)
         {
-            if (!doubleColumnVector1.noNulls && doubleColumnVector1.isNull[i])
+            if (!vectorColumnVector1.noNulls && vectorColumnVector1.isNull[i])
             {
-                assert !doubleColumnVector.noNulls && doubleColumnVector.isNull[i];
+                assert !vectorColumnVector.noNulls && vectorColumnVector.isNull[i];
             }
             else
             {
-                assert doubleColumnVector1.vector[i] == doubleColumnVector.vector[i];
+                assert Arrays.equals(vectorColumnVector1.vector[i], vectorColumnVector.vector[i]);
             }
         }
     }
 
-    @Test
-    public void testBuffer()
+    public static double[] getRandomVector(int dimension)
     {
-        byte[] byteArr = new byte[24];
-        ByteBuffer bb = ByteBuffer.wrap(byteArr);
-        bb.putDouble(1.0);
-        bb.putDouble(0.0);
-        bb.putDouble(1.0);
-        System.out.println(bb.getDouble(0));
+        Random random = new Random();
+        double[] randomVec = new double[dimension];
+        for (int i=0; i<dimension; i++) {
+            randomVec[i] = random.nextDouble();
+        }
+        return randomVec;
     }
 
 }

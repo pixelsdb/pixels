@@ -22,7 +22,13 @@ public class VectorColumnWriter extends BaseColumnWriter{
         return writerOption.isNullsPadding();
     }
 
-// todo need to write the dimension of the vector
+    /**
+     * Write a vector column vector to the output stream. The dimension of the vector should be enforced by the schema.
+     * @param vector vector
+     * @param size   size of vector
+     * @return
+     * @throws IOException
+     */
     @Override
     public int write(ColumnVector vector, int size) throws IOException {
         VectorColumnVector columnVector = (VectorColumnVector) vector;
@@ -60,10 +66,7 @@ public class VectorColumnWriter extends BaseColumnWriter{
             else
             {
                 byte[] bytesOfOneVec = vecToBytes(values[curPartOffset + i], columnVector.dimension);
-                //outputStream.write(bytesOfOneVec.length);
                 outputStream.write(bytesOfOneVec);
-                // todo possibly need to handle metadata for vector type
-                // todo maybe create stat recorder for vector type
                 pixelStatRecorder.updateVector();
             }
         }

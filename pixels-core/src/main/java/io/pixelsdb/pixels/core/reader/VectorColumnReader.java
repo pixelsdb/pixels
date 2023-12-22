@@ -4,13 +4,10 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorColumnVector;
-import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.Arrays;
 
 public class VectorColumnReader extends ColumnReader {
@@ -20,10 +17,9 @@ public class VectorColumnReader extends ColumnReader {
     private int inputIndex = 0;
     private int dimension;
 
-    public VectorColumnReader(TypeDescription type, int dimension) {
+    public VectorColumnReader(TypeDescription type) {
         super(type);
-        // todo dimension should probably be in the type
-        this.dimension = dimension;
+        this.dimension = type.getDimension();
     }
 
     /**
@@ -74,8 +70,7 @@ public class VectorColumnReader extends ColumnReader {
             bytesToDeCompact = (numToRead + 7) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
-            //todo hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-            hasNull = false;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
                 BitUtils.bitWiseDeCompact(vectorColumnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);

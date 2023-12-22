@@ -26,7 +26,7 @@ public class TestVectorColumnWriter {
         PixelsWriterOption pixelsWriterOption = new PixelsWriterOption()
                 .pixelStride(10000).encodingLevel(EncodingLevel.EL2).byteOrder(ByteOrder.BIG_ENDIAN);
         VectorColumnWriter vectorColumnWriter = new VectorColumnWriter(
-                TypeDescription.createVector(), pixelsWriterOption);
+                TypeDescription.createVector(dimension), pixelsWriterOption);
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < length; ++i)
         {
