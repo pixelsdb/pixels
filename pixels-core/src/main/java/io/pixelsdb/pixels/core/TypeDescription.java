@@ -712,6 +712,18 @@ public final class TypeDescription
             case STRUCT:
                 parseStruct(result, source);
                 break;
+            case VECTOR:
+                if (consumeChar(source, '('))
+                {
+                    // with length specified
+                    result.withDimension(parseInt(source));
+                    requireChar(source, ')');
+                }
+                else
+                {
+                    result.withDimension(DEFAULT_VECTOR_DIMENSION);
+                }
+                break;
             default:
                 throw new IllegalArgumentException("Unknown type " +
                         result.getCategory() + " at " + source);
@@ -841,6 +853,7 @@ public final class TypeDescription
                 case VECTOR:
                     tmpType.setKind(PixelsProto.Type.Kind.VECTOR);
                     tmpType.setDimension(child.getDimension());
+                    break;
                 default:
                     throw new IllegalArgumentException("Unknown category: " +
                             schema.getCategory());
@@ -1164,6 +1177,8 @@ public final class TypeDescription
                 }
                 return new StructColumnVector(maxSize, fieldVector);
             }
+            case VECTOR:
+                return new VectorColumnVector(maxSize, dimension);
             default:
                 throw new IllegalArgumentException("Unknown type " + category);
         }

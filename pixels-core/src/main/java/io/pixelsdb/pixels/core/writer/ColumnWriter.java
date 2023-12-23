@@ -80,6 +80,8 @@ public interface ColumnWriter
                 return new TimeColumnWriter(type, writerOption);
             case TIMESTAMP:
                 return new TimestampColumnWriter(type, writerOption);
+            case VECTOR:
+                return new VectorColumnWriter(type, writerOption);
             default:
                 throw new IllegalArgumentException("Bad schema type: " + type.getCategory());
         }
