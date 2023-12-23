@@ -137,8 +137,11 @@ std::shared_ptr<TypeDescription> TypeDescription::createSchema(const std::vector
             case pixels::proto::Type_Kind_TIME:
                 fieldType = TypeDescription::createTime();
                 break;
+            case pixels::proto::Type_Kind_TIMESTAMP:
+                fieldType = TypeDescription::createTimestamp();
+                break;
             default:
-                throw InvalidArgumentException("Unknown type: " + type->name());
+                throw InvalidArgumentException("TypeDescription::createSchema: Unknown type: " + type->name());
         }
         schema->addField(fieldName, fieldType);
     }
@@ -295,6 +298,8 @@ std::shared_ptr<ColumnVector> TypeDescription::createColumn(int maxSize, std::ve
 				throw InvalidArgumentException("Currently we didn't implement LongDecimalColumnVector.");
 		    }
 	    }
+        case TIMESTAMP:
+            return std::make_shared<TimestampColumnVector>(maxSize, 0, useEncodedVector.at(0));
         case STRING:
         case BINARY:
         case VARBINARY:

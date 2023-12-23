@@ -240,8 +240,9 @@ void PixelsScanFunction::TransformDuckdbType(const std::shared_ptr<TypeDescripti
 			    break;
 			//        case TypeDescription::TIME:
 			//            break;
-			//        case TypeDescription::TIMESTAMP:
-			//            break;
+            case TypeDescription::TIMESTAMP:
+                return_types.emplace_back(LogicalType::TIMESTAMP);
+                break;
 			//        case TypeDescription::VARBINARY:
 			//            break;
 			//        case TypeDescription::BINARY:
@@ -340,8 +341,14 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 
 			//        case TypeDescription::TIME:
 			//            break;
-			//        case TypeDescription::TIMESTAMP:
-			//            break;
+            case TypeDescription::TIMESTAMP: {
+                auto tsCol = std::static_pointer_cast<TimestampColumnVector>(col);
+                Vector vector(LogicalType::TIMESTAMP,
+                              (data_ptr_t)(tsCol->current()));
+                output.data.at(col_id).Reference(vector);
+                break;
+            }
+
 			//        case TypeDescription::VARBINARY:
 			//            break;
 			//        case TypeDescription::BINARY:

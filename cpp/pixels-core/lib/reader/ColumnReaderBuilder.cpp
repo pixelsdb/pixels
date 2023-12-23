@@ -32,8 +32,8 @@ std::shared_ptr<ColumnReader> ColumnReaderBuilder::newColumnReader(std::shared_p
 		    return std::make_shared<DateColumnReader>(type);
 //        case TypeDescription::TIME:
 //            break;
-//        case TypeDescription::TIMESTAMP:
-//            break;
+        case TypeDescription::TIMESTAMP:
+            return std::make_shared<TimestampColumnReader>(type);
 //        case TypeDescription::VARBINARY:
 //            break;
 //        case TypeDescription::BINARY:

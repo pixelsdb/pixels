@@ -23,6 +23,7 @@
 #include "vector/BinaryColumnVector.h"
 #include "vector/DecimalColumnVector.h"
 #include "vector/DateColumnVector.h"
+#include "vector/TimestampColumnVector.h"
 
 struct CategoryProperty {
     bool isPrimitive;
