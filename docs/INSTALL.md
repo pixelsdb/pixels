@@ -1,11 +1,18 @@
-# Installation
+# Basic Installation
 
-Here, we show how to install Pixels in AWS EC2 as an example.
-However, installation in other cloud or on-premises environments is almost the same.
+In this document, we show an example of installing the core components of Pixels in AWS EC2.
+Installation in other cloud or on-premises environments is almost the same.
 In this example, we use Trino as the query engine. To use other query engines, skip [Install Trino](#install-trino)
 and check the instructions for the other query engine:
 * [Install Pixels + Presto](https://github.com/pixelsdb/pixels-presto)
 * [Install Pixels + Hive](https://github.com/pixelsdb/pixels-hive)
+* [Install Pixels + DuckDB](../cpp/README.md)
+
+Here, we only install and configure the essential components for query processing.
+The usage of optional components can be found in the following documents:
+* [Pixels Cache](../pixels-cache/README.md): The distributed columnar cache to accelerate query processing.
+* [Pixels Turbo](../pixels-turbo/README.md): The hybrid query engine that invokes serverless resources to help process unpredictable workload spikes.
+* [Pixels Amphi](../pixels-amphi/README.md): The adaptive query scheduler that enables cost-efficient query processing in both on-perm and in-cloud environments.
 
 In AWS EC2, create an Ubuntu-20.04 or 22.04 instance with x86 arch and at least 4GB memory and 20GB root volume. 
 8GB or larger memory is recommended for performance evaluations on datasets larger than 10GB. 
@@ -201,9 +208,12 @@ Modify `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`
 and point it to the `etc/hadoop` directory under the home of Hadoop.
 Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from this directory.
 
-> Note that some default ports used by Hadoop
+> Note:
+> (1) Some default ports used by Hadoop
 > may conflict with the default ports used by Trino. In this case, modify the default port configuration
 > of either system.
+> (2) Hadoop 2.7.x and 3.3.x are not compatible with high-version JDKs such as JDK 17. Please configure
+> Hadoop to use JDK 8.
 
 ## Install Trino
 Trino is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Trino-405.
