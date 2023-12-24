@@ -12,7 +12,7 @@ and use DuckDB as the engine for the local worker. The server-client communicati
 `Pixels-Amphi` is composed of the following two components:
 - [`pixels-amphi`](./pixels-amphi) works inside the `pixels-server` to provide coordinating decision. 
 Coordinator analyzes the SQL query and decides if the worker has cached the data required to execute the query.
-- [`pixels-amphi-worker`](./pixels-amphi-worker) is an independent client process to handle with the OLAP workload.
+- [`pixels-amphi-worker`](../cpp/pixels-amphi-worker) is an independent client process to handle with the OLAP workload.
 Given the workload, the worker will download partial columns data in the storage first. 
 Then it submits the query to pixels server endpoint and processes the coordinator response.
 
@@ -21,7 +21,7 @@ Then it submits the query to pixels server endpoint and processes the coordinato
 On the server side, install `Pixels + Trino` following the instructions [HERE](../docs/INSTALL.md).
 
 On the worker/client side, build `pixels-amphi-worker` from source or build a Docker container. 
-See the instructions [HERE](./pixels-amphi-worker/README.md).
+See the instructions [HERE](../cpp/pixels-amphi-worker/README.md).
 
 ### 1. Custom schema
 
@@ -71,13 +71,13 @@ They have to be converted to other types and claimed as `logicalType` in avsc fi
 `Pixels-amphi` provides different strategies to generate the column-level cache plan for the worker.
 Given the metadata of the database and workload, the algorithm will decide which columns to cache in the local storage.
 
-First, we need a configuration file to specify the relevant information. We provide the example for the benchmarks: [TPC-H](./pixels-amphi-worker/benchmark/config/tpch.yaml):
+First, we need a configuration file to specify the relevant information. We provide the example for the benchmarks: [TPC-H](../cpp/pixels-amphi-worker/benchmark/config/tpch.yaml):
 
 ```yaml
 ## Experiment level settings
 exp_name: tpch_template
 schema_name: tpch
-benchmark_path: /home/ubuntu/opt/pixels/pixels-amphi/pixels-amphi-worker/benchmark/
+benchmark_path: /home/ubuntu/opt/pixels/cpp/pixels-amphi-worker/benchmark/
 init_sql_path: sql/tpch.sql
 cache_data_path: /home/ubuntu/data/tpch/
 
@@ -99,17 +99,17 @@ Here is the explanation of all the parameters:
 - `benchmark_path`: the absolute path to the benchmark folder
 - `init_sql_path`: the path to the SQL file that contains the initialization queries in the local engine (i.e., DuckDB)
 - `cache_data_path`: the absolute path to the local cache storage, so that the worker engine can query the data from the local storage
-- `schema_path`: the path to the schema file, json file with table name and relevant columns (e.g., [TPC-H](./pixels-amphi-worker/benchmark/schema/tpch.json))
-- `table_stat_path`: the path to the table statistics file, containing all the column size in bytes (e.g., [TPC-H](./pixels-amphi-worker/benchmark/schema/tpch_stat.json))
-- `workload_path`: the path to the workload file, containing all the queries to be executed, one SQL query per line (e.g., [TPC-H](./pixels-amphi-worker/benchmark/workload/tpch.txt))
-- `cache_plan_path`: the path to the cache plan file, containing the column-level cache plan (e.g., [TPC-H](./pixels-amphi-worker/benchmark/results/tpch_plan.json))
-- `workload_cost_path`: the path to the workload cost file, containing the estimated cost of each query (e.g., [TPC-H](./pixels-amphi-worker/benchmark/stats/tpch_cost.json))
+- `schema_path`: the path to the schema file, json file with table name and relevant columns (e.g., [TPC-H](../cpp/pixels-amphi-worker/benchmark/schema/tpch.json))
+- `table_stat_path`: the path to the table statistics file, containing all the column size in bytes (e.g., [TPC-H](../cpp/pixels-amphi-worker/benchmark/schema/tpch_stat.json))
+- `workload_path`: the path to the workload file, containing all the queries to be executed, one SQL query per line (e.g., [TPC-H](../cpp/pixels-amphi-worker/benchmark/workload/tpch.txt))
+- `cache_plan_path`: the path to the cache plan file, containing the column-level cache plan (e.g., [TPC-H](../cpp/pixels-amphi-worker/benchmark/results/tpch_plan.json))
+- `workload_cost_path`: the path to the workload cost file, containing the estimated cost of each query (e.g., [TPC-H](../cpp/pixels-amphi-worker/benchmark/stats/tpch_cost.json))
 - `strategy`: the strategy to generate the cache plan, currently we support `most_number_columns`, `most_frequent_columns`, `rate_greedy_columns`, `most_coverage_columns`, and `cost_optimal_columns` (see [Generate cache plan](#3-generate-cache-plan) for more details)
 - `storage_restriction`: the storage restriction in bytes, the algorithm will ensure that the total size of the cached columns will not exceed this restriction (e.g., 1541191900 means that the storage restriction is ~1.5GB)
 
 ### 3. Generate cache plan
 
-Given the configuration file, we aim to cache a selected set of columns in the local storage to optimize the overall cost. The Python [script](./pixels-amphi-worker/benchmark/scripts/cache_algorithm.py) will generate the plan and store it in `cache_plan_path`, with specified strategy and storage restriction. The options of the strategy are as follows:
+Given the configuration file, we aim to cache a selected set of columns in the local storage to optimize the overall cost. The Python [script](../cpp/pixels-amphi-worker/benchmark/scripts/cache_algorithm.py) will generate the plan and store it in `cache_plan_path`, with specified strategy and storage restriction. The options of the strategy are as follows:
 - `most_number_columns`: cache the columns with the most number of columns
 - `most_frequent_columns`: cache the columns with the most frequent use in the workload
 - `rate_greedy_columns`: cache the columns with the highest ratio of frequency versus column size
@@ -147,8 +147,8 @@ After the preparations in the previous steps, now we have:
 - pixels server running in the cloud
 - pixels amphi worker to perform adaptive query processing
 
-We have add the executable to run the benchmark task ([benchmark source code](./pixels-amphi-worker/benchmark/benchmark.cpp)). We can now perform the task by running: 
+We have add the executable to run the benchmark task ([benchmark source code](../cpp/pixels-amphi-worker/benchmark/benchmark.cpp)). We can now perform the task by running: 
 ```bash
 ./benchmark <worker_config_path> <experiment_config_path>
 ```
-where the `worker_config_path` is the path to the [amphi worker configuration file](./pixels-amphi-worker/config.yaml), and `experiment_config_path` is the configuration mentioned in [Experiment configuration](#2-experiment-configuration). The results of the task will be logged in the `pixels-amphi-worker/benchmark/results` folder.
+where the `worker_config_path` is the path to the [amphi worker configuration file](../cpp/pixels-amphi-worker/config.yaml), and `experiment_config_path` is the configuration mentioned in [Experiment configuration](#2-experiment-configuration). The results of the task will be logged in the `cpp/pixels-amphi-worker/benchmark/results` folder.

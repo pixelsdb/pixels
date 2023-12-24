@@ -49,8 +49,8 @@ public class StatExecutor implements CommandExecutor
     {
         String schemaName = ns.getString("schema");
         String tableName = ns.getString("table");
-        boolean orderedEnabled = Boolean.parseBoolean(ns.getString("ordered_enabled"));
-        boolean compactEnabled = Boolean.parseBoolean(ns.getString("compact_enabled"));
+        boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
+        boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
 
         String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
         int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
