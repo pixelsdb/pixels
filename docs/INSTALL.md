@@ -125,19 +125,7 @@ Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
 Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
 Leave the other config parameters as default.
 
-Optionally, to use the columnar cache in Pixels (i.e., pixels-cache), create and mount an in-memory file system:
-```bash
-sudo mkdir -p /mnt/ramfs
-sudo mount -t tmpfs -o size=1g tmpfs /mnt/ramfs
-```
-The path `/mnt/ramfs` is determined by `cache.location` and `index.location` in `PIXELS_HOME/pixels.properties`.
-The `size` parameter of the mount command should be larger than or equal to the sum of `cache.size` and `index.size` in
-`PIXELS_HOME/pixels.properties`. And it must be smaller than the physical memory size.
-Set the schema name and table name of the cached table using `cache.schema` and `cache.table`, respectively.
-Set `cache.storage.scheme` to be the name of the storage system where the cached table is stored.
-**Finally**, set `cache.enabled` and `cache.read.direct` to `true` in `PIXELS_HOME/pixels.properties`.
-
-Set `cache.enabled` to `false` if you don't use pixels-cache.
+Set `cache.enabled` to `false` in `$PIXELS_HOME/pixels.properties` if you don't use pixels-cache.
 
 ## Install MySQL
 MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later is tested. Other forks or variants may also work.
@@ -342,23 +330,13 @@ Then we get three dashboards `Node Exporter` and `JVM Exporter` in Grafana.
 These dashboards can be used to monitor the performance metrics of the instance.
 
 ## Start Pixels
-Enter `PIXELS_HOME`.
-If pixels-cache is enabled, set up the cache before starting Pixels:
-```bash
-./sbin/reset-cache.sh
-sudo ./sbin/pin-cache.sh
-```
-`reset-cache.sh` is only needed for the first time of using pixels-cache.
-It initializes some states in etcd for the cache. 
-If you have modified the `etcd` urls, then you need to change the `ENDPOINTS` property in `reset-cache.sh` as well.
+Enter `PIXELS_HOME`, execute `./sbin/reset-cache.sh` for the first time of starting Pixels, even if pixels-cache is disabled.
 
-Even if pixels-cache is disabled, `reset-cache.sh` is needed for the first time of starting Pixels.
 Then, start the daemons of Pixels using:
-
 ```bash
 ./sbin/start-pixels.sh
 ```
-The metadata server, coordinator, node manager, and metrics server, are running in the daemons.
+The essential services of Pixels, such as the metadata server, transaction manager, cache coordinator, cache manager, and metrics server, are running in these daemons.
 
 After starting Pixels, enter the home of trino-server and start Trino:
 ```bash
@@ -380,6 +358,4 @@ Run `SHOW SCHEMAS` in trino-cli, the result should be as follows if everything i
 By now, Pixels has been installed in the EC2 instance. The aforementioned instructions should also
 work in other kinds of VMs or physical servers.
 
-Run the script `$PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels when needed.
-If pixels-cache is used, also run the `$PIXELS_HOME/sbin/unpin-cache.sh` to release the memory that is
-pinned by the cache.
+Run the script `$PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels.
