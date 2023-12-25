@@ -80,6 +80,8 @@ public abstract class ColumnReader implements Closeable
                 return new BinaryColumnReader(type);
             case VARBINARY:
                 return new VarbinaryColumnReader(type);
+            case VECTOR:
+                return new VectorColumnReader(type);
             default:
                 throw new IllegalArgumentException("bad column type: " + type.getCategory());
         }
