@@ -40,7 +40,11 @@ set(pixels_core_cxx
         include/PixelsFilter.h
         lib/PixelsFilter.cpp
         include/PixelsBitMask.h
-        lib/PixelsBitMask.cpp)
+        lib/PixelsBitMask.cpp
+        include/vector/TimestampColumnVector.h
+        lib/vector/TimestampColumnVector.cpp
+        include/reader/TimestampColumnReader.h
+        lib/reader/TimestampColumnReader.cpp)
 
 add_library(pixels-core ${pixels_core_cxx})
 

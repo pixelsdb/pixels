@@ -139,7 +139,7 @@ We offer a convenient python script to distribute the pixels data in a single di
 
 ```
 cd pixels-duckdb
-python scripts/multidir-generator.py -i /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian \
+python scripts/pixels-multidir-generator.py -i /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian \
 -o /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1 \
 /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2 \
 /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition3 \
