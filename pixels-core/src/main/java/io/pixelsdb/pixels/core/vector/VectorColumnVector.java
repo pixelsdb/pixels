@@ -1,11 +1,11 @@
 package io.pixelsdb.pixels.core.vector;
 
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import jdk.internal.util.ArraysSupport;
 
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.*;
 import static java.util.Objects.requireNonNull;
 
 public class VectorColumnVector extends ColumnVector
@@ -16,7 +16,8 @@ public class VectorColumnVector extends ColumnVector
     // dimension of vectors in this column todo enforce this in schema
     public int dimension;
 
-    public VectorColumnVector(int len, int dimension) {
+    public VectorColumnVector(int len, int dimension)
+    {
         super(len);
         this.dimension = dimension;
         vector = new double[len][dimension];
@@ -25,7 +26,8 @@ public class VectorColumnVector extends ColumnVector
     }
 
     @Override
-    public void addElement(int inputIndex, ColumnVector inputVector) {
+    public void addElement(int inputIndex, ColumnVector inputVector)
+    {
         int index = writeIndex++;
         if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
@@ -39,7 +41,6 @@ public class VectorColumnVector extends ColumnVector
             isNull[index] = true;
             noNulls = false;
         }
-
     }
 
     /**
@@ -127,18 +128,21 @@ public class VectorColumnVector extends ColumnVector
      * compare two double arrays lexicographically. copied from newer version of standard java library
      * @return <0,0,>0 for <,=,> respectively
      */
-    private static int compare(double[] a, double[] b) {
+    private static int compare(double[] a, double[] b)
+    {
         if (a == b)
+        {
             return 0;
+        }
         if (a == null || b == null)
+        {
             return a == null ? -1 : 1;
-
-        int i = ArraysSupport.mismatch(a, b,
-                Math.min(a.length, b.length));
-        if (i >= 0) {
+        }
+        int i = mismatch(a, b, Math.min(a.length, b.length));
+        if (i >= 0)
+        {
             return Double.compare(a[i], b[i]);
         }
-
         return a.length - b.length;
     }
 
