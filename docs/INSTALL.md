@@ -40,14 +40,14 @@ Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 ## Install Maven
 
 Pixels requires maven 3.6 to build the source code (maven 3.1-3.5 might work, but we didn't test them yet). On some old operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
-In this case, you need to install a later maven that is compatible with your JDK manually. 
+In this case, manually install a newer maven compatible with your JDK. 
 
 ## Setup AWS Credentials*
 
-If we use S3 as the underlying storage system, we have to configure the AWS credentials.
+To use S3 as the underlying storage system, we have to configure the AWS credentials.
 
 Currently, we do not configure the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` from Pixels.
-Therefore, we have to configure these credentials using
+Therefore, configure these credentials using
 [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-set) or
 [credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
 
@@ -89,7 +89,7 @@ The hostnames, ports, paths, usernames, and passwords in these properties are to
 > to specify a different location of `pixels.properties`. This can be a http or https URL
 > to a remote location.
 
-Optionally, to install Pixels step-by-step, please see the guidance below.
+Optionally, to install Pixels step-by-step, see the guidance below.
 
 ### Install Step-by-Step*
 
