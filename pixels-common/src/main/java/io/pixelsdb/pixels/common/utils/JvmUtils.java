@@ -27,6 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * The utilities related to JVM. Some of the fields and methods in this class are
+ * from the source code of JDKs.
+ *
  * @author hank
  * @create 2022-08-27
  */
