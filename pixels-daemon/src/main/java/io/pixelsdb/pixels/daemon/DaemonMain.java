@@ -69,14 +69,15 @@ public class DaemonMain
                     TimeUnit.SECONDS.sleep(1);
                 } catch (InterruptedException e)
                 {
-                    log.error("error when waiting for the main daemon thread to start.", e);
+                    log.error("error when waiting for the main daemon thread to start", e);
                 }
 
                 ServerContainer container = new ServerContainer();
+                ConfigFactory config = ConfigFactory.Instance();
+                boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
 
                 if (args[0].equalsIgnoreCase("coordinator"))
                 {
-                    ConfigFactory config = ConfigFactory.Instance();
                     int metadataServerPort = Integer.parseInt(config.getProperty("metadata.server.port"));
                     int transServerPort = Integer.parseInt(config.getProperty("trans.server.port"));
                     int queryScheduleServerPort = Integer.parseInt(config.getProperty("query.schedule.server.port"));
@@ -92,9 +93,12 @@ public class DaemonMain
                         // start query schedule server
                         QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                         container.addServer("query_schedule", queryScheduleServer);
-                        // start cache coordinator
-                        CacheCoordinator cacheCoordinator = new CacheCoordinator();
-                        container.addServer("cache_coordinator", cacheCoordinator);
+                        if (cacheEnabled)
+                        {
+                            // start cache coordinator
+                            CacheCoordinator cacheCoordinator = new CacheCoordinator();
+                            container.addServer("cache_coordinator", cacheCoordinator);
+                        }
                     } catch (Throwable e)
                     {
                         log.error("failed to start coordinator", e);
@@ -112,8 +116,11 @@ public class DaemonMain
                             MetricsServer metricsServer = new MetricsServer();
                             container.addServer("metrics", metricsServer);
                         }
-                        CacheManager cacheManager = new CacheManager();
-                        container.addServer("cache_manager", cacheManager);
+                        if (cacheEnabled)
+                        {
+                            CacheManager cacheManager = new CacheManager();
+                            container.addServer("cache_manager", cacheManager);
+                        }
                     } catch (Throwable e)
                     {
                         log.error("failed to start node manager", e);
@@ -132,7 +139,7 @@ public class DaemonMain
                             container.shutdownServer(name);
                         } catch (NoSuchServerException e)
                         {
-                            log.error("error when stopping server threads.", e);
+                            log.error("error when stopping server threads", e);
                         }
                     }
                     for (int i = 60; i > 0; --i)
@@ -154,9 +161,9 @@ public class DaemonMain
                                 break;
                             }
                             TimeUnit.SECONDS.sleep(1);
-                        } catch (Exception e)
+                        } catch (Throwable e)
                         {
-                            log.error("error when waiting server threads shutdown.", e);
+                            log.error("error when waiting server threads shutdown", e);
                         }
                     }
                     /**
@@ -175,15 +182,15 @@ public class DaemonMain
                     {
                         for (String name : container.getServerNames())
                         {
-                            if (container.checkServer(name) == false)
+                            if (!container.checkServer(name))
                             {
                                 container.startServer(name);
                             }
                         }
                         TimeUnit.SECONDS.sleep(1);
-                    } catch (Exception e)
+                    } catch (Throwable e)
                     {
-                        log.error("error in the main loop of daemon.", e);
+                        log.error("error in the main loop of daemon", e);
                         break;
                     }
                 }
