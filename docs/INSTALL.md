@@ -9,7 +9,7 @@ and check the instructions for the other query engine:
 * [Install Pixels + DuckDB](../cpp/README.md)
 
 Here, we only install and configure the essential components for query processing.
-The usage of optional components can be found in the following documents:
+The additional instructions to install and use the optional components can be found in the following documents:
 * [Pixels Cache](../pixels-cache/README.md): The distributed columnar cache to accelerate query processing.
 * [Pixels Turbo](../pixels-turbo/README.md): The hybrid query engine that invokes serverless resources to help process unpredictable workload spikes.
 * [Pixels Amphi](../pixels-amphi/README.md): The adaptive query scheduler that enables cost-efficient query processing in both on-perm and in-cloud environments.
@@ -330,7 +330,7 @@ Then we get three dashboards `Node Exporter` and `JVM Exporter` in Grafana.
 These dashboards can be used to monitor the performance metrics of the instance.
 
 ## Start Pixels
-Enter `PIXELS_HOME`, execute `./sbin/reset-cache.sh` for the first time of starting Pixels, even if pixels-cache is disabled.
+Enter `PIXELS_HOME`, execute `./sbin/reset-cache.sh` for the first time of starting Pixels if pixels-cache is enabled.
 
 Then, start the daemons of Pixels using:
 ```bash
