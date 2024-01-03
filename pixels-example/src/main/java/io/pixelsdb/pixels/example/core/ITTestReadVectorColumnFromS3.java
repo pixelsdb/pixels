@@ -1,22 +1,3 @@
-/*
- * Copyright 2018 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
 package io.pixelsdb.pixels.example.core;
 
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -32,16 +13,13 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * @author hank
- */
-public class TestPixelsReader
-{
+public class ITTestReadVectorColumnFromS3 {
+
     public static void main(String[] args)
     {
         // Note you may need to restart intellij to let it pick up the updated environment variable value
         // example path: s3://bucket-name/test-file.pxl
-        String currentPath = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test.pxl";
+        String currentPath = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test-vec-larger2.pxl";
         System.out.println(currentPath);
         try {
             Storage storage = StorageFactory.Instance().getStorage("s3");
@@ -52,6 +30,7 @@ public class TestPixelsReader
                     .build();
 
             TypeDescription schema = reader.getFileSchema();
+            System.out.println(schema);
             List<String> fieldNames = schema.getFieldNames();
             System.out.println("fieldNames: " + fieldNames);
             String[] cols = new String[fieldNames.size()];

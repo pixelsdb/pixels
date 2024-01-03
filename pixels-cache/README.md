@@ -51,7 +51,7 @@ cache.enabled=true
 # set to true to read cache without memory copy
 cache.read.direct=true
 ```
-The above values are a good default setting for each node to cache up to 64GB data of table `pixels.test_105` stored on HDFS.
+The above values are a good default setting for each node to cache up-to 64GB data of table `pixels.test_105` stored on HDFS.
 Change the `cache.schema`, `cache.table`, and `cache.storage.scheme` to cache a different table that is stored in a different storage system.
 
 On each worker node, create and mount an in-memory file system with 65GB capacity:

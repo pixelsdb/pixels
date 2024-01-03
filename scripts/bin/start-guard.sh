@@ -11,7 +11,7 @@ else
   base_dir=$PIXELS_HOME
 fi
 
-EXTRA_ARGS="-role guard -name PixelsCoordinator"
+EXTRA_ARGS="-role guard -name PixelsGuard"
 ROLE=$2
 COMMAND=$1
 case ${COMMAND} in

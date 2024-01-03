@@ -1,22 +1,3 @@
-/*
- * Copyright 2018 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
 package io.pixelsdb.pixels.example.core;
 
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -31,31 +12,23 @@ import io.pixelsdb.pixels.core.vector.*;
 import java.io.IOException;
 import java.sql.Timestamp;
 
-/**
- * @author hank
- * @create 2018-11-19
- */
-public class TestPixelsWriter
-{
+public class ITTestWriteVectorColumnToS3 {
+
     public static void main(String[] args) throws IOException
     {
         // Note you may need to restart intellij to let it pick up the updated environment variable value
         // example path: s3://bucket-name/test-file.pxl
-        String pixelsFile = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test.pxl";
+        String pixelsFile = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test-vec-larger2.pxl";
         Storage storage = StorageFactory.Instance().getStorage("s3");
 
-        String schemaStr = "struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>";
+        int dimension = 256;
+        String schemaStr = String.format("struct<v:vector(%s)>", dimension);
 
         try
         {
             TypeDescription schema = TypeDescription.fromString(schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
-            LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
-            FloatColumnVector b = (FloatColumnVector) rowBatch.cols[1];          // float
-            DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
-            TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
-            ByteColumnVector e = (ByteColumnVector) rowBatch.cols[4];              // boolean
-            BinaryColumnVector z = (BinaryColumnVector) rowBatch.cols[5];            // string
+            VectorColumnVector v = (VectorColumnVector) rowBatch.cols[0];
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -73,21 +46,14 @@ public class TestPixelsWriter
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
-            for (int i = 0; i < 1; i++)
+            for (int i = 0; i < 20; i++)
             {
                 int row = rowBatch.size++;
-                a.vector[row] = i;
-                a.isNull[row] = false;
-                b.vector[row] = Float.floatToIntBits(i * 3.1415f);
-                b.isNull[row] = false;
-                c.vector[row] = Double.doubleToLongBits(i * 3.14159d);
-                c.isNull[row] = false;
-                d.set(row, timestamp);
-                d.isNull[row] = false;
-                e.vector[row] = (byte) (i > 25000 ? 1 : 0);
-                e.isNull[row] = false;
-                z.setVal(row, String.valueOf(i).getBytes());
-                z.isNull[row] = false;
+                v.vector[row] = new double[dimension];
+                for (int d=0; d<dimension; d++) {
+                    v.vector[row][d] = 0.1 + i;
+                }
+                v.isNull[row] = false;
                 if (rowBatch.size == rowBatch.getMaxSize())
                 {
                     pixelsWriter.addRowBatch(rowBatch);
@@ -108,4 +74,5 @@ public class TestPixelsWriter
             e.printStackTrace();
         }
     }
+
 }

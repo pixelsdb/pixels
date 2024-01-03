@@ -41,8 +41,8 @@ public class Daemon implements Runnable
     private String[] partnerCmd = null;
     private volatile boolean running = false;
     private volatile boolean cleaned = false;
-    private ShutdownHandler shutdownHandler = null;
-    private static Logger log = LogManager.getLogger(Daemon.class);
+    private final ShutdownHandler shutdownHandler = null;
+    private static final Logger log = LogManager.getLogger(Daemon.class);
 
     public void setup (String selfFilePath, String partnerFilePath, String[] partnerCmd)
     {

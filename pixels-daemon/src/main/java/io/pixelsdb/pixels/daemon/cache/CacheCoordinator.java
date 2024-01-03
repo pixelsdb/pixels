@@ -100,12 +100,15 @@ public class CacheCoordinator implements Server
         this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         this.hostName = System.getenv("HOSTNAME");
         logger.debug("HostName from system env: " + hostName);
-        if (hostName == null) {
-            try {
+        if (hostName == null)
+        {
+            try
+            {
                 this.hostName = InetAddress.getLocalHost().getHostName();
                 logger.debug("HostName from InetAddress: " + hostName);
             }
-            catch (UnknownHostException e) {
+            catch (UnknownHostException e)
+            {
                 logger.debug("Hostname is null. Exit");
                 return;
             }
@@ -151,7 +154,9 @@ public class CacheCoordinator implements Server
                 return;
             }
         }
-        try {
+
+        try
+        {
             // 2. register the coordinator
             Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();

@@ -120,6 +120,11 @@ public class StatsRecorder
         throw new UnsupportedOperationException("Can't update binary");
     }
 
+    public void updateVector()
+    {
+        throw new UnsupportedOperationException("Can't update vector");
+    }
+
     public void updateDate(Date value)
     {
         throw new UnsupportedOperationException("Can't update date");
@@ -231,6 +236,8 @@ public class StatsRecorder
             case BINARY:
             case VARBINARY:
                 return new BinaryStatsRecorder();
+            case VECTOR:
+                return new VectorStatsRecorder();
             default:
                 return new StatsRecorder();
         }
@@ -275,6 +282,8 @@ public class StatsRecorder
             case BINARY:
             case VARBINARY:
                 return new BinaryStatsRecorder(statistic);
+            case VECTOR:
+                return new VectorStatsRecorder(statistic);
             default:
                 return new StatsRecorder(statistic);
         }
@@ -319,6 +328,8 @@ public class StatsRecorder
             case BINARY:
             case VARBINARY:
                 return new BinaryStatsRecorder(statistic);
+            case VECTOR:
+                return new VectorStatsRecorder(statistic);
             default:
                 return new StatsRecorder(statistic);
         }
