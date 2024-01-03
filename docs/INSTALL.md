@@ -9,7 +9,7 @@ and check the instructions for the other query engine:
 * [Install Pixels + DuckDB](../cpp/README.md)
 
 Here, we only install and configure the essential components for query processing.
-The additional instructions to install and use the optional components can be found in the following documents:
+To use the following optional components, follow the instructions in the corresponding README.md after the basic installation:
 * [Pixels Cache](../pixels-cache/README.md): The distributed columnar cache to accelerate query processing.
 * [Pixels Turbo](../pixels-turbo/README.md): The hybrid query engine that invokes serverless resources to help process unpredictable workload spikes.
 * [Pixels Amphi](../pixels-amphi/README.md): The adaptive query scheduler that enables cost-efficient query processing in both on-perm and in-cloud environments.
@@ -19,7 +19,6 @@ In AWS EC2, create an Ubuntu-20.04 or 22.04 instance with x86 arch and at least 
 Login the instance as `ubuntu` user, and install the following components.
 
 > Installation steps marked with `*` are optional.
-> After finishing the installation of Pixels + Trino, you can optionally enable [Pixels Turbo](../pixels-turbo).
 
 ## Install JDK
 Install JDK 17.0 in the EC2 instance:
@@ -240,7 +239,7 @@ pixels.config=/home/ubuntu/opt/pixels/pixels.properties
 
 # serverless config
 # it can be on, off, auto
-cloud.function.switch=auto
+cloud.function.switch=off
 local.scan.concurrency=40
 clean.intermediate.result=true
 ```
@@ -248,35 +247,8 @@ clean.intermediate.result=true
 **Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
 The other properties are related to serverless execution.
 In Trino, Pixels can push projections, filters, joins, and aggregations into serverless computing services (e.g., AWS Lambda).
-This feature is named `Pixels Turbo` and can be turned on by setting `cloud.function.switch` to `auto` (adaptively enabled) or `on` (always enabled).
-
-If Pixels Turbo is enabled, we also need to set the following settings in `PIXELS_HOME/pixels.properties`:
-```properties
-executor.input.storage.scheme=s3
-executor.intermediate.storage.scheme=s3
-executor.intermediate.folder=/pixels-turbo/intermediate/
-executor.output.storage.scheme=output-storage-scheme-dummy
-executor.output.folder=output-folder-dummy
-```
-Those storage schemes are used to access the input data (the storage scheme of the base tables defined by 
-`CREATE TABLE` statements), the intermediate data (intermediate results generated during query execution), and the 
-output data (the result of the sub-plan executed in the serverless workers), respectively.
-If any of these storage schemes is `minio` or `redis`, we also need to set the other information, such as the endpoint
-and keys, of the storage:
-```properties
-minio.region=eu-central-2
-minio.endpoint=http://localhost:9000
-minio.access.key=minio-access-key-dummy
-minio.secret.key=minio-secret-key-dummy
-redis.endpoint=localhost:6379
-redis.access.key=redis-user-dummy
-redis.secret.key=redis-password-dummy
-```
-Ensure they are valid so that the serverless workers can access the corresponding storage systems.
-Especially, the `executor.input.storage.scheme` must be consistent with the storage scheme of the base
-tables. This is checked during query-planning for Pixels Turbo.
-In addition, the `executor.intermediate.folder` and `executor.output.folder` are the base path where the intermediate
-and output data are stored. They also need to be valid and accessible for the serverless workers.
+This feature is named `Pixels-Turbo` and can be turned on by setting `cloud.function.switch` to `auto` (adaptively enabled) or `on` (always enabled).
+Turn it `off` to only use Trino workers for query processing.
 
 Append the following two lines into `etc/jvm.config`:
 ```config
