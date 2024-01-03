@@ -73,9 +73,13 @@ want to enable auto-scaling of MPP cluster and adaptive invocation of serverless
 # serverless config
 # it can be on, off, auto
 cloud.function.switch=auto
-local.scan.concurrency=40
+local.scan.concurrency=0
 clean.intermediate.result=true
 ```
+`local.scan.concurrency` is the number of concurrent scan tasks that can be executed locally (not in the serverless workers) in the MPP cluster.
+It only takes effects for the table scan operator when the query is pushed down into serverless workers.
+By setting this number to a value larger than 0, the MPP worker and the serverless workers can work in parallel to improve table scan throughput.
+`clean.intermediate.result` controls whether delete the intermediate results when the queries executed in serverless workers are finished.
 
 After that, start Trino and run queries. Pixels will automatically push the queries into the serverless workers when Trino 
 is too busy to process the new coming queries (in `auto` mode).
