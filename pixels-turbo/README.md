@@ -26,12 +26,56 @@ These executors are used in the serverless workers to execute the assigned physi
 It reports the performance metrics, such as CPU/memory usage and query concurrency, in the MPP cluster. These metrics are 
 consumed by the scaling manager (e.g., AWS EC2 Autoscaling Group) in the cloud platform to make scaling decisions.
 
-## Usage
+## Installation
 
 Install `Pixels + Trino` following the instructions [HERE](../docs/INSTALL.md).
+
+To use Pixels-Turbo, we need to set the following properties in `PIXELS_HOME/pixels.properties`:
+```properties
+executor.input.storage.scheme=s3
+executor.intermediate.storage.scheme=s3
+executor.intermediate.folder=/pixels-turbo/intermediate/
+executor.output.storage.scheme=output-storage-scheme-dummy
+executor.output.folder=output-folder-dummy
+```
+These storage schemes are used to access the input data (the storage scheme of the base tables defined by
+`CREATE TABLE` statements), the intermediate data (intermediate results generated during query execution), and the
+output data (the result of the sub-plan executed in the serverless workers), respectively.
+If any of these storage schemes is `minio` or `redis`, we also need to set the properties for the corresponding storage:
+```properties
+minio.region=eu-central-2
+minio.endpoint=http://localhost:9000
+minio.access.key=minio-access-key-dummy
+minio.secret.key=minio-secret-key-dummy
+redis.endpoint=localhost:6379
+redis.access.key=redis-user-dummy
+redis.secret.key=redis-password-dummy
+```
+Ensure they are valid so that the serverless workers can access the corresponding storage systems.
+Especially, the `executor.input.storage.scheme` must be consistent with the storage scheme of the base
+tables. This is checked during query-planning for Pixels-Turbo.
+In addition, the `executor.intermediate.folder` and `executor.output.folder` are the base path where the intermediate
+and output data are stored. They also need to be valid and accessible for the serverless workers.
+
 Then, deploy the serverless workers following the instructions in the README.md of `pixels-worker-[service]`.
 Currently, we support AWS Lambda and vHive. So the worker service can be `pixels-worker-lambda` or `pixels-worker-vhive`.
 More platform integrations will be provided in the future.
 
+If the MPP cluster is running in a cloud machine service such as AWS EC2, follow the instructions in the README.md of `pixels-scakubg-[service]`
+to deploy the auto-scaling manager for the MPP cluster. Currently, we support auto-scaling in AWS EC2. So `pixels-scaling-ec2` is the only option.
+It can be used as an example to implement the auto-scaling manager for other cloud platforms.
+
+## ## Start Pixels (with Turbo)
+
+In `etc/catalogpixels.properties` under the installation directory of Trino, set `cloud.function.switch` to `auto` if you have installed the auto-scaling manager and 
+want to enable auto-scaling of MPP cluster and adaptive invocation of serverless workers; or set it to `on` if you want to always push the queries into serverless workers.
+```properties
+# serverless config
+# it can be on, off, auto
+cloud.function.switch=auto
+local.scan.concurrency=40
+clean.intermediate.result=true
+```
+
 After that, start Trino and run queries. Pixels will automatically push the queries into the serverless workers when Trino 
-is too busy to process the new coming queries.
+is too busy to process the new coming queries (in `auto` mode).
