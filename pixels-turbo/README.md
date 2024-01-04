@@ -28,7 +28,7 @@ consumed by the scaling manager (e.g., AWS EC2 Autoscaling Group) in the cloud p
 
 ## Installation
 
-Install `Pixels + Trino` following the instructions [HERE](../docs/INSTALL.md).
+Install `Pixels-Trino` following the instructions [HERE](../docs/INSTALL.md).
 
 To use Pixels-Turbo, we need to set the following properties in `PIXELS_HOME/pixels.properties`:
 ```properties
