@@ -27,76 +27,47 @@ void StringColumnReader::close() {
 void StringColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::ColumnEncoding & encoding, int offset,
                               int size, int pixelStride, int vectorIndex, std::shared_ptr<ColumnVector> vector,
                               pixels::proto::ColumnChunkIndex & chunkIndex, std::shared_ptr<PixelsBitMask> filterMask) {
-    if(offset == 0) {
-        elementIndex = 0;
-        bufferOffset = 0;
-        readContent(input, input->bytesRemaining(), encoding);
-    }
     // TODO: support dictionary
     std::shared_ptr<BinaryColumnVector> columnVector =
             std::static_pointer_cast<BinaryColumnVector>(vector);
+
+    if(offset == 0) {
+        elementIndex = 0;
+        bufferOffset = 0;
+        isNullOffset = chunkIndex.isnulloffset();
+        readContent(input, input->bytesRemaining(), encoding);
+    }
+
+    int pixelId = elementIndex / pixelStride;
+    bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+    setValid(input, pixelStride, vector, pixelId, hasNull);
+
     // TODO: if dictionary encoded
-    if(filterMask != nullptr) {
-        if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY) {
-            for(int i = 0; i < size; i++) {
-                if(elementIndex % pixelStride == 0) {
-                    int pixelId = elementIndex / pixelStride;
-                    // TODO: should write the remaining code
-                }
-                if(filterMask->get(i)) {
-                    int originId = (int) contentDecoder->next();
-                    int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
-                    // use setRef instead of setVal to reduce memory copy.
-                    columnVector->setRef(i + vectorIndex, dictContentBuf->getPointer(), dictStarts[originId], tmpLen);
-                } else {
-                    // skip this number
-                    contentDecoder->next();
-                }
-                elementIndex++;
+    if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY) {
+        for(int i = 0; i < size; i++) {
+            if(elementIndex % pixelStride == 0) {
+                int pixelId = elementIndex / pixelStride;
+                // TODO: should write the remaining code
             }
-        } else {
-            for(int i = 0; i < size; i++) {
-                if(elementIndex % pixelStride == 0) {
-                    int pixelId = elementIndex / pixelStride;
-                    // TODO: should write the remaining code
-                }
-                if(filterMask->get(i)) {
-                    currentStart = nextStart;
-                    nextStart = startsBuf->getInt();
-                    int len = nextStart - currentStart;
-                    // use setRef instead of setVal to reduce memory copy
-                    columnVector->setRef(
-                            i + vectorIndex, contentBuf->getPointer(), bufferOffset, len);
-                    bufferOffset += len;
-                } else {
-                    // skip this number
-                    currentStart = nextStart;
-                    nextStart = startsBuf->getInt();
-                    int len = nextStart - currentStart;
-                    bufferOffset += len;
-                }
-                elementIndex++;
-            }
-        }
-    } else {
-        if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY) {
-            for(int i = 0; i < size; i++) {
-                if(elementIndex % pixelStride == 0) {
-                    int pixelId = elementIndex / pixelStride;
-                    // TODO: should write the remaining code
-                }
+            if(vector->checkValid(i) && (filterMask == nullptr || filterMask->get(i))) {
                 int originId = (int) contentDecoder->next();
                 int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
                 // use setRef instead of setVal to reduce memory copy.
                 columnVector->setRef(i + vectorIndex, dictContentBuf->getPointer(), dictStarts[originId], tmpLen);
-                elementIndex++;
+            } else {
+                // skip this number
+                contentDecoder->next();
             }
-        } else {
-            for(int i = 0; i < size; i++) {
-                if(elementIndex % pixelStride == 0) {
-                    int pixelId = elementIndex / pixelStride;
-                    // TODO: should write the remaining code
-                }
+            elementIndex++;
+        }
+    } else {
+        for(int i = 0; i < size; i++) {
+            if(elementIndex % pixelStride == 0) {
+                int pixelId = elementIndex / pixelStride;
+                // TODO: should write the remaining code
+            }
+            bool valid = vector->checkValid(i);
+            if(valid && (filterMask == nullptr || filterMask->get(i))) {
                 currentStart = nextStart;
                 nextStart = startsBuf->getInt();
                 int len = nextStart - currentStart;
@@ -104,12 +75,20 @@ void StringColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::
                 columnVector->setRef(
                         i + vectorIndex, contentBuf->getPointer(), bufferOffset, len);
                 bufferOffset += len;
-                elementIndex++;
+            } else if (!valid) {
+                // is null: skip this number
+                currentStart = nextStart;
+                nextStart = startsBuf->getInt();
+            } else {
+                // filter out: skip this number
+                currentStart = nextStart;
+                nextStart = startsBuf->getInt();
+                int len = nextStart - currentStart;
+                bufferOffset += len;
             }
+            elementIndex++;
         }
     }
-
-
 }
 
 void StringColumnReader::readContent(std::shared_ptr<ByteBuffer> input,

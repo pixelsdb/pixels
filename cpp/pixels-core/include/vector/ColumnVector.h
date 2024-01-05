@@ -47,6 +47,16 @@ public:
     uint64_t memoryUsage;
 	bool closed;
 	bool encoding;
+
+    /**
+     * If hasNulls is true, then this array contains true if the value
+     * is null, otherwise false. The array is always allocated, so a batch can be re-used
+     * later and nulls added.
+     */
+    uint8_t * isNull;
+
+    // DuckDB requires that the type of the valid mask should be uint64
+    uint64_t * isValid;
     explicit ColumnVector(uint64_t len, bool encoding);
     void increment(uint64_t size);              // increment the readIndex
     bool isFull();                         // if the readIndex reaches length
@@ -55,7 +65,9 @@ public:
     virtual void close();
     virtual void reset();
     virtual void * current() = 0;              // get the pointer in the current location
+    uint64_t * currentValid();
     virtual void print(int rowCount);      // this is only used for debug
+    bool checkValid(int index);
 };
 
 #endif //PIXELS_COLUMNVECTOR_H
