@@ -541,19 +541,19 @@ public class BitUtils
      * @param littleEndian whether the byte order of input is little endian
      */
     public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength,
-                                        ByteBuf input, int offset, boolean littleEndian)
+                                        ByteBuf input, int offset, int skipBits, boolean littleEndian)
     {
         if (littleEndian)
         {
-            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset);
+            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset, skipBits);
         }
         else
         {
-            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset);
+            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset, skipBits);
         }
     }
 
-    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset)
+    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset, int skipBits)
     {
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
@@ -569,7 +569,7 @@ public class BitUtils
         }
     }
 
-    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset)
+    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset, int skipBits)
     {
         byte currBit = 0, b;
         int bitsEnd = bitsOffset + bitsLength;

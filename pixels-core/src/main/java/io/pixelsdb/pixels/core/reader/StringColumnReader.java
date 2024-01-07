@@ -206,7 +206,7 @@ public class StringColumnReader extends ColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull)
                     {
-                        BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
+                        BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, 0, littleEndian);
                         isNullOffset += bytesToDeCompact;
                         columnVector.noNulls = false;
                     } else
@@ -264,7 +264,7 @@ public class StringColumnReader extends ColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull)
                     {
-                        BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
+                        BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, 0, littleEndian);
                         isNullOffset += bytesToDeCompact;
                         columnVector.noNulls = false;
                     } else
@@ -321,7 +321,7 @@ public class StringColumnReader extends ColumnReader
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                 if (hasNull)
                 {
-                    BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
+                    BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, 0, littleEndian);
                     isNullOffset += bytesToDeCompact;
                     columnVector.noNulls = false;
                 } else
