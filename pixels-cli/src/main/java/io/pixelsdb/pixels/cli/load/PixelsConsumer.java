@@ -85,7 +85,7 @@ public class PixelsConsumer extends Consumer
             short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
             TypeDescription schema = TypeDescription.fromString(schemaStr);
-            VectorizedRowBatch rowBatch = schema.createRowBatch();
+            VectorizedRowBatch rowBatch = schema.createRowBatch(pixelStride);
             ColumnVector[] columnVectors = rowBatch.cols;
 
             BufferedReader reader;
@@ -175,12 +175,19 @@ public class PixelsConsumer extends Consumer
                         {
                             pixelsWriter.addRowBatch(rowBatch);
                             rowBatch.reset();
-                            if (rowCounter >= maxRowNum)
+                        }
+
+                        if (rowCounter >= maxRowNum)
+                        {
+                            // finish writing the file
+                            if (rowBatch.size != 0)
                             {
-                                pixelsWriter.close();
-                                rowCounter = 0;
-                                initPixelsFile = true;
+                                pixelsWriter.addRowBatch(rowBatch);
+                                rowBatch.reset();
                             }
+                            pixelsWriter.close();
+                            rowCounter = 0;
+                            initPixelsFile = true;
                         }
                     }
                     reader.close();
@@ -194,7 +201,7 @@ public class PixelsConsumer extends Consumer
 
             if (rowCounter > 0)
             {
-                // left last file to write
+                // last file to write
                 if (rowBatch.size != 0)
                 {
                     pixelsWriter.addRowBatch(rowBatch);
