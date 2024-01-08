@@ -553,10 +553,20 @@ public class BitUtils
         }
     }
 
-    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset, int skipBits)
+    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength,
+                                           ByteBuf input, int offset, int skipBits)
     {
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
+        b = input.getByte(offset++);
+        for (int i = 7; i >= 0 ; --i)
+        {
+            if (skipBits-- > 0)
+            {
+                continue;
+            }
+            bits[bitsOffset++] = (0x01 & (b >> i)) == 1;
+        }
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.getByte(i);
@@ -569,10 +579,20 @@ public class BitUtils
         }
     }
 
-    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuf input, int offset, int skipBits)
+    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength,
+                                           ByteBuf input, int offset, int skipBits)
     {
         byte currBit = 0, b;
         int bitsEnd = bitsOffset + bitsLength;
+        b = input.getByte(offset++);
+        for (int i = 0; i < 8 ; ++i)
+        {
+            if (skipBits-- > 0)
+            {
+                continue;
+            }
+            bits[bitsOffset++] = (0x01 & (b >> i)) == 1;
+        }
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.getByte(i);

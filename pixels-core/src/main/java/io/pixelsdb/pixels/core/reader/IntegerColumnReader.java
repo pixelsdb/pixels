@@ -43,7 +43,6 @@ public class IntegerColumnReader extends ColumnReader
     private RunLenIntDecoder decoder;
     private ByteBuffer inputBuffer;
     private InputStream inputStream;
-    private int isNullOffset = 0;
 
     /**
      * True if the data type of the values is long (int64), otherwise the data type is int32.

@@ -46,7 +46,6 @@ public class DateColumnReader extends ColumnReader
     private ByteBuffer inputBuffer = null;
     private InputStream inputStream = null;
     private RunLenIntDecoder decoder = null;
-    private int isNullOffset = 0;
 
     DateColumnReader(TypeDescription type)
     {

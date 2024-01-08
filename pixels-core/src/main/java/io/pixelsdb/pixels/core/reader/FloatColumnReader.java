@@ -40,7 +40,6 @@ public class FloatColumnReader extends ColumnReader
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;
     private int inputIndex = 0;
-    private int isNullOffset = 0;
 
     FloatColumnReader(TypeDescription type)
     {

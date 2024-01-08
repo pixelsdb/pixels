@@ -13,7 +13,6 @@ import java.util.Arrays;
 public class VectorColumnReader extends ColumnReader {
 
     private ByteBuffer inputBuffer;
-    private int isNullOffset = 0;
     private int inputIndex = 0;
     private int dimension;
 

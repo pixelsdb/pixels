@@ -42,7 +42,6 @@ public class DecimalColumnReader extends ColumnReader
 {
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;
-    private int isNullOffset = 0;
     private int inputIndex = 0;
 
     DecimalColumnReader(TypeDescription type)

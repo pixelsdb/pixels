@@ -46,7 +46,6 @@ public class TimeColumnReader extends ColumnReader
     private ByteBuffer inputBuffer = null;
     private InputStream inputStream = null;
     private RunLenIntDecoder decoder = null;
-    private int isNullOffset = 0;
 
     TimeColumnReader(TypeDescription type)
     {

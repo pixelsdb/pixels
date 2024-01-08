@@ -41,7 +41,6 @@ public class BooleanColumnReader extends ColumnReader
      * or the index of {@link #inputBuffer} if the column chunk is nulls-padded.
      */
     private int bitsOrInputIndex = 0;
-    private int isNullOffset = 0;
 
     BooleanColumnReader(TypeDescription type)
     {
