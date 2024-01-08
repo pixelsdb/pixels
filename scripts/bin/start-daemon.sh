@@ -17,12 +17,10 @@ EXTRA_ARGS="-operation start"
 DAEMON_ROLE=$1
 case ${DAEMON_ROLE} in
   coordinator)
-    echo "Start Pixels Coordinator."
     MAIN_CLASS=${MAIN_CLASS}".PixelsCoordinator"
     EXTRA_ARGS=${EXTRA_ARGS}" -role coordinator"
     ;;
   datanode)
-    echo "Start Pixels DataNode."
     MAIN_CLASS=${MAIN_CLASS}".PixelsDataNode"
     EXTRA_ARGS=${EXTRA_ARGS}" -role datanode"
     ;;

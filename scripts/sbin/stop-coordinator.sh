@@ -4,4 +4,4 @@ if [ -z "$PIXELS_HOME" ]; then
   exit 1
 fi
 
-$PIXELS_HOME/bin/stop-coordinator.sh
+$PIXELS_HOME/bin/stop-daemon.sh coordinator
