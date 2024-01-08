@@ -100,6 +100,7 @@ public class LongDecimalColumnReader extends ColumnReader
             inputIndex = inputBuffer.position();
             // isNull
             isNullOffset = inputIndex + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
             // re-init
             hasNull = true;
             elementIndex = 0;
@@ -117,14 +118,16 @@ public class LongDecimalColumnReader extends ColumnReader
             {
                 numToRead = numLeft;
             }
-            bytesToDeCompact = (numToRead + 7) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
+                        inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
+                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             } else
             {

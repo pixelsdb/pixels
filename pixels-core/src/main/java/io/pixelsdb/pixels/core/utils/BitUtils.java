@@ -25,6 +25,8 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * The bit compaction and de-compaction utils.
  *
@@ -254,6 +256,7 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, byte[] input, int offset, int length, boolean littleEndian)
     {
+        checkArgument(offset >= 0 && length > 0, "invalid input offset or length");
         if (littleEndian)
         {
             bitWiseDeCompactLE(bits, input, offset, length);
@@ -266,11 +269,6 @@ public class BitUtils
 
     private static void bitWiseDeCompactBE(byte[] bits, byte[] input, int offset, int length)
     {
-        /*
-         * Issue #99:
-         * Use as fewer variables as possible to reduce stack footprint
-         * and thus improve performance.
-         */
         byte bitsLeft = 8;
         int index = 0;
         for (int i = offset; i < offset + length; i++)
@@ -310,6 +308,7 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, ByteBuffer input, int offset, int length, boolean littleEndian)
     {
+        checkArgument(offset >= 0 && length > 0, "invalid input offset or length");
         if (littleEndian)
         {
             bitWiseDeCompactLE(bits, input, offset, length);
@@ -322,14 +321,8 @@ public class BitUtils
 
     private static void bitWiseDeCompactBE(byte[] bits, ByteBuffer input, int offset, int length)
     {
-        /*
-         * Issue #99:
-         * Use as fewer variables as possible to reduce stack footprint
-         * and thus improve performance.
-         */
         byte bitsLeft = 8, b;
         int index = 0;
-        // loop condition fixed in Issue #99.
         for (int i = offset; i < offset + length; ++i)
         {
             b = input.get(i);
@@ -369,6 +362,7 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, ByteBuf input, int offset, int length, boolean littleEndian)
     {
+        checkArgument(offset >= 0 && length > 0, "invalid input offset or length");
         if (littleEndian)
         {
             bitWiseDeCompactLE(bits, input, offset, length);
@@ -381,14 +375,8 @@ public class BitUtils
 
     private static void bitWiseDeCompactBE(byte[] bits, ByteBuf input, int offset, int length)
     {
-        /*
-         * Issue #99:
-         * Use as fewer variables as possible to reduce stack footprint
-         * and thus improve performance.
-         */
         byte bitsLeft = 8, b;
         int index = 0;
-        // loop condition fixed in Issue #99.
         for (int i = offset; i < offset + length; ++i)
         {
             b = input.getByte(i);
@@ -426,25 +414,39 @@ public class BitUtils
      * @param bitsLength the number of bits to de-compact
      * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
+     * @param skipBits the number of bits to skip in the first byte read from input, should be < 8
      * @param littleEndian whether the byte order of input is little endian
      */
     public static void bitWiseDeCompact(byte[] bits, int bitsOffset, int bitsLength,
-                                        ByteBuffer input, int offset, boolean littleEndian)
+                                        ByteBuffer input, int offset, int skipBits, boolean littleEndian)
     {
+        checkArgument(bitsOffset >= 0 && bitsLength > 0, "invalid bitsOffset or bitsLength");
+        checkArgument(offset >= 0, "invalid input offset");
+        checkArgument(skipBits >=0 && skipBits < 8, "skipBits is out of the range [0, 8)");
         if (littleEndian)
         {
-            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset);
+            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset, skipBits);
         }
         else
         {
-            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset);
+            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset,skipBits);
         }
     }
 
-    private static void bitWiseDeCompactBE(byte[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    private static void bitWiseDeCompactBE(byte[] bits, int bitsOffset, int bitsLength,
+                                           ByteBuffer input, int offset, int skipBits)
     {
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
+        b = input.get(offset++);
+        for (int i = 7; i >= 0 ; --i)
+        {
+            if (skipBits-- > 0)
+            {
+                continue;
+            }
+            bits[bitsOffset++] = (byte) (0x01 & (b >> i));
+        }
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.get(i);
@@ -457,10 +459,20 @@ public class BitUtils
         }
     }
 
-    private static void bitWiseDeCompactLE(byte[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    private static void bitWiseDeCompactLE(byte[] bits, int bitsOffset, int bitsLength,
+                                           ByteBuffer input, int offset, int skipBits)
     {
         byte currBit = 0, b;
         int bitsEnd = bitsOffset + bitsLength;
+        b = input.get(offset++);
+        for (int i = 0; i < 8 ; ++i)
+        {
+            if (skipBits-- > 0)
+            {
+                continue;
+            }
+            bits[bitsOffset++] = (byte) (0x01 & (b >> i));
+        }
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.get(i);
@@ -482,25 +494,39 @@ public class BitUtils
      * @param bitsLength the number of bits to de-compact
      * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
+     * @param skipBits the number of bits to skip in the first byte read from input, should be < 8
      * @param littleEndian whether the byte order of input is little endian
      */
     public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength,
-                                        ByteBuffer input, int offset, boolean littleEndian)
+                                        ByteBuffer input, int offset, int skipBits, boolean littleEndian)
     {
+        checkArgument(bitsOffset >= 0 && bitsLength > 0, "invalid bitsOffset or bitsLength");
+        checkArgument(offset >= 0, "invalid input offset");
+        checkArgument(skipBits >=0 && skipBits < 8, "skipBits is out of the range [0, 8)");
         if (littleEndian)
         {
-            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset);
+            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset, skipBits);
         }
         else
         {
-            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset);
+            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset, skipBits);
         }
     }
 
-    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength,
+                                           ByteBuffer input, int offset, int skipBits)
     {
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
+        b = input.get(offset++);
+        for (int i = 7; i >= 0 ; --i)
+        {
+            if (skipBits-- > 0)
+            {
+                continue;
+            }
+            bits[bitsOffset++] = (0x01 & (b >> i)) == 1;
+        }
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.get(i);
@@ -513,10 +539,20 @@ public class BitUtils
         }
     }
 
-    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength, ByteBuffer input, int offset)
+    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength,
+                                           ByteBuffer input, int offset, int skipBits)
     {
         byte currBit = 0, b;
         int bitsEnd = bitsOffset + bitsLength;
+        b = input.get(offset++);
+        for (int i = 0; i < 8 ; ++i)
+        {
+            if (skipBits-- > 0)
+            {
+                continue;
+            }
+            bits[bitsOffset++] = (0x01 & (b >> i)) == 1;
+        }
         for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
         {
             b = input.get(i);
@@ -538,11 +574,15 @@ public class BitUtils
      * @param bitsLength the number of bits to de-compact
      * @param input input byte buffer, which can be direct
      * @param offset starting offset of the input
+     * @param skipBits the number of bits to skip in the first byte read from input, should be < 8
      * @param littleEndian whether the byte order of input is little endian
      */
     public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength,
                                         ByteBuf input, int offset, int skipBits, boolean littleEndian)
     {
+        checkArgument(bitsOffset >= 0 && bitsLength > 0, "invalid bitsOffset or bitsLength");
+        checkArgument(offset >= 0, "invalid input offset");
+        checkArgument(skipBits >=0 && skipBits < 8, "skipBits is out of the range [0, 8)");
         if (littleEndian)
         {
             bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset, skipBits);
