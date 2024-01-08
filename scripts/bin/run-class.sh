@@ -40,15 +40,18 @@ else
   JAVA="$JAVA_HOME/bin/java"
 fi
 
-# Memory options
-if [ -z "$PIXELS_HEAP_OPTS" ]; then
-  PIXELS_HEAP_OPTS="-Xmx1024M"
+# Set JVM options file path or use default JVM options
+JVM_OPTIONS_FILE="./jvm.config"
+if [ -z "$PIXELS_JVM_OPTS" ]; then
+  if [ -e "$JVM_OPTIONS_FILE" ]; then
+    PIXELS_JVM_OPTS=$(tr '\n' ' ' < "$JVM_OPTIONS_FILE")
+  else
+    echo "jvm.config is not found, using default jvm configurations"
+    PIXELS_JVM_OPTS="-Xmx1024M -server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+DisableExplicitGC -Djava.awt.headless=true"
+  fi
 fi
 
-# JVM performance options
-if [ -z "$PIXELS_JVM_PERFORMANCE_OPTS" ]; then
-  PIXELS_JVM_PERFORMANCE_OPTS="-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+DisableExplicitGC -Djava.awt.headless=true"
-fi
+echo "JVM options: ${PIXELS_JVM_OPTS}"
 
 # Parse commands
 while [ $# -gt 0 ]; do
@@ -98,7 +101,7 @@ fi
 # Launch mode
 if [ "x$DAEMON_MODE" = "xtrue" ]; then
   echo "$DAEMON_NAME running in the daemon mode."
-  nohup ${NUMA_INTERLEAVE} ${JAVA} ${PIXELS_HEAP_OPTS} ${PIXELS_JVM_PERFORMANCE_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@" > ${CONSOLE_OUTPUT_FILE} 2>&1 < /dev/null &
+  nohup ${NUMA_INTERLEAVE} ${JAVA} ${PIXELS_JVM_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@" > ${CONSOLE_OUTPUT_FILE} 2>&1 < /dev/null &
 else
-  exec ${NUMA_INTERLEAVE} ${JAVA} ${PIXELS_HEAP_OPTS} ${PIXELS_JVM_PERFORMANCE_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@"
+  exec ${NUMA_INTERLEAVE} ${JAVA} ${PIXELS_JVM_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@"
 fi

@@ -431,7 +431,9 @@ void PixelsRecordReaderImpl::close() {
 	for(const auto& reader: readers) {
 		reader->close();
 	}
-    resultRowBatch->close();
+    if (resultRowBatch != nullptr) {
+        resultRowBatch->close();
+    }
 	readers.clear();
 	rowGroupFooters.clear();
 	includedColumnTypes.clear();

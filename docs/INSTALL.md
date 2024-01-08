@@ -80,7 +80,6 @@ etcd.hosts=localhost
 etcd.port=2379
 metrics.node.text.dir=/home/pixels/opt/node_exporter/text/
 presto.pixels.jdbc.url=jdbc:trino://localhost:8080/pixels/tpch
-hdfs.config.dir=/opt/hadoop-2.7.3/etc/hadoop/
 ```
 The hostnames, ports, paths, usernames, and passwords in these properties are to be configured in the following steps of installation.
 

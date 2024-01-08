@@ -15,8 +15,9 @@
 
 // when allocating buffer pool, we use the size of the first pxl file. Consider that
 // the remaining pxl file has larger size than the first file, we allocate some extra
-// size (1MB) to each column.
-#define EXTRA_POOL_SIZE 1024*1024
+// size (10MB) to each column.
+// TODO: how to evaluate the maximal pool size
+#define EXTRA_POOL_SIZE 40*1024*1024
 
 class DirectUringRandomAccessFile;
 // This class is global class. The variable is shared by each thread

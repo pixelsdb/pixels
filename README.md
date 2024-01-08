@@ -71,7 +71,7 @@ setting up a *Remote JVM Debug*.
 ## Deploy and Evaluate Pixels
 
 You can follow the [Installation](docs/INSTALL.md) instructions to deploy Pixels in a cluster,
-and learn how to use Pixels and evaluate its performance following [TPC-H Evaluation](docs/TPC-H.md).
+and learn how to use Pixels and evaluate its performance following [TPC-H Evaluation](docs/TPC-H.md) or [ClickBench Evaluation](docs/CLICKBENCH.md).
 
 
 ## Contributing

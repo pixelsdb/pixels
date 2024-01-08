@@ -35,6 +35,8 @@ import static java.util.Objects.requireNonNull;
  * Read from file, and decode column values
  *
  * @author guodong, hank
+ * @update 2024-01-08 add isNullSkipBits
+ *
  */
 public abstract class ColumnReader implements Closeable
 {
@@ -42,6 +44,15 @@ public abstract class ColumnReader implements Closeable
 
     int elementIndex = 0;
     boolean hasNull = true;
+    /**
+     * The current offset in the input buffer of this column chunk from which to decompact the isNull array.
+     * It starts from the offset of the bit-packed isNull array in this column chunk.
+     */
+    int isNullOffset = 0;
+    /**
+     * The number of bits to skip in the first byte (start from isNullOffset) when decompacting the isNull array.
+     */
+    int isNullSkipBits = 0;
 
     public static ColumnReader newColumnReader(TypeDescription type)
     {
