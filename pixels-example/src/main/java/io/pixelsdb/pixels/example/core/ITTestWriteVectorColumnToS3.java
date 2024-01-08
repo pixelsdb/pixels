@@ -16,13 +16,19 @@ public class ITTestWriteVectorColumnToS3 {
 
     public static void main(String[] args) throws IOException
     {
+        writeVectorColumn();
+//        writeVarcharColumn();
+    }
+
+    public static void writeVectorColumn() throws IOException {
         // Note you may need to restart intellij to let it pick up the updated environment variable value
         // example path: s3://bucket-name/test-file.pxl
-        String pixelsFile = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test-vec-larger2.pxl";
+        //String pixelsFile = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test-vec-larger2.pxl";
+        String pixelsFile = "s3://tiannan-test/test_arr_table_7/v-0-ordered/1.pxl";
         Storage storage = StorageFactory.Instance().getStorage("s3");
 
         int dimension = 256;
-        String schemaStr = String.format("struct<v:vector(%s)>", dimension);
+        String schemaStr = String.format("struct<arr_col:vector(%s)>", dimension);
 
         try
         {
@@ -74,5 +80,4 @@ public class ITTestWriteVectorColumnToS3 {
             e.printStackTrace();
         }
     }
-
 }

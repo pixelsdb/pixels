@@ -20,8 +20,11 @@
 package io.pixelsdb.pixels.core;
 
 import com.google.common.collect.ImmutableSet;
+import io.pixelsdb.pixels.common.lock.LockInternals;
 import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.Serializable;
 import java.sql.Time;
@@ -73,7 +76,7 @@ public final class TypeDescription
     /**
      * The default dimension of vector
      */
-    public static final int DEFAULT_VECTOR_DIMENSION = 256;
+    public static final int DEFAULT_VECTOR_DIMENSION = 2;
     /**
      * the supported maximum dimension
      */
@@ -107,6 +110,8 @@ public final class TypeDescription
      */
     public static final int MAX_TIME_PRECISION = 3;
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
+
+    private static final Logger logger = LogManager.getLogger(TypeDescription.class);
 
     @Override
     public int compareTo(TypeDescription other)
@@ -191,7 +196,7 @@ public final class TypeDescription
         VARCHAR(true, byte[].class, byte[].class,"varchar"),
         CHAR(true, byte[].class, byte[].class,"char"),
         STRUCT(false, Class.class, Class.class, "struct"),
-        VECTOR(false, double[].class, double[].class, "vector");
+        VECTOR(false, double[].class, double[].class, "vector", "array");
 
         /**
          * Ensure that all elements in names are in <b>lowercase</b>.
@@ -519,6 +524,27 @@ public final class TypeDescription
         return result;
     }
 
+
+    public TypeDescription checkElementType(StringPosition source)
+    {
+        int start = source.position;
+        String elementType;
+        while (source.position < source.length) {
+            char ch = source.value.charAt(source.position);
+            if (ch==')') {
+                elementType = source.value.substring(start, source.position);
+                if (elementType.equalsIgnoreCase("double")) {
+                    source.position++;
+                    return this;
+                } else {
+                    throw new IllegalArgumentException("For Pixels vector type, the trino type should be array(double), but instead is " + source.value);
+                }
+            }
+            source.position++;
+        }
+        throw new IllegalArgumentException("For Pixels vector type, the trino type should be array(double), but instead is " + source.value);
+    }
+
     /**
      * Parse the field name, i.e., user-defined identifier, from the source.
      * For example, if the source is 'a:int' with position = 0,
@@ -713,15 +739,30 @@ public final class TypeDescription
                 parseStruct(result, source);
                 break;
             case VECTOR:
-                if (consumeChar(source, '('))
                 {
-                    // with length specified
-                    result.withDimension(parseInt(source));
-                    requireChar(source, ')');
-                }
-                else
-                {
-                    result.withDimension(DEFAULT_VECTOR_DIMENSION);
+                    // handle type string passed from trino. Check that the type is double(array).
+                    if (result.toString().equals("array")) {
+                        if (consumeChar(source, '('))
+                        {
+                            // the array type must be double
+                            result.checkElementType(source);
+                            result.withDimension(DEFAULT_VECTOR_DIMENSION);
+                        }
+                    }
+                    // handle type string passed from Pixels writer, should be vector(d), where (d) specifies that
+                    // this column has dimension d, and is optional
+                    else if (result.toString().equals("vector")) {
+                        if (consumeChar(source, '(')) {
+                            // with dimension specified
+                            result.withDimension(parseInt(source));
+                            requireChar(source, ')');
+                        } else {
+                            result.withDimension(DEFAULT_VECTOR_DIMENSION);
+                        }
+                    }  else {
+                        throw new IllegalArgumentException("Unknown type string" +
+                                result + " at " + source);
+                    }
                 }
                 break;
             default:
