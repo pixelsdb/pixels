@@ -46,6 +46,7 @@ if [ -z "$PIXELS_JVM_OPTS" ]; then
   if [ -e "$JVM_OPTIONS_FILE" ]; then
     PIXELS_JVM_OPTS=$(tr '\n' ' ' < "$JVM_OPTIONS_FILE")
   else
+    echo "jvm.config is not found, using default jvm configurations"
     PIXELS_JVM_OPTS="-Xmx1024M -server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+DisableExplicitGC -Djava.awt.headless=true"
   fi
 fi
