@@ -5,13 +5,13 @@ if [ -z "$PIXELS_HOME" ]; then
 fi
 
 # Remember to set `hostnames` and `pixels_home[Optional]` in config file `datanodes`
-DEFAULT_PIXELS_HOME="/home/pixels/opt/pixels/"
+DEFAULT_PIXELS_HOME=$PIXELS_HOME
 
 while read datanode home
 do
     home="${home:-${DEFAULT_PIXELS_HOME}}"
-    REMOTE_SCRIPT="export PIXELS_HOME=${home} && $PIXELS_HOME/bin/start-datanode.sh -daemon"
-    echo "Starting DataNode on ${datanode}."
+    REMOTE_SCRIPT="export PIXELS_HOME=${home} && $PIXELS_HOME/bin/start-daemon.sh datanode -daemon"
+    echo "Starting DataNode on ${datanode}..."
     ssh "${datanode}" "${REMOTE_SCRIPT}"
 done < ./datanodes
 

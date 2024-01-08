@@ -37,18 +37,14 @@ import java.util.concurrent.TimeUnit;
 public class Daemon implements Runnable
 {
     private FileChannel myChannel = null;
-    private FileChannel partnerChannel = null;
-    private String[] partnerCmd = null;
     private volatile boolean running = false;
     private volatile boolean cleaned = false;
     private final ShutdownHandler shutdownHandler = null;
     private static final Logger log = LogManager.getLogger(Daemon.class);
 
-    public void setup (String selfFilePath, String partnerFilePath, String[] partnerCmd)
+    public void setup (String lockFilePath)
     {
-        File myLockFile = new File(selfFilePath);
-        File partnerLockFile = new File(partnerFilePath);
-        this.partnerCmd = partnerCmd;
+        File myLockFile = new File(lockFilePath);
         if (!myLockFile.exists())
         {
             try
@@ -59,20 +55,9 @@ public class Daemon implements Runnable
                 log.error("failed to create my own lock file.", e);
             }
         }
-        if (!partnerLockFile.exists())
-        {
-            try
-            {
-                partnerLockFile.createNewFile();
-            } catch (IOException e)
-            {
-                log.error("failed to create my partner's lock file.", e);
-            }
-        }
         try
         {
             this.myChannel = new FileOutputStream(myLockFile).getChannel();
-            this.partnerChannel = new FileOutputStream(partnerLockFile).getChannel();
             /**
              * Issue #181:
              * We should not bind the SIGTERM handler.
@@ -102,16 +87,6 @@ public class Daemon implements Runnable
         {
             log.error("error when closing my own channel.", e);
         }
-        try
-        {
-            if (this.partnerChannel != null)
-            {
-                this.partnerChannel.close();
-            }
-        } catch (IOException e)
-        {
-            log.error("error when closing my partner's channel", e);
-        }
         this.cleaned = true;
         // this.shutdownHandler.unbind();
     }
@@ -137,30 +112,10 @@ public class Daemon implements Runnable
                 log.info("starting daemon thread...");
             }
 
-            /*
-            Due to that main daemon and its guard daemon are not guaranteed to receive the
-            TERM signal at the same time. So that there is a case that:
-            The first process receives the signal and terminates with the file lock released.
-            After that but before the other process receives the signal, the other process
-            obtains its partner's lock and restart its partner.
-            In such a case, the main/guard daemons will not be terminated.
-            To solve this problem, we make the process sleep 1 second before tries to start
-            its partner. One second should be enough to send TERM signals to each daemon.
-            */
+            // keep the daemon thread running in an empty loop
             while (this.running)
             {
-                // make sure the partner is running too.
-                FileLock partnerLock = this.partnerChannel.tryLock();
-                if (partnerLock != null)
-                {
-                    // the guarded process is not running.
-                    TimeUnit.SECONDS.sleep(1); // make sure
-                    partnerLock.release();
-                    log.info("starting partner...");
-                    ProcessBuilder builder = new ProcessBuilder(this.partnerCmd);
-                    builder.start();
-                }
-                TimeUnit.SECONDS.sleep(3);
+                TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e)
         {
