@@ -8,5 +8,5 @@ fi
 HOSTNAME=$(hostname -f)
 
 # start coordinator
-echo "Starting Coordinator on ${HOSTNAME}..."
-$PIXELS_HOME/bin/start-daemon.sh coodrinator -daemon
+echo "Starting coordinator on ${HOSTNAME}..."
+$PIXELS_HOME/bin/start-daemon.sh coordinator -daemon

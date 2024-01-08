@@ -13,7 +13,7 @@ if [ -z "$PIXELS_HOME" ]; then
 fi
 
 MAIN_CLASS="io.pixelsdb.pixels.daemon"
-EXTRA_ARGS="-operation=start"
+EXTRA_ARGS="-operation start"
 DAEMON_ROLE=$1
 case ${DAEMON_ROLE} in
   coordinator)

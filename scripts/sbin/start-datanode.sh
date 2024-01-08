@@ -11,7 +11,7 @@ while read datanode home
 do
     home="${home:-${DEFAULT_PIXELS_HOME}}"
     REMOTE_SCRIPT="export PIXELS_HOME=${home} && $PIXELS_HOME/bin/start-daemon.sh datanode -daemon"
-    echo "Starting DataNode on ${datanode}..."
+    echo "Starting datanode on ${datanode}..."
     ssh "${datanode}" "${REMOTE_SCRIPT}"
 done < ./datanodes
 
