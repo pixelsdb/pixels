@@ -105,10 +105,8 @@ public abstract class AbstractS3 implements Storage
     /**
      * Get the statuses of the files or subdirectories in the given path if it is
      * a directory or multiple directories seperated by semicolon (;).
-     * Note that S3 does not support real directories, a directory / folder is
-     * an empty object with its name ends with '/'. So that of we want to list the
-     * status of the objects in a 'folder', the path must ends with '/', otherwise
-     * we can not filter out the status of the 'folder' itself from the returned result.
+     * Note that S3 does not support real directories, a directory / folder is simply
+     * a key prefix or an empty object with its name ends with '/'.
      * @param path the given path, may contain multiple directories that are seperated by semicolon.
      * @return the statuses of the files or subdirectories.
      * @throws IOException
@@ -143,17 +141,24 @@ public abstract class AbstractS3 implements Storage
             {
                 statuses = new ArrayList<>(objects.size());
             }
-            ObjectPath op = new ObjectPath(eachPath);
+            /*
+             * Issue #618:
+             * If p is a folder (i.e., its key ends with "/"), we should filter out the empty object with exact the
+             * same key. If p is not a folder, we should not filter out the object with the same key. However, in this
+             * case we should filter out the empty object with the key p.key+"/", because in this case the user intend
+             * to list a path of a folder but forgot to append "/" to the path.
+             */
+            String maybeFolderPath = p.isFolder ? p.key : p.key + "/";
             for (S3Object object : objects)
             {
-                if (object.key().equals(p.key))
+                if (object.key().equals(maybeFolderPath) && object.size() == 0)
                 {
                     // exclude the directory (i.e., eachPath) itself
                     continue;
                 }
-                op.key = object.key();
-                statuses.add(new Status(op.toStringWithPrefix(this),
-                        object.size(), op.key.endsWith("/"), 1));
+                p.key = object.key();
+                statuses.add(new Status(p.toStringWithPrefix(this),
+                        object.size(), p.key.endsWith("/"), 1));
             }
         }
         return statuses;
