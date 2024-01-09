@@ -13,5 +13,5 @@ do
     home="${home:-${DEFAULT_PIXELS_HOME}}"
     REMOTE_SCRIPT="export PIXELS_HOME=${home} && $PIXELS_HOME/bin/stop-daemon.sh datanode"
     echo "Stop datanode on ${datanode}."
-    ssh "${datanode}" "${REMOTE_SCRIPT}"
+    ssh -n "${datanode}" "${REMOTE_SCRIPT}"
 done < $PIXELS_HOME/sbin/datanodes
