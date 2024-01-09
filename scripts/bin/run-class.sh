@@ -41,7 +41,7 @@ else
 fi
 
 # Set JVM options file path or use default JVM options
-JVM_OPTIONS_FILE="./jvm.config"
+JVM_OPTIONS_FILE="$PIXELS_HOME/bin/jvm.config"
 if [ -z "$PIXELS_JVM_OPTS" ]; then
   if [ -e "$JVM_OPTIONS_FILE" ]; then
     PIXELS_JVM_OPTS=$(tr '\n' ' ' < "$JVM_OPTIONS_FILE")
