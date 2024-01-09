@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * example command to start pixels-daemon:
- * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.2.0-SNAPSHOT-full.jar datanode|coordinator
+ * java -Dio.netty.leakDetection.level=advanced -Doperation=start|stop -Drole=coordinator|datanode -jar pixels-daemon-0.2.0-SNAPSHOT-full.jar
  * */
 public class DaemonMain
 {
@@ -31,14 +31,14 @@ public class DaemonMain
 
         if (role == null || operation == null)
         {
-            System.err.println("Run with -Drole={coordinator/datanode} -Doperation={start/stop}");
+            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|datanode}");
             System.exit(1);
         }
 
         if (!role.equalsIgnoreCase("coordinator") && !role.equalsIgnoreCase("datanode")||
                 !operation.equalsIgnoreCase("start") && !operation.equalsIgnoreCase("stop"))
         {
-            System.err.println("Run with -Drole={coordinator/datanode} -Doperation={start/stop}");
+            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|datanode}");
             System.exit(1);
         }
 
@@ -55,10 +55,6 @@ public class DaemonMain
             System.out.println("Starting daemon of " + role + "...");
             Daemon mainDaemon = new Daemon();
             mainDaemon.setup(lockFile);
-            // the main daemon logic will be running in a thread.
-            Thread daemonThread = new Thread(mainDaemon);
-            daemonThread.setName("main daemon thread");
-            daemonThread.start();
 
             try
             {
@@ -140,7 +136,6 @@ public class DaemonMain
                 }
                 for (int i = 60; i > 0; --i)
                 {
-                    // System.out.print("\rRemaining (" + i + ")s for server threads to shutdown...");
                     try
                     {
                         boolean done = true;
@@ -167,7 +162,7 @@ public class DaemonMain
                  * Shutdown the daemon thread here instead of using the SIGTERM handler.
                  */
                 mainDaemon.shutdown();
-                log.info("All the servers and the daemon thread are shutdown, byte...");
+                log.info("all the servers are shutdown, byte...");
             }));
 
             // continue the main thread, start and check the server threads.
@@ -190,7 +185,7 @@ public class DaemonMain
                     break;
                 }
             }
-            // the daemon thread is terminated.
+            // the daemon is terminated.
         }
         else
         {

@@ -29,14 +29,16 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.util.concurrent.TimeUnit;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
  */
-public class Daemon implements Runnable
+public class Daemon
 {
     private FileChannel myChannel = null;
+    private FileLock myLock = null;
     private volatile boolean running = false;
     private volatile boolean cleaned = false;
     private final ShutdownHandler shutdownHandler = null;
@@ -49,15 +51,33 @@ public class Daemon implements Runnable
         {
             try
             {
-                myLockFile.createNewFile();
+                if (!myLockFile.createNewFile())
+                {
+                    log.info("reuse existing lock file " + lockFilePath);
+                }
             } catch (IOException e)
             {
-                log.error("failed to create my own lock file.", e);
+                log.error("failed to create lock file " + lockFilePath, e);
             }
         }
         try
         {
             this.myChannel = new FileOutputStream(myLockFile).getChannel();
+            this.myLock = this.myChannel.tryLock();
+            if (myLock == null)
+            {
+                // this process has been started
+                this.clean();
+                log.info("another daemon process is holding lock on " + lockFilePath + ", exiting...");
+                this.running = false;
+                System.exit(0);
+            }
+            else
+            {
+                this.running = true;
+                log.info("starting daemon thread...");
+            }
+
             /**
              * Issue #181:
              * We should not bind the SIGTERM handler.
@@ -79,8 +99,20 @@ public class Daemon implements Runnable
     {
         try
         {
+            if (myLock != null)
+            {
+                myLock.release();
+            }
+        } catch (IOException e1)
+        {
+            log.error("error when releasing daemon lock");
+        }
+
+        try
+        {
             if (this.myChannel != null)
             {
+                this.myChannel.truncate(0);
                 this.myChannel.close();
             }
         } catch (IOException e)
@@ -88,53 +120,6 @@ public class Daemon implements Runnable
             log.error("error when closing my own channel.", e);
         }
         this.cleaned = true;
-        // this.shutdownHandler.unbind();
-    }
-
-    @Override
-    public void run()
-    {
-        FileLock myLock = null;
-        try
-        {
-            myLock = this.myChannel.tryLock();
-            if (myLock == null)
-            {
-                // this process has been started
-                this.clean();
-                log.info("Such daemon process has already been started, exiting...");
-                this.running = false;
-                System.exit(0);
-            }
-            else
-            {
-                this.running = true;
-                log.info("starting daemon thread...");
-            }
-
-            // keep the daemon thread running in an empty loop
-            while (this.running)
-            {
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (Exception e)
-        {
-            this.running = false;
-            log.error("exception occurs when running.", e);
-        }
-
-        try
-        {
-            if (myLock != null)
-            {
-                myLock.release();
-            }
-        } catch (IOException e1)
-        {
-            log.error("error when releasing my lock.");
-        }
-        log.info("The daemon thread is stopped, cleaning the file channels...");
-        this.clean();
     }
 
     public void shutdown()
@@ -142,13 +127,8 @@ public class Daemon implements Runnable
         this.running = false;
         while (!this.cleaned)
         {
-            try
-            {
-                TimeUnit.SECONDS.sleep(1);
-            } catch (InterruptedException e)
-            {
-                log.error("interrupted when waiting for file channel cleaning...");
-            }
+            log.info("the daemon thread is stopped, cleaning the file channels...");
+            this.clean();
         }
     }
 
@@ -159,24 +139,22 @@ public class Daemon implements Runnable
 
     public static class ShutdownHandler implements SignalHandler
     {
-        private volatile Daemon target = null;
+        private final Daemon daemon;
+        private final Runnable executor;
 
-        public ShutdownHandler(Daemon target)
+        public ShutdownHandler(Daemon daemon, Runnable executor)
         {
-            this.target = target;
-        }
-
-        public void unbind()
-        {
-            this.target = null;
+            this.daemon = requireNonNull(daemon, "daemon is null");
+            this.executor = requireNonNull(executor, "shutdown executor is null");
         }
 
         @Override
         public void handle(Signal signal)
         {
-            if (this.target != null)
+            if (signal.getNumber() == 15)
             {
-                this.target.shutdown();
+                this.daemon.shutdown();
+                this.executor.run();
             }
         }
     }
