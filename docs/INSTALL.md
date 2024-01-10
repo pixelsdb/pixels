@@ -87,6 +87,8 @@ The hostnames, ports, paths, usernames, and passwords in these properties are to
 > to specify a different location of `pixels.properties`. This can be a http or https URL
 > to a remote location.
 
+If you are installing a cluster, install Pixels on each node of the cluster.
+
 Optionally, to install Pixels step-by-step, see the guidance below.
 
 ### Install Step-by-Step*
@@ -126,7 +128,8 @@ Leave the other config parameters as default.
 Set `cache.enabled` to `false` in `$PIXELS_HOME/pixels.properties` if you don't use pixels-cache.
 
 ## Install MySQL
-MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later is tested. Other forks or variants may also work.
+MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later has been tested. Other forks or variants may also work.
+You only need to install one etcd and one MySQL instance, even in a cluster.
 
 To install MySQL:
 ```bash
@@ -267,6 +270,8 @@ performance metrics of the whole system.
 
 To install Prometheus, copy `node_exporter-1.5.0.linux-amd64.tar.xz`, `jmx_exporter-0.18.0.tar.xz`, and `prometheus-2.43.0.linux-amd64.tar.xz`
 under `scripts/tars` into the `~/opt` directory and decompress them.
+Node exporter and jmx exporter are needed for every node in a cluster, whereas Prometheus and Grafana are only needed on the node where you want
+to store the performance metrics and provide visualization.
 
 Create links:
 ```bash
@@ -309,6 +314,18 @@ Then, start the daemons of Pixels using:
 ```
 The essential services of Pixels, such as the metadata server, transaction manager, cache coordinator, cache manager, and metrics server, are running in these daemons.
 
+To start Pixels in a cluster, edit `PIXELS_HOME/sbin/datanodes` and list all the datanodes in this file.
+Each line in this file is in the following format:
+```config
+hostname_of_the_datanode pixels_home_of_the_datanode
+```
+`pixels_home_of_the_datanode` is optional if the datanode has the same `PIXELS_HOME` as the coordinator node where you run
+`start_pixels.sh`.
+
+You can also start Pixels coordinator and datanodes separately using `PIXELS_HOME/start-coordinator` and `PIXELS_HOME/start-datanode.sh`.
+
+> Note: You can also add JVM OPTS for Pixels daemons in `PIXELS_HOME/bin/jvm.config`. This is useful for profiling and remote debugging.
+
 After starting Pixels, enter the home of trino-server and start Trino:
 ```bash
 ./bin/launcher start
@@ -329,4 +346,4 @@ Run `SHOW SCHEMAS` in trino-cli, the result should be as follows if everything i
 By now, Pixels has been installed in the EC2 instance. The aforementioned instructions should also
 work in other kinds of VMs or physical servers.
 
-Run the script `$PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels.
+Run the script `PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels, or run `PIXELS_HOME/stop-coordinator` and `PIXELS_HOME/stop-datanode.sh` to stop the coordinator and datanodes, respectively.

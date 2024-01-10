@@ -145,7 +145,7 @@ public abstract class AbstractS3 implements Storage
              * Issue #618:
              * If p is a folder (i.e., its key ends with "/"), we should filter out the empty object with exact the
              * same key. If p is not a folder, we should not filter out the object with the same key. However, in this
-             * case we should filter out the empty object with the key p.key+"/", because in this case the user intend
+             * case we should filter out the empty object with the key p.key+"/", because in this case the user intends
              * to list a path of a folder but forgot to append "/" to the path.
              */
             String maybeFolderPath = p.isFolder ? p.key : p.key + "/";
@@ -272,7 +272,7 @@ public abstract class AbstractS3 implements Storage
     /**
      * For S3, this open method is only used to read the data object
      * fully and sequentially. And it will load the whole object into
-     * memory, so be careful for large objects.
+     * memory, so be careful with large objects.
      * @param path
      * @return
      * @throws IOException
