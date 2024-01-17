@@ -741,7 +741,7 @@ public final class TypeDescription
             case VECTOR:
                 {
                     // handle type string passed from trino. Check that the type is double(array).
-                    if (result.toString().equals("array")) {
+                    if (source.value.contains("array")) {
                         if (consumeChar(source, '('))
                         {
                             // the array type must be double
@@ -751,7 +751,7 @@ public final class TypeDescription
                     }
                     // handle type string passed from Pixels writer, should be vector(d), where (d) specifies that
                     // this column has dimension d, and is optional
-                    else if (result.toString().equals("vector")) {
+                    else if (source.value.contains("vector")) {
                         if (consumeChar(source, '(')) {
                             // with dimension specified
                             result.withDimension(parseInt(source));
