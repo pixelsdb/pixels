@@ -68,6 +68,7 @@ public class PixelsCacheWriter
     private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
     private Set<String> cachedColumnChunks = new HashSet<>();
+    private Set<String> uncacheColumnChunksOfLastFile = new HashSet<>();
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
@@ -351,6 +352,14 @@ public class PixelsCacheWriter
         {
             cachedColumnChunks.clear();
         }
+        if (uncacheColumnChunksOfLastFile == null || uncacheColumnChunksOfLastFile.isEmpty())
+        {
+            uncacheColumnChunksOfLastFile = new HashSet<>();
+        }
+        else
+        {
+            uncacheColumnChunksOfLastFile.clear();
+        }
         radix.removeAll();
         long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
@@ -373,6 +382,12 @@ public class PixelsCacheWriter
                 String[] columnChunkIdStr = cacheColumnChunkOrders.get(i).split(":");
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
+                if(rowGroupId >= pixelsPhysicalReader.getRowGroupNum())
+                {
+                    logger.warn("row group id: " + rowGroupId + " is out of range: "+(pixelsPhysicalReader.getRowGroupNum()-1));
+                    uncacheColumnChunksOfLastFile.add(cacheColumnChunkOrders.get(i));
+                    continue;
+                }
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
@@ -449,6 +464,7 @@ public class PixelsCacheWriter
             }
         }
         this.cachedColumnChunks.clear();
+        this.uncacheColumnChunksOfLastFile.retainAll(survivedColumnChunks);
         PixelsRadix oldRadix = radix;
         List<PixelsCacheEntry> survivedIdxes = new ArrayList<>(survivedColumnChunks.size()*files.length);
         for (String file : files)
@@ -462,6 +478,10 @@ public class PixelsCacheWriter
                 String[] columnChunkIdStr = survivedColumnChunk.split(":");
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
+                if(rowGroupId >= physicalReader.getRowGroupNum())
+                {
+                    continue;
+                }
                 PixelsCacheIdx curCacheIdx = oldRadix.get(blockId, rowGroupId, columnId);
                 survivedIdxes.add(
                         new PixelsCacheEntry(new PixelsCacheKey(
@@ -536,6 +556,12 @@ public class PixelsCacheWriter
                 String[] columnChunkIdStr = newCachedColumnChunks.get(i).split(":");
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
+                if(rowGroupId >= pixelsPhysicalReader.getRowGroupNum())
+                {
+                    logger.warn("row group id: " + rowGroupId + " is out of range: "+(pixelsPhysicalReader.getRowGroupNum()-1));
+                    uncacheColumnChunksOfLastFile.add(newCachedColumnChunks.get(i));
+                    continue;
+                }
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
