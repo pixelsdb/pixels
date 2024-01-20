@@ -2,7 +2,7 @@
 
 if [ $# -lt 1 ];
 then
-  echo "USAGE: $0 [-role role] [-name serviceName] [-daemon] classname [opts]"
+  echo "USAGE: $0 [-operation operation] [-role role] [-daemon] classname [opts]"
   exit 1
 fi
 
@@ -41,7 +41,7 @@ else
 fi
 
 # Set JVM options file path or use default JVM options
-JVM_OPTIONS_FILE="./jvm.config"
+JVM_OPTIONS_FILE="$PIXELS_HOME/bin/jvm.config"
 if [ -z "$PIXELS_JVM_OPTS" ]; then
   if [ -e "$JVM_OPTIONS_FILE" ]; then
     PIXELS_JVM_OPTS=$(tr '\n' ' ' < "$JVM_OPTIONS_FILE")
@@ -57,13 +57,13 @@ echo "JVM options: ${PIXELS_JVM_OPTS}"
 while [ $# -gt 0 ]; do
   COMMAND=$1
   case $COMMAND in
-    -role)
-      DAEMON_ROLE=$2
+    -operation)
+      OPERATION=$2
       shift 2
       ;;
-    -name)
-      DAEMON_NAME=$2
-      CONSOLE_OUTPUT_FILE=${base_dir}/logs/$DAEMON_NAME.out
+    -role)
+      DAEMON_ROLE=$2
+      CONSOLE_OUTPUT_FILE=${base_dir}/logs/$DAEMON_ROLE.out
       shift 2
       ;;
     -daemon)
@@ -76,19 +76,17 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-echo "role: $DAEMON_ROLE, name: $DAEMON_NAME, mode: $DAEMON_MODE"
-
 PIXELS_OPTS="-Dio.netty.leakDetection.level=advanced"
+if [ "x$OPERATION" = "x" ]; then
+  PIXELS_OPTS=$PIXELS_OPTS
+else
+  PIXELS_OPTS=$PIXELS_OPTS" -Doperation=$OPERATION"
+fi
+
 if [ "x$DAEMON_ROLE" = "x" ]; then
   PIXELS_OPTS=$PIXELS_OPTS
 else
   PIXELS_OPTS=$PIXELS_OPTS" -Drole=$DAEMON_ROLE"
-fi
-
-if [ "x$DAEMON_NAME" = "x" ]; then
-  PIXELS_OPTS=$PIXELS_OPTS
-else
-  PIXELS_OPTS=$PIXELS_OPTS" -Dname=$DAEMON_NAME"
 fi
 
 echo "PIXELS OPTS: "$PIXELS_OPTS
@@ -100,7 +98,7 @@ fi
 
 # Launch mode
 if [ "x$DAEMON_MODE" = "xtrue" ]; then
-  echo "$DAEMON_NAME running in the daemon mode."
+  echo "$DAEMON_ROLE running in the daemon mode."
   nohup ${NUMA_INTERLEAVE} ${JAVA} ${PIXELS_JVM_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@" > ${CONSOLE_OUTPUT_FILE} 2>&1 < /dev/null &
 else
   exec ${NUMA_INTERLEAVE} ${JAVA} ${PIXELS_JVM_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@"

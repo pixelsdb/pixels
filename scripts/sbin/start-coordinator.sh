@@ -5,6 +5,8 @@ if [ -z "$PIXELS_HOME" ]; then
   exit 1
 fi
 
-# start coodrinator
-echo "Starting Coordinator..."
-$PIXELS_HOME/bin/start-coordinator.sh -daemon
+HOSTNAME=$(hostname -f)
+
+# start coordinator
+echo "Starting coordinator on ${HOSTNAME}..."
+$PIXELS_HOME/bin/start-daemon.sh coordinator -daemon

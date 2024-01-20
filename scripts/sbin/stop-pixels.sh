@@ -5,6 +5,6 @@ if [ -z "$PIXELS_HOME" ]; then
   exit 1
 fi
 
-# $PIXELS_HOME/bin/stop-datanode.sh
+$PIXELS_HOME/sbin/stop-datanode.sh
 
-$PIXELS_HOME/bin/stop-coordinator.sh
+$PIXELS_HOME/sbin/stop-coordinator.sh
