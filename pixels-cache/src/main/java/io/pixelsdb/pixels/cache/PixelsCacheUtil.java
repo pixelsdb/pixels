@@ -364,9 +364,9 @@ public class PixelsCacheUtil
      * @param cacheFile the cache file of the local cache
      * @return the local cache version in the index file, or -1 when the local cache is empty
      */
-    public static int getIndexVersion(MemoryMappedFile indexFile, MemoryMappedFile cacheFile)
+    public static int getIndexVersion(MemoryMappedFile indexFile, PixelsCacheWriter cacheWriter)
     {
-        if (isCacheFileEmpty(cacheFile))
+        if (cacheWriter.isExistZoneEmpty())
         {
             return -1;
         }
