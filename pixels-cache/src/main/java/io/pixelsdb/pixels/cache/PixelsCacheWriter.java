@@ -68,7 +68,6 @@ public class PixelsCacheWriter
     private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
     private Set<String> cachedColumnChunks = new HashSet<>();
-    private Set<String> uncacheColumnChunksOfLastFile = new HashSet<>();
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
@@ -352,18 +351,11 @@ public class PixelsCacheWriter
         {
             cachedColumnChunks.clear();
         }
-        if (uncacheColumnChunksOfLastFile == null || uncacheColumnChunksOfLastFile.isEmpty())
-        {
-            uncacheColumnChunksOfLastFile = new HashSet<>();
-        }
-        else
-        {
-            uncacheColumnChunksOfLastFile.clear();
-        }
         radix.removeAll();
         long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
                 ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
+        int rowGroupNumInLayout = Integer.parseInt(ConfigFactory.Instance().getProperty("compact.factor"));
         outer_loop:
         for (String file : files)
         {
@@ -374,6 +366,11 @@ public class PixelsCacheWriter
                 file = ensureLocality(file);
             }
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
+            if(pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
+            {
+                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " + pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " + file);
+                continue;
+            }
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
@@ -382,12 +379,6 @@ public class PixelsCacheWriter
                 String[] columnChunkIdStr = cacheColumnChunkOrders.get(i).split(":");
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
-                if(rowGroupId >= pixelsPhysicalReader.getRowGroupNum())
-                {
-                    logger.warn("row group id: " + rowGroupId + " is out of range: "+(pixelsPhysicalReader.getRowGroupNum()-1));
-                    uncacheColumnChunksOfLastFile.add(cacheColumnChunkOrders.get(i));
-                    continue;
-                }
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
@@ -464,12 +455,17 @@ public class PixelsCacheWriter
             }
         }
         this.cachedColumnChunks.clear();
-        this.uncacheColumnChunksOfLastFile.retainAll(survivedColumnChunks);
         PixelsRadix oldRadix = radix;
         List<PixelsCacheEntry> survivedIdxes = new ArrayList<>(survivedColumnChunks.size()*files.length);
+        int rowGroupNumInLayout = Integer.parseInt(ConfigFactory.Instance().getProperty("compact.factor"));
         for (String file : files)
         {
             PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file);
+            if(physicalReader.getRowGroupNum() < rowGroupNumInLayout)
+            {
+                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " + physicalReader.getRowGroupNum() + " row groups are found in " + file);
+                continue;
+            }
             // TODO: in case of block id was changed, the survived column chunks in this block can not survive in the cache update.
             // This problem only affects the efficiency, but it is better to resolve it.
             long blockId = physicalReader.getCurrentBlockId();
@@ -478,10 +474,6 @@ public class PixelsCacheWriter
                 String[] columnChunkIdStr = survivedColumnChunk.split(":");
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
-                if(rowGroupId >= physicalReader.getRowGroupNum())
-                {
-                    continue;
-                }
                 PixelsCacheIdx curCacheIdx = oldRadix.get(blockId, rowGroupId, columnId);
                 survivedIdxes.add(
                         new PixelsCacheEntry(new PixelsCacheKey(
@@ -548,6 +540,11 @@ public class PixelsCacheWriter
                 file = ensureLocality(file);
             }
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
+            if(pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
+            {
+                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " + pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " + file);
+                continue;
+            }
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
@@ -556,12 +553,6 @@ public class PixelsCacheWriter
                 String[] columnChunkIdStr = newCachedColumnChunks.get(i).split(":");
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
-                if(rowGroupId >= pixelsPhysicalReader.getRowGroupNum())
-                {
-                    logger.warn("row group id: " + rowGroupId + " is out of range: "+(pixelsPhysicalReader.getRowGroupNum()-1));
-                    uncacheColumnChunksOfLastFile.add(newCachedColumnChunks.get(i));
-                    continue;
-                }
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
