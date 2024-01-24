@@ -146,6 +146,9 @@ void PixelsRecordReaderImpl::UpdateRowGroupInfo() {
 
 
 // If cross multiple row group, we only process one row group
+// In the current configuration, one batch is 10000 rows. This function creates
+// VectorizedRowBatch with some cols. Each column has 10000 elements. The columns
+// read value from chunkBuffer.
 std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse) {
     if(endOfFile) {
 		endOfFile = true;

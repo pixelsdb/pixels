@@ -78,7 +78,7 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
         }
         uint64_t currentLoc = data.vectorizedRowBatch->position();
         std::shared_ptr<TypeDescription> resultSchema = data.currPixelsRecordReader->getResultSchema();
-        uint64_t remaining = data.vectorizedRowBatch->rowCount - currentLoc;
+        uint64_t remaining = data.vectorizedRowBatch->remaining();
         assert(remaining > 0);
         auto thisOutputChunkRows = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
         output.SetCardinality(thisOutputChunkRows);
@@ -369,9 +369,9 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 //			default:
 //				throw InvalidArgumentException("bad column type " + std::to_string(colSchema->getCategory()));
 		}
-        col->increment(thisOutputChunkRows);
 		row_batch_id++;
 	}
+    vectorizedRowBatch->increment(thisOutputChunkRows);
 }
 
 bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
@@ -419,7 +419,6 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     }
 
     ::BufferPool::Switch();
-
     scan_data.currReader = scan_data.nextReader;
     scan_data.currPixelsRecordReader = scan_data.nextPixelsRecordReader;
     // asyncReadComplete is not invoked in the first run (is_init_state = true)
