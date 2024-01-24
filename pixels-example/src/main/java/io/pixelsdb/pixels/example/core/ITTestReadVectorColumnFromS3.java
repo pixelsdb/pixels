@@ -17,9 +17,13 @@ public class ITTestReadVectorColumnFromS3 {
 
     public static void main(String[] args)
     {
+        readVectorColumn("s3://tiannan-test/test_arr_table_4/v-0-ordered/1.pxl");
+    }
+
+    public static void readVectorColumn(String currentPath) {
         // Note you may need to restart intellij to let it pick up the updated environment variable value
         // example path: s3://bucket-name/test-file.pxl
-        String currentPath = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test-vec-larger2.pxl";
+//        String currentPath = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test-vec-larger2.pxl";
         System.out.println(currentPath);
         try {
             Storage storage = StorageFactory.Instance().getStorage("s3");
