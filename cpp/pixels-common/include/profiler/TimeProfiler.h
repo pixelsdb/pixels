@@ -15,6 +15,8 @@
 #include <mutex>
 #include <thread>
 
+#define PROFILE_START(X) ::TimeProfiler::Instance().Start(X)
+#define PROFILE_END(X) ::TimeProfiler::Instance().End(X)
 
 class TimeProfiler: public AbstractProfiler {
 public:
