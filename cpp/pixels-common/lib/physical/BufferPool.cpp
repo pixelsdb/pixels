@@ -18,7 +18,11 @@ void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> 
 	assert(colIds.size() == bytes.size());
 	int fsBlockSize = std::stoi(ConfigFactory::Instance().getProperty("localfs.block.size"));
     std::string columnSizePath = ConfigFactory::Instance().getProperty("pixel.column.size.path");
-    ColumnSizeCSVReader csvReader(columnSizePath);
+    std::shared_ptr<ColumnSizeCSVReader> csvReader;
+    if (!columnSizePath.empty()) {
+        csvReader = std::make_shared<ColumnSizeCSVReader>(columnSizePath);
+    }
+
     // give the maximal column size, which is stored in csv reader
 	if(!BufferPool::isInitialized) {
         currBufferIdx = 0;
@@ -28,7 +32,13 @@ void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> 
 			uint32_t colId = colIds.at(i);
             std::string columnName = columnNames[colId];
             for(int idx = 0; idx < 2; idx++) {
-                auto buffer = BufferPool::directIoLib->allocateDirectBuffer(csvReader.get(columnName) + static_cast<int64_t>(EXTRA_POOL_SIZE));
+                std::shared_ptr<ByteBuffer> buffer;
+                if (columnSizePath.empty()) {
+                    buffer = BufferPool::directIoLib->allocateDirectBuffer(bytes.at(i) + EXTRA_POOL_SIZE);
+                } else {
+                    buffer = BufferPool::directIoLib->allocateDirectBuffer(csvReader->get(columnName));
+                }
+
                 BufferPool::nrBytes[colId] = buffer->size();
                 BufferPool::buffers[idx][colId] = buffer;
             }
@@ -47,7 +57,6 @@ void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> 
 			}
 			// Note: this code should never happen in the pixels scenario
 			if (BufferPool::nrBytes[colId] < byte) {
-                std::cout<<columnName<<" "<<csvReader.get(columnName)<<" "<<byte<<std::endl;
 				throw InvalidArgumentException("the new buffer byte cannot larger than the previous buffer byte. ");
 			}
 		}
