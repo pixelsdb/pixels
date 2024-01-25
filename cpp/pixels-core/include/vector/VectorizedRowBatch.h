@@ -35,6 +35,7 @@ public:
     void reset();
     void resize(int size);
     uint64_t position();
+    void increment(int size);
     int count();
     bool isEmpty();
     bool isFull();
@@ -42,5 +43,6 @@ public:
     bool isEndOfFile();
 private:
 	bool closed;
+    int current;                                        // The current pointer of VectorizedRowBatch.
 };
 #endif //PIXELS_VECTORIZEDROWBATCH_H

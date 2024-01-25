@@ -146,6 +146,9 @@ void PixelsRecordReaderImpl::UpdateRowGroupInfo() {
 
 
 // If cross multiple row group, we only process one row group
+// In the current configuration, one batch is 10000 rows. This function creates
+// VectorizedRowBatch with some cols. Each column has 10000 elements. The columns
+// read value from chunkBuffer.
 std::shared_ptr<VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse) {
     if(endOfFile) {
 		endOfFile = true;
@@ -377,7 +380,7 @@ bool PixelsRecordReaderImpl::read() {
 			colIds.emplace_back(chunk.columnId);
 			bytes.emplace_back(chunk.length);
         }
-		::BufferPool::Initialize(colIds, bytes);
+		::BufferPool::Initialize(colIds, bytes, fileSchema->getFieldNames());
         ::DirectUringRandomAccessFile::RegisterBufferFromPool(colIds);
 		std::vector<std::shared_ptr<ByteBuffer>> originalByteBuffers;
 		for(int i = 0; i < colIds.size(); i++) {

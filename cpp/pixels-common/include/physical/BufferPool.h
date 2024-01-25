@@ -11,19 +11,20 @@
 #include <memory>
 #include "physical/natives/DirectIoLib.h"
 #include "exception/InvalidArgumentException.h"
+#include "utils/ColumnSizeCSVReader.h"
 #include <map>
 
 // when allocating buffer pool, we use the size of the first pxl file. Consider that
 // the remaining pxl file has larger size than the first file, we allocate some extra
 // size (10MB) to each column.
 // TODO: how to evaluate the maximal pool size
-#define EXTRA_POOL_SIZE 2*1024*1024
+#define EXTRA_POOL_SIZE 1*1024*1024
 
 class DirectUringRandomAccessFile;
 // This class is global class. The variable is shared by each thread
 class BufferPool {
 public:
-	static void Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> bytes);
+	static void Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> bytes, std::vector<std::string> columnNames);
 	static std::shared_ptr<ByteBuffer> GetBuffer(uint32_t colId);
     static int64_t GetBufferId(uint32_t index);
     static void Switch();

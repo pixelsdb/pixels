@@ -14,23 +14,26 @@ thread_local int BufferPool::currBufferIdx = 1;
 thread_local int BufferPool::nextBufferIdx = 0;
 std::shared_ptr<DirectIoLib> BufferPool::directIoLib;
 
-void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> bytes) {
+void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> bytes, std::vector<std::string> columnNames) {
 	assert(colIds.size() == bytes.size());
 	int fsBlockSize = std::stoi(ConfigFactory::Instance().getProperty("localfs.block.size"));
+    std::string columnSizePath = ConfigFactory::Instance().getProperty("pixel.column.size.path");
+    ColumnSizeCSVReader csvReader(columnSizePath);
+    // give the maximal column size, which is stored in csv reader
 	if(!BufferPool::isInitialized) {
         currBufferIdx = 0;
         nextBufferIdx = 1;
 		directIoLib = std::make_shared<DirectIoLib>(fsBlockSize);
 		for(int i = 0; i < colIds.size(); i++) {
 			uint32_t colId = colIds.at(i);
-			uint64_t byte = bytes.at(i);
+            std::string columnName = columnNames[colId];
             for(int idx = 0; idx < 2; idx++) {
-                auto buffer = BufferPool::directIoLib->allocateDirectBuffer(byte + static_cast<int64_t>(EXTRA_POOL_SIZE));
+                auto buffer = BufferPool::directIoLib->allocateDirectBuffer(csvReader.get(columnName) + static_cast<int64_t>(EXTRA_POOL_SIZE));
                 BufferPool::nrBytes[colId] = buffer->size();
                 BufferPool::buffers[idx][colId] = buffer;
             }
 		}
-		BufferPool::colCount = bytes.size();
+		BufferPool::colCount = colIds.size();
 		BufferPool::isInitialized = true;
 	} else {
 		// check if resize the buffer is needed
@@ -38,11 +41,13 @@ void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> 
 		for (int i = 0; i < colIds.size(); i++) {
 			uint32_t colId = colIds.at(i);
 			uint64_t byte = bytes.at(i);
+            std::string columnName = columnNames[colId];
 			if (BufferPool::nrBytes.find(colId) == BufferPool::nrBytes.end()) {
 				throw InvalidArgumentException("BufferPool::Initialize: no such the column id.");
 			}
 			// Note: this code should never happen in the pixels scenario
 			if (BufferPool::nrBytes[colId] < byte) {
+                std::cout<<columnName<<" "<<csvReader.get(columnName)<<" "<<byte<<std::endl;
 				throw InvalidArgumentException("the new buffer byte cannot larger than the previous buffer byte. ");
 			}
 		}
