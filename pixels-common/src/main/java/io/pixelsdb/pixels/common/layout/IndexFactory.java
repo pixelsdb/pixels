@@ -21,8 +21,8 @@ package io.pixelsdb.pixels.common.layout;
 
 import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class IndexFactory
 {
@@ -37,13 +37,13 @@ public class IndexFactory
         return instance;
     }
 
-    private Map<SchemaTableName, SplitsIndex> splitsIndexes;
-    private Map<SchemaTableName, ProjectionsIndex> projectionsIndexes;
+    private final Map<SchemaTableName, SplitsIndex> splitsIndexes;
+    private final Map<SchemaTableName, ProjectionsIndex> projectionsIndexes;
 
     private IndexFactory()
     {
-        this.splitsIndexes = new HashMap<>();
-        this.projectionsIndexes = new HashMap<>();
+        this.splitsIndexes = new ConcurrentHashMap<>();
+        this.projectionsIndexes = new ConcurrentHashMap<>();
     }
 
     public void cacheSplitsIndex(SchemaTableName entry, SplitsIndex splitsIndex)
@@ -56,6 +56,16 @@ public class IndexFactory
         return this.splitsIndexes.get(entry);
     }
 
+    public void dropSplitsIndex(SchemaTableName entry)
+    {
+        this.splitsIndexes.remove(entry);
+    }
+
+    public void dropSplitsIndex(String schemaName, String tableName)
+    {
+        this.dropSplitsIndex(new SchemaTableName(schemaName, tableName));
+    }
+
     public void cacheProjectionsIndex(SchemaTableName entry, ProjectionsIndex projectionsIndex)
     {
         this.projectionsIndexes.put(entry, projectionsIndex);
@@ -64,5 +74,15 @@ public class IndexFactory
     public ProjectionsIndex getProjectionsIndex(SchemaTableName entry)
     {
         return this.projectionsIndexes.get(entry);
+    }
+
+    public void dropProjectionsIndex(SchemaTableName entry)
+    {
+        this.projectionsIndexes.remove(entry);
+    }
+
+    public void dropProjectionsIndex(String schemaName, String tableName)
+    {
+        this.dropProjectionsIndex(new SchemaTableName(schemaName, tableName));
     }
 }
