@@ -3,7 +3,6 @@
 //
 
 #include "utils/EncodingUtils.h"
-#include "EncodingUtils.h"
 
 int EncodingUtils::BUFFER_SIZE = 64;
 
@@ -497,7 +496,7 @@ int EncodingUtils::getClosestFixedBits(int n) {
     }
 }
 
-void EncodingUtils::unrolledBitPack1(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack1(long* input, int offset, int len, 
                                      std::shared_ptr<ByteBuffer> output) {
     int numHops = 8;
     int remainder = len % numHops;
@@ -527,7 +526,7 @@ void EncodingUtils::unrolledBitPack1(const std::vector<long> &input, int offset,
     }
 }
 
-void EncodingUtils::unrolledBitPack2(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack2(long* input, int offset, int len, 
                                      std::shared_ptr<ByteBuffer> output) {
     int numHops = 4;
     int remainder = len % numHops;
@@ -553,7 +552,7 @@ void EncodingUtils::unrolledBitPack2(const std::vector<long> &input, int offset,
     }
 }
 
-void EncodingUtils::unrolledBitPack4(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack4(long* input, int offset, int len, 
                                      std::shared_ptr<ByteBuffer> output) {
     int numHops = 2;
     int remainder = len % numHops;
@@ -577,46 +576,46 @@ void EncodingUtils::unrolledBitPack4(const std::vector<long> &input, int offset,
     }
 }
 
-void EncodingUtils::unrolledBitPack8(const std::vector<long> &input, int offset, int len, std::shared_ptr<ByteBuffer> output) {
+void EncodingUtils::unrolledBitPack8(long* input, int offset, int len, std::shared_ptr<ByteBuffer> output) {
     unrolledBitPackBytes(input, offset, len, output, 1);
 }
 
-void EncodingUtils::unrolledBitPack16(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack16(long* input, int offset, int len, 
                                       std::shared_ptr<ByteBuffer> output) {
     unrolledBitPackBytes(input, offset, len, output, 2);
 }   
 
-void EncodingUtils::unrolledBitPack24(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack24(long* input, int offset, int len, 
                                       std::shared_ptr<ByteBuffer> output) {
     unrolledBitPackBytes(input, offset, len, output, 3);
 }
 
-void EncodingUtils::unrolledBitPack32(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack32(long* input, int offset, int len, 
                                       std::shared_ptr<ByteBuffer> output) {
     unrolledBitPackBytes(input, offset, len, output, 4);
 }
 
-void EncodingUtils::unrolledBitPack40(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack40(long* input, int offset, int len, 
                                       std::shared_ptr<ByteBuffer> output) {
     unrolledBitPackBytes(input, offset, len, output, 5);
 }
 
-void EncodingUtils::unrolledBitPack48(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack48(long* input, int offset, int len, 
                                       std::shared_ptr<ByteBuffer> output) {
     unrolledBitPackBytes(input, offset, len, output, 6);
 }
 
-void EncodingUtils::unrolledBitPack56(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack56(long* input, int offset, int len, 
                                       std::shared_ptr<ByteBuffer> output) {
     unrolledBitPackBytes(input, offset, len, output, 7);
 }
 
-void EncodingUtils::unrolledBitPack64(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPack64(long* input, int offset, int len, 
                                       std::shared_ptr<ByteBuffer> output) {
     unrolledBitPackBytes(input, offset, len, output, 8);
 }
 
-void EncodingUtils::unrolledBitPackBytes(const std::vector<long> &input, int offset, int len, 
+void EncodingUtils::unrolledBitPackBytes(long* input, int offset, int len, 
                                          std::shared_ptr<ByteBuffer> output, int numBytes) {
     int numHops = 8;
     int remainder = len % numHops;
@@ -625,7 +624,7 @@ void EncodingUtils::unrolledBitPackBytes(const std::vector<long> &input, int off
     int i = offset;
     for(; i < endUnroll; i += numHops) {
         // PENDING: in C++ version, we will change data into little endian
-        writeLongLE(output, input, i, numHops, numBytes);
+        writeLongBE(output, input, i, numHops, numBytes);
     }
 
     if(remainder > 0) {
@@ -638,7 +637,7 @@ void EncodingUtils::unrolledBitPackBytes(const std::vector<long> &input, int off
  * @brief write a encoded long value into the output in little endian
 */
 void EncodingUtils::writeLongBE(std::shared_ptr<ByteBuffer> output, 
-                                const std::vector<long>& input, int offset, int numHops, int numBytes) {
+                                long* input, int offset, int numHops, int numBytes) {
     switch (numBytes) {
         case 1:
             writeBuffer[0] = (byte) (input[offset] & 255);
@@ -791,7 +790,7 @@ void EncodingUtils::writeLongBE8(std::shared_ptr<ByteBuffer> output,
 }
 
 void EncodingUtils::writeRemainingLongs(std::shared_ptr<ByteBuffer> output, int offset, 
-                                        const std::vector<long> &input, int remainder, int numBytes) {
+                                        long* input, int remainder, int numBytes) {
     int numHops = remainder;
     int idx = 0;
     switch(numBytes) {

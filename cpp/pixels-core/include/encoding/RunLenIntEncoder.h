@@ -30,13 +30,14 @@ public:
     RunLenIntEncoder();
 
     RunLenIntEncoder(bool isSigned, bool isAlignedBitPacking);
+    ~RunLenIntEncoder();
 
     // -----------------------------------------------------------
     // Encoding functions
-    void encode(const std::vector<long>& values, int offset, int length, std::vector<byte>& results);
-    void encode(const std::vector<int>&, int offset, int length, std::vector<byte>& results);
-    void encode(const std::vector<long>& values, std::vector<byte>& results);
-    void encode(const std::vector<int>& values, std::vector<byte>& results);
+    void encode(long* values, int offset, int length, byte* results);
+    void encode(int* values, int offset, int length, byte* results);
+    void encode(long* values, byte* results, int length);
+    void encode(int* values, byte* results, int length);
     // -----------------------------------------------------------
     void determineEncoding();
     // -----------------------------------------------------------
@@ -45,12 +46,13 @@ public:
     void writeDirectValues();
     void writePatchedBaseValues();
     void writeDeltaValues();
-    void writeInts(const std::vector<long>& input, int offset, int len, int bitSize);
+    void writeInts(long* input, int offset, int len, int bitSize);
     int getOpcode();
     void write(long value);
+    void flush();
     void initializeLiterals(long value);
     void clear();
-    int percentileBits(const std::vector<long>& data, int offset, int length, double p);
+    int percentileBits(long* data, int offset, int length, double p);
     int findClosestNumBits(long value);
     bool isSafeSubtract(long left, long right);
     int getClosestAlignedFixedBits(int n);
@@ -61,7 +63,8 @@ public:
     // zigzag 
     void computeZigZagLiterals();
     long zigzagEncode(long val);
-
+    void writeVslong(std::shared_ptr<ByteBuffer> output, long value);
+    void writeVulong(std::shared_ptr<ByteBuffer> output, long value);
 
 
 // -----------------------------------------------------------
@@ -81,7 +84,8 @@ private:
     int patchWidth;
     int patchGapWidth;
     int patchLength;
-    std::vector<long> gapVsPatchList;
+    long* gapVsPatchList;
+    int gapVsPatchListSize;
     // -----------------------------------------------------------
     int zzBits90p;
     int zzBits100p;
@@ -90,10 +94,10 @@ private:
     
     long min;
 
-    std::vector<long> literals;
-    std::vector<long> zigzagLiterals;
-    std::vector<long> baseRedLiterals;
-    std::vector<long> adjDeltas;
+    long* literals;
+    long* zigzagLiterals;
+    long* baseRedLiterals;
+    long* adjDeltas;
 
     EncodingUtils encodingUtils;
     // PENDING: should use byte buffer here? ref @Decoder

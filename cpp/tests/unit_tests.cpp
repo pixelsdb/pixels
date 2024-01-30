@@ -600,3 +600,47 @@ TEST(reader, filterMaskTest) {
 	bool isNone = filterMask.isNone();
 
 }
+
+static const uint32_t TestRowNum = 10;
+
+template<class T> 
+bool arrayEquals(const std::vector<T>& a, const std::vector<T>& b) {
+    if(a.size() != b.size()) {
+        std::cout << "Size of a and b are not equal " << a.size() << " " << b.size() << std::endl;
+        return false;
+    }
+    for(int i = 0; i < a.size(); ++i) {
+        if(a[i] == b[i]) continue;
+        std::cout << "Found a and b not equal at " << i << " " << a[i] << " " << b[i] << std::endl; 
+        return false;
+    }
+    return true;
+}
+
+TEST(reader, runLengthTest) {
+    std::random_device r;
+    std::default_random_engine e(r());
+    std::uniform_int_distribution<long> dist;
+
+    std::vector<long> values(TestRowNum, 0L);
+    values[0] = 0;
+    values[1] = -1;
+    values[2] = -2;
+    for (int i = 3; i < TestRowNum; i++)
+    {
+        values[i] = dist(e);
+    }
+    std::vector<long> decoderValues(TestRowNum, 0L);
+    RunLenIntEncoder encoder(true, true);
+    std::vector<byte> bytes;
+    encoder.encode(values, bytes);
+    std::shared_pointer<ByteBuffer> buffer;
+    RunLenIntDecoder decoder(buffer, true);
+    int i = 0;
+    while (decoder.hasNext())
+    {
+        decoderValues[i++] = decoder.next();
+    }
+    std::cout << bytes.size() << std::endl;
+    assert(arrayEquals<long>(decoderValues, values));
+}

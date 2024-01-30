@@ -8,8 +8,11 @@
  */
 
 #include "encoding/RunLenIntEncoder.h"
+#include "utils/Constants.h"
+
+
+
 #include <memory>
-#include "RunLenIntEncoder.h"
 
 // -----------------------------------------------------------
 // Construtors 
@@ -29,49 +32,75 @@ RunLenIntEncoder::RunLenIntEncoder(bool isSigned, bool isAlignedBitPacking) :
     // PENDING: will the byte buffer be used in a buffer pool
     //          so that we do not need to create it here
     outputStream = std::make_shared<ByteBuffer>();
+    literals = new long[Constants::MAX_SCOPE];
+    zigzagLiterals = new long[Constants::MAX_SCOPE];
+    baseRedLiterals = new long[Constants::MAX_SCOPE];
+    adjDeltas = new long[Constants::MAX_SCOPE];
+    gapVsPatchList = new long[Constants::MAX_SCOPE];
     clear();
 }
 
+RunLenIntEncoder::~RunLenIntEncoder() {
+	if(literals != nullptr) {
+		delete[] literals;
+		literals = nullptr;
+	}
+    if(zigzagLiterals != nullptr) {
+		delete[] zigzagLiterals;
+		zigzagLiterals = nullptr;
+	}
+    if(baseRedLiterals != nullptr) {
+		delete[] baseRedLiterals;
+		baseRedLiterals = nullptr;
+	}
+    if(adjDeltas != nullptr) {
+		delete[] adjDeltas;
+		adjDeltas = nullptr;
+	}
+    if(gapVsPatchList != nullptr) {
+		delete[] gapVsPatchList;
+		gapVsPatchList = nullptr;
+	}
+}
+
+
 // -----------------------------------------------------------
 // Encoding Handles
-void RunLenIntEncoder::encode(const std::vector<long>& values, int offset, int length, std::vector<byte>& results) {
+void RunLenIntEncoder::encode(long*  values, int offset, int length, byte* results) {
     for(int i = 0; i < length; ++i) {
         this->write(values[i + offset]);
     }
     flush();
     int len = length * sizeof(long);
-    // BUG: the length is not right
-    byte tmp_result[len];
-    outputStream->getBytes(tmp_result, len);
-    results.resize(len);
+    byte* tmpResult = new byte[len];
+    outputStream->getBytes(tmpResult, len);
     for(int i = 0; i < len; ++i) {
-        results[i] = tmp_result[i];
+        results[i] = tmpResult[i];
     }
     outputStream->clear();
 }
 
-void RunLenIntEncoder::encode(const std::vector<int>& values, int offset, int length, std::vector<byte>& results) {
+void RunLenIntEncoder::encode(int* values, int offset, int length, byte* results) {
     for(int i = 0; i < length; ++i) {
         this->write(values[i + offset]);
     }
     flush();
     int len = length * sizeof(int);
-    // BUG: the length is not right
-    byte tmp_result[len];
-    outputStream->getBytes(tmp_result, len);
-    results.resize(len);
+    byte* tmpResult = new byte[len];
+    outputStream->getBytes(tmpResult, len);
     for(int i = 0; i < len; ++i) {
-        results[i] = tmp_result[i];
+        results[i] = tmpResult[i];
     }
+    delete[] tmpResult;
     outputStream->clear();
 }
 
-void RunLenIntEncoder::encode(const std::vector<long>& values, std::vector<byte>& results) {
-    encode(values, 0, values.size(), results);
+void RunLenIntEncoder::encode(long* values, byte* results, int length) {
+    encode(values, 0, length, results);
 }
 
-void RunLenIntEncoder::encode(const std::vector<int>& values, std::vector<byte>& results) {
-    encode(values, 0, values.size(), results);
+void RunLenIntEncoder::encode(int* values, byte* results, int length) {
+    encode(values, 0, length, results);
 }
 
 
@@ -103,7 +132,6 @@ void RunLenIntEncoder::determineEncoding() {
     long initialDelta = literals[1] - literals[0];
     long currDelta = 0;
     long deltaMax = 0;
-    adjDeltas.resize(numLiterals);
     adjDeltas[0] = initialDelta;
     
     // traverse the literals and probe the monocity and delta
@@ -178,8 +206,6 @@ void RunLenIntEncoder::determineEncoding() {
     zzBits90p = percentileBits(zigzagLiterals, 0, numLiterals, 0.9);
     int diffBitsLH = zzBits100p - zzBits90p;
 
-    assert(baseRedLiterals.size() == 0);
-    baseRedLiterals.resize(numLiterals);
     // if the difference is larger than 1 we should patch the values
     if(diffBitsLH > 1) {
         for(int i = 0; i < numLiterals; ++i) {
@@ -304,7 +330,6 @@ void RunLenIntEncoder::preparePatchedBlob() {
     // create gap vs patch list
     gapIdx = 0;
     patchIdx = 0;
-    gapVsPatchList.resize(patchLength);
     for(int i = 0; i < patchLength; i++) {
         long g = gapList[gapIdx++];
         long p = patchList[patchIdx++];
@@ -317,6 +342,7 @@ void RunLenIntEncoder::preparePatchedBlob() {
         // TODO: if we want to encode the values into little endian
         //       shall we modify here?
         gapVsPatchList[i] = (g << patchWidth) | p;
+        gapVsPatchListSize = i + 1;
     }    
 }
 
@@ -479,18 +505,93 @@ void RunLenIntEncoder::writePatchedBaseValues() {
     // write patch list
     closestFixedBits = encodingUtils.getClosestFixedBits(patchGapWidth + patchWidth);
 
-    writeInts(gapVsPatchList, 0, gapVsPatchList.size(), closestFixedBits);
+    writeInts(gapVsPatchList, 0, gapVsPatchListSize, closestFixedBits);
 
     // reset run length
     variableRunLength = 0;
 }
 
-void RunLenIntEncoder::writeDeltaValues() {
 
+
+void RunLenIntEncoder::writeDeltaValues() {
+    int len;
+    int fb = bitsDeltaMax;
+    int efb = 0;
+
+    if (isAlignedBitPacking) {
+        fb = getClosestAlignedFixedBits(fb);
+    }
+
+    if (isFixedDelta) {
+        // if fixed run length is greater than threshold then it will be fixed
+        // delta sequence with delta value 0 else fixed delta sequence with
+        // non-zero delta value
+        if (fixedRunLength > Constants::MIN_REPEAT) {
+            // ex. sequence: 2 2 2 2 2 2 2 2
+            len = fixedRunLength - 1;
+            fixedRunLength = 0;
+        }
+        else {
+            // ex. sequence: 4 6 8 10 12 14 16
+            len = variableRunLength - 1;
+            variableRunLength = 0;
+        }
+    }
+    else {
+        // fixed width 0 is used for long repeating values.
+        // sequences that require only 1 bit to encode will have an additional bit
+        if (fb == 1) {
+            fb = 2;
+        }
+        efb = encodingUtils.encodeBitWidth(fb);
+        efb = efb << 1;
+        len = variableRunLength - 1;
+        variableRunLength = 0;
+    }
+
+    // extract the 9th bit of run length
+    int tailBits = (len & 0x100) >>> 8;
+
+    // header(2 bytes):
+    // encoding type(2 bits)
+    // encoded width of deltas(5 bits, representing 0 to 64 bits)
+    // run length(9 bits, representing 1 to 512 values)
+    // create first byte of the header
+    int headerFirstByte = getOpcode() | efb | tailBits;
+
+    // second byte of the header stores the remaining 8 bits of runlength
+    int headerSecondByte = len & 0xff;
+
+    // write header
+    outputStream->put(headerFirstByte);
+    outputStream->put(headerSecondByte);
+
+    // store the first value from zigzag literal array
+    if (isSigned) {
+        writeVslong(outputStream, literals[0]);
+    }
+    else {
+        writeVulong(outputStream, literals[0]);
+    }
+
+    if (isFixedDelta) {
+        // if delta is fixed then we don't need to store delta blob
+        writeVslong(outputStream, fixedDelta);
+    }
+    else {
+        // store the first value as delta value using zigzag encoding
+        writeVslong(outputStream, adjDeltas[0]);
+
+        // adjacent delta values are bit-packed. The length of adjDeltas array is
+        // always one less than the number of literals (delta difference for n
+        // elements is n-1). We have already written one element, write the
+        // remaining numLiterals - 2 elements here
+        writeInts(adjDeltas, 1, numLiterals - 2, fb);
+    }
 }
 
-void RunLenIntEncoder::writeInts(const std::vector<long> &input, int offset, int len, int bitSize) {
-    if(input.size() < 1 || offset < 0 || len < 1 || bitSize < 1) {
+void RunLenIntEncoder::writeInts(long* input, int offset, int len, int bitSize) {
+    if(input == nullptr || offset < 0 || len < 1 || bitSize < 1) {
         return;
     }
 
@@ -536,35 +637,40 @@ void RunLenIntEncoder::writeInts(const std::vector<long> &input, int offset, int
     int bitsLeft = 8;
     byte current = 0;
 
-    // we need to encode the value using little endian 
     // PENDING: different from big endian, we cannot directly 
     //          joint start of the next value with the previous one
     //          using little endian, since the remaining part of the
     //          previous value will be at the higher parts of the encoded bytes.
-    // for(int i = offset; i < (offset + len); ++i) {
-    //     long value = input[i];
-    //     int bitsToWrite = bitSize;
-    //     while(bitsToWrite > bitsLeft) {
-    //         // get the lower bitsLeft bits of value
-    //         current |= (((unsigned long)value) & ((1l << bitsLeft) - 1));
-    //         bitsToWrite -= bitsLeft;
-    //         // zero out lower bits
-    //         value >>= bitsLeft;
-    //         outputStream->putBytes(&current, 1);
-    //         current = 0;
-    //         bitsLeft = 8;
-    //     }
-    //     bitsLeft -= bitsToWrite;
-    //     current |= value
+    for(int i = offset; i < (offset + len); ++i) {
+        long value = input[i];
+        int bitsToWrite = bitSize;
+        while(bitsToWrite > bitsLeft) {
+             // add the bits to the bottom of the current word
+            current |= ((unsigned long)value) >> (bitsToWrite - bitsLeft);
+            // subtract out the bits we just added
+            bitsToWrite -= bitsLeft;
+            // zero out the bits above bitsToWrite
+            value &= (1L << bitsToWrite) - 1;
+            outputStream->putBytes(&current, 1);
+            current = 0;
+            bitsLeft = 8;
+        }
+        bitsLeft -= bitsToWrite;
+        current |= value << bitsLeft;
 
-    //     if(bitsToWrite != 0) {
-    //         // now only remains the higher (bitSize % bitsLeft) bits
-    //         current |= value & ((1l << bitsToWrite) - 1);
-    //         outputStream->putBytes(&current, 1);
-    //     }
-        
-        
-    // }
+        if (bitsLeft == 0) {
+            outputStream->put(current);
+            current = 0;
+            bitsLeft = 8;
+        }
+    }
+    // flush
+    if (bitsLeft != 8) {
+        outputStream->put(current);
+        current = 0;
+        bitsLeft = 8;
+    }
+
 }
 
 int RunLenIntEncoder::getOpcode() {
@@ -612,7 +718,7 @@ void RunLenIntEncoder::write(long value) {
                     numLiterals -= Constants::MIN_REPEAT;
                     // before entering this branch, last (min_repeat - 1) same values are counted into variable run
                     variableRunLength -= (Constants::MIN_REPEAT - 1);
-                    long tailVals[Constants::MIN_REPEAT];
+                    long* tailVals = new long[Constants::MIN_REPEAT];
                     // copy out the current fixed run part
                     // PENDING: can we use memcpy here?
                     std::memcpy(tailVals, literals + numLiterals, Constants::MIN_REPEAT * sizeof(long));
@@ -622,6 +728,7 @@ void RunLenIntEncoder::write(long value) {
                     // shift the tail fixed runs to the start of the buffer
                     memcpy(literals + numLiterals, tailVals, Constants::MIN_REPEAT * sizeof(long));
                     numLiterals += Constants::MIN_REPEAT;
+                    delete [] tailVals;
 
                 } 
                 
@@ -678,6 +785,34 @@ void RunLenIntEncoder::write(long value) {
     }
 }
 
+void RunLenIntEncoder::flush() {
+    if (numLiterals != 0) {
+        if (variableRunLength != 0) {
+            determineEncoding();
+            writeValues();
+        }
+        else if (fixedRunLength != 0) {
+            if (fixedRunLength < Constants::MIN_REPEAT) {
+                variableRunLength = fixedRunLength;
+                fixedRunLength = 0;
+                determineEncoding();
+                writeValues();
+            }
+            else if (fixedRunLength >= Constants::MIN_REPEAT
+                    && fixedRunLength <= Constants::MAX_SHORT_REPEAT_LENGTH) {
+                encodingType = EncodingType::SHORT_REPEAT;
+                writeValues();
+            }
+            else {
+                encodingType = EncodingType::DELTA;
+                isFixedDelta = true;
+                writeValues();
+            }
+        }
+    }
+    outputStream->flush();
+}
+
 void RunLenIntEncoder::initializeLiterals(long value) {
     assert(numLiterals == 0);
     literals[numLiterals++] = value;
@@ -701,14 +836,13 @@ void RunLenIntEncoder::clear() {
     patchGapWidth = 0;
     patchLength = 0;
     patchWidth = 0;
-    gapVsPatchList.clear();
 
     min = 0;
     isFixedDelta = true;
 }
 
 // Compute the number of bits required to represent pth percentile value
-int RunLenIntEncoder::percentileBits(const std::vector<long>& data, int offset, int length, double p) {
+int RunLenIntEncoder::percentileBits(long*  data, int offset, int length, double p) {
     if((p > 1.0) || (p <= 0.0)) {
         return -1;
     }
@@ -821,4 +955,21 @@ void RunLenIntEncoder::computeZigZagLiterals() {
 
 long RunLenIntEncoder::zigzagEncode(long val) {
     return (val << 1) ^ (val >> 63);
+}
+
+void RunLenIntEncoder::writeVulong(std::shared_ptr<ByteBuffer> output, long value) {
+    while (true) {
+        if ((value & ~0x7f) == 0) {
+            output->put((byte) value);
+            return;
+        }
+        else {
+            output->put((byte) (0x80 | (value & 0x7f)));
+            value >>>= 7;
+        }
+    }
+}
+
+void RunLenIntEncoder::writeVslong(std::shared_ptr<ByteBuffer> output, long value) {
+    writeVulong(output, (value << 1) ^ (value >> 63));
 }
