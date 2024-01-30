@@ -10,6 +10,7 @@
 
 class EncodingUtils {
 public:
+    using byte = uint8_t;
     EncodingUtils();
 	~EncodingUtils();
 	int decodeBitWidth(int n);
@@ -48,6 +49,53 @@ public:
 	                      const std::shared_ptr<ByteBuffer> &input);
 	void unrolledUnPack64(long *buffer, int offset, int len,
 	                      const std::shared_ptr<ByteBuffer> &input);
+    // -----------------------------------------------------------
+    // encoding utils
+    int encodeBitWidth(int n);
+    int getClosestFixedBits(int n);
+    void unrolledBitPack1(long* input, int offset, int len, 
+                          std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack2(long* input, int offset, int len, 
+                          std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack4(long* input, int offset, int len, 
+                          std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack8(long* input, int offset, int len, 
+                          std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack16(long* input, int offset, int len, 
+                           std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack24(long* input, int offset, int len, 
+                           std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack32(long* input, int offset, int len, 
+                           std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack40(long* input, int offset, int len, 
+                           std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack48(long* input, int offset, int len, 
+                           std::shared_ptr<ByteBuffer> output);                      
+    void unrolledBitPack56(long* input, int offset, int len, 
+                           std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPack64(long* input, int offset, int len, 
+                           std::shared_ptr<ByteBuffer> output);
+    void unrolledBitPackBytes(long* input, int offset, int len, 
+                              std::shared_ptr<ByteBuffer> output, int numBytes);
+    void writeLongBE(std::shared_ptr<ByteBuffer> output, 
+                     long* input, int offset, int numHops, int numBytes);
+    void writeLongBE2(std::shared_ptr<ByteBuffer> output, 
+                      long val, int wbOffset);
+    void writeLongBE3(std::shared_ptr<ByteBuffer> output, 
+                      long val, int wbOffset);
+    void writeLongBE4(std::shared_ptr<ByteBuffer> output, 
+                      long val, int wbOffset);
+    void writeLongBE5(std::shared_ptr<ByteBuffer> output, 
+                      long val, int wbOffset);
+    void writeLongBE6(std::shared_ptr<ByteBuffer> output, 
+                      long val, int wbOffset);
+    void writeLongBE7(std::shared_ptr<ByteBuffer> output, 
+                      long val, int wbOffset);
+    void writeLongBE8(std::shared_ptr<ByteBuffer> output, 
+                      long val, int wbOffset);     
+    void writeRemainingLongs(std::shared_ptr<ByteBuffer> output, int offset, 
+                             long* input, int remainder, int numBytes);            
+    // -----------------------------------------------------------
 private:
 enum FixedBitSizes{
         ONE, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, ELEVEN, TWELVE,

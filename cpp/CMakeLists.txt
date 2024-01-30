@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 14)
 # Set extension name here
 set(TARGET_NAME pixels)
+set(DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 project(${TARGET_NAME})
