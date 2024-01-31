@@ -75,7 +75,16 @@ public class Main
         while (true)
         {
             System.out.print("pixels> ");
-            inputStr = scanner.nextLine().trim();
+            if (scanner.hasNextLine())
+            {
+                inputStr = scanner.nextLine().trim();
+            }
+            else
+            {
+                // Issue #631: in case of input from a file, exit at EOF.
+                System.out.println("Bye.");
+                break;
+            }
 
             if (inputStr.isEmpty() || inputStr.equals(";"))
             {
@@ -132,15 +141,14 @@ public class Main
                 argumentParser.addArgument("-l", "--loading_data_paths")
                         .help("specify the paths where the data is loaded into");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels Load.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -169,15 +177,14 @@ public class Main
                 argumentParser.addArgument("-q", "--query_per_minute").required(false).setDefault(0)
                         .help("specify the number of queries to execute if rate_limited is true");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels QUERY.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -207,15 +214,14 @@ public class Main
                         .setDefault("4").required(true)
                         .help("specify the number of threads used for data compaction");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels COPY.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -244,15 +250,14 @@ public class Main
                         .setDefault("4").required(true)
                         .help("specify the number of threads used for data compaction");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels Compact.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -276,15 +281,14 @@ public class Main
                 argumentParser.addArgument("-t", "--table").required(true)
                         .help("specify the table name");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels STAT.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -308,6 +312,7 @@ public class Main
             }
         }
         // Use exit to terminate other threads and invoke the shutdown hooks.
+        scanner.close();
         System.exit(0);
     }
 
@@ -333,7 +338,7 @@ public class Main
 
     /**
      * Check if the order or compact path from pixels metadata is valid.
-     * @param paths the order or compact pathw from pixels metadata.
+     * @param paths the order or compact paths from pixels metadata.
      */
     public static void validateOrderOrCompactPath(String[] paths)
     {
