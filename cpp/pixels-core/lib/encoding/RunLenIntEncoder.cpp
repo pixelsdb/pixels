@@ -550,7 +550,7 @@ void RunLenIntEncoder::writeDeltaValues() {
     }
 
     // extract the 9th bit of run length
-    int tailBits = (len & 0x100) >>> 8;
+    int tailBits = ((unsigned)(len & 0x100)) >> 8;
 
     // header(2 bytes):
     // encoding type(2 bits)
@@ -810,7 +810,8 @@ void RunLenIntEncoder::flush() {
             }
         }
     }
-    outputStream->flush();
+    // In Java version, outputStream does nothing on flush
+    // outputStream->flush();
 }
 
 void RunLenIntEncoder::initializeLiterals(long value) {
@@ -965,7 +966,7 @@ void RunLenIntEncoder::writeVulong(std::shared_ptr<ByteBuffer> output, long valu
         }
         else {
             output->put((byte) (0x80 | (value & 0x7f)));
-            value >>>= 7;
+            value = ((unsigned)value) >> 7;
         }
     }
 }
