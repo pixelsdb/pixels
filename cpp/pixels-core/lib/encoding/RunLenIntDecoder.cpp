@@ -296,5 +296,6 @@ long RunLenIntDecoder::bytesToLongBE(const std::shared_ptr<ByteBuffer> &input, i
 	return out;
 }
 bool RunLenIntDecoder::hasNext() {
+	// print used and inputstream size and pos
 	return used != numLiterals || (inputStream->size() - inputStream->getReadPos()) > 0;
 }

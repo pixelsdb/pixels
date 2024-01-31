@@ -66,21 +66,26 @@ RunLenIntEncoder::~RunLenIntEncoder() {
 
 // -----------------------------------------------------------
 // Encoding Handles
-void RunLenIntEncoder::encode(long*  values, int offset, int length, byte* results) {
+void RunLenIntEncoder::encode(long*  values, int offset, int length, byte* results, int& resLen) {
     for(int i = 0; i < length; ++i) {
+        // std::cout << encodingType << " value : " << values[i + offset] << std::endl;
         this->write(values[i + offset]);
     }
     flush();
     int len = length * sizeof(long);
-    byte* tmpResult = new byte[len];
-    outputStream->getBytes(tmpResult, len);
+    // std::cout << "length: " << length << std::endl;
+    // std::cout << "buffer end: " << outputStream->getWritePos() << std::endl;
+    resLen = outputStream->getWritePos();
+    byte* tmpResult = new byte[outputStream->getWritePos()];
+    outputStream->getBytes(tmpResult, outputStream->getWritePos());
     for(int i = 0; i < len; ++i) {
+        // std::cout << i << " result : " << (int)tmpResult[i] << std::endl;
         results[i] = tmpResult[i];
     }
     outputStream->clear();
 }
 
-void RunLenIntEncoder::encode(int* values, int offset, int length, byte* results) {
+void RunLenIntEncoder::encode(int* values, int offset, int length, byte* results, int& resLen) {
     for(int i = 0; i < length; ++i) {
         this->write(values[i + offset]);
     }
@@ -95,18 +100,19 @@ void RunLenIntEncoder::encode(int* values, int offset, int length, byte* results
     outputStream->clear();
 }
 
-void RunLenIntEncoder::encode(long* values, byte* results, int length) {
-    encode(values, 0, length, results);
+void RunLenIntEncoder::encode(long* values, byte* results, int length, int& resLen) {
+    encode(values, 0, length, results, resLen);
 }
 
-void RunLenIntEncoder::encode(int* values, byte* results, int length) {
-    encode(values, 0, length, results);
+void RunLenIntEncoder::encode(int* values, byte* results, int length, int& resLen) {
+    encode(values, 0, length, results, resLen);
 }
 
 
 // -----------------------------------------------------------
 
 void RunLenIntEncoder::determineEncoding() {
+    // std::cout << "determineEncoding()" << std::endl;
     // compute zigzag values for direct encoding if break early 
     // for delta overflows or shoter runs
     computeZigZagLiterals();
@@ -114,6 +120,7 @@ void RunLenIntEncoder::determineEncoding() {
 
     // less than min repeat num so direct encoding
     if (numLiterals <= Constants::MIN_REPEAT) {
+        // std::cout << "numLiterals <= Constants::MIN_REPEAT" << std::endl;
         encodingType = EncodingType::DIRECT;
         return;
     }
@@ -156,6 +163,7 @@ void RunLenIntEncoder::determineEncoding() {
     // if delta overflow happens, we use DIRECT encoding 
     // without checking PATCHED_BASE because direct is faster
     if(!isSafeSubtract(max, min)) {
+        // std::cout << "!isSafeSubtract(max, min)" << std::endl;
         encodingType = EncodingType::DIRECT;
         return;
     }
@@ -169,6 +177,7 @@ void RunLenIntEncoder::determineEncoding() {
         assert(isFixedDelta);
         assert(currDelta == 0);
         fixedDelta = 0;
+        // std::cout << "min == max" << std::endl;
         encodingType = EncodingType::DELTA;
         return;
     }
@@ -177,6 +186,7 @@ void RunLenIntEncoder::determineEncoding() {
     if(isFixedDelta) {
         assert(currDelta == initialDelta);
         encodingType = EncodingType::DELTA;
+        // std::cout << "isFixedDelta" << std::endl;
         fixedDelta = currDelta;
         return;
     }
@@ -190,6 +200,7 @@ void RunLenIntEncoder::determineEncoding() {
 
         // monotonic condition
         if(isIncreasing || isDecreasing) {
+            // std::cout << "isIncreasing || isDecreasing" << std::endl;
             encodingType = EncodingType::DELTA;
             return;
         }
@@ -225,11 +236,13 @@ void RunLenIntEncoder::determineEncoding() {
         // The decision to use patched base was based on zigzag values, but the
         // actual patching is done on base reduced literals.
         if(brBits100p - brBits95p != 0) {
+            // std::cout << "brBits100p - brBits95p != 0" << std::endl;
             encodingType = EncodingType::PATCHED_BASE;
             preparePatchedBlob();
             return;
         } 
         else {
+            // std::cout << "brBits100p - brBits95p == 0" << std::endl;
             encodingType = EncodingType::DIRECT;
             return;
         }
@@ -237,6 +250,7 @@ void RunLenIntEncoder::determineEncoding() {
     else {
         // if difference in bits between 90th and 100th percentile
         // is 0, patch length is 0, fallback to DIRECT
+        // std::cout << "diffBitsLH <= 1" << std::endl;
         encodingType = EncodingType::DIRECT;
         return;
     }
@@ -424,13 +438,15 @@ void RunLenIntEncoder::writeDirectValues() {
     if(isAlignedBitPacking) {
         fb = getClosestAlignedFixedBits(fb);
     }
-    int efb = encodingUtils.encodeBitWidth(fb);
+    int efb = encodingUtils.encodeBitWidth(fb) << 1;
 
     // adjust variable run length
     variableRunLength -= 1;
+    // std::cout << "variableRunLength: " << variableRunLength << std::endl;
 
     // extract the 9th bit of the run length
     int tailBits = (int)(((unsigned)(variableRunLength & 0x100)) >> 8);
+    // std::cout << "tailBits: " << tailBits << std::endl;
 
     // -----------------------------------------------------------
     // Header
@@ -439,13 +455,13 @@ void RunLenIntEncoder::writeDirectValues() {
     //   encoding type (2 bits)
     //   encoded width of values (5 bits, representing 1~64 bits)
     //   length (9 bits, representing 1~512 values)
-    int headerFirstByte = getOpcode() | efb | tailBits;
-    int headerSecondByte = variableRunLength & 0xff;
+    byte headerFirstByte = getOpcode() | efb | tailBits;
+    byte headerSecondByte = variableRunLength & 0xff;
+    // std::cout << "headerFirstByte: " << (int)headerFirstByte << std::endl;
 
     // write header
     outputStream->put(headerFirstByte);
     outputStream->put(headerSecondByte);
-
     writeInts(zigzagLiterals, 0, numLiterals, fb);
 
     variableRunLength = 0;

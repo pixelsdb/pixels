@@ -34,10 +34,10 @@ public:
 
     // -----------------------------------------------------------
     // Encoding functions
-    void encode(long* values, int offset, int length, byte* results);
-    void encode(int* values, int offset, int length, byte* results);
-    void encode(long* values, byte* results, int length);
-    void encode(int* values, byte* results, int length);
+    void encode(long* values, int offset, int length, byte* results, int& resultLength);
+    void encode(int* values, int offset, int length, byte* results, int& resultLength);
+    void encode(long* values, byte* results, int length, int& resultLength);
+    void encode(int* values, byte* results, int length, int& resultLength);
     // -----------------------------------------------------------
     void determineEncoding();
     // -----------------------------------------------------------

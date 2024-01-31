@@ -3,7 +3,6 @@ set(CMAKE_CXX_STANDARD 14)
 # Set extension name here
 set(TARGET_NAME pixels)
 set(DCMAKE_EXPORT_COMPILE_COMMANDS=1)
-
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 project(${TARGET_NAME})
 include_directories(include)
@@ -21,7 +20,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(pixels-common)
 add_subdirectory(pixels-core)
-#add_subdirectory(tests)
+add_subdirectory(tests)
 
 include_directories(pixels-common/include)
 include_directories(pixels-core/include)
