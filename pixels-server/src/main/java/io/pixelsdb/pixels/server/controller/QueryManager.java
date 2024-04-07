@@ -315,9 +315,10 @@ public class QueryManager
             {
                 Statement statement = connection.createStatement();
                 this.runningQueries.put(traceToken, query);
+                long pendingTimeMs = System.currentTimeMillis() - query.getReceivedTimeMs();
                 long start = System.currentTimeMillis();
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
-                long latencyMs = System.currentTimeMillis() - start;
+                long executeTimeMs = System.currentTimeMillis() - start;
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -339,14 +340,15 @@ public class QueryManager
 
                 // TODO: support get cost from trans service.
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
-                        columnPrintSizes, columnNames, rows, latencyMs, 0);
+                        columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs, 0, 0);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
             } catch (SQLException e)
             {
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED,
-                        e.getMessage(), null, null, null, 0, 0);
+                        e.getMessage(), null, null, null,
+                        0, 0, 0, 0);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
