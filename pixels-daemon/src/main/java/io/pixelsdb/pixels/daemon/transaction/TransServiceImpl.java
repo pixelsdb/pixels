@@ -176,6 +176,31 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     }
 
     @Override
+    public void setTransProperty(TransProto.SetTransPropertyRequest request, StreamObserver<TransProto.SetTransPropertyResponse> responseObserver)
+    {
+        long transId = request.getTransId();
+        String key = request.getKey();
+        String value = request.getValue();
+        TransProto.SetTransPropertyResponse.Builder builder = TransProto.SetTransPropertyResponse.newBuilder();
+        TransContext context = TransContextManager.Instance().getTransContext(transId);
+        if (context != null)
+        {
+            String prevValue = (String) context.getProperties().setProperty(key, value);
+            if (prevValue != null)
+            {
+                builder.setPrevValue(prevValue);
+            }
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        else
+        {
+            builder.setErrorCode(ErrorCode.TRANS_CONTEXT_NOT_FOUND);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void getTransConcurrency(TransProto.GetTransConcurrencyRequest request,
                                     StreamObserver<TransProto.GetTransConcurrencyResponse> responseObserver) {
         int concurrency = TransContextManager.Instance().getQueryConcurrency(request.getReadOnly());

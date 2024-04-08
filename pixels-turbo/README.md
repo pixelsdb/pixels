@@ -61,7 +61,7 @@ Then, deploy the serverless workers following the instructions in the README.md 
 Currently, we support AWS Lambda and vHive. So the worker service can be `pixels-worker-lambda` or `pixels-worker-vhive`.
 More platform integrations will be provided in the future.
 
-If the MPP cluster is running in a cloud machine service such as AWS EC2, follow the instructions in the README.md of `pixels-scakubg-[service]`
+If the MPP cluster is running in a cloud machine service such as AWS EC2, follow the instructions in the README.md of `pixels-scaling-[service]`
 to deploy the auto-scaling manager for the MPP cluster. Currently, we support auto-scaling in AWS EC2. So `pixels-scaling-ec2` is the only option.
 It can be used as an example to implement the auto-scaling manager for other cloud platforms.
 

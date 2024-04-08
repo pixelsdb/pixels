@@ -125,6 +125,30 @@ public class TransService
         return new TransContext(response.getTransContext());
     }
 
+    /**
+     * Set the string property of a transaction.
+     * @param transId the id of the transaction
+     * @param key the property key
+     * @param value the property value
+     * @return the previous value of the property key, or null if not present
+     * @throws TransException if the transaction does not exist
+     */
+    public String setTransProperty(long transId, String key, String value) throws TransException
+    {
+        TransProto.SetTransPropertyRequest request = TransProto.SetTransPropertyRequest.newBuilder()
+                .setTransId(transId).setKey(key).setValue(value).build();
+        TransProto.SetTransPropertyResponse response = this.stub.setTransProperty(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to set transaction property, error code=" + response.getErrorCode());
+        }
+        if (response.hasPrevValue())
+        {
+            return response.getPrevValue();
+        }
+        return null;
+    }
+
     public int getTransConcurrency(boolean readOnly) throws TransException
     {
         TransProto.GetTransConcurrencyRequest request = TransProto.GetTransConcurrencyRequest.newBuilder()

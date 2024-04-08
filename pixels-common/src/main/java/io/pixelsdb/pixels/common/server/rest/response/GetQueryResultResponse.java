@@ -34,8 +34,22 @@ public class GetQueryResultResponse
     private int[] columnPrintSizes;
     private String[] columnNames;
     private String[][] rows;
-    private double latencyMs;
+    /**
+     * The time in ms the query waits in the queue for execution.
+     */
+    private double pendingTimeMs;
+    /**
+     * The time the query really executes.
+     */
+    private double executionTimeMs;
+    /**
+     * The amount of money in cents really spent by the query.
+     */
     private double costCents;
+    /**
+     * The amount of money in cents billed according to our price model.
+     */
+    private double billedCents;
 
     /**
      * Default constructor for Jackson.
@@ -58,15 +72,18 @@ public class GetQueryResultResponse
     }
 
     public GetQueryResultResponse(int errorCode, String errorMessage, int[] columnPrintSizes,
-                                  String[] columnNames, String[][] rows, double latencyMs, double costCents)
+                                  String[] columnNames, String[][] rows, double pendingTimeMs,
+                                  double executionTimeMs, double costCents, double billedCents)
     {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.columnPrintSizes = columnPrintSizes;
         this.columnNames = columnNames;
         this.rows = rows;
-        this.latencyMs = latencyMs;
+        this.pendingTimeMs = pendingTimeMs;
+        this.executionTimeMs = executionTimeMs;
         this.costCents = costCents;
+        this.billedCents = billedCents;
     }
 
     public int getErrorCode()
@@ -119,14 +136,24 @@ public class GetQueryResultResponse
         this.rows = rows;
     }
 
-    public double getLatencyMs()
+    public double getPendingTimeMs()
     {
-        return latencyMs;
+        return pendingTimeMs;
     }
 
-    public void setLatencyMs(double latencyMs)
+    public void setPendingTimeMs(double pendingTimeMs)
     {
-        this.latencyMs = latencyMs;
+        this.pendingTimeMs = pendingTimeMs;
+    }
+
+    public double getExecutionTimeMs()
+    {
+        return executionTimeMs;
+    }
+
+    public void setExecutionTimeMs(double executionTimeMs)
+    {
+        this.executionTimeMs = executionTimeMs;
     }
 
     public double getCostCents()
@@ -137,5 +164,15 @@ public class GetQueryResultResponse
     public void setCostCents(double costCents)
     {
         this.costCents = costCents;
+    }
+
+    public double getBilledCents()
+    {
+        return billedCents;
+    }
+
+    public void setBilledCents(double billedCents)
+    {
+        this.billedCents = billedCents;
     }
 }
