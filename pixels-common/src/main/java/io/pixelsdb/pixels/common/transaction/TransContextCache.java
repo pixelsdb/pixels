@@ -28,7 +28,7 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * This is only a cache of the contexts of the transactions handled in this process.
- * The context is this cache may be not strictly consistent with the global transaction context.
+ * The context in this cache may be not strictly consistent with the global transaction context.
  * Thus, the result returned by this cache may be inaccurate.
  *
  * @create 2022-02-20

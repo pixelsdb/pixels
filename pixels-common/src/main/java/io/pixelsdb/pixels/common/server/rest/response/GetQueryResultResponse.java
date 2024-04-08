@@ -42,8 +42,13 @@ public class GetQueryResultResponse
      * The time the query really executes.
      */
     private double executionTimeMs;
+    /**
+     * The amount of money in cents really spent by the query.
+     */
     private double costCents;
-
+    /**
+     * The amount of money in cents billed according to our price model.
+     */
     private double billedCents;
 
     /**

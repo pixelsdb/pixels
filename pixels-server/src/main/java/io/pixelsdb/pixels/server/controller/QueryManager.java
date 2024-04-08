@@ -22,13 +22,17 @@ package io.pixelsdb.pixels.server.controller;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.QueryScheduleException;
 import io.pixelsdb.pixels.common.exception.QueryServerException;
+import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.server.ExecutionHint;
 import io.pixelsdb.pixels.common.server.QueryStatus;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
 import io.pixelsdb.pixels.common.server.rest.response.GetQueryResultResponse;
 import io.pixelsdb.pixels.common.server.rest.response.SubmitQueryResponse;
+import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.turbo.QueryScheduleService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -102,6 +106,7 @@ public class QueryManager
     private final ExecutorService bestEffortSubmitService = Executors.newSingleThreadExecutor();
     private final ExecutorService executeService = Executors.newCachedThreadPool();
     private final QueryScheduleService queryScheduleService;
+    private final TransService transService;
     private final String jdbcUrl;
     private final Properties costEffectiveConnProp;
     private final Properties immediateConnProp;
@@ -109,8 +114,10 @@ public class QueryManager
 
     private QueryManager() throws QueryServerException
     {
-        String host = ConfigFactory.Instance().getProperty("query.schedule.server.host");
-        int port = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
+        String scheduleServerHost = ConfigFactory.Instance().getProperty("query.schedule.server.host");
+        int scheduleServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
+        String transServerHost = ConfigFactory.Instance().getProperty("trans.server.host");
+        int transServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
         try
         {
             /*
@@ -119,8 +126,18 @@ public class QueryManager
              * Here, we only need to get the query slots from the query schedule service and do not need to report
              * metrics for cluster auto-scaling, so we set scalingEnabled to false.
              */
-            this.queryScheduleService = new QueryScheduleService(host, port, false);
-            Runtime.getRuntime().addShutdownHook(new Thread(this.queryScheduleService::shutdown));
+            this.queryScheduleService = new QueryScheduleService(scheduleServerHost, scheduleServerPort, false);
+            this.transService = new TransService(transServerHost, transServerPort);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                queryScheduleService.shutdown();
+                try
+                {
+                    transService.shutdown();
+                } catch (InterruptedException e)
+                {
+                    log.error("failed to shutdown query schedule service or transaction service", e);
+                }
+            }));
         } catch (QueryScheduleException e)
         {
             throw new QueryServerException("failed to initialize query schedule service", e);
@@ -319,6 +336,11 @@ public class QueryManager
                 long start = System.currentTimeMillis();
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
                 long executeTimeMs = System.currentTimeMillis() - start;
+                TransContext transContext = this.transService.getTransContext(traceToken);
+                double costCents = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
+                double billedCents = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_BILLED_CENTS_KEY, "0"));
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -338,13 +360,12 @@ public class QueryManager
                     rows[i] = row;
                 }
 
-                // TODO: support get cost from trans service.
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
-                        columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs, 0, 0);
+                        columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs, costCents, billedCents);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
-            } catch (SQLException e)
+            } catch (SQLException | TransException e)
             {
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED,
                         e.getMessage(), null, null, null,
