@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.exception.QueryScheduleException;
 import io.pixelsdb.pixels.common.exception.QueryServerException;
 import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.server.ExecutionHint;
+import io.pixelsdb.pixels.common.server.PriceModel;
 import io.pixelsdb.pixels.common.server.QueryStatus;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
 import io.pixelsdb.pixels.common.server.rest.response.GetQueryResultResponse;
@@ -339,8 +340,9 @@ public class QueryManager
                 TransContext transContext = this.transService.getTransContext(traceToken);
                 double costCents = Double.parseDouble(transContext.getProperties().getProperty(
                         Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
-                double billedCents = Double.parseDouble(transContext.getProperties().getProperty(
-                        Constants.TRANS_CONTEXT_BILLED_CENTS_KEY, "0"));
+                double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, "0"));
+                double billedCents = PriceModel.billedCents(scanBytes, request.getExecutionHint());
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];

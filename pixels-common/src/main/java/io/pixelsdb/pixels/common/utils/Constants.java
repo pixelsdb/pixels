@@ -48,7 +48,7 @@ public final class Constants
     public static final int MAX_BLOCK_ID_LEN = 20480;
 
     public static final String TRANS_CONTEXT_COST_CENTS_KEY = "trans_cost_cents";
-    public static final String TRANS_CONTEXT_BILLED_CENTS_KEY = "trans_billed_cents";
+    public static final String TRANS_CONTEXT_SCAN_BYTES_KEY = "trans_scan_bytes";
 
     /**
      * The time in seconds that a relaxed query can be postponed for execution.

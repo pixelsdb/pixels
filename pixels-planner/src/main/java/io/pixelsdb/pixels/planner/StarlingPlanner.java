@@ -28,18 +28,15 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.SchemaTableName;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Ordered;
-import io.pixelsdb.pixels.common.metadata.domain.Projections;
-import io.pixelsdb.pixels.common.metadata.domain.Splits;
+import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.plan.PlanOptimizer;
+import io.pixelsdb.pixels.planner.plan.logical.Table;
 import io.pixelsdb.pixels.planner.plan.logical.*;
 import io.pixelsdb.pixels.planner.plan.physical.*;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
@@ -77,6 +74,11 @@ public class StarlingPlanner
     private final boolean compactPathEnabled;
     private final Storage storage;
     private final long transId;
+
+    /**
+     * The data size in bytes to be scanned by the input query.
+     */
+    private double scanSize = 0;
 
     static
     {
@@ -145,6 +147,11 @@ public class StarlingPlanner
             throw new UnsupportedOperationException("root table type '" +
                     this.rootTable.getTableType() + "' is currently not supported");
         }
+    }
+
+    public double getScanSize()
+    {
+        return scanSize;
     }
 
     private StarlingAggregationOperator getAggregationOperator(AggregatedTable aggregatedTable)
@@ -1164,6 +1171,18 @@ public class StarlingPlanner
         checkArgument(tableStorageScheme.equals(this.storage.getScheme()), String.format(
                 "the storage scheme of table '%s.%s' is not consistent with the input storage scheme for Pixels Turbo",
                 table.getSchemaName(), table.getTableName()));
+        // Issue #506: add the column size of the base table to the scan size of this query.
+        List<Column> columns = metadataService.getColumns(table.getSchemaName(), table.getTableName(), true);
+        Map<String, Column> nameToColumnMap = new HashMap<>(columns.size());
+        for (Column column : columns)
+        {
+            nameToColumnMap.put(column.getName(), column);
+        }
+        for (String columnName : table.getColumnNames())
+        {
+            this.scanSize += nameToColumnMap.get(columnName).getSize();
+        }
+
         List<Layout> layouts = metadataService.getLayouts(table.getSchemaName(), table.getTableName());
         for (Layout layout : layouts)
         {
