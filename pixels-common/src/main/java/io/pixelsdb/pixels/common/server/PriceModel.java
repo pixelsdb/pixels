@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,13 +19,33 @@
  */
 package io.pixelsdb.pixels.common.server;
 
+import io.pixelsdb.pixels.common.exception.QueryServerException;
+
 /**
  * @author hank
- * @create 2023-05-24
+ * @create 2024-04-10
  */
-public enum ExecutionHint
+public class PriceModel
 {
-    BEST_OF_EFFORT, // execute the query at best of effort, without any guarantee of timeliness or performance
-    RELAXED, // the query can be postponed a few minutes for execution
-    IMMEDIATE, // execute the query immediately using Pixel-Turbo
+    private PriceModel () { }
+
+    /**
+     *
+     * @param scanSize
+     * @return
+     */
+    public static double billedCents(double scanSize, ExecutionHint executionHint)
+    {
+        switch (executionHint)
+        {
+            case IMMEDIATE:
+                return scanSize / 1024 / 1024 / 2048;
+            case RELAXED:
+                return scanSize / 1024 / 1024 / 10240;
+            case BEST_OF_EFFORT:
+                return scanSize / 1024 / 1024 / 20480;
+            default:
+                throw new QueryServerException("invalid execution hint for calculating billed cents");
+        }
+    }
 }

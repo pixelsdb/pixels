@@ -176,13 +176,22 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     }
 
     @Override
-    public void setTransProperty(TransProto.SetTransPropertyRequest request, StreamObserver<TransProto.SetTransPropertyResponse> responseObserver)
+    public void setTransProperty(TransProto.SetTransPropertyRequest request,
+                                 StreamObserver<TransProto.SetTransPropertyResponse> responseObserver)
     {
-        long transId = request.getTransId();
+        TransContext context = null;
+        if (request.hasTransId())
+        {
+            context = TransContextManager.Instance().getTransContext(request.getTransId());
+        }
+        else if (request.hasExternalTraceId())
+        {
+            context = TransContextManager.Instance().getTransContext(request.getExternalTraceId());
+
+        }
         String key = request.getKey();
         String value = request.getValue();
         TransProto.SetTransPropertyResponse.Builder builder = TransProto.SetTransPropertyResponse.newBuilder();
-        TransContext context = TransContextManager.Instance().getTransContext(transId);
         if (context != null)
         {
             String prevValue = (String) context.getProperties().setProperty(key, value);

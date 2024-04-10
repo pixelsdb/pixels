@@ -65,7 +65,7 @@ If the MPP cluster is running in a cloud machine service such as AWS EC2, follow
 to deploy the auto-scaling manager for the MPP cluster. Currently, we support auto-scaling in AWS EC2. So `pixels-scaling-ec2` is the only option.
 It can be used as an example to implement the auto-scaling manager for other cloud platforms.
 
-## ## Start Pixels (with Turbo)
+## Start Pixels (with Turbo)
 
 In `etc/catalogpixels.properties` under the installation directory of Trino, set `cloud.function.switch` to `auto` if you have installed the auto-scaling manager and 
 want to enable auto-scaling of MPP cluster and adaptive invocation of serverless workers; or set it to `on` if you want to always push the queries into serverless workers.

@@ -38,8 +38,8 @@ Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 
 ## Install Maven
 
-Pixels requires maven 3.6 to build the source code (maven 3.1-3.5 might work, but we didn't test them yet). On some old operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
-In this case, manually install a newer maven compatible with your JDK. 
+Pixels requires maven 3.8 or later to build the source code (some early maven versions may work, but we haven't test them yet). On some operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
+In this case, manually install a newer maven compatible with your JDK.
 
 ## Setup AWS Credentials*
 

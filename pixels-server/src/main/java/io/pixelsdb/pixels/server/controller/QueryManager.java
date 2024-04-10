@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.exception.QueryScheduleException;
 import io.pixelsdb.pixels.common.exception.QueryServerException;
 import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.server.ExecutionHint;
+import io.pixelsdb.pixels.common.server.PriceModel;
 import io.pixelsdb.pixels.common.server.QueryStatus;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
 import io.pixelsdb.pixels.common.server.rest.response.GetQueryResultResponse;
@@ -230,7 +231,7 @@ public class QueryManager
                     if (query != null)
                     {
                         // this queue should only contain best-effort queries that are to be executed in the mpp cluster
-                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.BEST_EFFORT,
+                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.BEST_OF_EFFORT,
                                 "pending queue should only contain cost-effective queries");
                         QueryScheduleService.QueryConcurrency queryConcurrency = queryScheduleService.getQueryConcurrency();
                         if (queryConcurrency.mppConcurrency == 0)
@@ -263,7 +264,7 @@ public class QueryManager
      */
     public SubmitQueryResponse submitQuery(SubmitQueryRequest request)
     {
-        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             try
             {
@@ -288,7 +289,7 @@ public class QueryManager
             try
             {
                 String traceToken = UUID.randomUUID().toString();
-                this.submit(new ReceivedQuery(traceToken, request, 0L)); // received time is not needed
+                this.submit(new ReceivedQuery(traceToken, request, System.currentTimeMillis()));
                 return new SubmitQueryResponse(ErrorCode.SUCCESS, "", traceToken);
             } catch (Throwable e)
             {
@@ -310,7 +311,7 @@ public class QueryManager
     {
         Properties properties;
         SubmitQueryRequest request = query.getRequest();
-        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             // submit it to the mpp connection
             properties = this.costEffectiveConnProp;
@@ -336,11 +337,7 @@ public class QueryManager
                 long start = System.currentTimeMillis();
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
                 long executeTimeMs = System.currentTimeMillis() - start;
-                TransContext transContext = this.transService.getTransContext(traceToken);
-                double costCents = Double.parseDouble(transContext.getProperties().getProperty(
-                        Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
-                double billedCents = Double.parseDouble(transContext.getProperties().getProperty(
-                        Constants.TRANS_CONTEXT_BILLED_CENTS_KEY, "0"));
+
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -359,6 +356,17 @@ public class QueryManager
                     }
                     rows[i] = row;
                 }
+
+                resultSet.close();
+                statement.close();
+
+                // Issue #506: must collect the transaction properties after statement close.
+                TransContext transContext = this.transService.getTransContext(traceToken);
+                double costCents = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
+                double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, "0"));
+                double billedCents = PriceModel.billedCents(scanBytes, request.getExecutionHint());
 
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
                         columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs, costCents, billedCents);

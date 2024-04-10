@@ -137,6 +137,26 @@ public class TransService
     {
         TransProto.SetTransPropertyRequest request = TransProto.SetTransPropertyRequest.newBuilder()
                 .setTransId(transId).setKey(key).setValue(value).build();
+        return setTransProperty(request);
+    }
+
+    /**
+     * Set the string property of a transaction.
+     * @param externalTraceId the external trace id (token) of the transaction
+     * @param key the property key
+     * @param value the property value
+     * @return the previous value of the property key, or null if not present
+     * @throws TransException if the transaction does not exist
+     */
+    public String setTransProperty(String externalTraceId, String key, String value) throws TransException
+    {
+        TransProto.SetTransPropertyRequest request = TransProto.SetTransPropertyRequest.newBuilder()
+                .setExternalTraceId(externalTraceId).setKey(key).setValue(value).build();
+        return setTransProperty(request);
+    }
+
+    private String setTransProperty(TransProto.SetTransPropertyRequest request) throws TransException
+    {
         TransProto.SetTransPropertyResponse response = this.stub.setTransProperty(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
