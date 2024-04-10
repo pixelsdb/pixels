@@ -139,7 +139,7 @@ public class TestQueryAPI
         String json = this.mockMvc.perform(
                         post(RestUrlPath.SUBMIT_QUERY).contentType(MediaType.APPLICATION_JSON).content(
                                 JSON.toJSONString(new SubmitQueryRequest(
-                                        "SELECT * FROM clickbench.hits LIMIT 1", ExecutionHint.RELAXED, 10))))
+                                        "SELECT * FROM clickbench.hits LIMIT 1", ExecutionHint.IMMEDIATE, 10))))
                 .andDo(print()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         SubmitQueryResponse response = JSON.parseObject(json, SubmitQueryResponse.class);
         TimeUnit.SECONDS.sleep(5);

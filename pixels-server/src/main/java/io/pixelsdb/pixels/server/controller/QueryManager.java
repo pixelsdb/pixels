@@ -337,12 +337,7 @@ public class QueryManager
                 long start = System.currentTimeMillis();
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
                 long executeTimeMs = System.currentTimeMillis() - start;
-                TransContext transContext = this.transService.getTransContext(traceToken);
-                double costCents = Double.parseDouble(transContext.getProperties().getProperty(
-                        Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
-                double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
-                        Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, "0"));
-                double billedCents = PriceModel.billedCents(scanBytes, request.getExecutionHint());
+
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -361,6 +356,17 @@ public class QueryManager
                     }
                     rows[i] = row;
                 }
+
+                resultSet.close();
+                statement.close();
+
+                // Issue #506: must collect the transaction properties after statement close.
+                TransContext transContext = this.transService.getTransContext(traceToken);
+                double costCents = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
+                double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, "0"));
+                double billedCents = PriceModel.billedCents(scanBytes, request.getExecutionHint());
 
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
                         columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs, costCents, billedCents);
