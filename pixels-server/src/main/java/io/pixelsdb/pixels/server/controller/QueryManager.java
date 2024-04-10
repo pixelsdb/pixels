@@ -231,7 +231,7 @@ public class QueryManager
                     if (query != null)
                     {
                         // this queue should only contain best-effort queries that are to be executed in the mpp cluster
-                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.BEST_EFFORT,
+                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.BEST_OF_EFFORT,
                                 "pending queue should only contain cost-effective queries");
                         QueryScheduleService.QueryConcurrency queryConcurrency = queryScheduleService.getQueryConcurrency();
                         if (queryConcurrency.mppConcurrency == 0)
@@ -264,7 +264,7 @@ public class QueryManager
      */
     public SubmitQueryResponse submitQuery(SubmitQueryRequest request)
     {
-        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             try
             {
@@ -289,7 +289,7 @@ public class QueryManager
             try
             {
                 String traceToken = UUID.randomUUID().toString();
-                this.submit(new ReceivedQuery(traceToken, request, 0L)); // received time is not needed
+                this.submit(new ReceivedQuery(traceToken, request, System.currentTimeMillis()));
                 return new SubmitQueryResponse(ErrorCode.SUCCESS, "", traceToken);
             } catch (Throwable e)
             {
@@ -311,7 +311,7 @@ public class QueryManager
     {
         Properties properties;
         SubmitQueryRequest request = query.getRequest();
-        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             // submit it to the mpp connection
             properties = this.costEffectiveConnProp;

@@ -42,7 +42,7 @@ public class PriceModel
                 return scanSize / 1024 / 1024 / 2048;
             case RELAXED:
                 return scanSize / 1024 / 1024 / 10240;
-            case BEST_EFFORT:
+            case BEST_OF_EFFORT:
                 return scanSize / 1024 / 1024 / 20480;
             default:
                 throw new QueryServerException("invalid execution hint for calculating billed cents");
