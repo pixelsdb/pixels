@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.common.state;
 
-import io.etcd.jetcd.Watch;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author hank
@@ -27,22 +27,50 @@ import io.etcd.jetcd.Watch;
  */
 public class StateManager
 {
-    public StateManager()
+    private String key;
+
+    /**
+     * Create a state manager for the state with a key.
+     * @param key the key
+     */
+    public StateManager(String key)
+    {
+        this.key = key;
+    }
+
+    /**
+     * Update the state by setting a value for the state key.
+     * @param value the value
+     */
+    public void setState(String value)
     {
 
     }
 
-    public void setState(String key, String value)
+    /**
+     * Delete the state key-value pair.
+     */
+    public void deleteState()
     {
 
     }
 
-    public void clearState(String key)
+    /**
+     * Set the action for the update event of the state.
+     * @param action the action
+     * @return the result of performing the action.
+     */
+    public CompletableFuture<ActionResult> onStateUpdate(Action action)
     {
-
+        return null;
     }
 
-    public Watch.Watcher onStateChange()
+    /**
+     * Set the action for the delete event of the state.
+     * @param action the action
+     * @return the result of performing the action
+     */
+    public CompletableFuture<ActionResult> onStateDelete(Action action)
     {
         return null;
     }
