@@ -19,15 +19,26 @@
  */
 package io.pixelsdb.pixels.common.state;
 
+import io.etcd.jetcd.ByteSequence;
+import io.etcd.jetcd.KeyValue;
+import io.etcd.jetcd.options.WatchOption;
+import io.etcd.jetcd.watch.WatchEvent;
+import io.pixelsdb.pixels.common.utils.EtcdUtil;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
  * @create 2024-04-19
  */
-public class StateManager
+public class StateManager implements Closeable
 {
-    private String key;
+    private final String key;
 
     /**
      * Create a state manager for the state with a key.
@@ -35,7 +46,7 @@ public class StateManager
      */
     public StateManager(String key)
     {
-        this.key = key;
+        this.key = requireNonNull(key, "key is null");
     }
 
     /**
@@ -44,7 +55,7 @@ public class StateManager
      */
     public void setState(String value)
     {
-
+        EtcdUtil.Instance().putKeyValue(key, value);
     }
 
     /**
@@ -52,7 +63,7 @@ public class StateManager
      */
     public void deleteState()
     {
-
+        EtcdUtil.Instance().delete(key);
     }
 
     /**
@@ -62,7 +73,26 @@ public class StateManager
      */
     public CompletableFuture<ActionResult> onStateUpdate(Action action)
     {
-        return null;
+        CompletableFuture<ActionResult> actionResult = new CompletableFuture<>();
+        EtcdUtil.Instance().getWatchClient().watch(
+                ByteSequence.from(key, StandardCharsets.UTF_8),
+                WatchOption.DEFAULT, watchResponse -> {
+                    for (WatchEvent event : watchResponse.getEvents())
+                    {
+                        if (event.getEventType() == WatchEvent.EventType.PUT)
+                        {
+                            KeyValue current = requireNonNull(event.getKeyValue(),
+                                    "the current key value should not be null");
+                            KeyValue previous = event.getPrevKV();
+                            ActionResult result = action.perform(
+                                    current.getKey().toString(StandardCharsets.UTF_8),
+                                    current.getValue().toString(StandardCharsets.UTF_8),
+                                    previous != null ? previous.getValue().toString(StandardCharsets.UTF_8) : null);
+                            actionResult.complete(result);
+                        }
+                    }
+                });
+        return actionResult;
     }
 
     /**
@@ -73,5 +103,15 @@ public class StateManager
     public CompletableFuture<ActionResult> onStateDelete(Action action)
     {
         return null;
+    }
+
+    /**
+     * Close this state manager.
+     * @throws IOException if some state watchers are closed exceptionally.
+     */
+    @Override
+    public void close() throws IOException
+    {
+
     }
 }

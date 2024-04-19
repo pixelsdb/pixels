@@ -19,11 +19,20 @@
  */
 package io.pixelsdb.pixels.common.state;
 
+import javax.annotation.Nullable;
+
 /**
  * @author hank
  * @create 2024-04-19
  */
 public interface Action
 {
-    void run(String key, String value);
+    /**
+     * Perform the action for the target event, with the key and the current and previous values of the state.
+     * @param key the key of the state
+     * @param curValue the current value of the state
+     * @param preValue the previous value of the state
+     * @return the result of performing this action
+     */
+    ActionResult perform(@Nullable String key, @Nullable String curValue, @Nullable String preValue);
 }
