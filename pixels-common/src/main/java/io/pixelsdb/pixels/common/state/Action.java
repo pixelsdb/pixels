@@ -29,10 +29,10 @@ public interface Action
 {
     /**
      * Perform the action for the target event, with the key and the current and previous values of the state.
+     * This method should not throw any exception.
      * @param key the key of the state
      * @param curValue the current value of the state
      * @param preValue the previous value of the state
-     * @return the result of performing this action
      */
-    ActionResult perform(@Nullable String key, @Nullable String curValue, @Nullable String preValue);
+    void perform(@Nullable String key, @Nullable String curValue, @Nullable String preValue);
 }

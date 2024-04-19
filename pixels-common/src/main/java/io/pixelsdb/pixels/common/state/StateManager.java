@@ -21,24 +21,32 @@ package io.pixelsdb.pixels.common.state;
 
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KeyValue;
+import io.etcd.jetcd.Watch;
 import io.etcd.jetcd.options.WatchOption;
 import io.etcd.jetcd.watch.WatchEvent;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletableFuture;
+import java.util.LinkedList;
+import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
 /**
+ * The manager of a state stored in Etcd.
  * @author hank
  * @create 2024-04-19
  */
 public class StateManager implements Closeable
 {
+    private static final Logger logger = LogManager.getLogger(StateManager.class);
+
     private final String key;
+    private final List<Watch.Watcher> watchers;
 
     /**
      * Create a state manager for the state with a key.
@@ -47,6 +55,7 @@ public class StateManager implements Closeable
     public StateManager(String key)
     {
         this.key = requireNonNull(key, "key is null");
+        this.watchers = new LinkedList<>();
     }
 
     /**
@@ -69,40 +78,74 @@ public class StateManager implements Closeable
     /**
      * Set the action for the update event of the state.
      * @param action the action
-     * @return the result of performing the action.
      */
-    public CompletableFuture<ActionResult> onStateUpdate(Action action)
+    public void onStateUpdate(Action action)
     {
-        CompletableFuture<ActionResult> actionResult = new CompletableFuture<>();
-        EtcdUtil.Instance().getWatchClient().watch(
+        Watch.Watcher watcher = EtcdUtil.Instance().getWatchClient().watch(
                 ByteSequence.from(key, StandardCharsets.UTF_8),
                 WatchOption.DEFAULT, watchResponse -> {
                     for (WatchEvent event : watchResponse.getEvents())
                     {
                         if (event.getEventType() == WatchEvent.EventType.PUT)
                         {
-                            KeyValue current = requireNonNull(event.getKeyValue(),
-                                    "the current key value should not be null");
-                            KeyValue previous = event.getPrevKV();
-                            ActionResult result = action.perform(
-                                    current.getKey().toString(StandardCharsets.UTF_8),
-                                    current.getValue().toString(StandardCharsets.UTF_8),
-                                    previous != null ? previous.getValue().toString(StandardCharsets.UTF_8) : null);
-                            actionResult.complete(result);
+                            try
+                            {
+                                KeyValue current = requireNonNull(event.getKeyValue(),
+                                        "the current key value should not be null");
+                                KeyValue previous = event.getPrevKV();
+                                action.perform(
+                                        current.getKey().toString(StandardCharsets.UTF_8),
+                                        current.getValue().toString(StandardCharsets.UTF_8),
+                                        previous != null ? previous.getValue().toString(StandardCharsets.UTF_8) : null);
+                            }
+                            catch (Exception e)
+                            {
+                                logger.error("no exception should be caught here", e);
+                            }
                         }
                     }
                 });
-        return actionResult;
+        this.watchers.add(watcher);
     }
 
     /**
      * Set the action for the delete event of the state.
      * @param action the action
-     * @return the result of performing the action
      */
-    public CompletableFuture<ActionResult> onStateDelete(Action action)
+    public void onStateDelete(Action action)
     {
-        return null;
+        Watch.Watcher watcher = EtcdUtil.Instance().getWatchClient().watch(
+                ByteSequence.from(key, StandardCharsets.UTF_8),
+                WatchOption.DEFAULT, watchResponse -> {
+                    for (WatchEvent event : watchResponse.getEvents())
+                    {
+                        if (event.getEventType() == WatchEvent.EventType.DELETE)
+                        {
+                            try
+                            {
+                                KeyValue current = event.getKeyValue();
+                                KeyValue previous = event.getPrevKV();
+                                String preValue = previous != null ?
+                                        previous.getValue().toString(StandardCharsets.UTF_8) : null;
+                                if (current != null)
+                                {
+                                     action.perform(
+                                            current.getKey().toString(StandardCharsets.UTF_8),
+                                            current.getValue().toString(StandardCharsets.UTF_8), preValue);
+                                }
+                                else
+                                {
+                                    action.perform(null, null, preValue);
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                logger.error("no exception should be caught here", e);
+                            }
+                        }
+                    }
+                });
+        this.watchers.add(watcher);
     }
 
     /**
@@ -112,6 +155,9 @@ public class StateManager implements Closeable
     @Override
     public void close() throws IOException
     {
-
+        for (Watch.Watcher watcher : this.watchers)
+        {
+            watcher.close();
+        }
     }
 }
