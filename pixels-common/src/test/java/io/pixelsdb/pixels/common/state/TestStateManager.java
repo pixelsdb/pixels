@@ -19,42 +19,36 @@
  */
 package io.pixelsdb.pixels.common.state;
 
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import org.junit.Test;
 
-import static java.util.Objects.requireNonNull;
+import java.io.IOException;
 
 /**
- * The manager of a state stored in Etcd.
  * @author hank
- * @create 2024-04-19
+ * @create 2024-04-20
  */
-public class StateManager
+public class TestStateManager
 {
-    private final String key;
-
-    /**
-     * Create a state manager for the state with a key.
-     * @param key the key
-     */
-    public StateManager(String key)
+    @Test
+    public void testSetState() throws IOException, InterruptedException
     {
-        this.key = requireNonNull(key, "key is null");
-    }
+        StateManager manager = new StateManager("state-1");
+        manager.setState("1");
 
-    /**
-     * Update the state by setting a value for the state key.
-     * @param value the value
-     */
-    public void setState(String value)
-    {
-        EtcdUtil.Instance().putKeyValue(key, value);
-    }
+        StateWatcher watcher = new StateWatcher("state-1");
+        watcher.onStateUpdate((key, value) -> {
+            System.out.println("on state update:");
+            System.out.println("key=" + key);
+            System.out.println("value=" + value);
+        });
 
-    /**
-     * Delete the state key-value pair.
-     */
-    public void deleteState()
-    {
-        EtcdUtil.Instance().delete(key);
+        manager.setState("2");
+
+        manager.setState("3");
+
+        manager.deleteState();
+
+        watcher.close();
+        Thread.sleep(1000);
     }
 }
