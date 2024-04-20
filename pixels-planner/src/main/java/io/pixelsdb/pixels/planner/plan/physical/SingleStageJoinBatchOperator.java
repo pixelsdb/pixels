@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner.plan.physical;
 
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
@@ -56,7 +57,7 @@ public class SingleStageJoinBatchOperator extends SingleStageJoinOperator
      * @return the completable future of the completable futures of the join outputs.
      */
     @Override
-    public CompletableFuture<CompletableFuture<?>[]> execute()
+    public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
         return executePrev().handle((result, exception) ->
         {
@@ -97,24 +98,24 @@ public class SingleStageJoinBatchOperator extends SingleStageJoinOperator
         {
             try
             {
-                CompletableFuture<CompletableFuture<?>[]> smallChildFuture = null;
+                CompletableFuture<CompletableFuture<? extends Output>[]> smallChildFuture = null;
                 if (smallChild != null)
                 {
                     smallChildFuture = smallChild.execute();
                 }
-                CompletableFuture<CompletableFuture<?>[]> largeChildFuture = null;
+                CompletableFuture<CompletableFuture<? extends Output>[]> largeChildFuture = null;
                 if (largeChild != null)
                 {
                     largeChildFuture = largeChild.execute();
                 }
                 if (smallChildFuture != null)
                 {
-                    CompletableFuture<?>[] smallChildOutputs = smallChildFuture.join();
+                    CompletableFuture<? extends Output>[] smallChildOutputs = smallChildFuture.join();
                     waitForCompletion(smallChildOutputs);
                 }
                 if (largeChildFuture != null)
                 {
-                    CompletableFuture<?>[] largeChildOutputs = largeChildFuture.join();
+                    CompletableFuture<? extends Output>[] largeChildOutputs = largeChildFuture.join();
                     waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
                 }
                 prevStagesFuture.complete(null);

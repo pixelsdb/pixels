@@ -62,11 +62,11 @@ public abstract class AggregationOperator extends Operator
     /**
      * The outputs of the scan workers.
      */
-    protected CompletableFuture<?>[] scanOutputs = null;
+    protected CompletableFuture<? extends Output>[] scanOutputs = null;
     /**
      * The outputs of the final aggregation workers.
      */
-    protected CompletableFuture<?>[] finalAggrOutputs = null;
+    protected CompletableFuture<? extends Output>[] finalAggrOutputs = null;
 
     public AggregationOperator(String name, List<AggregationInput> finalAggrInputs, List<ScanInput> scanInputs)
     {
@@ -163,7 +163,7 @@ public abstract class AggregationOperator extends Operator
             Output[] outputs = new Output[this.scanOutputs.length];
             for (int i = 0; i < this.scanOutputs.length; ++i)
             {
-                outputs[i] = (Output) this.scanOutputs[i].get();
+                outputs[i] = this.scanOutputs[i].get();
             }
             outputCollection.setScanOutputs(outputs);
         }
@@ -172,7 +172,7 @@ public abstract class AggregationOperator extends Operator
             Output[] outputs = new Output[this.finalAggrOutputs.length];
             for (int i = 0; i < this.finalAggrOutputs.length; ++i)
             {
-                outputs[i] = (Output) this.finalAggrOutputs[i].get();
+                outputs[i] = this.finalAggrOutputs[i].get();
             }
             outputCollection.setFinalAggrOutputs(outputs);
         }

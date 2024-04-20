@@ -66,11 +66,11 @@ public class StarlingAggregationOperator extends Operator
     /**
      * The outputs of the partition workers.
      */
-    private CompletableFuture<?>[] partitionOutputs = null;
+    private CompletableFuture<? extends Output>[] partitionOutputs = null;
     /**
      * The outputs of the final aggregation workers.
      */
-    private CompletableFuture<?>[] finalAggrOutputs = null;
+    private CompletableFuture<? extends Output>[] finalAggrOutputs = null;
 
     public StarlingAggregationOperator(String name, List<AggregationInput> finalAggrInputs,
                                        List<PartitionInput> partitionInputs)
@@ -124,7 +124,7 @@ public class StarlingAggregationOperator extends Operator
     }
 
     @Override
-    public CompletableFuture<CompletableFuture<?>[]> execute()
+    public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
         return executePrev().handle((result, exception) ->
         {
@@ -160,7 +160,7 @@ public class StarlingAggregationOperator extends Operator
         {
             try
             {
-                CompletableFuture<CompletableFuture<?>[]> childFuture = null;
+                CompletableFuture<CompletableFuture<? extends Output>[]> childFuture = null;
                 if (this.child != null)
                 {
                     checkArgument(this.partitionInputs.isEmpty(), "partitionInputs is not empty");
@@ -208,7 +208,7 @@ public class StarlingAggregationOperator extends Operator
             Output[] outputs = new Output[this.partitionOutputs.length];
             for (int i = 0; i < this.partitionOutputs.length; ++i)
             {
-                outputs[i] = (Output) this.partitionOutputs[i].get();
+                outputs[i] = this.partitionOutputs[i].get();
             }
             outputCollection.setPartitionOutputs(outputs);
         }
@@ -217,7 +217,7 @@ public class StarlingAggregationOperator extends Operator
             Output[] outputs = new Output[this.finalAggrOutputs.length];
             for (int i = 0; i < this.finalAggrOutputs.length; ++i)
             {
-                outputs[i] = (Output) this.finalAggrOutputs[i].get();
+                outputs[i] = this.finalAggrOutputs[i].get();
             }
             outputCollection.setFinalAggrOutputs(outputs);
         }

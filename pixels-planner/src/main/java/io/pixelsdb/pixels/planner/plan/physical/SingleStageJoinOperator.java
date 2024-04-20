@@ -43,7 +43,7 @@ public abstract class SingleStageJoinOperator extends JoinOperator
     protected final JoinAlgorithm joinAlgo;
     protected JoinOperator smallChild = null;
     protected JoinOperator largeChild = null;
-    protected CompletableFuture<?>[] joinOutputs = null;
+    protected CompletableFuture<? extends Output>[] joinOutputs = null;
 
     public SingleStageJoinOperator(String name, boolean complete, JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
@@ -136,7 +136,7 @@ public abstract class SingleStageJoinOperator extends JoinOperator
             Output[] outputs = new Output[joinOutputs.length];
             for (int i = 0; i < joinOutputs.length; ++i)
             {
-                outputs[i] = (Output) joinOutputs[i].get();
+                outputs[i] = joinOutputs[i].get();
             }
             outputCollection.setJoinOutputs(outputs);
         }
