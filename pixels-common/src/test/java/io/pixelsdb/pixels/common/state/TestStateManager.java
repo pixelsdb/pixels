@@ -59,7 +59,7 @@ public class TestStateManager
 
         StateWatcher watcher = new StateWatcher("state-1");
 
-        watcher.onStateUpdateorExist((key, value) -> {
+        watcher.onStateUpdateOrExist((key, value) -> {
             System.out.println("on state update:");
             System.out.println("key=" + key);
             System.out.println("value=" + value);

@@ -72,7 +72,7 @@ public class StateWatcher implements Closeable
      * action if the state exists. The action must be idempotent as it may be called twice for the same state update.
      * @param action the action
      */
-    public void onStateUpdateorExist(Action action)
+    public void onStateUpdateOrExist(Action action)
     {
         Watch.Watcher watcher = getStateWatcher(action);
         KeyValue keyValue = EtcdUtil.Instance().getKeyValue(this.key);

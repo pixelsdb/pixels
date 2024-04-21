@@ -177,4 +177,13 @@ public abstract class Output
     {
         this.totalWriteBytes = totalWriteBytes;
     }
+
+    public SimpleOutput toSimpleOutput()
+    {
+        SimpleOutput simpleOutput = new SimpleOutput();
+        simpleOutput.setRequestId(this.requestId);
+        simpleOutput.setSuccessful(this.successful);
+        simpleOutput.setErrorMessage(this.errorMessage);
+        return simpleOutput;
+    }
 }
