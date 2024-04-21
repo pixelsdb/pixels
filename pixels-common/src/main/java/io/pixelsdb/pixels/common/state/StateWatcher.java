@@ -69,7 +69,6 @@ public class StateWatcher implements Closeable
                 WatchOption.DEFAULT, watchResponse -> {
                     for (WatchEvent event : watchResponse.getEvents())
                     {
-                        System.out.println("1" + event.getEventType().toString());
                         if (event.getEventType() == WatchEvent.EventType.PUT)
                         {
                             try
