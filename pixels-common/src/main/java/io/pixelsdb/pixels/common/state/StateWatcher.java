@@ -64,7 +64,29 @@ public class StateWatcher implements Closeable
      */
     public void onStateUpdate(Action action)
     {
-        Watch.Watcher watcher = EtcdUtil.Instance().getWatchClient().watch(
+        this.watchers.add(getStateWatcher(action));
+    }
+
+    /**
+     * Set the action for the update event of the state if the key does not exist, or perform the
+     * action if the state exists. The action must be idempotent as it may be called twice for the same state update.
+     * @param action the action
+     */
+    public void onStateUpdateorExist(Action action)
+    {
+        Watch.Watcher watcher = getStateWatcher(action);
+        KeyValue keyValue = EtcdUtil.Instance().getKeyValue(this.key);
+        if (keyValue != null)
+        {
+            watcher.close();
+            action.perform(keyValue.getKey().toString(StandardCharsets.UTF_8),
+                    keyValue.getValue().toString(StandardCharsets.UTF_8));
+        }
+    }
+
+    private Watch.Watcher getStateWatcher(Action action)
+    {
+        return EtcdUtil.Instance().getWatchClient().watch(
                 ByteSequence.from(key, StandardCharsets.UTF_8),
                 WatchOption.DEFAULT, watchResponse -> {
                     for (WatchEvent event : watchResponse.getEvents())
@@ -78,8 +100,7 @@ public class StateWatcher implements Closeable
                                 action.perform(
                                         current.getKey().toString(StandardCharsets.UTF_8),
                                         current.getValue().toString(StandardCharsets.UTF_8));
-                            }
-                            catch (Exception e)
+                            } catch (Exception e)
                             {
                                 logger.error("no exception should be caught here", e);
                                 e.printStackTrace();
@@ -87,7 +108,6 @@ public class StateWatcher implements Closeable
                         }
                     }
                 });
-        this.watchers.add(watcher);
     }
 
     /**
