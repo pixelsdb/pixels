@@ -107,7 +107,6 @@ public class StateWatcher implements Closeable
                             } catch (Exception e)
                             {
                                 logger.error("no exception should be caught here", e);
-                                e.printStackTrace();
                             }
                         }
                     }
