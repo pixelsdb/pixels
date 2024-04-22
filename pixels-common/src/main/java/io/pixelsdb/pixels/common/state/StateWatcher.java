@@ -82,6 +82,10 @@ public class StateWatcher implements Closeable
             action.perform(keyValue.getKey().toString(StandardCharsets.UTF_8),
                     keyValue.getValue().toString(StandardCharsets.UTF_8));
         }
+        else
+        {
+            this.watchers.add(watcher);
+        }
     }
 
     private Watch.Watcher getStateWatcher(Action action)
