@@ -241,7 +241,6 @@ connector.name=pixels
 # serverless config
 # it can be on, off, auto, or session
 cloud.function.switch=off
-local.scan.concurrency=40
 clean.intermediate.result=true
 ```
 **Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
