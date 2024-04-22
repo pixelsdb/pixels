@@ -24,6 +24,9 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ScanTableInfo;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * The input format for table scan.
  * @author hank
@@ -120,5 +123,28 @@ public class ScanInput extends Input
     public void setOutput(OutputInfo output)
     {
         this.output = output;
+    }
+
+    public static String[] generateOutputPaths(String outputFolder, int numSplits)
+    {
+        requireNonNull(outputFolder, "outputFolder is null");
+        checkArgument(numSplits > 0, "numSplits is non-positive");
+        if (!outputFolder.endsWith("/"))
+        {
+            outputFolder += "/";
+        }
+        String[] outputPaths = new String[numSplits];
+        for (int i = 0; i < numSplits; ++i)
+        {
+            outputPaths[i] = outputFolder + "scan_" + i++;
+        }
+        return outputPaths;
+    }
+
+    public static String[] generateOutputPaths(ScanInput scanInput)
+    {
+        requireNonNull(scanInput, "scanInput is null");
+        return generateOutputPaths(scanInput.getOutput().getPath(),
+                scanInput.getTableInfo().getInputSplits().size());
     }
 }
