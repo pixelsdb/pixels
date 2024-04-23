@@ -76,7 +76,7 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
                 else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInput);
+                            .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN).invoke(joinInput);
                 }
                 else
                 {
