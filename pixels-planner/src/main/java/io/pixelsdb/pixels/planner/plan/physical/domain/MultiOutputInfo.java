@@ -52,6 +52,7 @@ public class MultiOutputInfo extends OutputInfo
 
     /**
      * Set the folder that the output files are written into.
+     * @param path the path of the folder
      */
     public void setPath(String path)
     {
