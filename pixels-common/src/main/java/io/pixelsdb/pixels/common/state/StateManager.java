@@ -57,4 +57,13 @@ public class StateManager
     {
         EtcdUtil.Instance().delete(key);
     }
+
+    /**
+     * Delete all the states by the prefix of their keys.
+     * @param keyPredix the predix of the state keys
+     */
+    public void deleteAllStatesByPrefix(String keyPredix)
+    {
+        EtcdUtil.Instance().deleteByPrefix(keyPredix);
+    }
 }
