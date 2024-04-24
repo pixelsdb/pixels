@@ -229,11 +229,11 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         TransProto.UpdateQueryCostsResponse.Builder builder = TransProto.UpdateQueryCostsResponse.newBuilder();
         if (context != null)
         {
+            context.getProperties().setProperty(Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, String.valueOf(newScanBytes));
             double curCostCents = Double.parseDouble(
                     context.getProperties().getProperty(Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
             context.getProperties().setProperty(Constants.TRANS_CONTEXT_COST_CENTS_KEY,
                     String.valueOf(curCostCents + addCostCents));
-            context.getProperties().setProperty(Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, String.valueOf(newScanBytes));
             builder.setErrorCode(ErrorCode.SUCCESS);
         }
         else
