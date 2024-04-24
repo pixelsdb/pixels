@@ -157,6 +157,11 @@ public class PixelsPlanner
         return scanSize;
     }
 
+    public static String getIntermediateFolderForTrans(long transId)
+    {
+        return IntermediateFolder + transId + "/";
+    }
+
     private AggregationOperator getAggregationOperator(AggregatedTable aggregatedTable)
             throws IOException, MetadataException
     {
@@ -177,7 +182,7 @@ public class PixelsPlanner
         partialAggregationInfo.setPartition(numPartitions > 1);
         partialAggregationInfo.setNumPartition(numPartitions);
 
-        final String intermediateBase = IntermediateFolder + transId + "/" +
+        final String intermediateBase = getIntermediateFolderForTrans(transId) +
                 aggregatedTable.getSchemaName() + "/" + aggregatedTable.getTableName() + "/";
 
         ImmutableList.Builder<String> aggrInputFilesBuilder = ImmutableList.builder();
@@ -378,7 +383,7 @@ public class PixelsPlanner
                         BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
 
-                        String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                        String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/";
                         MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -703,7 +708,7 @@ public class PixelsPlanner
                         BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                        String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                        String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/";
                         MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -818,7 +823,7 @@ public class PixelsPlanner
                     BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                    String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                    String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -866,7 +871,7 @@ public class PixelsPlanner
                     BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
 
-                    String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                    String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -911,7 +916,7 @@ public class PixelsPlanner
 
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
-                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
@@ -946,7 +951,7 @@ public class PixelsPlanner
                 boolean[] leftPartitionProjection = getPartitionProjection(leftTable, join.getLeftProjection());
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
                         leftTable, leftInputSplits, leftKeyColumnIds, leftPartitionProjection, numPartition,
-                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs, leftPartitionProjection);
@@ -954,7 +959,7 @@ public class PixelsPlanner
                 boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
-                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
@@ -1314,7 +1319,7 @@ public class PixelsPlanner
                 outputFileNames.add(i + "/join_left");
             }
 
-            String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+            String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                     joinedTable.getTableName() + "/";
             MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
 
