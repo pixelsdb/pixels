@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner.plan.physical;
 
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
@@ -43,7 +44,7 @@ public class AggregationBatchOperator extends AggregationOperator
     }
 
     @Override
-    public CompletableFuture<CompletableFuture<?>[]> execute()
+    public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
         return executePrev().handle((result, exception) ->
         {
@@ -79,7 +80,7 @@ public class AggregationBatchOperator extends AggregationOperator
         {
             try
             {
-                CompletableFuture<CompletableFuture<?>[]> childFuture = null;
+                CompletableFuture<CompletableFuture<? extends Output>[]> childFuture = null;
                 if (this.child != null)
                 {
                     checkArgument(this.scanInputs.isEmpty(), "scanInputs is not empty");

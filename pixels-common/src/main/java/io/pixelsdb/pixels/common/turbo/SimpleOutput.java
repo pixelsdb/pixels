@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,18 +17,45 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.cli;
-
-import org.junit.Test;
+package io.pixelsdb.pixels.common.turbo;
 
 /**
  * @author hank
- * @create 2023-12-06
+ * @create 2024-04-22
  */
-public class TestExecuteQuery
+public class SimpleOutput
 {
-    @Test
-    public void test()
+    private String requestId;
+    private boolean successful;
+    private String errorMessage;
+
+    public String getRequestId()
     {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId)
+    {
+        this.requestId = requestId;
+    }
+
+    public boolean isSuccessful()
+    {
+        return successful;
+    }
+
+    public void setSuccessful(boolean successful)
+    {
+        this.successful = successful;
+    }
+
+    public String getErrorMessage()
+    {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage)
+    {
+        this.errorMessage = errorMessage;
     }
 }

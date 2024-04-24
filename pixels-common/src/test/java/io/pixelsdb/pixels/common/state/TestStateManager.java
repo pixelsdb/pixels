@@ -30,13 +30,36 @@ import java.io.IOException;
 public class TestStateManager
 {
     @Test
-    public void testSetState() throws IOException, InterruptedException
+    public void testStateUpdate() throws IOException, InterruptedException
     {
         StateManager manager = new StateManager("state-1");
         manager.setState("1");
 
         StateWatcher watcher = new StateWatcher("state-1");
         watcher.onStateUpdate((key, value) -> {
+            System.out.println("on state update:");
+            System.out.println("key=" + key);
+            System.out.println("value=" + value);
+        });
+
+        manager.setState("2");
+
+        manager.setState("3");
+
+        manager.deleteState();
+
+        watcher.close();
+        Thread.sleep(1000);
+    }
+
+    @Test
+    public void testStateUpdateOrExist() throws IOException, InterruptedException
+    {
+        StateManager manager = new StateManager("state-1");
+        manager.setState("1");
+
+        StateWatcher watcher = new StateWatcher("state-1");
+        watcher.onStateUpdateOrExist((key, value) -> {
             System.out.println("on state update:");
             System.out.println("key=" + key);
             System.out.println("value=" + value);

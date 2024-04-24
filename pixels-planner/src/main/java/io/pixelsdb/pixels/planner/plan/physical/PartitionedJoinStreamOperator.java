@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
@@ -40,7 +41,7 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
     }
 
     @Override
-    public CompletableFuture<CompletableFuture<?>[]> execute()
+    public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
         // TODO: implement
         return null;

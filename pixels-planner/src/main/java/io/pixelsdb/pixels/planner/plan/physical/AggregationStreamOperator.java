@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
@@ -37,7 +38,7 @@ public class AggregationStreamOperator extends AggregationOperator
     }
 
     @Override
-    public CompletableFuture<CompletableFuture<?>[]> execute()
+    public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
         // TODO: implement
         return null;

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.daemon.transaction;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.daemon.TransProto;
 import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -199,6 +200,40 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             {
                 builder.setPrevValue(prevValue);
             }
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        else
+        {
+            builder.setErrorCode(ErrorCode.TRANS_CONTEXT_NOT_FOUND);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updateQueryCosts(TransProto.UpdateQueryCostsRequest request,
+                                 StreamObserver<TransProto.UpdateQueryCostsResponse> responseObserver)
+    {
+        TransContext context = null;
+        if (request.hasTransId())
+        {
+            context = TransContextManager.Instance().getTransContext(request.getTransId());
+        }
+        else if (request.hasExternalTraceId())
+        {
+            context = TransContextManager.Instance().getTransContext(request.getExternalTraceId());
+
+        }
+        double newScanBytes = request.getNewScanBytes();
+        double addCostCents = request.getAddCostCents();
+        TransProto.UpdateQueryCostsResponse.Builder builder = TransProto.UpdateQueryCostsResponse.newBuilder();
+        if (context != null)
+        {
+            context.getProperties().setProperty(Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, String.valueOf(newScanBytes));
+            double curCostCents = Double.parseDouble(
+                    context.getProperties().getProperty(Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
+            context.getProperties().setProperty(Constants.TRANS_CONTEXT_COST_CENTS_KEY,
+                    String.valueOf(curCostCents + addCostCents));
             builder.setErrorCode(ErrorCode.SUCCESS);
         }
         else
