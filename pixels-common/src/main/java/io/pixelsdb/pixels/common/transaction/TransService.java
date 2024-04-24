@@ -169,6 +169,46 @@ public class TransService
         return null;
     }
 
+    /**
+     * Update the costs of a transaction (query).
+     * @param transId the id of the transaction
+     * @param newScanBytes the new scan bytes to set in the transaction context
+     * @param addCostCents the additional cost in cents to add into the transaction context
+     * @return true of the costs are updates successfully, otherwise false
+     * @throws TransException if the transaction does not exist
+     */
+    public boolean updateQueryCosts(long transId, double newScanBytes, double addCostCents) throws TransException
+    {
+        TransProto.UpdateQueryCostsRequest request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                .setTransId(transId).setNewScanBytes(newScanBytes).setAddCostCents(addCostCents).build();
+        return updateQueryCosts(request);
+    }
+
+    /**
+     * Update the costs of a transaction (query).
+     * @param externalTraceId the external trace id (token) of the transaction
+     * @param newScanBytes the new scan bytes to set in the transaction context
+     * @param addCostCents the additional cost in cents to add into the transaction context
+     * @return true of the costs are updates successfully, otherwise false
+     * @throws TransException if the transaction does not exist
+     */
+    public boolean updateQueryCosts(String externalTraceId, double newScanBytes, double addCostCents) throws TransException
+    {
+        TransProto.UpdateQueryCostsRequest request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                .setExternalTraceId(externalTraceId).setNewScanBytes(newScanBytes).setAddCostCents(addCostCents).build();
+        return updateQueryCosts(request);
+    }
+
+    private boolean updateQueryCosts(TransProto.UpdateQueryCostsRequest request) throws TransException
+    {
+        TransProto.UpdateQueryCostsResponse response = this.stub.updateQueryCosts(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to update query costs, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
     public int getTransConcurrency(boolean readOnly) throws TransException
     {
         TransProto.GetTransConcurrencyRequest request = TransProto.GetTransConcurrencyRequest.newBuilder()

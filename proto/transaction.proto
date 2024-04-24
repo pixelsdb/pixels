@@ -35,6 +35,7 @@ service TransService {
     rpc RollbackTrans (RollbackTransRequest) returns (RollbackTransResponse);
     rpc GetTransContext (GetTransContextRequest) returns (GetTransContextResponse);
     rpc SetTransProperty (SetTransPropertyRequest) returns (SetTransPropertyResponse);
+    rpc UpdateQueryCosts (UpdateQueryCostsRequest) returns (UpdateQueryCostsResponse);
     rpc GetTransConcurrency (GetTransConcurrencyRequest) returns (GetTransConcurrencyResponse);
     rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
 }
@@ -109,6 +110,21 @@ message SetTransPropertyRequest {
 message SetTransPropertyResponse {
     int32 errorCode = 1;
     optional string prevValue = 2;
+}
+
+message UpdateQueryCostsRequest {
+    oneof lookupKey {
+        string externalTraceId = 1;
+        uint64 transId = 2;
+    }
+    // the new scan bytes to set
+    double newScanBytes = 3;
+    // the additional cost in cents to add
+    double addCostCents = 4;
+}
+
+message UpdateQueryCostsResponse {
+    int32 errorCode = 1;
 }
 
 message GetTransConcurrencyRequest {
