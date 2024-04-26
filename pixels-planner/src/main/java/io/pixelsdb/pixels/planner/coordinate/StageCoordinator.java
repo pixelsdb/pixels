@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
+ * The coordinator of a query execution stage.
  * @author hank
  * @create 2023-09-22
  */
@@ -61,6 +62,15 @@ public class StageCoordinator
     private final AtomicInteger workerIndexAssigner = new AtomicInteger(0);
     private final Object lock = new Object();
 
+    /**
+     * Create a non-queued stage coordinator with a fixed number of workers in this stage. The tasks on a non-queued
+     * stage are send directly to the workers, thus the workers does not need to get pending tasks from the stage
+     * coordinator to execute. However, the workers still need to register to the stage coordinator when they are up.
+     * The stage coordinator will notify the upstream (child) state that waits on {@link #waitForAllWorkersReady()}
+     * when the fixed number of workers have been added into this stage coordinator.
+     * @param stageId the id of this stage
+     * @param workerNum the fixed number of workers in this stage
+     */
     public StageCoordinator(int stageId, int workerNum)
     {
         this.stageId = stageId;
@@ -69,6 +79,12 @@ public class StageCoordinator
         this.taskQueue = null;
     }
 
+    /**
+     * Create a queued stage coordinator with a list of pending tasks. The stage coordinator will notify the
+     * upstream (child) state that waits on {@link #waitForAllWorkersReady()} when there is none tasks pending.
+     * @param stageId
+     * @param pendingTasks
+     */
     public StageCoordinator(int stageId, List<Task> pendingTasks)
     {
         this.stageId = stageId;
@@ -77,6 +93,10 @@ public class StageCoordinator
         this.taskQueue = new TaskQueue<>(pendingTasks);
     }
 
+    /**
+     * Add (register) a worker on this stage coordinator.
+     * @param worker the worker to be added
+     */
     public void addWorker(Worker<CFWorkerInfo> worker)
     {
         this.workerIdToWorkers.put(worker.getWorkerId(), worker);
@@ -87,6 +107,14 @@ public class StageCoordinator
         }
     }
 
+    /**
+     * Get a batch of tasks from the task queue to execute by a worker. This method should only be called on a
+     * queued stage. The number of tasks in a batch usually equals to the task parallelism in a worker, which is
+     * configured in pixels.properties.
+     * @param workerId the id of the worker
+     * @return the batch of tasks
+     * @throws WorkerCoordinateException if the worker of the id does not exist
+     */
     public List<Task> getTasksToRun(long workerId) throws WorkerCoordinateException
     {
         checkArgument(this.isQueued && this.taskQueue != null,
@@ -118,6 +146,11 @@ public class StageCoordinator
         }
     }
 
+    /**
+     * Complete a task on a queued stage. This method should not be called on non-queued stage.
+     * @param taskId the task id
+     * @param success whether the task is completed successfully or not
+     */
     public void completeTask(int taskId, boolean success)
     {
         checkArgument(this.isQueued && this.taskQueue != null,
@@ -125,11 +158,19 @@ public class StageCoordinator
         this.taskQueue.complete(taskId, success);
     }
 
+    /**
+     * @return the stage id of this stage
+     */
     public int getStageId()
     {
         return this.stageId;
     }
 
+    /**
+     * Get the worker with the worker id.
+     * @param workerId the worker id
+     * @return the worker
+     */
     public Worker<CFWorkerInfo> getWorker(long workerId)
     {
         return this.workerIdToWorkers.get(workerId);
@@ -150,6 +191,9 @@ public class StageCoordinator
         return -1;
     }
 
+    /**
+     * Block and wait for all the workers on this stage to ready.
+     */
     void waitForAllWorkersReady()
     {
         synchronized (this.lock)
@@ -183,6 +227,9 @@ public class StageCoordinator
         }
     }
 
+    /**
+     * @return all the workers in this stage coordinator
+     */
     public List<Worker<CFWorkerInfo>> getWorkers()
     {
         return this.workers;

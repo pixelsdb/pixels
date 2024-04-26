@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.planner.coordinate;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
+ * The dependency of a query execution stage.
  * @author hank
  * @create 2023-09-24
  */
@@ -34,6 +35,12 @@ public class StageDependency
     private final int downStreamStageId;
     private final boolean isWide;
 
+    /**
+     * Create a dependency between the current stage and the downstream (parent) stage.
+     * @param currentStageId the id of the current stage
+     * @param downStreamStageId the id of the downstream stage
+     * @param isWide whether this dependency is wide or not
+     */
     public StageDependency(int currentStageId, int downStreamStageId, boolean isWide)
     {
         checkArgument(currentStageId >= 0, "currentStageId must be non-negative");
