@@ -59,7 +59,7 @@ public abstract class Operator implements OperatorExecutor
 
     /**
      * Initialize the query plan coordinator. This method should be invoked recursively to traverse all
-     * the operators in the query plan. Each operator added its own query execution stages into the plan
+     * the operators in the query plan. Each operator adds its own query execution stages into the plan
      * coordinator. Therefore, the users only need to call this method on the root operator of the plan.
      * @param planCoordinator the plan coordinator to be initialized
      * @param parentStageId the stage id of the parent (i.e., downstream) stage of this operator, for the
