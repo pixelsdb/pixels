@@ -63,11 +63,12 @@ public class StageCoordinator
     private final Object lock = new Object();
 
     /**
-     * Create a non-queued stage coordinator with a fixed number of workers in this stage. The tasks on a non-queued
-     * stage are send directly to the workers, thus the workers does not need to get pending tasks from the stage
-     * coordinator to execute. However, the workers still need to register to the stage coordinator when they are up.
-     * The stage coordinator will notify the upstream (child) state that waits on {@link #waitForAllWorkersReady()}
-     * when the fixed number of workers have been added into this stage coordinator.
+     * Create a non-queued stage coordinator with a fixed number of workers in this stage. Non-queued stage coordinator
+     * is used when the upstream (child) stage has a wide dependency on this stage. The tasks in a non-queued stage
+     * are send directly to the workers, thus the workers does not need to call {@link #getTasksToRun(long)} on this
+     * stage coordinator. However, the workers still need to register by calling {@link #addWorker(Worker)} when they
+     * are up and running. The stage coordinator will notify the child stage waits on {@link #waitForAllWorkersReady()}
+     * when all the workers in this stage are registered (i.e., up and running). This is required by a wide dependency.
      * @param stageId the id of this stage
      * @param workerNum the fixed number of workers in this stage
      */
@@ -80,8 +81,10 @@ public class StageCoordinator
     }
 
     /**
-     * Create a queued stage coordinator with a list of pending tasks. The stage coordinator will notify the
-     * upstream (child) state that waits on {@link #waitForAllWorkersReady()} when there is none tasks pending.
+     * Create a queued stage coordinator with a list of pending tasks. Queued stage coordinator is used when the
+     * upstream (child) stage does not exist or has a narrow dependency on this stage. The stage coordinator will
+     * notify the child stage waits on {@link #waitForAllWorkersReady()} when there is none tasks pending in this
+     * stage (i.e., when all the tasks are assigned to corresponding workers, meaning no more workers will be added).
      * @param stageId
      * @param pendingTasks
      */
@@ -94,13 +97,14 @@ public class StageCoordinator
     }
 
     /**
-     * Add (register) a worker on this stage coordinator.
+     * Add (register) a worker into this stage coordinator.
      * @param worker the worker to be added
      */
     public void addWorker(Worker<CFWorkerInfo> worker)
     {
         this.workerIdToWorkers.put(worker.getWorkerId(), worker);
         this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndexAssigner.getAndIncrement());
+        this.workers.add(worker);
         if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
         {
             this.lock.notifyAll();
