@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.planner.coordinate;
 import java.util.List;
 
 /**
+ * A batch of tasks to execute. If {@link #isEndOfTasks()} returns true, it means this is the last batch
+ * of tasks for the stage.
  * @author hank
  * @create 2023-10-04
  */
@@ -36,11 +38,17 @@ public class TaskBatch
         this.tasks = tasks;
     }
 
+    /**
+     * @return true if this the last batch of tasks in the stage
+     */
     public boolean isEndOfTasks()
     {
         return endOfTasks;
     }
 
+    /**
+     * @return the tasks in the batch
+     */
     public List<TaskInfo> getTasks()
     {
         return tasks;
