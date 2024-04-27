@@ -32,6 +32,7 @@ import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -87,5 +88,156 @@ public abstract class ScanOperator extends Operator
         }
         StageCoordinator scanStageCoordinator = new StageCoordinator(scanStageId, tasks);
         planCoordinator.addStageCoordinator(scanStageCoordinator, scanStageDependency);
+    }
+
+    @Override
+    public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
+    {
+        ScanOutputCollection outputCollection = new ScanOutputCollection();
+
+        if (this.scanOutputs != null && this.scanOutputs.length > 0)
+        {
+            Output[] outputs = new Output[this.scanOutputs.length];
+            for (int i = 0; i < this.scanOutputs.length; ++i)
+            {
+                outputs[i] = this.scanOutputs[i].get();
+            }
+            outputCollection.setScanOutputs(outputs);
+        }
+        return outputCollection;
+    }
+
+    public static class ScanOutputCollection implements OutputCollection
+    {
+        private Output[] scanOutputs = null;
+
+        public ScanOutputCollection() { }
+
+        public ScanOutputCollection(Output[] scanOutputs)
+        {
+            this.scanOutputs = requireNonNull(scanOutputs, "scanOutputs is null");
+        }
+
+        public Output[] getScanOutputs()
+        {
+            return scanOutputs;
+        }
+
+        public void setScanOutputs(Output[] scanOutputs)
+        {
+            this.scanOutputs = scanOutputs;
+        }
+
+        @Override
+        public long getTotalGBMs()
+        {
+            long totalGBMs = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    totalGBMs += output.getGBMs();
+                }
+            }
+            return totalGBMs;
+        }
+
+        @Override
+        public int getTotalNumReadRequests()
+        {
+            int numReadRequests = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    numReadRequests += output.getNumReadRequests();
+                }
+            }
+            return numReadRequests;
+        }
+
+        @Override
+        public int getTotalNumWriteRequests()
+        {
+            int numWriteRequests = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    numWriteRequests += output.getNumWriteRequests();
+                }
+            }
+            return numWriteRequests;
+        }
+
+        @Override
+        public long getTotalReadBytes()
+        {
+            long readBytes = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    readBytes += output.getTotalReadBytes();
+                }
+            }
+            return readBytes;
+        }
+
+        @Override
+        public long getTotalWriteBytes()
+        {
+            long writeBytes = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    writeBytes += output.getTotalWriteBytes();
+                }
+            }
+            return writeBytes;
+        }
+
+        @Override
+        public long getLayerInputCostMs()
+        {
+            long inputCostMs = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    inputCostMs += output.getCumulativeInputCostMs();
+                }
+            }
+            return inputCostMs;
+        }
+
+        @Override
+        public long getLayerComputeCostMs()
+        {
+            long computeCostMs = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    computeCostMs += output.getCumulativeComputeCostMs();
+                }
+            }
+            return computeCostMs;
+        }
+
+        @Override
+        public long getLayerOutputCostMs()
+        {
+            long outputCostMs = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    outputCostMs += output.getCumulativeOutputCostMs();
+                }
+            }
+            return outputCostMs;
+        }
     }
 }
