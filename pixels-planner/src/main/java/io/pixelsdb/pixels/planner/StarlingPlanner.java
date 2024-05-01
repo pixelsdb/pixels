@@ -117,8 +117,10 @@ public class StarlingPlanner
     {
         this.transId = transId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
-        checkArgument(rootTable.getTableType() == Table.TableType.JOINED || rootTable.getTableType() == Table.TableType.AGGREGATED,
-                "currently, StarlingPlanner only supports join and aggregation");
+        checkArgument(rootTable.getTableType() == Table.TableType.BASE ||
+                        rootTable.getTableType() == Table.TableType.JOINED ||
+                        rootTable.getTableType() == Table.TableType.AGGREGATED,
+                "currently, StarlingPlanner only supports scan, join, and aggregation");
         this.config = ConfigFactory.Instance();
         this.metadataService = metadataService.orElseGet(() ->
                 new MetadataService(config.getProperty("metadata.server.host"),
