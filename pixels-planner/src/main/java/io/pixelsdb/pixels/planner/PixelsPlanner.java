@@ -115,9 +115,7 @@ public class PixelsPlanner
      * @param metadataService the metadata service to access Pixels metadata
      * @throws IOException
      */
-    public PixelsPlanner(long transId, Table rootTable,
-                         boolean orderedPathEnabled,
-                         boolean compactPathEnabled,
+    public PixelsPlanner(long transId, Table rootTable, boolean orderedPathEnabled, boolean compactPathEnabled,
                          Optional<MetadataService> metadataService) throws IOException
     {
         this.transId = transId;
