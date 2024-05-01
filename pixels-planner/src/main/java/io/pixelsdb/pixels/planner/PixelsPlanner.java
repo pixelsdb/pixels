@@ -196,7 +196,7 @@ public class PixelsPlanner
             tableInfo.setStorageInfo(InputStorageInfo);
             scanInput.setTableInfo(tableInfo);
             scanInput.setScanProjection(scanProjection);
-            scanInput.setPartialAggregationPresent(true);
+            scanInput.setPartialAggregationPresent(false);
             scanInput.setPartialAggregationInfo(null);
             String folderName = intermediateBase + (outputId++) + "/";
             scanInput.setOutput(new OutputInfo(folderName, IntermediateStorageInfo, true));
