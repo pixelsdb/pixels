@@ -91,7 +91,7 @@ public abstract class ScanOperator extends Operator
     }
 
     @Override
-    public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
+    public ScanOutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
         ScanOutputCollection outputCollection = new ScanOutputCollection();
 
