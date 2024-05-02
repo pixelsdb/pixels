@@ -39,7 +39,7 @@ import static io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.waitForC
  */
 public class SingleStageJoinBatchOperator extends SingleStageJoinOperator
 {
-    private static final Logger logger = LogManager.getLogger(SingleStageJoinOperator.class);
+    private static final Logger logger = LogManager.getLogger(SingleStageJoinBatchOperator.class);
 
     public SingleStageJoinBatchOperator(String name, boolean complete, JoinInput joinInput, JoinAlgorithm joinAlgo)
     {

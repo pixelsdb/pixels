@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,36 +17,36 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.planner.plan.physical.output;
+package io.pixelsdb.pixels.planner.plan.physical;
 
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
-import java.util.Set;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * The output format of the hash partitioning.
  * @author hank
- * @create 2022-05-07
+ * @create 2024-04-28
  */
-public class PartitionOutput extends Output
+public class ScanStreamOperator extends ScanOperator
 {
-    /**
-     * The hash value of the partitions that exist in the partitioned result.
-     */
-    private Set<Integer> hashValues;
-
-    /**
-     * Default constructor for Jackson.
-     */
-    public PartitionOutput() { }
-
-    public Set<Integer> getHashValues()
+    public ScanStreamOperator(String name, List<ScanInput> scanInputs)
     {
-        return hashValues;
+        super(name, scanInputs);
     }
 
-    public void setHashValues(Set<Integer> hashValues)
+    @Override
+    public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
-        this.hashValues = hashValues;
+        // TODO: implement
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> executePrev()
+    {
+        // TODO: implement
+        return null;
     }
 }

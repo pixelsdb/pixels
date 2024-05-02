@@ -115,15 +115,15 @@ public class PixelsPlanner
      * @param metadataService the metadata service to access Pixels metadata
      * @throws IOException
      */
-    public PixelsPlanner(long transId, Table rootTable,
-                         boolean orderedPathEnabled,
-                         boolean compactPathEnabled,
+    public PixelsPlanner(long transId, Table rootTable, boolean orderedPathEnabled, boolean compactPathEnabled,
                          Optional<MetadataService> metadataService) throws IOException
     {
         this.transId = transId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
-        checkArgument(rootTable.getTableType() == Table.TableType.JOINED || rootTable.getTableType() == Table.TableType.AGGREGATED,
-                "currently, PixelsPlanner only supports join and aggregation");
+        checkArgument(rootTable.getTableType() == Table.TableType.BASE ||
+                        rootTable.getTableType() == Table.TableType.JOINED ||
+                        rootTable.getTableType() == Table.TableType.AGGREGATED,
+                "currently, PixelsPlanner only supports scan, join, and aggregation");
         this.config = ConfigFactory.Instance();
         this.metadataService = metadataService.orElseGet(() ->
                 new MetadataService(config.getProperty("metadata.server.host"),
@@ -137,7 +137,11 @@ public class PixelsPlanner
 
     public Operator getRootOperator() throws IOException, MetadataException
     {
-        if (this.rootTable.getTableType() == Table.TableType.JOINED)
+        if (this.rootTable.getTableType() == Table.TableType.BASE)
+        {
+            return this.getScanOperator((BaseTable) this.rootTable);
+        }
+        else if (this.rootTable.getTableType() == Table.TableType.JOINED)
         {
             return this.getJoinOperator((JoinedTable) this.rootTable, Optional.empty());
         }
@@ -160,6 +164,47 @@ public class PixelsPlanner
     public static String getIntermediateFolderForTrans(long transId)
     {
         return IntermediateFolder + transId + "/";
+    }
+
+    private ScanOperator getScanOperator(BaseTable scanTable) throws IOException, MetadataException
+    {
+        final String intermediateBase = getIntermediateFolderForTrans(transId) +
+                scanTable.getSchemaName() + "/" + scanTable.getTableName() + "/";
+        ImmutableList.Builder<ScanInput> scanInputsBuilder = ImmutableList.builder();
+        List<InputSplit> inputSplits = this.getInputSplits(scanTable);
+        int outputId = 0;
+        boolean[] scanProjection = new boolean[scanTable.getColumnNames().length];
+        Arrays.fill(scanProjection, true);
+
+        for (int i = 0; i < inputSplits.size(); )
+        {
+            ScanInput scanInput = new ScanInput();
+            scanInput.setTransId(transId);
+            ScanTableInfo tableInfo = new ScanTableInfo();
+            ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
+                    .builderWithExpectedSize(IntraWorkerParallelism);
+            for (int j = 0; j < IntraWorkerParallelism && i < inputSplits.size(); ++j, ++i)
+            {
+                // We assign a number of IntraWorkerParallelism input-splits to each partition worker.
+                inputsBuilder.add(inputSplits.get(i));
+            }
+            tableInfo.setInputSplits(inputsBuilder.build());
+            tableInfo.setColumnsToRead(scanTable.getColumnNames());
+            tableInfo.setTableName(scanTable.getTableName());
+            tableInfo.setFilter(JSON.toJSONString(scanTable.getFilter()));
+            tableInfo.setBase(true);
+            tableInfo.setStorageInfo(InputStorageInfo);
+            scanInput.setTableInfo(tableInfo);
+            scanInput.setScanProjection(scanProjection);
+            scanInput.setPartialAggregationPresent(false);
+            scanInput.setPartialAggregationInfo(null);
+            String folderName = intermediateBase + (outputId++) + "/";
+            scanInput.setOutput(new OutputInfo(folderName, IntermediateStorageInfo, true));
+            scanInputsBuilder.add(scanInput);
+        }
+        return EnabledExchangeMethod == ExchangeMethod.batch ?
+                new ScanBatchOperator(scanTable.getTableName(), scanInputsBuilder.build()) :
+                new ScanStreamOperator(scanTable.getTableName(), scanInputsBuilder.build());
     }
 
     private AggregationOperator getAggregationOperator(AggregatedTable aggregatedTable)

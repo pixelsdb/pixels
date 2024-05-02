@@ -57,10 +57,10 @@ public class AggregationBatchOperator extends AggregationOperator
             {
                 this.finalAggrOutputs = new CompletableFuture[this.finalAggrInputs.size()];
                 int i = 0;
-                for (AggregationInput preAggrInput : this.finalAggrInputs)
+                for (AggregationInput aggrInput : this.finalAggrInputs)
                 {
                     this.finalAggrOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
+                            .getInvoker(WorkerType.AGGREGATION).invoke(aggrInput);
                 }
                 waitForCompletion(this.finalAggrOutputs);
             } catch (InterruptedException e)
