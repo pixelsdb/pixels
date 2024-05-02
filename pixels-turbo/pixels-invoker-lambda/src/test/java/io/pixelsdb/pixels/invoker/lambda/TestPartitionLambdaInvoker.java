@@ -83,7 +83,8 @@ public class TestPartitionLambdaInvoker
 
             PartitionOutput output = (PartitionOutput) InvokerFactory.Instance()
                     .getInvoker(WorkerType.PARTITION).invoke(input).get();
-            System.out.println(output.getPath());
+            System.out.println(output.getOutputs().size());
+            System.out.println(Joiner.on(",").join(output.getOutputs()));
             System.out.println(Joiner.on(",").join(output.getHashValues()));
         }
     }
@@ -125,7 +126,8 @@ public class TestPartitionLambdaInvoker
 
             PartitionOutput output = (PartitionOutput) InvokerFactory.Instance()
                     .getInvoker(WorkerType.PARTITION).invoke(input).get();
-            System.out.println(output.getPath());
+            System.out.println(output.getOutputs().size());
+            System.out.println(Joiner.on(",").join(output.getOutputs()));
             System.out.println(Joiner.on(",").join(output.getHashValues()));
         }
     }

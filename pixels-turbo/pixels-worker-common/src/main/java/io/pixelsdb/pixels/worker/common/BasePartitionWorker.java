@@ -165,7 +165,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                     hashValues.add(hash);
                 }
             }
-            partitionOutput.setPath(outputPath);
+            partitionOutput.addOutput(outputPath);
             partitionOutput.setHashValues(hashValues);
 
             pixelsWriter.close();

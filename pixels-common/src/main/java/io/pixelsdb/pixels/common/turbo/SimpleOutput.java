@@ -28,6 +28,7 @@ public class SimpleOutput
     private String requestId;
     private boolean successful;
     private String errorMessage;
+    private int numOutputs;
 
     public String getRequestId()
     {
@@ -57,5 +58,15 @@ public class SimpleOutput
     public void setErrorMessage(String errorMessage)
     {
         this.errorMessage = errorMessage;
+    }
+
+    public int getNumOutputs()
+    {
+        return numOutputs;
+    }
+
+    public void setNumOutputs(int numOutputs)
+    {
+        this.numOutputs = numOutputs;
     }
 }
