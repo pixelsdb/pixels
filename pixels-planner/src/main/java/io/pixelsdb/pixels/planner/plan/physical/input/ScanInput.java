@@ -139,7 +139,7 @@ public class ScanInput extends Input
         String[] outputPaths = new String[numSplits];
         for (int i = 0; i < numSplits; ++i)
         {
-            outputPaths[i] = outputFolder + "scan_" + i++;
+            outputPaths[i] = outputFolder + "scan_" + i;
         }
         return outputPaths;
     }
@@ -162,7 +162,7 @@ public class ScanInput extends Input
         }
         for (int i = 0; i < numSplits; ++i)
         {
-            builder.add(folder + "scan_" + i++);
+            builder.add(folder + "scan_" + i);
         }
         return builder.build();
     }
