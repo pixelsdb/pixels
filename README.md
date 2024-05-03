@@ -20,8 +20,11 @@ It prioritizes processing queries in an autoscaling MPP cluster (currently based
 to accelerate the processing of workload spikes. With `Pixels-Turbo`, we can achieve better performance and cost-efficiency 
 for continuous workloads while not compromising elasticity for workload spikes.
 
-On the basis of Pixels-Turbo, we are also building a pure cloud-function-based serverless query engine, and exploring how to improve the query execution 
-efficiency in cloud functions.
+Based on Pixels-Turbo, we implement [Pixels-Rover](https://github.com/pixelsdb/pixels-rover), a web-based query interface
+that provides users with a complete experience of serverless query processing, natural-language-to-SQL translation, and flexible
+service levels in query urgency. It allows users to select whether to execute the query immediately, within a grace period, or eventually.
+Pixels-Turbo can apply different resource scheduling and query execution policies for Different levels of query urgency, which
+will result in different monetary costs on resources.
 
 ## Build Pixels
 
