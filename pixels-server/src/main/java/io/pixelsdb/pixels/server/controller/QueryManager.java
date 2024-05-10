@@ -34,6 +34,7 @@ import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.turbo.QueryScheduleService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
+import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -360,29 +361,21 @@ public class QueryManager
                 resultSet.close();
                 statement.close();
 
-                // Issue #506: must collect the transaction properties after statement close.
-                TransContext transContext = this.transService.getTransContext(traceToken);
-                double costCents = Double.parseDouble(transContext.getProperties().getProperty(
-                        Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
-                double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
-                        Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, "0"));
-                double billedCents = PriceModel.billedCents(scanBytes, request.getExecutionHint());
-
-                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
-                        columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs, costCents, billedCents);
+                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "", request.getExecutionHint(),
+                        columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
-            } catch (SQLException | TransException e)
+            } catch (SQLException e)
             {
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED,
-                        e.getMessage(), null, null, null,
-                        0, 0, 0, 0);
+                        e.getMessage(), null, null, null, null,
+                        0, 0);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
-                log.error("failed to execute query with trac token " + traceToken, e);
-                throw new QueryServerException("failed to execute query with trac token " + traceToken, e);
+                log.error("failed to execute query with trace token " + traceToken, e);
+                throw new QueryServerException("failed to execute query with trace token " + traceToken, e);
             }
         });
     }
@@ -427,6 +420,41 @@ public class QueryManager
     public synchronized GetQueryResultResponse popQueryResult(String traceToken)
     {
         GetQueryResultResponse response = this.queryResults.get(traceToken);
+
+        // Issue #649: get the cost from the transaction service
+        if (!response.isValidVmCostCents()) {
+            TransContext transContext = null;
+            try
+            {
+                transContext = this.transService.getTransContext(traceToken);
+                double vmCostCents;
+                // Try to get vmCostCents every 0.5 seconds
+                while ((vmCostCents = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY, "-1"))) < 0) {
+                    TimeUnit.MILLISECONDS.sleep(500);
+                }
+                response.setVmCostCents(vmCostCents);
+                response.setValidVmCostCents(); // set the vm cost as valid
+                response.addCostCents(vmCostCents);
+            } catch (TransException e)
+            {
+                log.error("failed to get trans context with trace token " + traceToken, e);
+                throw new QueryServerException("failed to get trans context with trace token " + traceToken, e);
+            } catch (InterruptedException e)
+            {
+                log.error("failed to sleep before getting vm costs", e);
+                throw new QueryServerException("failed to sleep before getting vm costs", e);
+            }
+            double cfCostCents = Double.parseDouble(transContext.getProperties().getProperty(
+                    Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY, "0"));
+            response.setCfCostCents(cfCostCents);
+            response.addCostCents(cfCostCents);
+            double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
+                    Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, "0"));
+            double billedCents = PriceModel.billedCents(scanBytes, response.getExecutionHint());
+            response.setBilledCents(billedCents);
+        }
+
         if (response != null)
         {
             // put it into finished query before removing from query results, to avoid unknown query status

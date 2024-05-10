@@ -47,7 +47,12 @@ public final class Constants
     public static final String CACHE_LOCATION_LITERAL = "location_";
     public static final int MAX_BLOCK_ID_LEN = 20480;
 
-    public static final String TRANS_CONTEXT_COST_CENTS_KEY = "trans_cost_cents";
+    /*
+     * Issue #649:
+     * Breakdown costs into vmCost and cfCost
+     */
+    public static final String TRANS_CONTEXT_VM_COST_CENTS_KEY = "trans_vm_cost_cents";
+    public static final String TRANS_CONTEXT_CF_COST_CENTS_KEY = "trans_cf_cost_cents";
     public static final String TRANS_CONTEXT_SCAN_BYTES_KEY = "trans_scan_bytes";
 
     /**
