@@ -177,10 +177,20 @@ public class TransService
      * @return true of the costs are updates successfully, otherwise false
      * @throws TransException if the transaction does not exist
      */
-    public boolean updateQueryCosts(long transId, double newScanBytes, double addCostCents) throws TransException
+    public boolean updateQueryCosts(long transId, double newScanBytes, QueryCost addCostCents) throws TransException
     {
-        TransProto.UpdateQueryCostsRequest request = TransProto.UpdateQueryCostsRequest.newBuilder()
-                .setTransId(transId).setNewScanBytes(newScanBytes).setAddCostCents(addCostCents).build();
+        TransProto.UpdateQueryCostsRequest request = null;
+        if (addCostCents.getType() == QueryCostType.VMCOST)
+        {
+            request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                .setTransId(transId).setNewScanBytes(newScanBytes).setAddVMCostCents(addCostCents.getCostCents()).build();
+        }
+        else if (addCostCents.getType() == QueryCostType.CFCOST)
+        {
+            request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                    .setTransId(transId).setNewScanBytes(newScanBytes).setAddCFCostCents(addCostCents.getCostCents()).build();
+        }
+        assert(request != null);
         return updateQueryCosts(request);
     }
 
@@ -192,10 +202,20 @@ public class TransService
      * @return true of the costs are updates successfully, otherwise false
      * @throws TransException if the transaction does not exist
      */
-    public boolean updateQueryCosts(String externalTraceId, double newScanBytes, double addCostCents) throws TransException
+    public boolean updateQueryCosts(String externalTraceId, double newScanBytes, QueryCost addCostCents) throws TransException
     {
-        TransProto.UpdateQueryCostsRequest request = TransProto.UpdateQueryCostsRequest.newBuilder()
-                .setExternalTraceId(externalTraceId).setNewScanBytes(newScanBytes).setAddCostCents(addCostCents).build();
+        TransProto.UpdateQueryCostsRequest request = null;
+        if (addCostCents.getType() == QueryCostType.VMCOST)
+        {
+            request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                    .setExternalTraceId(externalTraceId).setNewScanBytes(newScanBytes).setAddVMCostCents(addCostCents.getCostCents()).build();
+        }
+        else if (addCostCents.getType() == QueryCostType.CFCOST)
+        {
+            request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                    .setExternalTraceId(externalTraceId).setNewScanBytes(newScanBytes).setAddCFCostCents(addCostCents.getCostCents()).build();
+        }
+        assert(request != null);
         return updateQueryCosts(request);
     }
 

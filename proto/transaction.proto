@@ -119,8 +119,14 @@ message UpdateQueryCostsRequest {
     }
     // the new scan bytes to set
     double newScanBytes = 3;
-    // the additional cost in cents to add
-    double addCostCents = 4;
+    /*
+     * Issue #649:
+     * Specify addCostCents: vmCost or cfCost
+     */
+    oneof addCostCents {
+        double addVMCostCents = 4;
+        double addCFCostCents = 5;
+    }
 }
 
 message UpdateQueryCostsResponse {

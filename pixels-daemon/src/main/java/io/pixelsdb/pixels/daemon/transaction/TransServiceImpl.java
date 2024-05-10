@@ -225,15 +225,23 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 
         }
         double newScanBytes = request.getNewScanBytes();
-        double addCostCents = request.getAddCostCents();
         TransProto.UpdateQueryCostsResponse.Builder builder = TransProto.UpdateQueryCostsResponse.newBuilder();
         if (context != null)
         {
             context.getProperties().setProperty(Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, String.valueOf(newScanBytes));
-            double curCostCents = Double.parseDouble(
-                    context.getProperties().getProperty(Constants.TRANS_CONTEXT_COST_CENTS_KEY, "0"));
-            context.getProperties().setProperty(Constants.TRANS_CONTEXT_COST_CENTS_KEY,
-                    String.valueOf(curCostCents + addCostCents));
+            if (request.hasAddVMCostCents()) {
+                double addVMCostCents = request.getAddVMCostCents();
+                double curCostCents = Double.parseDouble(
+                        context.getProperties().getProperty(Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY, "0"));
+                context.getProperties().setProperty(Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY,
+                        String.valueOf(curCostCents + addVMCostCents));
+            } else if (request.hasAddCFCostCents()) {
+                double addCFCostCents = request.getAddCFCostCents();
+                double curCostCents = Double.parseDouble(
+                        context.getProperties().getProperty(Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY, "0"));
+                context.getProperties().setProperty(Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY,
+                        String.valueOf(curCostCents + addCFCostCents));
+            }
             builder.setErrorCode(ErrorCode.SUCCESS);
         }
         else

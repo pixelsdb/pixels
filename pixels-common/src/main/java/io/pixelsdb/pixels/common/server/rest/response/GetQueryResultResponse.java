@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.server.rest.response;
 
 import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.server.ExecutionHint;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -51,6 +52,24 @@ public class GetQueryResultResponse
      */
     private double billedCents;
 
+    // Issue #649: Breakdown costs into vmCost and cfCost
+    /**
+     * The amount of money in cents really spent in vm by the query.
+     */
+    private double vmCostCents;
+    /**
+     * The amount of money in cents really spent in cf by the query.
+     */
+    private double cfCostCents;
+    /**
+     * The validity of vmCostCents.
+     */
+    private boolean isValidVmCostCents;
+    /**
+     * The execution hint of query.
+     */
+    private ExecutionHint executionHint;
+
     /**
      * Default constructor for Jackson.
      */
@@ -71,19 +90,20 @@ public class GetQueryResultResponse
         this.errorMessage = errorMessage;
     }
 
-    public GetQueryResultResponse(int errorCode, String errorMessage, int[] columnPrintSizes,
+    public GetQueryResultResponse(int errorCode, String errorMessage, ExecutionHint executionHint, int[] columnPrintSizes,
                                   String[] columnNames, String[][] rows, double pendingTimeMs,
-                                  double executionTimeMs, double costCents, double billedCents)
+                                  double executionTimeMs)
     {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
+        this.executionHint = executionHint;
         this.columnPrintSizes = columnPrintSizes;
         this.columnNames = columnNames;
         this.rows = rows;
         this.pendingTimeMs = pendingTimeMs;
         this.executionTimeMs = executionTimeMs;
-        this.costCents = costCents;
-        this.billedCents = billedCents;
+        this.costCents = 0;
+        this.isValidVmCostCents = false;
     }
 
     public int getErrorCode()
@@ -105,6 +125,10 @@ public class GetQueryResultResponse
     {
         this.errorMessage = errorMessage;
     }
+
+    public ExecutionHint getExecutionHint() { return executionHint; }
+
+    public void setExecutionHint(ExecutionHint executionHint) { this.executionHint = executionHint; }
 
     public int[] getColumnPrintSizes()
     {
@@ -166,6 +190,8 @@ public class GetQueryResultResponse
         this.costCents = costCents;
     }
 
+    public void addCostCents(double costCents) { this.costCents += costCents; }
+
     public double getBilledCents()
     {
         return billedCents;
@@ -175,4 +201,16 @@ public class GetQueryResultResponse
     {
         this.billedCents = billedCents;
     }
+
+    public void setVmCostCents(double vmCostCents) { this.vmCostCents = vmCostCents; }
+
+    public double getVmCostCents() { return vmCostCents; }
+
+    public void setCfCostCents(double cfCostCents) { this.cfCostCents = cfCostCents; }
+
+    public double getCfCostCents() { return cfCostCents; }
+
+    public boolean isValidVmCostCents() { return isValidVmCostCents; }
+
+    public void setValidVmCostCents() { this.isValidVmCostCents = true; }
 }
