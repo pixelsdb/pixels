@@ -59,6 +59,7 @@ echo 'export PIXELS_HOME=$HOME/opt/pixels/' >> ~/.bashrc
 source ~/.bashrc
 ./install.sh
 ```
+Note:If you encounter the error message "source: not found" when running a Shell script containing the source command on an Ubuntu system, it is likely because the Shell interpreter is not set to bash. To resolve this issue, you can either change the Shell interpreter to bash or replace the `source` command with `.` (dot) command.
 
 But you still need to:
 - Put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib`.
