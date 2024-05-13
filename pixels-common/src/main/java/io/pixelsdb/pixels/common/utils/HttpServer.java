@@ -1,3 +1,22 @@
+/*
+ * Copyright 2023 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 package io.pixelsdb.pixels.common.utils;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -13,38 +32,16 @@ import javax.net.ssl.SSLException;
 import java.security.cert.CertificateException;
 
 /**
- * An HTTP server that sends back the content of the received HTTP request
- * in a pretty plaintext form.
+ * Basic HTTP server using the netty library.
+ *
+ * @author jasha64
+ * @create 2023-07-27
  */
 public final class HttpServer {
-    // Can do Dynamic Pipeline
-    /*
-    public class StreamHeaderHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
-        @Override
-        protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
-            // Process the stream header
-            // ...
-
-            // Remove this handler and add the regular message handler
-            ctx.pipeline().remove(this);
-            ctx.pipeline().addLast(new StreamRegularMessageHandler());
-        }
-    }
-    */
-
-    static final boolean SSL = System.getProperty("ssl") != null;
-//    static final int PORT = Integer.parseInt(System.getProperty("port", SSL? "8443" : "8080"));
     final HttpServerInitializer initializer;
 
-    public HttpServer() throws CertificateException, SSLException {
-        this.initializer = new HttpServerInitializer(HttpServerUtil.buildSslContext());
-    }
     public HttpServer(HttpServerHandler handler) throws CertificateException, SSLException {
         this.initializer = new HttpServerInitializer(HttpServerUtil.buildSslContext(), handler);
-    }
-
-    public static void main(String[] args) throws Exception {
-        new HttpServer().serve(8080);
     }
 
     public void serve(int PORT) throws Exception {
