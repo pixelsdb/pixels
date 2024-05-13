@@ -360,8 +360,8 @@ public class QueryManager
                 resultSet.close();
                 statement.close();
 
-                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "", request.getExecutionHint(),
-                        columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs);
+                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
+                        request.getExecutionHint(), columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
@@ -421,7 +421,7 @@ public class QueryManager
         GetQueryResultResponse response = this.queryResults.get(traceToken);
 
         // Issue #649: get the cost from the transaction service
-        if (!response.isValidVmCostCents()) {
+        if (!response.hasValidVmCostCents()) {
             TransContext transContext = null;
             try
             {
@@ -433,7 +433,6 @@ public class QueryManager
                     TimeUnit.MILLISECONDS.sleep(500);
                 }
                 response.setVmCostCents(vmCostCents);
-                response.setValidVmCostCents(); // set the vm cost as valid
                 response.addCostCents(vmCostCents);
             } catch (TransException e)
             {

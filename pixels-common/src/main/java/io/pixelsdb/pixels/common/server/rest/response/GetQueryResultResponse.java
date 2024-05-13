@@ -46,25 +46,21 @@ public class GetQueryResultResponse
     /**
      * The amount of money in cents really spent by the query.
      */
-    private double costCents;
+    private double costCents = 0;
     /**
      * The amount of money in cents billed according to our price model.
      */
-    private double billedCents;
+    private double billedCents = 0;
 
     // Issue #649: Breakdown costs into vmCost and cfCost
     /**
      * The amount of money in cents really spent in vm by the query.
      */
-    private double vmCostCents;
+    private double vmCostCents = -1;
     /**
      * The amount of money in cents really spent in cf by the query.
      */
-    private double cfCostCents;
-    /**
-     * The validity of vmCostCents.
-     */
-    private boolean isValidVmCostCents;
+    private double cfCostCents = -1;
     /**
      * The execution hint of query.
      */
@@ -102,8 +98,6 @@ public class GetQueryResultResponse
         this.rows = rows;
         this.pendingTimeMs = pendingTimeMs;
         this.executionTimeMs = executionTimeMs;
-        this.costCents = 0;
-        this.isValidVmCostCents = false;
     }
 
     public int getErrorCode()
@@ -202,15 +196,28 @@ public class GetQueryResultResponse
         this.billedCents = billedCents;
     }
 
-    public void setVmCostCents(double vmCostCents) { this.vmCostCents = vmCostCents; }
+    public void setVmCostCents(double vmCostCents)
+    {
+        this.vmCostCents = vmCostCents;
+    }
 
-    public double getVmCostCents() { return vmCostCents; }
+    public double getVmCostCents()
+    {
+        return vmCostCents;
+    }
 
-    public void setCfCostCents(double cfCostCents) { this.cfCostCents = cfCostCents; }
+    public void setCfCostCents(double cfCostCents)
+    {
+        this.cfCostCents = cfCostCents;
+    }
 
-    public double getCfCostCents() { return cfCostCents; }
+    public double getCfCostCents()
+    {
+        return cfCostCents;
+    }
 
-    public boolean isValidVmCostCents() { return isValidVmCostCents; }
-
-    public void setValidVmCostCents() { this.isValidVmCostCents = true; }
+    public boolean hasValidVmCostCents()
+    {
+        return this.vmCostCents >= 0;
+    }
 }
