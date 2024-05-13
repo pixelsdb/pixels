@@ -172,23 +172,23 @@ public class TransService
     /**
      * Update the costs of a transaction (query).
      * @param transId the id of the transaction
-     * @param newScanBytes the new scan bytes to set in the transaction context
-     * @param addCostCents the additional cost in cents to add into the transaction context
+     * @param scanBytes the scan bytes to set in the transaction context
+     * @param costCents the cost in cents to set in the transaction context
      * @return true of the costs are updates successfully, otherwise false
      * @throws TransException if the transaction does not exist
      */
-    public boolean updateQueryCosts(long transId, double newScanBytes, QueryCost addCostCents) throws TransException
+    public boolean updateQueryCosts(long transId, double scanBytes, QueryCost costCents) throws TransException
     {
         TransProto.UpdateQueryCostsRequest request = null;
-        if (addCostCents.getType() == QueryCostType.VMCOST)
+        if (costCents.getType() == QueryCostType.VMCOST)
         {
             request = TransProto.UpdateQueryCostsRequest.newBuilder()
-                .setTransId(transId).setNewScanBytes(newScanBytes).setAddVMCostCents(addCostCents.getCostCents()).build();
+                .setTransId(transId).setScanBytes(scanBytes).setVmCostCents(costCents.getCostCents()).build();
         }
-        else if (addCostCents.getType() == QueryCostType.CFCOST)
+        else if (costCents.getType() == QueryCostType.CFCOST)
         {
             request = TransProto.UpdateQueryCostsRequest.newBuilder()
-                    .setTransId(transId).setNewScanBytes(newScanBytes).setAddCFCostCents(addCostCents.getCostCents()).build();
+                    .setTransId(transId).setScanBytes(scanBytes).setCfCostCents(costCents.getCostCents()).build();
         }
         assert(request != null);
         return updateQueryCosts(request);
@@ -197,23 +197,23 @@ public class TransService
     /**
      * Update the costs of a transaction (query).
      * @param externalTraceId the external trace id (token) of the transaction
-     * @param newScanBytes the new scan bytes to set in the transaction context
-     * @param addCostCents the additional cost in cents to add into the transaction context
+     * @param scanBytes the scan bytes to set in the transaction context
+     * @param costCents the cost in cents to set in the transaction context
      * @return true of the costs are updates successfully, otherwise false
      * @throws TransException if the transaction does not exist
      */
-    public boolean updateQueryCosts(String externalTraceId, double newScanBytes, QueryCost addCostCents) throws TransException
+    public boolean updateQueryCosts(String externalTraceId, double scanBytes, QueryCost costCents) throws TransException
     {
         TransProto.UpdateQueryCostsRequest request = null;
-        if (addCostCents.getType() == QueryCostType.VMCOST)
+        if (costCents.getType() == QueryCostType.VMCOST)
         {
             request = TransProto.UpdateQueryCostsRequest.newBuilder()
-                    .setExternalTraceId(externalTraceId).setNewScanBytes(newScanBytes).setAddVMCostCents(addCostCents.getCostCents()).build();
+                    .setExternalTraceId(externalTraceId).setScanBytes(scanBytes).setVmCostCents(costCents.getCostCents()).build();
         }
-        else if (addCostCents.getType() == QueryCostType.CFCOST)
+        else if (costCents.getType() == QueryCostType.CFCOST)
         {
             request = TransProto.UpdateQueryCostsRequest.newBuilder()
-                    .setExternalTraceId(externalTraceId).setNewScanBytes(newScanBytes).setAddCFCostCents(addCostCents.getCostCents()).build();
+                    .setExternalTraceId(externalTraceId).setScanBytes(scanBytes).setCfCostCents(costCents.getCostCents()).build();
         }
         assert(request != null);
         return updateQueryCosts(request);

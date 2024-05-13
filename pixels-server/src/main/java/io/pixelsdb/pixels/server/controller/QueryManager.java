@@ -34,7 +34,6 @@ import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.turbo.QueryScheduleService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
-import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

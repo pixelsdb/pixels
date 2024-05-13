@@ -117,15 +117,15 @@ message UpdateQueryCostsRequest {
         string externalTraceId = 1;
         uint64 transId = 2;
     }
-    // the new scan bytes to set
-    double newScanBytes = 3;
+    // the scan bytes to set
+    double scanBytes = 3;
     /*
      * Issue #649:
      * Specify addCostCents: vmCost or cfCost
      */
-    oneof addCostCents {
-        double addVMCostCents = 4;
-        double addCFCostCents = 5;
+    oneof costCents {
+        double vmCostCents = 4;
+        double cfCostCents = 5;
     }
 }
 
