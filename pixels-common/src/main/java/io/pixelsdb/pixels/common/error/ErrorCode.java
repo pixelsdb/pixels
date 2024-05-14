@@ -97,6 +97,7 @@ public class ErrorCode
     public static final int QUERY_SERVER_NOT_SUPPORTED = (ERROR_QUERY_SERVER + 3);
     public static final int QUERY_SERVER_BAD_REQUEST = (ERROR_QUERY_SERVER + 4);
     public static final int QUERY_SERVER_QUERY_NOT_FINISHED = (ERROR_QUERY_SERVER + 5);
+    public static final int QUERY_SERVER_QUERY_RESULT_NOT_FOUND = (ERROR_QUERY_SERVER + 6);
 
     // begin error code for pixels-turbo worker coordinate service
     private static final int ERROR_WORKER_COORDINATE = ERROR_BASE + 500;

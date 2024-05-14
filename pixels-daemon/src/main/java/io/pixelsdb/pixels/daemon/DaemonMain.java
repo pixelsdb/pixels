@@ -162,7 +162,7 @@ public class DaemonMain
                  * Shutdown the daemon thread here instead of using the SIGTERM handler.
                  */
                 mainDaemon.shutdown();
-                log.info("all the servers are shutdown, byte...");
+                log.info("all the servers are shutdown, bye...");
             }));
 
             // continue the main thread, start and check the server threads.
