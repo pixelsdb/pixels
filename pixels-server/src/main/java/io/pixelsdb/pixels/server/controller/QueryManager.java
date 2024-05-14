@@ -47,8 +47,7 @@ import java.util.concurrent.*;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.Constants.RELAXED_EXECUTION_MAX_POSTPONE_SEC;
 import static io.pixelsdb.pixels.common.utils.Constants.RELAXED_EXECUTION_RETRY_INTERVAL_SEC;
-import static io.pixelsdb.pixels.server.constant.ControllerParameters.GET_QUERY_COSTS_DELAY_MS;
-import static io.pixelsdb.pixels.server.constant.ControllerParameters.QUERY_RESULT_CLEAR_DELAY_MS;
+import static io.pixelsdb.pixels.server.constant.ControllerParameters.*;
 
 /**
  * @author hank
@@ -264,7 +263,7 @@ public class QueryManager
             {
                 try
                 {
-                    TimeUnit.MILLISECONDS.sleep(QUERY_RESULT_CLEAR_DELAY_MS);
+                    TimeUnit.MILLISECONDS.sleep(QUERY_RESULT_CLEAR_INTERVAL_MS);
                     for (Map.Entry<String, GetQueryResultResponse> entry : this.queryResults.entrySet())
                     {
                         long current = System.currentTimeMillis();
