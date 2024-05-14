@@ -23,6 +23,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.layout.IndexFactory;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.daemon.MetadataProto;
@@ -867,6 +868,18 @@ public class MetadataService
     public boolean dropSchema(String schemaName) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
+
+        List<Table> tables = getTables(schemaName);
+        if (tables != null)
+        {
+            // Issue #630: drop cached splits and projections indexes.
+            for (Table table : tables)
+            {
+                IndexFactory.Instance().dropSplitsIndex(schemaName, table.getName());
+                IndexFactory.Instance().dropProjectionsIndex(schemaName, table.getName());
+            }
+        }
+
         String token = UUID.randomUUID().toString();
         MetadataProto.DropSchemaRequest request = MetadataProto.DropSchemaRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -941,6 +954,10 @@ public class MetadataService
     {
         assert schemaName != null && !schemaName.isEmpty();
         assert tableName != null && !tableName.isEmpty();
+
+        // Issue #630: drop cached splits and projections indexes.
+        IndexFactory.Instance().dropSplitsIndex(schemaName, tableName);
+        IndexFactory.Instance().dropProjectionsIndex(schemaName, tableName);
 
         String token = UUID.randomUUID().toString();
         MetadataProto.DropTableRequest request = MetadataProto.DropTableRequest.newBuilder()

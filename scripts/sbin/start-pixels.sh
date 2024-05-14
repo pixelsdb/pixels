@@ -5,12 +5,10 @@ if [ -z "$PIXELS_HOME" ]; then
   exit 1
 fi
 
-# start coodrinator
-echo "Starting Coordinator..."
-$PIXELS_HOME/bin/start-coordinator.sh -daemon
+# start coordinator
+$PIXELS_HOME/sbin/start-coordinator.sh -daemon
 
 sleep 5
 
-echo "Starting DataNode..."
-$PIXELS_HOME/bin/start-datanode.sh -daemon
+$PIXELS_HOME/sbin/start-datanode.sh -daemon
 

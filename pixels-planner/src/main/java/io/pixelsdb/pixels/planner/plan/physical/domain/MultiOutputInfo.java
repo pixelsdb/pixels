@@ -19,7 +19,11 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical.domain;
 
+import com.google.common.collect.ImmutableList;
+
 import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -52,6 +56,7 @@ public class MultiOutputInfo extends OutputInfo
 
     /**
      * Set the folder that the output files are written into.
+     * @param path the path of the folder
      */
     public void setPath(String path)
     {
@@ -66,5 +71,27 @@ public class MultiOutputInfo extends OutputInfo
     public void setFileNames(List<String> fileNames)
     {
         this.fileNames = fileNames;
+    }
+
+    /**
+     * Generate the absolute paths of the output files.
+     * @param outputInfo the multi-output info
+     * @return the absolute output file paths
+     */
+    public static List<String> generateOutputPaths(MultiOutputInfo outputInfo)
+    {
+        requireNonNull(outputInfo, "outputInfo is null");
+        ImmutableList.Builder<String> builder =
+                ImmutableList.builderWithExpectedSize(outputInfo.fileNames.size());
+        String folder = outputInfo.getPath();
+        if (!folder.endsWith("/"))
+        {
+            folder += "/";
+        }
+        for (String filePath : outputInfo.fileNames)
+        {
+            builder.add(folder + filePath);
+        }
+        return builder.build();
     }
 }

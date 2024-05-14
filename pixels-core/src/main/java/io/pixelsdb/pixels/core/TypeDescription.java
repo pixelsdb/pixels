@@ -20,8 +20,11 @@
 package io.pixelsdb.pixels.core;
 
 import com.google.common.collect.ImmutableSet;
+import io.pixelsdb.pixels.common.lock.LockInternals;
 import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.Serializable;
 import java.sql.Time;
@@ -71,6 +74,14 @@ public final class TypeDescription
      */
     public static final int DEFAULT_VARCHAR_OR_BINARY_LENGTH = 65535;
     /**
+     * The default dimension of vector
+     */
+    public static final int DEFAULT_VECTOR_DIMENSION = 2;
+    /**
+     * the supported maximum dimension
+     */
+    public static final int MAXIMUM_VECTOR_DIMENSION = 4096;
+    /**
      * It is a standard that the default length of char is 1.
      */
     public static final int DEFAULT_CHAR_LENGTH = 1;
@@ -99,6 +110,8 @@ public final class TypeDescription
      */
     public static final int MAX_TIME_PRECISION = 3;
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
+
+    private static final Logger logger = LogManager.getLogger(TypeDescription.class);
 
     @Override
     public int compareTo(TypeDescription other)
@@ -182,7 +195,8 @@ public final class TypeDescription
         BINARY(true, byte[].class, byte[].class, "binary"),
         VARCHAR(true, byte[].class, byte[].class,"varchar"),
         CHAR(true, byte[].class, byte[].class,"char"),
-        STRUCT(false, Class.class, Class.class, "struct");
+        STRUCT(false, Class.class, Class.class, "struct"),
+        VECTOR(false, double[].class, double[].class, "vector", "array");
 
         /**
          * Ensure that all elements in names are in <b>lowercase</b>.
@@ -338,6 +352,13 @@ public final class TypeDescription
         return new TypeDescription(Category.STRUCT);
     }
 
+    public static TypeDescription createVector(int dimension)
+    {
+        TypeDescription type = new TypeDescription(Category.VECTOR);
+        type.withDimension(dimension);
+        return type;
+    }
+
     public static TypeDescription createSchema(List<PixelsProto.Type> types)
     {
         TypeDescription schema = TypeDescription.createStruct();
@@ -401,6 +422,11 @@ public final class TypeDescription
                 case BINARY:
                     fieldType = TypeDescription.createBinary(
                             type.getMaximumLength());
+                    break;
+                case VECTOR:
+                    fieldType = TypeDescription.createVector(
+                            type.getDimension()
+                    );
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown type: " +
@@ -496,6 +522,27 @@ public final class TypeDescription
             throw new IllegalArgumentException("Missing integer at " + source);
         }
         return result;
+    }
+
+
+    public TypeDescription checkElementType(StringPosition source)
+    {
+        int start = source.position;
+        String elementType;
+        while (source.position < source.length) {
+            char ch = source.value.charAt(source.position);
+            if (ch==')') {
+                elementType = source.value.substring(start, source.position);
+                if (elementType.equalsIgnoreCase("double")) {
+                    source.position++;
+                    return this;
+                } else {
+                    throw new IllegalArgumentException("For Pixels vector type, the trino type should be array(double), but instead is " + source.value);
+                }
+            }
+            source.position++;
+        }
+        throw new IllegalArgumentException("For Pixels vector type, the trino type should be array(double), but instead is " + source.value);
     }
 
     /**
@@ -691,6 +738,33 @@ public final class TypeDescription
             case STRUCT:
                 parseStruct(result, source);
                 break;
+            case VECTOR:
+                {
+                    // handle type string passed from trino. Check that the type is double(array).
+                    if (source.value.contains("array")) {
+                        if (consumeChar(source, '('))
+                        {
+                            // the array type must be double
+                            result.checkElementType(source);
+                            result.withDimension(DEFAULT_VECTOR_DIMENSION);
+                        }
+                    }
+                    // handle type string passed from Pixels writer, should be vector(d), where (d) specifies that
+                    // this column has dimension d, and is optional
+                    else if (source.value.contains("vector")) {
+                        if (consumeChar(source, '(')) {
+                            // with dimension specified
+                            result.withDimension(parseInt(source));
+                            requireChar(source, ')');
+                        } else {
+                            result.withDimension(DEFAULT_VECTOR_DIMENSION);
+                        }
+                    }  else {
+                        throw new IllegalArgumentException("Unknown type string" +
+                                result + " at " + source);
+                    }
+                }
+                break;
             default:
                 throw new IllegalArgumentException("Unknown type " +
                         result.getCategory() + " at " + source);
@@ -817,6 +891,10 @@ public final class TypeDescription
                     tmpType.setKind(PixelsProto.Type.Kind.TIME);
                     tmpType.setPrecision(child.getPrecision());
                     break;
+                case VECTOR:
+                    tmpType.setKind(PixelsProto.Type.Kind.VECTOR);
+                    tmpType.setDimension(child.getDimension());
+                    break;
                 default:
                     throw new IllegalArgumentException("Unknown category: " +
                             schema.getCategory());
@@ -918,6 +996,29 @@ public final class TypeDescription
             throw new IllegalArgumentException("maxLength " + maxLength + " is not positive");
         }
         this.maxLength = maxLength;
+        return this;
+    }
+
+    /**
+     * Set the dimension for the column of vector type
+     *
+     * @param dimension the dimension of the vector column
+     * @return this
+     */
+    public TypeDescription withDimension(int dimension)
+    {
+        if (category != Category.VECTOR)
+        {
+            throw new IllegalArgumentException("dimension is only allowed on vector type but not on " + category.primaryName);
+        }
+        if (dimension < 1)
+        {
+            throw new IllegalArgumentException("dimension " + dimension + " is not positive");
+        }
+        if (dimension > MAXIMUM_VECTOR_DIMENSION) {
+            throw new IllegalArgumentException("dimension" + dimension + "currently supported maximum dimension " + MAXIMUM_VECTOR_DIMENSION);
+        }
+        this.dimension = dimension;
         return this;
     }
 
@@ -1117,6 +1218,8 @@ public final class TypeDescription
                 }
                 return new StructColumnVector(maxSize, fieldVector);
             }
+            case VECTOR:
+                return new VectorColumnVector(maxSize, dimension);
             default:
                 throw new IllegalArgumentException("Unknown type " + category);
         }
@@ -1183,6 +1286,16 @@ public final class TypeDescription
     public int getMaxLength()
     {
         return maxLength;
+    }
+
+    /**
+     * Get the dimension of the vector type
+     *
+     * @return the dimension of the vector type
+     */
+    public int getDimension()
+    {
+        return dimension;
     }
 
     /**
@@ -1275,6 +1388,7 @@ public final class TypeDescription
     private int maxLength = DEFAULT_VARCHAR_OR_BINARY_LENGTH;
     private int precision = DEFAULT_SHORT_DECIMAL_PRECISION;
     private int scale = DEFAULT_DECIMAL_SCALE;
+    private int dimension = DEFAULT_VECTOR_DIMENSION;
 
     static void printFieldName(StringBuilder buffer, String name)
     {

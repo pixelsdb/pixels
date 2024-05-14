@@ -22,12 +22,12 @@ package io.pixelsdb.pixels.cli.executor;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import net.sourceforge.argparse4j.inf.Namespace;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.*;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.cli.Main.executeSQL;
 
 /**
@@ -37,31 +37,42 @@ import static io.pixelsdb.pixels.cli.Main.executeSQL;
 public class QueryExecutor implements CommandExecutor
 {
     @Override
-    public void execute(Namespace ns, String command) throws Exception
+    public void execute(Namespace ns, String command)
     {
-        String type = ns.getString("type");
         String workload = ns.getString("workload");
         String log = ns.getString("log");
-        String cache = ns.getString("cache");
+        String cache = ns.getString("drop_cache");
+        Boolean rateLimited = Boolean.parseBoolean(ns.getString("rate_limited"));
+        String qpmStr = ns.getString("query_per_minute");
+        int queryPerMinute = qpmStr != null ? Integer.parseInt(qpmStr) : 0;
+        ExecutorService threadPool = null;
+        if (rateLimited)
+        {
+            checkArgument(queryPerMinute > 0 && queryPerMinute <= 60,
+                    "query_per_minute must be in the range [1, 60] if rate_limited is true");
+            threadPool = Executors.newCachedThreadPool();
+        }
 
-        if (type != null && workload != null && log != null)
+        if (workload != null && log != null)
         {
             ConfigFactory instance = ConfigFactory.Instance();
             Properties properties = new Properties();
             // String user = instance.getProperty("presto.user");
             String password = instance.getProperty("presto.password");
             String ssl = instance.getProperty("presto.ssl");
-            String jdbc = instance.getProperty("presto.pixels.jdbc.url");
-            if (type.equalsIgnoreCase("orc"))
-            {
-                jdbc = instance.getProperty("presto.orc.jdbc.url");
-            }
+            String jdbc = instance.getProperty("presto.jdbc.url");
 
             if (!password.equalsIgnoreCase("null"))
             {
                 properties.setProperty("password", password);
             }
             properties.setProperty("SSL", ssl);
+            boolean orderedEnabled = Boolean.parseBoolean(instance.getProperty("executor.ordered.layout.enabled"));
+            boolean compactEnabled = Boolean.parseBoolean(instance.getProperty("executor.compact.layout.enabled"));
+            StringBuilder builder = new StringBuilder()
+                    .append("pixels.ordered_path_enabled:").append(orderedEnabled).append(";")
+                    .append("pixels.compact_path_enabled:").append(compactEnabled);
+            properties.setProperty("sessionProperties", builder.toString());
 
             try (BufferedReader workloadReader = new BufferedReader(new FileReader(workload));
                  BufferedWriter timeWriter = new BufferedWriter(new FileWriter(log)))
@@ -73,10 +84,10 @@ public class QueryExecutor implements CommandExecutor
                 String defaultUser = null;
                 while ((line = workloadReader.readLine()) != null)
                 {
-                    if (!line.contains("SELECT"))
+                    if (!line.contains("SELECT") && !line.contains("select"))
                     {
                         defaultUser = line;
-                        properties.setProperty("user", type + "_" + defaultUser);
+                        properties.setProperty("user", "pixels-cli-" + defaultUser);
                     } else
                     {
                         if (cache != null)
@@ -85,24 +96,45 @@ public class QueryExecutor implements CommandExecutor
                             ProcessBuilder processBuilder = new ProcessBuilder(cache);
                             Process process = processBuilder.start();
                             process.waitFor();
-                            Thread.sleep(1000);
                             System.out.println("clear cache: " + (System.currentTimeMillis() - start) + "ms\n");
+                        }
+
+                        if (rateLimited)
+                        {
+                            String finalLine = line;
+                            String finalDefaultUser = defaultUser;
+                            int finalI = i;
+                            threadPool.submit(() ->
+                            {
+                                long cost = executeSQL(jdbc, properties, finalLine, finalDefaultUser);
+                                synchronized (timeWriter)
+                                {
+                                    try
+                                    {
+                                        timeWriter.write(finalDefaultUser + "," + finalI + "," + cost + "\n");
+                                        timeWriter.flush();
+                                    } catch (IOException e)
+                                    {
+                                        throw new RuntimeException(e);
+                                    }
+                                    System.out.println(finalI + "," + cost + "ms");
+                                }
+                            });
+
+                            i++;
+                            int millisToWait = 60 * 1000 / queryPerMinute;
+                            Thread.sleep(millisToWait);
+                            System.out.println("wait for " + millisToWait + " ms before submitting the next query\n");
                         }
                         else
                         {
-                            Thread.sleep(15 * 1000);
-                            System.out.println("wait 15000 ms\n");
-                        }
-
-                        long cost = executeSQL(jdbc, properties, line, defaultUser);
-                        timeWriter.write(defaultUser + "," + i + "," + cost + "\n");
-
-                        System.out.println(i + "," + cost + "ms");
-                        i++;
-                        if (i % 10 == 0)
-                        {
+                            long cost = executeSQL(jdbc, properties, line, defaultUser);
+                            timeWriter.write(defaultUser + "," + i + "," + cost + "\n");
                             timeWriter.flush();
-                            System.out.println(i);
+
+                            System.out.println(i + "," + cost + "ms");
+                            i++;
+                            Thread.sleep(1000); // wait for 1 second before submitting the next query
                         }
                     }
                 }

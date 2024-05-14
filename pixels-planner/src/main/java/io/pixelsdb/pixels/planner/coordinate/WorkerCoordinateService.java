@@ -49,8 +49,7 @@ public class WorkerCoordinateService
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
-        this.channel = ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext().build();
+        this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
         this.stub = WorkerCoordinateServiceGrpc.newBlockingStub(channel);
     }
 

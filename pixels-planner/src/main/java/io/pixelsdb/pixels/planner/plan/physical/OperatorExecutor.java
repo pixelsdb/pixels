@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import io.pixelsdb.pixels.common.turbo.Output;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -41,7 +43,7 @@ public interface OperatorExecutor
      * @return the completable future that completes when this operator is complete, and
      * provides the computable futures of the outputs of this operator
      */
-    CompletableFuture<CompletableFuture<?>[]> execute();
+    CompletableFuture<CompletableFuture<? extends Output>[]> execute();
 
     /**
      * Execute the previous stages (if any) before the last stage, recursively.
@@ -78,12 +80,12 @@ public interface OperatorExecutor
         long getLayerOutputCostMs();
     }
 
-    static void waitForCompletion(CompletableFuture<?>[] stageOutputs) throws InterruptedException
+    static void waitForCompletion(CompletableFuture<? extends Output>[] stageOutputs) throws InterruptedException
     {
         waitForCompletion(stageOutputs, StageCompletionRatio);
     }
 
-    static void waitForCompletion(CompletableFuture<?>[] stageOutputs, double completionRatio)
+    static void waitForCompletion(CompletableFuture<? extends Output>[] stageOutputs, double completionRatio)
             throws InterruptedException
     {
         requireNonNull(stageOutputs, "stageOutputs is null");
@@ -96,7 +98,7 @@ public interface OperatorExecutor
         while (true)
         {
             double completed = 0;
-            for (CompletableFuture<?> childOutput : stageOutputs)
+            for (CompletableFuture<? extends Output> childOutput : stageOutputs)
             {
                 if (childOutput.isDone())
                 {

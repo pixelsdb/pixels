@@ -3,7 +3,7 @@
 //
 
 #include "vector/ColumnVector.h"
-
+#include <cmath>
 ColumnVector::ColumnVector(uint64_t len, bool encoding) {
     writeIndex = 0;
     readIndex = 0;
@@ -11,14 +11,20 @@ ColumnVector::ColumnVector(uint64_t len, bool encoding) {
 	this->encoding = encoding;
     memoryUsage = len + sizeof(int) * 3 + 4;
 	closed = false;
+    isNull = nullptr;
+    posix_memalign(reinterpret_cast<void **>(&isValid), 64, ceil(1.0 * len / 64) * sizeof(uint64_t));
 }
 
 void ColumnVector::close() {
 	if(!closed) {
-		writeIndex = 0;
-		closed = true;
-		// TODO: reset other variables
-	}
+        writeIndex = 0;
+        closed = true;
+        // TODO: reset other variables
+        if (isValid != nullptr) {
+            free(isValid);
+            isValid = nullptr;
+        }
+    }
 }
 
 void ColumnVector::reset() {
@@ -49,6 +55,17 @@ void ColumnVector::resize(int size) {
     } else {
         this->length = size;
     }
+}
+
+bool ColumnVector::checkValid(int index) {
+    int byteIndex = index / 8;
+    int bitIndex = index % 8;
+    auto * isValidByte = (uint8_t *)isValid;
+    return isValidByte[byteIndex] & (1 << bitIndex);
+}
+
+uint64_t * ColumnVector::currentValid() {
+    return isValid + readIndex / 64;
 }
 
 

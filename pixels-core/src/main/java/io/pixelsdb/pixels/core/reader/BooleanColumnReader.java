@@ -41,7 +41,11 @@ public class BooleanColumnReader extends ColumnReader
      * or the index of {@link #inputBuffer} if the column chunk is nulls-padded.
      */
     private int bitsOrInputIndex = 0;
-    private int isNullOffset = 0;
+    /**
+     * The number of bits to skip in the first byte (start from bitsOrInputIndex)
+     * when decompacting values from nulls-padded column chunk.
+     */
+    private int inputSkipBits = 0;
 
     BooleanColumnReader(TypeDescription type)
     {
@@ -107,8 +111,10 @@ public class BooleanColumnReader extends ColumnReader
             }
             // read isNull
             isNullOffset = input.position() + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
             // re-init
             bitsOrInputIndex = 0;
+            inputSkipBits = 0;
             hasNull = true;
             elementIndex = 0;
         }
@@ -126,14 +132,17 @@ public class BooleanColumnReader extends ColumnReader
             {
                 numToRead = numLeft;
             }
-            bytesToDeCompact = (numToRead + 7) / 8;
+
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
+                bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
+                        inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
+                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
@@ -143,12 +152,16 @@ public class BooleanColumnReader extends ColumnReader
             // read content
             if (nullsPadding)
             {
-                BitUtils.bitWiseDeCompact(columnVector.vector, i, numToRead, inputBuffer, bitsOrInputIndex, littleEndian);
+                bytesToDeCompact = (numToRead + inputSkipBits) / 8;
+                BitUtils.bitWiseDeCompact(columnVector.vector, i, numToRead,
+                        inputBuffer, bitsOrInputIndex, inputSkipBits, littleEndian);
                 bitsOrInputIndex += bytesToDeCompact;
+                inputSkipBits = (numToRead + inputSkipBits) % 8;
             }
             else
             {
-                bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
+                // Issue #615: no need to align bitsOrInputIndex to 8.
+                // bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
                 for (int j = i; j < i + numToRead; ++j)
                 {
                     if (!(hasNull && columnVector.isNull[j]))

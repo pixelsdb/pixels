@@ -44,13 +44,25 @@ public class PlanCoordinatorFactory
         this.transIdToPlanCoordinator = new ConcurrentHashMap<>();
     }
 
-    public void createPlanCoordinator(long transId, Operator planRootOperator)
+    /**
+     * Create the plan coordinator for the query plan.
+     * @param transId the transaction id
+     * @param planRootOperator the root operator of the query plan
+     * @return the plan coordinator
+     */
+    public PlanCoordinator createPlanCoordinator(long transId, Operator planRootOperator)
     {
         PlanCoordinator planCoordinator = new PlanCoordinator(transId);
         planRootOperator.initPlanCoordinator(planCoordinator, -1, false);
         this.transIdToPlanCoordinator.put(transId, planCoordinator);
+        return planCoordinator;
     }
 
+    /**
+     * Retrieve the plan coordinator of the query.
+     * @param transId the transaction id of the query
+     * @return the plan coordinator
+     */
     public PlanCoordinator getPlanCoordinator(long transId)
     {
         return this.transIdToPlanCoordinator.get(transId);

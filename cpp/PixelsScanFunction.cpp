@@ -35,7 +35,7 @@ TableFunctionSet PixelsScanFunction::GetFunctionSet() {
     TableFunction table_function("pixels_scan", {LogicalType::VARCHAR}, PixelsScanImplementation, PixelsScanBind,
 	                             PixelsScanInitGlobal, PixelsScanInitLocal);
 	table_function.projection_pushdown = true;
-	table_function.filter_pushdown = true;
+//	table_function.filter_pushdown = true;
     //table_function.filter_prune = true;
     enable_filter_pushdown = table_function.filter_pushdown;
     MultiFileReader::AddParameters(table_function);
@@ -78,7 +78,7 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
         }
         uint64_t currentLoc = data.vectorizedRowBatch->position();
         std::shared_ptr<TypeDescription> resultSchema = data.currPixelsRecordReader->getResultSchema();
-        uint64_t remaining = data.vectorizedRowBatch->rowCount - currentLoc;
+        uint64_t remaining = data.vectorizedRowBatch->remaining();
         assert(remaining > 0);
         auto thisOutputChunkRows = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
         output.SetCardinality(thisOutputChunkRows);
@@ -240,8 +240,9 @@ void PixelsScanFunction::TransformDuckdbType(const std::shared_ptr<TypeDescripti
 			    break;
 			//        case TypeDescription::TIME:
 			//            break;
-			//        case TypeDescription::TIMESTAMP:
-			//            break;
+            case TypeDescription::TIMESTAMP:
+                return_types.emplace_back(LogicalType::TIMESTAMP);
+                break;
 			//        case TypeDescription::VARBINARY:
 			//            break;
 			//        case TypeDescription::BINARY:
@@ -284,7 +285,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 			case TypeDescription::INT: {
 			    auto intCol = std::static_pointer_cast<LongColumnVector>(col);
                 Vector vector(LogicalType::INTEGER,
-                              (data_ptr_t)(intCol->current()));
+                              (data_ptr_t)(intCol->current()), col->currentValid());
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<int>(output.data.at(col_id));
 //			    memcpy(result_ptr, intCol->intVector + row_offset, thisOutputChunkRows * sizeof(int));
@@ -297,7 +298,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 			case TypeDescription::LONG: {
 				auto longCol = std::static_pointer_cast<LongColumnVector>(col);
                 Vector vector(LogicalType::BIGINT,
-                              (data_ptr_t)(longCol->current()));
+                              (data_ptr_t)(longCol->current()), col->currentValid());
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<long>(output.data.at(col_id));
 //			    memcpy(result_ptr, longCol->longVector + row_offset, thisOutputChunkRows * sizeof(long));
@@ -310,10 +311,10 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 			//            break;
 			//        case TypeDescription::DOUBLE:
 			//            break;
-		    case TypeDescription::DECIMAL:{
+		    case TypeDescription::DECIMAL: {
 			    auto decimalCol = std::static_pointer_cast<DecimalColumnVector>(col);
                 Vector vector(LogicalType::DECIMAL(colSchema->getPrecision(), colSchema->getScale()),
-                              (data_ptr_t)(decimalCol->current()));
+                              (data_ptr_t)(decimalCol->current()), col->currentValid());
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<long>(output.data.at(col_id));
 //			    memcpy(result_ptr, decimalCol->vector + row_offset, thisOutputChunkRows * sizeof(long));
@@ -328,7 +329,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 			case TypeDescription::DATE:{
 			    auto dateCol = std::static_pointer_cast<DateColumnVector>(col);
                 Vector vector(LogicalType::DATE,
-                              (data_ptr_t)(dateCol->current()));
+                              (data_ptr_t)(dateCol->current()), col->currentValid());
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<int>(output.data.at(col_id));
 //			    memcpy(result_ptr, dateCol->dates + row_offset, thisOutputChunkRows * sizeof(int));
@@ -340,8 +341,14 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 
 			//        case TypeDescription::TIME:
 			//            break;
-			//        case TypeDescription::TIMESTAMP:
-			//            break;
+            case TypeDescription::TIMESTAMP: {
+                auto tsCol = std::static_pointer_cast<TimestampColumnVector>(col);
+                Vector vector(LogicalType::TIMESTAMP,
+                              (data_ptr_t)(tsCol->current()), col->currentValid());
+                output.data.at(col_id).Reference(vector);
+                break;
+            }
+
 			//        case TypeDescription::VARBINARY:
 			//            break;
 			//        case TypeDescription::BINARY:
@@ -351,7 +358,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 		    {
 			    auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
                 Vector vector(LogicalType::VARCHAR,
-                              (data_ptr_t)(binaryCol->current()));
+                              (data_ptr_t)(binaryCol->current()), col->currentValid());
                 output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<duckdb::string_t>(output.data.at(col_id));
 //                memcpy(result_ptr, binaryCol->vector + row_offset, thisOutputChunkRows * sizeof(string_t));
@@ -362,9 +369,9 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState & data,
 //			default:
 //				throw InvalidArgumentException("bad column type " + std::to_string(colSchema->getCategory()));
 		}
-        col->increment(thisOutputChunkRows);
 		row_batch_id++;
 	}
+    vectorizedRowBatch->increment(thisOutputChunkRows);
 }
 
 bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
@@ -412,7 +419,6 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     }
 
     ::BufferPool::Switch();
-
     scan_data.currReader = scan_data.nextReader;
     scan_data.currPixelsRecordReader = scan_data.nextPixelsRecordReader;
     // asyncReadComplete is not invoked in the first run (is_init_state = true)

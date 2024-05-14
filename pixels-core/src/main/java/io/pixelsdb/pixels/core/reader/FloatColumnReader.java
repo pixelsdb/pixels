@@ -40,7 +40,6 @@ public class FloatColumnReader extends ColumnReader
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;
     private int inputIndex = 0;
-    private int isNullOffset = 0;
 
     FloatColumnReader(TypeDescription type)
     {
@@ -92,6 +91,7 @@ public class FloatColumnReader extends ColumnReader
             this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
             inputIndex = inputBuffer.position();
             isNullOffset = inputIndex + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
             hasNull = true;
             elementIndex = 0;
         }
@@ -108,14 +108,16 @@ public class FloatColumnReader extends ColumnReader
             {
                 numToRead = numLeft;
             }
-            bytesToDeCompact = (numToRead + 7) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead, inputBuffer, isNullOffset, littleEndian);
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
+                        inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
+                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             } else
             {

@@ -11,6 +11,7 @@
 #include "reader/VarcharColumnReader.h"
 #include "reader/DecimalColumnReader.h"
 #include "reader/DateColumnReader.h"
+#include "reader/TimestampColumnReader.h"
 
 class ColumnReaderBuilder {
 public:

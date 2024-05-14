@@ -29,50 +29,55 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.util.concurrent.TimeUnit;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
  */
-public class Daemon implements Runnable
+public class Daemon
 {
     private FileChannel myChannel = null;
-    private FileChannel partnerChannel = null;
-    private String[] partnerCmd = null;
+    private FileLock myLock = null;
     private volatile boolean running = false;
     private volatile boolean cleaned = false;
-    private ShutdownHandler shutdownHandler = null;
-    private static Logger log = LogManager.getLogger(Daemon.class);
+    private final ShutdownHandler shutdownHandler = null;
+    private static final Logger log = LogManager.getLogger(Daemon.class);
 
-    public void setup (String selfFilePath, String partnerFilePath, String[] partnerCmd)
+    public void setup (String lockFilePath)
     {
-        File myLockFile = new File(selfFilePath);
-        File partnerLockFile = new File(partnerFilePath);
-        this.partnerCmd = partnerCmd;
+        File myLockFile = new File(lockFilePath);
         if (!myLockFile.exists())
         {
             try
             {
-                myLockFile.createNewFile();
+                if (!myLockFile.createNewFile())
+                {
+                    log.info("reuse existing lock file " + lockFilePath);
+                }
             } catch (IOException e)
             {
-                log.error("failed to create my own lock file.", e);
-            }
-        }
-        if (!partnerLockFile.exists())
-        {
-            try
-            {
-                partnerLockFile.createNewFile();
-            } catch (IOException e)
-            {
-                log.error("failed to create my partner's lock file.", e);
+                log.error("failed to create lock file " + lockFilePath, e);
             }
         }
         try
         {
             this.myChannel = new FileOutputStream(myLockFile).getChannel();
-            this.partnerChannel = new FileOutputStream(partnerLockFile).getChannel();
+            this.myLock = this.myChannel.tryLock();
+            if (myLock == null)
+            {
+                // this process has been started
+                this.clean();
+                log.info("another daemon process is holding lock on " + lockFilePath + ", exiting...");
+                this.running = false;
+                System.exit(0);
+            }
+            else
+            {
+                this.running = true;
+                log.info("starting daemon thread...");
+            }
+
             /**
              * Issue #181:
              * We should not bind the SIGTERM handler.
@@ -94,92 +99,27 @@ public class Daemon implements Runnable
     {
         try
         {
-            if (this.myChannel != null)
-            {
-                this.myChannel.close();
-            }
-        } catch (IOException e)
-        {
-            log.error("error when closing my own channel.", e);
-        }
-        try
-        {
-            if (this.partnerChannel != null)
-            {
-                this.partnerChannel.close();
-            }
-        } catch (IOException e)
-        {
-            log.error("error when closing my partner's channel", e);
-        }
-        this.cleaned = true;
-        // this.shutdownHandler.unbind();
-    }
-
-    @Override
-    public void run()
-    {
-        FileLock myLock = null;
-        try
-        {
-            myLock = this.myChannel.tryLock();
-            if (myLock == null)
-            {
-                // this process has been started
-                this.clean();
-                log.info("Such daemon process has already been started, exiting...");
-                this.running = false;
-                System.exit(0);
-            }
-            else
-            {
-                this.running = true;
-                log.info("starting daemon thread...");
-            }
-
-            /*
-            Due to that main daemon and its guard daemon are not guaranteed to receive the
-            TERM signal at the same time. So that there is a case that:
-            The first process receives the signal and terminates with the file lock released.
-            After that but before the other process receives the signal, the other process
-            obtains its partner's lock and restart its partner.
-            In such a case, the main/guard daemons will not be terminated.
-            To solve this problem, we make the process sleep 1 second before tries to start
-            its partner. One second should be enough to send TERM signals to each daemon.
-            */
-            while (this.running)
-            {
-                // make sure the partner is running too.
-                FileLock partnerLock = this.partnerChannel.tryLock();
-                if (partnerLock != null)
-                {
-                    // the guarded process is not running.
-                    TimeUnit.SECONDS.sleep(1); // make sure
-                    partnerLock.release();
-                    log.info("starting partner...");
-                    ProcessBuilder builder = new ProcessBuilder(this.partnerCmd);
-                    builder.start();
-                }
-                TimeUnit.SECONDS.sleep(3);
-            }
-        } catch (Exception e)
-        {
-            this.running = false;
-            log.error("exception occurs when running.", e);
-        }
-
-        try
-        {
             if (myLock != null)
             {
                 myLock.release();
             }
         } catch (IOException e1)
         {
-            log.error("error when releasing my lock.");
+            log.error("error when releasing daemon lock");
         }
-        log.info("The daemon thread is stopped, cleaning the file channels...");
-        this.clean();
+
+        try
+        {
+            if (this.myChannel != null)
+            {
+                this.myChannel.truncate(0);
+                this.myChannel.close();
+            }
+        } catch (IOException e)
+        {
+            log.error("error when closing my own channel.", e);
+        }
+        this.cleaned = true;
     }
 
     public void shutdown()
@@ -187,13 +127,8 @@ public class Daemon implements Runnable
         this.running = false;
         while (!this.cleaned)
         {
-            try
-            {
-                TimeUnit.SECONDS.sleep(1);
-            } catch (InterruptedException e)
-            {
-                log.error("interrupted when waiting for file channel cleaning...");
-            }
+            log.info("the daemon thread is stopped, cleaning the file channels...");
+            this.clean();
         }
     }
 
@@ -204,24 +139,22 @@ public class Daemon implements Runnable
 
     public static class ShutdownHandler implements SignalHandler
     {
-        private volatile Daemon target = null;
+        private final Daemon daemon;
+        private final Runnable executor;
 
-        public ShutdownHandler(Daemon target)
+        public ShutdownHandler(Daemon daemon, Runnable executor)
         {
-            this.target = target;
-        }
-
-        public void unbind()
-        {
-            this.target = null;
+            this.daemon = requireNonNull(daemon, "daemon is null");
+            this.executor = requireNonNull(executor, "shutdown executor is null");
         }
 
         @Override
         public void handle(Signal signal)
         {
-            if (this.target != null)
+            if (signal.getNumber() == 15)
             {
-                this.target.shutdown();
+                this.daemon.shutdown();
+                this.executor.run();
             }
         }
     }

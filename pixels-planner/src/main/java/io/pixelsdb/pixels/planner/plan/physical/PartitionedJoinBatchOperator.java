@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner.plan.physical;
 
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
+import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
@@ -55,7 +56,7 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
      * @return the completable future of the completable futures of the join outputs.
      */
     @Override
-    public CompletableFuture<CompletableFuture<?>[]> execute()
+    public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
         return executePrev().handle((result, exception) ->
         {
@@ -75,7 +76,7 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
                 else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInput);
+                            .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN).invoke(joinInput);
                 }
                 else
                 {
@@ -96,8 +97,8 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
         {
             try
             {
-                CompletableFuture<CompletableFuture<?>[]> smallChildFuture = null;
-                CompletableFuture<CompletableFuture<?>[]> largeChildFuture = null;
+                CompletableFuture<CompletableFuture<? extends Output>[]> smallChildFuture = null;
+                CompletableFuture<CompletableFuture<? extends Output>[]> largeChildFuture = null;
                 if (smallChild != null && largeChild != null)
                 {
                     // both children exist, we should execute both children and wait for the small child.

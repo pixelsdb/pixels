@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,16 +17,36 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon;
+package io.pixelsdb.pixels.planner.plan.physical;
+
+import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author hank
- * @create 2019-07-28
+ * @create 2024-04-28
  */
-public class PixelsGuard
+public class ScanStreamOperator extends ScanOperator
 {
-    public static void main(String[] args)
+    public ScanStreamOperator(String name, List<ScanInput> scanInputs)
     {
-        DaemonMain.main(args);
+        super(name, scanInputs);
+    }
+
+    @Override
+    public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
+    {
+        // TODO: implement
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> executePrev()
+    {
+        // TODO: implement
+        return null;
     }
 }

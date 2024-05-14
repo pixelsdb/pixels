@@ -47,19 +47,22 @@ import static java.util.Objects.requireNonNull;
  *
  * <br>This should be run under root user to execute cache cleaning commands
  * <p>
- * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_1_compact_cache_2020.01.10-2.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
- * </p>
- * <p> Local
- * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
+ * QUERY -w /home/pixels/opt/pixels/1187_dedup_query.txt -l /home/pixels/opt/pixels/pixels_duration_1187_v_1_compact_cache_2020.01.10-2.csv -d /home/pixels/opt/presto-server/sbin/drop-caches.sh
  * </p>
  * <p>
- * COPY -p .pxl -s hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -d hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -n 3 -c 3
+ * QUERY -w /home/pixels/opt/pixels/105_dedup_query.txt -l /home/pixels/opt/pixels/pixels_duration_local.csv
+ * </p>
+ * <p>
+ * QUERY -w /home/pixels/opt/pixels/105_dedup_query.txt -l /home/pixels/opt/pixels/pixels_duration_local.csv -r true -q 3
+ * </p>
+ * <p>
+ * COPY -p .pxl -s hdfs://node01:9000/pixels/pixels/test_105/v_1_order -d hdfs://node01:9000/pixels/pixels/test_105/v_1_order -n 3 -c 3
  * </p>
  * <p>
  * COMPACT -s pixels -t test_105 -n yes -c 8
  * </p>
  * <p>
- * STAT -s tpch -t region -o false -c true
+ * STAT -s tpch -t region
  * </p>
  */
 public class Main
@@ -72,7 +75,16 @@ public class Main
         while (true)
         {
             System.out.print("pixels> ");
-            inputStr = scanner.nextLine().trim();
+            if (scanner.hasNextLine())
+            {
+                inputStr = scanner.nextLine().trim();
+            }
+            else
+            {
+                // Issue #631: in case of input from a file, exit at EOF.
+                System.out.println("Bye.");
+                break;
+            }
 
             if (inputStr.isEmpty() || inputStr.equals(";"))
             {
@@ -115,11 +127,11 @@ public class Main
                 argumentParser.addArgument("-s", "--schema").required(true)
                         .help("specify the name of database");
                 argumentParser.addArgument("-t", "--table").required(true)
-                        .help("Specify the name of table");
+                        .help("specify the name of table");
                 argumentParser.addArgument("-n", "--row_num").required(true)
-                        .help("Specify the max number of rows to write in a file");
+                        .help("specify the max number of rows to write in a file");
                 argumentParser.addArgument("-r", "--row_regex").required(true)
-                        .help("Specify the split regex of each row in a file");
+                        .help("specify the split regex of each row in a file");
                 argumentParser.addArgument("-c", "--consumer_thread_num").setDefault("4").required(true)
                         .help("specify the number of consumer threads used for data generation");
                 argumentParser.addArgument("-e", "--encoding_level").setDefault("2")
@@ -129,15 +141,14 @@ public class Main
                 argumentParser.addArgument("-l", "--loading_data_paths")
                         .help("specify the paths where the data is loaded into");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels Load.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -155,24 +166,25 @@ public class Main
                 ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels QUERY")
                         .defaultHelp(true);
 
-                argumentParser.addArgument("-t", "--type").required(true)
-                        .help("Specify the format of files");
                 argumentParser.addArgument("-w", "--workload").required(true)
-                        .help("specify the path of workload");
+                        .help("specify the path of workload file");
                 argumentParser.addArgument("-l", "--log").required(true)
-                        .help("Specify the path of log");
-                argumentParser.addArgument("-c", "--cache")
-                        .help("Specify the command of dropping cache");
+                        .help("specify the path of query log files");
+                argumentParser.addArgument("-r", "--rate_limited").required(false).setDefault(false)
+                        .help("specify whether the queries are executed in a rate-limited manner");
+                argumentParser.addArgument("-d", "--drop_cache").required(false)
+                        .help("specify the path of the script file that is used to drop cache after each query");
+                argumentParser.addArgument("-q", "--query_per_minute").required(false).setDefault(0)
+                        .help("specify the number of queries to execute if rate_limited is true");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels QUERY.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -191,26 +203,25 @@ public class Main
                         .defaultHelp(true);
 
                 argumentParser.addArgument("-p", "--postfix").required(true)
-                        .help("Specify the postfix of files to be copied");
+                        .help("specify the postfix of files to be copied");
                 argumentParser.addArgument("-s", "--source").required(true)
                         .help("specify the source directory");
                 argumentParser.addArgument("-d", "--destination").required(true)
-                        .help("Specify the destination directory");
+                        .help("specify the destination directory");
                 argumentParser.addArgument("-n", "--number").required(true)
-                        .help("Specify the number of copies");
+                        .help("specify the number of copies");
                 argumentParser.addArgument("-c", "--concurrency")
                         .setDefault("4").required(true)
                         .help("specify the number of threads used for data compaction");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels COPY.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -230,24 +241,23 @@ public class Main
                         .defaultHelp(true);
 
                 argumentParser.addArgument("-s", "--schema").required(true)
-                        .help("Specify the name of schema.");
+                        .help("specify the name of schema.");
                 argumentParser.addArgument("-t", "--table").required(true)
                         .help("specify the name of table.");
                 argumentParser.addArgument("-n", "--naive").required(true)
-                        .help("Specify whether or not to create naive compact layout.");
+                        .help("specify whether or not to create naive compact layout.");
                 argumentParser.addArgument("-c", "--concurrency")
                         .setDefault("4").required(true)
                         .help("specify the number of threads used for data compaction");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels Compact.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -267,23 +277,18 @@ public class Main
                         .defaultHelp(true);
 
                 argumentParser.addArgument("-s", "--schema").required(true)
-                        .help("Specify the schema name");
+                        .help("specify the schema name");
                 argumentParser.addArgument("-t", "--table").required(true)
-                        .help("Specify the table name");
-                argumentParser.addArgument("-o", "--ordered_enabled").setDefault(false)
-                        .help("Specify whether the ordered path is enabled");
-                argumentParser.addArgument("-c", "--compact_enabled").setDefault(true)
-                        .help("Specify whether the compact path is enabled");
+                        .help("specify the table name");
 
-                Namespace ns = null;
+                Namespace ns;
                 try
                 {
                     ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels STAT.");
-                    System.exit(0);
+                    continue;
                 }
 
                 try
@@ -307,6 +312,7 @@ public class Main
             }
         }
         // Use exit to terminate other threads and invoke the shutdown hooks.
+        scanner.close();
         System.exit(0);
     }
 
@@ -332,7 +338,7 @@ public class Main
 
     /**
      * Check if the order or compact path from pixels metadata is valid.
-     * @param paths the order or compact pathw from pixels metadata.
+     * @param paths the order or compact paths from pixels metadata.
      */
     public static void validateOrderOrCompactPath(String[] paths)
     {
