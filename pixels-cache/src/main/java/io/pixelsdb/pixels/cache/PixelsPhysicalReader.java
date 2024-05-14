@@ -119,4 +119,9 @@ public class PixelsPhysicalReader
     {
         return physicalReader.getBlockId();
     }
+
+    public long getRowGroupNum() throws IOException
+    {
+        return fileTail.getFooter().getRowGroupInfosCount();
+    }
 }

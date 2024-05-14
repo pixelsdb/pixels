@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.utils;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KeyValue;
+import io.etcd.jetcd.Watch;
 import io.etcd.jetcd.kv.PutResponse;
 import io.etcd.jetcd.lease.LeaseGrantResponse;
 import io.etcd.jetcd.options.DeleteOption;
@@ -75,13 +76,19 @@ public class EtcdUtil
     }
 
     /**
-     * get the singleton client instance.
-     *
-     * @return
+     * @return the singleton client instance.
      */
     public Client getClient()
     {
         return client;
+    }
+
+    /**
+     * @return the watch client from the singleton client instance.
+     */
+    public Watch getWatchClient()
+    {
+        return client.getWatchClient();
     }
 
     /**

@@ -34,6 +34,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.List;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.SUCCESS;
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -59,7 +60,9 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, workerInfo);
         CFWorkerManager.Instance().registerCFWorker(worker);
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
+        requireNonNull(planCoordinator, "plan coordinator is not found");
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
+        requireNonNull(stageCoordinator, "stage coordinator is not found");
         stageCoordinator.addWorker(worker);
         TurboProto.RegisterWorkerResponse response = TurboProto.RegisterWorkerResponse.newBuilder()
                 .setErrorCode(SUCCESS).setWorkerId(workerId).setLeasePeriodMs(lease.getPeriodMs())

@@ -1,10 +1,14 @@
 ////
 //// Created by liyu on 3/13/23.
 ////
+#include "encoding/RunLenIntEncoder.h"
+#include "encoding/RunLenIntDecoder.h"
+
 #include <gtest/gtest.h>
 #include <iostream>
 #include <thread>
 #include <string>
+#include <random>
 #include "PixelsBitMask.h"
 using namespace std;
 //
@@ -599,4 +603,48 @@ TEST(reader, filterMaskTest) {
 	}
 	bool isNone = filterMask.isNone();
 
+}
+
+static const uint32_t TestRowNum = 10;
+
+template<class T> 
+bool arrayEquals(T* a, T* b, int len) {
+    for(int i = 0; i < len; ++i) {
+        if(a[i] == b[i]) continue;
+        std::cout << "Found a and b not equal at " << i << " " << a[i] << " " << b[i] << std::endl; 
+        return false;
+    }
+    return true;
+}
+
+TEST(reader, runLengthTest) {
+    std::random_device r;
+    std::default_random_engine e(r());
+    std::uniform_int_distribution<long> dist;
+
+    long* values = new long[TestRowNum];
+    values[0] = 0;
+    values[1] = -1;
+    values[2] = -2;
+    for (int i = 3; i < TestRowNum; i++)
+    {
+        values[i] = dist(e);
+    }
+    long* decoderValues = new long[TestRowNum];
+    RunLenIntEncoder encoder(true, true);
+    byte* bytes = new byte[TestRowNum * sizeof(long) * 2];
+    int len = 0;
+    encoder.encode(values, bytes, TestRowNum, len);
+    std::shared_ptr<ByteBuffer> buffer = std::make_shared<ByteBuffer>(bytes, len, true);
+    RunLenIntDecoder decoder(buffer, true);
+    int i = 0;
+    while (decoder.hasNext())
+    {
+        // std::cout << "decoding " << i << std::endl;
+        decoderValues[i++] = decoder.next();
+        // std::cout << "result: " << decoderValues[i - 1] << std::endl;
+    }
+    assert(arrayEquals<long>(decoderValues, values));
+    delete[] values;
+    delete[] decoderValues;
 }

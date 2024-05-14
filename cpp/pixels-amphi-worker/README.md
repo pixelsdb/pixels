@@ -1,15 +1,15 @@
 # Pixels-Worker-Amphi
 
-`pixels-worker-amphi` is the on-premises worker in `pixels-amphi` that aims at submitting queries to 
-`pixels-server` and receiving the coordinator decision. According to the trade-offs in computation cost, 
-the coordinator either execute the query on the cloud and send back the results, or execute the query 
+`pixels-amphi-worker` is the on-premises worker of `pixels-amphi` that aims at submitting queries to 
+`pixels-server` and receiving the coordinator decision. According to the trade-offs in performance and computation costs, 
+the coordinator either decide to execute the query in the cloud and send back the results, or execute the query 
 locally with cached columnar data.
 
 ## Basic Functionalities
 
-- Communicate with `pixels-server` on cloud side with gRPC. This project shares proto files with Pixels project.
-See `protos` in pixels root directory for the definitions.
-- Send SQL queries to the dialect transpilation service, and decide corresponding queries for both the 
+- Communicate with `pixels-server` in the cloud with gRPC. This project shares proto files with Pixels project.
+See the protocol buffer files in the `proto` directory of this project for the definitions.
+- Send SQL queries to the dialect transpilation service, and transpile the corresponding queries for both
 in-cloud query engine (Trino) and on-premise query engine (DuckDB).
 - Submit the transpiled query to the coordinator service, to receive either the 
 exact query result from cloud compute, or instructed to perform on-premises execution.

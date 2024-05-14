@@ -22,13 +22,19 @@ package io.pixelsdb.pixels.server.controller;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.QueryScheduleException;
 import io.pixelsdb.pixels.common.exception.QueryServerException;
+import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.server.ExecutionHint;
+import io.pixelsdb.pixels.common.server.PriceModel;
 import io.pixelsdb.pixels.common.server.QueryStatus;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
 import io.pixelsdb.pixels.common.server.rest.response.GetQueryResultResponse;
 import io.pixelsdb.pixels.common.server.rest.response.SubmitQueryResponse;
+import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.turbo.QueryScheduleService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.Constants;
+import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -102,6 +108,7 @@ public class QueryManager
     private final ExecutorService bestEffortSubmitService = Executors.newSingleThreadExecutor();
     private final ExecutorService executeService = Executors.newCachedThreadPool();
     private final QueryScheduleService queryScheduleService;
+    private final TransService transService;
     private final String jdbcUrl;
     private final Properties costEffectiveConnProp;
     private final Properties immediateConnProp;
@@ -109,8 +116,10 @@ public class QueryManager
 
     private QueryManager() throws QueryServerException
     {
-        String host = ConfigFactory.Instance().getProperty("query.schedule.server.host");
-        int port = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
+        String scheduleServerHost = ConfigFactory.Instance().getProperty("query.schedule.server.host");
+        int scheduleServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
+        String transServerHost = ConfigFactory.Instance().getProperty("trans.server.host");
+        int transServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
         try
         {
             /*
@@ -119,14 +128,24 @@ public class QueryManager
              * Here, we only need to get the query slots from the query schedule service and do not need to report
              * metrics for cluster auto-scaling, so we set scalingEnabled to false.
              */
-            this.queryScheduleService = new QueryScheduleService(host, port, false);
-            Runtime.getRuntime().addShutdownHook(new Thread(this.queryScheduleService::shutdown));
+            this.queryScheduleService = new QueryScheduleService(scheduleServerHost, scheduleServerPort, false);
+            this.transService = new TransService(transServerHost, transServerPort);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                queryScheduleService.shutdown();
+                try
+                {
+                    transService.shutdown();
+                } catch (InterruptedException e)
+                {
+                    log.error("failed to shutdown query schedule service or transaction service", e);
+                }
+            }));
         } catch (QueryScheduleException e)
         {
             throw new QueryServerException("failed to initialize query schedule service", e);
         }
 
-        this.jdbcUrl = ConfigFactory.Instance().getProperty("presto.pixels.jdbc.url");
+        this.jdbcUrl = ConfigFactory.Instance().getProperty("presto.jdbc.url");
         boolean orderEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
         boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
         this.costEffectiveConnProp = new Properties();
@@ -213,7 +232,7 @@ public class QueryManager
                     if (query != null)
                     {
                         // this queue should only contain best-effort queries that are to be executed in the mpp cluster
-                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.BEST_EFFORT,
+                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.BEST_OF_EFFORT,
                                 "pending queue should only contain cost-effective queries");
                         QueryScheduleService.QueryConcurrency queryConcurrency = queryScheduleService.getQueryConcurrency();
                         if (queryConcurrency.mppConcurrency == 0)
@@ -246,7 +265,7 @@ public class QueryManager
      */
     public SubmitQueryResponse submitQuery(SubmitQueryRequest request)
     {
-        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             try
             {
@@ -271,7 +290,7 @@ public class QueryManager
             try
             {
                 String traceToken = UUID.randomUUID().toString();
-                this.submit(new ReceivedQuery(traceToken, request, 0L)); // received time is not needed
+                this.submit(new ReceivedQuery(traceToken, request, System.currentTimeMillis()));
                 return new SubmitQueryResponse(ErrorCode.SUCCESS, "", traceToken);
             } catch (Throwable e)
             {
@@ -293,7 +312,7 @@ public class QueryManager
     {
         Properties properties;
         SubmitQueryRequest request = query.getRequest();
-        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             // submit it to the mpp connection
             properties = this.costEffectiveConnProp;
@@ -315,9 +334,11 @@ public class QueryManager
             {
                 Statement statement = connection.createStatement();
                 this.runningQueries.put(traceToken, query);
+                long pendingTimeMs = System.currentTimeMillis() - query.getReceivedTimeMs();
                 long start = System.currentTimeMillis();
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
-                long latencyMs = System.currentTimeMillis() - start;
+                long executeTimeMs = System.currentTimeMillis() - start;
+
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -337,21 +358,24 @@ public class QueryManager
                     rows[i] = row;
                 }
 
-                // TODO: support get cost from trans service.
-                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
-                        columnPrintSizes, columnNames, rows, latencyMs, 0);
+                resultSet.close();
+                statement.close();
+
+                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "", request.getExecutionHint(),
+                        columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
             } catch (SQLException e)
             {
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED,
-                        e.getMessage(), null, null, null, 0, 0);
+                        e.getMessage(), null, null, null, null,
+                        0, 0);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
-                log.error("failed to execute query with trac token " + traceToken, e);
-                throw new QueryServerException("failed to execute query with trac token " + traceToken, e);
+                log.error("failed to execute query with trace token " + traceToken, e);
+                throw new QueryServerException("failed to execute query with trace token " + traceToken, e);
             }
         });
     }
@@ -396,6 +420,41 @@ public class QueryManager
     public synchronized GetQueryResultResponse popQueryResult(String traceToken)
     {
         GetQueryResultResponse response = this.queryResults.get(traceToken);
+
+        // Issue #649: get the cost from the transaction service
+        if (!response.isValidVmCostCents()) {
+            TransContext transContext = null;
+            try
+            {
+                transContext = this.transService.getTransContext(traceToken);
+                double vmCostCents;
+                // Try to get vmCostCents every 0.5 seconds
+                while ((vmCostCents = Double.parseDouble(transContext.getProperties().getProperty(
+                        Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY, "-1"))) < 0) {
+                    TimeUnit.MILLISECONDS.sleep(500);
+                }
+                response.setVmCostCents(vmCostCents);
+                response.setValidVmCostCents(); // set the vm cost as valid
+                response.addCostCents(vmCostCents);
+            } catch (TransException e)
+            {
+                log.error("failed to get trans context with trace token " + traceToken, e);
+                throw new QueryServerException("failed to get trans context with trace token " + traceToken, e);
+            } catch (InterruptedException e)
+            {
+                log.error("failed to sleep before getting vm costs", e);
+                throw new QueryServerException("failed to sleep before getting vm costs", e);
+            }
+            double cfCostCents = Double.parseDouble(transContext.getProperties().getProperty(
+                    Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY, "0"));
+            response.setCfCostCents(cfCostCents);
+            response.addCostCents(cfCostCents);
+            double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
+                    Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, "0"));
+            double billedCents = PriceModel.billedCents(scanBytes, response.getExecutionHint());
+            response.setBilledCents(billedCents);
+        }
+
         if (response != null)
         {
             // put it into finished query before removing from query results, to avoid unknown query status

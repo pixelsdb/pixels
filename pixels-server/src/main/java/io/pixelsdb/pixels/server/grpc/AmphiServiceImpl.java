@@ -137,8 +137,7 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
         ConfigFactory configFactory = ConfigFactory.Instance();
         String metadataHost = configFactory.getProperty("metadata.server.host");
         int metadataPort = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
-        String trinoEndpoint = configFactory.getProperty("presto.pixels.jdbc.url");
-        trinoEndpoint = trinoEndpoint.substring(0, trinoEndpoint.lastIndexOf('/'));
+        String trinoEndpoint = configFactory.getProperty("presto.jdbc.url");
 
         MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
         Coordinator coordinator = new Coordinator(metadataService);

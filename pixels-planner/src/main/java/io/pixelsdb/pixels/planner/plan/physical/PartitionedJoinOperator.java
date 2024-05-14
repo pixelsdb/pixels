@@ -48,8 +48,8 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
 {
     protected final List<PartitionInput> smallPartitionInputs;
     protected final List<PartitionInput> largePartitionInputs;
-    protected CompletableFuture<?>[] smallPartitionOutputs = null;
-    protected CompletableFuture<?>[] largePartitionOutputs = null;
+    protected CompletableFuture<? extends Output>[] smallPartitionOutputs = null;
+    protected CompletableFuture<? extends Output>[] largePartitionOutputs = null;
 
     public PartitionedJoinOperator(String name, List<PartitionInput> smallPartitionInputs,
                                    List<PartitionInput> largePartitionInputs,
@@ -135,9 +135,9 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
         int joinStageId = planCoordinator.assignStageId();
-        StageDependency aggrStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
-        StageCoordinator aggrStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
-        planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
+        StageDependency joinStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
+        StageCoordinator joinStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
+        planCoordinator.addStageCoordinator(joinStageCoordinator, joinStageDependency);
         if (this.joinAlgo == JoinAlgorithm.PARTITIONED || this.joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
         {
             if (smallChild != null && largeChild != null)
@@ -221,7 +221,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
             Output[] outputs = new Output[joinOutputs.length];
             for (int i = 0; i < joinOutputs.length; ++i)
             {
-                outputs[i] = (Output) joinOutputs[i].get();
+                outputs[i] = joinOutputs[i].get();
             }
             outputCollection.setJoinOutputs(outputs);
         }
@@ -230,7 +230,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
             Output[] outputs = new Output[smallPartitionOutputs.length];
             for (int i = 0; i < smallPartitionOutputs.length; ++i)
             {
-                outputs[i] = (Output) smallPartitionOutputs[i].get();
+                outputs[i] = smallPartitionOutputs[i].get();
             }
             outputCollection.setSmallPartitionOutputs(outputs);
         }
@@ -239,7 +239,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
             Output[] outputs = new Output[largePartitionOutputs.length];
             for (int i = 0; i < largePartitionOutputs.length; ++i)
             {
-                outputs[i] = (Output) largePartitionOutputs[i].get();
+                outputs[i] = largePartitionOutputs[i].get();
             }
             outputCollection.setLargePartitionOutputs(outputs);
         }

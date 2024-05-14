@@ -62,11 +62,11 @@ public abstract class AggregationOperator extends Operator
     /**
      * The outputs of the scan workers.
      */
-    protected CompletableFuture<?>[] scanOutputs = null;
+    protected CompletableFuture<? extends Output>[] scanOutputs = null;
     /**
      * The outputs of the final aggregation workers.
      */
-    protected CompletableFuture<?>[] finalAggrOutputs = null;
+    protected CompletableFuture<? extends Output>[] finalAggrOutputs = null;
 
     public AggregationOperator(String name, List<AggregationInput> finalAggrInputs, List<ScanInput> scanInputs)
     {
@@ -158,21 +158,25 @@ public abstract class AggregationOperator extends Operator
     {
         AggregationOutputCollection outputCollection = new AggregationOutputCollection();
 
-        if (this.scanOutputs.length > 0)
+        if (this.scanOutputs != null && this.scanOutputs.length > 0)
         {
             Output[] outputs = new Output[this.scanOutputs.length];
             for (int i = 0; i < this.scanOutputs.length; ++i)
             {
-                outputs[i] = (Output) this.scanOutputs[i].get();
+                outputs[i] = this.scanOutputs[i].get();
             }
             outputCollection.setScanOutputs(outputs);
+        }
+        if (this.child != null)
+        {
+            outputCollection.setChild(this.child.collectOutputs());
         }
         if (this.finalAggrOutputs != null && this.finalAggrOutputs.length > 0)
         {
             Output[] outputs = new Output[this.finalAggrOutputs.length];
             for (int i = 0; i < this.finalAggrOutputs.length; ++i)
             {
-                outputs[i] = (Output) this.finalAggrOutputs[i].get();
+                outputs[i] = this.finalAggrOutputs[i].get();
             }
             outputCollection.setFinalAggrOutputs(outputs);
         }
@@ -182,13 +186,15 @@ public abstract class AggregationOperator extends Operator
     public static class AggregationOutputCollection implements OutputCollection
     {
         private Output[] scanOutputs = null;
+        private OutputCollection child;
         private Output[] finalAggrOutputs = null;
 
         public AggregationOutputCollection() { }
 
-        public AggregationOutputCollection(Output[] scanOutputs, Output[] preAggrOutputs)
+        public AggregationOutputCollection(Output[] scanOutputs, OutputCollection child, Output[] preAggrOutputs)
         {
             this.scanOutputs = scanOutputs;
+            this.child = child;
             this.finalAggrOutputs = preAggrOutputs;
         }
 
@@ -200,6 +206,16 @@ public abstract class AggregationOperator extends Operator
         public void setScanOutputs(Output[] scanOutputs)
         {
             this.scanOutputs = scanOutputs;
+        }
+
+        public OutputCollection getChild()
+        {
+            return child;
+        }
+
+        public void setChild(OutputCollection child)
+        {
+            this.child = child;
         }
 
         public Output[] getFinalAggrOutputs()
@@ -223,6 +239,10 @@ public abstract class AggregationOperator extends Operator
                     totalGBMs += output.getGBMs();
                 }
             }
+            if (child != null)
+            {
+                totalGBMs += child.getTotalGBMs();
+            }
             if (this.finalAggrOutputs != null)
             {
                 for (Output output : finalAggrOutputs)
@@ -243,6 +263,10 @@ public abstract class AggregationOperator extends Operator
                 {
                     numReadRequests += output.getNumReadRequests();
                 }
+            }
+            if (child != null)
+            {
+                numReadRequests += child.getTotalNumReadRequests();
             }
             if (this.finalAggrOutputs != null)
             {
@@ -265,6 +289,10 @@ public abstract class AggregationOperator extends Operator
                     numWriteRequests += output.getNumWriteRequests();
                 }
             }
+            if (this.child != null)
+            {
+                numWriteRequests += this.child.getTotalNumWriteRequests();
+            }
             if (this.finalAggrOutputs != null)
             {
                 for (Output output : finalAggrOutputs)
@@ -286,6 +314,10 @@ public abstract class AggregationOperator extends Operator
                     readBytes += output.getTotalReadBytes();
                 }
             }
+            if (this.child != null)
+            {
+                readBytes += this.child.getTotalReadBytes();
+            }
             if (this.finalAggrOutputs != null)
             {
                 for (Output output : finalAggrOutputs)
@@ -306,6 +338,10 @@ public abstract class AggregationOperator extends Operator
                 {
                     writeBytes += output.getTotalWriteBytes();
                 }
+            }
+            if (this.child != null)
+            {
+                writeBytes += this.child.getTotalWriteBytes();
             }
             if (this.finalAggrOutputs != null)
             {

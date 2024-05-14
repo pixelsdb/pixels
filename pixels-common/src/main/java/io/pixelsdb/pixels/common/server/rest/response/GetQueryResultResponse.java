@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.server.rest.response;
 
 import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.server.ExecutionHint;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -34,8 +35,40 @@ public class GetQueryResultResponse
     private int[] columnPrintSizes;
     private String[] columnNames;
     private String[][] rows;
-    private double latencyMs;
+    /**
+     * The time in ms the query waits in the queue for execution.
+     */
+    private double pendingTimeMs;
+    /**
+     * The time the query really executes.
+     */
+    private double executionTimeMs;
+    /**
+     * The amount of money in cents really spent by the query.
+     */
     private double costCents;
+    /**
+     * The amount of money in cents billed according to our price model.
+     */
+    private double billedCents;
+
+    // Issue #649: Breakdown costs into vmCost and cfCost
+    /**
+     * The amount of money in cents really spent in vm by the query.
+     */
+    private double vmCostCents;
+    /**
+     * The amount of money in cents really spent in cf by the query.
+     */
+    private double cfCostCents;
+    /**
+     * The validity of vmCostCents.
+     */
+    private boolean isValidVmCostCents;
+    /**
+     * The execution hint of query.
+     */
+    private ExecutionHint executionHint;
 
     /**
      * Default constructor for Jackson.
@@ -57,16 +90,20 @@ public class GetQueryResultResponse
         this.errorMessage = errorMessage;
     }
 
-    public GetQueryResultResponse(int errorCode, String errorMessage, int[] columnPrintSizes,
-                                  String[] columnNames, String[][] rows, double latencyMs, double costCents)
+    public GetQueryResultResponse(int errorCode, String errorMessage, ExecutionHint executionHint, int[] columnPrintSizes,
+                                  String[] columnNames, String[][] rows, double pendingTimeMs,
+                                  double executionTimeMs)
     {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
+        this.executionHint = executionHint;
         this.columnPrintSizes = columnPrintSizes;
         this.columnNames = columnNames;
         this.rows = rows;
-        this.latencyMs = latencyMs;
-        this.costCents = costCents;
+        this.pendingTimeMs = pendingTimeMs;
+        this.executionTimeMs = executionTimeMs;
+        this.costCents = 0;
+        this.isValidVmCostCents = false;
     }
 
     public int getErrorCode()
@@ -88,6 +125,10 @@ public class GetQueryResultResponse
     {
         this.errorMessage = errorMessage;
     }
+
+    public ExecutionHint getExecutionHint() { return executionHint; }
+
+    public void setExecutionHint(ExecutionHint executionHint) { this.executionHint = executionHint; }
 
     public int[] getColumnPrintSizes()
     {
@@ -119,14 +160,24 @@ public class GetQueryResultResponse
         this.rows = rows;
     }
 
-    public double getLatencyMs()
+    public double getPendingTimeMs()
     {
-        return latencyMs;
+        return pendingTimeMs;
     }
 
-    public void setLatencyMs(double latencyMs)
+    public void setPendingTimeMs(double pendingTimeMs)
     {
-        this.latencyMs = latencyMs;
+        this.pendingTimeMs = pendingTimeMs;
+    }
+
+    public double getExecutionTimeMs()
+    {
+        return executionTimeMs;
+    }
+
+    public void setExecutionTimeMs(double executionTimeMs)
+    {
+        this.executionTimeMs = executionTimeMs;
     }
 
     public double getCostCents()
@@ -138,4 +189,28 @@ public class GetQueryResultResponse
     {
         this.costCents = costCents;
     }
+
+    public void addCostCents(double costCents) { this.costCents += costCents; }
+
+    public double getBilledCents()
+    {
+        return billedCents;
+    }
+
+    public void setBilledCents(double billedCents)
+    {
+        this.billedCents = billedCents;
+    }
+
+    public void setVmCostCents(double vmCostCents) { this.vmCostCents = vmCostCents; }
+
+    public double getVmCostCents() { return vmCostCents; }
+
+    public void setCfCostCents(double cfCostCents) { this.cfCostCents = cfCostCents; }
+
+    public double getCfCostCents() { return cfCostCents; }
+
+    public boolean isValidVmCostCents() { return isValidVmCostCents; }
+
+    public void setValidVmCostCents() { this.isValidVmCostCents = true; }
 }

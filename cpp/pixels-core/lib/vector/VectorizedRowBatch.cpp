@@ -21,6 +21,7 @@ int VectorizedRowBatch::DEFAULT_SIZE = 1024;
 VectorizedRowBatch::VectorizedRowBatch(int nCols, int size) {
     numCols = nCols;
     rowCount = 0;
+    current = 0;
     maxSize = size;
     cols.clear();
     cols.resize(numCols);
@@ -85,19 +86,11 @@ void VectorizedRowBatch::close() {
 }
 
 bool VectorizedRowBatch::isEndOfFile() {
-    bool isEndOfFile = closed;
-    if(!cols.empty()) {
-        isEndOfFile = cols.at(0)->isFull();
-    }
-    return isEndOfFile;
+    return closed || current >= rowCount;
 }
 
 uint64_t VectorizedRowBatch::position() {
-    uint64_t position = 0;
-    if(!cols.empty()) {
-        position = cols.at(0)->position();
-    }
-    return position;
+    return current;
 }
 
 void VectorizedRowBatch::reset() {
@@ -105,6 +98,7 @@ void VectorizedRowBatch::reset() {
         col->reset();
     }
     rowCount = 0;
+    current = 0;
 }
 
 void VectorizedRowBatch::resize(int size) {
@@ -112,5 +106,16 @@ void VectorizedRowBatch::resize(int size) {
         col->resize(size);
     }
     maxSize = size;
+}
+
+void VectorizedRowBatch::increment(int size) {
+    current += size;
+    for (const auto& col: cols) {
+        col->increment(size);
+    }
+}
+
+uint64_t VectorizedRowBatch::remaining() {
+    return rowCount - current;
 }
 

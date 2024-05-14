@@ -49,8 +49,8 @@ public class StatExecutor implements CommandExecutor
     {
         String schemaName = ns.getString("schema");
         String tableName = ns.getString("table");
-        boolean orderedEnabled = Boolean.parseBoolean(ns.getString("ordered_enabled"));
-        boolean compactEnabled = Boolean.parseBoolean(ns.getString("compact_enabled"));
+        boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
+        boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
 
         String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
         int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
@@ -148,7 +148,7 @@ public class StatExecutor implements CommandExecutor
                 .append("pixels.ordered_path_enabled:").append(orderedEnabled).append(";")
                 .append("pixels.compact_path_enabled:").append(compactEnabled);
         properties.setProperty("sessionProperties", builder.toString());
-        String jdbc = instance.getProperty("presto.pixels.jdbc.url");
+        String jdbc = instance.getProperty("presto.jdbc.url");
         try
         {
             DriverManager.registerDriver(new TrinoDriver());
@@ -184,7 +184,7 @@ public class StatExecutor implements CommandExecutor
             {
                 String sql = "SELECT COUNT(DISTINCT(" + column.getName() + ")) AS cardinality, " +
                         "SUM(CASE WHEN " + column.getName() + " IS NULL THEN 1 ELSE 0 END) AS null_count " +
-                        "FROM " + tableName;
+                        "FROM " + schemaName + "." + tableName;
                 Statement statement = connection.createStatement();
                 ResultSet resultSet = statement.executeQuery(sql);
                 if (resultSet.next())

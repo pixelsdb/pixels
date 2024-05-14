@@ -42,11 +42,13 @@ public:
                       int offset, int size, int pixelStride,
                       int vectorIndex, std::shared_ptr<ColumnVector> vector,
                       pixels::proto::ColumnChunkIndex & chunkIndex,
-                      std::shared_ptr<PixelsBitMask> filterMask) = 0;
-private:
-	bool hasNull;
+                      std::shared_ptr<PixelsBitMask> filterMask);
+
+    void setValid(const std::shared_ptr<ByteBuffer>& input, int pixelStride, const std::shared_ptr<ColumnVector>& columnVector, int pixelId, bool hasNull);
+
 protected:
     int elementIndex;
 	std::shared_ptr<TypeDescription> type;
+    uint32_t isNullOffset;
 };
 #endif //PIXELS_COLUMNREADER_H

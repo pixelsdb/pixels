@@ -50,11 +50,19 @@ public class OutputInfo
         this.encoding = encoding;
     }
 
+    /**
+     * Get the path of the output file.
+     * @return the path
+     */
     public String getPath()
     {
         return path;
     }
 
+    /**
+     * Set the path of the output file.
+     * @param the path
+     */
     public void setPath(String path)
     {
         this.path = path;

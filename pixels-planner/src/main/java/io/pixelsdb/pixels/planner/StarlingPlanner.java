@@ -28,18 +28,15 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.SchemaTableName;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Ordered;
-import io.pixelsdb.pixels.common.metadata.domain.Projections;
-import io.pixelsdb.pixels.common.metadata.domain.Splits;
+import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.plan.PlanOptimizer;
+import io.pixelsdb.pixels.planner.plan.logical.Table;
 import io.pixelsdb.pixels.planner.plan.logical.*;
 import io.pixelsdb.pixels.planner.plan.physical.*;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
@@ -78,6 +75,11 @@ public class StarlingPlanner
     private final Storage storage;
     private final long transId;
 
+    /**
+     * The data size in bytes to be scanned by the input query.
+     */
+    private double scanSize = 0;
+
     static
     {
         Storage.Scheme inputStorageScheme = Storage.Scheme.from(
@@ -110,15 +112,15 @@ public class StarlingPlanner
      * @param metadataService the metadata service to access Pixels metadata
      * @throws IOException
      */
-    public StarlingPlanner(long transId, Table rootTable,
-                           boolean orderedPathEnabled,
-                           boolean compactPathEnabled,
+    public StarlingPlanner(long transId, Table rootTable, boolean orderedPathEnabled, boolean compactPathEnabled,
                            Optional<MetadataService> metadataService) throws IOException
     {
         this.transId = transId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
-        checkArgument(rootTable.getTableType() == Table.TableType.JOINED || rootTable.getTableType() == Table.TableType.AGGREGATED,
-                "currently, StarlingPlanner only supports join and aggregation");
+        checkArgument(rootTable.getTableType() == Table.TableType.BASE ||
+                        rootTable.getTableType() == Table.TableType.JOINED ||
+                        rootTable.getTableType() == Table.TableType.AGGREGATED,
+                "currently, StarlingPlanner only supports scan, join, and aggregation");
         this.config = ConfigFactory.Instance();
         this.metadataService = metadataService.orElseGet(() ->
                 new MetadataService(config.getProperty("metadata.server.host"),
@@ -132,7 +134,11 @@ public class StarlingPlanner
 
     public Operator getRootOperator() throws IOException, MetadataException
     {
-        if (this.rootTable.getTableType() == Table.TableType.JOINED)
+        if (this.rootTable.getTableType() == Table.TableType.BASE)
+        {
+            return this.getScanOperator((BaseTable) this.rootTable);
+        }
+        else if (this.rootTable.getTableType() == Table.TableType.JOINED)
         {
             return this.getJoinOperator((JoinedTable) this.rootTable, Optional.empty());
         }
@@ -145,6 +151,55 @@ public class StarlingPlanner
             throw new UnsupportedOperationException("root table type '" +
                     this.rootTable.getTableType() + "' is currently not supported");
         }
+    }
+
+    public double getScanSize()
+    {
+        return scanSize;
+    }
+
+    public static String getIntermediateFolderForTrans(long transId)
+    {
+        return IntermediateFolder + transId + "/";
+    }
+
+    private ScanOperator getScanOperator(BaseTable scanTable) throws IOException, MetadataException
+    {
+        final String intermediateBase = getIntermediateFolderForTrans(transId) +
+                scanTable.getSchemaName() + "/" + scanTable.getTableName() + "/";
+        ImmutableList.Builder<ScanInput> scanInputsBuilder = ImmutableList.builder();
+        List<InputSplit> inputSplits = this.getInputSplits(scanTable);
+        int outputId = 0;
+        boolean[] scanProjection = new boolean[scanTable.getColumnNames().length];
+        Arrays.fill(scanProjection, true);
+
+        for (int i = 0; i < inputSplits.size(); )
+        {
+            ScanInput scanInput = new ScanInput();
+            scanInput.setTransId(transId);
+            ScanTableInfo tableInfo = new ScanTableInfo();
+            ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
+                    .builderWithExpectedSize(IntraWorkerParallelism);
+            for (int j = 0; j < IntraWorkerParallelism && i < inputSplits.size(); ++j, ++i)
+            {
+                // We assign a number of IntraWorkerParallelism input-splits to each partition worker.
+                inputsBuilder.add(inputSplits.get(i));
+            }
+            tableInfo.setInputSplits(inputsBuilder.build());
+            tableInfo.setColumnsToRead(scanTable.getColumnNames());
+            tableInfo.setTableName(scanTable.getTableName());
+            tableInfo.setFilter(JSON.toJSONString(scanTable.getFilter()));
+            tableInfo.setBase(true);
+            tableInfo.setStorageInfo(InputStorageInfo);
+            scanInput.setTableInfo(tableInfo);
+            scanInput.setScanProjection(scanProjection);
+            scanInput.setPartialAggregationPresent(false);
+            scanInput.setPartialAggregationInfo(null);
+            String folderName = intermediateBase + (outputId++) + "/";
+            scanInput.setOutput(new OutputInfo(folderName, IntermediateStorageInfo, true));
+            scanInputsBuilder.add(scanInput);
+        }
+        return new ScanBatchOperator(scanTable.getTableName(), scanInputsBuilder.build());
     }
 
     private StarlingAggregationOperator getAggregationOperator(AggregatedTable aggregatedTable)
@@ -169,7 +224,7 @@ public class StarlingPlanner
 
         PartitionInfo partitionInfo = new PartitionInfo(aggregation.getGroupKeyColumnIds(), 16);
 
-        final String intermediateBase = IntermediateFolder + transId + "/" +
+        final String intermediateBase = getIntermediateFolderForTrans(transId) +
                 aggregatedTable.getSchemaName() + "/" + aggregatedTable.getTableName() + "/";
 
         ImmutableList.Builder<String> AggrInputFilesBuilder = ImmutableList.builder();
@@ -339,7 +394,7 @@ public class StarlingPlanner
                 BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                         rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
 
-                String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                         joinedTable.getTableName() + "/";
                 MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -551,7 +606,7 @@ public class StarlingPlanner
                     BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                    String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                    String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -599,7 +654,7 @@ public class StarlingPlanner
                     BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
 
-                    String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                    String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
@@ -641,7 +696,7 @@ public class StarlingPlanner
 
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
-                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
@@ -670,7 +725,7 @@ public class StarlingPlanner
                 boolean[] leftPartitionProjection = getPartitionProjection(leftTable, join.getLeftProjection());
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
                         leftTable, leftInputSplits, leftKeyColumnIds, leftPartitionProjection, numPartition,
-                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs, leftPartitionProjection);
@@ -678,7 +733,7 @@ public class StarlingPlanner
                 boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
-                        IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
@@ -1052,7 +1107,7 @@ public class StarlingPlanner
                 outputFileNames.add(i + "/join_left");
             }
 
-            String path = IntermediateFolder + transId + "/" + joinedTable.getSchemaName() + "/" +
+            String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                     joinedTable.getTableName() + "/";
             MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
 
@@ -1164,6 +1219,18 @@ public class StarlingPlanner
         checkArgument(tableStorageScheme.equals(this.storage.getScheme()), String.format(
                 "the storage scheme of table '%s.%s' is not consistent with the input storage scheme for Pixels Turbo",
                 table.getSchemaName(), table.getTableName()));
+        // Issue #506: add the column size of the base table to the scan size of this query.
+        List<Column> columns = metadataService.getColumns(table.getSchemaName(), table.getTableName(), true);
+        Map<String, Column> nameToColumnMap = new HashMap<>(columns.size());
+        for (Column column : columns)
+        {
+            nameToColumnMap.put(column.getName(), column);
+        }
+        for (String columnName : table.getColumnNames())
+        {
+            this.scanSize += nameToColumnMap.get(columnName).getSize();
+        }
+
         List<Layout> layouts = metadataService.getLayouts(table.getSchemaName(), table.getTableName());
         for (Layout layout : layouts)
         {

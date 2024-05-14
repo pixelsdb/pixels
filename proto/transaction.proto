@@ -34,6 +34,8 @@ service TransService {
     rpc CommitTrans (CommitTransRequest) returns (CommitTransResponse);
     rpc RollbackTrans (RollbackTransRequest) returns (RollbackTransResponse);
     rpc GetTransContext (GetTransContextRequest) returns (GetTransContextResponse);
+    rpc SetTransProperty (SetTransPropertyRequest) returns (SetTransPropertyResponse);
+    rpc UpdateQueryCosts (UpdateQueryCostsRequest) returns (UpdateQueryCostsResponse);
     rpc GetTransConcurrency (GetTransConcurrencyRequest) returns (GetTransConcurrencyResponse);
     rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
 }
@@ -94,6 +96,41 @@ message GetTransContextRequest {
 message GetTransContextResponse {
     int32 errorCode = 1;
     TransContext transContext = 2;
+}
+
+message SetTransPropertyRequest {
+    oneof lookupKey {
+        string externalTraceId = 1;
+        uint64 transId = 2;
+    }
+    string key = 3;
+    string value = 4;
+}
+
+message SetTransPropertyResponse {
+    int32 errorCode = 1;
+    optional string prevValue = 2;
+}
+
+message UpdateQueryCostsRequest {
+    oneof lookupKey {
+        string externalTraceId = 1;
+        uint64 transId = 2;
+    }
+    // the new scan bytes to set
+    double newScanBytes = 3;
+    /*
+     * Issue #649:
+     * Specify addCostCents: vmCost or cfCost
+     */
+    oneof addCostCents {
+        double addVMCostCents = 4;
+        double addCFCostCents = 5;
+    }
+}
+
+message UpdateQueryCostsResponse {
+    int32 errorCode = 1;
 }
 
 message GetTransConcurrencyRequest {

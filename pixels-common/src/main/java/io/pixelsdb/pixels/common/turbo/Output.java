@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.turbo;
 
+import java.util.ArrayList;
+
 /**
  * The base class for the output of a cloud function.
  * @author hank
@@ -39,6 +41,10 @@ public abstract class Output
     private int numWriteRequests;
     private long totalReadBytes;
     private long totalWriteBytes;
+    /**
+     * The path of the result files. No need to contain endpoint information.
+     */
+    private ArrayList<String> outputs = new ArrayList<>();
 
     public String getRequestId()
     {
@@ -176,5 +182,30 @@ public abstract class Output
     public void setTotalWriteBytes(long totalWriteBytes)
     {
         this.totalWriteBytes = totalWriteBytes;
+    }
+
+    public ArrayList<String> getOutputs()
+    {
+        return outputs;
+    }
+
+    public void setOutputs(ArrayList<String> outputs)
+    {
+        this.outputs = outputs;
+    }
+
+    public synchronized void addOutput(String output)
+    {
+        this.outputs.add(output);
+    }
+
+    public SimpleOutput toSimpleOutput()
+    {
+        SimpleOutput simpleOutput = new SimpleOutput();
+        simpleOutput.setRequestId(this.requestId);
+        simpleOutput.setSuccessful(this.successful);
+        simpleOutput.setErrorMessage(this.errorMessage != null ? this.errorMessage : "");
+        simpleOutput.setNumOutputs(this.outputs != null ? this.outputs.size() : 0);
+        return simpleOutput;
     }
 }

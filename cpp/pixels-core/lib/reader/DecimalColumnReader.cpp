@@ -31,9 +31,13 @@ void DecimalColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto:
     if(offset == 0) {
         // TODO: here we check null
         ColumnReader::elementIndex = 0;
+        isNullOffset = chunkIndex.isnulloffset();
     }
     // TODO: we didn't implement the run length encoded method
 
+    int pixelId = elementIndex / pixelStride;
+    bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+    setValid(input, pixelStride, vector, pixelId, hasNull);
 
     columnVector->vector = (long *)(input->getPointer() + input->getReadPos());
     input->setReadPos(input->getReadPos() + size * sizeof(long));

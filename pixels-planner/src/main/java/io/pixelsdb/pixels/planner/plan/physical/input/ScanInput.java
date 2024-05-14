@@ -19,10 +19,16 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical.input;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ScanTableInfo;
+
+import java.util.List;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The input format for table scan.
@@ -120,5 +126,44 @@ public class ScanInput extends Input
     public void setOutput(OutputInfo output)
     {
         this.output = output;
+    }
+
+    public static String[] generateOutputPaths(String outputFolder, int numSplits)
+    {
+        requireNonNull(outputFolder, "outputFolder is null");
+        checkArgument(numSplits > 0, "numSplits is non-positive");
+        if (!outputFolder.endsWith("/"))
+        {
+            outputFolder += "/";
+        }
+        String[] outputPaths = new String[numSplits];
+        for (int i = 0; i < numSplits; ++i)
+        {
+            outputPaths[i] = outputFolder + "scan_" + i;
+        }
+        return outputPaths;
+    }
+
+    /**
+     * Generate the absolute paths of the output files for a scan input.
+     * @param scanInput the scan input
+     * @return the absolute output file paths
+     */
+    public static List<String> generateOutputPaths(ScanInput scanInput)
+    {
+        requireNonNull(scanInput, "scanInput is null");
+        String folder = requireNonNull(scanInput.getOutput().getPath(), "output folder is null");
+        int numSplits = scanInput.getTableInfo().getInputSplits().size();
+        checkArgument(numSplits > 0, "input splits is empty");
+        ImmutableList.Builder<String> builder = ImmutableList.builderWithExpectedSize(numSplits);
+        if (!folder.endsWith("/"))
+        {
+            folder += "/";
+        }
+        for (int i = 0; i < numSplits; ++i)
+        {
+            builder.add(folder + "scan_" + i);
+        }
+        return builder.build();
     }
 }

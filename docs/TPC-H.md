@@ -40,13 +40,13 @@ Then use the following commands in pixels-cli to load data for the TPC-H tables:
 LOAD -o file:///data/tpch/100g/customer -s tpch -t customer -n 319150 -r \| -c 1
 LOAD -o file:///data/tpch/100g/lineitem -s tpch -t lineitem -n 600040 -r \| -c 1
 LOAD -o file:///data/tpch/100g/nation -s tpch -t nation -n 100 -r \| -c 1
-LOAD -o file:///data/tpch/100g/orders/ -s tpch -t orders -n 638300 -r \| -c 1
+LOAD -o file:///data/tpch/100g/orders -s tpch -t orders -n 638300 -r \| -c 1
 LOAD -o file:///data/tpch/100g/part -s tpch -t part -n 769240 -r \| -c 1
 LOAD -o file:///data/tpch/100g/partsupp -s tpch -t partsupp -n 360370 -r \| -c 1
 LOAD -o file:///data/tpch/100g/region -s tpch -t region -n 10 -r \| -c 1
 LOAD -o file:///data/tpch/100g/supplier -s tpch -t supplier -n 333340 -r \| -c 1
 ```
-It may take about one hour. The last parameter `-c` of the `LOAD` command is the maximum number
+It may take half an hour if data is loaded in a single thread. The last parameter `-c` of the `LOAD` command is the maximum number
 of threads used for loading data. It only effects when the input directory (specified by `-o`)
 contains multiple input files. In case that the TPC-H table has multiple parts, you can set
 `-c` to the number of parts to improve the data loading performance.
@@ -94,10 +94,9 @@ COMPACT -s tpch -t partsupp -n no -c 8
 COMPACT -s tpch -t region -n no -c 1
 COMPACT -s tpch -t supplier -n no -c 1
 ```
-The tables `nation` and `region` are too small, no need to compact them.
-The last parameter `-c` of `COMPACT` command is the maximum number
-of threads used for data compaction. For large tables such as `lineitem`, you can increase `-c` to
-improve the compaction performance. Compaction is normally faster than loading with same number of threads.
+The last parameter `-c` of `COMPACT` command is the maximum number of threads used for data compaction.
+For large tables such as `lineitem`, you can increase `-c` to improve the compaction performance.
+Compaction does not re-encode data, hence it should be much faster than loading.
 
 > `compact.factor` in `$PIXELS_HOME/pixels.properties` determines how many row groups are compacted into a single
 > file. The default value is 32, which is appropriate in most conditions. An experimental evaluation of the effects
@@ -107,16 +106,25 @@ To avoid scanning the small files in the ordered path during query execution, di
 
 ## Statistics Collection*
 This is optional. Data statistics enable cost-based query optimization for the queries.
-Start Pixels and Trino, make sure that Trino can execute queries on `tpch` schema.
-In pixels-cli, use the following commands to collect the data statistics for the columns in each table.
+Start Pixels and Trino, make sure that Trino can execute queries on `tpch` schema and `presto.jdbc.url`
+in `$PIXELS_HOME/properties` points to the JDBC endpoint of your Trino instance.
+
+In pixels-cli, use the `STAT` command to collect the data statistics for each table.
 ```bash
-STAT -s tpch -t nation -o false -c true
-STAT -s tpch -t region -o false -c true
-STAT -s tpch -t supplier -o false -c true
-STAT -s tpch -t customer -o false -c true
-STAT -s tpch -t part -o false -c true
-STAT -s tpch -t partsupp -o false -c true
-STAT -s tpch -t orders -o false -c true
-STAT -s tpch -t lineitem -o false -c true
+STAT -s tpch -t nation
+STAT -s tpch -t region
+STAT -s tpch -t supplier
+STAT -s tpch -t customer
+STAT -s tpch -t part
+STAT -s tpch -t partsupp
+STAT -s tpch -t orders
+STAT -s tpch -t lineitem
 ```
+Note that `STAT` command issues queries to Trino to collect some statistics. Set the following two properties in `$PIXELS_HOME/pixels.properties` as needed before executing this command:
+```properties
+executor.ordered.layout.enabled=false
+executor.compact.layout.enabled=true
+```
+By setting `executor.compact.layout.enabled=true`, the compact layout is used for the statistic collection.
+
 When it is finished successfully, set `splits.index.type=cost_based` and restart Trino to benefit from cost-based data splitting (determining the number of tasks to scan a base table).

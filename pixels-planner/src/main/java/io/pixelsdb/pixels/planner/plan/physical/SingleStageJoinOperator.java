@@ -43,7 +43,7 @@ public abstract class SingleStageJoinOperator extends JoinOperator
     protected final JoinAlgorithm joinAlgo;
     protected JoinOperator smallChild = null;
     protected JoinOperator largeChild = null;
-    protected CompletableFuture<?>[] joinOutputs = null;
+    protected CompletableFuture<? extends Output>[] joinOutputs = null;
 
     public SingleStageJoinOperator(String name, boolean complete, JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
@@ -105,9 +105,9 @@ public abstract class SingleStageJoinOperator extends JoinOperator
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
         int joinStageId = planCoordinator.assignStageId();
-        StageDependency aggrStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
-        StageCoordinator aggrStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
-        planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
+        StageDependency joinStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
+        StageCoordinator joinStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
+        planCoordinator.addStageCoordinator(joinStageCoordinator, joinStageDependency);
         if (this.joinAlgo == JoinAlgorithm.BROADCAST || this.joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
         {
             if (this.smallChild != null)
@@ -136,7 +136,7 @@ public abstract class SingleStageJoinOperator extends JoinOperator
             Output[] outputs = new Output[joinOutputs.length];
             for (int i = 0; i < joinOutputs.length; ++i)
             {
-                outputs[i] = (Output) joinOutputs[i].get();
+                outputs[i] = joinOutputs[i].get();
             }
             outputCollection.setJoinOutputs(outputs);
         }

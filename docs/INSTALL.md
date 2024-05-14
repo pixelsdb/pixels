@@ -1,18 +1,24 @@
-# Installation
+# Basic Installation
 
-Here, we show how to install Pixels in AWS EC2 as an example.
-However, installation in other cloud or on-premises environments is almost the same.
+In this document, we show an example of installing the core components of Pixels in AWS EC2.
+Installation in other cloud or on-premises environments is almost the same.
 In this example, we use Trino as the query engine. To use other query engines, skip [Install Trino](#install-trino)
 and check the instructions for the other query engine:
 * [Install Pixels + Presto](https://github.com/pixelsdb/pixels-presto)
 * [Install Pixels + Hive](https://github.com/pixelsdb/pixels-hive)
+* [Install Pixels + DuckDB](../cpp/README.md)
+
+Here, we only install and configure the essential components for query processing.
+To use the following optional components, follow the instructions in the corresponding README.md after the basic installation:
+* [Pixels Cache](../pixels-cache/README.md): The distributed columnar cache to accelerate query processing.
+* [Pixels Turbo](../pixels-turbo/README.md): The hybrid query engine that invokes serverless resources to help process unpredictable workload spikes.
+* [Pixels Amphi](../pixels-amphi/README.md): The adaptive query scheduler that enables cost-efficient query processing in both on-perm and in-cloud environments.
 
 In AWS EC2, create an Ubuntu-20.04 or 22.04 instance with x86 arch and at least 4GB memory and 20GB root volume. 
 8GB or larger memory is recommended for performance evaluations on datasets larger than 10GB. 
 Login the instance as `ubuntu` user, and install the following components.
 
 > Installation steps marked with `*` are optional.
-> After finishing the installation of Pixels + Trino, you can optionally enable [Pixels Turbo](../pixels-turbo).
 
 ## Install JDK
 Install JDK 17.0 in the EC2 instance:
@@ -32,15 +38,15 @@ Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 
 ## Install Maven
 
-Pixels requires maven 3.6 to build the source code (maven 3.1-3.5 might work, but we didn't test them yet). On some old operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
-In this case, you need to install a later maven that is compatible with your JDK manually. 
+Pixels requires maven 3.8 or later to build the source code (some early maven versions may work, but we haven't test them yet). On some operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
+In this case, manually install a newer maven compatible with your JDK.
 
 ## Setup AWS Credentials*
 
-If we use S3 as the underlying storage system, we have to configure the AWS credentials.
+To use S3 as the underlying storage system, we have to configure the AWS credentials.
 
 Currently, we do not configure the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` from Pixels.
-Therefore, we have to configure these credentials using
+Therefore, configure these credentials using
 [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-set) or
 [credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
 
@@ -74,7 +80,6 @@ etcd.hosts=localhost
 etcd.port=2379
 metrics.node.text.dir=/home/pixels/opt/node_exporter/text/
 presto.pixels.jdbc.url=jdbc:trino://localhost:8080/pixels/tpch
-hdfs.config.dir=/opt/hadoop-2.7.3/etc/hadoop/
 ```
 The hostnames, ports, paths, usernames, and passwords in these properties are to be configured in the following steps of installation.
 
@@ -82,7 +87,9 @@ The hostnames, ports, paths, usernames, and passwords in these properties are to
 > to specify a different location of `pixels.properties`. This can be a http or https URL
 > to a remote location.
 
-Optionally, to install Pixels step-by-step, please see the guidance below.
+If you are installing a cluster, install Pixels on each node of the cluster.
+
+Optionally, to install Pixels step-by-step, see the guidance below.
 
 ### Install Step-by-Step*
 
@@ -110,7 +117,7 @@ mkdir logs
 mkdir sbin
 mkdir var
 ```
-Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` and `PIXELS_HOME/sbin` respectively.
+Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` and `PIXELS_HOME/sbin`, respectively.
 Put `pixels-daemon-*-full.jar` into `PIXELS_HOME`.
 Put `pixels-cli-*-full.jar` into `PIXELS_HOME/sbin`
 Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
@@ -118,22 +125,11 @@ Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
 Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
 Leave the other config parameters as default.
 
-Optionally, to use the columnar cache in Pixels (i.e., pixels-cache), create and mount an in-memory file system:
-```bash
-sudo mkdir -p /mnt/ramfs
-sudo mount -t tmpfs -o size=1g tmpfs /mnt/ramfs
-```
-The path `/mnt/ramfs` is determined by `cache.location` and `index.location` in `PIXELS_HOME/pixels.properties`.
-The `size` parameter of the mount command should be larger than or equal to the sum of `cache.size` and `index.size` in
-`PIXELS_HOME/pixels.properties`. And it must be smaller than the physical memory size.
-Set the schema name and table name of the cached table using `cache.schema` and `cache.table`, respectively.
-Set `cache.storage.scheme` to be the name of the storage system where the cached table is stored.
-**Finally**, set `cache.enabled` and `cache.read.direct` to `true` in `PIXELS_HOME/pixels.properties`.
-
-Set `cache.enabled` to `false` if you don't use pixels-cache.
+Set `cache.enabled` to `false` in `$PIXELS_HOME/pixels.properties` if you don't use pixels-cache.
 
 ## Install MySQL
-MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later is tested. Other forks or variants may also work.
+MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later has been tested. Other forks or variants may also work.
+You only need to install one etcd and one MySQL instance, even in a cluster.
 
 To install MySQL:
 ```bash
@@ -201,9 +197,12 @@ Modify `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`
 and point it to the `etc/hadoop` directory under the home of Hadoop.
 Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from this directory.
 
-> Note that some default ports used by Hadoop
+> Note:
+> (1) Some default ports used by Hadoop
 > may conflict with the default ports used by Trino. In this case, modify the default port configuration
 > of either system.
+> (2) Hadoop 2.7.x and 3.3.x are not compatible with high-version JDKs such as JDK 17. Please configure
+> Hadoop to use JDK 8.
 
 ## Install Trino
 Trino is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Trino-405.
@@ -238,47 +237,18 @@ an existing directory where the listener logs will appear.
   with the following content:
 ```properties
 connector.name=pixels
-pixels.config=/home/ubuntu/opt/pixels/pixels.properties
 
 # serverless config
-# it can be on, off, auto
-cloud.function.switch=auto
-local.scan.concurrency=40
+# it can be on, off, auto, or session
+cloud.function.switch=off
 clean.intermediate.result=true
 ```
-`pixels.config` is used to specify the config file for Pixels, and has a higher priority than the config file under `PIXELS_HOME`.
 **Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
-The other properties are related to serverless execution.
 In Trino, Pixels can push projections, filters, joins, and aggregations into serverless computing services (e.g., AWS Lambda).
-This feature is named `Pixels Turbo` and can be turned on by setting `cloud.function.switch` to `auto` (adaptively enabled) or `on` (always enabled).
-
-If Pixels Turbo is enabled, we also need to set the following settings in `PIXELS_HOME/pixels.properties`:
-```properties
-executor.input.storage.scheme=s3
-executor.intermediate.storage.scheme=s3
-executor.intermediate.folder=/pixels-turbo/intermediate/
-executor.output.storage.scheme=s3
-executor.output.folder=/pixels-turbo/output/
-```
-Those storage schemes are used to access the input data (the storage scheme of the base tables defined by 
-`CREATE TABLE` statements), the intermediate data (intermediate results generated during query execution), and the 
-output data (the result of the sub-plan executed in the serverless workers), respectively.
-If any of these storage schemes is `minio` or `redis`, we also need to set the other information, such as the endpoint
-and keys, of the storage:
-```properties
-minio.region=eu-central-2
-minio.endpoint=http://localhost:9000
-minio.access.key=minio-access-key-dummy
-minio.secret.key=minio-secret-key-dummy
-redis.endpoint=localhost:6379
-redis.access.key=redis-user-dummy
-redis.secret.key=redis-password-dummy
-```
-Ensure that they are valid so that the serverless workers can access the corresponding storage systems.
-Especially, the `executor.input.storage.scheme` must be consistent with the storage scheme of the base
-tables. This is checked during query-planning for Pixels Turbo.
-In addition, the `executor.intermediate.folder` and `executor.output.folder` are the base path where the intermediate
-and output data are stored. They also need to be valid and accessible for the serverless workers.
+This feature is named `Pixels-Turbo` and can be turned on by setting `cloud.function.switch` to `auto` (adaptively enabled) or `on` (always enabled).
+Turn it `off` to only use Trino workers for query processing.
+We can also set it to `session` so that this switch can be dynamically turned on or off by the session properties `pixels.cloud_function_enabled`.
+This allows `pixels-server` choosing whether to execute the query with cloud functions enabled.
 
 Append the following two lines into `etc/jvm.config`:
 ```config
@@ -298,6 +268,8 @@ performance metrics of the whole system.
 
 To install Prometheus, copy `node_exporter-1.5.0.linux-amd64.tar.xz`, `jmx_exporter-0.18.0.tar.xz`, and `prometheus-2.43.0.linux-amd64.tar.xz`
 under `scripts/tars` into the `~/opt` directory and decompress them.
+Node exporter and jmx exporter are needed for every node in a cluster, whereas Prometheus and Grafana are only needed on the node where you want
+to store the performance metrics and provide visualization.
 
 Create links:
 ```bash
@@ -332,23 +304,25 @@ Then we get three dashboards `Node Exporter` and `JVM Exporter` in Grafana.
 These dashboards can be used to monitor the performance metrics of the instance.
 
 ## Start Pixels
-Enter `PIXELS_HOME`.
-If pixels-cache is enabled, set up the cache before starting Pixels:
-```bash
-./sbin/reset-cache.sh
-sudo ./sbin/pin-cache.sh
-```
-`reset-cache.sh` is only needed for the first time of using pixels-cache.
-It initializes some states in etcd for the cache. 
-If you have modified the `etcd` urls, then you need to change the `ENDPOINTS` property in `reset-cache.sh` as well.
+Enter `PIXELS_HOME`, execute `./sbin/reset-cache.sh` for the first time of starting Pixels if pixels-cache is enabled.
 
-Even if pixels-cache is disabled, `reset-cache.sh` is needed for the first time of starting Pixels.
 Then, start the daemons of Pixels using:
-
 ```bash
 ./sbin/start-pixels.sh
 ```
-The metadata server, coordinator, node manager, and metrics server, are running in the daemons.
+The essential services of Pixels, such as the metadata server, transaction manager, cache coordinator, cache manager, and metrics server, are running in these daemons.
+
+To start Pixels in a cluster, edit `PIXELS_HOME/sbin/datanodes` and list all the datanodes in this file.
+Each line in this file is in the following format:
+```config
+hostname_of_the_datanode pixels_home_of_the_datanode
+```
+`pixels_home_of_the_datanode` is optional if the datanode has the same `PIXELS_HOME` as the coordinator node where you run
+`start_pixels.sh`.
+
+You can also start Pixels coordinator and datanodes separately using `PIXELS_HOME/start-coordinator` and `PIXELS_HOME/start-datanode.sh`.
+
+> Note: You can also add JVM OPTS for Pixels daemons in `PIXELS_HOME/bin/jvm.config`. This is useful for profiling and remote debugging.
 
 After starting Pixels, enter the home of trino-server and start Trino:
 ```bash
@@ -370,6 +344,4 @@ Run `SHOW SCHEMAS` in trino-cli, the result should be as follows if everything i
 By now, Pixels has been installed in the EC2 instance. The aforementioned instructions should also
 work in other kinds of VMs or physical servers.
 
-Run the script `$PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels when needed.
-If pixels-cache is used, also run the `$PIXELS_HOME/sbin/unpin-cache.sh` to release the memory that is
-pinned by the cache.
+Run the script `PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels, or run `PIXELS_HOME/stop-coordinator` and `PIXELS_HOME/stop-datanode.sh` to stop the coordinator and datanodes, respectively.
