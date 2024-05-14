@@ -94,7 +94,7 @@ public class QueryController
         {
             return response;
         }
-        return new GetQueryResultResponse(ErrorCode.QUERY_SERVER_QUERY_NOT_FINISHED,
-                "the query is not finished yet");
+        return new GetQueryResultResponse(ErrorCode.QUERY_SERVER_QUERY_RESULT_NOT_FOUND,
+                "the query is not finished yet or its result has been cleared");
     }
 }

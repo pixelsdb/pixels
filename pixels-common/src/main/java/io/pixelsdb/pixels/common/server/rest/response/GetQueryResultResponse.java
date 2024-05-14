@@ -44,23 +44,17 @@ public class GetQueryResultResponse
      */
     private double executionTimeMs;
     /**
+     * The milliseconds since Unix epoch at which the query is finished.
+     */
+    private long finishTimestampMs = -1;
+    /**
      * The amount of money in cents really spent by the query.
      */
-    private double costCents = 0;
+    private double costCents = -1;
     /**
      * The amount of money in cents billed according to our price model.
      */
-    private double billedCents = 0;
-
-    // Issue #649: Breakdown costs into vmCost and cfCost
-    /**
-     * The amount of money in cents really spent in vm by the query.
-     */
-    private double vmCostCents = -1;
-    /**
-     * The amount of money in cents really spent in cf by the query.
-     */
-    private double cfCostCents = -1;
+    private double billedCents = -1;
     /**
      * The execution hint of query.
      */
@@ -88,8 +82,9 @@ public class GetQueryResultResponse
 
     public GetQueryResultResponse(int errorCode, String errorMessage, ExecutionHint executionHint, int[] columnPrintSizes,
                                   String[] columnNames, String[][] rows, double pendingTimeMs,
-                                  double executionTimeMs)
+                                  double executionTimeMs, long finishTimestampMs)
     {
+        checkArgument(finishTimestampMs > 0, "finish timestamp is invalid");
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.executionHint = executionHint;
@@ -98,6 +93,7 @@ public class GetQueryResultResponse
         this.rows = rows;
         this.pendingTimeMs = pendingTimeMs;
         this.executionTimeMs = executionTimeMs;
+        this.finishTimestampMs = finishTimestampMs;
     }
 
     public int getErrorCode()
@@ -174,6 +170,16 @@ public class GetQueryResultResponse
         this.executionTimeMs = executionTimeMs;
     }
 
+    public long getFinishTimestampMs()
+    {
+        return finishTimestampMs;
+    }
+
+    public void setFinishTimestampMs(long finishTimestampMs)
+    {
+        this.finishTimestampMs = finishTimestampMs;
+    }
+
     public double getCostCents()
     {
         return costCents;
@@ -196,28 +202,11 @@ public class GetQueryResultResponse
         this.billedCents = billedCents;
     }
 
-    public void setVmCostCents(double vmCostCents)
+    /**
+     * @return true if this query result has valid billed and cost cents
+     */
+    public boolean hasValidCents()
     {
-        this.vmCostCents = vmCostCents;
-    }
-
-    public double getVmCostCents()
-    {
-        return vmCostCents;
-    }
-
-    public void setCfCostCents(double cfCostCents)
-    {
-        this.cfCostCents = cfCostCents;
-    }
-
-    public double getCfCostCents()
-    {
-        return cfCostCents;
-    }
-
-    public boolean hasValidVmCostCents()
-    {
-        return this.vmCostCents >= 0;
+        return this.costCents >= 0 && this.billedCents >= 0;
     }
 }

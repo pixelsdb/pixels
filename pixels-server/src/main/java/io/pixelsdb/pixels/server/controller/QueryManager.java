@@ -39,6 +39,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.sql.*;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -46,6 +47,8 @@ import java.util.concurrent.*;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.Constants.RELAXED_EXECUTION_MAX_POSTPONE_SEC;
 import static io.pixelsdb.pixels.common.utils.Constants.RELAXED_EXECUTION_RETRY_INTERVAL_SEC;
+import static io.pixelsdb.pixels.server.constant.ControllerParameters.GET_QUERY_COSTS_DELAY_MS;
+import static io.pixelsdb.pixels.server.constant.ControllerParameters.QUERY_RESULT_CLEAR_DELAY_MS;
 
 /**
  * @author hank
@@ -105,6 +108,7 @@ public class QueryManager
     private final ExecutorService relaxedSubmitService = Executors.newSingleThreadExecutor();
     private final ExecutorService relaxedRetryService = Executors.newSingleThreadExecutor();
     private final ExecutorService bestEffortSubmitService = Executors.newSingleThreadExecutor();
+    private final ExecutorService queryResultClearService = Executors.newSingleThreadExecutor();
     private final ExecutorService executeService = Executors.newCachedThreadPool();
     private final QueryScheduleService queryScheduleService;
     private final TransService transService;
@@ -254,6 +258,33 @@ public class QueryManager
             }
         });
         this.bestEffortSubmitService.shutdown();
+
+        this.queryResultClearService.submit(() -> {
+            while (running)
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(QUERY_RESULT_CLEAR_DELAY_MS);
+                    for (Map.Entry<String, GetQueryResultResponse> entry : this.queryResults.entrySet())
+                    {
+                        long current = System.currentTimeMillis();
+                        String traceToken = entry.getKey();
+                        GetQueryResultResponse response = entry.getValue();
+                        if (current - response.getFinishTimestampMs() >= QUERY_RESULT_CLEAR_DELAY_MS)
+                        {
+                            // put it into finished query before removing from query results, to avoid unknown query status
+                            this.finishedQueries.put(traceToken, traceToken);
+                            this.queryResults.remove(traceToken);
+                        }
+                    }
+                } catch (InterruptedException e)
+                {
+                    log.error("failed to clear query result", e);
+                    throw new QueryServerException("failed to clear query result", e);
+                }
+            }
+        });
+        this.queryResultClearService.shutdown();
     }
 
     /**
@@ -336,7 +367,8 @@ public class QueryManager
                 long pendingTimeMs = System.currentTimeMillis() - query.getReceivedTimeMs();
                 long start = System.currentTimeMillis();
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
-                long executeTimeMs = System.currentTimeMillis() - start;
+                long finishTimestampMs = System.currentTimeMillis();
+                long executeTimeMs = finishTimestampMs - start;
 
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
@@ -361,15 +393,15 @@ public class QueryManager
                 statement.close();
 
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
-                        request.getExecutionHint(), columnPrintSizes, columnNames, rows, pendingTimeMs, executeTimeMs);
+                        request.getExecutionHint(), columnPrintSizes, columnNames, rows, pendingTimeMs,
+                        executeTimeMs, finishTimestampMs);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
             } catch (SQLException e)
             {
-                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED,
-                        e.getMessage(), null, null, null, null,
-                        0, 0);
+                GetQueryResultResponse result = new GetQueryResultResponse(
+                        ErrorCode.QUERY_SERVER_EXECUTE_FAILED, e.getMessage());
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
@@ -385,6 +417,7 @@ public class QueryManager
         this.relaxedSubmitService.shutdownNow();
         this.relaxedRetryService.shutdownNow();
         this.bestEffortSubmitService.shutdownNow();
+        this.queryResultClearService.shutdownNow();
         this.executeService.shutdownNow();
     }
 
@@ -420,44 +453,49 @@ public class QueryManager
     {
         GetQueryResultResponse response = this.queryResults.get(traceToken);
 
-        // Issue #649: get the cost from the transaction service
-        if (!response.hasValidVmCostCents()) {
-            TransContext transContext = null;
-            try
-            {
-                transContext = this.transService.getTransContext(traceToken);
-                double vmCostCents;
-                // Try to get vmCostCents every 0.5 seconds
-                while ((vmCostCents = Double.parseDouble(transContext.getProperties().getProperty(
-                        Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY, "-1"))) < 0) {
-                    TimeUnit.MILLISECONDS.sleep(500);
-                }
-                response.setVmCostCents(vmCostCents);
-                response.addCostCents(vmCostCents);
-            } catch (TransException e)
-            {
-                log.error("failed to get trans context with trace token " + traceToken, e);
-                throw new QueryServerException("failed to get trans context with trace token " + traceToken, e);
-            } catch (InterruptedException e)
-            {
-                log.error("failed to sleep before getting vm costs", e);
-                throw new QueryServerException("failed to sleep before getting vm costs", e);
-            }
-            double cfCostCents = Double.parseDouble(transContext.getProperties().getProperty(
-                    Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY, "0"));
-            response.setCfCostCents(cfCostCents);
-            response.addCostCents(cfCostCents);
-            double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
-                    Constants.TRANS_CONTEXT_SCAN_BYTES_KEY, "0"));
-            double billedCents = PriceModel.billedCents(scanBytes, response.getExecutionHint());
-            response.setBilledCents(billedCents);
-        }
-
         if (response != null)
         {
-            // put it into finished query before removing from query results, to avoid unknown query status
-            this.finishedQueries.put(traceToken, traceToken);
-            this.queryResults.remove(traceToken);
+            // Issue #649: get the costs from the transaction service
+            while (!response.hasValidCents())
+            {
+                try
+                {
+                    TransContext transContext = this.transService.getTransContext(traceToken);
+                    double vmCostCents;
+                    // wait until get vmCostCents
+                    if ((vmCostCents = Double.parseDouble(transContext.getProperties().getProperty(
+                            Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY, "-1"))) < 0)
+                    {
+                        // to our experience, 500ms is enough for transaction service to collect the cost metrics
+                        TimeUnit.MILLISECONDS.sleep(GET_QUERY_COSTS_DELAY_MS);
+                        continue;
+                    }
+                    response.setCostCents(vmCostCents);
+                    double cfCostCents = Double.parseDouble(transContext.getProperties().getProperty(
+                            Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY));
+                    if (cfCostCents < 0)
+                    {
+                        throw new TransException("the trans context returned by transaction service has an invalid cf cost");
+                    }
+                    response.addCostCents(cfCostCents);
+                    double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
+                            Constants.TRANS_CONTEXT_SCAN_BYTES_KEY));
+                    if (scanBytes < 0)
+                    {
+                        throw new TransException("the trans context returned by transaction service has an invalid scan bytes");
+                    }
+                    double billedCents = PriceModel.billedCents(scanBytes, response.getExecutionHint());
+                    response.setBilledCents(billedCents);
+                } catch (TransException e)
+                {
+                    log.error("failed to get trans context with trace token " + traceToken, e);
+                    throw new QueryServerException("failed to get trans context with trace token " + traceToken, e);
+                } catch (InterruptedException e)
+                {
+                    log.error("failed to sleep before getting vm costs", e);
+                    throw new QueryServerException("failed to sleep before getting vm costs", e);
+                }
+            }
         }
         return response;
     }
