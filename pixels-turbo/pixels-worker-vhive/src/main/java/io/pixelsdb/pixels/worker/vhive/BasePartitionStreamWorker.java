@@ -180,7 +180,7 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                     hashValues.add(hash);
                 }
             }
-            partitionOutput.setPath(outputPath);
+            partitionOutput.addOutput(outputPath);
             partitionOutput.setHashValues(hashValues);
 
             pixelsWriter.close();
