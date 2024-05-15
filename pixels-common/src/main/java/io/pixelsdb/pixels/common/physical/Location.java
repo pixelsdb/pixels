@@ -43,17 +43,22 @@ public class Location
     private String[] names; // Datanode IP:Port, i.e., authority, for accessing the block.
     private boolean corrupt;
 
-    private static String localhost;
+    /**
+     * The host name of the local machine where this class is loaded.
+     */
+    public static final String LOCALHOST;
 
     static
     {
+        String hostName;
         try
         {
-            localhost = InetAddress.getLocalHost().getHostName();
+            hostName = InetAddress.getLocalHost().getHostName();
         } catch (Exception e)
         {
-            localhost = "localhost";
+            hostName = "localhost";
         }
+        LOCALHOST = hostName;
     }
 
     private static final String[] EMPTY_STR_ARRAY = new String[0];
@@ -88,10 +93,14 @@ public class Location
         String host = uri.getHost();
         if (host == null)
         {
-            host = localhost;
+            // Issue #653: do not use LOCALHOST if host does not exist in the uri, that is confusing for Trino.
+            this.hosts = EMPTY_STR_ARRAY;
+        }
+        else
+        {
+            this.hosts = new String[]{host};
         }
 
-        this.hosts = new String[]{host};
         this.names = new String[]{uri.getAuthority()};
         this.corrupt = false;
     }
