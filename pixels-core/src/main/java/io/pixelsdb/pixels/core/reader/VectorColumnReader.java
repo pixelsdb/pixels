@@ -1,3 +1,22 @@
+/*
+ * Copyright 2024 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -10,13 +29,15 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-public class VectorColumnReader extends ColumnReader {
+public class VectorColumnReader extends ColumnReader
+{
 
+    private final int dimension;
     private ByteBuffer inputBuffer;
     private int inputIndex = 0;
-    private int dimension;
 
-    public VectorColumnReader(TypeDescription type) {
+    public VectorColumnReader(TypeDescription type)
+    {
         super(type);
         this.dimension = type.getDimension();
     }
@@ -24,20 +45,21 @@ public class VectorColumnReader extends ColumnReader {
     /**
      * Read input buffer into a vector.
      *
-     * @param input    input buffer
-     * @param encoding encoding type
-     * @param offset   starting reading offset of values
-     * @param size     number of values to read
+     * @param input       input buffer
+     * @param encoding    encoding type
+     * @param offset      starting reading offset of values
+     * @param size        number of values to read
      * @param pixelStride the stride (number of rows) in a pixel
      * @param vectorIndex the index from where we start reading values into the vector
-     * @param vector   vector to read values into
-     * @param chunkIndex the metadata of the column chunk to read.
+     * @param vector      vector to read values into
+     * @param chunkIndex  the metadata of the column chunk to read.
      */
     @Override
-    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding, int offset, int size, int pixelStride, int vectorIndex, ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
+    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding, int offset, int size, int pixelStride,
+                     int vectorIndex, ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
         VectorColumnVector vectorColumnVector = (VectorColumnVector) vector;
-        ((VectorColumnVector) vector).vector= new double[vector.getLength()][((VectorColumnVector) vector).dimension];
+        ((VectorColumnVector) vector).vector = new double[vector.getLength()][((VectorColumnVector) vector).dimension];
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
         if (offset == 0)
@@ -87,7 +109,7 @@ public class VectorColumnReader extends ColumnReader {
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    for (int d=0; d<dimension; d++)
+                    for (int d = 0; d < dimension; d++)
                     {
                         vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
                         inputIndex += Double.BYTES;
@@ -97,7 +119,7 @@ public class VectorColumnReader extends ColumnReader {
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    for (int d=0; d<dimension; d++)
+                    for (int d = 0; d < dimension; d++)
                     {
                         vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
                         inputIndex += Double.BYTES;
@@ -114,6 +136,5 @@ public class VectorColumnReader extends ColumnReader {
     @Override
     public void close() throws IOException
     {
-
     }
 }
