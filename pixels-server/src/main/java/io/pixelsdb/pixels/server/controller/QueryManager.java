@@ -471,7 +471,7 @@ public class QueryManager
                     }
                     response.setCostCents(vmCostCents);
                     double cfCostCents = Double.parseDouble(transContext.getProperties().getProperty(
-                            Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY));
+                            Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY, "0"));
                     if (cfCostCents < 0)
                     {
                         throw new TransException("the trans context returned by transaction service has an invalid cf cost");
