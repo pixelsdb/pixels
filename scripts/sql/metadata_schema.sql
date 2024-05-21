@@ -7,10 +7,6 @@ SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,N
 -- -----------------------------------------------------
 -- Schema pixels_metadata
 -- -----------------------------------------------------
-
--- -----------------------------------------------------
--- Schema pixels_metadata
--- -----------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS `pixels_metadata` ;
 USE `pixels_metadata` ;
 
@@ -82,22 +78,14 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `RI_STRUCT` MEDIUMBLOB NOT NULL,
-    `KEY_COL_ID` BIGINT NOT NULL,
+    `RI_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
+    `KEY_COLS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RI_ID`),
     INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
-    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC),
-    INDEX `fk_RANGE_INDEX_COLS_idx` (`KEY_COL_ID` ASC),
-    UNIQUE INDEX `KEY_COL_ID_UNIQUE` (`KEY_COL_ID` ASC),
     CONSTRAINT `fk_RANGE_INDEX_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-    CONSTRAINT `fk_RANGE_INDEX_COLS`
-    FOREIGN KEY (`KEY_COL_ID`)
-    REFERENCES `pixels_metadata`.`COLS` (`COL_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE)
     ENGINE = InnoDB
@@ -190,19 +178,20 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
     `RANGE_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `RANGE_RECORD_STATS` BLOB NOT NULL,
-    `RANGES_PARENT_ID` BIGINT NULL,
+    `RANGE_MIN` BLOB NOT NULL COMMENT 'The min value of the key column(s).',
+    `RANGE_MAX` BLOB NOT NULL COMMENT 'The max value of the key column(s).',
+    `RANGE_PARENT_ID` BIGINT NULL,
     `RANGE_INDEXES_RI_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RANGE_ID`),
     INDEX `fk_RANGES_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC),
-    INDEX `fk_RANGES_RANGES_idx` (`RANGES_PARENT_ID` ASC),
+    INDEX `fk_RANGES_RANGES_idx` (`RANGE_PARENT_ID` ASC),
     CONSTRAINT `fk_RANGES_RANGE_INDEXES`
     FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
     REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE,
     CONSTRAINT `fk_RANGES_RANGES`
-    FOREIGN KEY (`RANGES_PARENT_ID`)
+    FOREIGN KEY (`RANGE_PARENT_ID`)
     REFERENCES `pixels_metadata`.`RANGES` (`RANGE_ID`)
     ON DELETE RESTRICT
     ON UPDATE CASCADE)

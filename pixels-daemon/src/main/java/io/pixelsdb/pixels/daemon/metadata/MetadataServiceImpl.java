@@ -154,10 +154,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         return pathsBuilder.build();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void getSchemas(MetadataProto.GetSchemasRequest request, StreamObserver<MetadataProto.GetSchemasResponse> responseObserver)
     {
@@ -186,10 +182,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void getTable(MetadataProto.GetTableRequest request, StreamObserver<MetadataProto.GetTableResponse> responseObserver)
     {
@@ -270,10 +262,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void getTables(MetadataProto.GetTablesRequest request, StreamObserver<MetadataProto.GetTablesResponse> responseObserver)
     {
@@ -316,10 +304,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void getLayouts(MetadataProto.GetLayoutsRequest request, StreamObserver<MetadataProto.GetLayoutsResponse> responseObserver)
     {
@@ -368,10 +352,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void getLayout(MetadataProto.GetLayoutRequest request, StreamObserver<MetadataProto.GetLayoutResponse> responseObserver)
     {
@@ -861,7 +841,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
                     request.getSchemaName() + "' not found");
         }
-        if(columns != null && columns.isEmpty() == false)
+        if(columns != null && !columns.isEmpty())
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
             response = MetadataProto.GetColumnsResponse.newBuilder()
@@ -903,10 +883,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void createSchema(MetadataProto.CreateSchemaRequest request,
                              StreamObserver<MetadataProto.CreateSchemaResponse> responseObserver)
@@ -940,10 +916,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void dropSchema(MetadataProto.DropSchemaRequest request,
                            StreamObserver<MetadataProto.DropSchemaResponse> responseObserver)
@@ -967,10 +939,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void createTable(MetadataProto.CreateTableRequest request,
                             StreamObserver<MetadataProto.CreateTableResponse> responseObserver)
@@ -1111,10 +1079,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void dropTable(MetadataProto.DropTableRequest request, StreamObserver<MetadataProto.DropTableResponse> responseObserver)
     {
@@ -1138,10 +1102,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void existTable(MetadataProto.ExistTableRequest request, StreamObserver<MetadataProto.ExistTableResponse> responseObserver)
     {
@@ -1194,10 +1154,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void existSchema(MetadataProto.ExistSchemaRequest request, StreamObserver<MetadataProto.ExistSchemaResponse> responseObserver)
     {
