@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `RI_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
-    `KEY_COLS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
+    `RI_KEY_COLS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RI_ID`),
     INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
