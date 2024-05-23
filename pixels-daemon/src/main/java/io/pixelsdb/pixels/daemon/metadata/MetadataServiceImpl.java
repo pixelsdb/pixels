@@ -465,6 +465,66 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void createRangeIndex(MetadataProto.CreateRangeIndexRequest request, StreamObserver<MetadataProto.CreateRangeIndexResponse> responseObserver)
+    {
+        super.createRangeIndex(request, responseObserver);
+    }
+
+    @Override
+    public void getRangeIndex(MetadataProto.GetRangeIndexRequest request, StreamObserver<MetadataProto.GetRangeIndexResponse> responseObserver)
+    {
+        super.getRangeIndex(request, responseObserver);
+    }
+
+    @Override
+    public void updateRangeIndex(MetadataProto.UpdateRangeIndexRequest request, StreamObserver<MetadataProto.UpdateRangeIndexResponse> responseObserver)
+    {
+        super.updateRangeIndex(request, responseObserver);
+    }
+
+    @Override
+    public void deleteRangeIndex(MetadataProto.DeleteRangeIndexRequest request, StreamObserver<MetadataProto.DeleteRangeIndexResponse> responseObserver)
+    {
+        super.deleteRangeIndex(request, responseObserver);
+    }
+
+    @Override
+    public void createRange(MetadataProto.CreateRangeRequest request, StreamObserver<MetadataProto.CreateRangeResponse> responseObserver)
+    {
+        super.createRange(request, responseObserver);
+    }
+
+    @Override
+    public void getRange(MetadataProto.GetRangeRequest request, StreamObserver<MetadataProto.GetRangeResponse> responseObserver)
+    {
+        super.getRange(request, responseObserver);
+    }
+
+    @Override
+    public void getRanges(MetadataProto.GetRangesRequest request, StreamObserver<MetadataProto.GetRangesResponse> responseObserver)
+    {
+        super.getRanges(request, responseObserver);
+    }
+
+    @Override
+    public void mergeRanges(MetadataProto.MergeRangesRequest request, StreamObserver<MetadataProto.MergeRangesResponse> responseObserver)
+    {
+        super.mergeRanges(request, responseObserver);
+    }
+
+    @Override
+    public void splitRange(MetadataProto.SplitRangeRequest request, StreamObserver<MetadataProto.SplitRangeResponse> responseObserver)
+    {
+        super.splitRange(request, responseObserver);
+    }
+
+    @Override
+    public void deleteRange(MetadataProto.DeleteRangeRequest request, StreamObserver<MetadataProto.DeleteRangeResponse> responseObserver)
+    {
+        super.deleteRange(request, responseObserver);
+    }
+
+    @Override
     public void createPath(MetadataProto.CreatePathRequest request, StreamObserver<MetadataProto.CreatePathResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
