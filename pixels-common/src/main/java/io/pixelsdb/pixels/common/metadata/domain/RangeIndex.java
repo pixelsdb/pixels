@@ -31,6 +31,7 @@ public class RangeIndex
     private KeyColumns keyColumns;
     private String keyColumnsJson;
     private long tableId;
+    private long schemaVersionId;
 
     public RangeIndex()
     {
@@ -74,5 +75,15 @@ public class RangeIndex
     public void setTableId(long tableId)
     {
         this.tableId = tableId;
+    }
+
+    public long getSchemaVersionId()
+    {
+        return schemaVersionId;
+    }
+
+    public void setSchemaVersionId(long schemaVersionId)
+    {
+        this.schemaVersionId = schemaVersionId;
     }
 }

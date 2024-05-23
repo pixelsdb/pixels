@@ -33,7 +33,6 @@ public class SchemaVersion extends Base
     private List<Column> columns;
     private long transTs;
     private long tableId;
-    private long rangeIndexId;
 
     public SchemaVersion() { }
 
@@ -42,14 +41,6 @@ public class SchemaVersion extends Base
         this.columns = Column.convertColumns(schemaVersion.getColumnsList());
         this.transTs = schemaVersion.getTransTs();
         this.tableId = schemaVersion.getTableId();
-        if (schemaVersion.hasRangeIndexId())
-        {
-            this.rangeIndexId = schemaVersion.getRangeIndexId();
-        }
-        else
-        {
-            this.rangeIndexId = 0;
-        }
     }
 
     public List<Column> getColumns()
@@ -80,15 +71,5 @@ public class SchemaVersion extends Base
     public void setTableId(long tableId)
     {
         this.tableId = tableId;
-    }
-
-    public long getRangeIndexId()
-    {
-        return rangeIndexId;
-    }
-
-    public void setRangeIndexId(long rangeIndexId)
-    {
-        this.rangeIndexId = rangeIndexId;
     }
 }

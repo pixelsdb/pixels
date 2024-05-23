@@ -78,14 +78,22 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `RI_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
-    `RI_KEY_COLS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
+    `RI_INDEX_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
+    `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
+    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RI_ID`),
     INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_RANGE_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC, `SCHEMA_VERSIONS_SV_ID` ASC) COMMENT 'We ensure every (table, schema_version) has only one range index.',
     CONSTRAINT `fk_RANGE_INDEX_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+    CONSTRAINT `fk_RANGE_INDEXES_SCHEMA_VERSIONS1`
+    FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
+    REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE)
     ENGINE = InnoDB
@@ -101,19 +109,12 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
     `SV_COLUMNS` MEDIUMTEXT NOT NULL COMMENT 'The json string that contains the ids of the columns owned by this schema version.',
     `SV_TRANS_TS` BIGINT NOT NULL COMMENT 'The transaction timestamp of this schema version.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
-    `RANGE_INDEXES_RI_ID` BIGINT NULL DEFAULT NULL,
     PRIMARY KEY (`SV_ID`),
     INDEX `fk_SCHEMA_VERSIONS_TBLS_idx` (`TBLS_TBL_ID` ASC),
-    INDEX `fk_SCHEMA_VERSIONS_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC),
     CONSTRAINT `fk_SCHEMA_VERSIONS_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
     ON DELETE CASCADE
-    ON UPDATE CASCADE,
-    CONSTRAINT `fk_SCHEMA_VERSIONS_RANGE_INDEXES`
-    FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
-    REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
-    ON DELETE SET NULL
     ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
