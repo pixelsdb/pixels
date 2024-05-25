@@ -19,12 +19,17 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
+import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.metadata.dao.RangeDao;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 
 /**
@@ -42,6 +47,26 @@ public class RdbRangeDao extends RangeDao
     @Override
     public MetadataProto.Range getById(long id)
     {
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement())
+        {
+            ResultSet rs = st.executeQuery("SELECT * FROM RANGES WHERE RANGE_ID=" + id);
+            if (rs.next())
+            {
+                MetadataProto.Range range = MetadataProto.Range.newBuilder()
+                        .setId(id)
+                        .setMin(ByteString.copyFrom(rs.getBytes("RANGE_MIN")))
+                        .setMax(ByteString.copyFrom(rs.getBytes("RANGE_MAX")))
+                        // Issue #658: parent id is set to 0 if it is null in metadata.
+                        .setParentId(rs.getLong("RANGE_PARENT_ID"))
+                        .setRangeIndexId(rs.getLong("RANGE_INDEXES_RI_ID")).build();
+                return range;
+            }
+        } catch (SQLException e)
+        {
+            log.error("getById in RdbRangeDao", e);
+        }
+
         return null;
     }
 

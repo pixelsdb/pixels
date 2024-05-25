@@ -19,12 +19,17 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
+import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.metadata.dao.RangeIndexDao;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 
 /**
@@ -42,6 +47,25 @@ public class RdbRangeIndexDao extends RangeIndexDao
     @Override
     public MetadataProto.RangeIndex getById(long id)
     {
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement())
+        {
+            ResultSet rs = st.executeQuery("SELECT * FROM RANGE_INDEXES WHERE RI_ID=" + id);
+            if (rs.next())
+            {
+                MetadataProto.RangeIndex rangeIndex = MetadataProto.RangeIndex.newBuilder()
+                        .setId(id)
+                        .setIndexStruct(ByteString.copyFrom(rs.getBytes("RI_INDEX_STRUCT")))
+                        .setKeyColumns(rs.getString("RI_KEY_COLUMNS"))
+                        .setTableId(rs.getLong("TBLS_TBL_ID"))
+                        .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID")).build();
+                return rangeIndex;
+            }
+        } catch (SQLException e)
+        {
+            log.error("getById in RdbRangeIndexDao", e);
+        }
+
         return null;
     }
 
