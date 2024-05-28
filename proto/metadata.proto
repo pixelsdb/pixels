@@ -44,11 +44,11 @@ service MetadataService {
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
     rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
-    rpc CreateRangeIndex (CreateRangeIndexRequest) returns (CreateRangeIndexResponse);
+    rpc AddRangeIndex (AddRangeIndexRequest) returns (AddRangeIndexResponse);
     rpc GetRangeIndex (GetRangeIndexRequest) returns (GetRangeIndexResponse);
     rpc UpdateRangeIndex (UpdateRangeIndexRequest) returns (UpdateRangeIndexResponse);
     rpc DeleteRangeIndex (DeleteRangeIndexRequest) returns (DeleteRangeIndexResponse);
-    rpc CreateRange (CreateRangeRequest) returns (CreateRangeResponse);
+    rpc AddRange (AddRangeRequest) returns (AddRangeResponse);
     rpc GetRange (GetRangeRequest) returns (GetRangeResponse);
     rpc GetRanges (GetRangesRequest) returns (GetRangesResponse);
     rpc DeleteRange (DeleteRangeRequest) returns (DeleteRangeResponse);
@@ -382,12 +382,12 @@ message UpdateLayoutResponse {
 }
 
 // range index
-message CreateRangeIndexRequest {
+message AddRangeIndexRequest {
     RequestHeader header = 1;
     RangeIndex rangeIndex = 2;
 }
 
-message CreateRangeIndexResponse {
+message AddRangeIndexResponse {
     ResponseHeader header = 1;
 }
 
@@ -422,12 +422,12 @@ message DeleteRangeIndexResponse {
 };
 
 // range
-message CreateRangeRequest {
+message AddRangeRequest {
     RequestHeader header = 1;
     Range range = 2;
 }
 
-message CreateRangeResponse {
+message AddRangeResponse {
     ResponseHeader header = 1;
 };
 

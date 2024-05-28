@@ -475,8 +475,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void createRangeIndex(MetadataProto.CreateRangeIndexRequest request,
-                                 StreamObserver<MetadataProto.CreateRangeIndexResponse> responseObserver)
+    public void addRangeIndex(MetadataProto.AddRangeIndexRequest request,
+                                 StreamObserver<MetadataProto.AddRangeIndexResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -490,7 +490,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             headerBuilder.setErrorCode(METADATA_ADD_RANGE_INDEX_FAILED).setErrorMsg("add range index failed");
         }
 
-        MetadataProto.CreateRangeIndexResponse response = MetadataProto.CreateRangeIndexResponse.newBuilder()
+        MetadataProto.AddRangeIndexResponse response = MetadataProto.AddRangeIndexResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
@@ -560,8 +560,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void createRange(MetadataProto.CreateRangeRequest request,
-                            StreamObserver<MetadataProto.CreateRangeResponse> responseObserver)
+    public void addRange(MetadataProto.AddRangeRequest request,
+                            StreamObserver<MetadataProto.AddRangeResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -575,7 +575,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             headerBuilder.setErrorCode(METADATA_ADD_RANGE_FAILED).setErrorMsg("add range failed");
         }
 
-        MetadataProto.CreateRangeResponse response = MetadataProto.CreateRangeResponse.newBuilder()
+        MetadataProto.AddRangeResponse response = MetadataProto.AddRangeResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();

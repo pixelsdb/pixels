@@ -462,6 +462,47 @@ public class MetadataService
         return true;
     }
 
+    public boolean addRangeIndex(RangeIndex rangeIndex)
+    {
+        return false;
+    }
+
+    public RangeIndex getRangeIndex(long tableId, long schemaVersionId)
+    {
+        return null;
+    }
+
+    public boolean updateRangeIndex(RangeIndex rangeIndex)
+    {
+        return false;
+    }
+
+    public boolean deleteRangeIndex(long tableId)
+    {
+        return false;
+    }
+
+    public boolean addRange(Range range)
+    {
+        return false;
+    }
+
+    public Range getRange(long rangeId)
+    {
+        return null;
+    }
+
+    public List<Range> getRanges(long rangeIndexId)
+    {
+        return null;
+    }
+
+    public boolean deleteRange(long rangeId)
+    {
+        return false;
+    }
+
+
     public boolean createPath(String uri, boolean isCompact, Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
