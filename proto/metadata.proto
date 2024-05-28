@@ -51,8 +51,6 @@ service MetadataService {
     rpc CreateRange (CreateRangeRequest) returns (CreateRangeResponse);
     rpc GetRange (GetRangeRequest) returns (GetRangeResponse);
     rpc GetRanges (GetRangesRequest) returns (GetRangesResponse);
-    rpc MergeRanges (MergeRangesRequest) returns (MergeRangesResponse);
-    rpc SplitRange (SplitRangeRequest) returns (SplitRangeResponse);
     rpc DeleteRange (DeleteRangeRequest) returns (DeleteRangeResponse);
     rpc CreatePath (CreatePathRequest) returns (CreatePathResponse);
     rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
@@ -452,28 +450,6 @@ message GetRangesResponse {
     ResponseHeader header = 1;
     repeated Range ranges = 2;
 }
-
-message MergeRangesRequest {
-    RequestHeader header = 1;
-    Range leftRange = 2;
-    Range rightRange = 3;
-}
-
-message MergeRangesResponse {
-    ResponseHeader header = 1;
-    optional Range mergedRange = 2;
-};
-
-message SplitRangeRequest {
-    RequestHeader header = 1;
-    Range rangeToSplit = 2;
-}
-
-message SplitRangeResponse {
-    ResponseHeader header = 1;
-    optional Range leftRange = 2;
-    optional Range rightRange = 3;
-};
 
 message DeleteRangeRequest {
     RequestHeader header = 1;

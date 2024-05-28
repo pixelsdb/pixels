@@ -65,5 +65,5 @@ public abstract class RangeIndexDao implements Dao<MetadataProto.RangeIndex>
 
     abstract public boolean update (MetadataProto.RangeIndex rangeIndex);
 
-    abstract public boolean deleteById (long id);
+    abstract public boolean deleteByTableAndSvIds(long tableId, long schemaVersionId);
 }

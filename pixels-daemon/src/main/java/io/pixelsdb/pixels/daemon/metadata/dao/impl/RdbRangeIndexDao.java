@@ -209,13 +209,14 @@ public class RdbRangeIndexDao extends RangeIndexDao
     }
 
     @Override
-    public boolean deleteById(long id)
+    public boolean deleteByTableAndSvIds(long tableId, long schemaVersionId)
     {
         Connection conn = db.getConnection();
-        String sql = "DELETE FROM RANGE_INDEXES WHERE RI_ID=?";
+        String sql = "DELETE FROM RANGE_INDEXES WHERE TBLS_TBL_ID=? AND SCHEMA_VERSIONS_SV_ID=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setLong(1, id);
+            pst.setLong(1, tableId);
+            pst.setLong(2, schemaVersionId);
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
