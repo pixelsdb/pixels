@@ -28,6 +28,8 @@ public class DaoFactory
     private final PeerDao peerDao;
     private final PeerPathDao peerPathDao;
     private final SchemaVersionDao schemaVersionDao;
+    private final RangeDao rangeDao;
+    private final RangeIndexDao rangeIndexDao;
 
     private DaoFactory ()
     {
@@ -40,6 +42,8 @@ public class DaoFactory
         this.peerDao = new RdbPeerDao();
         this.peerPathDao = new RdbPeerPathDao();
         this.schemaVersionDao = new RdbSchemaVersionDao();
+        this.rangeDao = new RdbRangeDao();
+        this.rangeIndexDao = new RdbRangeIndexDao();
     }
 
     public ColumnDao getColumnDao ()
@@ -85,5 +89,15 @@ public class DaoFactory
     public SchemaVersionDao getSchemaVersionDao()
     {
         return this.schemaVersionDao;
+    }
+
+    public RangeDao getRangeDao()
+    {
+        return rangeDao;
+    }
+
+    public RangeIndexDao getRangeIndexDao()
+    {
+        return rangeIndexDao;
     }
 }

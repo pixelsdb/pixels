@@ -49,6 +49,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     private final TableDao tableDao = DaoFactory.Instance().getTableDao();
     private final ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
     private final LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
+    private final RangeDao rangeDao = DaoFactory.Instance().getRangeDao();
+    private final RangeIndexDao rangeIndexDao = DaoFactory.Instance().getRangeIndexDao();
     private final ViewDao viewDao = DaoFactory.Instance().getViewDao();
     private final PathDao pathDao = DaoFactory.Instance().getPathDao();
     private final PeerDao peerDao = DaoFactory.Instance().getPeerDao();
