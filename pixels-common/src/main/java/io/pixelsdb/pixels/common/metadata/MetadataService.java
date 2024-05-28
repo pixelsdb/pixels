@@ -502,7 +502,6 @@ public class MetadataService
         return false;
     }
 
-
     public boolean createPath(String uri, boolean isCompact, Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
