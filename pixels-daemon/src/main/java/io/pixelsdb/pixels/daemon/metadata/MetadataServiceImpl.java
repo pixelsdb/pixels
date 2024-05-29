@@ -511,7 +511,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_GET_RANGE_INDEX_FAILED).setErrorMsg("range index with table id '" +
+            headerBuilder.setErrorCode(METADATA_RANGE_INDEX_NOT_FOUND).setErrorMsg("range index with table id '" +
                             request.getTableId() + "' is not found");
             response = MetadataProto.GetRangeIndexResponse.newBuilder().setHeader(headerBuilder).build();
         }
@@ -596,7 +596,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_GET_RANGE_FAILED).setErrorMsg("range with id '" +
+            headerBuilder.setErrorCode(METADATA_RANGE_NOT_FOUNT).setErrorMsg("range with id '" +
                     request.getRangeId() + "' is not found");
             response = MetadataProto.GetRangeResponse.newBuilder().setHeader(headerBuilder).build();
         }

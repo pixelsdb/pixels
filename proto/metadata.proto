@@ -392,7 +392,7 @@ message AddRangeIndexResponse {
 }
 
 message GetRangeIndexRequest {
-    ResponseHeader header = 1;
+    RequestHeader header = 1;
     int64 tableId = 2;
 }
 
@@ -411,7 +411,7 @@ message UpdateRangeIndexResponse {
 };
 
 message DeleteRangeIndexRequest {
-    ResponseHeader header = 1;
+    RequestHeader header = 1;
     int64 tableId = 2;
 }
 

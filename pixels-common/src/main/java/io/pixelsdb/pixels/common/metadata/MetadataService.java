@@ -33,8 +33,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_VIEW_NOT_FOUND;
+import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
 /**
  * @author hank
@@ -598,7 +597,6 @@ public class MetadataService
 
     private Layout internalGetLayout(MetadataProto.GetLayoutRequest request) throws MetadataException
     {
-        Layout layout;
         try
         {
             MetadataProto.GetLayoutResponse response = this.stub.getLayout(request);
@@ -620,13 +618,12 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            layout = new Layout(response.getLayout());
+            return new Layout(response.getLayout());
         }
         catch (Exception e)
         {
             throw new MetadataException("failed to get layouts from metadata", e);
         }
-        return layout;
     }
 
     /**
@@ -688,9 +685,45 @@ public class MetadataService
         return true;
     }
 
-    public RangeIndex getRangeIndex(long tableId, long schemaVersionId)
+    /**
+     * Get range index by table id.
+     * @param tableId the table id
+     * @return null if range index is not found for the table id
+     * @throws MetadataException
+     */
+    public RangeIndex getRangeIndex(long tableId) throws MetadataException
     {
-        return null;
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetRangeIndexRequest request = MetadataProto.GetRangeIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTableId(tableId).build();
+        try
+        {
+            MetadataProto.GetRangeIndexResponse response = this.stub.getRangeIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                if (response.getHeader().getErrorCode() == METADATA_RANGE_INDEX_NOT_FOUND)
+                {
+                    /**
+                     * Issue #658:
+                     * return null if range index is not found, this is useful for clients
+                     * as they can hardly deal with error code.
+                     */
+                    return null;
+                }
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return new RangeIndex(response.getRangeIndex());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get range index", e);
+        }
     }
 
     public boolean updateRangeIndex(RangeIndex rangeIndex) throws MetadataException
@@ -719,9 +752,30 @@ public class MetadataService
         return true;
     }
 
-    public boolean deleteRangeIndex(long tableId)
+    public boolean deleteRangeIndex(long tableId) throws MetadataException
     {
-        return false;
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DeleteRangeIndexRequest request = MetadataProto.DeleteRangeIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTableId(tableId).build();
+        try
+        {
+            MetadataProto.DeleteRangeIndexResponse response = this.stub.deleteRangeIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to delete range index", e);
+        }
+        return true;
     }
 
     public boolean addRange(Range range) throws MetadataException
@@ -750,19 +804,93 @@ public class MetadataService
         return true;
     }
 
-    public Range getRange(long rangeId)
+    public Range getRange(long rangeId) throws MetadataException
     {
-        return null;
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetRangeRequest request = MetadataProto.GetRangeRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setRangeId(rangeId).build();
+        try
+        {
+            MetadataProto.GetRangeResponse response = this.stub.getRange(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                if (response.getHeader().getErrorCode() == METADATA_RANGE_NOT_FOUNT)
+                {
+                    /**
+                     * Issue #658:
+                     * return null if range is not found, this is useful for clients
+                     * as they can hardly deal with error code.
+                     */
+                    return null;
+                }
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return new Range(response.getRange());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get range", e);
+        }
     }
 
-    public List<Range> getRanges(long rangeIndexId)
+    public List<Range> getRanges(long rangeIndexId) throws MetadataException
     {
-        return null;
+        List<Range> ranges = new ArrayList<>();
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetRangesRequest request = MetadataProto.GetRangesRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setRangeIndexId(rangeIndexId).build();
+        try
+        {
+            MetadataProto.GetRangesResponse response = this.stub.getRanges(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            response.getRangesList().forEach(range -> ranges.add(new Range(range)));
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get ranges from metadata", e);
+        }
+        return ranges;
     }
 
-    public boolean deleteRange(long rangeId)
+    public boolean deleteRange(long rangeId) throws MetadataException
     {
-        return false;
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DeleteRangeRequest request = MetadataProto.DeleteRangeRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setRangeId(rangeId).build();
+        try
+        {
+            MetadataProto.DeleteRangeResponse response = this.stub.deleteRange(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to delete range", e);
+        }
+        return true;
     }
 
     public boolean createPath(String uri, boolean isCompact, Layout layout) throws MetadataException

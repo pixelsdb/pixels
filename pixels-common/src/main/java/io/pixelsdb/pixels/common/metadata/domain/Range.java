@@ -39,6 +39,22 @@ public class Range extends Base
     {
     }
 
+    public Range(MetadataProto.Range range)
+    {
+        this.setId(range.getId());
+        this.min = range.getMin().asReadOnlyByteBuffer();
+        this.max = range.getMax().asReadOnlyByteBuffer();
+        if (range.hasParentId())
+        {
+            this.parentId = range.getParentId();
+        }
+        else
+        {
+            this.parentId = 0;
+        }
+        this.rangeIndexId = range.getRangeIndexId();
+    }
+
     public ByteBuffer getMin()
     {
         return min;

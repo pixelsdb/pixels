@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import com.alibaba.fastjson.JSON;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
@@ -37,6 +38,15 @@ public class RangeIndex extends Base
 
     public RangeIndex()
     {
+    }
+
+    public RangeIndex(MetadataProto.RangeIndex rangeIndex)
+    {
+        this.setId(rangeIndex.getId());
+        this.indexStruct = rangeIndex.getIndexStruct().asReadOnlyByteBuffer();
+        this.keyColumnsJson = rangeIndex.getKeyColumns();
+        this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
+        this.tableId = rangeIndex.getTableId();
     }
 
     public ByteBuffer getIndexStruct()
