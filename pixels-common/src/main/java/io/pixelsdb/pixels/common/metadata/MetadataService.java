@@ -504,6 +504,38 @@ public class MetadataService
     }
 
     /**
+     * The ordered and compact paths of the layout are not added, they need to be added separately.
+     * @param layout the new layout
+     * @return true if success, false otherwise
+     * @throws MetadataException
+     */
+    public boolean addLayout(Layout layout) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.AddLayoutRequest request = MetadataProto.AddLayoutRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setLayout(layout.toProto()).build();
+        try
+        {
+            MetadataProto.AddLayoutResponse response = this.stub.addLayout(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to add layout into metadata", e);
+        }
+        return true;
+    }
+
+    /**
      * Get the readable layouts of a table.
      * @param schemaName
      * @param tableName
@@ -630,22 +662,15 @@ public class MetadataService
         return true;
     }
 
-    /**
-     * The ordered and compact paths of the layout are not added, they need to be added separately.
-     * @param layout the new layout
-     * @return true if success, false otherwise
-     * @throws MetadataException
-     */
-    public boolean addLayout(Layout layout) throws MetadataException
+    public boolean addRangeIndex(RangeIndex rangeIndex) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.Layout layoutPb = layout.toProto();
-        MetadataProto.AddLayoutRequest request = MetadataProto.AddLayoutRequest.newBuilder()
+        MetadataProto.AddRangeIndexRequest request = MetadataProto.AddRangeIndexRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setLayout(layoutPb).build();
+                .setRangeIndex(rangeIndex.toProto()).build();
         try
         {
-            MetadataProto.AddLayoutResponse response = this.stub.addLayout(request);
+            MetadataProto.AddRangeIndexResponse response = this.stub.addRangeIndex(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
@@ -658,14 +683,9 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to add layout into metadata", e);
+            throw new MetadataException("failed to add range index", e);
         }
         return true;
-    }
-
-    public boolean addRangeIndex(RangeIndex rangeIndex)
-    {
-        return false;
     }
 
     public RangeIndex getRangeIndex(long tableId, long schemaVersionId)
@@ -673,9 +693,30 @@ public class MetadataService
         return null;
     }
 
-    public boolean updateRangeIndex(RangeIndex rangeIndex)
+    public boolean updateRangeIndex(RangeIndex rangeIndex) throws MetadataException
     {
-        return false;
+        String token = UUID.randomUUID().toString();
+        MetadataProto.UpdateRangeIndexRequest request = MetadataProto.UpdateRangeIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setRangeIndex(rangeIndex.toProto()).build();
+        try
+        {
+            MetadataProto.UpdateRangeIndexResponse response = this.stub.updateRangeIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update range index", e);
+        }
+        return true;
     }
 
     public boolean deleteRangeIndex(long tableId)
@@ -683,9 +724,30 @@ public class MetadataService
         return false;
     }
 
-    public boolean addRange(Range range)
+    public boolean addRange(Range range) throws MetadataException
     {
-        return false;
+        String token = UUID.randomUUID().toString();
+        MetadataProto.AddRangeRequest request = MetadataProto.AddRangeRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setRange(range.toProto()).build();
+        try
+        {
+            MetadataProto.AddRangeResponse response = this.stub.addRange(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to add range", e);
+        }
+        return true;
     }
 
     public Range getRange(long rangeId)
