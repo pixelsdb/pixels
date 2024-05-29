@@ -7,10 +7,6 @@ SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,N
 -- -----------------------------------------------------
 -- Schema pixels_metadata
 -- -----------------------------------------------------
-
--- -----------------------------------------------------
--- Schema pixels_metadata
--- -----------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS `pixels_metadata` ;
 USE `pixels_metadata` ;
 
@@ -82,22 +78,22 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `RI_STRUCT` MEDIUMBLOB NOT NULL,
-    `KEY_COL_ID` BIGINT NOT NULL,
+    `RI_INDEX_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
+    `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
+    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RI_ID`),
     INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
-    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC),
-    INDEX `fk_RANGE_INDEX_COLS_idx` (`KEY_COL_ID` ASC),
-    UNIQUE INDEX `KEY_COL_ID_UNIQUE` (`KEY_COL_ID` ASC),
+    INDEX `fk_RANGE_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC, `SCHEMA_VERSIONS_SV_ID` ASC) COMMENT 'We ensure every (table, schema_version) has only one range index.',
     CONSTRAINT `fk_RANGE_INDEX_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE,
-    CONSTRAINT `fk_RANGE_INDEX_COLS`
-    FOREIGN KEY (`KEY_COL_ID`)
-    REFERENCES `pixels_metadata`.`COLS` (`COL_ID`)
+    CONSTRAINT `fk_RANGE_INDEXES_SCHEMA_VERSIONS1`
+    FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
+    REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE)
     ENGINE = InnoDB
@@ -113,19 +109,12 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
     `SV_COLUMNS` MEDIUMTEXT NOT NULL COMMENT 'The json string that contains the ids of the columns owned by this schema version.',
     `SV_TRANS_TS` BIGINT NOT NULL COMMENT 'The transaction timestamp of this schema version.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
-    `RANGE_INDEXES_RI_ID` BIGINT NULL DEFAULT NULL,
     PRIMARY KEY (`SV_ID`),
     INDEX `fk_SCHEMA_VERSIONS_TBLS_idx` (`TBLS_TBL_ID` ASC),
-    INDEX `fk_SCHEMA_VERSIONS_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC),
     CONSTRAINT `fk_SCHEMA_VERSIONS_TBLS`
     FOREIGN KEY (`TBLS_TBL_ID`)
     REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
     ON DELETE CASCADE
-    ON UPDATE CASCADE,
-    CONSTRAINT `fk_SCHEMA_VERSIONS_RANGE_INDEXES`
-    FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
-    REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
-    ON DELETE SET NULL
     ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
@@ -144,8 +133,8 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`LAYOUTS` (
     `LAYOUT_COMPACT` LONGTEXT NOT NULL COMMENT 'the layout strategy, stored as json. It is used to determine how row groups are compacted into a big block.',
     `LAYOUT_SPLITS` LONGTEXT NOT NULL COMMENT 'The suggested split size for access patterns, stored as json.',
     `LAYOUT_PROJECTIONS` LONGTEXT NOT NULL COMMENT 'The projections each maps a set of columns to a different set of paths.',
-    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
     `TBLS_TBL_ID` BIGINT NOT NULL,
+    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
     PRIMARY KEY (`LAYOUT_ID`),
     INDEX `fk_LAYOUTS_TBLS_idx` (`TBLS_TBL_ID` ASC),
     INDEX `fk_LAYOUTS_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
@@ -190,19 +179,20 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
     `RANGE_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `RANGE_RECORD_STATS` BLOB NOT NULL,
-    `RANGES_PARENT_ID` BIGINT NULL,
+    `RANGE_MIN` BLOB NOT NULL COMMENT 'The min value of the key column(s).',
+    `RANGE_MAX` BLOB NOT NULL COMMENT 'The max value of the key column(s).',
+    `RANGE_PARENT_ID` BIGINT NULL,
     `RANGE_INDEXES_RI_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RANGE_ID`),
     INDEX `fk_RANGES_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC),
-    INDEX `fk_RANGES_RANGES_idx` (`RANGES_PARENT_ID` ASC),
+    INDEX `fk_RANGES_RANGES_idx` (`RANGE_PARENT_ID` ASC),
     CONSTRAINT `fk_RANGES_RANGE_INDEXES`
     FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
     REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
     ON DELETE CASCADE
     ON UPDATE CASCADE,
     CONSTRAINT `fk_RANGES_RANGES`
-    FOREIGN KEY (`RANGES_PARENT_ID`)
+    FOREIGN KEY (`RANGE_PARENT_ID`)
     REFERENCES `pixels_metadata`.`RANGES` (`RANGE_ID`)
     ON DELETE RESTRICT
     ON UPDATE CASCADE)

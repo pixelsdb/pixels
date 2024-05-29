@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,42 +19,31 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
-import com.google.protobuf.MessageOrBuilder;
-
-import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
+ * The key columns if a range index (partition).
+ * It can be used as the object parsed from the json string stored in metadata RANGE_INDEXES.RI_KEY_COLS.
  * @author hank
+ * @create 2024-05-22
  */
-public abstract class Base implements Serializable
+public class KeyColumns
 {
-    private long id;
+    private List<Integer> keyColumnIds = new ArrayList<>();
 
-    public long getId()
+    public List<Integer> getKeyColumnIds()
     {
-        return id;
+        return keyColumnIds;
     }
 
-    public void setId(long id)
+    public void setKeyColumnIds(List<Integer> keyColumnIds)
     {
-        this.id = id;
+        this.keyColumnIds = keyColumnIds;
     }
 
-    public abstract MessageOrBuilder toProto();
-
-    @Override
-    public int hashCode()
+    public void addKeyColumnIds(int keyColumnId)
     {
-        return (int) this.id;
-    }
-
-    @Override
-    public boolean equals(Object o)
-    {
-        if (o instanceof Base)
-        {
-            return this.id == ((Base) o).id;
-        }
-        return false;
+        this.keyColumnIds.add(keyColumnId);
     }
 }

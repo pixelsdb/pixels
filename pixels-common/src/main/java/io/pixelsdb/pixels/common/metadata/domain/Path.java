@@ -131,7 +131,8 @@ public class Path extends Base
                 ", rangeId='" + rangeId + '\'' + '}';
     }
 
-    private MetadataProto.Path toProto()
+    @Override
+    public MetadataProto.Path toProto()
     {
         MetadataProto.Path.Builder builder = MetadataProto.Path.newBuilder()
                 .setId(this.getId()).setUri(this.uri).setIsCompact(this.isCompact).setLayoutId(this.layoutId);
