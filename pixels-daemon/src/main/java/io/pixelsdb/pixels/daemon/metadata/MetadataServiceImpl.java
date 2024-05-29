@@ -503,7 +503,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
         MetadataProto.GetRangeIndexResponse response;
-        MetadataProto.RangeIndex rangeIndex = rangeIndexDao.getByTableAndSvIds(request.getTableId(), request.getSchemaVersionId());
+        MetadataProto.RangeIndex rangeIndex = rangeIndexDao.getByTableId(request.getTableId());
         if (rangeIndex != null)
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
@@ -512,7 +512,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         else
         {
             headerBuilder.setErrorCode(METADATA_GET_RANGE_INDEX_FAILED).setErrorMsg("range index with table id '" +
-                            request.getTableId() + "' and schema version id '" + request.getSchemaVersionId() + "' is not found");
+                            request.getTableId() + "' is not found");
             response = MetadataProto.GetRangeIndexResponse.newBuilder().setHeader(headerBuilder).build();
         }
         responseObserver.onNext(response);
@@ -545,7 +545,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
-        if (rangeIndexDao.deleteByTableAndSvIds(request.getTableId(), request.getSchemaVersionId()))
+        if (rangeIndexDao.deleteByTableId(request.getTableId()))
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
         }

@@ -92,4 +92,11 @@ public class View extends Base
                 ", schemaId=" + schemaId +
                 '}';
     }
+
+    @Override
+    public MetadataProto.View toProto()
+    {
+        return MetadataProto.View.newBuilder().setId(this.getId()).setName(this.name).setType(this.type)
+                .setData(this.data).setSchemaId(this.schemaId).build();
+    }
 }

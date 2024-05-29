@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.metadata;
 
-import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.MetadataException;
@@ -36,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_VIEW_NOT_FOUND;
-import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermission;
 
 /**
  * @author hank
@@ -60,6 +58,26 @@ public class MetadataService
     public void shutdown() throws InterruptedException
     {
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    }
+
+    public boolean createSchema(String schemaName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        String token = UUID.randomUUID().toString();
+        MetadataProto.CreateSchemaRequest request = MetadataProto.CreateSchemaRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setSchemaDesc("Created by Pixels MetadataService").build();
+        MetadataProto.CreateSchemaResponse response = this.stub.createSchema(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to create schema. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return true;
     }
 
     public List<Schema> getSchemas() throws MetadataException
@@ -87,6 +105,90 @@ public class MetadataService
             throw new MetadataException("failed to get schemas from metadata", e);
         }
         return schemas;
+    }
+
+    public boolean existSchema(String schemaName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.ExistSchemaRequest request = MetadataProto.ExistSchemaRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).build();
+        MetadataProto.ExistSchemaResponse response = this.stub.existSchema(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to check table existence. error code="
+                    + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return response.getExists();
+    }
+
+    public boolean dropSchema(String schemaName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+
+        List<Table> tables = getTables(schemaName);
+        if (tables != null)
+        {
+            // Issue #630: drop cached splits and projections indexes.
+            for (Table table : tables)
+            {
+                IndexFactory.Instance().dropSplitsIndex(schemaName, table.getName());
+                IndexFactory.Instance().dropProjectionsIndex(schemaName, table.getName());
+            }
+        }
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DropSchemaRequest request = MetadataProto.DropSchemaRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).build();
+        MetadataProto.DropSchemaResponse response = this.stub.dropSchema(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to drop schema. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        return true;
+    }
+
+    public boolean createTable(String schemaName, String tableName, Storage.Scheme storageScheme,
+                               List<String> basePathUris, List<Column> columns) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert tableName != null && !tableName.isEmpty();
+        assert storageScheme != null;
+        assert columns != null && !columns.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        List<MetadataProto.Column> columnList = new ArrayList<>();
+        for (Column column : columns)
+        {
+            columnList.add(MetadataProto.Column.newBuilder()
+                    .setId(column.getId()).setName(column.getName())
+                    .setType(column.getType().replaceAll("\\s", ""))
+                    .build()); // no need to set table id.
+        }
+        MetadataProto.CreateTableRequest request = MetadataProto.CreateTableRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).setStorageScheme(storageScheme.name())
+                .addAllBasePathUris(basePathUris).addAllColumns(columnList).build();
+        MetadataProto.CreateTableResponse response = this.stub.createTable(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to create table. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return true;
     }
 
     public Table getTable(String schemaName, String tableName) throws MetadataException
@@ -117,32 +219,6 @@ public class MetadataService
         return table;
     }
 
-    public boolean updateRowCount(String schemaName, String tableName, long rowCount) throws MetadataException
-    {
-        String token = UUID.randomUUID().toString();
-        MetadataProto.UpdateRowCountRequest request = MetadataProto.UpdateRowCountRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).setRowCount(rowCount).build();
-        try
-        {
-            MetadataProto.UpdateRowCountResponse response = this.stub.updateRowCount(request);
-            if (response.getHeader().getErrorCode() != 0)
-            {
-                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
-                        + ", error message=" + response.getHeader().getErrorMsg());
-            }
-            if (!response.getHeader().getToken().equals(token))
-            {
-                throw new MetadataException("response token does not match.");
-            }
-        }
-        catch (Exception e)
-        {
-            throw new MetadataException("failed to update table row count", e);
-        }
-        return true;
-    }
-
     public List<Table> getTables(String schemaName) throws MetadataException
     {
         List<Table> tables = new ArrayList<>();
@@ -169,6 +245,148 @@ public class MetadataService
             throw new MetadataException("failed to get tables from metadata", e);
         }
         return tables;
+    }
+
+    public boolean existTable(String schemaName, String tableName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert tableName != null && !tableName.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.ExistTableRequest request = MetadataProto.ExistTableRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).build();
+        MetadataProto.ExistTableResponse response = this.stub.existTable(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to check table existence. error code="
+                    + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return response.getExists();
+    }
+
+    public boolean dropTable(String schemaName, String tableName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert tableName != null && !tableName.isEmpty();
+
+        // Issue #630: drop cached splits and projections indexes.
+        IndexFactory.Instance().dropSplitsIndex(schemaName, tableName);
+        IndexFactory.Instance().dropProjectionsIndex(schemaName, tableName);
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DropTableRequest request = MetadataProto.DropTableRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).build();
+        MetadataProto.DropTableResponse response = this.stub.dropTable(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to drop table. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return true;
+    }
+
+    public void updateRowCount(String schemaName, String tableName, long rowCount) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.UpdateRowCountRequest request = MetadataProto.UpdateRowCountRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).setRowCount(rowCount).build();
+        try
+        {
+            MetadataProto.UpdateRowCountResponse response = this.stub.updateRowCount(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update table row count", e);
+        }
+    }
+
+    public boolean createView(String schemaName, String viewName, String viewData, boolean updateIfExists) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert viewName != null && !viewName.isEmpty();
+        assert viewData != null && !viewData.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.CreateViewRequest request = MetadataProto.CreateViewRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build()).setSchemaName(schemaName)
+                .setViewName(viewName).setViewData(viewData).setUpdateIfExists(updateIfExists).build();
+        MetadataProto.CreateViewResponse response = this.stub.createView(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to create view. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return true;
+    }
+
+    public boolean existView(String schemaName, String viewName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert viewName != null && !viewName.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.ExistViewRequest request = MetadataProto.ExistViewRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setViewName(viewName).build();
+        MetadataProto.ExistViewResponse response = this.stub.existView(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to check view existence. error code="
+                    + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return response.getExists();
+    }
+
+    public boolean dropView(String schemaName, String viewName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert viewName != null && !viewName.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DropViewRequest request = MetadataProto.DropViewRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setViewName(viewName).build();
+        MetadataProto.DropViewResponse response = this.stub.dropView(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to drop view. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return true;
     }
 
     public View getView(String schemaName, String viewName, boolean returnNullIfNotExists) throws MetadataException
@@ -259,16 +477,10 @@ public class MetadataService
         return columns;
     }
 
-    public boolean updateColumn(Column column) throws MetadataException
+    public void updateColumn(Column column) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.Column columnPb = MetadataProto.Column.newBuilder()
-                .setId(column.getId()).setName(column.getName()).setType(column.getType())
-                .setChunkSize(column.getChunkSize()).setSize(column.getSize())
-                .setNullFraction(column.getNullFraction()).setCardinality(column.getCardinality())
-                // column.getRecordStats() returns empty bytes if the record stats does not exist.
-                .setRecordStats(ByteString.copyFrom(column.getRecordStats()))
-                .setTableId(column.getTableId()).build();
+        MetadataProto.Column columnPb = column.toProto();
         MetadataProto.UpdateColumnRequest request = MetadataProto.UpdateColumnRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setColumn(columnPb).build();
@@ -289,7 +501,6 @@ public class MetadataService
         {
             throw new MetadataException("failed to update column in metadata", e);
         }
-        return true;
     }
 
     /**
@@ -395,12 +606,7 @@ public class MetadataService
     public boolean updateLayout(Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
-                .setId(layout.getId()).setPermission(convertPermission(layout.getPermission()))
-                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplitsJson())
-                .setOrdered(layout.getOrderedJson()).setCompact(layout.getCompactJson())
-                .setVersion(layout.getVersion()).setProjections(layout.getProjectionsJson())
-                .setTableId(layout.getTableId()).build();
+        MetadataProto.Layout layoutPb = layout.toProto();
         MetadataProto.UpdateLayoutRequest request = MetadataProto.UpdateLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setLayout(layoutPb).build();
@@ -433,12 +639,7 @@ public class MetadataService
     public boolean addLayout(Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
-                .setId(layout.getId()).setPermission(convertPermission(layout.getPermission()))
-                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplitsJson())
-                .setOrdered(layout.getOrderedJson()).setCompact(layout.getCompactJson())
-                .setVersion(layout.getVersion()).setProjections(layout.getProjectionsJson())
-                .setTableId(layout.getTableId()).build();
+        MetadataProto.Layout layoutPb = layout.toProto();
         MetadataProto.AddLayoutRequest request = MetadataProto.AddLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setLayout(layoutPb).build();
@@ -810,9 +1011,7 @@ public class MetadataService
         String token = UUID.randomUUID().toString();
         MetadataProto.UpdatePeerRequest request = MetadataProto.UpdatePeerRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
-                .setPeer(MetadataProto.Peer.newBuilder().setId(peer.getId()).setName(peer.getName())
-                        .setLocation(peer.getLocation()).setHost(peer.getHost()).setPort(peer.getPort())
-                        .setStorageScheme(peer.getStorageScheme().name())).build();
+                .setPeer(peer.toProto()).build();
         try
         {
             MetadataProto.UpdatePeerResponse response = this.stub.updatePeer(request);
@@ -883,226 +1082,5 @@ public class MetadataService
             throw new MetadataException("failed to delete peer from metadata", e);
         }
         return false;
-    }
-
-    public boolean createSchema(String schemaName) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-        String token = UUID.randomUUID().toString();
-        MetadataProto.CreateSchemaRequest request = MetadataProto.CreateSchemaRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setSchemaDesc("Created by Pixels MetadataService").build();
-        MetadataProto.CreateSchemaResponse response = this.stub.createSchema(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to create schema. error code=" + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new MetadataException("response token does not match.");
-        }
-        return true;
-    }
-
-    public boolean dropSchema(String schemaName) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-
-        List<Table> tables = getTables(schemaName);
-        if (tables != null)
-        {
-            // Issue #630: drop cached splits and projections indexes.
-            for (Table table : tables)
-            {
-                IndexFactory.Instance().dropSplitsIndex(schemaName, table.getName());
-                IndexFactory.Instance().dropProjectionsIndex(schemaName, table.getName());
-            }
-        }
-
-        String token = UUID.randomUUID().toString();
-        MetadataProto.DropSchemaRequest request = MetadataProto.DropSchemaRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).build();
-        MetadataProto.DropSchemaResponse response = this.stub.dropSchema(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to drop schema. error code=" + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        return true;
-    }
-
-    public boolean createTable(String schemaName, String tableName, Storage.Scheme storageScheme,
-                               List<String> basePathUris, List<Column> columns) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-        assert tableName != null && !tableName.isEmpty();
-        assert storageScheme != null;
-        assert columns != null && !columns.isEmpty();
-
-        String token = UUID.randomUUID().toString();
-        List<MetadataProto.Column> columnList = new ArrayList<>();
-        for (Column column : columns)
-        {
-            columnList.add(MetadataProto.Column.newBuilder()
-                    .setId(column.getId()).setName(column.getName())
-                    .setType(column.getType().replaceAll("\\s", ""))
-                    .build()); // no need to set table id.
-        }
-        MetadataProto.CreateTableRequest request = MetadataProto.CreateTableRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).setStorageScheme(storageScheme.name())
-                .addAllBasePathUris(basePathUris).addAllColumns(columnList).build();
-        MetadataProto.CreateTableResponse response = this.stub.createTable(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to create table. error code=" + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new MetadataException("response token does not match.");
-        }
-        return true;
-    }
-
-    public boolean createView(String schemaName, String viewName, String viewData, boolean updateIfExists) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-        assert viewName != null && !viewName.isEmpty();
-        assert viewData != null && !viewData.isEmpty();
-
-        String token = UUID.randomUUID().toString();
-        MetadataProto.CreateViewRequest request = MetadataProto.CreateViewRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build()).setSchemaName(schemaName)
-                .setViewName(viewName).setViewData(viewData).setUpdateIfExists(updateIfExists).build();
-        MetadataProto.CreateViewResponse response = this.stub.createView(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to create view. error code=" + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new MetadataException("response token does not match.");
-        }
-        return true;
-    }
-
-    public boolean dropTable(String schemaName, String tableName) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-        assert tableName != null && !tableName.isEmpty();
-
-        // Issue #630: drop cached splits and projections indexes.
-        IndexFactory.Instance().dropSplitsIndex(schemaName, tableName);
-        IndexFactory.Instance().dropProjectionsIndex(schemaName, tableName);
-
-        String token = UUID.randomUUID().toString();
-        MetadataProto.DropTableRequest request = MetadataProto.DropTableRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).build();
-        MetadataProto.DropTableResponse response = this.stub.dropTable(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to drop table. error code=" + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new MetadataException("response token does not match.");
-        }
-        return true;
-    }
-
-    public boolean dropView(String schemaName, String viewName) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-        assert viewName != null && !viewName.isEmpty();
-
-        String token = UUID.randomUUID().toString();
-        MetadataProto.DropViewRequest request = MetadataProto.DropViewRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setViewName(viewName).build();
-        MetadataProto.DropViewResponse response = this.stub.dropView(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to drop view. error code=" + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new MetadataException("response token does not match.");
-        }
-        return true;
-    }
-
-    public boolean existTable(String schemaName, String tableName) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-        assert tableName != null && !tableName.isEmpty();
-
-        String token = UUID.randomUUID().toString();
-        MetadataProto.ExistTableRequest request = MetadataProto.ExistTableRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).build();
-        MetadataProto.ExistTableResponse response = this.stub.existTable(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to check table existence. error code="
-                    + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new MetadataException("response token does not match.");
-        }
-        return response.getExists();
-    }
-
-    public boolean existView(String schemaName, String viewName) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-        assert viewName != null && !viewName.isEmpty();
-
-        String token = UUID.randomUUID().toString();
-        MetadataProto.ExistViewRequest request = MetadataProto.ExistViewRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setViewName(viewName).build();
-        MetadataProto.ExistViewResponse response = this.stub.existView(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to check view existence. error code="
-                    + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new MetadataException("response token does not match.");
-        }
-        return response.getExists();
-    }
-
-    public boolean existSchema(String schemaName) throws MetadataException
-    {
-        assert schemaName != null && !schemaName.isEmpty();
-
-        String token = UUID.randomUUID().toString();
-        MetadataProto.ExistSchemaRequest request = MetadataProto.ExistSchemaRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).build();
-        MetadataProto.ExistSchemaResponse response = this.stub.existSchema(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new MetadataException("failed to check table existence. error code="
-                    + response.getHeader().getErrorCode()
-                    + ", error message=" + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new MetadataException("response token does not match.");
-        }
-        return response.getExists();
     }
 }

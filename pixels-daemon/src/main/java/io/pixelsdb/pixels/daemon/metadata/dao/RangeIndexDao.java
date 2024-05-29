@@ -38,7 +38,7 @@ public abstract class RangeIndexDao implements Dao<MetadataProto.RangeIndex>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public abstract MetadataProto.RangeIndex getByTableAndSvIds(long tableId, long schemaVersionId);
+    public abstract MetadataProto.RangeIndex getByTableId(long tableId);
 
     public abstract List<MetadataProto.RangeIndex> getAllByTableId(long tableId);
 
@@ -65,5 +65,5 @@ public abstract class RangeIndexDao implements Dao<MetadataProto.RangeIndex>
 
     abstract public boolean update (MetadataProto.RangeIndex rangeIndex);
 
-    abstract public boolean deleteByTableAndSvIds(long tableId, long schemaVersionId);
+    abstract public boolean deleteByTableId(long tableId);
 }

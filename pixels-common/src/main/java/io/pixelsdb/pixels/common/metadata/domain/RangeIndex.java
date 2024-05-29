@@ -19,32 +19,34 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import com.google.protobuf.ByteString;
+import io.pixelsdb.pixels.daemon.MetadataProto;
+
 import java.nio.ByteBuffer;
 
 /**
  * @author hank
  * @create 2024-05-22
  */
-public class RangeIndex
+public class RangeIndex extends Base
 {
-    private ByteBuffer struct;
+    private ByteBuffer indexStruct;
     private KeyColumns keyColumns;
     private String keyColumnsJson;
     private long tableId;
-    private long schemaVersionId;
 
     public RangeIndex()
     {
     }
 
-    public ByteBuffer getStruct()
+    public ByteBuffer getIndexStruct()
     {
-        return struct;
+        return indexStruct;
     }
 
-    public void setStruct(ByteBuffer struct)
+    public void setIndexStruct(ByteBuffer indexStruct)
     {
-        this.struct = struct;
+        this.indexStruct = indexStruct;
     }
 
     public KeyColumns getKeyColumns()
@@ -77,13 +79,11 @@ public class RangeIndex
         this.tableId = tableId;
     }
 
-    public long getSchemaVersionId()
+    @Override
+    public MetadataProto.RangeIndex toProto()
     {
-        return schemaVersionId;
-    }
-
-    public void setSchemaVersionId(long schemaVersionId)
-    {
-        this.schemaVersionId = schemaVersionId;
+        return MetadataProto.RangeIndex.newBuilder().setId(this.getId())
+                .setIndexStruct(ByteString.copyFrom(this.indexStruct)).setKeyColumns(this.keyColumnsJson)
+                .setTableId(this.tableId).build();
     }
 }

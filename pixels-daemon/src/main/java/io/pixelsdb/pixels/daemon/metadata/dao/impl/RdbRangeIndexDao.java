@@ -95,14 +95,13 @@ public class RdbRangeIndexDao extends RangeIndexDao
     }
 
     @Override
-    public MetadataProto.RangeIndex getByTableAndSvIds(long tableId, long schemaVersionId)
+    public MetadataProto.RangeIndex getByTableId(long tableId)
     {
         Connection conn = db.getConnection();
-        String sql = "SELECT * FROM RANGE_INDEXES WHERE TBLS_TBL_ID=? AND SCHEMA_VERSIONS_SV_ID=?";
+        String sql = "SELECT * FROM RANGE_INDEXES WHERE TBLS_TBL_ID=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setLong(1, tableId);
-            pst.setLong(2, schemaVersionId);
             ResultSet rs = pst.executeQuery();
             if (rs.next())
             {
@@ -111,7 +110,7 @@ public class RdbRangeIndexDao extends RangeIndexDao
                         .setIndexStruct(ByteString.copyFrom(rs.getBytes("RI_INDEX_STRUCT")))
                         .setKeyColumns(rs.getString("RI_KEY_COLUMNS"))
                         .setTableId(tableId)
-                        .setSchemaVersionId(schemaVersionId).build();
+                        .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID")).build();
                 return rangeIndex;
             }
         } catch (SQLException e)
@@ -209,14 +208,13 @@ public class RdbRangeIndexDao extends RangeIndexDao
     }
 
     @Override
-    public boolean deleteByTableAndSvIds(long tableId, long schemaVersionId)
+    public boolean deleteByTableId(long tableId)
     {
         Connection conn = db.getConnection();
-        String sql = "DELETE FROM RANGE_INDEXES WHERE TBLS_TBL_ID=? AND SCHEMA_VERSIONS_SV_ID=?";
+        String sql = "DELETE FROM RANGE_INDEXES WHERE TBLS_TBL_ID=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setLong(1, tableId);
-            pst.setLong(2, schemaVersionId);
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {

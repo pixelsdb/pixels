@@ -19,13 +19,16 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import com.google.protobuf.ByteString;
+import io.pixelsdb.pixels.daemon.MetadataProto;
+
 import java.nio.ByteBuffer;
 
 /**
  * @author hank
  * @create 2024-05-22
  */
-public class Range
+public class Range extends Base
 {
     private ByteBuffer min;
     private ByteBuffer max;
@@ -74,5 +77,18 @@ public class Range
     public void setRangeIndexId(long rangeIndexId)
     {
         this.rangeIndexId = rangeIndexId;
+    }
+
+    @Override
+    public MetadataProto.Range toProto()
+    {
+        MetadataProto.Range.Builder builder =  MetadataProto.Range.newBuilder().setId(this.getId())
+                .setMin(ByteString.copyFrom(this.min)).setMax(ByteString.copyFrom(this.max))
+                .setRangeIndexId(this.rangeIndexId);
+        if (this.parentId > 0)
+        {
+            builder.setParentId(this.parentId);
+        }
+        return builder.build();
     }
 }

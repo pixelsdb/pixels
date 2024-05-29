@@ -72,4 +72,12 @@ public class SchemaVersion extends Base
     {
         this.tableId = tableId;
     }
+
+    @Override
+    public MetadataProto.SchemaVersion toProto()
+    {
+        return MetadataProto.SchemaVersion.newBuilder().setId(this.getId())
+                .addAllColumns(Column.revertColumns(this.columns))
+                .setTransTs(this.transTs).setTableId(this.tableId).build();
+    }
 }

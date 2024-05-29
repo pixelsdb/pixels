@@ -108,4 +108,12 @@ public class Peer extends Base
                 ", port='" + port + '\'' +
                 ", storageScheme='" + storageScheme + '\'' + '}';
     }
+
+    @Override
+    public MetadataProto.Peer toProto()
+    {
+        return MetadataProto.Peer.newBuilder().setId(this.getId()).setName(this.getName())
+                .setLocation(this.getLocation()).setHost(this.getHost()).setPort(this.getPort())
+                .setStorageScheme(this.getStorageScheme().name()).build();
+    }
 }
