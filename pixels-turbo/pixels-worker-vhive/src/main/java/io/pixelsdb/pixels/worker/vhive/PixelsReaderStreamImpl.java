@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.worker.vhive;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -39,7 +38,6 @@ import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsStreamHeaderMalformedException;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.worker.common.WorkerThreadExceptionHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -250,7 +248,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
         }
 
         public V get(K key) throws InterruptedException {
-            return getQueue(key).take();
+            V ret = getQueue(key).poll(60, TimeUnit.SECONDS);
+            if (ret == null) {
+                throw new RuntimeException("BlockingMap.get() timed out");
+            }
+            return ret;
         }
 
         public boolean exist(K key) {
@@ -314,7 +316,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     }
 
     public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) {
-        throw new UnsupportedOperationException("getNumRowGroupFooter is not supported in a stream");
+        throw new UnsupportedOperationException("getRowGroupFooter is not supported in a stream");
     }
 
     /**
@@ -328,7 +330,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public PixelsRecordReader read(PixelsReaderOption option) throws IOException
     {
-        // todo: process hash values in the option
         assert(recordReaders.size() == 0);
 
         PixelsRecordReaderStreamImpl recordReader = new PixelsRecordReaderStreamImpl(partitioned, byteBufSharedQueue, byteBufBlockingMap, streamHeader, option);
@@ -506,9 +507,9 @@ public class PixelsReaderStreamImpl implements PixelsReader
         // Use new Thread().start() for simple, one-off asynchronous tasks where the overhead of managing a thread pool is unnecessary.
         new Thread(() -> {
             try {
-                if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(10, TimeUnit.SECONDS);
+                if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(5, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
-                logger.warn("HTTP server did not shut down in 10 seconds, doing forceful shutdown");
+                logger.warn("In close(), HTTP server did not shut down in 5 seconds, doing forceful shutdown");
                 this.httpServerFuture.cancel(true);
             } catch (InterruptedException | ExecutionException e) {
                 logger.error("Exception during HTTP server shutdown", e);

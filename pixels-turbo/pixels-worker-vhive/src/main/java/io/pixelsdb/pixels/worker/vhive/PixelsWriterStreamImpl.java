@@ -305,7 +305,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             checkArgument(this.builderPartitioned ==
                             (this.builderPartKeyColumnIds.isPresent() && !this.builderPartKeyColumnIds.get().isEmpty()),
                     "partition column ids are present while partitioned is false, or vice versa");
-            // todo: check the other arguments
 
 
             return new PixelsWriterStreamImpl(

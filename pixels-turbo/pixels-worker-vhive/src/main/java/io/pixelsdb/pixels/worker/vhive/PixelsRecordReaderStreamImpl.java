@@ -46,10 +46,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     PixelsProto.StreamHeader streamHeader;
     private final PixelsReaderOption option;
     private final long transId;
-    /**
-     * In streaming mode, RGLen means max number of row groups to read.
-     */
-    private int RGLen;
+    private int RGLen;  // In streaming mode, RGLen means max number of row groups to read. But currently unused.
     private final List<PixelsProto.Type> includedColumnTypes;
 
     private final boolean partitioned;
@@ -516,7 +513,12 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             {
                 curRGIdx++;
                 acquireNewRowGroup(reuse);
-                if (endOfFile) break;
+                if (endOfFile)
+                {
+                    checkValid = false;
+                    resultRowBatch.endOfFile = true;
+                    break;
+                }
 
                 rgRowCount = (int) curRowGroupStreamFooter.getNumberOfRows();
                 //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
@@ -572,7 +574,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
                 {
                     throw new IOException("failed to read stream.");
                 }
-                readTimeNanos += System.nanoTime() - start;  // todo: update measurements
+                readTimeNanos += System.nanoTime() - start;
                 if (endOfFile)
                 {
                     /**
