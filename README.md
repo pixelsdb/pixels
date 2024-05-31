@@ -89,6 +89,9 @@ Pixels is an academic system aims at providing production-grade quality. It supp
 is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
+> `arXiv'24` [PixelsDB: Serverless and Natural-Language-Aided Data Analytics with Flexible Service Levels and Prices](https://arxiv.org/abs/2405.19784)\
+> Haoqiong Bian, Dongyang Geng, Haoyang Li, Anastasia Ailamaki
+
 > `SIGMOD'23` [Using Cloud Functions as Accelerator for Elastic Data Analytics](https://doi.org/10.1145/3589306)\
 > Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki
 
