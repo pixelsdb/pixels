@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -29,6 +29,7 @@ import io.pixelsdb.pixels.common.utils.DateUtil;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -42,10 +43,10 @@ import java.util.Properties;
 
 /**
  * @author mzp0514
- * @date 27/05/2022
+ * @date 2022-05-27
  */
-public class RetinaWriter {
-
+public class RetinaWriter
+{
     MemoryMappedFile memoryMappedFile;
     MetadataService metadataService;
 
@@ -53,7 +54,8 @@ public class RetinaWriter {
 
     HashMap<String, TypeDescription> schemas;
 
-    enum ValueType {
+    enum ValueType
+    {
         NONE,  // Useful when the type of column vector has not be determined yet.
         LONG,
         DOUBLE,
@@ -66,7 +68,8 @@ public class RetinaWriter {
         MAP,
         UNION;
 
-        public static ValueType fromShort(short x) {
+        public static ValueType fromShort(short x)
+        {
             switch(x) {
                 case 0:
                     return NONE;
@@ -79,10 +82,13 @@ public class RetinaWriter {
         }
     }
 
-    RetinaWriter() {
-        try {
+    RetinaWriter()
+    {
+        try
+        {
             memoryMappedFile = new MemoryMappedFile("/dev/shm/flush", 200 * 1024);
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             e.printStackTrace();
         }
 
@@ -98,15 +104,18 @@ public class RetinaWriter {
         metadataService = new MetadataService(metadataHost, metadataPort);
     }
 
-    TypeDescription getSchema(String schemaName, String tableName) throws MetadataException {
+    TypeDescription getSchema(String schemaName, String tableName) throws MetadataException
+    {
         String key = schemaName + ":" + tableName;
         TypeDescription schema = schemas.getOrDefault(key, null);
-        if (schema == null) {
+        if (schema == null)
+        {
             List<Column> columns = metadataService.getColumns(schemaName, tableName, false);
             StringBuilder builder = new StringBuilder();
             builder.append("struct<");
             String prefix = "struct<";
-            for (Column col : columns) {
+            for (Column col : columns)
+            {
                 builder.append(prefix);
                 builder.append(col.getName());
                 builder.append(":");
@@ -125,7 +134,9 @@ public class RetinaWriter {
     /**
      * Read from shared memory and write to file
      */
-    void readAndWrite(String schemaName, String tableName, int rgid, long pos, String filePath) throws IOException, MetadataException {
+    void readAndWrite(String schemaName, String tableName, int rgid, long pos, String filePath)
+            throws IOException, MetadataException
+    {
         System.out.printf("Request received: %s %s %d %d %s...\n", schemaName, tableName, rgid, pos, filePath);
         int colNum = memoryMappedFile.getInt(pos);
         pos += Integer.BYTES;
@@ -164,24 +175,27 @@ public class RetinaWriter {
                 .setBlockSize(blockSize)
                 .setReplication(replication)
                 .setBlockPadding(true)
-                .setEncoding(true)
+                .setEncodingLevel(EncodingLevel.EL1)
                 .setCompressionBlockSize(1)
                 .build();
 
-        for (int i = 0; i < colNum; i++) {
+        for (int i = 0; i < colNum; i++)
+        {
             System.out.println(i);
             short type = memoryMappedFile.getShort(pos);
             pos += Short.BYTES;
             System.out.printf("type: %d\n", type);
 
             ValueType valueType = ValueType.fromShort(type);
-            switch (Objects.requireNonNull(valueType)) {
+            switch (Objects.requireNonNull(valueType))
+            {
                 case LONG:
                     int length = memoryMappedFile.getInt(pos);
                     pos += Integer.BYTES;
                     System.out.printf("length: %d\n", length);
                     LongColumnVector longCol = (LongColumnVector) rowBatch.cols[i];
-                    for (int j = 0; j < rowNum; j++) {
+                    for (int j = 0; j < rowNum; j++)
+                    {
                         longCol.vector[j] = memoryMappedFile.getLong(pos);
                         pos += Long.BYTES;
                     }
@@ -194,12 +208,14 @@ public class RetinaWriter {
                     System.out.printf("length: %d\n", lenLength);
                     BinaryColumnVector strCol = (BinaryColumnVector) rowBatch.cols[i];
 
-                    for (int j = 0; j < rowNum; j++) {
+                    for (int j = 0; j < rowNum; j++)
+                    {
                         strCol.start[j] = memoryMappedFile.getInt(pos);
                         pos += Integer.BYTES;
                     }
 
-                    for (int j = 0; j < rowNum; j++) {
+                    for (int j = 0; j < rowNum; j++)
+                    {
                         strCol.lens[j] = memoryMappedFile.getInt(pos);
                         pos += Integer.BYTES;
                     }
@@ -210,7 +226,8 @@ public class RetinaWriter {
                     memoryMappedFile.getBytes(pos, strCol.buffer, 0, dataLength);
                     pos += dataLength;
 
-                    for (int j = 0; j < rowNum; j++) {
+                    for (int j = 0; j < rowNum; j++)
+                    {
                         strCol.vector[j] = strCol.buffer;
                     }
 
@@ -218,7 +235,8 @@ public class RetinaWriter {
             }
         }
 
-        if (rowBatch.size != 0) {
+        if (rowBatch.size != 0)
+        {
             pixelsWriter.addRowBatch(rowBatch);
             rowBatch.reset();
         }
