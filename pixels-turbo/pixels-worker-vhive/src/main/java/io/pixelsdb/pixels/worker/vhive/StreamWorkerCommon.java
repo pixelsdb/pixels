@@ -14,7 +14,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,18 +27,23 @@ import static java.util.Objects.requireNonNull;
 
 public class StreamWorkerCommon extends WorkerCommon {
     private static final Logger logger = LogManager.getLogger(StreamWorkerCommon.class);
-//    private static final ConfigFactory configFactory = ConfigFactory.Instance();
-    private static Storage http;
 
     private static final PixelsReaderStreamImpl.BlockingMap<String, Integer> pathToPort = new PixelsReaderStreamImpl.BlockingMap<>();
     private static final ConcurrentHashMap<String, Integer> pathToSchemaPort = new ConcurrentHashMap<>();
-    private static final AtomicInteger nextPort = new AtomicInteger(50100);
-    private static final AtomicInteger schemaPorts = new AtomicInteger(50099);
+    // We allocate data ports in ascending order, starting from `firstPort`;
+    // and allocate schema ports in descending order, starting from `firstPort - 1`.
+    private static final int firstPort = 50100;
+    private static final AtomicInteger nextPort = new AtomicInteger(firstPort);
+    private static final AtomicInteger schemaPorts = new AtomicInteger(firstPort - 1);
 
-    public static int getPort(String path) {
+    public static int getPort(String path)
+    {
+        // XXX: Ideally, the getPort() should block until the server started. Otherwise, the server may not be ready when the client tries to connect.
+        //  Currently, we resolve this by using Spring Retry in the HTTP client, but this could be optimized.
         try {
             int ret = pathToPort.get(path);
-            setPort(path, ret);  // ArrayBlockingQueue.take() removes the element from the queue, so we need to put it back
+            // ArrayBlockingQueue.take() removes element from the queue, so we need to put it back
+            setPort(path, ret);
             return ret;
         }
         catch (InterruptedException e) {
@@ -47,7 +51,7 @@ public class StreamWorkerCommon extends WorkerCommon {
             return -1;
         }
     }
-    public static int getOrSetPort(String path) throws InterruptedException {
+    public static int getOrSetPort(String path) {
         if (pathToPort.exist(path)) return getPort(path);
         else {
             int port = nextPort.getAndIncrement();
@@ -58,20 +62,17 @@ public class StreamWorkerCommon extends WorkerCommon {
     public static void setPort(String path, int port) {
         pathToPort.put(path, port);
     }
-//    public static void delPort(int port) {
-//        logger.debug("delPort: " + port);
-//        assert(pathToPort.entrySet().removeIf(entry -> entry.getValue() == port));
-//    }
 
     public static int getSchemaPort(String path) { return pathToSchemaPort.computeIfAbsent(path, k -> schemaPorts.getAndDecrement()); }
     public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException {
         if (storageInfo.getScheme() == Storage.Scheme.mock) {
-            // streaming mode, return nothing
+            // Currently, we use Storage.Scheme.mock to indicate streaming mode,
+            //  where we don't need to initialize anything. Returns immediately.
             if (isOutput)
             {
-                // This is an output storage using HTTP. The opposite side must be waiting for a schema.
+                // This is an output storage using HTTP. The opposite side must be waiting for a schema;
                 //  will need to send the schema one-off.
-                // But currently is done in BaseStreamWorkers
+                // But currently this is done in BaseStreamWorkers, so nothing here.
 
             }
             return;
@@ -84,7 +85,7 @@ public class StreamWorkerCommon extends WorkerCommon {
             throws IOException {
         if (storageInfo.getScheme() != Storage.Scheme.mock ||
                 !Objects.equals(storageInfo.getRegion(), "http")) {
-            throw new IllegalArgumentException("Storage is not HTTP under streaming mode");
+            throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
         // Start a special port to pass schema
         passSchemaToNextLevel(schema, storageInfo, "http://localhost:" + getSchemaPort(outputInfo.getPath()) + "/");
@@ -94,19 +95,17 @@ public class StreamWorkerCommon extends WorkerCommon {
             throws IOException {
         if (storageInfo.getScheme() != Storage.Scheme.mock ||
                 !Objects.equals(storageInfo.getRegion(), "http")) {
-            throw new IllegalArgumentException("Storage is not HTTP under streaming mode");
+            throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
-//        logger.debug("passSchemaToNextLevel streaming mode");
         PixelsWriter pixelsWriter = getWriter(schema, null, endpoint, false, false, -1, null, null, true);
         ((PixelsWriterStreamImpl)pixelsWriter).writeRowGroup();
         pixelsWriter.close();
-        // outputStream.writeUTF(schema.toString());
     }
 
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, List<String> endpoints)
             throws IOException {
         for (String endpoint : endpoints)
-            passSchemaToNextLevel(schema, storageInfo, endpoint);  // todo: can do it in parallel
+            passSchemaToNextLevel(schema, storageInfo, endpoint);  // Can do it in parallel, but this is not a bottleneck
     }
 
     public static Storage getStorage(Storage.Scheme scheme)
@@ -120,11 +119,11 @@ public class StreamWorkerCommon extends WorkerCommon {
 
     public static TypeDescription getSchemaFromSplits(Storage storage, List<InputSplit> inputSplits)
             throws Exception {
-        // XXX: Consider just start the HTTP server and wait for an arbitrary split to write the schema member,
-        //  instead of getting the schema in advance like we do now.
         if (storage == null) {
             PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(inputSplits.get(0).getInputInfos().get(0).getPath()));
-            return pixelsReader.getFileSchema();
+            TypeDescription ret = pixelsReader.getFileSchema();
+            pixelsReader.close();
+            return ret;
         }
         return WorkerCommon.getFileSchemaFromSplits(storage, inputSplits);
     }
@@ -134,7 +133,9 @@ public class StreamWorkerCommon extends WorkerCommon {
         if (storage == null)
         {
             PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(paths.get(0)));
-            return pixelsReader.getFileSchema();
+            TypeDescription ret = pixelsReader.getFileSchema();
+            pixelsReader.close();
+            return ret;
         }
         return WorkerCommon.getFileSchemaFromPaths(storage, paths);
     }
@@ -151,19 +152,22 @@ public class StreamWorkerCommon extends WorkerCommon {
         requireNonNull(leftPaths, "leftPaths is null");
         requireNonNull(rightPaths, "rightPaths is null");
         if (leftStorage == null && rightStorage == null) {
+            // streaming mode
             // Currently, the first packet from the stream brings the schema
             Future<?> leftFuture = executor.submit(() -> {
                 try {
-                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(leftPaths.get(0)));  // XXX: pixelsReader.close()
+                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(leftPaths.get(0)));
                     leftSchema.set(pixelsReader.getFileSchema());
+                    pixelsReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             });
             Future<?> rightFuture = executor.submit(() -> {
                 try {
-                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(rightPaths.get(0)));  // XXX: pixelsReader.close()
+                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(rightPaths.get(0)));
                     rightSchema.set(pixelsReader.getFileSchema());
+                    pixelsReader.close();  // XXX: This `close()` makes the test noticeably slower. Will need to look into it.
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -178,9 +182,9 @@ public class StreamWorkerCommon extends WorkerCommon {
         else WorkerCommon.getFileSchemaFromPaths(executor, leftStorage, rightStorage, leftSchema, rightSchema, leftPaths, rightPaths);
     }
 
-    public static PixelsReader getReader(String filePath, Storage storage) throws IOException
+    public static PixelsReader getReader(String filePath, Storage storage) throws UnsupportedOperationException
     {
-        throw new IOException("Forbidden to call WorkerCommon.getReader() from StringWorkerCommon");
+        throw new UnsupportedOperationException("Forbidden to call WorkerCommon.getReader() from StringWorkerCommon");
     }
 
     public static PixelsReader getReader(Storage.Scheme storageScheme, String path) throws Exception
@@ -195,7 +199,7 @@ public class StreamWorkerCommon extends WorkerCommon {
         requireNonNull(path, "fileName is null");
         if (storageScheme == Storage.Scheme.mock) {
             logger.debug("getReader streaming mode, path: " + path + ", port: " + getOrSetPort(path));
-            return new PixelsReaderStreamImpl("http://localhost:" + getOrSetPort(path) + "/", partitioned, numHashes);  // todo: let the getPort() go through only after the server started
+            return new PixelsReaderStreamImpl("http://localhost:" + getOrSetPort(path) + "/", partitioned, numHashes);
         }
         else return WorkerCommon.getReader(path, WorkerCommon.getStorage(storageScheme));
     }
@@ -219,10 +223,7 @@ public class StreamWorkerCommon extends WorkerCommon {
                                          List<Integer> keyColumnIds,
                                          List<String> outputPaths, boolean isSchemaWriter)
     {
-        // root operator是可以把结果直接传回VM的，但没时间写了，本次demo时只能把结果写到minio中。所以仍然是
-        //  分类讨论，可能返回PixelsWriterStreamImpl或者PixelsWriterImpl
         if (storage != null && storage.getScheme() != Storage.Scheme.mock) return WorkerCommon.getWriter(schema, storage, outputPath, encoding, isPartitioned, keyColumnIds);
-        // It's a bad practice to use null to indicate streaming mode. todo: declare a new Storage indicating streaming mode in place of null
         logger.debug("getWriter streaming mode, path: " + outputPath + ", paths: " + outputPaths + ", isSchemaWriter: " + isSchemaWriter);
         requireNonNull(schema, "schema is null");
         requireNonNull(outputPath, "fileName is null");
@@ -235,7 +236,6 @@ public class StreamWorkerCommon extends WorkerCommon {
         builder.setSchema(schema)
                 .setPixelStride(pixelStride)
                 .setRowGroupSize(rowGroupSize)
-                // .setOverwrite(true) // set overwrite to true to avoid existence checking.
                 .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
                 .setPartitioned(isPartitioned)
                 .setPartitionId(isPartitioned ? partitionId : -1);
@@ -249,9 +249,4 @@ public class StreamWorkerCommon extends WorkerCommon {
         }
         return builder.build();
     }
-
-//    public static PixelsReaderOption getReaderOption(long transId, String[] cols, InputInfo input)
-//    {
-//        return WorkerCommon.getReaderOption(transId, cols, input);
-//    }
 }
