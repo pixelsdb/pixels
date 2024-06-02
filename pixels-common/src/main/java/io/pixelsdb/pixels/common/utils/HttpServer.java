@@ -44,9 +44,9 @@ public final class HttpServer {
         this.initializer = new HttpServerInitializer(HttpServerUtil.buildSslContext(), handler);
     }
 
-    public void serve(int PORT) throws Exception {
+    public void serve(int PORT) throws InterruptedException {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();  // todo: test how many threads are best
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.option(ChannelOption.SO_BACKLOG, 1024);
