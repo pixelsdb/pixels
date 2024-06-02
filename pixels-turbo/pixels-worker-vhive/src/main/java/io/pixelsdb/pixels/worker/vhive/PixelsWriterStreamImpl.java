@@ -33,6 +33,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.core.writer.ColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
+import io.pixelsdb.pixels.turbo.StreamProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.asynchttpclient.*;
@@ -620,15 +621,15 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         }
 
         // put curRowGroupIndex into rowGroupFooter
-        PixelsProto.StreamRowGroupFooter.Builder rowGroupFooterBuilder =
-                PixelsProto.StreamRowGroupFooter.newBuilder()
+        StreamProto.StreamRowGroupFooter.Builder rowGroupFooterBuilder =
+                StreamProto.StreamRowGroupFooter.newBuilder()
                         .setRowGroupIndexEntry(curRowGroupIndex.build())
                         .setRowGroupEncoding(curRowGroupEncoding.build())
                         .setNumberOfRows(curRowGroupNumOfRows);
         if (partitioned) {
             rowGroupFooterBuilder.setPartitionInfo(curPartitionInfo.build());
         }
-        PixelsProto.StreamRowGroupFooter rowGroupFooter = rowGroupFooterBuilder.build();
+        StreamProto.StreamRowGroupFooter rowGroupFooter = rowGroupFooterBuilder.build();
         // XXX: rowGroupIndex and rowGroupEncoding are the same for all row groups in the same file?
         //  If so, we can send them only once per file.  -- Row group footer accounts for <1% of the total data size. No need to optimize.
 
@@ -721,7 +722,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
 //        });
     }
 
-    static void writeTypes(PixelsProto.StreamHeader.Builder builder, TypeDescription schema)
+    static void writeTypes(StreamProto.StreamHeader.Builder builder, TypeDescription schema)
     {
         List<TypeDescription> children = schema.getChildren();
         List<String> names = schema.getFieldNames();
@@ -802,8 +803,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
 
     private void writeStreamHeader() {
         // build streamHeader
-        PixelsProto.StreamHeader.Builder streamHeaderBuilder =
-                PixelsProto.StreamHeader.newBuilder();
+        StreamProto.StreamHeader.Builder streamHeaderBuilder =
+                StreamProto.StreamHeader.newBuilder();
         writeTypes(streamHeaderBuilder, schema);
         streamHeaderBuilder.setVersion(Constants.VERSION)
                 .setPixelStride(columnWriterOption.getPixelStride())
@@ -812,7 +813,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 .setColumnChunkAlignment(CHUNK_ALIGNMENT)
                 .setMagic(Constants.MAGIC)
                 .build();
-        PixelsProto.StreamHeader streamHeader = streamHeaderBuilder.build();
+        StreamProto.StreamHeader streamHeader = streamHeaderBuilder.build();
         int streamHeaderLength = streamHeader.getSerializedSize();
 
         // write and flush streamHeader

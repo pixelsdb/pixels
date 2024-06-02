@@ -38,6 +38,7 @@ import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsStreamHeaderMalformedException;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.turbo.StreamProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -84,7 +85,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * It is set to null until the first message arrives.
      * The streamHeaderLatch is used to wait for the streamHeader to arrive.
      */
-    private PixelsProto.StreamHeader streamHeader;
+    private StreamProto.StreamHeader streamHeader;
     private final CountDownLatch streamHeaderLatch = new CountDownLatch(1);
 
     public PixelsReaderStreamImpl(String endpoint) throws Exception {
@@ -280,7 +281,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         return value + difference;
     }
 
-    private PixelsProto.StreamHeader parseStreamHeader(ByteBuf byteBuf)
+    private StreamProto.StreamHeader parseStreamHeader(ByteBuf byteBuf)
             throws InvalidProtocolBufferException, PixelsStreamHeaderMalformedException
     {
         try {
@@ -296,7 +297,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
             int metadataLength = byteBuf.getInt(magicLength);
             ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
             byteBuf.getBytes(magicLength + Integer.BYTES, metadataBuf);
-            PixelsProto.StreamHeader streamHeader = PixelsProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
+            StreamProto.StreamHeader streamHeader = StreamProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
 
             // check file version
             int fileVersion = streamHeader.getVersion();

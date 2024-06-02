@@ -29,6 +29,7 @@ import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReaderImpl;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.turbo.StreamProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -43,7 +44,7 @@ import java.util.concurrent.BlockingQueue;
 @NotThreadSafe
 public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderStreamImpl.class);
-    PixelsProto.StreamHeader streamHeader;
+    StreamProto.StreamHeader streamHeader;
     private final PixelsReaderOption option;
     private final long transId;
     private int RGLen;  // In streaming mode, RGLen means max number of row groups to read. But currently unused.
@@ -59,7 +60,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     private final BlockingQueue<ByteBuf> byteBufSharedQueue;
     private final PixelsReaderStreamImpl.BlockingMap<Integer, ByteBuf> byteBufBlockingMap;  // hash value -> ByteBuf
 
-    PixelsProto.StreamRowGroupFooter curRowGroupStreamFooter;
+    StreamProto.StreamRowGroupFooter curRowGroupStreamFooter;
     private TypeDescription fileSchema = null;
     private TypeDescription resultSchema = null;
 
@@ -110,7 +111,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     public PixelsRecordReaderStreamImpl(boolean partitioned,
                                         BlockingQueue<ByteBuf> byteBufSharedQueue,
                                         PixelsReaderStreamImpl.BlockingMap<Integer, ByteBuf> byteBufBlockingMap,
-                                        PixelsProto.StreamHeader streamHeader,
+                                        StreamProto.StreamHeader streamHeader,
                                         PixelsReaderOption option) throws IOException
     {
         this.partitioned = partitioned;
@@ -295,7 +296,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
         // byteBuf.readerIndex(rowGroupsPosition + rowGroupDataLength);  // skip row group data and row group data length, and get to row group footer
         // byte[] firstRgFooterBytes = new byte[byteBuf.readInt()];
         // byteBuf.readBytes(firstRgFooterBytes);
-        // PixelsProto.StreamRowGroupFooter firstRgFooter = PixelsProto.StreamRowGroupFooter.parseFrom(firstRgFooterBytes);
+        // StreamProto.StreamRowGroupFooter firstRgFooter = StreamProto.StreamRowGroupFooter.parseFrom(firstRgFooterBytes);
 
         byteBuf.readerIndex(rowGroupsPosition);
         this.resultColumnsEncoded = new boolean[includedColumnNum];
@@ -599,7 +600,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             byte[] curRowGroupFooterBytes = new byte[curRowGroupByteBuf.readInt()];
             curRowGroupByteBuf.readBytes(curRowGroupFooterBytes);
             curRowGroupByteBuf.resetReaderIndex();
-            curRowGroupStreamFooter = PixelsProto.StreamRowGroupFooter.parseFrom(curRowGroupFooterBytes);
+            curRowGroupStreamFooter = StreamProto.StreamRowGroupFooter.parseFrom(curRowGroupFooterBytes);
 
             PixelsProto.RowGroupEncoding rgEncoding = curRowGroupStreamFooter.getRowGroupEncoding();
             // refresh resultColumnsEncoded for reading the column vectors in the next row group.
