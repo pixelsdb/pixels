@@ -43,6 +43,7 @@
         <module>pixels-executor</module>
         <module>pixels-parser</module>
         <module>pixels-planner</module>
+        <module>pixels-retina</module>
         <module>pixels-server</module>
         <module>pixels-amphi</module>
         <module>pixels-storage/pixels-storage-s3</module>

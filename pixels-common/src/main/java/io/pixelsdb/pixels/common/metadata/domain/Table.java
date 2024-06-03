@@ -105,4 +105,12 @@ public class Table extends Base
                 ", rowCount=" + rowCount +
                 ", schemaId=" + schemaId + '}';
     }
+
+    @Override
+    public MetadataProto.Table toProto()
+    {
+        return MetadataProto.Table.newBuilder().setId(this.getId()).setName(this.name)
+                .setType(this.type).setStorageScheme(this.storageScheme.toString())
+                .setRowCount(this.rowCount).setSchemaId(this.schemaId).build();
+    }
 }

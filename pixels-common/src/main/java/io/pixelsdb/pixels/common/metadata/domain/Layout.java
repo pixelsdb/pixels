@@ -19,10 +19,12 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
-import io.pixelsdb.pixels.daemon.MetadataProto;
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.util.List;
+
+import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermission;
 
 public class Layout extends Base
 {
@@ -273,5 +275,16 @@ public class Layout extends Base
                 ", splits='" + splitsJson + '\'' +
                 ", projections='" + projectionsJson + '\'' +
                 ", tableId=" + tableId + '}';
+    }
+
+    @Override
+    public MetadataProto.Layout toProto()
+    {
+        return MetadataProto.Layout.newBuilder()
+                .setId(this.getId()).setPermission(convertPermission(this.getPermission()))
+                .setCreateAt(this.getCreateAt()).setSplits(this.getSplitsJson())
+                .setOrdered(this.getOrderedJson()).setCompact(this.getCompactJson())
+                .setVersion(this.getVersion()).setProjections(this.getProjectionsJson())
+                .setTableId(this.getTableId()).build();
     }
 }

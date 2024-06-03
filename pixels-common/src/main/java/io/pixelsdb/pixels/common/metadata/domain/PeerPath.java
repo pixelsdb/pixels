@@ -110,4 +110,12 @@ public class PeerPath extends Base
                 ", pathId='" + pathId + '\'' +
                 ", peerId='" + peerId + '\'' + '}';
     }
+
+    @Override
+    public MetadataProto.PeerPath toProto()
+    {
+        return MetadataProto.PeerPath.newBuilder().setId(this.getId()).setUri(this.uri)
+                .addAllColumns(Column.revertColumns(this.columns))
+                .setPathId(this.pathId).setPeerId(this.peerId).build();
+    }
 }
