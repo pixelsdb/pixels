@@ -27,8 +27,8 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.worker.common.WorkerException;
-import io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl;
-import io.pixelsdb.pixels.worker.vhive.PixelsWriterStreamImpl;
+import io.pixelsdb.pixels.core.PixelsReaderStreamImpl;
+import io.pixelsdb.pixels.core.PixelsWriterStreamImpl;
 import org.junit.Test;
 
 import java.io.IOException;

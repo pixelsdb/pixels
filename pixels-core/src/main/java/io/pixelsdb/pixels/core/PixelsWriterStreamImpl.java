@@ -17,16 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.vhive;
+package io.pixelsdb.pixels.core;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
-import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.core.PixelsWriter;
-import io.pixelsdb.pixels.core.PixelsWriterImpl;
-import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
@@ -54,7 +50,6 @@ import static io.netty.handler.codec.http.HttpHeaderNames.*;
 import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
 import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 import static io.pixelsdb.pixels.core.writer.ColumnWriter.newColumnWriter;
-import static io.pixelsdb.pixels.worker.vhive.StreamWorkerCommon.getPort;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -160,6 +155,41 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     private final List<TypeDescription> children;
     private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
 
+    private static final PixelsReaderStreamImpl.BlockingMap<String, Integer> pathToPort = new PixelsReaderStreamImpl.BlockingMap<>();
+    private static final ConcurrentHashMap<String, Integer> pathToSchemaPort = new ConcurrentHashMap<>();
+    // We allocate data ports in ascending order, starting from `firstPort`;
+    // and allocate schema ports in descending order, starting from `firstPort - 1`.
+    private static final int firstPort = 50100;
+    private static final AtomicInteger nextPort = new AtomicInteger(firstPort);
+    private static final AtomicInteger schemaPorts = new AtomicInteger(firstPort - 1);
+
+    public static int getPort(String path)
+    {
+        // XXX: Ideally, the getPort() should block until the server started. Otherwise, the server may not be ready when the client tries to connect.
+        //  Currently, we resolve this by using Spring Retry in the HTTP client.
+        try {
+            int ret = pathToPort.get(path);
+            // ArrayBlockingQueue.take() removes element from the queue, so we need to put it back
+            setPort(path, ret);
+            return ret;
+        }
+        catch (InterruptedException e) {
+            e.printStackTrace();
+            return -1;
+        }
+    }
+    public static int getOrSetPort(String path) {
+        if (pathToPort.exist(path)) return getPort(path);
+        else {
+            int port = nextPort.getAndIncrement();
+            setPort(path, port);
+            return port;
+        }
+    }
+    public static void setPort(String path, int port) {
+        pathToPort.put(path, port);
+    }
+    public static int getSchemaPort(String path) { return pathToSchemaPort.computeIfAbsent(path, k -> schemaPorts.getAndDecrement()); }
     private String fileNameToUri(String fileName) {
         return "http://localhost:" + getPort(fileName) + "/";
     }

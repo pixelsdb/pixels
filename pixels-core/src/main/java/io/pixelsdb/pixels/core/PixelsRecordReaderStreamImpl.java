@@ -17,12 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.vhive;
+package io.pixelsdb.pixels.core;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.ColumnReader;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
@@ -408,7 +406,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     /**
      * In the streaming version, the readBatch() method returns row batches read online from the stream.
      * This corresponds to the Next() method in the pipelining model of databases.
-     * ReadBatch() would block until any (new) batch is available or until timeout (60s - as defined in {@link io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl.BlockingMap}),
+     * ReadBatch() would block until any (new) batch is available or until timeout (60s - as defined in {@link PixelsReaderStreamImpl.BlockingMap}),
      *  and returns an empty row batch if the end of the stream is reached.
      */
     @Override

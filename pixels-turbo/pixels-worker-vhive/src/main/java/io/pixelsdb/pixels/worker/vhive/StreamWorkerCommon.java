@@ -20,9 +20,7 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsWriter;
-import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
@@ -35,10 +33,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -47,42 +43,6 @@ import static java.util.Objects.requireNonNull;
 public class StreamWorkerCommon extends WorkerCommon {
     private static final Logger logger = LogManager.getLogger(StreamWorkerCommon.class);
 
-    private static final PixelsReaderStreamImpl.BlockingMap<String, Integer> pathToPort = new PixelsReaderStreamImpl.BlockingMap<>();
-    private static final ConcurrentHashMap<String, Integer> pathToSchemaPort = new ConcurrentHashMap<>();
-    // We allocate data ports in ascending order, starting from `firstPort`;
-    // and allocate schema ports in descending order, starting from `firstPort - 1`.
-    private static final int firstPort = 50100;
-    private static final AtomicInteger nextPort = new AtomicInteger(firstPort);
-    private static final AtomicInteger schemaPorts = new AtomicInteger(firstPort - 1);
-
-    public static int getPort(String path)
-    {
-        // XXX: Ideally, the getPort() should block until the server started. Otherwise, the server may not be ready when the client tries to connect.
-        //  Currently, we resolve this by using Spring Retry in the HTTP client, but this could be optimized.
-        try {
-            int ret = pathToPort.get(path);
-            // ArrayBlockingQueue.take() removes element from the queue, so we need to put it back
-            setPort(path, ret);
-            return ret;
-        }
-        catch (InterruptedException e) {
-            e.printStackTrace();
-            return -1;
-        }
-    }
-    public static int getOrSetPort(String path) {
-        if (pathToPort.exist(path)) return getPort(path);
-        else {
-            int port = nextPort.getAndIncrement();
-            setPort(path, port);
-            return port;
-        }
-    }
-    public static void setPort(String path, int port) {
-        pathToPort.put(path, port);
-    }
-
-    public static int getSchemaPort(String path) { return pathToSchemaPort.computeIfAbsent(path, k -> schemaPorts.getAndDecrement()); }
     public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException {
         if (storageInfo.getScheme() == Storage.Scheme.mock) {
             // Currently, we use Storage.Scheme.mock to indicate streaming mode,
@@ -107,7 +67,7 @@ public class StreamWorkerCommon extends WorkerCommon {
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
         // Start a special port to pass schema
-        passSchemaToNextLevel(schema, storageInfo, "http://localhost:" + getSchemaPort(outputInfo.getPath()) + "/");
+        passSchemaToNextLevel(schema, storageInfo, "http://localhost:" + PixelsWriterStreamImpl.getSchemaPort(outputInfo.getPath()) + "/");
     }
 
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, String endpoint)
@@ -117,8 +77,7 @@ public class StreamWorkerCommon extends WorkerCommon {
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
         PixelsWriter pixelsWriter = getWriter(schema, null, endpoint, false, false, -1, null, null, true);
-        ((PixelsWriterStreamImpl)pixelsWriter).writeRowGroup();
-        pixelsWriter.close();
+        pixelsWriter.close();  // We utilize the sendRowGroup() in PixelsWriterStreamImpl's close() to send the schema.
     }
 
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, List<String> endpoints)
@@ -139,7 +98,7 @@ public class StreamWorkerCommon extends WorkerCommon {
     public static TypeDescription getSchemaFromSplits(Storage storage, List<InputSplit> inputSplits)
             throws Exception {
         if (storage == null) {
-            PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(inputSplits.get(0).getInputInfos().get(0).getPath()));
+            PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(inputSplits.get(0).getInputInfos().get(0).getPath()));
             TypeDescription ret = pixelsReader.getFileSchema();
             pixelsReader.close();
             return ret;
@@ -151,7 +110,7 @@ public class StreamWorkerCommon extends WorkerCommon {
             throws Exception {
         if (storage == null)
         {
-            PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(paths.get(0)));
+            PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(paths.get(0)));
             TypeDescription ret = pixelsReader.getFileSchema();
             pixelsReader.close();
             return ret;
@@ -175,7 +134,7 @@ public class StreamWorkerCommon extends WorkerCommon {
             // Currently, the first packet from the stream brings the schema
             Future<?> leftFuture = executor.submit(() -> {
                 try {
-                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(leftPaths.get(0)));
+                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(leftPaths.get(0)));
                     leftSchema.set(pixelsReader.getFileSchema());
                     pixelsReader.close();
                 } catch (Exception e) {
@@ -184,7 +143,7 @@ public class StreamWorkerCommon extends WorkerCommon {
             });
             Future<?> rightFuture = executor.submit(() -> {
                 try {
-                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(StreamWorkerCommon.getSchemaPort(rightPaths.get(0)));
+                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(rightPaths.get(0)));
                     rightSchema.set(pixelsReader.getFileSchema());
                     pixelsReader.close();  // XXX: This `close()` makes the test noticeably slower. Will need to look into it.
                 } catch (Exception e) {
@@ -217,8 +176,8 @@ public class StreamWorkerCommon extends WorkerCommon {
         requireNonNull(storageScheme, "storageInfo is null");
         requireNonNull(path, "fileName is null");
         if (storageScheme == Storage.Scheme.mock) {
-            logger.debug("getReader streaming mode, path: " + path + ", port: " + getOrSetPort(path));
-            return new PixelsReaderStreamImpl("http://localhost:" + getOrSetPort(path) + "/", partitioned, numHashes);
+            logger.debug("getReader streaming mode, path: " + path + ", port: " + PixelsWriterStreamImpl.getOrSetPort(path));
+            return new PixelsReaderStreamImpl("http://localhost:" + PixelsWriterStreamImpl.getOrSetPort(path) + "/", partitioned, numHashes);
         }
         else return WorkerCommon.getReader(path, WorkerCommon.getStorage(storageScheme));
     }
@@ -259,7 +218,7 @@ public class StreamWorkerCommon extends WorkerCommon {
                 .setPartitioned(isPartitioned)
                 .setPartitionId(isPartitioned ? partitionId : -1);
         if (!isPartitioned) {
-            if (isSchemaWriter) builder.setUri(URI.create("http://localhost:" + getSchemaPort(outputPath) + "/"));
+            if (isSchemaWriter) builder.setUri(URI.create("http://localhost:" + PixelsWriterStreamImpl.getSchemaPort(outputPath) + "/"));
             builder.setFileName(outputPath);
         }
         else {

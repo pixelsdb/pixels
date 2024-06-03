@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.vhive;
+package io.pixelsdb.pixels.core;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.buffer.ByteBuf;
@@ -29,10 +29,6 @@ import io.netty.handler.codec.http.*;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
 import io.pixelsdb.pixels.common.utils.HttpServerHandler;
-import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsVersion;
-import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsStreamHeaderMalformedException;
@@ -60,7 +56,7 @@ import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 /**
  * PixelsReaderStreamImpl is an implementation of {@link io.pixelsdb.pixels.core.PixelsReader} that reads
  * ColumnChunks from a stream, for operator pipelining over HTTP.
- * DESIGN: For the design of the stream protocol, see the head comment in {@link io.pixelsdb.pixels.worker.vhive.PixelsWriterStreamImpl}.
+ * DESIGN: For the design of the stream protocol, see the head comment in {@link PixelsWriterStreamImpl}.
  * <p>
  * TODO: Currently, we assume the HTTP messages arrive in order. Implement a state machine to handle out-of-order messages
  *  (e.g. send a response to the client to ask for retransmission if the header is missing).
@@ -68,7 +64,7 @@ import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 @NotThreadSafe
 public class PixelsReaderStreamImpl implements PixelsReader
 {
-    private static final Logger logger = LogManager.getLogger(io.pixelsdb.pixels.worker.vhive.PixelsReaderStreamImpl.class);
+    private static final Logger logger = LogManager.getLogger(PixelsReaderStreamImpl.class);
 
     private TypeDescription fileSchema;
     private final HttpServer httpServer;
