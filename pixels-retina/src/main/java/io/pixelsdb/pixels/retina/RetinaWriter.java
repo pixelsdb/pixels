@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
 import io.pixelsdb.pixels.core.PixelsWriter;
@@ -33,7 +34,6 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -49,38 +49,8 @@ public class RetinaWriter
 {
     MemoryMappedFile memoryMappedFile;
     MetadataService metadataService;
-
-    private Properties prop;
-
     HashMap<String, TypeDescription> schemas;
-
-    enum ValueType
-    {
-        NONE,  // Useful when the type of column vector has not be determined yet.
-        LONG,
-        DOUBLE,
-        BYTES,
-        DECIMAL,
-        TIMESTAMP,
-        INTERVAL_DAY_TIME,
-        STRUCT,
-        LIST,
-        MAP,
-        UNION;
-
-        public static ValueType fromShort(short x)
-        {
-            switch(x) {
-                case 0:
-                    return NONE;
-                case 1:
-                    return LONG;
-                case 3:
-                    return BYTES;
-            }
-            return null;
-        }
-    }
+    private final Properties prop;
 
     RetinaWriter()
     {
@@ -130,7 +100,6 @@ public class RetinaWriter
         return TypeDescription.fromString("struct<a:long,b:long,c:long,d:long,e:long,f:string,g:string,version:long>");
     }
 
-
     /**
      * Read from shared memory and write to file
      */
@@ -155,7 +124,7 @@ public class RetinaWriter
         String targetDirPath = "/tmp/pixels/";
 
         int pixelStride = Integer.parseInt(prop.getProperty("pixel.stride"));
-        int rowGroupSize = Integer.parseInt(prop.getProperty("row.group.size")) ;
+        int rowGroupSize = Integer.parseInt(prop.getProperty("row.group.size"));
         long blockSize = Long.parseLong(prop.getProperty("block.size"));
         short replication = Short.parseShort(prop.getProperty("block.replication"));
 
@@ -244,5 +213,35 @@ public class RetinaWriter
         // TODO Inform metadata service
 
         pixelsWriter.close();
+    }
+
+
+    enum ValueType
+    {
+        NONE,  // Useful when the type of column vector has not be determined yet.
+        LONG,
+        DOUBLE,
+        BYTES,
+        DECIMAL,
+        TIMESTAMP,
+        INTERVAL_DAY_TIME,
+        STRUCT,
+        LIST,
+        MAP,
+        UNION;
+
+        public static ValueType fromShort(short x)
+        {
+            switch (x)
+            {
+                case 0:
+                    return NONE;
+                case 1:
+                    return LONG;
+                case 3:
+                    return BYTES;
+            }
+            return null;
+        }
     }
 }
