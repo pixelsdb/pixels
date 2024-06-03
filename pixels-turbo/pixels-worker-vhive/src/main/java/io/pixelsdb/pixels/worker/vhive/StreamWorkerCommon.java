@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.worker.vhive;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
@@ -226,5 +227,19 @@ public class StreamWorkerCommon extends WorkerCommon {
                     .setPartKeyColumnIds(keyColumnIds);
         }
         return builder.build();
+    }
+
+    public static PixelsReaderOption getReaderOption(long transId, String[] cols, PixelsReader pixelsReader,
+                                                     int hashValue, int numPartition)
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.transId(transId);
+        option.includeCols(cols);
+        option.rgRange(hashValue, 1);
+        // XXX: The original implementation in WorkerCommon uses `pixelsReader.getRowGroupNum()`,
+        //  but it is not supported in PixelsReaderStreamImpl. We thus hardcode it to 1.
+        return option;
     }
 }
