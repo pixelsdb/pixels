@@ -17,14 +17,14 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core;
+package io.pixelsdb.pixels.core.reader;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.pixelsdb.pixels.core.reader.ColumnReader;
-import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
-import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.core.reader.PixelsRecordReaderImpl;
+import io.pixelsdb.pixels.core.PixelsProto;
+import io.pixelsdb.pixels.core.PixelsReaderStreamImpl;
+import io.pixelsdb.pixels.core.PixelsWriterStreamImpl;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.turbo.StreamProto;
@@ -126,6 +126,23 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
         // requireNonNull(TransContextCache.Instance().getQueryTransInfo(this.transId),
         //         "The transaction context does not contain query (trans) id '" + this.transId + "'");
         if (this.streamHeader != null) checkBeforeRead();
+    }
+
+    /**
+     * We allow creating a RecordReader instance first anywhere and
+     *  initialize it with `checkBeforeRead()` later in HTTP server's serve method in Reader,
+     * because the first package of the stream (which contains the StreamHeader) might not have arrived
+     *  by the time we create the RecordReader instance.
+     * Also, because we put the byteBuf into the blocking queue only after initializing the `streamHeader`,
+     *  it is safe to assume that the `streamHeader` has been initialized by the time
+     *  we first call `readBatch()` in the recordReader.
+     * @param streamHeader
+     * @throws IOException
+     */
+    public void lateInitialization(StreamProto.StreamHeader streamHeader) throws IOException
+    {
+        this.streamHeader = streamHeader;
+        checkBeforeRead();
     }
 
     /**

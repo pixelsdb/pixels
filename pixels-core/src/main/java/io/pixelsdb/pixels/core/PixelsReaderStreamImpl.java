@@ -34,6 +34,7 @@ import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsStreamHeaderMalformedException;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.reader.PixelsRecordReaderStreamImpl;
 import io.pixelsdb.pixels.turbo.StreamProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -141,15 +142,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
                             for (PixelsRecordReaderStreamImpl recordReader : recordReaders) {
                                 // XXX: potential data race with line 235 - if read() and this handler are executed in parallel
-                                recordReader.streamHeader = streamHeader;
-                                recordReader.checkBeforeRead();
-                                // Currently, we allow creating a RecordReader instance first elsewhere and
-                                //  initialize it with `checkBeforeRead()` later here,
-                                //  because the first package of the stream (which contains the StreamHeader) might not have arrived
-                                //  by the time we create the RecordReader instance.
-                                // Also, because we put the byteBuf into the blocking queue only after initializing the `streamHeader`,
-                                //  it is safe to assume that the `streamHeader` has been initialized by the time
-                                //  we first call `readBatch()` in the recordReader.
+                                recordReader.lateInitialization(streamHeader);
                             }
                         } catch (IOException e) {
                             throw new RuntimeException(e);
