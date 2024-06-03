@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
+import io.pixelsdb.pixels.core.utils.BlockingMap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.core.writer.ColumnWriter;
@@ -155,7 +156,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     private final List<TypeDescription> children;
     private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
 
-    private static final PixelsReaderStreamImpl.BlockingMap<String, Integer> pathToPort = new PixelsReaderStreamImpl.BlockingMap<>();
+    private static final BlockingMap<String, Integer> pathToPort = new BlockingMap<>();
     private static final ConcurrentHashMap<String, Integer> pathToSchemaPort = new ConcurrentHashMap<>();
     // We allocate data ports in ascending order, starting from `firstPort`;
     // and allocate schema ports in descending order, starting from `firstPort - 1`.

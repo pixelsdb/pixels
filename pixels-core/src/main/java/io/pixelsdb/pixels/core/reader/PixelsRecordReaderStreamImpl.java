@@ -22,9 +22,9 @@ package io.pixelsdb.pixels.core.reader;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.core.PixelsReaderStreamImpl;
 import io.pixelsdb.pixels.core.PixelsWriterStreamImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.BlockingMap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.turbo.StreamProto;
@@ -56,7 +56,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
      */
     private ByteBuf curRowGroupByteBuf;
     private final BlockingQueue<ByteBuf> byteBufSharedQueue;
-    private final PixelsReaderStreamImpl.BlockingMap<Integer, ByteBuf> byteBufBlockingMap;  // hash value -> ByteBuf
+    private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;  // hash value -> ByteBuf
 
     StreamProto.StreamRowGroupFooter curRowGroupStreamFooter;
     private TypeDescription fileSchema = null;
@@ -108,7 +108,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
 
     public PixelsRecordReaderStreamImpl(boolean partitioned,
                                         BlockingQueue<ByteBuf> byteBufSharedQueue,
-                                        PixelsReaderStreamImpl.BlockingMap<Integer, ByteBuf> byteBufBlockingMap,
+                                        BlockingMap<Integer, ByteBuf> byteBufBlockingMap,
                                         StreamProto.StreamHeader streamHeader,
                                         PixelsReaderOption option) throws IOException
     {
@@ -423,7 +423,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     /**
      * In the streaming version, the readBatch() method returns row batches read online from the stream.
      * This corresponds to the Next() method in the pipelining model of databases.
-     * ReadBatch() would block until any (new) batch is available or until timeout (60s - as defined in {@link PixelsReaderStreamImpl.BlockingMap}),
+     * ReadBatch() would block until any (new) batch is available or until timeout (60s - as defined in {@link BlockingMap}),
      *  and returns an empty row batch if the end of the stream is reached.
      */
     @Override
