@@ -659,7 +659,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         }
         StreamProto.StreamRowGroupFooter rowGroupFooter = rowGroupFooterBuilder.build();
         // XXX: rowGroupIndex and rowGroupEncoding are the same for all row groups in the same file?
-        //  If so, we can send them only once per file.  -- Row group footer accounts for <1% of the total data size. No need to optimize.
+        //  If so, we can send them only once per file.
+        // -- rowGroupIndex: no, it contains the offsets of the column chunks. rowGroupEncoding: yes
+        //  so not possible to send them only once per file.
+        // -- Row group footer accounts for <1% of the total data size. No need to optimize.
 
         // write and flush row group footer
         byte[] footerBuffer = rowGroupFooter.toByteArray();
