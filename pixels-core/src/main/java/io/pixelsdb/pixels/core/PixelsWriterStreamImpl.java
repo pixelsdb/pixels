@@ -458,8 +458,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             CompletableFuture<Void> future = new CompletableFuture<>();
             ColumnWriter writer = columnWriters[i];
             ColumnVector columnVector = columnVectors[i];
-            columnWriterService.execute(() ->
-            {
+            columnWriterService.execute(() -> {
                 try {
                     dataLength.addAndGet(writer.write(columnVector, rowBatchSize));
                     future.complete(null);
@@ -528,9 +527,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         }
     }
 
-    // XXX: In demo version, I have modified this method to be non-private, because StreamWorkerCommon::passSchemaToNextLevel() needs it.
-    //  This is a bad practice. todo Change it back.
-    void writeRowGroup() throws IOException {
+    private void writeRowGroup() throws IOException {
         if (isFirstRowGroup || partitioned) {
             writeStreamHeader(); isFirstRowGroup = false;
         }
