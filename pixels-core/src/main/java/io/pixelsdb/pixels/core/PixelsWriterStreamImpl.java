@@ -70,7 +70,7 @@ import static java.util.Objects.requireNonNull;
  * |---|---|---|---|---|
  * | 2 | 2 | 2 | 2 | 2 |
  * |---|---|---|---|---|
- *
+ * <p>
  * Each partition worker sends its hashed data parts to the corresponding join workers in sequence. For example:
  *  - Partition worker 0 sends its hash=0 part (of partition 0) to join worker 0, hash=1 part to join worker 1, and so on.
  *  - The same pattern is followed by partition workers 1, 2, 3, 4, etc.
@@ -78,7 +78,8 @@ import static java.util.Objects.requireNonNull;
  * Consequently, a partition worker must send each hash part (within its partition) to different ports.
  */
 @NotThreadSafe
-public class PixelsWriterStreamImpl implements PixelsWriter {
+public class PixelsWriterStreamImpl implements PixelsWriter
+{
     private static final Logger logger = LogManager.getLogger(PixelsWriterStreamImpl.class);
 
     private static final ByteOrder WRITER_ENDIAN;
@@ -91,12 +92,15 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
      */
     private static final byte[] CHUNK_PADDING_BUFFER;
 
-    static {
+    static
+    {
         boolean littleEndian = Boolean.parseBoolean(
                 ConfigFactory.Instance().getProperty("column.chunk.little.endian"));
-        if (littleEndian) {
+        if (littleEndian)
+        {
             WRITER_ENDIAN = ByteOrder.LITTLE_ENDIAN;
-        } else {
+        } else
+        {
             WRITER_ENDIAN = ByteOrder.BIG_ENDIAN;
         }
         CHUNK_ALIGNMENT = Integer.parseInt(ConfigFactory.Instance().getProperty("column.chunk.alignment"));
@@ -168,30 +172,42 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     {
         // XXX: Ideally, the getPort() should block until the server started. Otherwise, the server may not be ready when the client tries to connect.
         //  Currently, we resolve this by using Spring Retry in the HTTP client.
-        try {
+        try
+        {
             int ret = pathToPort.get(path);
             // ArrayBlockingQueue.take() removes element from the queue, so we need to put it back
             setPort(path, ret);
             return ret;
-        }
-        catch (InterruptedException e) {
+        } catch (InterruptedException e)
+        {
             e.printStackTrace();
             return -1;
         }
     }
-    public static int getOrSetPort(String path) {
+
+    public static int getOrSetPort(String path)
+    {
         if (pathToPort.exist(path)) return getPort(path);
-        else {
+        else
+        {
             int port = nextPort.getAndIncrement();
             setPort(path, port);
             return port;
         }
     }
-    public static void setPort(String path, int port) {
+
+    public static void setPort(String path, int port)
+    {
         pathToPort.put(path, port);
     }
-    public static int getSchemaPort(String path) { return pathToSchemaPort.computeIfAbsent(path, k -> schemaPorts.getAndDecrement()); }
-    private String fileNameToUri(String fileName) {
+
+    public static int getSchemaPort(String path)
+    {
+        return pathToSchemaPort.computeIfAbsent(path, k -> schemaPorts.getAndDecrement());
+    }
+
+    private String fileNameToUri(String fileName)
+    {
         return "http://localhost:" + getPort(fileName) + "/";
     }
 
@@ -207,7 +223,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             boolean partitioned,
             int partitionId,
             Optional<List<Integer>> partKeyColumnIds,
-            URI uri, String fileName, List<String> fileNames) {
+            URI uri, String fileName, List<String> fileNames)
+    {
         this.schema = requireNonNull(schema, "schema is null");
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
         checkArgument(rowGroupSize > 0, "row group size is not positive");
@@ -227,7 +244,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 .encodingLevel(requireNonNull(encodingLevel, "encodingLevel is null"))
                 .byteOrder(WRITER_ENDIAN)
                 .nullsPadding(nullsPadding);
-        for (int i = 0; i < children.size(); ++i) {
+        for (int i = 0; i < children.size(); ++i)
+        {
             columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
         }
 
@@ -238,7 +256,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         this.httpClient = Dsl.asyncHttpClient();
     }
 
-    public static class Builder {
+    public static class Builder
+    {
         private TypeDescription builderSchema = null;
         private int builderPixelStride = 0;
         private int builderRowGroupSize = 0;
@@ -254,35 +273,42 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         private String builderFileName = null;
         private List<String> builderFileNames = null;
 
-        private Builder() {
+        private Builder()
+        {
         }
 
-        public Builder setSchema(TypeDescription schema) {
+        public Builder setSchema(TypeDescription schema)
+        {
             this.builderSchema = requireNonNull(schema);
             return this;
         }
 
-        public Builder setPixelStride(int stride) {
+        public Builder setPixelStride(int stride)
+        {
             this.builderPixelStride = stride;
             return this;
         }
 
-        public Builder setRowGroupSize(int rowGroupSize) {
+        public Builder setRowGroupSize(int rowGroupSize)
+        {
             this.builderRowGroupSize = rowGroupSize;
             return this;
         }
 
-        public Builder setCompressionKind(PixelsProto.CompressionKind compressionKind) {
+        public Builder setCompressionKind(PixelsProto.CompressionKind compressionKind)
+        {
             this.builderCompressionKind = requireNonNull(compressionKind);
             return this;
         }
 
-        public Builder setCompressionBlockSize(int compressionBlockSize) {
+        public Builder setCompressionBlockSize(int compressionBlockSize)
+        {
             this.builderCompressionBlockSize = compressionBlockSize;
             return this;
         }
 
-        public Builder setTimeZone(TimeZone timeZone) {
+        public Builder setTimeZone(TimeZone timeZone)
+        {
             this.builderTimeZone = requireNonNull(timeZone);
             return this;
         }
@@ -293,42 +319,50 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
             return this;
         }
 
-        public Builder setEncodingLevel(EncodingLevel encodingLevel) {
+        public Builder setEncodingLevel(EncodingLevel encodingLevel)
+        {
             this.builderEncodingLevel = encodingLevel;
             return this;
         }
 
-        public Builder setPartitioned(boolean partitioned) {
+        public Builder setPartitioned(boolean partitioned)
+        {
             this.builderPartitioned = partitioned;
             return this;
         }
 
-        public Builder setPartitionId(int partitionId) {
+        public Builder setPartitionId(int partitionId)
+        {
             this.builderPartitionId = partitionId;
             return this;
         }
 
-        public Builder setPartKeyColumnIds(List<Integer> partitionColumnIds) {
+        public Builder setPartKeyColumnIds(List<Integer> partitionColumnIds)
+        {
             this.builderPartKeyColumnIds = Optional.ofNullable(partitionColumnIds);
             return this;
         }
 
-        public Builder setFileName(String fileName) {
+        public Builder setFileName(String fileName)
+        {
             this.builderFileName = requireNonNull(fileName);
             return this;
         }
 
-        public Builder setFileNames(List<String> fileNames) {
+        public Builder setFileNames(List<String> fileNames)
+        {
             this.builderFileNames = requireNonNull(fileNames);
             return this;
         }
 
-        public Builder setUri(URI uri) {
+        public Builder setUri(URI uri)
+        {
             this.builderUri = requireNonNull(uri);
             return this;
         }
 
-        public PixelsWriter build() throws PixelsWriterException {
+        public PixelsWriter build() throws PixelsWriterException
+        {
             requireNonNull(this.builderSchema, "schema is not set");
             checkArgument(!requireNonNull(builderSchema.getChildren(),
                     "schema's children is null").isEmpty(), "schema is empty");
@@ -357,11 +391,13 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         }
     }
 
-    public static Builder newBuilder() {
+    public static Builder newBuilder()
+    {
         return new Builder();
     }
 
-    public TypeDescription getSchema() {
+    public TypeDescription getSchema()
+    {
         return schema;
     }
 
@@ -369,50 +405,61 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
      * Returns the num of already written row groups. (different from {@link PixelsWriterImpl#getNumRowGroup()})
      */
     @Override
-    public int getNumRowGroup() {
+    public int getNumRowGroup()
+    {
         return rowGroupNum;
     }
 
     @Override
-    public int getNumWriteRequests() {
+    public int getNumWriteRequests()
+    {
         return 0;  // ??? Do we need to count the number of HTTP requests under HTTP streaming mode?
     }
 
     @Override
-    public long getCompletedBytes() {
+    public long getCompletedBytes()
+    {
         return writtenBytes;
     }
 
-    public int getPixelStride() {
+    public int getPixelStride()
+    {
         return columnWriterOption.getPixelStride();
     }
 
-    public int getRowGroupSize() {
+    public int getRowGroupSize()
+    {
         return rowGroupSize;
     }
 
-    public PixelsProto.CompressionKind getCompressionKind() {
+    public PixelsProto.CompressionKind getCompressionKind()
+    {
         return compressionKind;
     }
 
-    public int getCompressionBlockSize() {
+    public int getCompressionBlockSize()
+    {
         return compressionBlockSize;
     }
 
-    public TimeZone getTimeZone() {
+    public TimeZone getTimeZone()
+    {
         return timeZone;
     }
 
-    public EncodingLevel getEncodingLevel() {
+    public EncodingLevel getEncodingLevel()
+    {
         return columnWriterOption.getEncodingLevel();
     }
 
-    public boolean isPartitioned() {
+    public boolean isPartitioned()
+    {
         return partitioned;
     }
 
     @Override
-    public boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException {
+    public boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException
+    {
         checkArgument(!partitioned, "this file is hash partitioned, " +
                 "use addRowBatch(rowBatch, hashValue) instead");
         /**
@@ -424,7 +471,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         curRowGroupNumOfRows += rowBatch.size;
         writeColumnVectors(rowBatch.cols, rowBatch.size);
         // If the current row group size has exceeded the row group size, write current row group.
-        if (curRowGroupDataLength >= rowGroupSize) {
+        if (curRowGroupDataLength >= rowGroupSize)
+        {
             writeRowGroup();
             curRowGroupNumOfRows = 0L;
             return false;
@@ -433,12 +481,15 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
     }
 
     @Override
-    public void addRowBatch(VectorizedRowBatch rowBatch, int hashValue) throws IOException {
+    public void addRowBatch(VectorizedRowBatch rowBatch, int hashValue) throws IOException
+    {
         checkArgument(partitioned, "this file is not hash partitioned, " +
                 "use addRowBatch(rowBatch) instead");
-        if (hashValueIsSet) {
+        if (hashValueIsSet)
+        {
             // As the current hash value is set, at lease one row batch has been added.
-            if (currHashValue != hashValue) {
+            if (currHashValue != hashValue)
+            {
                 // Write the current hash partition (row group) and add the row batch to a new hash partition.
                 writeRowGroup();
                 curRowGroupNumOfRows = 0L;
@@ -451,18 +502,22 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         writeColumnVectors(rowBatch.cols, rowBatch.size);
     }
 
-    private void writeColumnVectors(ColumnVector[] columnVectors, int rowBatchSize) {
+    private void writeColumnVectors(ColumnVector[] columnVectors, int rowBatchSize)
+    {
         CompletableFuture<?>[] futures = new CompletableFuture[columnVectors.length];
         AtomicInteger dataLength = new AtomicInteger(0);
-        for (int i = 0; i < columnVectors.length; ++i) {
+        for (int i = 0; i < columnVectors.length; ++i)
+        {
             CompletableFuture<Void> future = new CompletableFuture<>();
             ColumnWriter writer = columnWriters[i];
             ColumnVector columnVector = columnVectors[i];
             columnWriterService.execute(() -> {
-                try {
+                try
+                {
                     dataLength.addAndGet(writer.write(columnVector, rowBatchSize));
                     future.complete(null);
-                } catch (IOException e) {
+                } catch (IOException e)
+                {
                     throw new CompletionException("failed to write column vector", e);
                 }
             });
@@ -476,22 +531,29 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
      * Close PixelsWriterStreamImpl, indicating the end of stream.
      */
     @Override
-    public void close() {
-        try {
-            if (curRowGroupNumOfRows != 0) {
+    public void close()
+    {
+        try
+        {
+            if (curRowGroupNumOfRows != 0)
+            {
                 writeRowGroup();
             }
             // If the outgoing stream is empty (addRowBatch() and thus writeRowGroup() never called), we artificially send an empty row group here before closing,
             //  so that the HTTP server can properly move on and close.
-            else if (isFirstRowGroup) {
-                writeRowGroup(); isFirstRowGroup = false;
+            else if (isFirstRowGroup)
+            {
+                writeRowGroup();
+                isFirstRowGroup = false;
             }
 
-            if (!partitioned) {
+            if (!partitioned)
+            {
                 // close the HTTP connection
                 // XXX: Can just set the connection header to "close" on the last row group / each partitioned row group,
                 //  instead of sending a separate close request. -- the PixelsWriterStreamImpl does not know which row group is the last. Not possible.
-                if (!partitioned && uri == null) {
+                if (!partitioned && uri == null)
+                {
                     uri = URI.create(fileNameToUri(fileName));
                 }
                 Request req = httpClient.preparePost(partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString())
@@ -499,37 +561,46 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                         .addHeader(CONTENT_LENGTH, 0)
                         .addHeader(CONNECTION, CLOSE)
                         .build();
-                try {
+                try
+                {
                     outstandingHTTPRequestSemaphore.acquire();
                     Response response = httpClient.executeRequest(req).get();
-                    if (response.getStatusCode() != 200) {
+                    if (response.getStatusCode() != 200)
+                    {
                         throw new IOException("Failed to send close request to server. Is the server already closed? HTTP status code: " + response.getStatusCode());
                     }
-                } catch (Throwable e) {
+                } catch (Throwable e)
+                {
                     // log to warn that remote has already closed, but not throwing out the exception
                     logger.warn(e.getMessage());
                     e.printStackTrace();
                 }
             }
 
-            for (ColumnWriter cw : columnWriters) {
+            for (ColumnWriter cw : columnWriters)
+            {
                 cw.close();
             }
             columnWriterService.shutdown();
             columnWriterService.shutdownNow();
 
-            if (byteBuf.refCnt() > 0) {
+            if (byteBuf.refCnt() > 0)
+            {
                 byteBuf.release();
             }
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             logger.error(e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private void writeRowGroup() throws IOException {
-        if (isFirstRowGroup || partitioned) {
-            writeStreamHeader(); isFirstRowGroup = false;
+    private void writeRowGroup() throws IOException
+    {
+        if (isFirstRowGroup || partitioned)
+        {
+            writeStreamHeader();
+            isFirstRowGroup = false;
         }
 
         int rowGroupDataLength = 0;
@@ -542,16 +613,19 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 PixelsProto.PartitionInformation.newBuilder();
 
         // reset each column writer and get current row group content size in bytes
-        for (ColumnWriter writer : columnWriters) {
+        for (ColumnWriter writer : columnWriters)
+        {
             // flush writes the isNull bit map into the internal output stream.
             writer.flush();
         }
 
         // write and flush row group content
         int recordedRowGroupDataLen = 0;
-        try {
+        try
+        {
             curRowGroupOffset = byteBuf.writerIndex();
-            if (curRowGroupOffset != -1) {
+            if (curRowGroupOffset != -1)
+            {
                 /**
                  * Actually, this condition is always true because a ByteBuf's writerIndex is never -1.
                  * Just keep the code for compatibility with legacy {@link PixelsWriterImpl#writeRowGroup()}, where curRowGroupOffset could be -1 when write prepare failed.
@@ -565,18 +639,21 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 writtenBytes += Integer.BYTES;
                 curRowGroupOffset = byteBuf.writerIndex();
 
-                while (CHUNK_ALIGNMENT != 0 && curRowGroupOffset % CHUNK_ALIGNMENT != 0 && tryAlign++ < 2) {
+                while (CHUNK_ALIGNMENT != 0 && curRowGroupOffset % CHUNK_ALIGNMENT != 0 && tryAlign++ < 2)
+                {
                     int alignBytes = (int) (CHUNK_ALIGNMENT - curRowGroupOffset % CHUNK_ALIGNMENT);
                     byteBuf.writeBytes(CHUNK_PADDING_BUFFER, 0, alignBytes);
                     writtenBytes += alignBytes;
                     curRowGroupOffset = byteBuf.writerIndex();
                 }
-                if (tryAlign > 2) {
+                if (tryAlign > 2)
+                {
                     logger.warn("failed to align the start offset of the column chunks in the row group");
                     throw new IOException("failed to align the start offset of the column chunks in the row group");
                 }
 
-                for (ColumnWriter writer : columnWriters) {
+                for (ColumnWriter writer : columnWriters)
+                {
                     byte[] columnChunkBuffer = writer.getColumnChunkContent();
 
                     // DESIGN: Because ColumnChunkIndex does not change after the last write() or flush(),
@@ -593,7 +670,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                     // todo: try using byteBuf.addComponent(true, Unpooled.wrappedBuffer(columnChunkBuffer)) (and let byteBuf = Unpooled.compositeBuffer()) instead
                     writtenBytes += columnChunkBuffer.length;
                     // add align bytes to make sure the column size is the multiple of fsBlockSize
-                    if (CHUNK_ALIGNMENT != 0 && columnChunkBuffer.length % CHUNK_ALIGNMENT != 0) {
+                    if (CHUNK_ALIGNMENT != 0 && columnChunkBuffer.length % CHUNK_ALIGNMENT != 0)
+                    {
                         int alignBytes = CHUNK_ALIGNMENT - columnChunkBuffer.length % CHUNK_ALIGNMENT;
                         byteBuf.writeBytes(CHUNK_PADDING_BUFFER, 0, alignBytes);
                         writtenBytes += alignBytes;
@@ -605,21 +683,26 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 if (recordedRowGroupDataLen != writtenBytes - writtenBytesBefore)
                     logger.warn("Recorded rowGroupDataLen is not equal to accumulated writtenBytes");
                 byteBuf.setInt(rowGroupDataLenPos, recordedRowGroupDataLen);
-            } else {
+            }
+            else
+            {
                 logger.warn("write row group prepare failed");
                 throw new IOException("write row group prepare failed");
             }
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             logger.error(e.getMessage());
             throw e;
         }
 
         // update index and stats
         rowGroupDataLength = 0;
-        for (int i = 0; i < columnWriters.length; i++) {
+        for (int i = 0; i < columnWriters.length; i++)
+        {
             ColumnWriter writer = columnWriters[i];
             rowGroupDataLength += writer.getColumnChunkSize();
-            if (CHUNK_ALIGNMENT != 0 && rowGroupDataLength % CHUNK_ALIGNMENT != 0) {
+            if (CHUNK_ALIGNMENT != 0 && rowGroupDataLength % CHUNK_ALIGNMENT != 0)
+            {
                 /*
                  * Issue #519:
                  * This line must be consistent with how column chunks are padded above.
@@ -642,7 +725,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         if (rowGroupDataLength + 32 < recordedRowGroupDataLen || rowGroupDataLength + 8 > recordedRowGroupDataLen)  // XXX: if (rowGroupDataLength != recordedRowGroupDataLen)
             throw new IOException("The calculated rowGroupDataLength is not equal to the recorded value");
 
-        if (partitioned) {
+        if (partitioned)
+        {
             // partitionColumnIds has been checked to be present in the builder.
             curPartitionInfo.addAllColumnIds(partKeyColumnIds.orElse(null));
             curPartitionInfo.setHashValue(currHashValue);
@@ -654,7 +738,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                         .setRowGroupIndexEntry(curRowGroupIndex.build())
                         .setRowGroupEncoding(curRowGroupEncoding.build())
                         .setNumberOfRows(curRowGroupNumOfRows);
-        if (partitioned) {
+        if (partitioned)
+        {
             rowGroupFooterBuilder.setPartitionInfo(curPartitionInfo.build());
         }
         StreamProto.StreamRowGroupFooter rowGroupFooter = rowGroupFooterBuilder.build();
@@ -675,7 +760,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         this.rowGroupNum++;
 
         // Send row group to server (an additional step compared to PixelsWriterImpl)
-        if (!partitioned && uri == null) {
+        if (!partitioned && uri == null)
+        {
             uri = URI.create(fileNameToUri(fileName));
         }
         logger.debug("Sending row group with length: " + byteBuf.writerIndex() + " to endpoint: " + (partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString()));
@@ -694,7 +780,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         //   multi-threaded HTTP transmission to improve performance.
 //        CompletableFuture<Response> resultFuture = new CompletableFuture<>();
 //        CompletableFuture.runAsync(() -> {
-        try {
+        try
+        {
             outstandingHTTPRequestSemaphore.acquire();
             RetryTemplate template = RetryTemplate.builder()
                     .maxAttempts(50)
@@ -704,13 +791,16 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
 
             template.execute(ctx -> {
                 CompletableFuture<Response> future = new CompletableFuture<>();  // Use Future<> to throw the exception to Spring Retry
-                httpClient.executeRequest(req, new AsyncCompletionHandler<Response>() {
+                httpClient.executeRequest(req, new AsyncCompletionHandler<Response>()
+                {
 
                     @Override
-                    public Response onCompleted(Response response) throws Exception {
+                    public Response onCompleted(Response response) throws Exception
+                    {
                         byteBuf.clear();
                         future.complete(response);
-                        if (response.getStatusCode() != 200) {
+                        if (response.getStatusCode() != 200)
+                        {
                             throw new IOException("Failed to send row group to server, status code: " + response.getStatusCode());
                         }
                         outstandingHTTPRequestSemaphore.release();
@@ -718,12 +808,15 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                     }
 
                     @Override
-                    public void onThrowable(Throwable t) {
-                        if (t instanceof java.net.ConnectException) {
+                    public void onThrowable(Throwable t)
+                    {
+                        if (t instanceof java.net.ConnectException)
+                        {
                             // throw an exception for Spring Retry to retry
                             logger.debug("HTTP connection refused. Retrying... Exception message: " + t.getMessage());
                             future.completeExceptionally(t);
-                        } else {
+                        } else
+                        {
                             byteBuf.clear();
                             logger.error(t.getMessage());
                             t.printStackTrace();
@@ -733,16 +826,19 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                     }
                 });
 
-                try {
+                try
+                {
                     Response response = future.get();
                     return response;
-                } catch (ExecutionException e) {
+                } catch (ExecutionException e)
+                {
                     throw e.getCause();  // throw to Spring Retry
                 }
             });
-        } catch (Throwable e) {
-                logger.error(e.getMessage());
-                e.printStackTrace();
+        } catch (Throwable e)
+        {
+            logger.error(e.getMessage());
+            e.printStackTrace();
 //                resultFuture.completeExceptionally(e);
         }
 //        });
@@ -834,7 +930,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
         }
     }
 
-    private void writeStreamHeader() {
+    private void writeStreamHeader()
+    {
         // build streamHeader
         StreamProto.StreamHeader.Builder streamHeaderBuilder =
                 StreamProto.StreamHeader.newBuilder();

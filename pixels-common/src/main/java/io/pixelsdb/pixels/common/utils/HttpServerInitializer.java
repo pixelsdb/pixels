@@ -32,24 +32,30 @@ import io.netty.handler.ssl.SslContext;
  * @author jasha64
  * @create 2023-07-27
  */
-public class HttpServerInitializer extends ChannelInitializer<SocketChannel> {
+public class HttpServerInitializer extends ChannelInitializer<SocketChannel>
+{
 
     private final SslContext sslCtx;
     private final HttpServerHandler handler;
 
-    public HttpServerInitializer(SslContext sslCtx) {
+    public HttpServerInitializer(SslContext sslCtx)
+    {
         this.sslCtx = sslCtx;
         this.handler = new HttpServerHandler();
     }
-    public HttpServerInitializer(SslContext sslCtx, HttpServerHandler handler) {
+
+    public HttpServerInitializer(SslContext sslCtx, HttpServerHandler handler)
+    {
         this.sslCtx = sslCtx;
         this.handler = handler;
     }
 
     @Override
-    public void initChannel(SocketChannel ch) {
+    public void initChannel(SocketChannel ch)
+    {
         ChannelPipeline p = ch.pipeline();
-        if (sslCtx != null) {
+        if (sslCtx != null)
+        {
             p.addLast(sslCtx.newHandler(ch.alloc()));
         }
         p.addLast(new HttpServerCodec());

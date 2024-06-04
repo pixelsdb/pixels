@@ -29,15 +29,19 @@ import java.security.cert.CertificateException;
 /**
  * Some useful methods for server side.
  */
-public final class HttpServerUtil {
+public final class HttpServerUtil
+{
 
     private static final boolean SSL = System.getProperty("ssl") != null;
 
-    private HttpServerUtil() {
+    private HttpServerUtil()
+    {
     }
 
-    public static SslContext buildSslContext() throws CertificateException, SSLException {
-        if (!SSL) {
+    public static SslContext buildSslContext() throws CertificateException, SSLException
+    {
+        if (!SSL)
+        {
             return null;
         }
         SelfSignedCertificate ssc = new SelfSignedCertificate();

@@ -41,11 +41,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
-public class StreamWorkerCommon extends WorkerCommon {
+public class StreamWorkerCommon extends WorkerCommon
+{
     private static final Logger logger = LogManager.getLogger(StreamWorkerCommon.class);
 
-    public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException {
-        if (storageInfo.getScheme() == Storage.Scheme.mock) {
+    public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException
+    {
+        if (storageInfo.getScheme() == Storage.Scheme.mock)
+        {
             // Currently, we use Storage.Scheme.mock to indicate streaming mode,
             //  where we don't need to initialize anything. Returns immediately.
             if (isOutput)
@@ -62,9 +65,11 @@ public class StreamWorkerCommon extends WorkerCommon {
     }
 
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, OutputInfo outputInfo)
-            throws IOException {
+            throws IOException
+    {
         if (storageInfo.getScheme() != Storage.Scheme.mock ||
-                !Objects.equals(storageInfo.getRegion(), "http")) {
+                !Objects.equals(storageInfo.getRegion(), "http"))
+        {
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
         // Start a special port to pass schema
@@ -72,9 +77,11 @@ public class StreamWorkerCommon extends WorkerCommon {
     }
 
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, String endpoint)
-            throws IOException {
+            throws IOException
+    {
         if (storageInfo.getScheme() != Storage.Scheme.mock ||
-                !Objects.equals(storageInfo.getRegion(), "http")) {
+                !Objects.equals(storageInfo.getRegion(), "http"))
+        {
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
         PixelsWriter pixelsWriter = getWriter(schema, null, endpoint, false, false, -1, null, null, true);
@@ -82,14 +89,16 @@ public class StreamWorkerCommon extends WorkerCommon {
     }
 
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, List<String> endpoints)
-            throws IOException {
+            throws IOException
+    {
         for (String endpoint : endpoints)
             passSchemaToNextLevel(schema, storageInfo, endpoint);  // Can do it in parallel, but this is not a bottleneck
     }
 
     public static Storage getStorage(Storage.Scheme scheme)
     {
-        if (scheme == Storage.Scheme.mock) {
+        if (scheme == Storage.Scheme.mock)
+        {
             // streaming mode, return nothing
             return null;
         }
@@ -97,8 +106,10 @@ public class StreamWorkerCommon extends WorkerCommon {
     }
 
     public static TypeDescription getSchemaFromSplits(Storage storage, List<InputSplit> inputSplits)
-            throws Exception {
-        if (storage == null) {
+            throws Exception
+    {
+        if (storage == null)
+        {
             PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(inputSplits.get(0).getInputInfos().get(0).getPath()));
             TypeDescription ret = pixelsReader.getFileSchema();
             pixelsReader.close();
@@ -108,7 +119,8 @@ public class StreamWorkerCommon extends WorkerCommon {
     }
 
     public static TypeDescription getSchemaFromPaths(Storage storage, List<String> paths)
-            throws Exception {
+            throws Exception
+    {
         if (storage == null)
         {
             PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(paths.get(0)));
@@ -120,41 +132,48 @@ public class StreamWorkerCommon extends WorkerCommon {
     }
 
     public static void getSchemaFromPaths(ExecutorService executor,
-                                              Storage leftStorage, Storage rightStorage,
-                                              AtomicReference<TypeDescription> leftSchema,
-                                              AtomicReference<TypeDescription> rightSchema,
-                                              List<String> leftPaths, List<String> rightPaths)
+                                          Storage leftStorage, Storage rightStorage,
+                                          AtomicReference<TypeDescription> leftSchema,
+                                          AtomicReference<TypeDescription> rightSchema,
+                                          List<String> leftPaths, List<String> rightPaths)
     {
         requireNonNull(executor, "executor is null");
         requireNonNull(leftSchema, "leftSchema is null");
         requireNonNull(rightSchema, "rightSchema is null");
         requireNonNull(leftPaths, "leftPaths is null");
         requireNonNull(rightPaths, "rightPaths is null");
-        if (leftStorage == null && rightStorage == null) {
+        if (leftStorage == null && rightStorage == null)
+        {
             // streaming mode
             // Currently, the first packet from the stream brings the schema
             Future<?> leftFuture = executor.submit(() -> {
-                try {
+                try
+                {
                     PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(leftPaths.get(0)));
                     leftSchema.set(pixelsReader.getFileSchema());
                     pixelsReader.close();
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     e.printStackTrace();
                 }
             });
             Future<?> rightFuture = executor.submit(() -> {
-                try {
+                try
+                {
                     PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(rightPaths.get(0)));
                     rightSchema.set(pixelsReader.getFileSchema());
                     pixelsReader.close();  // XXX: This `close()` makes the test noticeably slower. Will need to look into it.
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     e.printStackTrace();
                 }
             });
-            try {
+            try
+            {
                 leftFuture.get();
                 rightFuture.get();
-            } catch (Throwable e) {
+            } catch (Throwable e)
+            {
                 logger.error("interrupted while waiting for the termination of schema read", e);
             }
         }
@@ -176,7 +195,8 @@ public class StreamWorkerCommon extends WorkerCommon {
     {
         requireNonNull(storageScheme, "storageInfo is null");
         requireNonNull(path, "fileName is null");
-        if (storageScheme == Storage.Scheme.mock) {
+        if (storageScheme == Storage.Scheme.mock)
+        {
             logger.debug("getReader streaming mode, path: " + path + ", port: " + PixelsWriterStreamImpl.getOrSetPort(path));
             return new PixelsReaderStreamImpl("http://localhost:" + PixelsWriterStreamImpl.getOrSetPort(path) + "/", partitioned, numHashes);
         }
@@ -202,7 +222,8 @@ public class StreamWorkerCommon extends WorkerCommon {
                                          List<Integer> keyColumnIds,
                                          List<String> outputPaths, boolean isSchemaWriter)
     {
-        if (storage != null && storage.getScheme() != Storage.Scheme.mock) return WorkerCommon.getWriter(schema, storage, outputPath, encoding, isPartitioned, keyColumnIds);
+        if (storage != null && storage.getScheme() != Storage.Scheme.mock)
+            return WorkerCommon.getWriter(schema, storage, outputPath, encoding, isPartitioned, keyColumnIds);
         logger.debug("getWriter streaming mode, path: " + outputPath + ", paths: " + outputPaths + ", isSchemaWriter: " + isSchemaWriter);
         requireNonNull(schema, "schema is null");
         requireNonNull(outputPath, "fileName is null");
@@ -218,11 +239,14 @@ public class StreamWorkerCommon extends WorkerCommon {
                 .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
                 .setPartitioned(isPartitioned)
                 .setPartitionId(isPartitioned ? partitionId : -1);
-        if (!isPartitioned) {
-            if (isSchemaWriter) builder.setUri(URI.create("http://localhost:" + PixelsWriterStreamImpl.getSchemaPort(outputPath) + "/"));
+        if (!isPartitioned)
+        {
+            if (isSchemaWriter)
+                builder.setUri(URI.create("http://localhost:" + PixelsWriterStreamImpl.getSchemaPort(outputPath) + "/"));
             builder.setFileName(outputPath);
         }
-        else {
+        else
+        {
             builder.setFileNames(outputPaths)
                     .setPartKeyColumnIds(keyColumnIds);
         }

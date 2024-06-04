@@ -119,7 +119,6 @@ public class PixelsReaderImpl implements PixelsReader
         }
 
         /**
-         *
          * @param cacheOrder should not be null.
          * @return
          */

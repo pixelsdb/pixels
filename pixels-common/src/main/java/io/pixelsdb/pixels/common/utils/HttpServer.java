@@ -37,17 +37,21 @@ import java.security.cert.CertificateException;
  * @author jasha64
  * @create 2023-07-27
  */
-public final class HttpServer {
+public final class HttpServer
+{
     final HttpServerInitializer initializer;
 
-    public HttpServer(HttpServerHandler handler) throws CertificateException, SSLException {
+    public HttpServer(HttpServerHandler handler) throws CertificateException, SSLException
+    {
         this.initializer = new HttpServerInitializer(HttpServerUtil.buildSslContext(), handler);
     }
 
-    public void serve(int PORT) throws InterruptedException {
+    public void serve(int PORT) throws InterruptedException
+    {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
-        try {
+        try
+        {
             ServerBootstrap b = new ServerBootstrap();
             b.option(ChannelOption.SO_BACKLOG, 1024);
             b.group(bossGroup, workerGroup)
@@ -58,7 +62,8 @@ public final class HttpServer {
             Channel ch = b.bind(PORT).sync().channel();
 
             ch.closeFuture().sync();
-        } finally {
+        } finally
+        {
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
         }

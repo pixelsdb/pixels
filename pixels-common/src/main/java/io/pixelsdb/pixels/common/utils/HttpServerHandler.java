@@ -43,19 +43,23 @@ import static io.netty.handler.codec.http.HttpResponseStatus.OK;
  * @create 2023-07-27
  */
 @ChannelHandler.Sharable
-public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
+public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject>
+{
 
     @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) {
+    public void channelReadComplete(ChannelHandlerContext ctx)
+    {
         ctx.flush();
     }
 
     @Override
-    public void channelRead0(ChannelHandlerContext ctx, HttpObject msg) {
+    public void channelRead0(ChannelHandlerContext ctx, HttpObject msg)
+    {
         // demo and default handler
-        final byte[] payload = { 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd' };;
+        final byte[] payload = {'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd'};
 
-        if (msg instanceof HttpRequest) {
+        if (msg instanceof HttpRequest)
+        {
             HttpRequest req = (HttpRequest) msg;
 
             boolean keepAlive = HttpUtil.isKeepAlive(req);
@@ -65,24 +69,30 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
                     .set(CONTENT_TYPE, "text/plain")
                     .setInt(CONTENT_LENGTH, response.content().readableBytes());
 
-            if (keepAlive) {
-                if (!req.protocolVersion().isKeepAliveDefault()) {
+            if (keepAlive)
+            {
+                if (!req.protocolVersion().isKeepAliveDefault())
+                {
                     response.headers().set(CONNECTION, KEEP_ALIVE);
                 }
-            } else {
+            }
+            else
+            {
                 response.headers().set(CONNECTION, CLOSE);
             }
 
             ChannelFuture f = ctx.write(response);
 
-            if (!keepAlive) {
+            if (!keepAlive)
+            {
                 f.addListener(ChannelFutureListener.CLOSE);
             }
         }
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
+    {
         cause.printStackTrace();
         ctx.close();
     }

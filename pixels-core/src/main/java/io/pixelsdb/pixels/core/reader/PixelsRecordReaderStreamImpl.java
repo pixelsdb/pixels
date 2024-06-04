@@ -40,7 +40,8 @@ import java.util.concurrent.BlockingQueue;
  * PixelsRecordReaderStreamImpl is the variant of {@link PixelsRecordReaderImpl} for streaming mode.
  */
 @NotThreadSafe
-public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
+public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
+{
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderStreamImpl.class);
     StreamProto.StreamHeader streamHeader;
     private final PixelsReaderOption option;
@@ -136,6 +137,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
      * Also, because we put the byteBuf into the blocking queue only after initializing the `streamHeader`,
      *  it is safe to assume that the `streamHeader` has been initialized by the time
      *  we first call `readBatch()` in the recordReader.
+     *
      * @param streamHeader
      * @throws IOException
      */
@@ -249,6 +251,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
      * This method is to prepare the internal status for read operations.
      * It should only return false when there is an error. Special cases
      * must be processed correctly and return true.
+     *
      * @return
      * @throws IOException
      */
@@ -285,7 +288,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
 
         targetRGNum = RGLen;
 
-        if (targetRGNum == 0) {
+        if (targetRGNum == 0)
+        {
             /**
              * Issue #388:
              * No need to continue preparing row group footers and encoded flags for the column vectors of each column.
@@ -380,10 +384,10 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
      * Such query is invalid but Presto does not reject it. For such query,
      * Presto will call PageSource.getNextPage() but will not call load() on
      * the lazy blocks inside the returned page.
-     *
+     * <p>
      * Unfortunately, we have no way to distinguish such type from the normal
      * queries by the predicates and projection columns from Presto.
-     *
+     * <p>
      * preRowInRG will keep in sync with curRowInRG if readBatch() is actually
      * called from LazyBlock.load().
      */
@@ -407,6 +411,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     /**
      * Create a row batch without any data, only sets the number of rows (size) and EOF.
      * Such a row batch is used for queries such as select count(*).
+     *
      * @param size the number of rows in the row batch.
      * @return the empty row batch.
      */
@@ -430,7 +435,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     public VectorizedRowBatch readBatch(int batchSize, boolean reuse)
             throws IOException
     {
-        if (!curRowGroupByteBuf.isReadable() && !endOfFile) {
+        if (!curRowGroupByteBuf.isReadable() && !endOfFile)
+        {
             acquireNewRowGroup(reuse);
             if (endOfFile) return createEmptyEOFRowBatch(0);
         }
@@ -469,7 +475,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
             this.resultRowBatch.reset();
             this.resultRowBatch.ensureSize(batchSize, false);
             resultRowBatch = this.resultRowBatch;
-        } else
+        }
+        else
         {
             resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
@@ -568,13 +575,17 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
         return resultRowBatch;
     }
 
-    private void acquireNewRowGroup(boolean reuse) throws IOException {
+    private void acquireNewRowGroup(boolean reuse) throws IOException
+    {
         logger.debug("In acquireNewRowGroup(), curRGIdx = " + curRGIdx);
-        if (!endOfFile) {
-            try {
+        if (!endOfFile)
+        {
+            try
+            {
                 curRowGroupByteBuf.release();
                 curRowGroupByteBuf = partitioned ? byteBufBlockingMap.get(curRGIdx) : byteBufSharedQueue.take();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException e)
+            {
                 e.printStackTrace();
             }
         }
@@ -670,7 +681,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader {
     }
 
     @Override
-    public boolean isEndOfFile ()
+    public boolean isEndOfFile()
     {
         return endOfFile;
     }

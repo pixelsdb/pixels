@@ -17,6 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
@@ -41,10 +42,12 @@ import java.util.concurrent.Executors;
  * @author jasha64
  * @create 2023-08-07
  */
-public class TestHttpServerClient {
+public class TestHttpServerClient
+{
 
     @Test
-    public void testServerSimple() throws Exception {
+    public void testServerSimple() throws Exception
+    {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
@@ -58,46 +61,63 @@ public class TestHttpServerClient {
         PixelsRecordReader recordReader = reader.read(option);
         // use an array of readers, to support multiple streams (relies on
         //  a service framework to map endpoints to IDs. todo)
-        while (true) {
-            try {
+        while (true)
+        {
+            try
+            {
                 VectorizedRowBatch rowBatch = recordReader.readBatch(5);
-                if (rowBatch.size == 0) {reader.close(); break;}
+                if (rowBatch.size == 0)
+                {
+                    reader.close();
+                    break;
+                }
                 System.out.println("Parsed rowBatch: ");
                 System.out.println(rowBatch);
-            } catch (IOException e) {
+            } catch (IOException e)
+            {
                 throw new RuntimeException(e);
             }
         }
     }
 
-    void runAsync(Runnable fp, int concurrency) {
+    void runAsync(Runnable fp, int concurrency)
+    {
         ExecutorService executorService = Executors.newFixedThreadPool(1);
 
         CompletableFuture<Void>[] httpServerFutures = new CompletableFuture[concurrency];
-        for (int i = 0; i < concurrency; i++) {
+        for (int i = 0; i < concurrency; i++)
+        {
             httpServerFutures[i] = CompletableFuture.runAsync(() -> {
-                try {
+                try
+                {
                     fp.run();
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     e.printStackTrace();
                 }
             }, executorService);
-            if (i < concurrency - 1) {
+            if (i < concurrency - 1)
+            {
                 System.out.println("Booted " + (i + 1) + " http clients");
-                try {
+                try
+                {
                     Thread.sleep(1000);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException e)
+                {
                     e.printStackTrace();
                 }
             }
         }
 
-        try {
-            for (int i = 10; i > 0; i--) {
+        try
+        {
+            for (int i = 10; i > 0; i--)
+            {
                 System.out.printf("Main thread is still running... %d\n", i);
                 Thread.sleep(1000);
             }
-        } catch (InterruptedException e) {
+        } catch (InterruptedException e)
+        {
             e.printStackTrace();
         }
 
@@ -108,18 +128,22 @@ public class TestHttpServerClient {
     }
 
     @Test
-    public void testServerAsync() {
+    public void testServerAsync()
+    {
         runAsync(() -> {
-            try {
+            try
+            {
                 testServerSimple();
-            } catch (Exception e) {
+            } catch (Exception e)
+            {
                 e.printStackTrace();
             }
         }, 1);
     }
 
     @Test
-    public void testClientSimple() throws IOException {
+    public void testClientSimple() throws IOException
+    {
         Storage fileStorage = StorageFactory.Instance().getStorage(Storage.Scheme.file);
         PixelsReaderImpl.Builder reader = PixelsReaderImpl.newBuilder()
                 .setStorage(fileStorage)
@@ -146,36 +170,48 @@ public class TestHttpServerClient {
                 .setPartitioned(false)
                 .build();
         // XXX: now we can send multiple rowBatches in one rowGroup in one packet, but have not tested to send multiple rowGroups
-        while (true) {
+        while (true)
+        {
             VectorizedRowBatch rowBatch = recordReader.readBatch(5);
             System.out.println(rowBatch.size + " rows read from tpch nation.pxl");
 
-            try {
-                if (rowBatch.size == 0) {pixelsWriter.close(); break;}
-                else pixelsWriter.addRowBatch(rowBatch);
-            } catch (Throwable e) {
+            try
+            {
+                if (rowBatch.size == 0)
+                {
+                    pixelsWriter.close();
+                    break;
+                } else pixelsWriter.addRowBatch(rowBatch);
+            } catch (Throwable e)
+            {
                 throw new WorkerException("failed to write rowBatch to HTTP server", e);
             }
         }
     }
 
     @Test
-    public void testClientAsync() {
+    public void testClientAsync()
+    {
         runAsync(() -> {
-            try {
+            try
+            {
                 testClientSimple();
-            } catch (Exception e) {
+            } catch (Exception e)
+            {
                 e.printStackTrace();
             }
         }, 1);
     }
 
     @Test
-    public void testClientConcurrent() {
+    public void testClientConcurrent()
+    {
         runAsync(() -> {
-            try {
+            try
+            {
                 testClientSimple();
-            } catch (Exception e) {
+            } catch (Exception e)
+            {
                 e.printStackTrace();
             }
         }, 3);
