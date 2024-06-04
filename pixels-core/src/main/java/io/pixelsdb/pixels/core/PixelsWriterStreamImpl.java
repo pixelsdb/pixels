@@ -687,6 +687,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter {
                 .addHeader(CONNECTION, "keep-alive")
                 .build();
 
+        // DESIGN: We use Spring retry here to retry the HTTP request in case of connection failure,
+        //  because the HTTP server may not be ready when the client tries to connect.
         // DESIGN: We do not implement async retry here, because experiment shows that the bottleneck is in the sequential
         //   HTTP transmission, and esp. the blocking wait for the previous request to return. Will need to implement
         //   multi-threaded HTTP transmission to improve performance.
