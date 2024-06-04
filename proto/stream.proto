@@ -36,9 +36,6 @@ option java_outer_classname = "StreamProto";
  * ------------------------------------------------------------------
  * where each rowGroup is sent like:
  * -----------------------------------------------------------------------
- * | rowGroupHeaderLen | rowGroupHeader | rowGroupDataLen | rowGroupData |
- * -----------------------------------------------------------------------
- * -----------------------------------------------------------------------
  * | rowGroupDataLen | rowGroupData | rowGroupFooterLen | rowGroupFooter |
  * -----------------------------------------------------------------------
  * and the end of the stream is done by simply closing the stream.
