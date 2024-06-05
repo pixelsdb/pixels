@@ -86,11 +86,13 @@ public class PixelsReaderStreamImpl implements PixelsReader
     private StreamProto.StreamHeader streamHeader;
     private final CountDownLatch streamHeaderLatch = new CountDownLatch(1);
 
-    public PixelsReaderStreamImpl(String endpoint) throws Exception {
+    public PixelsReaderStreamImpl(String endpoint) throws Exception
+    {
         this(endpoint, false, -1);
     }
 
-    public PixelsReaderStreamImpl(int port) throws Exception {
+    public PixelsReaderStreamImpl(int port) throws Exception
+    {
         this("http://localhost:" + port + "/");
     }
 
@@ -103,7 +105,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
         String IP = uri.getHost();
         int httpPort = uri.getPort();
         logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort + ", partitioned: " + partitioned + ", numHashes: " + numHashes);
-        if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost")) {
+        if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost"))
+        {
             throw new UnsupportedOperationException("Currently, only localhost is supported as the server address");
         }
         this.byteBufSharedQueue = new LinkedBlockingQueue<>(1);
@@ -114,77 +117,96 @@ public class PixelsReaderStreamImpl implements PixelsReader
         // WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
         ExecutorService executorService = Executors.newFixedThreadPool(1);  // , new ThreadFactoryBuilder().setUncaughtExceptionHandler(exceptionHandler).build());
         // 215行，应该logger.error()还是只需要e.printStackTrace()？
-        this.httpServer = new HttpServer(new HttpServerHandler() {
+        this.httpServer = new HttpServer(new HttpServerHandler()
+        {
             @Override
-            public void channelRead0(ChannelHandlerContext ctx, HttpObject msg) {
+            public void channelRead0(ChannelHandlerContext ctx, HttpObject msg)
+            {
                 // Concurrency: async thread. Reads or writes streamHeader, recordReaders, byteBufSharedQueue
                 if (!(msg instanceof HttpRequest)) return;
                 FullHttpRequest req = (FullHttpRequest) msg;
-                if (req.method() != HttpMethod.POST) {
+                if (req.method() != HttpMethod.POST)
+                {
                     FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), NOT_FOUND);
                     sendResponseAndClose(ctx, req, response);
                     return;
                 }
-                if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf")) {
+                if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf"))
+                {
                     // silent reject
                     return;
                 }
-                logger.debug("Incoming packet on port: " + httpPort + ", content_length header: " +  req.headers().get("content-length")
+                logger.debug("Incoming packet on port: " + httpPort + ", content_length header: " + req.headers().get("content-length")
                         + ", connection header: " + req.headers().get("connection") +
                         ", partition ID header: " + req.headers().get("X-Partition-Id") +
                         ", HTTP request object body total length: " + req.content().readableBytes());
 
                 ByteBuf byteBuf = req.content();
-                try {
-                    if (streamHeader == null) {
-                        try {
+                try
+                {
+                    if (streamHeader == null)
+                    {
+                        try
+                        {
                             streamHeader = parseStreamHeader(byteBuf);
                             streamHeaderLatch.countDown();
 
-                            for (PixelsRecordReaderStreamImpl recordReader : recordReaders) {
+                            for (PixelsRecordReaderStreamImpl recordReader : recordReaders)
+                            {
                                 // XXX: potential data race with line 235 - if read() and this handler are executed in parallel
                                 recordReader.lateInitialization(streamHeader);
                             }
-                        } catch (IOException e) {
+                        } catch (IOException e)
+                        {
                             throw new RuntimeException(e);
                         }  // todo: I ignored this and many other exceptions because the method signature is inherited and I cannot throw them out
-                    } else if (partitioned) {
+                        //  -- 看一下HttpServerHandler的exception handling机制
+                    } else if (partitioned)
+                    {
                         // In partitioned mode, every packet brings a streamHeader to prevent errors from possibly out-of-order packet arrivals,
                         //  so we need to parse it, but do not need the return value (except for the first incoming packet processed above).
                         parseStreamHeader(byteBuf);
                     }
-                } catch (InvalidProtocolBufferException e) {
+                } catch (InvalidProtocolBufferException e)
+                {
                     logger.error("Error parsing stream header", e);
                     FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), INTERNAL_SERVER_ERROR);
                     sendResponseAndClose(ctx, req, response);
                     return;
-                } catch (PixelsStreamHeaderMalformedException e) {  // ??? PixelsRuntimeException should not be caught here
+                } catch (PixelsStreamHeaderMalformedException e)
+                {
                     logger.error("Malformed stream header", e);
                     FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), BAD_REQUEST);
                     sendResponseAndClose(ctx, req, response);
                     return;
                 }
-                if (httpPort >= 50100) {
+                if (httpPort >= 50100)
+                {
                     // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the client is a data writer (port >= 50100)
                     //  rather than a schema writer. In the latter case, the schema packet has been processed when parsing the stream header above.
-                    try {
+                    try
+                    {
                         byteBuf.retain();
                         if (!partitioned) byteBufSharedQueue.put(byteBuf);
-                        else {
+                        else
+                        {
                             int hash = Integer.parseInt(req.headers().get("X-Partition-Id"));
-                            if (hash < 0 || hash >= numHashes) {
+                            if (hash < 0 || hash >= numHashes)
+                            {
                                 logger.warn("Client sent invalid hash value: " + hash);
                                 FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), BAD_REQUEST);
                                 sendResponseAndClose(ctx, req, response);
                                 return;
                             }
                             byteBufBlockingMap.put(hash, byteBuf);
-                            if (numHashesReceived.accumulateAndGet(1, Integer::sum) == numHashes) {
+                            if (numHashesReceived.accumulateAndGet(1, Integer::sum) == numHashes)
+                            {
                                 // The reader has read all the hashes, so we can put an artificial empty ByteBuf into the queue to signal the end of the stream.
                                 byteBufBlockingMap.put(numHashes, Unpooled.buffer(0).retain());
                             }
                         }
-                    } catch (InterruptedException e) {
+                    } catch (InterruptedException e)
+                    {
                         e.printStackTrace();
                     }  // todo: I ignored this and many other exceptions because the method signature is inherited and I cannot throw them out
                 }
@@ -193,16 +215,19 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 sendResponseAndClose(ctx, req, response);
             }
 
-            private void sendResponseAndClose(ChannelHandlerContext ctx, FullHttpRequest req, FullHttpResponse response) {
+            private void sendResponseAndClose(ChannelHandlerContext ctx, FullHttpRequest req, FullHttpResponse response)
+            {
                 ChannelFuture f = ctx.writeAndFlush(response);
                 f.addListener(future -> {
-                    if (!future.isSuccess()) {
+                    if (!future.isSuccess())
+                    {
                         logger.error("Failed to write response: " + future.cause());
                         ctx.channel().close();
                     }
                 });
                 f.addListener(ChannelFutureListener.CLOSE);  // shut down the connection with the current hash
-                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) || (partitioned && numHashesReceived.get() == numHashes)) {
+                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) || (partitioned && numHashesReceived.get() == numHashes))
+                {
                     f.addListener(future -> {
                         // shutdown the server
                         ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
@@ -214,23 +239,28 @@ public class PixelsReaderStreamImpl implements PixelsReader
             }
         });
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
-            try {
+            try
+            {
                 this.httpServer.serve(httpPort);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException e)
+            {
                 e.printStackTrace();
             }
         }, executorService);
     }
 
-    static int calculateCeiling(int value, int multiple) {
+    static int calculateCeiling(int value, int multiple)
+    {
         // to calculate padding length in HttpClient
 
-        if (value <= 0 || multiple <= 0) {
+        if (value <= 0 || multiple <= 0)
+        {
             throw new IllegalArgumentException("Both value and multiple must be positive.");
         }
 
         int remainder = value % multiple;
-        if (remainder == 0) {
+        if (remainder == 0)
+        {
             return value;
         }
 
@@ -241,13 +271,15 @@ public class PixelsReaderStreamImpl implements PixelsReader
     private StreamProto.StreamHeader parseStreamHeader(ByteBuf byteBuf)
             throws InvalidProtocolBufferException, PixelsStreamHeaderMalformedException
     {
-        try {
+        try
+        {
             // check MAGIC
             int magicLength = MAGIC.getBytes().length;
             byte[] magicBytes = new byte[magicLength];
             byteBuf.getBytes(0, magicBytes);
             String magic = new String(magicBytes);
-            if (!magic.contentEquals(Constants.MAGIC)) {
+            if (!magic.contentEquals(Constants.MAGIC))
+            {
                 throw new PixelsFileMagicInvalidException(magic);
             }
 
@@ -258,7 +290,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
             // check file version
             int fileVersion = streamHeader.getVersion();
-            if (!PixelsVersion.matchVersion(fileVersion)) {
+            if (!PixelsVersion.matchVersion(fileVersion))
+            {
                 throw new PixelsFileVersionInvalidException(fileVersion);
             }
 
@@ -268,12 +301,14 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
             this.fileSchema = TypeDescription.createSchema(streamHeader.getTypesList());
             return streamHeader;
-        } catch (IndexOutOfBoundsException e) {
+        } catch (IndexOutOfBoundsException e)
+        {
             throw new PixelsStreamHeaderMalformedException("Malformed stream header", e);
         }
     }
 
-    public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) {
+    public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId)
+    {
         throw new UnsupportedOperationException("getRowGroupFooter is not supported in a stream");
     }
 
@@ -288,7 +323,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public PixelsRecordReader read(PixelsReaderOption option) throws IOException
     {
-        assert(recordReaders.size() == 0);
+        assert (recordReaders.size() == 0);
 
         PixelsRecordReaderStreamImpl recordReader = new PixelsRecordReaderStreamImpl(partitioned, byteBufSharedQueue, byteBufBlockingMap, streamHeader, option);
         recordReaders.add(recordReader);
@@ -364,9 +399,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public TypeDescription getFileSchema()
     {
-        try {
+        try
+        {
             streamHeaderLatch.await();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException e)
+        {
             e.printStackTrace();
         }
         return this.fileSchema;
@@ -384,9 +421,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public boolean isPartitioned()
     {
-        try {
+        try
+        {
             streamHeaderLatch.await();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException e)
+        {
             e.printStackTrace();
         }
         return this.streamHeader.hasPartitioned() && this.streamHeader.getPartitioned();
@@ -396,7 +435,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * Get file level statistics of each column. Not required in streaming mode
      */
     @Override
-    public List<PixelsProto.ColumnStatistic> getColumnStats() {
+    public List<PixelsProto.ColumnStatistic> getColumnStats()
+    {
         throw new UnsupportedOperationException("getColumnStats is not supported in a stream");
     }
 
@@ -404,7 +444,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * Get file level statistic of the specified column. Currently unused and unsupported
      */
     @Override
-    public PixelsProto.ColumnStatistic getColumnStat(String columnName) {
+    public PixelsProto.ColumnStatistic getColumnStat(String columnName)
+    {
         throw new UnsupportedOperationException("getColumnStat is not supported in a stream");
     }
 
@@ -430,7 +471,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * Get statistics of the specified row group. Currently unused and unsupported
      */
     @Override
-    public PixelsProto.RowGroupStatistic getRowGroupStat(int rowGroupId) {
+    public PixelsProto.RowGroupStatistic getRowGroupStat(int rowGroupId)
+    {
         throw new UnsupportedOperationException("getRowGroupStat is not supported in a stream");
     }
 
@@ -438,17 +480,20 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * Get statistics of all row groups. Currently unused and unsupported
      */
     @Override
-    public List<PixelsProto.RowGroupStatistic> getRowGroupStats() {
+    public List<PixelsProto.RowGroupStatistic> getRowGroupStats()
+    {
         throw new UnsupportedOperationException("getRowGroupStats is not supported in a stream");
     }
 
     @Override
-    public PixelsProto.PostScript getPostScript() {
+    public PixelsProto.PostScript getPostScript()
+    {
         throw new UnsupportedOperationException("getPostScript is not supported in a stream");
     }
 
     @Override
-    public PixelsProto.Footer getFooter() {
+    public PixelsProto.Footer getFooter()
+    {
         throw new UnsupportedOperationException("getFooter is not supported in a stream");
     }
 
@@ -464,18 +509,25 @@ public class PixelsReaderStreamImpl implements PixelsReader
         // new Thread().start(): A low-level approach to create and start a new thread.
         // Use new Thread().start() for simple, one-off asynchronous tasks where the overhead of managing a thread pool is unnecessary.
         new Thread(() -> {
-            try {
+            try
+            {
                 if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(5, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
+            } catch (TimeoutException e)
+            {
                 logger.warn("In close(), HTTP server did not shut down in 5 seconds, doing forceful shutdown");
                 this.httpServerFuture.cancel(true);
-            } catch (InterruptedException | ExecutionException e) {
+            } catch (InterruptedException | ExecutionException e)
+            {
                 logger.error("Exception during HTTP server shutdown", e);
-            } finally {
-                for (PixelsRecordReader recordReader : recordReaders) {
-                    try {
+            } finally
+            {
+                for (PixelsRecordReader recordReader : recordReaders)
+                {
+                    try
+                    {
                         recordReader.close();
-                    } catch (IOException e) {
+                    } catch (IOException e)
+                    {
                         logger.error("Exception while closing record reader", e);
                     }
                 }

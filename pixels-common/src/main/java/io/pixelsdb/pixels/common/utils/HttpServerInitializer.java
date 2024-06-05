@@ -49,7 +49,6 @@ public class HttpServerInitializer extends ChannelInitializer<SocketChannel>
         this.sslCtx = sslCtx;
         this.handler = handler;
     }
-
     @Override
     public void initChannel(SocketChannel ch)
     {
