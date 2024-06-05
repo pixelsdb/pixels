@@ -52,8 +52,9 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private final boolean partitioned;
 
     /**
-     * If the curRowGroupByteBuf is no longer readable, we take the next ByteBuf from the byteBufSharedQueue or byteBufBlockingMap;
-     *  otherwise, we just read from curRowGroupByteBuf.
+     * If the curRowGroupByteBuf is no longer readable, we take the next ByteBuf from the byteBufSharedQueue or
+     * byteBufBlockingMap;
+     * otherwise, we just read from curRowGroupByteBuf.
      */
     private ByteBuf curRowGroupByteBuf;
     private final BlockingQueue<ByteBuf> byteBufSharedQueue;
@@ -301,7 +302,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         }
 
         /**
-         * Different from {@link PixelsRecordReaderImpl#prepareRead()}, we do not read all row group footers at once here.
+         * Different from {@link PixelsRecordReaderImpl#prepareRead()}, we do not read all row group footers at once
+         *  here.
          * In streaming mode, row group footers are interleaved with row groups, instead of
          *  residing in an array at the end of the file. So, we will read them one by one in {@link #readBatch()},
          *  each preceding reading the corresponding row group.
@@ -310,9 +312,12 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
          */
         int rowGroupsPosition = byteBuf.readerIndex();
         int rowGroupDataLength = byteBuf.readInt();
-        logger.debug("In prepareRead(), rowGroupsPosition = " + rowGroupsPosition + ", rowGroupDataLength = " + rowGroupDataLength + ", firstRgFooterPosition = " + (rowGroupsPosition + rowGroupDataLength));
+        logger.debug("In prepareRead(), rowGroupsPosition = " + rowGroupsPosition +
+                ", rowGroupDataLength = " + rowGroupDataLength +
+                ", firstRgFooterPosition = " + (rowGroupsPosition + rowGroupDataLength));
         // We do not need the row group footer here for now
-        // byteBuf.readerIndex(rowGroupsPosition + rowGroupDataLength);  // skip row group data and row group data length, and get to row group footer
+        // byteBuf.readerIndex(rowGroupsPosition + rowGroupDataLength);  // skip row group data and row group data
+        // length, and get to row group footer
         // byte[] firstRgFooterBytes = new byte[byteBuf.readInt()];
         // byteBuf.readBytes(firstRgFooterBytes);
         // StreamProto.StreamRowGroupFooter firstRgFooter = StreamProto.StreamRowGroupFooter.parseFrom(firstRgFooterBytes);
@@ -326,7 +331,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
 
     /**
      * In streaming mode, we do not read all row group footers at once in prepareRead().
-     * Workers should call readBatch() directly rather than read(), as the read() does not function like in {@link PixelsRecordReaderImpl#read()}.
+     * Workers should call readBatch() directly rather than read(), as the read() does not function like in
+     * {@link PixelsRecordReaderImpl#read()}.
      * But keep the read() method for compatibility.
      *
      * @return true if there is row group to read and the row groups are read
@@ -428,7 +434,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     /**
      * In the streaming version, the readBatch() method returns row batches read online from the stream.
      * This corresponds to the Next() method in the pipelining model of databases.
-     * ReadBatch() would block until any (new) batch is available or until timeout (60s - as defined in {@link BlockingMap}),
+     * ReadBatch() would block until any (new) batch is available or until timeout (60s - as defined in
+     * {@link BlockingMap}),
      *  and returns an empty row batch if the end of the stream is reached.
      */
     @Override
@@ -475,8 +482,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             this.resultRowBatch.reset();
             this.resultRowBatch.ensureSize(batchSize, false);
             resultRowBatch = this.resultRowBatch;
-        }
-        else
+        } else
         {
             resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
@@ -491,7 +497,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
          * One packet == one curByteBuf <= one row group.
          * <p>
          * Note that this implementation could return a row batch spanning multiple row groups. But for now,
-         *  sender ({@link PixelsWriterStreamImpl#writeRowGroup()}) guarantees that readBatch() will never encounter a row group boundary.
+         *  sender ({@link PixelsWriterStreamImpl#writeRowGroup()}) guarantees that readBatch() will never encounter
+         *  a row group boundary.
          * </p>
          */
         while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
@@ -515,7 +522,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                     // int index = curRGIdx * includedColumns.length + resultColumns[i];
                     PixelsProto.ColumnChunkIndex chunkIndex = curRowGroupStreamFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
-                    ByteBuf chunkBuffer = curRowGroupByteBuf.slice((int) chunkIndex.getChunkOffset(), chunkIndex.getChunkLength());
+                    ByteBuf chunkBuffer = curRowGroupByteBuf.slice((int) chunkIndex.getChunkOffset(),
+                            chunkIndex.getChunkLength());
                     readers[i].read(chunkBuffer.nioBuffer(), encoding, curRowInRG, curBatchSize,
                             streamHeader.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                     // don't update statistics in whenComplete as it may be executed in other threads.
@@ -635,12 +643,13 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                 this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
                         PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
             }
-        }
-        else
+        } else
         // incoming byteBuf unreadable, must be end of stream
         {
             // checkValid = false; // Issue #105: to reject continuous read.
-            if (reuse && resultRowBatch != null) // The close() below might be called before our readBatch() is complete, i.e. the resultRowBatch might be null.
+            if (reuse && resultRowBatch != null)
+                // The close() below might be called before our readBatch() is complete,
+                //  i.e. the resultRowBatch might be null.
                 resultRowBatch.endOfFile = true;
             this.endOfFile = true;  // In streaming mode, EOF indicates the end of stream
             curRowGroupByteBuf.release();
@@ -648,22 +657,19 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     }
 
     @Override
-    public VectorizedRowBatch readBatch(int batchSize)
-            throws IOException
+    public VectorizedRowBatch readBatch(int batchSize) throws IOException
     {
         return readBatch(batchSize, false);
     }
 
     @Override
-    public VectorizedRowBatch readBatch(boolean reuse)
-            throws IOException
+    public VectorizedRowBatch readBatch(boolean reuse) throws IOException
     {
         return readBatch(VectorizedRowBatch.DEFAULT_SIZE, reuse);
     }
 
     @Override
-    public VectorizedRowBatch readBatch()
-            throws IOException
+    public VectorizedRowBatch readBatch() throws IOException
     {
         return readBatch(VectorizedRowBatch.DEFAULT_SIZE, false);
     }

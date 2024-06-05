@@ -57,7 +57,8 @@ public class TestHttpServerClient
 
         String serverIpAddress = "127.0.0.1";
         int serverPort = 50100;
-        PixelsReaderStreamImpl reader = new PixelsReaderStreamImpl("http://" + serverIpAddress + ":" + serverPort + "/");
+        PixelsReaderStreamImpl reader = new PixelsReaderStreamImpl(
+                "http://" + serverIpAddress + ":" + serverPort + "/");
         PixelsRecordReader recordReader = reader.read(option);
         // use an array of readers, to support multiple streams (relies on
         //  a service framework to map endpoints to IDs. todo)
@@ -169,7 +170,8 @@ public class TestHttpServerClient
                 .setEncodingLevel(EncodingLevel.EL2)
                 .setPartitioned(false)
                 .build();
-        // XXX: now we can send multiple rowBatches in one rowGroup in one packet, but have not tested to send multiple rowGroups
+        // XXX: now we can send multiple rowBatches in one rowGroup in one packet, but have not tested to send
+        //  multiple rowGroups
         while (true)
         {
             VectorizedRowBatch rowBatch = recordReader.readBatch(5);

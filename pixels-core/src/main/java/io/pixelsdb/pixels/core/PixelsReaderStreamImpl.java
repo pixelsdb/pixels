@@ -60,8 +60,8 @@ import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
  * ColumnChunks from a stream, for operator pipelining over HTTP.
  * DESIGN: For the design of the stream protocol, see the head comment in {@link PixelsWriterStreamImpl}.
  * <p>
- * TODO: Currently, we assume the HTTP messages arrive in order. Implement a state machine to handle out-of-order messages
- *  (e.g. send a response to the client to ask for retransmission if the header is missing).
+ * TODO: Currently, we assume the HTTP messages arrive in order. Implement a state machine to handle out-of-order
+ * messages (e.g. send a response to the client to ask for retransmission if the header is missing).
  */
 @NotThreadSafe
 public class PixelsReaderStreamImpl implements PixelsReader
@@ -72,7 +72,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
     private final HttpServer httpServer;
     private final CompletableFuture<Void> httpServerFuture;
     private final BlockingQueue<ByteBuf> byteBufSharedQueue;
-    private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;  // In partitioned mode, maps hash value to corresponding ByteBuf
+    // In partitioned mode, we use byteBufBlockingMap to map hash value to corresponding ByteBuf
+    private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;
     private final boolean partitioned;
     private final AtomicReference<Integer> numHashesReceived = new AtomicReference<>(0);
     private final List<PixelsRecordReaderStreamImpl> recordReaders;
@@ -104,7 +105,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
         URI uri = new URI(endpoint);
         String IP = uri.getHost();
         int httpPort = uri.getPort();
-        logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort + ", partitioned: " + partitioned + ", numHashes: " + numHashes);
+        logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort +
+                ", partitioned: " + partitioned + ", numHashes: " + numHashes);
         if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost"))
         {
             throw new UnsupportedOperationException("Currently, only localhost is supported as the server address");
@@ -115,7 +117,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
         this.recordReaders = new ArrayList<>();
 
         // WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
-        ExecutorService executorService = Executors.newFixedThreadPool(1);  // , new ThreadFactoryBuilder().setUncaughtExceptionHandler(exceptionHandler).build());
+        ExecutorService executorService = Executors.newFixedThreadPool(1);  // , new ThreadFactoryBuilder()
+        // .setUncaughtExceptionHandler(exceptionHandler).build());
         // 215行，应该logger.error()还是只需要e.printStackTrace()？
         this.httpServer = new HttpServer(new HttpServerHandler()
         {
@@ -136,8 +139,9 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     // silent reject
                     return;
                 }
-                logger.debug("Incoming packet on port: " + httpPort + ", content_length header: " + req.headers().get("content-length")
-                        + ", connection header: " + req.headers().get("connection") +
+                logger.debug("Incoming packet on port: " + httpPort +
+                        ", content_length header: " + req.headers().get("content-length") +
+                        ", connection header: " + req.headers().get("connection") +
                         ", partition ID header: " + req.headers().get("X-Partition-Id") +
                         ", HTTP request object body total length: " + req.content().readableBytes());
 
@@ -153,24 +157,29 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
                             for (PixelsRecordReaderStreamImpl recordReader : recordReaders)
                             {
-                                // XXX: potential data race with line 235 - if read() and this handler are executed in parallel
+                                // XXX: potential data race with line 235 - if read() and this handler are executed
+                                //  in parallel
                                 recordReader.lateInitialization(streamHeader);
                             }
                         } catch (IOException e)
                         {
                             throw new RuntimeException(e);
-                        }  // todo: I ignored this and many other exceptions because the method signature is inherited and I cannot throw them out
+                        }
+                        // todo: I ignored this and many other exceptions because the method signature is
+                        //  inherited and I cannot throw them out
                         //  -- 看一下HttpServerHandler的exception handling机制
                     } else if (partitioned)
                     {
-                        // In partitioned mode, every packet brings a streamHeader to prevent errors from possibly out-of-order packet arrivals,
-                        //  so we need to parse it, but do not need the return value (except for the first incoming packet processed above).
+                        // In partitioned mode, every packet brings a streamHeader to prevent errors from possibly
+                        // out-of-order packet arrivals, so we need to parse it, but do not need the return value
+                        // (except for the first incoming packet processed above).
                         parseStreamHeader(byteBuf);
                     }
                 } catch (InvalidProtocolBufferException e)
                 {
                     logger.error("Error parsing stream header", e);
-                    FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), INTERNAL_SERVER_ERROR);
+                    FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(),
+                            INTERNAL_SERVER_ERROR);
                     sendResponseAndClose(ctx, req, response);
                     return;
                 } catch (PixelsStreamHeaderMalformedException e)
@@ -182,8 +191,9 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 }
                 if (httpPort >= 50100)
                 {
-                    // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the client is a data writer (port >= 50100)
-                    //  rather than a schema writer. In the latter case, the schema packet has been processed when parsing the stream header above.
+                    // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the
+                    // client is a data writer (port >= 50100) rather than a schema writer. In the latter case,
+                    // the schema packet has been processed when parsing the stream header above.
                     try
                     {
                         byteBuf.retain();
@@ -194,21 +204,25 @@ public class PixelsReaderStreamImpl implements PixelsReader
                             if (hash < 0 || hash >= numHashes)
                             {
                                 logger.warn("Client sent invalid hash value: " + hash);
-                                FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), BAD_REQUEST);
+                                FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(),
+                                        BAD_REQUEST);
                                 sendResponseAndClose(ctx, req, response);
                                 return;
                             }
                             byteBufBlockingMap.put(hash, byteBuf);
                             if (numHashesReceived.accumulateAndGet(1, Integer::sum) == numHashes)
                             {
-                                // The reader has read all the hashes, so we can put an artificial empty ByteBuf into the queue to signal the end of the stream.
+                                // The reader has read all the hashes, so we can put an artificial empty ByteBuf
+                                //  into the queue to signal the end of the stream.
                                 byteBufBlockingMap.put(numHashes, Unpooled.buffer(0).retain());
                             }
                         }
                     } catch (InterruptedException e)
                     {
                         e.printStackTrace();
-                    }  // todo: I ignored this and many other exceptions because the method signature is inherited and I cannot throw them out
+                    }
+                    // todo: I ignored this and many other exceptions because the method signature is inherited
+                    //  and I cannot throw them out
                 }
 
                 FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.OK);
@@ -226,7 +240,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     }
                 });
                 f.addListener(ChannelFutureListener.CLOSE);  // shut down the connection with the current hash
-                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) || (partitioned && numHashesReceived.get() == numHashes))
+                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) ||
+                        (partitioned && numHashesReceived.get() == numHashes))
                 {
                     f.addListener(future -> {
                         // shutdown the server
@@ -297,7 +312,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
             // consume the padding bytes
             byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8));
-            // At this point, the readerIndex of the byteBuf is past the streamHeader and at the start of the actual rowGroups.
+            // At this point, the readerIndex of the byteBuf is past the streamHeader and at the start of
+            // the actual rowGroups.
 
             this.fileSchema = TypeDescription.createSchema(streamHeader.getTypesList());
             return streamHeader;
@@ -325,7 +341,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
     {
         assert (recordReaders.size() == 0);
 
-        PixelsRecordReaderStreamImpl recordReader = new PixelsRecordReaderStreamImpl(partitioned, byteBufSharedQueue, byteBufBlockingMap, streamHeader, option);
+        PixelsRecordReaderStreamImpl recordReader = new PixelsRecordReaderStreamImpl(partitioned, byteBufSharedQueue,
+                byteBufBlockingMap, streamHeader, option);
         recordReaders.add(recordReader);
         return recordReader;
     }
@@ -507,7 +524,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
             throws IOException
     {
         // new Thread().start(): A low-level approach to create and start a new thread.
-        // Use new Thread().start() for simple, one-off asynchronous tasks where the overhead of managing a thread pool is unnecessary.
+        // Use new Thread().start() for simple, one-off asynchronous tasks where the overhead of managing
+        // a thread pool is unnecessary.
         new Thread(() -> {
             try
             {

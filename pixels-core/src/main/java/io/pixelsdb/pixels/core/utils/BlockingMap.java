@@ -23,7 +23,8 @@ public class BlockingMap<K, V>
 
     public void put(K key, V value)
     {
-        // This will throw an exception if the key is already present in the map - we've set the capacity of the queue to 1.
+        // This will throw an exception if the key is already present in the map - we've set the capacity of the queue
+        //  to 1.
         // Can also use queue.offer(value) if do not want an exception thrown.
         if (!getQueue(key).add(value))
         {
