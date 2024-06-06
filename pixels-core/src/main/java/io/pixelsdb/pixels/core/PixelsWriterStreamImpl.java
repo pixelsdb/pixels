@@ -366,10 +366,21 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                     "partition column ids are present while partitioned is false, or vice versa");
 
 
-            return new PixelsWriterStreamImpl(builderSchema, builderPixelStride, builderRowGroupSize,
-                    builderCompressionKind, builderCompressionBlockSize, builderTimeZone, builderEncodingLevel,
-                    builderNullsPadding, builderPartitioned, builderPartitionId, builderPartKeyColumnIds, builderUri,
-                    builderFileName, builderFileNames);
+            return new PixelsWriterStreamImpl(
+                    builderSchema,
+                    builderPixelStride,
+                    builderRowGroupSize,
+                    builderCompressionKind,
+                    builderCompressionBlockSize,
+                    builderTimeZone,
+                    builderEncodingLevel,
+                    builderNullsPadding,
+                    builderPartitioned,
+                    builderPartitionId,
+                    builderPartKeyColumnIds,
+                    builderUri,
+                    builderFileName,
+                    builderFileNames);
         }
     }
 
@@ -443,7 +454,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     public boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException
     {
         checkArgument(!partitioned,
-                "this file is hash partitioned, " + "use addRowBatch(rowBatch, hashValue) instead");
+                "this file is hash partitioned, use addRowBatch(rowBatch, hashValue) instead");
         /**
          * Issue #170:
          * ColumnWriter.write() returns the total size of the current column chunk,
@@ -466,7 +477,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     public void addRowBatch(VectorizedRowBatch rowBatch, int hashValue) throws IOException
     {
         checkArgument(partitioned,
-                "this file is not hash partitioned, " + "use addRowBatch(rowBatch) instead");
+                "this file is not hash partitioned, use addRowBatch(rowBatch) instead");
         if (hashValueIsSet)
         {
             // As the current hash value is set, at lease one row batch has been added.
@@ -540,9 +551,12 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 {
                     uri = URI.create(fileNameToUri(fileName));
                 }
-                Request req = httpClient.preparePost(partitioned ? fileNameToUri(fileNames.get(currHashValue)) :
-                        uri.toString()).addHeader(CONTENT_TYPE, "application/x-protobuf").addHeader(CONTENT_LENGTH,
-                        0).addHeader(CONNECTION, CLOSE).build();
+                Request req = httpClient
+                        .preparePost(partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString())
+                        .addHeader(CONTENT_TYPE, "application/x-protobuf")
+                        .addHeader(CONTENT_LENGTH, 0)
+                        .addHeader(CONNECTION, CLOSE)
+                        .build();
                 try
                 {
                     outstandingHTTPRequestSemaphore.acquire();

@@ -208,7 +208,8 @@ public class StreamWorkerCommon extends WorkerCommon
                     ", port: " + PixelsWriterStreamImpl.getOrSetPort(path));
             return new PixelsReaderStreamImpl("http://localhost:" + PixelsWriterStreamImpl.getOrSetPort(path) + "/",
                     partitioned, numHashes);
-        } else return WorkerCommon.getReader(path, WorkerCommon.getStorage(storageScheme));
+        }
+        else return WorkerCommon.getReader(path, WorkerCommon.getStorage(storageScheme));
     }
 
     public static PixelsWriter getWriter(TypeDescription schema, Storage storage,
