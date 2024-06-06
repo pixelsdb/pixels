@@ -161,13 +161,13 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         if (fileColTypes == null || fileColTypes.isEmpty())
         {
             checkValid = false;
-            throw new IOException("type list is empty.");
+            throw new IOException("streamHeader type list is empty.");
         }
         fileSchema = TypeDescription.createSchema(fileColTypes);
         if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty())
         {
             checkValid = false;
-            throw new IOException("file schema is empty.");
+            throw new IOException("file schema derived from streamHeader is empty.");
         }
 
         // filter included columns

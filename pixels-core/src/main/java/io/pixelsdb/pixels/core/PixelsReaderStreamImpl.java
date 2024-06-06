@@ -31,7 +31,6 @@ import io.pixelsdb.pixels.common.utils.HttpServer;
 import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
-import io.pixelsdb.pixels.core.exception.PixelsStreamHeaderMalformedException;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReaderStreamImpl;
@@ -119,7 +118,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
         // WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
         ExecutorService executorService = Executors.newFixedThreadPool(1);  // , new ThreadFactoryBuilder()
         // .setUncaughtExceptionHandler(exceptionHandler).build());
-        // 215行，应该logger.error()还是只需要e.printStackTrace()？
         this.httpServer = new HttpServer(new HttpServerHandler()
         {
             @Override
@@ -130,8 +128,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 FullHttpRequest req = (FullHttpRequest) msg;
                 if (req.method() != HttpMethod.POST)
                 {
-                    FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), NOT_FOUND);
-                    sendResponseAndClose(ctx, req, response);
+                    sendResponseAndClose(ctx, req, NOT_FOUND);
                     return;
                 }
                 if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf"))
@@ -163,11 +160,10 @@ public class PixelsReaderStreamImpl implements PixelsReader
                             }
                         } catch (IOException e)
                         {
-                            throw new RuntimeException(e);
+                            logger.error("Invalid stream header values: ", e);
+                            sendResponseAndClose(ctx, req, BAD_REQUEST);
+                            return;
                         }
-                        // todo: I ignored this and many other exceptions because the method signature is
-                        //  inherited and I cannot throw them out
-                        //  -- 看一下HttpServerHandler的exception handling机制
                     } else if (partitioned)
                     {
                         // In partitioned mode, every packet brings a streamHeader to prevent errors from possibly
@@ -175,18 +171,10 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         // (except for the first incoming packet processed above).
                         parseStreamHeader(byteBuf);
                     }
-                } catch (InvalidProtocolBufferException e)
+                } catch (InvalidProtocolBufferException | IndexOutOfBoundsException e)
                 {
-                    logger.error("Error parsing stream header", e);
-                    FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(),
-                            INTERNAL_SERVER_ERROR);
-                    sendResponseAndClose(ctx, req, response);
-                    return;
-                } catch (PixelsStreamHeaderMalformedException e)
-                {
-                    logger.error("Malformed stream header", e);
-                    FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), BAD_REQUEST);
-                    sendResponseAndClose(ctx, req, response);
+                    logger.error("Malformed or corrupted stream header", e);
+                    sendResponseAndClose(ctx, req, BAD_REQUEST);
                     return;
                 }
                 if (httpPort >= 50100)
@@ -204,9 +192,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                             if (hash < 0 || hash >= numHashes)
                             {
                                 logger.warn("Client sent invalid hash value: " + hash);
-                                FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(),
-                                        BAD_REQUEST);
-                                sendResponseAndClose(ctx, req, response);
+                                sendResponseAndClose(ctx, req, BAD_REQUEST);
                                 return;
                             }
                             byteBufBlockingMap.put(hash, byteBuf);
@@ -219,18 +205,23 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         }
                     } catch (InterruptedException e)
                     {
-                        e.printStackTrace();
+                        logger.error("Interrupted while putting ByteBuf into blocking queue", e);
+                        sendResponseAndClose(ctx, req, INTERNAL_SERVER_ERROR);
+                        // 只有用户用终端（c.f. pixels-cli）时可以e.printStackTrace()
                     }
-                    // todo: I ignored this and many other exceptions because the method signature is inherited
-                    //  and I cannot throw them out
                 }
 
-                FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.OK);
-                sendResponseAndClose(ctx, req, response);
+                sendResponseAndClose(ctx, req, HttpResponseStatus.OK);
             }
 
-            private void sendResponseAndClose(ChannelHandlerContext ctx, FullHttpRequest req, FullHttpResponse response)
+            private void sendResponseAndClose(ChannelHandlerContext ctx, FullHttpRequest req, HttpResponseStatus status)
             {
+                FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), status);
+                response.headers()
+                        .set(HttpHeaderNames.CONTENT_TYPE, "text/plain")
+                        .set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes())
+                        .set(CONNECTION, CLOSE);
+
                 ChannelFuture f = ctx.writeAndFlush(response);
                 f.addListener(future -> {
                     if (!future.isSuccess())
@@ -259,7 +250,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 this.httpServer.serve(httpPort);
             } catch (InterruptedException e)
             {
-                e.printStackTrace();
+                logger.error("HTTP server interrupted", e);
             }
         }, executorService);
     }
@@ -284,43 +275,37 @@ public class PixelsReaderStreamImpl implements PixelsReader
     }
 
     private StreamProto.StreamHeader parseStreamHeader(ByteBuf byteBuf)
-            throws InvalidProtocolBufferException, PixelsStreamHeaderMalformedException
+            throws InvalidProtocolBufferException, IndexOutOfBoundsException
     {
-        try
+        // check MAGIC
+        int magicLength = MAGIC.getBytes().length;
+        byte[] magicBytes = new byte[magicLength];
+        byteBuf.getBytes(0, magicBytes);
+        String magic = new String(magicBytes);
+        if (!magic.contentEquals(Constants.MAGIC))
         {
-            // check MAGIC
-            int magicLength = MAGIC.getBytes().length;
-            byte[] magicBytes = new byte[magicLength];
-            byteBuf.getBytes(0, magicBytes);
-            String magic = new String(magicBytes);
-            if (!magic.contentEquals(Constants.MAGIC))
-            {
-                throw new PixelsFileMagicInvalidException(magic);
-            }
-
-            int metadataLength = byteBuf.getInt(magicLength);
-            ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
-            byteBuf.getBytes(magicLength + Integer.BYTES, metadataBuf);
-            StreamProto.StreamHeader streamHeader = StreamProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
-
-            // check file version
-            int fileVersion = streamHeader.getVersion();
-            if (!PixelsVersion.matchVersion(fileVersion))
-            {
-                throw new PixelsFileVersionInvalidException(fileVersion);
-            }
-
-            // consume the padding bytes
-            byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8));
-            // At this point, the readerIndex of the byteBuf is past the streamHeader and at the start of
-            // the actual rowGroups.
-
-            this.fileSchema = TypeDescription.createSchema(streamHeader.getTypesList());
-            return streamHeader;
-        } catch (IndexOutOfBoundsException e)
-        {
-            throw new PixelsStreamHeaderMalformedException("Malformed stream header", e);
+            throw new PixelsFileMagicInvalidException(magic);
         }
+
+        int metadataLength = byteBuf.getInt(magicLength);
+        ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
+        byteBuf.getBytes(magicLength + Integer.BYTES, metadataBuf);
+        StreamProto.StreamHeader streamHeader = StreamProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
+
+        // check file version
+        int fileVersion = streamHeader.getVersion();
+        if (!PixelsVersion.matchVersion(fileVersion))
+        {
+            throw new PixelsFileVersionInvalidException(fileVersion);
+        }
+
+        // consume the padding bytes
+        byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8));
+        // At this point, the readerIndex of the byteBuf is past the streamHeader and at the start of
+        // the actual rowGroups.
+
+        this.fileSchema = TypeDescription.createSchema(streamHeader.getTypesList());
+        return streamHeader;
     }
 
     public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId)
@@ -421,7 +406,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
             streamHeaderLatch.await();
         } catch (InterruptedException e)
         {
-            e.printStackTrace();
+            logger.error("Interrupted while waiting for stream header", e);
         }
         return this.fileSchema;
     }
@@ -443,7 +428,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
             streamHeaderLatch.await();
         } catch (InterruptedException e)
         {
-            e.printStackTrace();
+            logger.error("Interrupted while waiting for stream header", e);
         }
         return this.streamHeader.hasPartitioned() && this.streamHeader.getPartitioned();
     }
