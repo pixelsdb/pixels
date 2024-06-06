@@ -56,11 +56,13 @@ import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 
 /**
  * PixelsReaderStreamImpl is an implementation of {@link io.pixelsdb.pixels.core.PixelsReader} that reads
- * ColumnChunks from a stream, for operator pipelining over HTTP.
- * DESIGN: For the design of the stream protocol, see the head comment in {@link PixelsWriterStreamImpl}.
+ *  ColumnChunks from a stream, for operator pipelining over HTTP.
+ * DESIGN: We adopt the stream protocol defined in the head comment in {@link PixelsWriterStreamImpl}.
+ *  In the stream reader, we use a shared queue, or in partitioned mode a blocking hash map (which maps hash value
+ *  to the ByteBuf of the corresponding hash partition), to pass received `ByteBuf`s to the record stream reader.
  * <p>
  * TODO: Currently, we assume the HTTP messages arrive in order. Implement a state machine to handle out-of-order
- * messages (e.g. send a response to the client to ask for retransmission if the header is missing).
+ *  messages (e.g. send a response to the client to ask for retransmission if the header is missing).
  */
 @NotThreadSafe
 public class PixelsReaderStreamImpl implements PixelsReader

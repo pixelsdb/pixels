@@ -53,8 +53,10 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
 
     /**
      * If the curRowGroupByteBuf is no longer readable, we take the next ByteBuf from the byteBufSharedQueue or
-     * byteBufBlockingMap;
-     * otherwise, we just read from curRowGroupByteBuf.
+     *  byteBufBlockingMap;
+     *  otherwise, we just read from curRowGroupByteBuf.
+     * Note that this blocking queue or map is created in the stream reader
+     * {@link io.pixelsdb.pixels.core.PixelsReaderStreamImpl#byteBufSharedQueue}, and only its reference is passed here.
      */
     private ByteBuf curRowGroupByteBuf;
     private final BlockingQueue<ByteBuf> byteBufSharedQueue;
