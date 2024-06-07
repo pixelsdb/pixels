@@ -62,7 +62,8 @@ import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
  *  to the ByteBuf of the corresponding hash partition), to pass received `ByteBuf`s to the record stream reader.
  * <p>
  * TODO: Currently, we assume the HTTP messages arrive in order. Implement a state machine to handle out-of-order
- *  messages (e.g. send a response to the client to ask for retransmission if the header is missing).
+ *  messages (e.g. send a response to the client to ask for retransmission, if the header packet has not arrived
+ *  by the time a data packet arrives).
  */
 @NotThreadSafe
 public class PixelsReaderStreamImpl implements PixelsReader
@@ -179,38 +180,45 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     sendResponseAndClose(ctx, req, BAD_REQUEST);
                     return;
                 }
+
+                // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the
+                //  client is a data writer (port >= 50100) rather than a schema writer. In the latter case,
+                //  the schema packet has been processed when parsing the stream header above.
                 if (httpPort >= 50100)
                 {
-                    // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the
-                    // client is a data writer (port >= 50100) rather than a schema writer. In the latter case,
-                    // the schema packet has been processed when parsing the stream header above.
-                    try
-                    {
-                        byteBuf.retain();
-                        if (!partitioned) byteBufSharedQueue.put(byteBuf);
-                        else
+                    // We use an ExecutorService to put the ByteBuf into the blocking queue, to avoid blocking the
+                    //  Netty event loop thread.
+                    // We can also use a group of partition-aware handlers in the Netty pipeline, to put the ByteBuf
+                    //  into the blocking map, instead of using an ExecutorService. But that would be more complex.
+                    CompletableFuture.runAsync(() -> {
+                        try
                         {
-                            int hash = Integer.parseInt(req.headers().get("X-Partition-Id"));
-                            if (hash < 0 || hash >= numHashes)
+                            byteBuf.retain();
+                            if (!partitioned) byteBufSharedQueue.put(byteBuf);
+                            else
                             {
-                                logger.warn("Client sent invalid hash value: " + hash);
-                                sendResponseAndClose(ctx, req, BAD_REQUEST);
-                                return;
+                                int hash = Integer.parseInt(req.headers().get("X-Partition-Id"));
+                                if (hash < 0 || hash >= numHashes)
+                                {
+                                    logger.warn("Client sent invalid hash value: " + hash);
+                                    sendResponseAndClose(ctx, req, BAD_REQUEST);
+                                    return;
+                                }
+                                byteBufBlockingMap.put(hash, byteBuf);
+                                if (numHashesReceived.accumulateAndGet(1, Integer::sum) == numHashes)
+                                {
+                                    // The reader has read all the hashes, so we can put an artificial empty ByteBuf
+                                    //  into the queue to signal the end of the stream.
+                                    byteBufBlockingMap.put(numHashes, Unpooled.buffer(0).retain());
+                                }
                             }
-                            byteBufBlockingMap.put(hash, byteBuf);
-                            if (numHashesReceived.accumulateAndGet(1, Integer::sum) == numHashes)
-                            {
-                                // The reader has read all the hashes, so we can put an artificial empty ByteBuf
-                                //  into the queue to signal the end of the stream.
-                                byteBufBlockingMap.put(numHashes, Unpooled.buffer(0).retain());
-                            }
+                        } catch (InterruptedException e)
+                        {
+                            logger.error("Interrupted while putting ByteBuf into blocking queue", e);
+                            sendResponseAndClose(ctx, req, INTERNAL_SERVER_ERROR);
+                            // 只有用户用终端（c.f. pixels-cli）时可以e.printStackTrace()
                         }
-                    } catch (InterruptedException e)
-                    {
-                        logger.error("Interrupted while putting ByteBuf into blocking queue", e);
-                        sendResponseAndClose(ctx, req, INTERNAL_SERVER_ERROR);
-                        // 只有用户用终端（c.f. pixels-cli）时可以e.printStackTrace()
-                    }
+                    });
                 }
 
                 sendResponseAndClose(ctx, req, HttpResponseStatus.OK);
