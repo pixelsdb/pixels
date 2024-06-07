@@ -42,7 +42,6 @@ option java_outer_classname = "StreamProto";
  * Note that there is not a footer in the stream, so the workers need to
  *  allocate their arrays etc. in a dynamic fashion
  */
-// XXX: should we use int or long for the lengths fields above?
 
 import "pixels.proto";
 

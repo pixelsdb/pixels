@@ -38,6 +38,10 @@ import java.util.concurrent.BlockingQueue;
 
 /**
  * PixelsRecordReaderStreamImpl is the variant of {@link PixelsRecordReaderImpl} for streaming mode.
+ * <p>
+ * TODO: Large row group support: Currently, we assume the row groups fit in the size of a single ByteBuf, i.e. 2GB
+ *  because a ByteBuf's index is a 32-bit integer. Implement a mechanism to handle large row groups
+ *  (e.g. using Netty's `ChunkedWriteHandler`).
  */
 @NotThreadSafe
 public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
@@ -313,7 +317,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
          *  first time to read all row group footers.
          */
         int rowGroupsPosition = byteBuf.readerIndex();
-        int rowGroupDataLength = byteBuf.readInt();
+        long rowGroupDataLength = byteBuf.readLong();
         logger.debug("In prepareRead(), rowGroupsPosition = " + rowGroupsPosition +
                 ", rowGroupDataLength = " + rowGroupDataLength +
                 ", firstRgFooterPosition = " + (rowGroupsPosition + rowGroupDataLength));
@@ -632,7 +636,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             curRowGroupByteBuf.markReaderIndex();
 
             // skip row group data and process row group footer first
-            curRowGroupByteBuf.readerIndex(curRowGroupByteBuf.readerIndex() + curRowGroupByteBuf.readInt());
+            curRowGroupByteBuf.readerIndex((int) (curRowGroupByteBuf.readerIndex() + curRowGroupByteBuf.readLong()));
             byte[] curRowGroupFooterBytes = new byte[curRowGroupByteBuf.readInt()];
             curRowGroupByteBuf.readBytes(curRowGroupFooterBytes);
             curRowGroupByteBuf.resetReaderIndex();

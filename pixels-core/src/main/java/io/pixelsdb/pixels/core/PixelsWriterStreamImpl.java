@@ -600,8 +600,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             isFirstRowGroup = false;
         }
 
-        int rowGroupDataLength = 0;
-
         PixelsProto.RowGroupIndex.Builder curRowGroupIndex = PixelsProto.RowGroupIndex.newBuilder();
         PixelsProto.RowGroupEncoding.Builder curRowGroupEncoding = PixelsProto.RowGroupEncoding.newBuilder();
         PixelsProto.PartitionInformation.Builder curPartitionInfo = PixelsProto.PartitionInformation.newBuilder();
@@ -614,9 +612,12 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         }
 
         // write and flush row group content
-        int recordedRowGroupDataLen = 0;
-        try
-        {
+        /**
+         * Currently, we use long to store row group data length in our ByteBuf,
+         * but we do not really support row groups that has data length exceeding int32, limited by ByteBuf.
+         */
+        long recordedRowGroupDataLen = 0;
+        try {
             curRowGroupOffset = byteBuf.writerIndex();
             if (curRowGroupOffset != -1)
             {
@@ -630,7 +631,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 int tryAlign = 0;
                 long writtenBytesBefore = writtenBytes;
                 int rowGroupDataLenPos = byteBuf.writerIndex();
-                byteBuf.writeInt(0); // write a placeholder for row group data length
+                byteBuf.writeLong(0); // write a placeholder for row group data length
                 writtenBytes += Integer.BYTES;
                 curRowGroupOffset = byteBuf.writerIndex();
 
@@ -678,7 +679,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 recordedRowGroupDataLen = byteBuf.writerIndex() - rowGroupDataLenPos;
                 if (recordedRowGroupDataLen != writtenBytes - writtenBytesBefore)
                     logger.warn("Recorded rowGroupDataLen is not equal to accumulated writtenBytes");
-                byteBuf.setInt(rowGroupDataLenPos, recordedRowGroupDataLen);
+                byteBuf.setLong(rowGroupDataLenPos, recordedRowGroupDataLen);
             }
             else
             {
@@ -692,7 +693,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         }
 
         // update index and stats
-        rowGroupDataLength = 0;
+        long rowGroupDataLength = 0;
         for (int i = 0; i < columnWriters.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
