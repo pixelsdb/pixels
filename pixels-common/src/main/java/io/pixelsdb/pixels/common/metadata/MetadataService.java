@@ -893,16 +893,15 @@ public class MetadataService
         return true;
     }
 
-    public boolean createPath(String uri, boolean isCompact, Layout layout) throws MetadataException
+    public boolean addPath(Path path) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.CreatePathRequest request = MetadataProto.CreatePathRequest.newBuilder()
+        MetadataProto.AddPathRequest request = MetadataProto.AddPathRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
-                .setPath(MetadataProto.Path.newBuilder().setUri(uri).setIsCompact(isCompact)
-                        .setLayoutId(layout.getId())).build();
+                .setPath(path.toProto()).build();
         try
         {
-            MetadataProto.CreatePathResponse response = this.stub.createPath(request);
+            MetadataProto.AddPathResponse response = this.stub.addPath(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
@@ -915,7 +914,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to create path in metadata", e);
+            throw new MetadataException("failed to add path", e);
         }
         return false;
     }
@@ -949,16 +948,16 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to get paths from metadata", e);
+            throw new MetadataException("failed to get paths", e);
         }
     }
 
-    public boolean updatePath(long pathId, String uri, boolean isCompact) throws MetadataException
+    public boolean updatePath(Path path) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.UpdatePathRequest request = MetadataProto.UpdatePathRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
-                .setPathId(pathId).setUri(uri).setIsCompact(isCompact).build();
+                .setPath(path.toProto()).build();
         try
         {
             MetadataProto.UpdatePathResponse response = this.stub.updatePath(request);
@@ -974,7 +973,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to update path in metadata", e);
+            throw new MetadataException("failed to update path", e);
         }
         return false;
     }
@@ -1000,7 +999,110 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to delete paths from metadata", e);
+            throw new MetadataException("failed to delete paths", e);
+        }
+        return false;
+    }
+
+    public boolean addFile(File file) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.AddFileRequest request = MetadataProto.AddFileRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setFile(file.toProto()).build();
+        try
+        {
+            MetadataProto.AddFileResponse response = this.stub.addFile(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to add file", e);
+        }
+        return false;
+    }
+
+    public List<File> getFiles(long pathId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetFilesRequest request = MetadataProto.GetFilesRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token)).setPathId(pathId).build();
+        try
+        {
+            MetadataProto.GetFilesResponse response = this.stub.getFiles(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return File.convertFiles(response.getFilesList());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get files", e);
+        }
+    }
+
+    public boolean updateFile(File file) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.UpdateFileRequest request = MetadataProto.UpdateFileRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setFile(file.toProto()).build();
+        try
+        {
+            MetadataProto.UpdateFileResponse response = this.stub.updateFile(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update file", e);
+        }
+        return false;
+    }
+
+    public boolean deleteFiles(List<Long> fileIds) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DeleteFilesRequest request = MetadataProto.DeleteFilesRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .addAllFileIds(fileIds).build();
+        try
+        {
+            MetadataProto.DeleteFilesResponse response = this.stub.deleteFiles(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to delete files", e);
         }
         return false;
     }

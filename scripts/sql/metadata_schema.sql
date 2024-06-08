@@ -74,34 +74,6 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
 
 
 -- -----------------------------------------------------
--- Table `pixels_metadata`.`RANGE_INDEXES`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
-    `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `RI_INDEX_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
-    `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
-    `TBLS_TBL_ID` BIGINT NOT NULL,
-    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
-    PRIMARY KEY (`RI_ID`),
-    INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
-    INDEX `fk_RANGE_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
-    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC, `SCHEMA_VERSIONS_SV_ID` ASC) COMMENT 'We ensure every (table, schema_version) has only one range index.',
-    CONSTRAINT `fk_RANGE_INDEX_TBLS`
-    FOREIGN KEY (`TBLS_TBL_ID`)
-    REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-    CONSTRAINT `fk_RANGE_INDEXES_SCHEMA_VERSIONS1`
-    FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
-    REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
-    ENGINE = InnoDB
-    DEFAULT CHARACTER SET = utf8mb4
-    COLLATE = utf8mb4_bin;
-
-
--- -----------------------------------------------------
 -- Table `pixels_metadata`.`SCHEMA_VERSIONS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
@@ -175,6 +147,34 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 
 
 -- -----------------------------------------------------
+-- Table `pixels_metadata`.`RANGE_INDEXES`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
+    `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `RI_INDEX_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
+    `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
+    `TBLS_TBL_ID` BIGINT NOT NULL,
+    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
+    PRIMARY KEY (`RI_ID`),
+    INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_RANGE_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC, `SCHEMA_VERSIONS_SV_ID` ASC) COMMENT 'We ensure every (table, schema_version) has only one range index.',
+    CONSTRAINT `fk_RANGE_INDEX_TBLS`
+    FOREIGN KEY (`TBLS_TBL_ID`)
+    REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+    CONSTRAINT `fk_RANGE_INDEXES_SCHEMA_VERSIONS`
+    FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
+    REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_bin;
+
+
+-- -----------------------------------------------------
 -- Table `pixels_metadata`.`RANGES`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
@@ -194,7 +194,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
     CONSTRAINT `fk_RANGES_RANGES`
     FOREIGN KEY (`RANGE_PARENT_ID`)
     REFERENCES `pixels_metadata`.`RANGES` (`RANGE_ID`)
-    ON DELETE RESTRICT
+    ON DELETE SET NULL
     ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
@@ -310,6 +310,24 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
+
+
+-- -----------------------------------------------------
+-- Table `pixels_metadata`.`FILES`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
+    `FILE_ID` INT NOT NULL AUTO_INCREMENT,
+    `FILE_NAME` VARCHAR(128) NOT NULL,
+    `FILE_LOCALITY` VARCHAR(128) NULL DEFAULT 'on which server or node this file is stored, only used for vsdfs',
+    `PATHS_PATH_ID` BIGINT NOT NULL,
+    PRIMARY KEY (`FILE_ID`),
+    INDEX `fk_FILES_PATHS_idx` (`PATHS_PATH_ID` ASC),
+    CONSTRAINT `fk_FILES_PATHS`
+    FOREIGN KEY (`PATHS_PATH_ID`)
+    REFERENCES `pixels_metadata`.`PATHS` (`PATH_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
+    ENGINE = InnoDB;
 
 
 SET SQL_MODE=@OLD_SQL_MODE;

@@ -52,12 +52,12 @@ import static java.util.Objects.requireNonNull;
 public final class LocalFS implements Storage
 {
     private final static boolean EnableCache;
-    private final static boolean MmapEnabled;
+    private final static boolean EnableMmap;
 
     static
     {
         EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
-        MmapEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.mmap"));
+        EnableMmap = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.mmap"));
 
         if (EnableCache)
         {
@@ -309,7 +309,7 @@ public final class LocalFS implements Storage
         {
             throw new IOException("File '" + p.realPath + "' doesn't exists.");
         }
-        if (MmapEnabled)
+        if (EnableMmap)
         {
             return new MappedRandomAccessFile(file);
         }

@@ -25,6 +25,7 @@ public class DaoFactory
     private final TableDao tableDao;
     private final ViewDao viewDao;
     private final PathDao pathDao;
+    private final FileDao fileDao;
     private final PeerDao peerDao;
     private final PeerPathDao peerPathDao;
     private final SchemaVersionDao schemaVersionDao;
@@ -39,6 +40,7 @@ public class DaoFactory
         this.tableDao = new RdbTableDao();
         this.viewDao = new RdbViewDao();
         this.pathDao = new RdbPathDao();
+        this.fileDao = new RdbFileDao();
         this.peerDao = new RdbPeerDao();
         this.peerPathDao = new RdbPeerPathDao();
         this.schemaVersionDao = new RdbSchemaVersionDao();
@@ -74,6 +76,11 @@ public class DaoFactory
     public PathDao getPathDao()
     {
         return this.pathDao;
+    }
+
+    public FileDao getFileDao()
+    {
+        return this.fileDao;
     }
 
     public PeerDao getPeerDao()
