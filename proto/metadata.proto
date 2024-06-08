@@ -145,7 +145,8 @@ message Path {
 message File {
     uint64 id = 1;
     string name = 2;
-    string locality = 3;
+    optional string locality = 3;
+    uint64 pathId = 4;
 }
 
 message SchemaVersion {
