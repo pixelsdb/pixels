@@ -53,6 +53,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     private final RangeIndexDao rangeIndexDao = DaoFactory.Instance().getRangeIndexDao();
     private final ViewDao viewDao = DaoFactory.Instance().getViewDao();
     private final PathDao pathDao = DaoFactory.Instance().getPathDao();
+    private final FileDao fileDao = DaoFactory.Instance().getFileDao();
     private final PeerDao peerDao = DaoFactory.Instance().getPeerDao();
     private final PeerPathDao peerPathDao = DaoFactory.Instance().getPeerPathDao();
     private final SchemaVersionDao schemaVersionDao = DaoFactory.Instance().getSchemaVersionDao();
@@ -762,28 +763,89 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     public void addFile(MetadataProto.AddFileRequest request,
                         StreamObserver<MetadataProto.AddFileResponse> responseObserver)
     {
-        super.addFile(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.fileDao.insert(request.getFile()) > 0)
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_FILE_FAILED).setErrorMsg("add file failed");
+        }
+
+        MetadataProto.AddFileResponse response = MetadataProto.AddFileResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void getFiles(MetadataProto.GetFilesRequest request,
                          StreamObserver<MetadataProto.GetFilesResponse> responseObserver)
     {
-        super.getFiles(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetFilesResponse.Builder responseBuilder = MetadataProto.GetFilesResponse.newBuilder();
+        List<MetadataProto.File> files = this.fileDao.getAllByPathId(request.getPathId());
+        if (files != null)
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+            responseBuilder.addAllFiles(files).setHeader(headerBuilder);
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_FILES_FAILED).setErrorMsg("get files by path id failed");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void updateFile(MetadataProto.UpdateFileRequest request,
                            StreamObserver<MetadataProto.UpdateFileResponse> responseObserver)
     {
-        super.updateFile(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        if (this.fileDao.update(request.getFile()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_FILE_FAILED).setErrorMsg("update file failed");
+        }
+
+        MetadataProto.UpdateFileResponse response = MetadataProto.UpdateFileResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void deleteFiles(MetadataProto.DeleteFilesRequest request,
                             StreamObserver<MetadataProto.DeleteFilesResponse> responseObserver)
     {
-        super.deleteFiles(request, responseObserver);
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.fileDao.deleteByIds(request.getFileIdsList()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_FILES_FAILED).setErrorMsg("delete files failed");
+        }
+
+        MetadataProto.DeleteFilesResponse response = MetadataProto.DeleteFilesResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
