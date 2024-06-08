@@ -52,10 +52,14 @@ service MetadataService {
     rpc GetRange (GetRangeRequest) returns (GetRangeResponse);
     rpc GetRanges (GetRangesRequest) returns (GetRangesResponse);
     rpc DeleteRange (DeleteRangeRequest) returns (DeleteRangeResponse);
-    rpc CreatePath (CreatePathRequest) returns (CreatePathResponse);
+    rpc AddPath (AddPathRequest) returns (AddPathResponse);
     rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
     rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
     rpc DeletePaths (DeletePathsRequest) returns (DeletePathsResponse);
+    rpc AddFile (AddFileRequest) returns (AddFileResponse);
+    rpc GetFiles (GetFilesRequest) returns (GetFilesResponse);
+    rpc UpdateFile (UpdateFileRequest) returns (UpdateFileResponse);
+    rpc DeleteFiles (DeleteFilesRequest) returns (DeleteFilesResponse);
     rpc CreatePeerPath (CreatePeerPathRequest) returns (CreatePeerPathResponse);
     rpc GetPeerPaths (GetPeerPathsRequest) returns (GetPeerPathsResponse);
     rpc UpdatePeerPath (UpdatePeerPathRequest) returns (UpdatePeerPathResponse);
@@ -510,12 +514,12 @@ message DeletePeerResponse {
 }
 
 // path
-message CreatePathRequest {
+message AddPathRequest {
     RequestHeader header = 1;
     Path path = 2;
 }
 
-message CreatePathResponse {
+message AddPathResponse {
     ResponseHeader header = 1;
 }
 
@@ -534,9 +538,7 @@ message GetPathsResponse {
 
 message UpdatePathRequest {
     RequestHeader header = 1;
-    uint64 pathId = 2;
-    string uri = 3;
-    bool isCompact = 4;
+    Path path = 2;
 }
 
 message UpdatePathResponse {
@@ -552,6 +554,45 @@ message DeletePathsResponse {
     ResponseHeader header = 1;
 }
 
+// file
+message AddFileRequest {
+    RequestHeader header = 1;
+    File file = 2;
+}
+
+message AddFileResponse {
+    ResponseHeader header = 1;
+}
+
+message GetFilesRequest {
+    RequestHeader header = 1;
+    uint64 pathId = 2;
+}
+
+message GetFilesResponse {
+    ResponseHeader header = 1;
+    repeated File files = 2;
+}
+
+message UpdateFileRequest {
+    RequestHeader header = 1;
+    File file = 2;
+}
+
+message UpdateFileResponse {
+    ResponseHeader header = 1;
+}
+
+message DeleteFilesRequest {
+    RequestHeader header = 1;
+    repeated uint64 fileIds = 2;
+}
+
+message DeleteFilesResponse {
+    ResponseHeader header = 1;
+}
+
+// peer path
 message CreatePeerPathRequest {
     RequestHeader header = 1;
     PeerPath peerPath = 2;

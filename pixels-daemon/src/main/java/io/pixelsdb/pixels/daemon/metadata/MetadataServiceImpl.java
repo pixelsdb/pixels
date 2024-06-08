@@ -648,8 +648,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void createPath(MetadataProto.CreatePathRequest request,
-                           StreamObserver<MetadataProto.CreatePathResponse> responseObserver)
+    public void addPath(MetadataProto.AddPathRequest request,
+                           StreamObserver<MetadataProto.AddPathResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -660,10 +660,10 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED).setErrorMsg("create path failed");
+            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED).setErrorMsg("add path failed");
         }
 
-        MetadataProto.CreatePathResponse response = MetadataProto.CreatePathResponse.newBuilder()
+        MetadataProto.AddPathResponse response = MetadataProto.AddPathResponse.newBuilder()
                 .setHeader(headerBuilder).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
@@ -721,10 +721,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
-
-        MetadataProto.Path path = MetadataProto.Path.newBuilder()
-                .setId(request.getPathId()).setUri(request.getUri()).setIsCompact(request.getIsCompact()).build();
-        if (this.pathDao.update(path))
+        if (this.pathDao.update(request.getPath()))
         {
             headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
         }
@@ -759,6 +756,34 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 .setHeader(headerBuilder).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void addFile(MetadataProto.AddFileRequest request,
+                        StreamObserver<MetadataProto.AddFileResponse> responseObserver)
+    {
+        super.addFile(request, responseObserver);
+    }
+
+    @Override
+    public void getFiles(MetadataProto.GetFilesRequest request,
+                         StreamObserver<MetadataProto.GetFilesResponse> responseObserver)
+    {
+        super.getFiles(request, responseObserver);
+    }
+
+    @Override
+    public void updateFile(MetadataProto.UpdateFileRequest request,
+                           StreamObserver<MetadataProto.UpdateFileResponse> responseObserver)
+    {
+        super.updateFile(request, responseObserver);
+    }
+
+    @Override
+    public void deleteFiles(MetadataProto.DeleteFilesRequest request,
+                            StreamObserver<MetadataProto.DeleteFilesResponse> responseObserver)
+    {
+        super.deleteFiles(request, responseObserver);
     }
 
     @Override
