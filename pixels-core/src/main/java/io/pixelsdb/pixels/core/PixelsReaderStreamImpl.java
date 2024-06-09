@@ -157,8 +157,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
                             for (PixelsRecordReaderStreamImpl recordReader : recordReaders)
                             {
-                                // XXX: potential data race with line 235 - if read() and this handler are executed
-                                //  in parallel
+                                // XXX: potential data race if `read()` method and this handler are executed in parallel
+                                //  due to concurrent modifications of the `recordReaders` list
                                 recordReader.lateInitialization(streamHeader);
                             }
                         } catch (IOException e)

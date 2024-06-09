@@ -110,6 +110,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private ColumnReader[] readers;      // column readers for each target columns
     private final boolean enableEncodedVector;
 
+    // XXX: The following members for performance metrics are not well maintained in the current implementation due to
+    //  disuse in the streaming mode. They are kept for compatibility and future use.
     private long diskReadBytes = 0L;
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;

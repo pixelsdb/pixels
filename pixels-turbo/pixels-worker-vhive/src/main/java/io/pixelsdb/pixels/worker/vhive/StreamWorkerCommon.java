@@ -230,6 +230,8 @@ public class StreamWorkerCommon extends WorkerCommon
                                          List<Integer> keyColumnIds,
                                          List<String> outputPaths, boolean isSchemaWriter)
     {
+        // root operator是可以把结果直接传回VM的，但没时间写了，本次demo时只能把结果写到minio中。所以仍然是
+        //  分类讨论，可能返回PixelsWriterStreamImpl或者PixelsWriterImpl
         if (storage != null && storage.getScheme() != Storage.Scheme.mock)
             return WorkerCommon.getWriter(schema, storage, outputPath, encoding, isPartitioned, keyColumnIds);
         logger.debug("getWriter streaming mode, path: " + outputPath + ", paths: " + outputPaths +
@@ -265,6 +267,9 @@ public class StreamWorkerCommon extends WorkerCommon
     public static PixelsReaderOption getReaderOption(long transId, String[] cols, PixelsReader pixelsReader,
                                                      int hashValue, int numPartition)
     {
+        // XXX: Currently we assume 1 reader is responsible for only 1 hash value, albeit for all its partitions.
+        // Might need to change if we want to support multiple hash values in the future.
+
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
