@@ -406,7 +406,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     @Override
     public int getNumWriteRequests()
     {
-        return 0;  // todo: Count the number of RTTs under HTTP streaming mode
+        return rowGroupNum;
     }
 
     @Override
@@ -755,7 +755,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         writtenBytes += footerBuffer.length;
 
         this.fileRowNum += curRowGroupNumOfRows;
-        this.rowGroupNum++;
 
         // Send row group to server (an additional step compared to PixelsWriterImpl)
         if (!partitioned && uri == null)
@@ -849,6 +848,9 @@ public class PixelsWriterStreamImpl implements PixelsWriter
 //                resultFuture.complete(result);
 //            }
 //        });
+        this.rowGroupNum++;
+        // In `getNumRowGroup()`, we use rowGroupNum to count the number of row groups sent. So we need to increment
+        //  `rowGroupNum` at the end of this method.
     }
 
     static void writeTypes(StreamProto.StreamHeader.Builder builder, TypeDescription schema)
