@@ -196,9 +196,8 @@ public class StreamWorkerCommon extends WorkerCommon
         return getReader(storageScheme, path, false, -1);
     }
 
-    // numHashes: the total number of hashes inside a partition
     public static PixelsReader getReader(Storage.Scheme storageScheme, String path, boolean partitioned,
-                                         int numHashes) throws Exception
+                                         int numPartitions) throws Exception
     {
         requireNonNull(storageScheme, "storageInfo is null");
         requireNonNull(path, "fileName is null");
@@ -207,7 +206,7 @@ public class StreamWorkerCommon extends WorkerCommon
             logger.debug("getReader streaming mode, path: " + path +
                     ", port: " + PixelsWriterStreamImpl.getOrSetPort(path));
             return new PixelsReaderStreamImpl("http://localhost:" + PixelsWriterStreamImpl.getOrSetPort(path) + "/",
-                    partitioned, numHashes);
+                    partitioned, numPartitions);
         }
         else return WorkerCommon.getReader(path, WorkerCommon.getStorage(storageScheme));
     }

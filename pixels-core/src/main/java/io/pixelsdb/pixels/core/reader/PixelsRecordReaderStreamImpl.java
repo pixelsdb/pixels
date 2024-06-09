@@ -452,6 +452,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         {
             acquireNewRowGroup(reuse);
             if (endOfFile) return createEmptyEOFRowBatch(0);
+            logger.debug("In readBatch(), new row group " + curRGIdx);
         }
 
         if (!checkValid || endOfFile)
@@ -632,7 +633,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                 }
             }
 
-            logger.debug("In readBatch(), new row group " + curRGIdx);
             curRowGroupByteBuf.markReaderIndex();
 
             // skip row group data and process row group footer first

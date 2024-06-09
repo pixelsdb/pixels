@@ -77,7 +77,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     // In partitioned mode, we use byteBufBlockingMap to map hash value to corresponding ByteBuf
     private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;
     private final boolean partitioned;
-    private final AtomicReference<Integer> numHashesReceived = new AtomicReference<>(0);
+    private final AtomicReference<Integer> numPartitionsReceived = new AtomicReference<>(0);
     private final List<PixelsRecordReaderStreamImpl> recordReaders;
 
     /**
@@ -99,7 +99,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         this("http://localhost:" + port + "/");
     }
 
-    public PixelsReaderStreamImpl(String endpoint, boolean partitioned, int numHashes)
+    public PixelsReaderStreamImpl(String endpoint, boolean partitioned, int numPartitions)
             throws URISyntaxException, CertificateException, SSLException
     {
         this.fileSchema = null;
@@ -108,7 +108,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         String IP = uri.getHost();
         int httpPort = uri.getPort();
         logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort +
-                ", partitioned: " + partitioned + ", numHashes: " + numHashes);
+                ", partitioned: " + partitioned + ", numPartitions: " + numPartitions);
         if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost"))
         {
             throw new UnsupportedOperationException("Currently, only localhost is supported as the server address");
@@ -197,19 +197,19 @@ public class PixelsReaderStreamImpl implements PixelsReader
                             if (!partitioned) byteBufSharedQueue.put(byteBuf);
                             else
                             {
-                                int hash = Integer.parseInt(req.headers().get("X-Partition-Id"));
-                                if (hash < 0 || hash >= numHashes)
+                                int partitionId = Integer.parseInt(req.headers().get("X-Partition-Id"));
+                                if (partitionId < 0 || partitionId >= numPartitions)
                                 {
-                                    logger.warn("Client sent invalid hash value: " + hash);
+                                    logger.warn("Client sent invalid partitionId value: " + partitionId);
                                     sendResponseAndClose(ctx, req, BAD_REQUEST);
                                     return;
                                 }
-                                byteBufBlockingMap.put(hash, byteBuf);
-                                if (numHashesReceived.accumulateAndGet(1, Integer::sum) == numHashes)
+                                byteBufBlockingMap.put(partitionId, byteBuf);
+                                if (numPartitionsReceived.accumulateAndGet(1, Integer::sum) == numPartitions)
                                 {
-                                    // The reader has read all the hashes, so we can put an artificial empty ByteBuf
+                                    // The reader has read all the partitions, so we can put an artificial empty ByteBuf
                                     //  into the queue to signal the end of the stream.
-                                    byteBufBlockingMap.put(numHashes, Unpooled.buffer(0).retain());
+                                    byteBufBlockingMap.put(numPartitions, Unpooled.buffer(0).retain());
                                 }
                             }
                         } catch (InterruptedException e)
@@ -242,7 +242,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 });
                 f.addListener(ChannelFutureListener.CLOSE);  // shut down the connection with the current hash
                 if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) ||
-                        (partitioned && numHashesReceived.get() == numHashes))
+                        (partitioned && numPartitionsReceived.get() == numPartitions))
                 {
                     f.addListener(future -> {
                         // shutdown the server
