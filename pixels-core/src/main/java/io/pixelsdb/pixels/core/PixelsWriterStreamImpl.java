@@ -632,7 +632,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 long writtenBytesBefore = writtenBytes;
                 int rowGroupDataLenPos = byteBuf.writerIndex();
                 byteBuf.writeLong(0); // write a placeholder for row group data length
-                writtenBytes += Integer.BYTES;
+                writtenBytes += Long.BYTES;
                 curRowGroupOffset = byteBuf.writerIndex();
 
                 while (CHUNK_ALIGNMENT != 0 && curRowGroupOffset % CHUNK_ALIGNMENT != 0 && tryAlign++ < 2)
