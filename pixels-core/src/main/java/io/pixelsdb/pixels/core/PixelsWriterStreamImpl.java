@@ -693,7 +693,13 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         }
 
         // update index and stats
-        long rowGroupDataLength = 0;
+        long rowGroupDataLength = Long.BYTES;
+        int tryAlign = 0;
+        while (CHUNK_ALIGNMENT != 0 && rowGroupDataLength % CHUNK_ALIGNMENT != 0 && tryAlign++ < 2)
+        {
+            int alignBytes = (int) (CHUNK_ALIGNMENT - rowGroupDataLength % CHUNK_ALIGNMENT);
+            rowGroupDataLength += alignBytes;
+        }
         for (int i = 0; i < columnWriters.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
@@ -719,9 +725,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
         }
 
-        if (rowGroupDataLength + 32 < recordedRowGroupDataLen || rowGroupDataLength + 8 > recordedRowGroupDataLen)
-            // XXX: if (rowGroupDataLength != recordedRowGroupDataLen)
-            throw new IOException("The calculated rowGroupDataLength is not equal to the recorded value");
+        if (rowGroupDataLength != recordedRowGroupDataLen)
+            logger.warn("The calculated rowGroupDataLength is not equal to the recorded value");
 
         if (partitioned)
         {
@@ -951,10 +956,19 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         byteBuf.writeBytes(magicBytes);
         byteBuf.writeInt(streamHeaderLength);
         byteBuf.writeBytes(streamHeader.toByteArray());
+        writtenBytes += magicBytes.length + streamHeaderLength + Integer.BYTES;
 
         int paddingLength = (8 - (magicBytes.length + Integer.BYTES + streamHeaderLength) % 8) % 8;  // Can use '&7'
         byte[] paddingBytes = new byte[paddingLength];
         byteBuf.writeBytes(paddingBytes);
-        writtenBytes += magicBytes.length + streamHeaderLength + Integer.BYTES + paddingLength;
+        writtenBytes += paddingLength;
+
+        // ensure the next member (row group data length) is aligned to CHUNK_ALIGNMENT
+        if (CHUNK_ALIGNMENT != 0 && byteBuf.writerIndex() % CHUNK_ALIGNMENT != 0)
+        {
+            int alignBytes = CHUNK_ALIGNMENT - byteBuf.writerIndex() % CHUNK_ALIGNMENT;
+            byteBuf.writeBytes(CHUNK_PADDING_BUFFER, 0, alignBytes);
+            writtenBytes += alignBytes;
+        }
     }
 }

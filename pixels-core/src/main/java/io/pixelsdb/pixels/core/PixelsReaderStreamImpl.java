@@ -26,6 +26,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
 import io.pixelsdb.pixels.common.utils.HttpServerHandler;
@@ -69,6 +70,11 @@ import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
 public class PixelsReaderStreamImpl implements PixelsReader
 {
     private static final Logger logger = LogManager.getLogger(PixelsReaderStreamImpl.class);
+    /**
+     * The number of bytes that the start offset of each column chunk is aligned to.
+     */
+    private static final int CHUNK_ALIGNMENT = Integer.parseInt(ConfigFactory.Instance()
+            .getProperty("column.chunk.alignment"));
 
     private TypeDescription fileSchema;
     private final HttpServer httpServer;
@@ -311,6 +317,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
         // consume the padding bytes
         byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8));
+        if (CHUNK_ALIGNMENT != 0)
+            byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, CHUNK_ALIGNMENT));
         // At this point, the readerIndex of the byteBuf is past the streamHeader and at the start of
         // the actual rowGroups.
 
