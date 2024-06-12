@@ -51,4 +51,16 @@ public class BlockingMap<K, V>
     {
         return getQueue(key).poll(timeout, unit);
     }
+
+    public boolean isEmpty()
+    {
+        for (BlockingQueue<V> queue : map.values())
+        {
+            if (!queue.isEmpty())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 }

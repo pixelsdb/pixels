@@ -54,10 +54,12 @@ import static io.netty.handler.codec.http.HttpHeaderNames.CONNECTION;
 import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
 import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
+import static java.lang.Thread.sleep;
 
 /**
  * PixelsReaderStreamImpl is an implementation of {@link io.pixelsdb.pixels.core.PixelsReader} that reads
  *  ColumnChunks from a stream, for operator pipelining over HTTP.
+ * <p>
  * DESIGN: We adopt the stream protocol defined in the head comment in {@link PixelsWriterStreamImpl}.
  *  In the stream reader, we use a shared queue, or in partitioned mode a blocking hash map (which maps hash value
  *  to the ByteBuf of the corresponding hash partition), to pass received `ByteBuf`s to the record stream reader.
@@ -119,7 +121,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         {
             throw new UnsupportedOperationException("Currently, only localhost is supported as the server address");
         }
-        this.byteBufSharedQueue = new LinkedBlockingQueue<>(1);
+        this.byteBufSharedQueue = new LinkedBlockingQueue<>();  // No need to specify capacity and block the writer
         this.byteBufBlockingMap = new BlockingMap<>();
         this.partitioned = partitioned;
         this.recordReaders = new ArrayList<>();
@@ -196,35 +198,27 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     //  Netty event loop thread.
                     // We can also use a group of partition-aware handlers in the Netty pipeline, to put the ByteBuf
                     //  into the blocking map, instead of using an ExecutorService. But that would be more complex.
-                    CompletableFuture.runAsync(() -> {
-                        try
+                    byteBuf.retain();
+                    // This would not block because the queue is unbounded, and the map expects only 1 byteBuf per key
+                    //  (partition ID). No need to do it asynchronously.
+                    if (!partitioned) byteBufSharedQueue.add(byteBuf);
+                    else
+                    {
+                        int partitionId = Integer.parseInt(req.headers().get("X-Partition-Id"));
+                        if (partitionId < 0 || partitionId >= numPartitions)
                         {
-                            byteBuf.retain();
-                            if (!partitioned) byteBufSharedQueue.put(byteBuf);
-                            else
-                            {
-                                int partitionId = Integer.parseInt(req.headers().get("X-Partition-Id"));
-                                if (partitionId < 0 || partitionId >= numPartitions)
-                                {
-                                    logger.warn("Client sent invalid partitionId value: " + partitionId);
-                                    sendResponseAndClose(ctx, req, BAD_REQUEST);
-                                    return;
-                                }
-                                byteBufBlockingMap.put(partitionId, byteBuf);
-                                if (numPartitionsReceived.accumulateAndGet(1, Integer::sum) == numPartitions)
-                                {
-                                    // The reader has read all the partitions, so we can put an artificial empty ByteBuf
-                                    //  into the queue to signal the end of the stream.
-                                    byteBufBlockingMap.put(numPartitions, Unpooled.buffer(0).retain());
-                                }
-                            }
-                        } catch (InterruptedException e)
-                        {
-                            logger.error("Interrupted while putting ByteBuf into blocking queue", e);
-                            sendResponseAndClose(ctx, req, INTERNAL_SERVER_ERROR);
-                            // 只有用户用终端（c.f. pixels-cli）时可以e.printStackTrace()
+                            logger.warn("Client sent invalid partitionId value: " + partitionId);
+                            sendResponseAndClose(ctx, req, BAD_REQUEST);
+                            return;
                         }
-                    });
+                        byteBufBlockingMap.put(partitionId, byteBuf);
+                        if (numPartitionsReceived.accumulateAndGet(1, Integer::sum) == numPartitions)
+                        {
+                            // The reader has read all the partitions, so we can put an artificial empty ByteBuf
+                            //  into the queue to signal the end of the stream.
+                            byteBufBlockingMap.put(numPartitions, Unpooled.buffer(0).retain());
+                        }
+                    }
                 }
 
                 sendResponseAndClose(ctx, req, HttpResponseStatus.OK);
@@ -246,11 +240,14 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         ctx.channel().close();
                     }
                 });
-                // if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()))
-                    f.addListener(ChannelFutureListener.CLOSE);
-                // if ((Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) && 0 == req.content().readableBytes()) ||
-                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) ||
-                        (partitioned && numPartitionsReceived.get() == numPartitions))
+                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()))
+                   f.addListener(ChannelFutureListener.CLOSE);
+                // schema port: only 1 packet expected, so close the connection immediately
+                // partitioned mode: close connection if all partitions received
+                // else (non-partitioned mode, data port): close connection if empty packet received
+                if (httpPort < 50100 || (partitioned && numPartitionsReceived.get() == numPartitions) ||
+                        (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
+                                req.content().readableBytes() == 0))
                 {
                     // if (partitioned && numPartitionsReceived.get() == numPartitions) logger.debug("All partitions received, closing connection: " + numPartitionsReceived.get());
                     // else logger.debug("Empty packet received, closing connection");
@@ -534,6 +531,18 @@ public class PixelsReaderStreamImpl implements PixelsReader
         // Use new Thread().start() for simple, one-off asynchronous tasks where the overhead of managing
         // a thread pool is unnecessary.
         new Thread(() -> {
+            // Conditions for closing:
+            // 1. streamHeaderLatch.await() to ensure that the stream header has been received
+            // 2. byteBufSharedQueue and byteBufBlockingMap are both empty, to ensure that all ByteBufs have been read
+            try
+            {
+                streamHeaderLatch.await();
+                while (!byteBufSharedQueue.isEmpty() && !byteBufBlockingMap.isEmpty()) sleep(20);
+            } catch (InterruptedException e)
+            {
+                throw new RuntimeException(e);
+            }
+
             try
             {
                 if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(5, TimeUnit.SECONDS);

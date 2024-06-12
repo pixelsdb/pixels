@@ -549,10 +549,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 isFirstRowGroup = false;
             }
 
-            // In non-partitioned mode, we send a close request to the server.
+            // In non-partitioned mode and for data servers, we send a close request to the server.
             // In partitioned mode, the server closes automatically when it receives all its partitions. No need to send
             //  a close request.
-            if (!partitioned)
+            // Schema servers also close automatically and do not need close requests.
+            if (!partitioned && uri.getPort() >= firstPort)
             {
                 // logger.debug("Sending close request to server");
                 // close the HTTP connection
@@ -785,7 +786,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 .addHeader("X-Partition-Id", String.valueOf(partitionId))
                 .addHeader(CONTENT_TYPE, "application/x-protobuf")
                 .addHeader(CONTENT_LENGTH, byteBuf.readableBytes())
-                .addHeader(CONNECTION, "keep-alive")  // .addHeader(CONNECTION, partitioned ? CLOSE : "keep-alive")
+                .addHeader(CONNECTION, partitioned || uri.getPort() < firstPort ? CLOSE : "keep-alive")
                 .build();
         // // In partitioned mode, we send only 1 row group to each upper-level worker, and so we set the connection to
         // //  CLOSE after sending the row group.
