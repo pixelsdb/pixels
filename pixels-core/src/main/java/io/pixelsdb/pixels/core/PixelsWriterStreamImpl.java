@@ -770,9 +770,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         {
             uri = URI.create(fileNameToUri(fileName));
         }
-        // if (!partitioned && getPort(fileName) != uri.getPort()) {
-        //     logger.warn("The corresponding port of the file name has changed");
-        // }
         logger.debug("Sending row group with length: " + byteBuf.writerIndex() +
                 " to endpoint: " + (partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString()));
         Request req = httpClient.preparePost(partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString())
