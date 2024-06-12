@@ -275,9 +275,14 @@ public class StreamWorkerCommon extends WorkerCommon
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
         option.includeCols(cols);
-        option.rgRange(hashValue, 1);
-        // XXX: The original implementation in WorkerCommon uses `pixelsReader.getRowGroupNum()`,
-        //  but it is not supported in PixelsReaderStreamImpl. We thus hardcode it to 1.
+
+        // Currently we do not use the rgRange members in PixelsReaderOption. Instead, in streaming mode,
+        //  we append the hash value and partition number to the endpoint URI path, which is then translated into
+        //  port numbers.
+        // option.rgRange(hashValue, 1);
+        // // XXX: The original implementation in WorkerCommon uses `pixelsReader.getRowGroupNum()`,
+        // //  but it is not supported in PixelsReaderStreamImpl. We thus hardcode it to 1.
+
         return option;
     }
 }

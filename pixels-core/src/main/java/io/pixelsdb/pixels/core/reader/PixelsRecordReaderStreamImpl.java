@@ -128,7 +128,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         this.streamHeader = streamHeader;
         this.option = option;
         this.transId = option.getTransId();
-        this.RGLen = option.getRGLen();
+        this.RGLen = 1;
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
         this.includedColumnTypes = new ArrayList<>();
         this.curRowGroupByteBuf = Unpooled.buffer();
@@ -651,7 +651,18 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                 this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
                         PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
             }
-        } else
+
+            if (partitioned) {
+                // curRowGroupStreamFooter.getPartitionInfo().getHashValue() already checked in PixelsReaderStreamImpl
+                // Check partition key ids
+//                for (int i = 0; i < resultColumns.length; i++) {
+//                    if (resultColumns[i] != curRowGroupStreamFooter.getPartitionInfo().getColumnIds(i)) {
+//                        throw new IOException("Partition column id mismatch.");
+//                    }
+//                }
+            }
+        }
+        else
         // incoming byteBuf unreadable, must be end of stream
         {
             // checkValid = false; // Issue #105: to reject continuous read.
