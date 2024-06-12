@@ -541,8 +541,12 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 isFirstRowGroup = false;
             }
 
+            // In non-partitioned mode, we send a close request to the server.
+            // In partitioned mode, the server closes automatically when it receives all its partitions. No need to send
+            //  a close request.
             if (!partitioned)
             {
+                // logger.debug("Sending close request to server");
                 // close the HTTP connection
                 // XXX: Can just set the connection header to "close" on the last row group / each partitioned row
                 // group, instead of sending a separate close request. -- the PixelsWriterStreamImpl does not know which
@@ -766,6 +770,9 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         {
             uri = URI.create(fileNameToUri(fileName));
         }
+        // if (!partitioned && getPort(fileName) != uri.getPort()) {
+        //     logger.warn("The corresponding port of the file name has changed");
+        // }
         logger.debug("Sending row group with length: " + byteBuf.writerIndex() +
                 " to endpoint: " + (partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString()));
         Request req = httpClient.preparePost(partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString())
@@ -773,8 +780,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 .addHeader("X-Partition-Id", String.valueOf(partitionId))
                 .addHeader(CONTENT_TYPE, "application/x-protobuf")
                 .addHeader(CONTENT_LENGTH, byteBuf.readableBytes())
-                .addHeader(CONNECTION, "keep-alive")
+                .addHeader(CONNECTION, "keep-alive")  // .addHeader(CONNECTION, partitioned ? CLOSE : "keep-alive")
                 .build();
+        // // In partitioned mode, we send only 1 row group to each upper-level worker, and so we set the connection to
+        // //  CLOSE after sending the row group.
 
         // DESIGN: We use Spring retry here to retry the HTTP request in case of connection failure,
         //  because the HTTP server may not be ready when the client tries to connect.

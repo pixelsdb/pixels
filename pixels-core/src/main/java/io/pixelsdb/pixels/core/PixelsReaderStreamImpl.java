@@ -246,10 +246,14 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         ctx.channel().close();
                     }
                 });
-                f.addListener(ChannelFutureListener.CLOSE);  // shut down the connection with the current hash
+                // if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()))
+                    f.addListener(ChannelFutureListener.CLOSE);
+                // if ((Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) && 0 == req.content().readableBytes()) ||
                 if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) ||
                         (partitioned && numPartitionsReceived.get() == numPartitions))
                 {
+                    // if (partitioned && numPartitionsReceived.get() == numPartitions) logger.debug("All partitions received, closing connection: " + numPartitionsReceived.get());
+                    // else logger.debug("Empty packet received, closing connection");
                     f.addListener(future -> {
                         // shutdown the server
                         ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
