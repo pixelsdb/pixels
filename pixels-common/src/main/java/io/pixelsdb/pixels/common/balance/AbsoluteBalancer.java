@@ -33,8 +33,8 @@ import static java.util.Objects.requireNonNull;
 public class AbsoluteBalancer extends Balancer
 {
     private int totalCount = 0;
-    private Map<HostAddress, Integer> nodeCounters = new HashMap<>();
-    private Map<String, HostAddress> pathToAddress = new HashMap<>();
+    private final Map<HostAddress, Integer> nodeCounters = new HashMap<>();
+    private final Map<String, HostAddress> pathToAddress = new HashMap<>();
 
     @Override
     public void put(String path, HostAddress address)
