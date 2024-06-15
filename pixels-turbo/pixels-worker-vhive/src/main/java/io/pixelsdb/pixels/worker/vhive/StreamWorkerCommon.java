@@ -73,8 +73,7 @@ public class StreamWorkerCommon extends WorkerCommon
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
         // Start a special port to pass schema
-        passSchemaToNextLevel(schema, storageInfo,
-                "http://localhost:" + PixelsWriterStreamImpl.getSchemaPort(outputInfo.getPath()) + "/");
+        passSchemaToNextLevel(schema, storageInfo, outputInfo.getPath());
     }
 
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, String endpoint)
