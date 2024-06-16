@@ -1,6 +1,24 @@
+/*
+ * Copyright 2023 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 package io.pixelsdb.pixels.core.utils;
 
-import io.pixelsdb.pixels.core.PixelsReaderStreamImpl;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -23,9 +41,8 @@ public class BlockingMap<K, V>
 
     public void put(K key, V value)
     {
-        // This will throw an exception if the key is already present in the map - we've set the capacity of the queue
-        //  to 1.
-        // Can also use queue.offer(value) if do not want an exception thrown.
+        // This will throw an exception if the key is already present in the map - we've set the capacity of the queue to 1.
+        // We can also use queue.offer(value) if we do not want an exception thrown.
         if (!getQueue(key).add(value))
         {
             logger.error("Ignoring duplicate key");

@@ -785,6 +785,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         try
         {
             outstandingHTTPRequestSemaphore.acquire();
+            // TODO: remove spring retry and the related dependencies.
             RetryTemplate template = RetryTemplate.builder()
                     .maxAttempts(50)
                     .fixedBackoff(20)
