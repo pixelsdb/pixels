@@ -58,11 +58,11 @@ public class WorkerCommon
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
     private static Storage s3;
-    private static Storage minio;
+    protected static Storage minio;
     private static Storage redis;
     public static final int rowBatchSize;
-    private static final int pixelStride;
-    private static final int rowGroupSize;
+    protected static final int pixelStride;
+    protected static final int rowGroupSize;
 
     static
     {

@@ -1,0 +1,72 @@
+/*
+ * Copyright 2023 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+// grpc protocol of streaming over HTTP, for operator pipelining
+
+syntax = "proto2";
+
+package stream.proto;
+
+option java_multiple_files = false;
+option java_package = "io.pixelsdb.pixels.turbo";
+option java_outer_classname = "StreamProto";
+
+/**
+ * DESIGN: In streaming mode, we cannot determine all these footer fields until the end of the stream. So:
+ * In streaming mode, the whole message flow is like:
+ * ------------------------------------------------------------------
+ * | magic | streamHeaderLen | streamHeader | rowGroup | rowGroup | ... |
+ * ------------------------------------------------------------------
+ * where each rowGroup is sent like:
+ * -----------------------------------------------------------------------
+ * | rowGroupDataLen | rowGroupData | rowGroupFooterLen | rowGroupFooter |
+ * -----------------------------------------------------------------------
+ * and the end of the stream is done by simply closing the stream.
+ * Note that there is not a footer in the stream, so the workers need to
+ *  allocate their arrays etc. in a dynamic fashion
+ */
+
+import "pixels.proto";
+
+message StreamHeader {
+  // Pixels file version
+  required uint32 version = 1;
+  // data schema of this file
+  repeated pixels.proto.Type types = 2;
+  // the maximum number of rows in a pixel
+  optional uint32 pixelStride = 6;
+  // the timezone in which the file was written
+  optional string writerTimezone = 7;
+  // whether this is a hash partitioned file, each row group is a hash partition if it is true
+  optional bool partitioned = 8;
+  // the number of bytes the start offsets of the column chunks are align to
+  optional uint32 columnChunkAlignment = 9;
+  // it is always "PIXELS", leave this last in the record
+  optional string magic = 8000;
+}
+
+message StreamRowGroupFooter {
+  optional pixels.proto.RowGroupIndex rowGroupIndexEntry = 1;
+  optional pixels.proto.RowGroupEncoding rowGroupEncoding = 2;
+
+  // number of rows in this row group
+  optional uint64 numberOfRows = 4;
+  optional pixels.proto.PartitionInformation partitionInfo = 5;
+}
