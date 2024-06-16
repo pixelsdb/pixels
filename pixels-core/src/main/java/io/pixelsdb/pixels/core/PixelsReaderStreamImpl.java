@@ -36,7 +36,7 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReaderStreamImpl;
 import io.pixelsdb.pixels.core.utils.BlockingMap;
-import io.pixelsdb.pixels.turbo.StreamProto;
+import io.pixelsdb.pixels.core.PixelsStreamProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -94,7 +94,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * It is set to null until the first message arrives.
      * The streamHeaderLatch is used to wait for the streamHeader to arrive.
      */
-    private StreamProto.StreamHeader streamHeader;
+    private PixelsStreamProto.StreamHeader streamHeader;
     private final CountDownLatch streamHeaderLatch = new CountDownLatch(1);
 
     public PixelsReaderStreamImpl(String endpoint) throws Exception
@@ -280,7 +280,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         return value + difference;
     }
 
-    private StreamProto.StreamHeader parseStreamHeader(ByteBuf byteBuf)
+    private PixelsStreamProto.StreamHeader parseStreamHeader(ByteBuf byteBuf)
             throws InvalidProtocolBufferException, IndexOutOfBoundsException
     {
         // check MAGIC
@@ -296,7 +296,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         int metadataLength = byteBuf.getInt(magicLength);
         ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
         byteBuf.getBytes(magicLength + Integer.BYTES, metadataBuf);
-        StreamProto.StreamHeader streamHeader = StreamProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
+        PixelsStreamProto.StreamHeader streamHeader = PixelsStreamProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
 
         // check file version
         int fileVersion = streamHeader.getVersion();

@@ -30,7 +30,6 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.core.writer.ColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
-import io.pixelsdb.pixels.turbo.StreamProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.asynchttpclient.*;
@@ -743,8 +742,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         }
 
         // put curRowGroupIndex into rowGroupFooter
-        StreamProto.StreamRowGroupFooter.Builder rowGroupFooterBuilder =
-                StreamProto.StreamRowGroupFooter.newBuilder()
+        PixelsStreamProto.StreamRowGroupFooter.Builder rowGroupFooterBuilder =
+                PixelsStreamProto.StreamRowGroupFooter.newBuilder()
                         .setRowGroupIndexEntry(curRowGroupIndex.build())
                         .setRowGroupEncoding(curRowGroupEncoding.build())
                         .setNumberOfRows(curRowGroupNumOfRows);
@@ -752,7 +751,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         {
             rowGroupFooterBuilder.setPartitionInfo(curPartitionInfo.build());
         }
-        StreamProto.StreamRowGroupFooter rowGroupFooter = rowGroupFooterBuilder.build();
+        PixelsStreamProto.StreamRowGroupFooter rowGroupFooter = rowGroupFooterBuilder.build();
 
         // write and flush row group footer
         byte[] footerBuffer = rowGroupFooter.toByteArray();
@@ -785,6 +784,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         try
         {
             outstandingHTTPRequestSemaphore.acquire();
+            // TODO: remove spring retry and the related dependencies.
             RetryTemplate template = RetryTemplate.builder()
                     .maxAttempts(50)
                     .fixedBackoff(20)
@@ -848,7 +848,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         //  `rowGroupNum` at the end of this method.
     }
 
-    static void writeTypes(StreamProto.StreamHeader.Builder builder, TypeDescription schema)
+    static void writeTypes(PixelsStreamProto.StreamHeader.Builder builder, TypeDescription schema)
     {
         List<TypeDescription> children = schema.getChildren();
         List<String> names = schema.getFieldNames();
@@ -929,7 +929,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     private void writeStreamHeader()
     {
         // build streamHeader
-        StreamProto.StreamHeader.Builder streamHeaderBuilder = StreamProto.StreamHeader.newBuilder();
+        PixelsStreamProto.StreamHeader.Builder streamHeaderBuilder = PixelsStreamProto.StreamHeader.newBuilder();
         writeTypes(streamHeaderBuilder, schema);
         streamHeaderBuilder.setVersion(Constants.VERSION)
                 .setPixelStride(columnWriterOption.getPixelStride())
@@ -938,7 +938,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 .setColumnChunkAlignment(CHUNK_ALIGNMENT)
                 .setMagic(Constants.MAGIC)
                 .build();
-        StreamProto.StreamHeader streamHeader = streamHeaderBuilder.build();
+        PixelsStreamProto.StreamHeader streamHeader = streamHeaderBuilder.build();
         int streamHeaderLength = streamHeader.getSerializedSize();
 
         // write and flush streamHeader
