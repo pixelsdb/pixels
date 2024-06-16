@@ -26,7 +26,6 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import io.netty.util.ResourceLeakDetector;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
@@ -111,8 +110,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public PixelsReaderStreamImpl(String endpoint, boolean partitioned, int numPartitions)
             throws URISyntaxException, CertificateException, SSLException
     {
-        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
-
         this.fileSchema = null;
         this.streamHeader = null;
         URI uri = new URI(endpoint);
