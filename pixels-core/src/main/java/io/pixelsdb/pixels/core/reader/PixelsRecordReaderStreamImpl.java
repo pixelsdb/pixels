@@ -756,10 +756,24 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
 
     /**
      * Cleanup and release resources
+     * <p>
+     * XXX: Consider blocked waiting for EOF before closing the record reader, to avoid premature closing before
+     *  reading all data. (and would need concurrent access to endOfFile)
      */
     @Override
     public void close() throws IOException
     {
+        // while (!endOfFile)
+        // {
+        //     try
+        //     {
+        //         sleep(20);
+        //     } catch (InterruptedException e)
+        //     {
+        //         throw new RuntimeException(e);
+        //     }
+        // }
+
         diskReadBytes = 0L;
         if (readers != null)
         {
