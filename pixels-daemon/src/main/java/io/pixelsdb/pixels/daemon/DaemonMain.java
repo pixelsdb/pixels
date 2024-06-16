@@ -2,7 +2,7 @@ package io.pixelsdb.pixels.daemon;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
-import io.pixelsdb.pixels.daemon.cache.CacheManager;
+import io.pixelsdb.pixels.daemon.cache.CacheWorker;
 import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * example command to start pixels-daemon:
- * java -Dio.netty.leakDetection.level=advanced -Doperation=start|stop -Drole=coordinator|datanode -jar pixels-daemon-0.2.0-SNAPSHOT-full.jar
+ * java -Dio.netty.leakDetection.level=advanced -Doperation=start|stop -Drole=coordinator|worker -jar pixels-daemon-0.2.0-SNAPSHOT-full.jar
  * */
 public class DaemonMain
 {
@@ -31,14 +31,14 @@ public class DaemonMain
 
         if (role == null || operation == null)
         {
-            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|datanode}");
+            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker}");
             System.exit(1);
         }
 
-        if (!role.equalsIgnoreCase("coordinator") && !role.equalsIgnoreCase("datanode")||
+        if (!role.equalsIgnoreCase("coordinator") && !role.equalsIgnoreCase("worker")||
                 !operation.equalsIgnoreCase("start") && !operation.equalsIgnoreCase("stop"))
         {
-            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|datanode}");
+            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker}");
             System.exit(1);
         }
 
@@ -102,7 +102,7 @@ public class DaemonMain
                         ConfigFactory.Instance().getProperty("metrics.server.enabled"));
                 try
                 {
-                    // start metrics server and cache manager on data node
+                    // start metrics server and cache worker on worker node
                     if (metricsServerEnabled)
                     {
                         MetricsServer metricsServer = new MetricsServer();
@@ -110,12 +110,12 @@ public class DaemonMain
                     }
                     if (cacheEnabled)
                     {
-                        CacheManager cacheManager = new CacheManager();
-                        container.addServer("cache_manager", cacheManager);
+                        CacheWorker cacheWorker = new CacheWorker();
+                        container.addServer("cache_worker", cacheWorker);
                     }
                 } catch (Throwable e)
                 {
-                    log.error("failed to start node manager", e);
+                    log.error("failed to start worker", e);
                 }
             }
 
@@ -204,7 +204,7 @@ public class DaemonMain
                         continue;
                     }
                     if (splits[1].contains(PixelsCoordinator.class.getName()) ||
-                            splits[1].contains(PixelsDataNode.class.getName()))
+                            splits[1].contains(PixelsWorker.class.getName()))
                     {
                         boolean roleFound = false;
                         boolean isStartOperation = false;

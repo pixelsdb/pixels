@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * CacheCoordinator is responsible for the following tasks:
  * 1. caching balance. It assigns each file a caching location, which are updated into etcd for global synchronization, and maintains a dynamic caching balance in the cluster.
- * 3. caching node monitor. It monitors all caching nodes(CacheManager) in the cluster, and update running status(available, busy, dead, etc.) of caching nodes.
+ * 3. caching node monitor. It monitors all cache workers in the cluster, and update running status(available, busy, dead, etc.) of caching nodes.
  *
  * @author guodong
  * @author hank
@@ -340,7 +340,7 @@ public class CacheCoordinator implements Server
             KeyValue node = nodes.get(i);
             // key: host_[hostname]; value: [status]. available if status == 1.
             if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) ==
-                    CacheManager.CacheNodeStatus.READY.StatusCode)
+                    CacheWorker.CacheNodeStatus.READY.StatusCode)
             {
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey()
                         .toString(StandardCharsets.UTF_8).substring(5));

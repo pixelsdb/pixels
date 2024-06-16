@@ -26,7 +26,7 @@ public class MockCacheManager
 {
     public static void main(String[] args)
     {
-        CacheManager cacheManager = new CacheManager();
-        cacheManager.run();
+        CacheWorker cacheWorker = new CacheWorker();
+        cacheWorker.run();
     }
 }

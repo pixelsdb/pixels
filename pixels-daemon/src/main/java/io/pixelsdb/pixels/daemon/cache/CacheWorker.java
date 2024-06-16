@@ -52,7 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author guodong
  * @author hank
  */
-public class CacheManager implements Server
+public class CacheWorker implements Server
 {
     enum CacheNodeStatus
     {
@@ -64,7 +64,7 @@ public class CacheManager implements Server
             this.StatusCode = statusCode;
         }
     }
-    private static Logger logger = LogManager.getLogger(CacheManager.class);
+    private static Logger logger = LogManager.getLogger(CacheWorker.class);
     // cache status: unhealthy(-1), ready(0), updating(1), out_of_size(2)
     private static AtomicInteger cacheStatus = new AtomicInteger(CacheNodeStatus.READY.StatusCode);
 
@@ -75,14 +75,14 @@ public class CacheManager implements Server
     private final EtcdUtil etcdUtil;
     private final ScheduledExecutorService scheduledExecutor;
     /**
-     * The hostname of the node where this CacheManager is running.
+     * The hostname of the node where this cache worker is running.
      */
     private String hostName;
     private boolean initializeSuccess = false;
     private int localCacheVersion = 0;
     private CountDownLatch runningLatch;
 
-    public CacheManager()
+    public CacheWorker()
     {
         this.cacheConfig = new PixelsCacheConfig();
         this.etcdUtil = EtcdUtil.Instance();
@@ -106,14 +106,14 @@ public class CacheManager implements Server
     }
 
     /**
-     * Initialize CacheManager:
+     * Initialize CacheWorker:
      *
      * 1. check if the cache coordinator exists.
      *      if not, initialization is failed and return.
      * 2. initialize the metadata service and cache writer.
      * 3. check if local cache version is the same as global cache version in etcd.
      *      if the local cache is not up-to-date, update the local cache.
-     * 4. register the DataNode by updating the status of CacheManager in etcd.
+     * 4. register the Worker by updating the status of CacheWorker in etcd.
      *
      * <p>
      *     2 and 3 are only executed if the cache is enabled.
@@ -166,7 +166,7 @@ public class CacheManager implements Server
                     }
                 }
             }
-            // 4. register the datanode
+            // 4. register the worker
             Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
             // start a scheduled thread to update node status periodically
