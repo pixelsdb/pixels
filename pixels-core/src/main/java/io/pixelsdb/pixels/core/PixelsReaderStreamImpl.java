@@ -254,9 +254,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     f.addListener(future -> {
                         // shutdown the server
                         ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
-                        // removes schema port to avoid port conflict or misuse
-                        // if (httpPort < 50100)
-                        //     StreamWorkerCommon.delPort(httpPort);
+                        // Can delete the port from the map of open ports, but not necessary
+                        // PixelsWriterStreamImpl.delPort(httpPort);
                     });
                 }
             }
