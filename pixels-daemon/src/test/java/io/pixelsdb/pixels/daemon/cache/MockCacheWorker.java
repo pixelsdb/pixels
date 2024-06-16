@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.daemon.cache;
 /**
  * @author guodong
  */
-public class MockCacheManager
+public class MockCacheWorker
 {
     public static void main(String[] args)
     {
