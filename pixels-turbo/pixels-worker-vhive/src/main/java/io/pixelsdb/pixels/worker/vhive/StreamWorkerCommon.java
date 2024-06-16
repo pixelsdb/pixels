@@ -44,6 +44,7 @@ import static java.util.Objects.requireNonNull;
 public class StreamWorkerCommon extends WorkerCommon
 {
     private static final Logger logger = LogManager.getLogger(StreamWorkerCommon.class);
+    private static final Storage http = null;  // placeholder. todo: modularize into a pixels-storage-stream module.
 
     public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException
     {
@@ -99,8 +100,7 @@ public class StreamWorkerCommon extends WorkerCommon
     {
         if (scheme == Storage.Scheme.mock)
         {
-            // streaming mode, return nothing
-            return null;
+            return http;
         }
         return WorkerCommon.getStorage(scheme);
     }
@@ -108,8 +108,10 @@ public class StreamWorkerCommon extends WorkerCommon
     public static TypeDescription getSchemaFromSplits(Storage storage, List<InputSplit> inputSplits)
             throws Exception
     {
-        if (storage == null)
+        if (storage == http)
         {
+            // XXX: Consider starting only the HTTP server and blocked waiting for an arbitrary split to arrive and then writing the `schema` member variable,
+            //  (just like how we do with streamHeader in PixelsReaderStreamImpl,) instead of getting the schema in advance like we do now.
             PixelsReader pixelsReader = new PixelsReaderStreamImpl(
                     PixelsWriterStreamImpl.getSchemaPort(inputSplits.get(0).getInputInfos().get(0).getPath()));
             TypeDescription ret = pixelsReader.getFileSchema();
@@ -122,7 +124,7 @@ public class StreamWorkerCommon extends WorkerCommon
     public static TypeDescription getSchemaFromPaths(Storage storage, List<String> paths)
             throws Exception
     {
-        if (storage == null)
+        if (storage == http)
         {
             PixelsReader pixelsReader = new PixelsReaderStreamImpl(PixelsWriterStreamImpl.getSchemaPort(paths.get(0)));
             TypeDescription ret = pixelsReader.getFileSchema();
@@ -143,7 +145,7 @@ public class StreamWorkerCommon extends WorkerCommon
         requireNonNull(rightSchema, "rightSchema is null");
         requireNonNull(leftPaths, "leftPaths is null");
         requireNonNull(rightPaths, "rightPaths is null");
-        if (leftStorage == null && rightStorage == null)
+        if (leftStorage == http && rightStorage == http)
         {
             // streaming mode
             // Currently, the first packet from the stream brings the schema
