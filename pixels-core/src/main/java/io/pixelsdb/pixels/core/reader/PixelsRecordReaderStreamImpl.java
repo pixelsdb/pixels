@@ -643,16 +643,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                 this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
                         PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
             }
-
-            if (partitioned) {
-                // curRowGroupStreamFooter.getPartitionInfo().getHashValue() already checked in PixelsReaderStreamImpl
-                // Check partition key ids
-//                for (int i = 0; i < resultColumns.length; i++) {
-//                    if (resultColumns[i] != curRowGroupStreamFooter.getPartitionInfo().getColumnIds(i)) {
-//                        throw new IOException("Partition column id mismatch.");
-//                    }
-//                }
-            }
         }
         else
         // incoming byteBuf unreadable, must be end of stream
@@ -802,5 +792,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         // no need to close resultRowBatch
         resultRowBatch = null;
         endOfFile = true;
+
+        // update measurements
+        // ...
     }
 }
