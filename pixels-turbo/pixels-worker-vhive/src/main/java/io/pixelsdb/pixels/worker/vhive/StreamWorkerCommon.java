@@ -93,7 +93,7 @@ public class StreamWorkerCommon extends WorkerCommon
             throws IOException
     {
         for (String endpoint : endpoints)
-            passSchemaToNextLevel(schema, storageInfo, endpoint);  // Can do it in parallel, but this is not a bottleneck
+            passSchemaToNextLevel(schema, storageInfo, endpoint);
     }
 
     public static Storage getStorage(Storage.Scheme scheme)
@@ -110,8 +110,9 @@ public class StreamWorkerCommon extends WorkerCommon
     {
         if (storage == http)
         {
-            // XXX: Consider starting only the HTTP server and blocked waiting for an arbitrary split to arrive and then writing the `schema` member variable,
-            //  (just like how we do with streamHeader in PixelsReaderStreamImpl,) instead of getting the schema in advance like we do now.
+            // XXX: Consider starting only the HTTP server and blocked waiting for an arbitrary split to arrive and then
+            // writing the `schema` member variable, (just like how we do with streamHeader in PixelsReaderStreamImpl,)
+            // instead of getting the schema in advance like we do now.
             PixelsReader pixelsReader = new PixelsReaderStreamImpl(
                     PixelsWriterStreamImpl.getSchemaPort(inputSplits.get(0).getInputInfos().get(0).getPath()));
             TypeDescription ret = pixelsReader.getFileSchema();
@@ -231,8 +232,6 @@ public class StreamWorkerCommon extends WorkerCommon
                                          List<Integer> keyColumnIds,
                                          List<String> outputPaths, boolean isSchemaWriter)
     {
-        // root operator是可以把结果直接传回VM的，但没时间写了，本次demo时只能把结果写到minio中。所以仍然是
-        //  分类讨论，可能返回PixelsWriterStreamImpl或者PixelsWriterImpl
         if (storage != null && storage.getScheme() != Storage.Scheme.mock)
             return WorkerCommon.getWriter(schema, storage, outputPath, encoding, isPartitioned, keyColumnIds);
         logger.debug("getWriter streaming mode, path: " + outputPath + ", paths: " + outputPaths +
@@ -276,13 +275,6 @@ public class StreamWorkerCommon extends WorkerCommon
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
         option.includeCols(cols);
-
-        // Currently we do not use the rgRange members in PixelsReaderOption. Instead, in streaming mode,
-        //  we append the hash value and partition number to the endpoint URI path, which is then translated into
-        //  port numbers.
-        // option.rgRange(hashValue, 1);
-        // // XXX: The original implementation in WorkerCommon uses `pixelsReader.getRowGroupNum()`,
-        // //  but it is not supported in PixelsReaderStreamImpl. We thus hardcode it to 1.
 
         return option;
     }

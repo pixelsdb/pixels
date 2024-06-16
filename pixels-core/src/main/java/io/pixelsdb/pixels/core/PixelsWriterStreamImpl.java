@@ -118,8 +118,9 @@ public class PixelsWriterStreamImpl implements PixelsWriter
      */
     private final PixelsWriterOption columnWriterOption;
     private final boolean partitioned;
-    // DESIGN: Since packets could arrive out of order, we do not appoint a specific writer to send the CLOSE packet.
-    // The HTTP server (reader) should only close the connection when it receives enough packets.
+    // DESIGN: In non-partitioned mode, the writer sends a CLOSE packet to the server to indicate the end of the stream.
+    // But since packets could arrive out of order, we do not appoint a specific writer to send the CLOSE packet in
+    //  partitioned mode. The HTTP server (reader) should only close the connection when it receives enough packets.
     private final Optional<List<Integer>> partKeyColumnIds;
 
     private final ColumnWriter[] columnWriters;
@@ -178,7 +179,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         try
         {
             int ret = pathToPort.get(path);
-            // ArrayBlockingQueue.take() removes element from the queue, so we need to put it back
+            // ArrayBlockingQueue.take() and .poll() removes element from the queue, so we need to put it back
             setPort(path, ret);
             return ret;
         } catch (InterruptedException e)
@@ -549,17 +550,12 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 isFirstRowGroup = false;
             }
 
-            // In non-partitioned mode and for data servers, we send a close request to the server.
+            // In non-partitioned mode and for data servers, we send a close request with empty content to the server.
             // In partitioned mode, the server closes automatically when it receives all its partitions. No need to send
             //  a close request.
             // Schema servers also close automatically and do not need close requests.
             if (!partitioned && uri.getPort() >= firstPort)
             {
-                // logger.debug("Sending close request to server");
-                // close the HTTP connection
-                // XXX: Can just set the connection header to "close" on the last row group / each partitioned row
-                // group, instead of sending a separate close request. -- the PixelsWriterStreamImpl does not know which
-                //  row group is the last. Not possible.
                 if (!partitioned && uri == null)
                 {
                     uri = URI.create(fileNameToUri(fileName));
@@ -676,8 +672,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                     // DESIGN: ColumnChunkEncoding is final. Also moved it from rowGroup footer to header
 
                     byteBuf.writeBytes(Unpooled.wrappedBuffer(columnChunkBuffer));
-                    // todo: try using byteBuf.addComponent(true, Unpooled.wrappedBuffer(columnChunkBuffer)) (and let
-                    //  byteBuf = Unpooled.compositeBuffer()) instead
                     writtenBytes += columnChunkBuffer.length;
                     // add align bytes to make sure the column size is the multiple of fsBlockSize
                     if (CHUNK_ALIGNMENT != 0 && columnChunkBuffer.length % CHUNK_ALIGNMENT != 0)
@@ -759,11 +753,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             rowGroupFooterBuilder.setPartitionInfo(curPartitionInfo.build());
         }
         StreamProto.StreamRowGroupFooter rowGroupFooter = rowGroupFooterBuilder.build();
-        // XXX: rowGroupIndex and rowGroupEncoding are the same for all row groups in the same file?
-        //  If so, we can send them only once per file.
-        // -- rowGroupIndex: no, it contains the offsets of the column chunks. rowGroupEncoding: yes
-        //  so not possible to send them only once per file.
-        // -- Row group footer accounts for <1% of the total data size. No need to optimize.
 
         // write and flush row group footer
         byte[] footerBuffer = rowGroupFooter.toByteArray();
@@ -788,16 +777,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 .addHeader(CONTENT_LENGTH, byteBuf.readableBytes())
                 .addHeader(CONNECTION, partitioned || uri.getPort() < firstPort ? CLOSE : "keep-alive")
                 .build();
-        // // In partitioned mode, we send only 1 row group to each upper-level worker, and so we set the connection to
-        // //  CLOSE after sending the row group.
+        // In partitioned mode, we send only 1 row group to each upper-level worker, and so we set the connection to
+        //  CLOSE after sending the row group.
 
         // DESIGN: We use Spring retry here to retry the HTTP request in case of connection failure,
         //  because the HTTP server may not be ready when the client tries to connect.
-        // DESIGN: We do not implement async retry here, because experiment shows that the bottleneck is in the
-        //  sequential HTTP transmission, and esp. the blocking wait for the previous request to return. Will need to
-        //  implement multi-threaded HTTP transmission to improve performance.
-//        CompletableFuture<Response> resultFuture = new CompletableFuture<>();
-//        CompletableFuture.runAsync(() -> {
         try
         {
             outstandingHTTPRequestSemaphore.acquire();
@@ -858,16 +842,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         {
             logger.error(e.getMessage());
             e.printStackTrace();
-//                resultFuture.completeExceptionally(e);
         }
-//        });
-//                .whenComplete((result, throwable) -> {
-//            if (throwable != null) {
-//                resultFuture.completeExceptionally(throwable);
-//            } else {
-//                resultFuture.complete(result);
-//            }
-//        });
         this.rowGroupNum++;
         // In `getNumRowGroup()`, we use rowGroupNum to count the number of row groups sent. So we need to increment
         //  `rowGroupNum` at the end of this method.

@@ -26,6 +26,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.netty.util.ResourceLeakDetector;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
@@ -110,6 +111,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public PixelsReaderStreamImpl(String endpoint, boolean partitioned, int numPartitions)
             throws URISyntaxException, CertificateException, SSLException
     {
+        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+
         this.fileSchema = null;
         this.streamHeader = null;
         URI uri = new URI(endpoint);
@@ -121,14 +124,12 @@ public class PixelsReaderStreamImpl implements PixelsReader
         {
             throw new UnsupportedOperationException("Currently, only localhost is supported as the server address");
         }
-        this.byteBufSharedQueue = new LinkedBlockingQueue<>();  // No need to specify capacity and block the writer
+        this.byteBufSharedQueue = new LinkedBlockingQueue<>();
         this.byteBufBlockingMap = new BlockingMap<>();
         this.partitioned = partitioned;
         this.recordReaders = new ArrayList<>();
 
-        // WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
-        ExecutorService executorService = Executors.newFixedThreadPool(1);  // , new ThreadFactoryBuilder()
-        // .setUncaughtExceptionHandler(exceptionHandler).build());
+        ExecutorService executorService = Executors.newFixedThreadPool(1);
         this.httpServer = new HttpServer(new HttpServerHandler()
         {
             @Override
@@ -194,13 +195,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 //  the schema packet has been processed when parsing the stream header above.
                 if (httpPort >= 50100)
                 {
-                    // We use an ExecutorService to put the ByteBuf into the blocking queue, to avoid blocking the
-                    //  Netty event loop thread.
-                    // We can also use a group of partition-aware handlers in the Netty pipeline, to put the ByteBuf
-                    //  into the blocking map, instead of using an ExecutorService. But that would be more complex.
                     byteBuf.retain();
-                    // This would not block because the queue is unbounded, and the map expects only 1 byteBuf per key
-                    //  (partition ID). No need to do it asynchronously.
                     if (!partitioned) byteBufSharedQueue.add(byteBuf);
                     else
                     {
@@ -249,8 +244,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
                                 req.content().readableBytes() == 0))
                 {
-                    // if (partitioned && numPartitionsReceived.get() == numPartitions) logger.debug("All partitions received, closing connection: " + numPartitionsReceived.get());
-                    // else logger.debug("Empty packet received, closing connection");
                     f.addListener(future -> {
                         // shutdown the server
                         ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
@@ -364,7 +357,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
     /**
      * Unsupported: In streaming mode, the number of rows cannot be determined in advance.
      */
-    // 用到numberOfRows的有三种情况：数组大小；判断rgIdx是否越界；作为循环条件
     @Override
     public long getNumberOfRows()
     {
@@ -526,9 +518,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public void close()
             throws IOException
     {
-        // new Thread().start(): A low-level approach to create and start a new thread.
-        // Use new Thread().start() for simple, one-off asynchronous tasks where the overhead of managing
-        // a thread pool is unnecessary.
         new Thread(() -> {
             // Conditions for closing:
             // 1. streamHeaderLatch.await() to ensure that the stream header has been received

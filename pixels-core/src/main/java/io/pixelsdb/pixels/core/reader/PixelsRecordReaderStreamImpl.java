@@ -110,7 +110,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private ColumnReader[] readers;      // column readers for each target columns
     private final boolean enableEncodedVector;
 
-    // XXX: The following members for performance metrics are not well maintained in the current implementation due to
+    // The following members for performance metrics are not well maintained in the current implementation due to
     //  disuse in the streaming mode. They are kept for compatibility and future use.
     private long diskReadBytes = 0L;
     private long readTimeNanos = 0L;
@@ -323,7 +323,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         logger.debug("In prepareRead(), rowGroupsPosition = " + rowGroupsPosition +
                 ", rowGroupDataLength = " + rowGroupDataLength +
                 ", firstRgFooterPosition = " + (rowGroupsPosition + rowGroupDataLength));
-        // We do not need the row group footer here for now
         // byteBuf.readerIndex(rowGroupsPosition + rowGroupDataLength);  // skip row group data and row group data
         // length, and get to row group footer
         // byte[] firstRgFooterBytes = new byte[byteBuf.readInt()];
@@ -520,8 +519,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             }
 
             // read vectors
-            // Can parallelize the following loop, but it is not much beneficial as the bottleneck lies with HTTP I/O.
-            // Arrays.stream(resultColumns).parallel().forEach(i ->
             for (int i = 0; i < resultColumns.length; i++)
             {
                 if (!columnVectors[i].duplicated)
@@ -540,7 +537,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                     memoryUsage += chunkIndex.getChunkLength();
                 }
             }
-            // );
 
             // update current row index in the row group
             curRowInRG += curBatchSize;
@@ -585,10 +581,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             }
         }
 
-        // Must have already been released in acquireNewRowGroup(); not necessary to release again.
-        // if (curRowGroupByteBuf.refCnt() > 0) {
-        //     curRowGroupByteBuf.release();
-        // }
         return resultRowBatch;
     }
 
@@ -651,14 +643,24 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                 this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
                         PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
             }
+
+            if (partitioned) {
+                // curRowGroupStreamFooter.getPartitionInfo().getHashValue() already checked in PixelsReaderStreamImpl
+                // Check partition key ids
+//                for (int i = 0; i < resultColumns.length; i++) {
+//                    if (resultColumns[i] != curRowGroupStreamFooter.getPartitionInfo().getColumnIds(i)) {
+//                        throw new IOException("Partition column id mismatch.");
+//                    }
+//                }
+            }
         }
         else
         // incoming byteBuf unreadable, must be end of stream
         {
             // checkValid = false; // Issue #105: to reject continuous read.
             if (reuse && resultRowBatch != null)
-                // The close() below might be called before our readBatch() is complete,
-                //  i.e. the resultRowBatch might be null.
+                // XXX: Before we implement necessary checks, the close() below might be called before our readBatch()
+                //  is complete, i.e. the resultRowBatch might be null.
                 resultRowBatch.endOfFile = true;
             this.endOfFile = true;  // In streaming mode, EOF indicates the end of stream
             curRowGroupByteBuf.release();
@@ -800,25 +802,5 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         // no need to close resultRowBatch
         resultRowBatch = null;
         endOfFile = true;
-        // write out read performance metrics
-//        if (enableMetrics)
-//        {
-//            String metrics = JSON.toJSONString(readPerfMetrics);
-//            Path metricsFilePath = Paths.get(metricsDir,
-//                    String.valueOf(System.nanoTime()) +
-//                    physicalFSReader.getPath().getName() +
-//                    ".json");
-//            try {
-//                RandomAccessFile raf = new RandomAccessFile(metricsFilePath.toFile(), "rw");
-//                raf.seek(0L);
-//                raf.writeChars(metrics);
-//                raf.close();
-//            }
-//            catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-        // reset read performance metrics
-//        readPerfMetrics.clear();
     }
 }
