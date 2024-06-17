@@ -19,29 +19,34 @@
  */
 package io.pixelsdb.pixels.daemon.heartbeat;
 
-import io.pixelsdb.pixels.common.server.Server;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author hank
- * @create 2024-06-17
  */
-public class HeartbeatWorker implements Server
+public class HeartbeatConfig
 {
-    @Override
-    public boolean isRunning()
+    private final ConfigFactory configFactory;
+
+    public HeartbeatConfig()
     {
-        return false;
+        this.configFactory = ConfigFactory.Instance();
     }
 
-    @Override
-    public void shutdown()
+    public int getNodeLeaseTTL()
     {
-
+        int ttl = Integer.parseInt(configFactory.getProperty("lease.ttl.seconds"));
+        int heartbeat = Integer.parseInt(configFactory.getProperty("heartbeat.period.seconds"));
+        checkArgument(ttl > heartbeat);
+        return ttl;
     }
 
-    @Override
-    public void run()
+    public int getNodeHeartbeatPeriod()
     {
-
+        int heartbeat = Integer.parseInt(configFactory.getProperty("heartbeat.period.seconds"));
+        checkArgument(heartbeat > 0);
+        return heartbeat;
     }
 }

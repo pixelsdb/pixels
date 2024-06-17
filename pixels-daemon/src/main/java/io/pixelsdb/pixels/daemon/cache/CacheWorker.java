@@ -64,9 +64,9 @@ public class CacheWorker implements Server
             this.StatusCode = statusCode;
         }
     }
-    private static Logger logger = LogManager.getLogger(CacheWorker.class);
+    private static final Logger logger = LogManager.getLogger(CacheWorker.class);
     // cache status: unhealthy(-1), ready(0), updating(1), out_of_size(2)
-    private static AtomicInteger cacheStatus = new AtomicInteger(CacheNodeStatus.READY.StatusCode);
+    private static final AtomicInteger cacheStatus = new AtomicInteger(CacheNodeStatus.READY.StatusCode);
 
     private PixelsCacheWriter cacheWriter = null;
     private MetadataService metadataService = null;
@@ -128,7 +128,7 @@ public class CacheWorker implements Server
         try
         {
             // 1. check the existence of the cache coordinator.
-            KeyValue cacheCoordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
+            KeyValue cacheCoordinatorKV = etcdUtil.getKeyValue(Constants.HEARTBEAT_COORDINATOR_LITERAL);
             if (cacheCoordinatorKV == null)
             {
                 logger.error("No coordinator found. Exit");

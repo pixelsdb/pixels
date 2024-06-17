@@ -19,29 +19,17 @@
  */
 package io.pixelsdb.pixels.daemon.heartbeat;
 
-import io.pixelsdb.pixels.common.server.Server;
-
 /**
  * @author hank
  * @create 2024-06-17
  */
-public class HeartbeatWorker implements Server
+public enum CoordinatorStatus
 {
-    @Override
-    public boolean isRunning()
+    DEAD(-1), INIT(0), READY(0x01);
+
+    public final int StatusCode;
+    CoordinatorStatus(int statusCode)
     {
-        return false;
-    }
-
-    @Override
-    public void shutdown()
-    {
-
-    }
-
-    @Override
-    public void run()
-    {
-
+        this.StatusCode = statusCode;
     }
 }

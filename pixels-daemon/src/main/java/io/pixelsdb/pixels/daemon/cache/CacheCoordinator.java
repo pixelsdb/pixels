@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.daemon.cache;
 import com.google.common.collect.ImmutableList;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KeyValue;
-import io.etcd.jetcd.Lease;
 import io.etcd.jetcd.Watch;
 import io.etcd.jetcd.options.WatchOption;
 import io.etcd.jetcd.watch.WatchEvent;
@@ -40,22 +39,18 @@ import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.common.server.Server;
+import io.pixelsdb.pixels.daemon.heartbeat.CoordinatorStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -69,27 +64,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 // todo cache location compaction. Cache locations for older versions still exist after being used.
 public class CacheCoordinator implements Server
 {
-    enum CoordinatorStatus
-    {
-        DEAD(-1), INIT(0), READY(1);
-
-        public final int StatusCode;
-        CoordinatorStatus(int statusCode)
-        {
-            this.StatusCode = statusCode;
-        }
-    }
-
     private static final Logger logger = LogManager.getLogger(CacheCoordinator.class);
     private final EtcdUtil etcdUtil;
     private final PixelsCacheConfig cacheConfig;
-    private final ScheduledExecutorService scheduledExecutor;
     private MetadataService metadataService = null;
-    private String hostName;
     private Storage storage = null;
     // coordinator status: 0: init, 1: ready; -1: dead
-    private AtomicInteger coordinatorStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
-    private CacheCoordinatorRegister cacheCoordinatorRegister = null;
+    private final AtomicInteger coordinatorStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
     private boolean initializeSuccess = false;
     private CountDownLatch runningLatch;
 
@@ -97,81 +78,28 @@ public class CacheCoordinator implements Server
     {
         this.etcdUtil = EtcdUtil.Instance();
         this.cacheConfig = new PixelsCacheConfig();
-        this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
-        this.hostName = System.getenv("HOSTNAME");
-        logger.debug("HostName from system env: " + hostName);
-        if (hostName == null)
-        {
-            try
-            {
-                this.hostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: " + hostName);
-            }
-            catch (UnknownHostException e)
-            {
-                logger.debug("Hostname is null. Exit");
-                return;
-            }
-        }
         initialize();
     }
 
     /**
-     * Initialize Coordinator:
-     *
-     * 1. check if there is an existing coordinator, if yes, return.
-     * 2. register the coordinator.
-     * 3. create the storage instance that is used to get the metadata of the storage.
-     * 4. check the local and the global cache versions, update the cache plan if needed.
-     *
+     * Initialize Coordinator if the cache is enabled:
      * <p>
-     *     3 and 4 are only executed when the cache is enabled.
+     * 1. create the storage instance that is used to get the metadata of the storage;
+     * 2. check the local and the global cache versions, update the cache plan if needed.
      * </p>
      */
     private void initialize()
     {
-        // 1. if another cache coordinator exists, stop the initialization.
-        KeyValue coordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
-        if (coordinatorKV != null && coordinatorKV.getLease() > 0)
-        {
-            /**
-             * Issue #181:
-             * When the lease of the coordinator key exists, wait for the lease ttl to expire.
-             */
-            try
-            {
-                Thread.sleep(cacheConfig.getNodeLeaseTTL() * 1000);
-            } catch (InterruptedException e)
-            {
-                logger.error(e.getMessage());
-                e.printStackTrace();
-            }
-            coordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
-            if (coordinatorKV != null && coordinatorKV.getLease() > 0)
-            {
-                // another coordinator exists
-                logger.error("Another coordinator exists, exit...");
-                return;
-            }
-        }
-
         try
         {
-            // 2. register the coordinator
-            Lease leaseClient = etcdUtil.getClient().getLeaseClient();
-            long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_COORDINATOR_LITERAL, hostName, leaseId);
-            this.cacheCoordinatorRegister = new CacheCoordinatorRegister(leaseClient, leaseId);
-            scheduledExecutor.scheduleAtFixedRate(cacheCoordinatorRegister,
-                    0, cacheConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             if (cacheConfig.isCacheEnabled())
             {
-                // 3. create the storage instance.
+                // 1. create the storage instance.
                 if (storage == null)
                 {
                     storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
                 }
-                // 4. check version consistency
+                // 2. check version consistency
                 int cache_version = 0, layout_version = 0;
                 this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
                 KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
@@ -190,22 +118,21 @@ public class CacheCoordinator implements Server
                     updateCachePlan(layout_version);
                 }
             }
-            coordinatorStatus.set(CoordinatorStatus.READY.StatusCode);
             initializeSuccess = true;
-            logger.info("CacheCoordinator on " + hostName + " has started.");
+            logger.info("Cache coordinator on is initialized");
         } catch (Exception e)
         {
-            logger.error("failed to initialize CacheCoordinator", e);
+            logger.error("failed to initialize cache coordinator", e);
         }
     }
 
     @Override
     public void run()
     {
-        logger.info("Starting Coordinator");
+        logger.info("Starting cache coordinator");
         if (!initializeSuccess)
         {
-            logger.error("Initialization failed, stop now...");
+            logger.error("Cache coordinator initialization failed, stop now...");
             return;
         }
         runningLatch = new CountDownLatch(1);
@@ -269,22 +196,13 @@ public class CacheCoordinator implements Server
     @Override
     public boolean isRunning()
     {
-        int status = coordinatorStatus.get();
-        return status == CoordinatorStatus.INIT.StatusCode ||
-                status == CoordinatorStatus.READY.StatusCode;
+        return this.runningLatch.getCount() > 0;
     }
 
     @Override
     public void shutdown()
     {
-        coordinatorStatus.set(CoordinatorStatus.DEAD.StatusCode);
-        logger.debug("Shutting down Coordinator...");
-        scheduledExecutor.shutdownNow();
-        if (cacheCoordinatorRegister != null)
-        {
-            cacheCoordinatorRegister.stop();
-        }
-        etcdUtil.delete(Constants.CACHE_COORDINATOR_LITERAL);
+        logger.debug("Shutting down cache coordinator...");
         if (metadataService != null)
         {
             try
@@ -293,7 +211,7 @@ public class CacheCoordinator implements Server
             } catch (InterruptedException e)
             {
                 logger.error("Failed to shutdown rpc channel for metadata service " +
-                        "while shutting down Coordinator.", e);
+                        "while shutting down cache coordinator.", e);
             }
         }
         if (storage != null)
@@ -303,7 +221,7 @@ public class CacheCoordinator implements Server
                 storage.close();
             } catch (IOException e)
             {
-                logger.error("Failed to close cache storage while shutting down Coordinator.", e);
+                logger.error("Failed to close cache storage while shutting down cache coordinator.", e);
             }
         }
         if (runningLatch != null)
@@ -311,7 +229,7 @@ public class CacheCoordinator implements Server
             runningLatch.countDown();
         }
         EtcdUtil.Instance().getClient().close();
-        logger.info("Coordinator on '" + hostName + "' is shutdown.");
+        logger.info("Cache coordinator is shutdown.");
     }
 
     /**
@@ -490,33 +408,5 @@ public class CacheCoordinator implements Server
             builder.add(HostAddress.fromString(host));
         }
         return builder.build();
-    }
-
-    /**
-     * TODO: there may be a gap between two calls of keepAliveOnce.
-     */
-    private static class CacheCoordinatorRegister
-            implements Runnable
-    {
-        private final Lease leaseClient;
-        private final long leaseId;
-
-        CacheCoordinatorRegister(Lease leaseClient, long leaseId)
-        {
-            this.leaseClient = leaseClient;
-            this.leaseId = leaseId;
-        }
-
-        @Override
-        public void run()
-        {
-            leaseClient.keepAliveOnce(leaseId);
-        }
-
-        public void stop()
-        {
-            leaseClient.revoke(leaseId);
-            leaseClient.close();
-        }
     }
 }

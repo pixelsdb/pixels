@@ -42,7 +42,7 @@ public final class Constants
 
     public static final String LAYOUT_VERSION_LITERAL = "layout_version";
     public static final String CACHE_VERSION_LITERAL = "cache_version";
-    public static final String CACHE_COORDINATOR_LITERAL = "coordinator";
+    public static final String HEARTBEAT_COORDINATOR_LITERAL = "coordinator";
     public static final String CACHE_NODE_STATUS_LITERAL = "node_";
     public static final String CACHE_LOCATION_LITERAL = "location_";
     public static final int MAX_BLOCK_ID_LEN = 20480;
