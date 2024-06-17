@@ -66,22 +66,16 @@ RunLenIntEncoder::~RunLenIntEncoder() {
 
 // -----------------------------------------------------------
 // Encoding Handles
-void RunLenIntEncoder::encode(long*  values, int offset, int length, byte* results, int& resLen) {
+void RunLenIntEncoder::encode(long* values, int offset, int length, byte* results, int& resLen) {
     for(int i = 0; i < length; ++i) {
         // std::cout << encodingType << " value : " << values[i + offset] << std::endl;
         this->write(values[i + offset]);
     }
     flush();
-    int len = length * sizeof(long);
     // std::cout << "length: " << length << std::endl;
     // std::cout << "buffer end: " << outputStream->getWritePos() << std::endl;
     resLen = outputStream->getWritePos();
-    byte* tmpResult = new byte[outputStream->getWritePos()];
-    outputStream->getBytes(tmpResult, outputStream->getWritePos());
-    for(int i = 0; i < len; ++i) {
-        // std::cout << i << " result : " << (int)tmpResult[i] << std::endl;
-        results[i] = tmpResult[i];
-    }
+    outputStream->getBytes(results, resLen);
     outputStream->clear();
 }
 
@@ -90,13 +84,8 @@ void RunLenIntEncoder::encode(int* values, int offset, int length, byte* results
         this->write(values[i + offset]);
     }
     flush();
-    int len = length * sizeof(int);
-    byte* tmpResult = new byte[len];
-    outputStream->getBytes(tmpResult, len);
-    for(int i = 0; i < len; ++i) {
-        results[i] = tmpResult[i];
-    }
-    delete[] tmpResult;
+    resLen = outputStream->getWritePos();
+    outputStream->getBytes(results, resLen);
     outputStream->clear();
 }
 
