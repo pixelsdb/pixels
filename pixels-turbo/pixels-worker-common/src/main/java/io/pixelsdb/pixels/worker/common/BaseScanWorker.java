@@ -134,6 +134,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
 
             int outputId = 0;
             logger.info("start scan and aggregate");
+            String[] outputPaths = ScanInput.generateOutputPaths(outputFolder, inputSplits.size());
             for (InputSplit inputSplit : inputSplits)
             {
                 List<InputInfo> scanInputs = inputSplit.getInputInfos();
@@ -142,7 +143,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                  * For table scan without partial aggregation, the path in output info is a folder.
                  * Each scan input split generates an output file in this folder.
                  */
-                String outputPath = outputFolder + "scan_" + outputId++;
+                String outputPath = outputPaths[outputId++];
 
                 threadPool.execute(() -> {
                     try

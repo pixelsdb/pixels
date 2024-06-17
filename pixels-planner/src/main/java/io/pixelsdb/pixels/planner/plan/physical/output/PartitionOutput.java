@@ -31,12 +31,7 @@ import java.util.Set;
 public class PartitionOutput extends Output
 {
     /**
-     * The path of the partitioned file.
-     */
-    private String path;
-
-    /**
-     * The hash value of the partitions that exist in the partitioned file.
+     * The hash value of the partitions that exist in the partitioned result.
      */
     private Set<Integer> hashValues;
 
@@ -44,22 +39,6 @@ public class PartitionOutput extends Output
      * Default constructor for Jackson.
      */
     public PartitionOutput() { }
-
-    public PartitionOutput(String path, Set<Integer> hashValues)
-    {
-        this.path = path;
-        this.hashValues = hashValues;
-    }
-
-    public String getPath()
-    {
-        return path;
-    }
-
-    public void setPath(String path)
-    {
-        this.path = path;
-    }
 
     public Set<Integer> getHashValues()
     {

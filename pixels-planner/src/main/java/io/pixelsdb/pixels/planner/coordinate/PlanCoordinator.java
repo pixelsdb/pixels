@@ -51,6 +51,13 @@ public class PlanCoordinator
         this.transId = transId;
     }
 
+    /**
+     * Add a new stage and its downstream dependency to this plan coordinator. All the stages must be added in the order
+     * of downstream to up stream, i.e., from the root operator to leaf operators.
+     * @param stageCoordinator the stage coordinator of the current stage
+     * @param stageDependency the downstream dependency of the current stage, for the root operator, the down stream
+     *                       dependency is empty (with downstream stage id < 0)
+     */
     public void addStageCoordinator(StageCoordinator stageCoordinator, StageDependency stageDependency)
     {
         int stageId = requireNonNull(stageCoordinator, "stageCoordinator is null").getStageId();
@@ -67,16 +74,30 @@ public class PlanCoordinator
         return this.stageCoordinators.get(stageId);
     }
 
+    /**
+     * Get this stage's dependency on the parent (downstream) stage.
+     * @param stageId the id of this stage
+     * @return the dependency
+     */
     public StageDependency getStageDependency(int stageId)
     {
         return this.stageDependencies.get(stageId);
     }
 
+    /**
+     * @return the transaction id of this query
+     */
     public long getTransId()
     {
         return transId;
     }
 
+    /**
+     * Assign an id for a stage. This should only be called in
+     * {@link io.pixelsdb.pixels.planner.plan.physical.Operator#initPlanCoordinator(PlanCoordinator, int, boolean)}
+     * when building the plan coordinator for a query plan.
+     * @return the assigned stage id
+     */
     public int assignStageId()
     {
         return this.stageIdAssigner.getAndIncrement();

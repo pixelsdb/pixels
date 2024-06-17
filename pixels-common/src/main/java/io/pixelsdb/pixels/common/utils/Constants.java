@@ -47,6 +47,14 @@ public final class Constants
     public static final String CACHE_LOCATION_LITERAL = "location_";
     public static final int MAX_BLOCK_ID_LEN = 20480;
 
+    /*
+     * Issue #649:
+     * Breakdown costs into vmCost and cfCost
+     */
+    public static final String TRANS_CONTEXT_VM_COST_CENTS_KEY = "trans_vm_cost_cents";
+    public static final String TRANS_CONTEXT_CF_COST_CENTS_KEY = "trans_cf_cost_cents";
+    public static final String TRANS_CONTEXT_SCAN_BYTES_KEY = "trans_scan_bytes";
+
     /**
      * The time in seconds that a relaxed query can be postponed for execution.
      */
@@ -81,4 +89,6 @@ public final class Constants
     public static final String GCS_ID_KEY = "pixels_storage_gcs_id";
     // the prefix for keys of gcs metadata (i.e. file path -> file id).
     public static final String GCS_META_PREFIX = "pixels_storage_gcs_meta:";
+
+    public static final String CF_OUTPUT_STATE_KEY_PREFIX = "pixels_turbo_cf_output";
 }

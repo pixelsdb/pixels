@@ -125,6 +125,110 @@ public class TransService
         return new TransContext(response.getTransContext());
     }
 
+    /**
+     * Set the string property of a transaction.
+     * @param transId the id of the transaction
+     * @param key the property key
+     * @param value the property value
+     * @return the previous value of the property key, or null if not present
+     * @throws TransException if the transaction does not exist
+     */
+    public String setTransProperty(long transId, String key, String value) throws TransException
+    {
+        TransProto.SetTransPropertyRequest request = TransProto.SetTransPropertyRequest.newBuilder()
+                .setTransId(transId).setKey(key).setValue(value).build();
+        return setTransProperty(request);
+    }
+
+    /**
+     * Set the string property of a transaction.
+     * @param externalTraceId the external trace id (token) of the transaction
+     * @param key the property key
+     * @param value the property value
+     * @return the previous value of the property key, or null if not present
+     * @throws TransException if the transaction does not exist
+     */
+    public String setTransProperty(String externalTraceId, String key, String value) throws TransException
+    {
+        TransProto.SetTransPropertyRequest request = TransProto.SetTransPropertyRequest.newBuilder()
+                .setExternalTraceId(externalTraceId).setKey(key).setValue(value).build();
+        return setTransProperty(request);
+    }
+
+    private String setTransProperty(TransProto.SetTransPropertyRequest request) throws TransException
+    {
+        TransProto.SetTransPropertyResponse response = this.stub.setTransProperty(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to set transaction property, error code=" + response.getErrorCode());
+        }
+        if (response.hasPrevValue())
+        {
+            return response.getPrevValue();
+        }
+        return null;
+    }
+
+    /**
+     * Update the costs of a transaction (query).
+     * @param transId the id of the transaction
+     * @param scanBytes the scan bytes to set in the transaction context
+     * @param costCents the cost in cents to set in the transaction context
+     * @return true of the costs are updates successfully, otherwise false
+     * @throws TransException if the transaction does not exist
+     */
+    public boolean updateQueryCosts(long transId, double scanBytes, QueryCost costCents) throws TransException
+    {
+        TransProto.UpdateQueryCostsRequest request = null;
+        if (costCents.getType() == QueryCostType.VMCOST)
+        {
+            request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                .setTransId(transId).setScanBytes(scanBytes).setVmCostCents(costCents.getCostCents()).build();
+        }
+        else if (costCents.getType() == QueryCostType.CFCOST)
+        {
+            request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                    .setTransId(transId).setScanBytes(scanBytes).setCfCostCents(costCents.getCostCents()).build();
+        }
+        assert(request != null);
+        return updateQueryCosts(request);
+    }
+
+    /**
+     * Update the costs of a transaction (query).
+     * @param externalTraceId the external trace id (token) of the transaction
+     * @param scanBytes the scan bytes to set in the transaction context
+     * @param costCents the cost in cents to set in the transaction context
+     * @return true of the costs are updates successfully, otherwise false
+     * @throws TransException if the transaction does not exist
+     */
+    public boolean updateQueryCosts(String externalTraceId, double scanBytes, QueryCost costCents) throws TransException
+    {
+        TransProto.UpdateQueryCostsRequest request = null;
+        if (costCents.getType() == QueryCostType.VMCOST)
+        {
+            request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                    .setExternalTraceId(externalTraceId).setScanBytes(scanBytes).setVmCostCents(costCents.getCostCents()).build();
+        }
+        else if (costCents.getType() == QueryCostType.CFCOST)
+        {
+            request = TransProto.UpdateQueryCostsRequest.newBuilder()
+                    .setExternalTraceId(externalTraceId).setScanBytes(scanBytes).setCfCostCents(costCents.getCostCents()).build();
+        }
+        assert(request != null);
+        return updateQueryCosts(request);
+    }
+
+    private boolean updateQueryCosts(TransProto.UpdateQueryCostsRequest request) throws TransException
+    {
+        TransProto.UpdateQueryCostsResponse response = this.stub.updateQueryCosts(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to update query costs, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
     public int getTransConcurrency(boolean readOnly) throws TransException
     {
         TransProto.GetTransConcurrencyRequest request = TransProto.GetTransConcurrencyRequest.newBuilder()

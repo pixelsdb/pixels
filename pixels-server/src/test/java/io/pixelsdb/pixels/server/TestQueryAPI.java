@@ -62,7 +62,7 @@ public class TestQueryAPI
         String json1 = this.mockMvc.perform(
                         post(RestUrlPath.SUBMIT_QUERY).contentType(MediaType.APPLICATION_JSON).content(
                                 JSON.toJSONString(new SubmitQueryRequest(
-                                        "SELECT COUNT(l_orderkey) AS d_l_orderkey FROM lineitem",
+                                        "SELECT COUNT(l_orderkey) AS d_l_orderkey FROM tpch.lineitem",
                                         ExecutionHint.RELAXED, 1))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         System.out.println(json1);
@@ -73,7 +73,7 @@ public class TestQueryAPI
         String json2 = this.mockMvc.perform(
                         post(RestUrlPath.SUBMIT_QUERY).contentType(MediaType.APPLICATION_JSON).content(
                                 JSON.toJSONString(new SubmitQueryRequest(
-                                        "SELECT * FROM nation", ExecutionHint.BEST_EFFORT, 10))))
+                                        "SELECT * FROM tpch.nation", ExecutionHint.BEST_OF_EFFORT, 10))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         System.out.println(json2);
         SubmitQueryResponse response2 = JSON.parseObject(json2, SubmitQueryResponse.class);
@@ -115,7 +115,7 @@ public class TestQueryAPI
         String json = this.mockMvc.perform(
                 post(RestUrlPath.SUBMIT_QUERY).contentType(MediaType.APPLICATION_JSON).content(
                         JSON.toJSONString(new SubmitQueryRequest(
-                                "SELECT * FROM nation", ExecutionHint.RELAXED, 10))))
+                                "SELECT * FROM tpch.nation", ExecutionHint.RELAXED, 10))))
                 .andDo(print()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         SubmitQueryResponse response = JSON.parseObject(json, SubmitQueryResponse.class);
 
@@ -139,7 +139,7 @@ public class TestQueryAPI
         String json = this.mockMvc.perform(
                         post(RestUrlPath.SUBMIT_QUERY).contentType(MediaType.APPLICATION_JSON).content(
                                 JSON.toJSONString(new SubmitQueryRequest(
-                                        "SELECT * FROM nation", ExecutionHint.IMMEDIATE, 10))))
+                                        "SELECT * FROM tpch_10g.nation LIMIT 1", ExecutionHint.IMMEDIATE, 10))))
                 .andDo(print()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         SubmitQueryResponse response = JSON.parseObject(json, SubmitQueryResponse.class);
         TimeUnit.SECONDS.sleep(5);

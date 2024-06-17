@@ -190,11 +190,13 @@ public class Column extends Base
                 '}';
     }
 
-    private MetadataProto.Column toProto()
+    @Override
+    public MetadataProto.Column toProto()
     {
-        return MetadataProto.Column.newBuilder().setId(this.getId()).setName(this.name).setType(this.type)
-                .setChunkSize(this.chunkSize).setSize(this.size).setNullFraction(this.nullFraction)
-                .setCardinality(this.cardinality).setRecordStats(ByteString.copyFrom(this.recordStats))
+        return MetadataProto.Column.newBuilder().setId(this.getId()).setName(this.name)
+                .setType(this.type).setChunkSize(this.chunkSize).setSize(this.size)
+                .setNullFraction(this.nullFraction).setCardinality(this.cardinality)
+                .setRecordStats(this.recordStats == null ? ByteString.EMPTY : ByteString.copyFrom(this.recordStats))
                 .setTableId(this.tableId).build();
     }
 }

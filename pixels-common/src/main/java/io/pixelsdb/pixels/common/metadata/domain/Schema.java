@@ -63,4 +63,10 @@ public class Schema extends Base
                 "name='" + name + '\'' +
                 ", desc='" + desc + '\'' + '}';
     }
+
+    @Override
+    public MetadataProto.Schema toProto()
+    {
+        return MetadataProto.Schema.newBuilder().setId(this.getId()).setName(this.name).setDesc(this.desc).build();
+    }
 }

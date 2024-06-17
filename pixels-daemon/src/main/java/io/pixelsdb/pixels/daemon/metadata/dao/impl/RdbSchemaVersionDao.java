@@ -58,8 +58,6 @@ public class RdbSchemaVersionDao extends SchemaVersionDao
                         .addAllColumns(columnDao.getAllByIds(columns.getColumnIds(), false))
                         .setTransTs(rs.getLong("SV_TRANS_TS"))
                         .setTableId(rs.getLong("TBLS_TBL_ID"))
-                        // Issue #437: range index id is set to 0 if it is null in metadata.
-                        .setRangeIndexId(rs.getLong("RANGE_INDEXES_RI_ID"))
                         .build();
                 return schemaVersion;
             }
@@ -78,21 +76,12 @@ public class RdbSchemaVersionDao extends SchemaVersionDao
         String sql = "INSERT INTO SCHEMA_VERSIONS(" +
                 "`SV_COLUMNS`," +
                 "`SV_TRANS_TS`," +
-                "`TBLS_TBL_ID`," +
-                "`RANGE_INDEXES_RI_ID`) VALUES (?,?,?,?)";
+                "`TBLS_TBL_ID`) VALUES (?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, JSON.toJSONString(new Columns(schemaVersion.getColumnsList())));
             pst.setLong(2, schemaVersion.getTransTs());
             pst.setLong(3, schemaVersion.getTableId());
-            if (schemaVersion.hasRangeIndexId())
-            {
-                pst.setLong(4, schemaVersion.getRangeIndexId());
-            }
-            else
-            {
-                pst.setNull(4, Types.BIGINT);
-            }
             if (pst.executeUpdate() == 1)
             {
                 ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");

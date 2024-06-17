@@ -38,8 +38,8 @@ Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 
 ## Install Maven
 
-Pixels requires maven 3.6 to build the source code (maven 3.1-3.5 might work, but we didn't test them yet). On some old operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
-In this case, manually install a newer maven compatible with your JDK. 
+Pixels requires maven 3.8 or later to build the source code (some early maven versions may work, but we haven't test them yet). On some operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
+In this case, manually install a newer maven compatible with your JDK.
 
 ## Setup AWS Credentials*
 
@@ -237,20 +237,18 @@ an existing directory where the listener logs will appear.
   with the following content:
 ```properties
 connector.name=pixels
-pixels.config=/home/ubuntu/opt/pixels/pixels.properties
 
 # serverless config
-# it can be on, off, auto
+# it can be on, off, auto, or session
 cloud.function.switch=off
-local.scan.concurrency=40
 clean.intermediate.result=true
 ```
-`pixels.config` is used to specify the config file for Pixels, and has a higher priority than the config file under `PIXELS_HOME`.
 **Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
-The other properties are related to serverless execution.
 In Trino, Pixels can push projections, filters, joins, and aggregations into serverless computing services (e.g., AWS Lambda).
 This feature is named `Pixels-Turbo` and can be turned on by setting `cloud.function.switch` to `auto` (adaptively enabled) or `on` (always enabled).
 Turn it `off` to only use Trino workers for query processing.
+We can also set it to `session` so that this switch can be dynamically turned on or off by the session properties `pixels.cloud_function_enabled`.
+This allows `pixels-server` choosing whether to execute the query with cloud functions enabled.
 
 Append the following two lines into `etc/jvm.config`:
 ```config

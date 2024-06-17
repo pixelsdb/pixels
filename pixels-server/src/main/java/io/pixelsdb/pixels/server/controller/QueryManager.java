@@ -22,18 +22,24 @@ package io.pixelsdb.pixels.server.controller;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.QueryScheduleException;
 import io.pixelsdb.pixels.common.exception.QueryServerException;
+import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.server.ExecutionHint;
+import io.pixelsdb.pixels.common.server.PriceModel;
 import io.pixelsdb.pixels.common.server.QueryStatus;
 import io.pixelsdb.pixels.common.server.rest.request.SubmitQueryRequest;
 import io.pixelsdb.pixels.common.server.rest.response.GetQueryResultResponse;
 import io.pixelsdb.pixels.common.server.rest.response.SubmitQueryResponse;
+import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.turbo.QueryScheduleService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.sql.*;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -41,6 +47,7 @@ import java.util.concurrent.*;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.Constants.RELAXED_EXECUTION_MAX_POSTPONE_SEC;
 import static io.pixelsdb.pixels.common.utils.Constants.RELAXED_EXECUTION_RETRY_INTERVAL_SEC;
+import static io.pixelsdb.pixels.server.constant.ControllerParameters.*;
 
 /**
  * @author hank
@@ -100,8 +107,10 @@ public class QueryManager
     private final ExecutorService relaxedSubmitService = Executors.newSingleThreadExecutor();
     private final ExecutorService relaxedRetryService = Executors.newSingleThreadExecutor();
     private final ExecutorService bestEffortSubmitService = Executors.newSingleThreadExecutor();
+    private final ExecutorService queryResultClearService = Executors.newSingleThreadExecutor();
     private final ExecutorService executeService = Executors.newCachedThreadPool();
     private final QueryScheduleService queryScheduleService;
+    private final TransService transService;
     private final String jdbcUrl;
     private final Properties costEffectiveConnProp;
     private final Properties immediateConnProp;
@@ -109,8 +118,10 @@ public class QueryManager
 
     private QueryManager() throws QueryServerException
     {
-        String host = ConfigFactory.Instance().getProperty("query.schedule.server.host");
-        int port = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
+        String scheduleServerHost = ConfigFactory.Instance().getProperty("query.schedule.server.host");
+        int scheduleServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
+        String transServerHost = ConfigFactory.Instance().getProperty("trans.server.host");
+        int transServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
         try
         {
             /*
@@ -119,8 +130,18 @@ public class QueryManager
              * Here, we only need to get the query slots from the query schedule service and do not need to report
              * metrics for cluster auto-scaling, so we set scalingEnabled to false.
              */
-            this.queryScheduleService = new QueryScheduleService(host, port, false);
-            Runtime.getRuntime().addShutdownHook(new Thread(this.queryScheduleService::shutdown));
+            this.queryScheduleService = new QueryScheduleService(scheduleServerHost, scheduleServerPort, false);
+            this.transService = new TransService(transServerHost, transServerPort);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                queryScheduleService.shutdown();
+                try
+                {
+                    transService.shutdown();
+                } catch (InterruptedException e)
+                {
+                    log.error("failed to shutdown query schedule service or transaction service", e);
+                }
+            }));
         } catch (QueryScheduleException e)
         {
             throw new QueryServerException("failed to initialize query schedule service", e);
@@ -213,7 +234,7 @@ public class QueryManager
                     if (query != null)
                     {
                         // this queue should only contain best-effort queries that are to be executed in the mpp cluster
-                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.BEST_EFFORT,
+                        checkArgument(query.getRequest().getExecutionHint() == ExecutionHint.BEST_OF_EFFORT,
                                 "pending queue should only contain cost-effective queries");
                         QueryScheduleService.QueryConcurrency queryConcurrency = queryScheduleService.getQueryConcurrency();
                         if (queryConcurrency.mppConcurrency == 0)
@@ -236,6 +257,33 @@ public class QueryManager
             }
         });
         this.bestEffortSubmitService.shutdown();
+
+        this.queryResultClearService.submit(() -> {
+            while (running)
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(QUERY_RESULT_CLEAR_INTERVAL_MS);
+                    for (Map.Entry<String, GetQueryResultResponse> entry : this.queryResults.entrySet())
+                    {
+                        long current = System.currentTimeMillis();
+                        String traceToken = entry.getKey();
+                        GetQueryResultResponse response = entry.getValue();
+                        if (current - response.getFinishTimestampMs() >= QUERY_RESULT_CLEAR_DELAY_MS)
+                        {
+                            // put it into finished query before removing from query results, to avoid unknown query status
+                            this.finishedQueries.put(traceToken, traceToken);
+                            this.queryResults.remove(traceToken);
+                        }
+                    }
+                } catch (InterruptedException e)
+                {
+                    log.error("failed to clear query result", e);
+                    throw new QueryServerException("failed to clear query result", e);
+                }
+            }
+        });
+        this.queryResultClearService.shutdown();
     }
 
     /**
@@ -246,7 +294,7 @@ public class QueryManager
      */
     public SubmitQueryResponse submitQuery(SubmitQueryRequest request)
     {
-        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             try
             {
@@ -271,7 +319,7 @@ public class QueryManager
             try
             {
                 String traceToken = UUID.randomUUID().toString();
-                this.submit(new ReceivedQuery(traceToken, request, 0L)); // received time is not needed
+                this.submit(new ReceivedQuery(traceToken, request, System.currentTimeMillis()));
                 return new SubmitQueryResponse(ErrorCode.SUCCESS, "", traceToken);
             } catch (Throwable e)
             {
@@ -293,7 +341,7 @@ public class QueryManager
     {
         Properties properties;
         SubmitQueryRequest request = query.getRequest();
-        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_EFFORT)
+        if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             // submit it to the mpp connection
             properties = this.costEffectiveConnProp;
@@ -315,9 +363,12 @@ public class QueryManager
             {
                 Statement statement = connection.createStatement();
                 this.runningQueries.put(traceToken, query);
+                long pendingTimeMs = System.currentTimeMillis() - query.getReceivedTimeMs();
                 long start = System.currentTimeMillis();
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
-                long latencyMs = System.currentTimeMillis() - start;
+                long finishTimestampMs = System.currentTimeMillis();
+                long executeTimeMs = finishTimestampMs - start;
+
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -337,21 +388,24 @@ public class QueryManager
                     rows[i] = row;
                 }
 
-                // TODO: support get cost from trans service.
+                resultSet.close();
+                statement.close();
+
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
-                        columnPrintSizes, columnNames, rows, latencyMs, 0);
+                        request.getExecutionHint(), columnPrintSizes, columnNames, rows, pendingTimeMs,
+                        executeTimeMs, finishTimestampMs);
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
             } catch (SQLException e)
             {
-                GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.QUERY_SERVER_EXECUTE_FAILED,
-                        e.getMessage(), null, null, null, 0, 0);
+                GetQueryResultResponse result = new GetQueryResultResponse(
+                        ErrorCode.QUERY_SERVER_EXECUTE_FAILED, e.getMessage());
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
-                log.error("failed to execute query with trac token " + traceToken, e);
-                throw new QueryServerException("failed to execute query with trac token " + traceToken, e);
+                log.error("failed to execute query with trace token " + traceToken, e);
+                throw new QueryServerException("failed to execute query with trace token " + traceToken, e);
             }
         });
     }
@@ -362,6 +416,7 @@ public class QueryManager
         this.relaxedSubmitService.shutdownNow();
         this.relaxedRetryService.shutdownNow();
         this.bestEffortSubmitService.shutdownNow();
+        this.queryResultClearService.shutdownNow();
         this.executeService.shutdownNow();
     }
 
@@ -396,11 +451,50 @@ public class QueryManager
     public synchronized GetQueryResultResponse popQueryResult(String traceToken)
     {
         GetQueryResultResponse response = this.queryResults.get(traceToken);
+
         if (response != null)
         {
-            // put it into finished query before removing from query results, to avoid unknown query status
-            this.finishedQueries.put(traceToken, traceToken);
-            this.queryResults.remove(traceToken);
+            // Issue #649: get the costs from the transaction service
+            while (!response.hasValidCents())
+            {
+                try
+                {
+                    TransContext transContext = this.transService.getTransContext(traceToken);
+                    double vmCostCents;
+                    // wait until get vmCostCents
+                    if ((vmCostCents = Double.parseDouble(transContext.getProperties().getProperty(
+                            Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY, "-1"))) < 0)
+                    {
+                        // to our experience, 500ms is enough for transaction service to collect the cost metrics
+                        TimeUnit.MILLISECONDS.sleep(GET_QUERY_COSTS_DELAY_MS);
+                        continue;
+                    }
+                    response.setCostCents(vmCostCents);
+                    double cfCostCents = Double.parseDouble(transContext.getProperties().getProperty(
+                            Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY, "0"));
+                    if (cfCostCents < 0)
+                    {
+                        throw new TransException("the trans context returned by transaction service has an invalid cf cost");
+                    }
+                    response.addCostCents(cfCostCents);
+                    double scanBytes = Double.parseDouble(transContext.getProperties().getProperty(
+                            Constants.TRANS_CONTEXT_SCAN_BYTES_KEY));
+                    if (scanBytes < 0)
+                    {
+                        throw new TransException("the trans context returned by transaction service has an invalid scan bytes");
+                    }
+                    double billedCents = PriceModel.billedCents(scanBytes, response.getExecutionHint());
+                    response.setBilledCents(billedCents);
+                } catch (TransException e)
+                {
+                    log.error("failed to get trans context with trace token " + traceToken, e);
+                    throw new QueryServerException("failed to get trans context with trace token " + traceToken, e);
+                } catch (InterruptedException e)
+                {
+                    log.error("failed to sleep before getting vm costs", e);
+                    throw new QueryServerException("failed to sleep before getting vm costs", e);
+                }
+            }
         }
         return response;
     }

@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.core;
 
 import com.google.common.collect.ImmutableSet;
-import io.pixelsdb.pixels.common.lock.LockInternals;
 import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
 import org.apache.logging.log4j.LogManager;
@@ -40,8 +39,7 @@ import static java.util.Objects.requireNonNull;
  * <p>
  * Schema description in a Pixels file.
  */
-public final class TypeDescription
-        implements Comparable<TypeDescription>, Serializable, Cloneable
+public final class TypeDescription implements Comparable<TypeDescription>, Serializable, Cloneable
 {
     private static final long serialVersionUID = 4270695889340023552L;
     /**

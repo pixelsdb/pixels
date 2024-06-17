@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.server.rest.response;
 
 import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.server.ExecutionHint;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -34,8 +35,30 @@ public class GetQueryResultResponse
     private int[] columnPrintSizes;
     private String[] columnNames;
     private String[][] rows;
-    private double latencyMs;
-    private double costCents;
+    /**
+     * The time in ms the query waits in the queue for execution.
+     */
+    private double pendingTimeMs;
+    /**
+     * The time the query really executes.
+     */
+    private double executionTimeMs;
+    /**
+     * The milliseconds since Unix epoch at which the query is finished.
+     */
+    private long finishTimestampMs = -1;
+    /**
+     * The amount of money in cents really spent by the query.
+     */
+    private double costCents = -1;
+    /**
+     * The amount of money in cents billed according to our price model.
+     */
+    private double billedCents = -1;
+    /**
+     * The execution hint of query.
+     */
+    private ExecutionHint executionHint;
 
     /**
      * Default constructor for Jackson.
@@ -57,16 +80,20 @@ public class GetQueryResultResponse
         this.errorMessage = errorMessage;
     }
 
-    public GetQueryResultResponse(int errorCode, String errorMessage, int[] columnPrintSizes,
-                                  String[] columnNames, String[][] rows, double latencyMs, double costCents)
+    public GetQueryResultResponse(int errorCode, String errorMessage, ExecutionHint executionHint, int[] columnPrintSizes,
+                                  String[] columnNames, String[][] rows, double pendingTimeMs,
+                                  double executionTimeMs, long finishTimestampMs)
     {
+        checkArgument(finishTimestampMs > 0, "finish timestamp is invalid");
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
+        this.executionHint = executionHint;
         this.columnPrintSizes = columnPrintSizes;
         this.columnNames = columnNames;
         this.rows = rows;
-        this.latencyMs = latencyMs;
-        this.costCents = costCents;
+        this.pendingTimeMs = pendingTimeMs;
+        this.executionTimeMs = executionTimeMs;
+        this.finishTimestampMs = finishTimestampMs;
     }
 
     public int getErrorCode()
@@ -88,6 +115,10 @@ public class GetQueryResultResponse
     {
         this.errorMessage = errorMessage;
     }
+
+    public ExecutionHint getExecutionHint() { return executionHint; }
+
+    public void setExecutionHint(ExecutionHint executionHint) { this.executionHint = executionHint; }
 
     public int[] getColumnPrintSizes()
     {
@@ -119,14 +150,34 @@ public class GetQueryResultResponse
         this.rows = rows;
     }
 
-    public double getLatencyMs()
+    public double getPendingTimeMs()
     {
-        return latencyMs;
+        return pendingTimeMs;
     }
 
-    public void setLatencyMs(double latencyMs)
+    public void setPendingTimeMs(double pendingTimeMs)
     {
-        this.latencyMs = latencyMs;
+        this.pendingTimeMs = pendingTimeMs;
+    }
+
+    public double getExecutionTimeMs()
+    {
+        return executionTimeMs;
+    }
+
+    public void setExecutionTimeMs(double executionTimeMs)
+    {
+        this.executionTimeMs = executionTimeMs;
+    }
+
+    public long getFinishTimestampMs()
+    {
+        return finishTimestampMs;
+    }
+
+    public void setFinishTimestampMs(long finishTimestampMs)
+    {
+        this.finishTimestampMs = finishTimestampMs;
     }
 
     public double getCostCents()
@@ -137,5 +188,25 @@ public class GetQueryResultResponse
     public void setCostCents(double costCents)
     {
         this.costCents = costCents;
+    }
+
+    public void addCostCents(double costCents) { this.costCents += costCents; }
+
+    public double getBilledCents()
+    {
+        return billedCents;
+    }
+
+    public void setBilledCents(double billedCents)
+    {
+        this.billedCents = billedCents;
+    }
+
+    /**
+     * @return true if this query result has valid billed and cost cents
+     */
+    public boolean hasValidCents()
+    {
+        return this.costCents >= 0 && this.billedCents >= 0;
     }
 }

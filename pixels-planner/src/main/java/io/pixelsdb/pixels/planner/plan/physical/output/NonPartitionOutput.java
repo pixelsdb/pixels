@@ -31,11 +31,6 @@ import java.util.ArrayList;
 public abstract class NonPartitionOutput extends Output
 {
     /**
-     * The path of the result files. No need to contain endpoint information.
-     */
-    private ArrayList<String> outputs = new ArrayList<>();
-
-    /**
      * The number of row groups in each result files.
      */
     private ArrayList<Integer> rowGroupNums = new ArrayList<>();
@@ -44,16 +39,6 @@ public abstract class NonPartitionOutput extends Output
      * Default constructor for jackson.
      */
     public NonPartitionOutput() { }
-
-    public ArrayList<String> getOutputs()
-    {
-        return outputs;
-    }
-
-    public void setOutputs(ArrayList<String> outputs)
-    {
-        this.outputs = outputs;
-    }
 
     public ArrayList<Integer> getRowGroupNums()
     {
@@ -67,7 +52,7 @@ public abstract class NonPartitionOutput extends Output
 
     public synchronized void addOutput(String output, int rowGroupNum)
     {
-        this.outputs.add(output);
+        this.addOutput(output);
         this.rowGroupNums.add(rowGroupNum);
     }
 }
