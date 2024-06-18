@@ -43,7 +43,6 @@ import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.daemon.heartbeat.CoordinatorStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -51,7 +50,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * CacheCoordinator is responsible for the following tasks:
@@ -61,7 +59,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author guodong
  * @author hank
  */
-// todo cache location compaction. Cache locations for older versions still exist after being used.
+// todo: cache location compaction. Cache locations for older versions still exist after being used.
 public class CacheCoordinator implements Server
 {
     private static final Logger logger = LogManager.getLogger(CacheCoordinator.class);
@@ -69,8 +67,6 @@ public class CacheCoordinator implements Server
     private final PixelsCacheConfig cacheConfig;
     private MetadataService metadataService = null;
     private Storage storage = null;
-    // coordinator status: 0: init, 1: ready; -1: dead
-    private final AtomicInteger coordinatorStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
     private boolean initializeSuccess = false;
     private CountDownLatch runningLatch;
 
@@ -150,26 +146,19 @@ public class CacheCoordinator implements Server
                             if (event.getEventType() == WatchEvent.EventType.PUT)
                             {
                                 // listen to the PUT even on the LAYOUT VERSION that can be changed by rainbow.
-                                if (coordinatorStatus.get() == CoordinatorStatus.READY.StatusCode)
+                                try
                                 {
-                                    try
-                                    {
-                                        // this coordinator is ready.
-                                        logger.debug("Update cache distribution");
-                                        // update the cache distribution
-                                        int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                                        updateCachePlan(layoutVersion);
-                                        // update cache version, notify cache managers on each node to update cache.
-                                        logger.debug("Update cache version to " + layoutVersion);
-                                        etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
-                                    } catch (IOException | MetadataException e)
-                                    {
-                                        logger.error("failed to update cache distribution", e);
-                                    }
-                                } else if (coordinatorStatus.get() == CoordinatorStatus.DEAD.StatusCode)
+                                    // this coordinator is ready.
+                                    logger.debug("Update cache distribution");
+                                    // update the cache distribution
+                                    int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
+                                    updateCachePlan(layoutVersion);
+                                    // update cache version, notify cache managers on each node to update cache.
+                                    logger.debug("Update cache version to " + layoutVersion);
+                                    etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
+                                } catch (IOException | MetadataException e)
                                 {
-                                    // coordinator is shutdown.
-                                    runningLatch.countDown();
+                                    logger.error("Failed to update cache distribution", e);
                                 }
                                 break;
                             }
@@ -182,8 +171,7 @@ public class CacheCoordinator implements Server
             runningLatch.await();
         } catch (InterruptedException e)
         {
-            logger.error(e.getMessage());
-            e.printStackTrace();
+            logger.error("Interrupted when waiting on the running latch", e);
         } finally
         {
             if (watcher != null)

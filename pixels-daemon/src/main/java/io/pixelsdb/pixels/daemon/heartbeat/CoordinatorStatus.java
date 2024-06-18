@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.daemon.heartbeat;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * @author hank
  * @create 2024-06-17
@@ -28,8 +30,25 @@ public enum CoordinatorStatus
     DEAD(-1), INIT(0), READY(0x01);
 
     public final int StatusCode;
+
     CoordinatorStatus(int statusCode)
     {
         this.StatusCode = statusCode;
+    }
+
+    private static final AtomicInteger CurrentStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
+
+    public static void updateCurrentStatus(CoordinatorStatus status)
+    {
+        int currStatus = CurrentStatus.get();
+        while (CurrentStatus.compareAndSet(currStatus, currStatus | status.StatusCode))
+        {
+            currStatus = CurrentStatus.get();
+        }
+    }
+
+    public static int getCurrentStatus()
+    {
+        return CurrentStatus.get();
     }
 }
