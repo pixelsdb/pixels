@@ -33,7 +33,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This is the coordinator of the heartbeat mechanism.
@@ -48,7 +47,6 @@ public class HeartbeatCoordinator implements Server
     private final EtcdUtil etcdUtil = EtcdUtil.Instance();
     private final HeartbeatConfig heartbeatConfig = new HeartbeatConfig();
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
-    private final AtomicInteger coordinatorStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
     private String hostName;
     private CoordinatorRegister coordinatorRegister = null;
     private boolean initializeSuccess = false;
@@ -113,7 +111,6 @@ public class HeartbeatCoordinator implements Server
             this.coordinatorRegister = new CoordinatorRegister(leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(coordinatorRegister,
                     0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
-            coordinatorStatus.set(CoordinatorStatus.READY.StatusCode);
             initializeSuccess = true;
             logger.info("Heartbeat coordinator on " + hostName + " is initialized");
         } catch (Exception e)
@@ -125,15 +122,12 @@ public class HeartbeatCoordinator implements Server
     @Override
     public boolean isRunning()
     {
-        int status = coordinatorStatus.get();
-        return status == CoordinatorStatus.INIT.StatusCode ||
-                status == CoordinatorStatus.READY.StatusCode;
+        return runningLatch.getCount() > 0;
     }
 
     @Override
     public void shutdown()
     {
-        coordinatorStatus.set(CoordinatorStatus.DEAD.StatusCode);
         logger.debug("Shutting down heartbeat coordinator...");
         scheduledExecutor.shutdownNow();
         if (coordinatorRegister != null)
