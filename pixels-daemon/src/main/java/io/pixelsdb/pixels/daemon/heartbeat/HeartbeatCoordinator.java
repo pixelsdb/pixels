@@ -44,7 +44,6 @@ import java.util.concurrent.TimeUnit;
 public class HeartbeatCoordinator implements Server
 {
     private static final Logger logger = LogManager.getLogger(HeartbeatCoordinator.class);
-    private final EtcdUtil etcdUtil = EtcdUtil.Instance();
     private final HeartbeatConfig heartbeatConfig = new HeartbeatConfig();
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
     private String hostName;
@@ -81,7 +80,7 @@ public class HeartbeatCoordinator implements Server
     private void initialize()
     {
         // 1. if another cache coordinator exists, stop initialization
-        KeyValue coordinatorKV = etcdUtil.getKeyValue(Constants.HEARTBEAT_COORDINATOR_LITERAL);
+        KeyValue coordinatorKV = EtcdUtil.Instance().getKeyValueByPrefix(Constants.HEARTBEAT_COORDINATOR_LITERAL);
         if (coordinatorKV != null && coordinatorKV.getLease() > 0)
         {
             try
@@ -93,7 +92,7 @@ public class HeartbeatCoordinator implements Server
                 logger.error(e.getMessage());
                 e.printStackTrace();
             }
-            coordinatorKV = etcdUtil.getKeyValue(Constants.HEARTBEAT_COORDINATOR_LITERAL);
+            coordinatorKV = EtcdUtil.Instance().getKeyValueByPrefix(Constants.HEARTBEAT_COORDINATOR_LITERAL);
             if (coordinatorKV != null && coordinatorKV.getLease() > 0)
             {
                 // another coordinator exists
@@ -105,10 +104,12 @@ public class HeartbeatCoordinator implements Server
         try
         {
             // 2. register the coordinator
-            Lease leaseClient = etcdUtil.getClient().getLeaseClient();
+            Lease leaseClient = EtcdUtil.Instance().getClient().getLeaseClient();
             long leaseId = leaseClient.grant(heartbeatConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId(Constants.HEARTBEAT_COORDINATOR_LITERAL, hostName, leaseId);
-            this.coordinatorRegister = new CoordinatorRegister(leaseClient, leaseId);
+            String key = Constants.HEARTBEAT_COORDINATOR_LITERAL + hostName;
+            EtcdUtil.Instance().putKeyValueWithLeaseId(Constants.HEARTBEAT_COORDINATOR_LITERAL + hostName,
+                    String.valueOf(CoordinatorStatus.getCurrentStatus()), leaseId);
+            this.coordinatorRegister = new CoordinatorRegister(key, leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(coordinatorRegister,
                     0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
@@ -134,7 +135,7 @@ public class HeartbeatCoordinator implements Server
         {
             coordinatorRegister.stop();
         }
-        etcdUtil.delete(Constants.HEARTBEAT_COORDINATOR_LITERAL);
+        EtcdUtil.Instance().delete(Constants.HEARTBEAT_COORDINATOR_LITERAL);
         if (runningLatch != null)
         {
             runningLatch.countDown();
@@ -167,11 +168,13 @@ public class HeartbeatCoordinator implements Server
 
     private static class CoordinatorRegister implements Runnable
     {
+        private final String coordinatorKey;
         private final Lease leaseClient;
         private final long leaseId;
 
-        CoordinatorRegister(Lease leaseClient, long leaseId)
+        CoordinatorRegister(String coordinatorKey, Lease leaseClient, long leaseId)
         {
+            this.coordinatorKey = coordinatorKey;
             this.leaseClient = leaseClient;
             this.leaseId = leaseId;
         }
@@ -180,6 +183,8 @@ public class HeartbeatCoordinator implements Server
         public void run()
         {
             leaseClient.keepAliveOnce(leaseId);
+            EtcdUtil.Instance().putKeyValueWithLeaseId(coordinatorKey,
+                    String.valueOf(CoordinatorStatus.getCurrentStatus()), leaseId);
         }
 
         public void stop()

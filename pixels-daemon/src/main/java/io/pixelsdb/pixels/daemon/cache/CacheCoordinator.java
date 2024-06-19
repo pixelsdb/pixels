@@ -90,28 +90,28 @@ public class CacheCoordinator implements Server
         {
             if (cacheConfig.isCacheEnabled())
             {
-                // 1. create the storage instance.
+                // 1. create the storage instance
                 if (storage == null)
                 {
                     storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
                 }
                 // 2. check version consistency
-                int cache_version = 0, layout_version = 0;
+                int cacheVersion = 0, layoutVersion = 0;
                 this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
                 KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (null != cacheVersionKV)
                 {
-                    cache_version = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                    cacheVersion = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
                 }
                 KeyValue layoutVersionKV = etcdUtil.getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
                 if (null != layoutVersionKV)
                 {
-                    layout_version = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                    layoutVersion = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
                 }
-                if (cache_version < layout_version)
+                if (cacheVersion < layoutVersion)
                 {
                     logger.debug("Current cache version is left behind of current layout version, update the cache...");
-                    updateCachePlan(layout_version);
+                    updateCachePlan(layoutVersion);
                 }
             }
             initializeSuccess = true;
@@ -167,7 +167,7 @@ public class CacheCoordinator implements Server
         }
         try
         {
-            // Wait for this coordinator to be shutdown.
+            // Wait for this coordinator to be shutdown
             runningLatch.await();
         } catch (InterruptedException e)
         {
@@ -217,7 +217,7 @@ public class CacheCoordinator implements Server
             runningLatch.countDown();
         }
         EtcdUtil.Instance().getClient().close();
-        logger.info("Cache coordinator is shutdown.");
+        logger.info("Cache coordinator is shutdown");
     }
 
     /**
@@ -225,8 +225,7 @@ public class CacheCoordinator implements Server
      * 1. for all files, decide which files to cache
      * 2. for each file, decide which node to cache it
      * */
-    private void updateCachePlan(int layoutVersion)
-            throws MetadataException, IOException
+    private void updateCachePlan(int layoutVersion) throws MetadataException, IOException
     {
         Layout layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
         // select: decide which files to cache
@@ -290,8 +289,7 @@ public class CacheCoordinator implements Server
      * @param layoutVersion
      * @throws IOException
      */
-    private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion)
-            throws IOException
+    private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion) throws IOException
     {
         CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes, size);
         for (int i = 0; i < size; i++)
@@ -312,8 +310,7 @@ public class CacheCoordinator implements Server
      * @return
      * @throws IOException
      */
-    private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size)
-            throws IOException
+    private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size) throws IOException
     {
         CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
@@ -366,7 +363,7 @@ public class CacheCoordinator implements Server
                         }
                     } else
                     {
-                        throw new BalancerException("absolute balancer failed to balance paths.");
+                        throw new BalancerException("absolute balancer failed to balance paths");
                     }
                 } else
                 {
@@ -380,7 +377,7 @@ public class CacheCoordinator implements Server
                 }
             } else
             {
-                throw new BalancerException("replica balancer failed to balance paths.");
+                throw new BalancerException("replica balancer failed to balance paths");
             }
         } catch (BalancerException e)
         {
@@ -390,9 +387,11 @@ public class CacheCoordinator implements Server
         return locationDistribution;
     }
 
-    private List<HostAddress> toHostAddress(String[] hosts) {
+    private List<HostAddress> toHostAddress(String[] hosts)
+    {
         ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-        for (String host : hosts) {
+        for (String host : hosts)
+        {
             builder.add(HostAddress.fromString(host));
         }
         return builder.build();
