@@ -33,6 +33,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This is the coordinator of the heartbeat mechanism.
@@ -44,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 public class HeartbeatCoordinator implements Server
 {
     private static final Logger logger = LogManager.getLogger(HeartbeatCoordinator.class);
+    private static final AtomicInteger currentStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
     private final HeartbeatConfig heartbeatConfig = new HeartbeatConfig();
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
     private String hostName;
@@ -108,11 +110,12 @@ public class HeartbeatCoordinator implements Server
             long leaseId = leaseClient.grant(heartbeatConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
             String key = Constants.HEARTBEAT_COORDINATOR_LITERAL + hostName;
             EtcdUtil.Instance().putKeyValueWithLeaseId(Constants.HEARTBEAT_COORDINATOR_LITERAL + hostName,
-                    String.valueOf(CoordinatorStatus.getCurrentStatus()), leaseId);
+                    String.valueOf(currentStatus.get()), leaseId);
             this.coordinatorRegister = new CoordinatorRegister(key, leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(coordinatorRegister,
                     0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
+            currentStatus.set(CoordinatorStatus.READY.StatusCode);
             logger.info("Heartbeat coordinator on " + hostName + " is initialized");
         } catch (Exception e)
         {
@@ -123,12 +126,14 @@ public class HeartbeatCoordinator implements Server
     @Override
     public boolean isRunning()
     {
-        return runningLatch.getCount() > 0;
+        int status = currentStatus.get();
+        return status == CoordinatorStatus.INIT.StatusCode || status == CoordinatorStatus.READY.StatusCode;
     }
 
     @Override
     public void shutdown()
     {
+        currentStatus.set(CoordinatorStatus.EXIT.StatusCode);
         logger.debug("Shutting down heartbeat coordinator...");
         scheduledExecutor.shutdownNow();
         if (coordinatorRegister != null)
@@ -184,7 +189,7 @@ public class HeartbeatCoordinator implements Server
         {
             leaseClient.keepAliveOnce(leaseId);
             EtcdUtil.Instance().putKeyValueWithLeaseId(coordinatorKey,
-                    String.valueOf(CoordinatorStatus.getCurrentStatus()), leaseId);
+                    String.valueOf(currentStatus.get()), leaseId);
         }
 
         public void stop()
