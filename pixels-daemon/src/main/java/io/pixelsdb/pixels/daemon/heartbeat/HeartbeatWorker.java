@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.daemon.heartbeat;
 
 import io.pixelsdb.pixels.common.server.Server;
+import io.pixelsdb.pixels.daemon.cache.CacheWorker;
 
 /**
  * @author hank
@@ -27,6 +28,7 @@ import io.pixelsdb.pixels.common.server.Server;
  */
 public class HeartbeatWorker implements Server
 {
+    private CacheWorker.CacheManagerRegister cacheManagerRegister;
     @Override
     public boolean isRunning()
     {

@@ -43,6 +43,7 @@ import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.daemon.heartbeat.NodeStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -245,7 +246,7 @@ public class CacheCoordinator implements Server
             KeyValue node = nodes.get(i);
             // key: host_[hostname]; value: [status]. available if status == 1.
             if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) ==
-                    CacheWorker.CacheNodeStatus.READY.StatusCode)
+                    NodeStatus.READY.StatusCode)
             {
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey()
                         .toString(StandardCharsets.UTF_8).substring(5));

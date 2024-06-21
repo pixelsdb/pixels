@@ -23,12 +23,13 @@ package io.pixelsdb.pixels.daemon.heartbeat;
  * @author hank
  * @create 2024-06-17
  */
-public enum WorkerStatus
+public enum NodeStatus
 {
-    UNHEALTHY(-1), READY(0), CACHE_UPDATING(0x01), INDEX_UPDATING(0x02);
+    INIT(0), READY(1), EXIT(2);
 
     public final int StatusCode;
-    WorkerStatus(int statusCode)
+
+    NodeStatus(int statusCode)
     {
         this.StatusCode = statusCode;
     }

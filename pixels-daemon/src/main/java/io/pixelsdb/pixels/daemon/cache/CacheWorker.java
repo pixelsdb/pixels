@@ -54,26 +54,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class CacheWorker implements Server
 {
-    enum CacheNodeStatus
-    {
-        UNHEALTHY(-1), READY(0), UPDATING(1), OUT_OF_SIZE(2);
-
-        public final int StatusCode;
-        CacheNodeStatus(int statusCode)
-        {
-            this.StatusCode = statusCode;
-        }
-    }
     private static final Logger logger = LogManager.getLogger(CacheWorker.class);
-    // cache status: unhealthy(-1), ready(0), updating(1), out_of_size(2)
-    private static final AtomicInteger cacheStatus = new AtomicInteger(CacheNodeStatus.READY.StatusCode);
-
     private PixelsCacheWriter cacheWriter = null;
     private MetadataService metadataService = null;
-    private CacheManagerRegister cacheManagerRegister;
     private final PixelsCacheConfig cacheConfig;
     private final EtcdUtil etcdUtil;
-    private final ScheduledExecutorService scheduledExecutor;
     /**
      * The hostname of the node where this cache worker is running.
      */

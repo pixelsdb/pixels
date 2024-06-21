@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class HeartbeatCoordinator implements Server
 {
     private static final Logger logger = LogManager.getLogger(HeartbeatCoordinator.class);
-    private static final AtomicInteger currentStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
+    private static final AtomicInteger currentStatus = new AtomicInteger(NodeStatus.INIT.StatusCode);
     private final HeartbeatConfig heartbeatConfig = new HeartbeatConfig();
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
     private String hostName;
@@ -115,7 +115,7 @@ public class HeartbeatCoordinator implements Server
             scheduledExecutor.scheduleAtFixedRate(coordinatorRegister,
                     0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
-            currentStatus.set(CoordinatorStatus.READY.StatusCode);
+            currentStatus.set(NodeStatus.READY.StatusCode);
             logger.info("Heartbeat coordinator on " + hostName + " is initialized");
         } catch (Exception e)
         {
@@ -127,20 +127,20 @@ public class HeartbeatCoordinator implements Server
     public boolean isRunning()
     {
         int status = currentStatus.get();
-        return status == CoordinatorStatus.INIT.StatusCode || status == CoordinatorStatus.READY.StatusCode;
+        return status == NodeStatus.INIT.StatusCode || status == NodeStatus.READY.StatusCode;
     }
 
     @Override
     public void shutdown()
     {
-        currentStatus.set(CoordinatorStatus.EXIT.StatusCode);
+        currentStatus.set(NodeStatus.EXIT.StatusCode);
         logger.debug("Shutting down heartbeat coordinator...");
         scheduledExecutor.shutdownNow();
         if (coordinatorRegister != null)
         {
             coordinatorRegister.stop();
         }
-        EtcdUtil.Instance().delete(Constants.HEARTBEAT_COORDINATOR_LITERAL);
+        EtcdUtil.Instance().deleteByPrefix(Constants.HEARTBEAT_COORDINATOR_LITERAL);
         if (runningLatch != null)
         {
             runningLatch.countDown();
