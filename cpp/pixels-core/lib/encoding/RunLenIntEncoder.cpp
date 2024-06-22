@@ -402,7 +402,7 @@ void RunLenIntEncoder::writeShortRepeatValues() {
     // width of repeating value (3 bits, representing 1~8 bytes)
     header |= ((numBytesRepeatVal - 1) << 3);
 
-    // repeat count (3 bytes, 3~10 values)
+    // repeat count (3 bits, 3~10 values)
     fixedRunLength -= Constants::MIN_REPEAT;
     header |= fixedRunLength;
 
@@ -412,8 +412,8 @@ void RunLenIntEncoder::writeShortRepeatValues() {
     // -----------------------------------------------------------
     // Repeating values
     // -----------------------------------------------------------
-    // write the repeating values in little endian by byte order
-    for(int i = 0; i < numBytesRepeatVal; ++i) {
+    // write the repeating values in byte order
+    for(int i = numBytesRepeatVal - 1; i >= 0; --i) {
         byte b = (byte)((((unsigned long)repeatVal) >> (i * 8)) & 0xff);
         outputStream->put(b);
     }
@@ -496,8 +496,8 @@ void RunLenIntEncoder::writePatchedBaseValues() {
     outputStream->put(headerFourthByte);
 
     
-    // write the base value using fixed bytes in little endian order
-    for(int i = 0; i < baseBytes; ++i) {
+    // write the base value using fixed bytes in big endian order
+    for(int i = baseBytes - 1; i >= 0; --i) {
         byte b = (byte) (((unsigned long)min) >> (i * 8) & 0xff);
         outputStream->put(b);
     }
@@ -679,7 +679,7 @@ void RunLenIntEncoder::writeInts(long* input, int offset, int len, int bitSize) 
 }
 
 int RunLenIntEncoder::getOpcode() {
-    return encodingType << 6;
+    return ((int)encodingType) << 6;
 }
 
 void RunLenIntEncoder::write(long value) {
