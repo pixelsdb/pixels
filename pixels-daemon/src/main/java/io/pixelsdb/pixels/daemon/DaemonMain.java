@@ -4,6 +4,8 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
 import io.pixelsdb.pixels.daemon.cache.CacheWorker;
 import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
+import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatCoordinator;
+import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
@@ -77,6 +79,9 @@ public class DaemonMain
 
                 try
                 {
+                    // start heartbeat coordinator
+                    HeartbeatCoordinator heartbeatCoordinator = new HeartbeatCoordinator();
+                    container.addServer("heartbeat_coordinator", heartbeatCoordinator);
                     // start metadata server
                     MetadataServer metadataServer = new MetadataServer(metadataServerPort);
                     container.addServer("metadata", metadataServer);
@@ -102,6 +107,9 @@ public class DaemonMain
                         ConfigFactory.Instance().getProperty("metrics.server.enabled"));
                 try
                 {
+                    // start heartbeat worker
+                    HeartbeatWorker heartbeatWorker = new HeartbeatWorker();
+                    container.addServer("heartbeat_worker", heartbeatWorker);
                     // start metrics server and cache worker on worker node
                     if (metricsServerEnabled)
                     {

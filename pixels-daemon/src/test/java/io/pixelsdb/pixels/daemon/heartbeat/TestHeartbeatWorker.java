@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,18 +17,22 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.encoding;
+package io.pixelsdb.pixels.daemon.heartbeat;
 
-import java.io.IOException;
+import org.junit.Test;
 
 /**
- * @author guodong
  * @author hank
+ * @create 2024-06-22
  */
-public abstract class Decoder implements AutoCloseable
+public class TestHeartbeatWorker
 {
-    public abstract boolean hasNext() throws IOException;
-
-    @Override
-    abstract public void close() throws IOException;
+    @Test
+    public void test() throws InterruptedException
+    {
+        HeartbeatWorker worker = new HeartbeatWorker();
+        Thread thread = new Thread(worker);
+        thread.start();
+        thread.join();
+    }
 }

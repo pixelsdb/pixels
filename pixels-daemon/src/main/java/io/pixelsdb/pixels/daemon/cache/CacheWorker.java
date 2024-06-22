@@ -86,11 +86,12 @@ public class CacheWorker implements Server
     }
 
     /**
-     * Initialize CacheWorker:
-     *
-     * 1. initialize the metadata service and cache writer.
+     * Initialize cache worker:
+     * <p>
+     * 1. initialize the metadata service and cache writer;
      * 2. check if local cache version is the same as global cache version in etcd.
      * If the local cache is not up-to-date, update the local cache.
+     * </p>
      * */
     private void initialize()
     {
@@ -128,6 +129,10 @@ public class CacheWorker implements Server
                     }
                 }
             }
+            else
+            {
+                logger.info("Cache is disabled, nothing to initialize");
+            }
             initializeSuccess = true;
         } catch (Exception e)
         {
@@ -164,66 +169,69 @@ public class CacheWorker implements Server
     @Override
     public void run()
     {
-        logger.info("Starting cache worker");
         if (!initializeSuccess)
         {
-            logger.error("Cache worker initialization failed, stop now...");
+            logger.error("Cache worker initialization failed, exit...");
             return;
         }
-        runningLatch = new CountDownLatch(1);
-        Watch.Watcher watcher = null;
-        if (cacheConfig.isCacheEnabled())
+
+        if (!cacheConfig.isCacheEnabled())
         {
-            watcher = EtcdUtil.Instance().getClient().getWatchClient().watch(
-                    ByteSequence.from(Constants.CACHE_VERSION_LITERAL, StandardCharsets.UTF_8),
-                    WatchOption.DEFAULT, watchResponse ->
+            logger.info("Cache is disabled, exit...");
+            return;
+        }
+
+        logger.info("Starting cache worker");
+        runningLatch = new CountDownLatch(1);
+        Watch.Watcher watcher = EtcdUtil.Instance().getClient().getWatchClient().watch(
+                ByteSequence.from(Constants.CACHE_VERSION_LITERAL, StandardCharsets.UTF_8),
+                WatchOption.DEFAULT, watchResponse ->
+                {
+                    for (WatchEvent event : watchResponse.getEvents())
                     {
-                        for (WatchEvent event : watchResponse.getEvents())
+                        if (event.getEventType() == WatchEvent.EventType.PUT)
                         {
-                            if (event.getEventType() == WatchEvent.EventType.PUT)
+                            // Get a new cache layout version.
+                            int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
+                            if (cacheStatus.get() == CacheWorkerStatus.READY.StatusCode)
                             {
-                                // Get a new cache layout version.
-                                int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                                if (cacheStatus.get() == CacheWorkerStatus.READY.StatusCode)
+                                // Ready to update the local cache.
+                                logger.debug("Cache version update detected, new global version is (" + version + ").");
+                                if (version > localCacheVersion)
                                 {
-                                    // Ready to update the local cache.
-                                    logger.debug("Cache version update detected, new global version is (" + version + ").");
-                                    if (version > localCacheVersion)
+                                    // The new version is newer, update the local cache.
+                                    logger.debug("New global version is greater than the local version, update the local cache.");
+                                    try
                                     {
-                                        // The new version is newer, update the local cache.
-                                        logger.debug("New global version is greater than the local version, update the local cache.");
-                                        try
-                                        {
-                                            updateLocalCache(version);
-                                        } catch (MetadataException e)
-                                        {
-                                            logger.error("Failed to update local cache.", e);
-                                            e.printStackTrace();
-                                        }
+                                        updateLocalCache(version);
+                                    } catch (MetadataException e)
+                                    {
+                                        logger.error("Failed to update local cache.", e);
                                     }
-                                } else if (cacheStatus.get() == CacheWorkerStatus.UPDATING.StatusCode)
-                                {
-                                    // The local cache is updating, ignore the new version.
-                                    logger.warn("The local cache is updating for version (" + localCacheVersion + "), " +
-                                            "ignore the new cache version (" + version + ").");
-                                } else
-                                {
-                                    // Shutdown this node manager.
-                                    runningLatch.countDown();
                                 }
-                            } else if (event.getEventType() == WatchEvent.EventType.DELETE)
+                            } else if (cacheStatus.get() == CacheWorkerStatus.UPDATING.StatusCode)
                             {
-                                logger.warn("Cache version deletion detected, the cluster is corrupted, stop now.");
-                                cacheStatus.set(CacheWorkerStatus.UNHEALTHY.StatusCode);
-                                // Shutdown the node manager.
+                                // The local cache is updating, ignore the new version.
+                                logger.warn("The local cache is updating for version (" + localCacheVersion + "), " +
+                                        "ignore the new cache version (" + version + ").");
+                            } else
+                            {
+                                // Shutdown this node manager.
                                 runningLatch.countDown();
                             }
+                        } else if (event.getEventType() == WatchEvent.EventType.DELETE)
+                        {
+                            logger.warn("Cache version deletion detected, the cluster is corrupted, exit now.");
+                            cacheStatus.set(CacheWorkerStatus.UNHEALTHY.StatusCode);
+                            // Shutdown the node manager.
+                            runningLatch.countDown();
                         }
-                    });
-        }
+                    }
+                });
         try
         {
             // Wait for this cache worker to be shutdown.
+            logger.info("Cache worker is running");
             runningLatch.await();
         } catch (InterruptedException e)
         {

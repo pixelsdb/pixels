@@ -74,10 +74,11 @@ public class HeartbeatCoordinator implements Server
     }
 
     /**
-     * Initialize Coordinator:
-     *
-     * 1. check if there is an existing coordinator, if yes, return.
+     * Initialize heartbeat coordinator:
+     * <p>
+     * 1. check if there is an existing coordinator, if yes, return;
      * 2. register the coordinator.
+     * </p>
      */
     private void initialize()
     {
@@ -91,8 +92,7 @@ public class HeartbeatCoordinator implements Server
                 Thread.sleep(heartbeatConfig.getNodeLeaseTTL() * 1000L);
             } catch (InterruptedException e)
             {
-                logger.error(e.getMessage());
-                e.printStackTrace();
+                logger.error("Interrupted when waiting for the lease to expire", e);
             }
             coordinatorKV = EtcdUtil.Instance().getKeyValueByPrefix(Constants.HEARTBEAT_COORDINATOR_LITERAL);
             if (coordinatorKV != null && coordinatorKV.getLease() > 0)
@@ -156,13 +156,14 @@ public class HeartbeatCoordinator implements Server
         logger.info("Starting heartbeat coordinator");
         if (!initializeSuccess)
         {
-            logger.error("Heartbeat coordinator initialization failed, stop now...");
+            logger.error("Heartbeat coordinator initialization failed, exit now...");
             return;
         }
         runningLatch = new CountDownLatch(1);
         try
         {
             // Wait for this coordinator to be shutdown.
+            logger.info("Heartbeat coordinator is running");
             runningLatch.await();
         } catch (InterruptedException e)
         {

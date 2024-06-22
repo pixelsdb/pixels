@@ -60,11 +60,10 @@ import java.util.concurrent.CountDownLatch;
  * @author guodong
  * @author hank
  */
-// todo: cache location compaction. Cache locations for older versions still exist after being used.
+// TODO: cache location compaction. Cache locations for older versions still exist after being used.
 public class CacheCoordinator implements Server
 {
     private static final Logger logger = LogManager.getLogger(CacheCoordinator.class);
-    private final EtcdUtil etcdUtil;
     private final PixelsCacheConfig cacheConfig;
     private MetadataService metadataService = null;
     private Storage storage = null;
@@ -73,13 +72,12 @@ public class CacheCoordinator implements Server
 
     public CacheCoordinator()
     {
-        this.etcdUtil = EtcdUtil.Instance();
         this.cacheConfig = new PixelsCacheConfig();
         initialize();
     }
 
     /**
-     * Initialize Coordinator if the cache is enabled:
+     * Initialize cache coordinator:
      * <p>
      * 1. create the storage instance that is used to get the metadata of the storage;
      * 2. check the local and the global cache versions, update the cache plan if needed.
@@ -99,12 +97,12 @@ public class CacheCoordinator implements Server
                 // 2. check version consistency
                 int cacheVersion = 0, layoutVersion = 0;
                 this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
-                KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
+                KeyValue cacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (null != cacheVersionKV)
                 {
                     cacheVersion = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
                 }
-                KeyValue layoutVersionKV = etcdUtil.getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
+                KeyValue layoutVersionKV = EtcdUtil.Instance().getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
                 if (null != layoutVersionKV)
                 {
                     layoutVersion = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
@@ -114,9 +112,14 @@ public class CacheCoordinator implements Server
                     logger.debug("Current cache version is left behind of current layout version, update the cache...");
                     updateCachePlan(layoutVersion);
                 }
+
+                logger.info("Cache coordinator on is initialized");
+            }
+            else
+            {
+                logger.info("Cache is disabled, nothing to initialize");
             }
             initializeSuccess = true;
-            logger.info("Cache coordinator on is initialized");
         } catch (Exception e)
         {
             logger.error("failed to initialize cache coordinator", e);
@@ -126,49 +129,52 @@ public class CacheCoordinator implements Server
     @Override
     public void run()
     {
-        logger.info("Starting cache coordinator");
         if (!initializeSuccess)
         {
-            logger.error("Cache coordinator initialization failed, stop now...");
+            logger.error("Cache coordinator initialization failed, exit now...");
             return;
         }
-        runningLatch = new CountDownLatch(1);
 
-        // watch layout version change, and update the cache plan and the local cache version
-        Watch.Watcher watcher = null;
-        if (cacheConfig.isCacheEnabled())
+        if (!cacheConfig.isCacheEnabled())
         {
-            watcher = etcdUtil.getClient().getWatchClient().watch(
-                    ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8),
-                    WatchOption.DEFAULT, watchResponse ->
-                    {
-                        for (WatchEvent event : watchResponse.getEvents())
-                        {
-                            if (event.getEventType() == WatchEvent.EventType.PUT)
-                            {
-                                // listen to the PUT even on the LAYOUT VERSION that can be changed by rainbow.
-                                try
-                                {
-                                    // this coordinator is ready.
-                                    logger.debug("Update cache distribution");
-                                    // update the cache distribution
-                                    int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                                    updateCachePlan(layoutVersion);
-                                    // update cache version, notify cache managers on each node to update cache.
-                                    logger.debug("Update cache version to " + layoutVersion);
-                                    etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
-                                } catch (IOException | MetadataException e)
-                                {
-                                    logger.error("Failed to update cache distribution", e);
-                                }
-                                break;
-                            }
-                        }
-                    });
+            logger.info("Cache is disabled, exit...");
+            return;
         }
+
+        logger.info("Starting cache coordinator");
+        runningLatch = new CountDownLatch(1);
+        // watch layout version change, and update the cache plan and the local cache version
+        Watch.Watcher watcher = EtcdUtil.Instance().getClient().getWatchClient().watch(
+                ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8),
+                WatchOption.DEFAULT, watchResponse ->
+                {
+                    for (WatchEvent event : watchResponse.getEvents())
+                    {
+                        if (event.getEventType() == WatchEvent.EventType.PUT)
+                        {
+                            // listen to the PUT even on the LAYOUT VERSION that can be changed by rainbow.
+                            try
+                            {
+                                // this coordinator is ready.
+                                logger.debug("Update cache distribution");
+                                // update the cache distribution
+                                int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
+                                updateCachePlan(layoutVersion);
+                                // update cache version, notify cache managers on each node to update cache.
+                                logger.debug("Update cache version to " + layoutVersion);
+                                EtcdUtil.Instance().putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
+                            } catch (IOException | MetadataException e)
+                            {
+                                logger.error("Failed to update cache distribution", e);
+                            }
+                            break;
+                        }
+                    }
+                });
         try
         {
             // Wait for this coordinator to be shutdown
+            logger.info("Cache coordinator is running");
             runningLatch.await();
         } catch (InterruptedException e)
         {
@@ -233,7 +239,7 @@ public class CacheCoordinator implements Server
         assert layout != null;
         String[] paths = select(layout);
         // allocate: decide which node to cache each file
-        List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
+        List<KeyValue> nodes = EtcdUtil.Instance().getKeyValuesByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
         if (nodes == null || nodes.isEmpty())
         {
             logger.info("Nodes is null or empty, no updates");
@@ -298,7 +304,7 @@ public class CacheCoordinator implements Server
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
             logger.debug(files.size() + " files are allocated to " + node + " at version" + layoutVersion);
-            etcdUtil.putKeyValue(key, String.join(";", files));
+            EtcdUtil.Instance().putKeyValue(key, String.join(";", files));
         }
     }
 

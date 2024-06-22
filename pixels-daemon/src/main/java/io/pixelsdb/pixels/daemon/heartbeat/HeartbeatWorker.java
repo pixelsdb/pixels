@@ -72,16 +72,17 @@ public class HeartbeatWorker implements Server
 
     /**
      * Initialize heartbeat worker:
-     *
-     * 1. check if the cache coordinator exists. If not, initialization is failed and return.
+     * <p>
+     * 1. check if the cache coordinator exists. If not, initialization is failed and return;
      * 2. register the Worker by updating the status of CacheWorker in etcd.
+     * </p>
      * */
     private void initialize()
     {
         try
         {
             // 1. check the existence of the cache coordinator.
-            KeyValue cacheCoordinatorKV = EtcdUtil.Instance().getKeyValue(Constants.HEARTBEAT_COORDINATOR_LITERAL);
+            KeyValue cacheCoordinatorKV = EtcdUtil.Instance().getKeyValueByPrefix(Constants.HEARTBEAT_COORDINATOR_LITERAL);
             if (cacheCoordinatorKV == null)
             {
                 logger.error("No heartbeat coordinator found, exit...");
@@ -137,13 +138,14 @@ public class HeartbeatWorker implements Server
         logger.info("Starting heartbeat worker");
         if (!initializeSuccess)
         {
-            logger.error("Heartbeat worker initialization failed, stop now...");
+            logger.error("Heartbeat worker initialization failed, exit now...");
             return;
         }
         runningLatch = new CountDownLatch(1);
         try
         {
             // Wait for this heartbeat worker to be shutdown.
+            logger.info("Heartbeat worker is running");
             runningLatch.await();
         } catch (InterruptedException e)
         {
@@ -172,6 +174,7 @@ public class HeartbeatWorker implements Server
         public void run()
         {
             leaseClient.keepAliveOnce(leaseId);
+            logger.info("heartbeat worker keep alive");
             EtcdUtil.Instance().putKeyValueWithLeaseId(workerKey,
                     String.valueOf(currentStatus.get()), leaseId);
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,16 +17,22 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.cache;
+package io.pixelsdb.pixels.daemon.heartbeat;
+
+import org.junit.Test;
 
 /**
- * @author guodong
+ * @author hank
+ * @create 2024-06-22
  */
-public class MockCacheWorker
+public class TestHeartbeatCoordinator
 {
-    public static void main(String[] args)
+    @Test
+    public void test() throws InterruptedException
     {
-        CacheWorker cacheWorker = new CacheWorker();
-        cacheWorker.run();
+        HeartbeatCoordinator coordinator = new HeartbeatCoordinator();
+        Thread thread = new Thread(coordinator);
+        thread.start();
+        thread.join();
     }
 }
