@@ -44,19 +44,32 @@ void StringColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::
 
     // TODO: if dictionary encoded
     if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY) {
+        bool cascadeRLE = false;
+        if (encoding.has_cascadeencoding() && encoding.cascadeencoding().kind() == pixels::proto::ColumnEncoding_Kind_RUNLENGTH) {
+            cascadeRLE = true;
+        }
+
         for(int i = 0; i < size; i++) {
+            bool valid = vector->checkValid(i);
             if(elementIndex % pixelStride == 0) {
                 int pixelId = elementIndex / pixelStride;
                 // TODO: should write the remaining code
             }
             if(vector->checkValid(i) && (filterMask == nullptr || filterMask->get(i))) {
-                int originId = (int) contentDecoder->next();
+                int originId = cascadeRLE ? (int) contentDecoder->next() : contentBuf->getInt();
                 int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
                 // use setRef instead of setVal to reduce memory copy.
                 columnVector->setRef(i + vectorIndex, dictContentBuf->getPointer(), dictStarts[originId], tmpLen);
+            } else if (!valid && (!cascadeRLE) && chunkIndex.nullspadding()) {
+                // is null: skip this number
+                contentBuf->getInt();
             } else {
-                // skip this number
-                contentDecoder->next();
+                // filter out: skip this number
+                if (!cascadeRLE) {
+                    contentBuf->getInt();
+                } else {
+                    contentDecoder->next();
+                }
             }
             elementIndex++;
         }
@@ -104,23 +117,42 @@ void StringColumnReader::readContent(std::shared_ptr<ByteBuffer> input,
         contentBuf = std::make_shared<ByteBuffer>(*input, 0, dictContentOffset);
 		dictContentBuf = std::make_shared<ByteBuffer>(
 		    *input, dictContentOffset, dictStartsOffset - dictContentOffset);
+        int startsBufLength = inputLength - dictStartsOffset - 2 * sizeof(int);
 		startsBuf = std::make_shared<ByteBuffer>(
-		    *input, dictStartsOffset, inputLength - dictStartsOffset - 2 * sizeof(int));
+		    *input, dictStartsOffset, startsBufLength);
 		int bufferStart = 0;
-		std::shared_ptr<RunLenIntDecoder> startsDecoder =
-		    std::make_shared<RunLenIntDecoder>(startsBuf, false);
-		if(encoding.has_dictionarysize()) {
-			startsLength = (int)encoding.dictionarysize() + 1;
-			dictStarts = new int[startsLength];
-			int i = 0;
-			while (startsDecoder->hasNext()) {
-				dictStarts[i++] = bufferStart + (int) startsDecoder->next();
-			}
-			dictStarts[i] = bufferStart + dictStartsOffset - dictContentOffset;
-		} else {
-            throw InvalidArgumentException("StringColumnReader::readContent: dictionary size must be defined.");
-		}
-		contentDecoder = std::make_shared<RunLenIntDecoder>(contentBuf, false);
+
+        if (encoding.has_cascadeencoding() && encoding.cascadeencoding().kind() == pixels::proto::ColumnEncoding_Kind::ColumnEncoding_Kind_RUNLENGTH) {
+            std::shared_ptr<RunLenIntDecoder> startsDecoder =
+                    std::make_shared<RunLenIntDecoder>(startsBuf, false);
+            if(encoding.has_dictionarysize()) {
+                startsLength = (int)encoding.dictionarysize() + 1;
+                dictStarts = new int[startsLength];
+                int i = 0;
+                while (startsDecoder->hasNext()) {
+                    dictStarts[i++] = bufferStart + (int) startsDecoder->next();
+                }
+            } else {
+                throw InvalidArgumentException("StringColumnReader::readContent: dictionary size must be defined.");
+            }
+            contentDecoder = std::make_shared<RunLenIntDecoder>(contentBuf, false);
+        } else {
+            if (startsBufLength % sizeof(int) != 0)
+            {
+                throw InvalidArgumentException("StringColumnReader::readContent: the length of the starts array buffer is invalid. ");
+            }
+            int startsSize = startsBufLength / sizeof(int);
+            if (encoding.has_dictionarysize() && encoding.dictionarysize() + 1 != startsSize)
+            {
+                throw new InvalidArgumentException("the dictionary size is inconsistent with the size of the starts array");
+            }
+            dictStarts = new int[startsSize];
+            for (int i = 0; i < startsSize; ++i)
+            {
+                dictStarts[i] = bufferStart + startsBuf->getInt();
+            }
+            contentDecoder = nullptr;
+        }
     } else {
         input->markReaderIndex();
         input->skipBytes(inputLength - sizeof(int));
