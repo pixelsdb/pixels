@@ -19,15 +19,20 @@
  */
 package io.pixelsdb.pixels.daemon.heartbeat;
 
+import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.Lease;
 import io.pixelsdb.pixels.common.server.Server;
+import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -45,23 +50,105 @@ public class HeartbeatWorker implements Server
     private boolean initializeSuccess = false;
     private CountDownLatch runningLatch;
 
+    public HeartbeatWorker()
+    {
+        this.hostName = System.getenv("HOSTNAME");
+        logger.debug("HostName from system env: " + hostName);
+        if (hostName == null)
+        {
+            try
+            {
+                this.hostName = InetAddress.getLocalHost().getHostName();
+                logger.debug("HostName from InetAddress: " + hostName);
+            } catch (UnknownHostException e)
+            {
+                logger.debug("Hostname is null. Exit");
+                return;
+            }
+        }
+        logger.debug("HostName: " + hostName);
+        initialize();
+    }
+
+    /**
+     * Initialize heartbeat worker:
+     *
+     * 1. check if the cache coordinator exists. If not, initialization is failed and return.
+     * 2. register the Worker by updating the status of CacheWorker in etcd.
+     * */
+    private void initialize()
+    {
+        try
+        {
+            // 1. check the existence of the cache coordinator.
+            KeyValue cacheCoordinatorKV = EtcdUtil.Instance().getKeyValue(Constants.HEARTBEAT_COORDINATOR_LITERAL);
+            if (cacheCoordinatorKV == null)
+            {
+                logger.error("No heartbeat coordinator found, exit...");
+                return;
+            }
+            // 2. register the worker
+            Lease leaseClient = EtcdUtil.Instance().getClient().getLeaseClient();
+            long leaseId = leaseClient.grant(heartbeatConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
+            String key = Constants.HEARTBEAT_WORKER_LITERAL + hostName;
+            EtcdUtil.Instance().putKeyValueWithLeaseId(key, String.valueOf(currentStatus.get()), leaseId);
+            // start a scheduled thread to update node status periodically
+            this.workerRegister = new WorkerRegister(key, leaseClient, leaseId);
+            scheduledExecutor.scheduleAtFixedRate(workerRegister,
+                    0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
+            initializeSuccess = true;
+            currentStatus.set(NodeStatus.READY.StatusCode);
+            logger.info("Heartbeat worker on " + hostName + " is initialized");
+        } catch (Exception e)
+        {
+            logger.error("failed to initialize heartbeat worker", e);
+        }
+    }
 
     @Override
     public boolean isRunning()
     {
-        return false;
+        int status = currentStatus.get();
+        return status == NodeStatus.INIT.StatusCode || status == NodeStatus.READY.StatusCode;
     }
 
     @Override
     public void shutdown()
     {
-
+        currentStatus.set(NodeStatus.EXIT.StatusCode);
+        logger.info("Shutting down heartbeat worker...");
+        scheduledExecutor.shutdownNow();
+        if (workerRegister != null)
+        {
+            workerRegister.stop();
+        }
+        EtcdUtil.Instance().deleteByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
+        if (runningLatch != null)
+        {
+            runningLatch.countDown();
+        }
+        EtcdUtil.Instance().getClient().close();
+        logger.info("Heartbeat worker on '" + hostName + "' is shutdown.");
     }
 
     @Override
     public void run()
     {
-
+        logger.info("Starting heartbeat worker");
+        if (!initializeSuccess)
+        {
+            logger.error("Heartbeat worker initialization failed, stop now...");
+            return;
+        }
+        runningLatch = new CountDownLatch(1);
+        try
+        {
+            // Wait for this heartbeat worker to be shutdown.
+            runningLatch.await();
+        } catch (InterruptedException e)
+        {
+            logger.error("Heartbeat worker interrupted when waiting on the running latch", e);
+        }
     }
 
     /**
@@ -70,13 +157,13 @@ public class HeartbeatWorker implements Server
      * */
     private static class WorkerRegister implements Runnable
     {
-        private final String coordinatorKey;
+        private final String workerKey;
         private final Lease leaseClient;
         private final long leaseId;
 
-        WorkerRegister(String coordinatorKey, Lease leaseClient, long leaseId)
+        WorkerRegister(String workerKey, Lease leaseClient, long leaseId)
         {
-            this.coordinatorKey = coordinatorKey;
+            this.workerKey = workerKey;
             this.leaseClient = leaseClient;
             this.leaseId = leaseId;
         }
@@ -85,7 +172,7 @@ public class HeartbeatWorker implements Server
         public void run()
         {
             leaseClient.keepAliveOnce(leaseId);
-            EtcdUtil.Instance().putKeyValueWithLeaseId(coordinatorKey,
+            EtcdUtil.Instance().putKeyValueWithLeaseId(workerKey,
                     String.valueOf(currentStatus.get()), leaseId);
         }
 

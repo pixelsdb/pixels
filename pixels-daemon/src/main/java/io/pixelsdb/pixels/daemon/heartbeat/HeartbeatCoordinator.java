@@ -111,6 +111,7 @@ public class HeartbeatCoordinator implements Server
             String key = Constants.HEARTBEAT_COORDINATOR_LITERAL + hostName;
             EtcdUtil.Instance().putKeyValueWithLeaseId(Constants.HEARTBEAT_COORDINATOR_LITERAL + hostName,
                     String.valueOf(currentStatus.get()), leaseId);
+            // start a scheduled thread to update node status periodically
             this.coordinatorRegister = new CoordinatorRegister(key, leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(coordinatorRegister,
                     0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
@@ -159,15 +160,13 @@ public class HeartbeatCoordinator implements Server
             return;
         }
         runningLatch = new CountDownLatch(1);
-
         try
         {
             // Wait for this coordinator to be shutdown.
             runningLatch.await();
         } catch (InterruptedException e)
         {
-            logger.error(e.getMessage());
-            e.printStackTrace();
+            logger.error("Heartbeat coordinator interrupted when waiting on the running latch", e);
         }
     }
 

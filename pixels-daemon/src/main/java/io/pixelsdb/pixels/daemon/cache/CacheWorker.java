@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.daemon.cache;
 
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KeyValue;
-import io.etcd.jetcd.Lease;
 import io.etcd.jetcd.Watch;
 import io.etcd.jetcd.options.WatchOption;
 import io.etcd.jetcd.watch.WatchEvent;
@@ -31,9 +30,9 @@ import io.pixelsdb.pixels.cache.PixelsCacheWriter;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.common.server.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -41,9 +40,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -55,10 +51,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CacheWorker implements Server
 {
     private static final Logger logger = LogManager.getLogger(CacheWorker.class);
+    // cache status: unhealthy(-1), ready(0), updating(1), out_of_size(2)
+    private static final AtomicInteger cacheStatus = new AtomicInteger(CacheWorkerStatus.READY.StatusCode);
     private PixelsCacheWriter cacheWriter = null;
     private MetadataService metadataService = null;
     private final PixelsCacheConfig cacheConfig;
-    private final EtcdUtil etcdUtil;
     /**
      * The hostname of the node where this cache worker is running.
      */
@@ -70,8 +67,6 @@ public class CacheWorker implements Server
     public CacheWorker()
     {
         this.cacheConfig = new PixelsCacheConfig();
-        this.etcdUtil = EtcdUtil.Instance();
-        this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         this.hostName = System.getenv("HOSTNAME");
         logger.debug("HostName from system env: " + hostName);
         if (hostName == null)
@@ -93,35 +88,17 @@ public class CacheWorker implements Server
     /**
      * Initialize CacheWorker:
      *
-     * 1. check if the cache coordinator exists.
-     *      if not, initialization is failed and return.
-     * 2. initialize the metadata service and cache writer.
-     * 3. check if local cache version is the same as global cache version in etcd.
-     *      if the local cache is not up-to-date, update the local cache.
-     * 4. register the Worker by updating the status of CacheWorker in etcd.
-     *
-     * <p>
-     *     2 and 3 are only executed if the cache is enabled.
-     * </p>
-     * <p>
-     *     A watcher will be added in run() to listen to changes of the cache version in etcd.
-     *     if there is a new version, we need to update caches according to new layouts.
-     * </p>
+     * 1. initialize the metadata service and cache writer.
+     * 2. check if local cache version is the same as global cache version in etcd.
+     * If the local cache is not up-to-date, update the local cache.
      * */
     private void initialize()
     {
         try
         {
-            // 1. check the existence of the cache coordinator.
-            KeyValue cacheCoordinatorKV = etcdUtil.getKeyValue(Constants.HEARTBEAT_COORDINATOR_LITERAL);
-            if (cacheCoordinatorKV == null)
-            {
-                logger.error("No coordinator found. Exit");
-                return;
-            }
             if (cacheConfig.isCacheEnabled())
             {
-                // 2. init cache writer and metadata service
+                // 1. init cache writer and metadata service.
                 this.cacheWriter = PixelsCacheWriter.newBuilder()
                         .setCacheLocation(cacheConfig.getCacheLocation())
                         .setCacheSize(cacheConfig.getCacheSize())
@@ -133,17 +110,17 @@ public class CacheWorker implements Server
                         .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
                 this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
 
-                // 3. Update cache if necessary.
+                // 2. update cache if necessary.
                 // If the cache is new created using start-vm.sh script, the local cache version would be zero.
                 localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
                 logger.debug("Local cache version: " + localCacheVersion);
                 // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
-                KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
+                KeyValue globalCacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (globalCacheVersionKV != null)
                 {
                     int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
                     logger.debug("Current global cache version: " + globalCacheVersion);
-                    // if cache file exists already. we need check local cache version with global cache version stored in etcd
+                    // if cache file exists already. we need check local cache version with global cache version stored in etcd.
                     if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion)
                     {
                         // If global version is ahead the local one, update local cache.
@@ -151,18 +128,10 @@ public class CacheWorker implements Server
                     }
                 }
             }
-            // 4. register the worker
-            Lease leaseClient = etcdUtil.getClient().getLeaseClient();
-            long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            // start a scheduled thread to update node status periodically
-            this.cacheManagerRegister = new CacheManagerRegister(leaseClient, leaseId);
-            scheduledExecutor.scheduleAtFixedRate(cacheManagerRegister,
-                    0, cacheConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
         } catch (Exception e)
         {
-            logger.error("failed to initialize cache manager", e);
+            logger.error("failed to initialize cache worker", e);
         }
     }
 
@@ -173,11 +142,10 @@ public class CacheWorker implements Server
         if (matchedLayout != null)
         {
             // update cache status
-            cacheStatus.set(CacheNodeStatus.UPDATING.StatusCode);
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
+            cacheStatus.set(CacheWorkerStatus.UPDATING.StatusCode);
             // update cache content
             int status = 0;
-            if (cacheWriter.isCacheEmpty() == true)
+            if (cacheWriter.isCacheEmpty())
             {
                 status = cacheWriter.updateAll(version, matchedLayout);
             }
@@ -186,7 +154,6 @@ public class CacheWorker implements Server
                 status = cacheWriter.updateIncremental(version, matchedLayout);
             }
             cacheStatus.set(status);
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             localCacheVersion = version;
         } else
         {
@@ -197,17 +164,17 @@ public class CacheWorker implements Server
     @Override
     public void run()
     {
-        logger.info("Starting Node Manager");
+        logger.info("Starting cache worker");
         if (!initializeSuccess)
         {
-            logger.error("Initialization failed, stop now...");
+            logger.error("Cache worker initialization failed, stop now...");
             return;
         }
         runningLatch = new CountDownLatch(1);
         Watch.Watcher watcher = null;
         if (cacheConfig.isCacheEnabled())
         {
-            watcher = etcdUtil.getClient().getWatchClient().watch(
+            watcher = EtcdUtil.Instance().getClient().getWatchClient().watch(
                     ByteSequence.from(Constants.CACHE_VERSION_LITERAL, StandardCharsets.UTF_8),
                     WatchOption.DEFAULT, watchResponse ->
                     {
@@ -217,7 +184,7 @@ public class CacheWorker implements Server
                             {
                                 // Get a new cache layout version.
                                 int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                                if (cacheStatus.get() == CacheNodeStatus.READY.StatusCode)
+                                if (cacheStatus.get() == CacheWorkerStatus.READY.StatusCode)
                                 {
                                     // Ready to update the local cache.
                                     logger.debug("Cache version update detected, new global version is (" + version + ").");
@@ -234,7 +201,7 @@ public class CacheWorker implements Server
                                             e.printStackTrace();
                                         }
                                     }
-                                } else if (cacheStatus.get() == CacheNodeStatus.UPDATING.StatusCode)
+                                } else if (cacheStatus.get() == CacheWorkerStatus.UPDATING.StatusCode)
                                 {
                                     // The local cache is updating, ignore the new version.
                                     logger.warn("The local cache is updating for version (" + localCacheVersion + "), " +
@@ -246,8 +213,8 @@ public class CacheWorker implements Server
                                 }
                             } else if (event.getEventType() == WatchEvent.EventType.DELETE)
                             {
-                                logger.warn("Cache version deletion detected, the cluster is corrupted. Stop now.");
-                                cacheStatus.set(CacheNodeStatus.UNHEALTHY.StatusCode);
+                                logger.warn("Cache version deletion detected, the cluster is corrupted, stop now.");
+                                cacheStatus.set(CacheWorkerStatus.UNHEALTHY.StatusCode);
                                 // Shutdown the node manager.
                                 runningLatch.countDown();
                             }
@@ -256,11 +223,11 @@ public class CacheWorker implements Server
         }
         try
         {
-            // Wait for this cache manager to be shutdown.
+            // Wait for this cache worker to be shutdown.
             runningLatch.await();
         } catch (InterruptedException e)
         {
-            logger.error("Node Manager was interrupted abnormally.", e);
+            logger.error("Cache worker interrupted when waiting on the running latch", e);
         } finally
         {
             if (watcher != null)
@@ -274,21 +241,15 @@ public class CacheWorker implements Server
     public boolean isRunning()
     {
         int status = cacheStatus.get();
-        return status == CacheNodeStatus.READY.StatusCode ||
-                status == CacheNodeStatus.UPDATING.StatusCode;
+        return status == CacheWorkerStatus.READY.StatusCode ||
+                status == CacheWorkerStatus.UPDATING.StatusCode;
     }
 
     @Override
     public void shutdown()
     {
-        cacheStatus.set(CacheNodeStatus.UNHEALTHY.StatusCode);
-        logger.info("Shutting down Node Manager...");
-        scheduledExecutor.shutdownNow();
-        if (cacheManagerRegister != null)
-        {
-            cacheManagerRegister.stop();
-        }
-        etcdUtil.delete(Constants.CACHE_NODE_STATUS_LITERAL + hostName);
+        cacheStatus.set(CacheWorkerStatus.UNHEALTHY.StatusCode);
+        logger.info("Shutting down cache worker...");
         if (metadataService != null)
         {
             try
@@ -297,7 +258,7 @@ public class CacheWorker implements Server
             } catch (InterruptedException e)
             {
                 logger.error("Failed to shutdown rpc channel for metadata service " +
-                        "while shutting down Node Manager.", e);
+                        "while shutting down cache worker.", e);
             }
         }
         if (cacheWriter != null)
@@ -307,7 +268,7 @@ public class CacheWorker implements Server
                 cacheWriter.close();
             } catch (Exception e)
             {
-                logger.error("Failed to close cache writer while shutting down Node Manager.", e);
+                logger.error("Failed to close cache writer while shutting down cache worker.", e);
             }
         }
         if (runningLatch != null)
@@ -315,8 +276,6 @@ public class CacheWorker implements Server
             runningLatch.countDown();
         }
         EtcdUtil.Instance().getClient().close();
-        logger.info("Node Manager on '" + hostName + "' is shutdown.");
+        logger.info("Cache worker on '" + hostName + "' is shutdown.");
     }
-
-
 }

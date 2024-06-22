@@ -172,7 +172,7 @@ public class CacheCoordinator implements Server
             runningLatch.await();
         } catch (InterruptedException e)
         {
-            logger.error("Interrupted when waiting on the running latch", e);
+            logger.error("Cache coordinator interrupted when waiting on the running latch", e);
         } finally
         {
             if (watcher != null)
@@ -233,7 +233,7 @@ public class CacheCoordinator implements Server
         assert layout != null;
         String[] paths = select(layout);
         // allocate: decide which node to cache each file
-        List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
+        List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
         if (nodes == null || nodes.isEmpty())
         {
             logger.info("Nodes is null or empty, no updates");
@@ -261,8 +261,7 @@ public class CacheCoordinator implements Server
      * @return the file paths
      * @throws IOException
      */
-    private String[] select(Layout layout)
-            throws IOException
+    private String[] select(Layout layout) throws IOException
     {
         String[] compactPaths = layout.getCompactPathUris();
         List<String> files = new ArrayList<>();
