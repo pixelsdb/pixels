@@ -318,37 +318,5 @@ public class CacheWorker implements Server
         logger.info("Node Manager on '" + hostName + "' is shutdown.");
     }
 
-    /**
-     * Scheduled register to update caching node status and keep its registration alive.
-     * */
-    private static class CacheManagerRegister
-            implements Runnable
-    {
-        private final Lease leaseClient;
-        private final long leaseId;
 
-        CacheManagerRegister(Lease leaseClient, long leaseId)
-        {
-            this.leaseClient = leaseClient;
-            this.leaseId = leaseId;
-        }
-
-        @Override
-        public void run()
-        {
-            try
-            {
-                leaseClient.keepAliveOnce(leaseId);
-            } catch (Exception e)
-            {
-                e.printStackTrace();
-            }
-        }
-
-        public void stop()
-        {
-            leaseClient.revoke(leaseId);
-            leaseClient.close();
-        }
-    }
 }

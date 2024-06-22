@@ -19,8 +19,16 @@
  */
 package io.pixelsdb.pixels.daemon.heartbeat;
 
+import io.etcd.jetcd.Lease;
 import io.pixelsdb.pixels.common.server.Server;
-import io.pixelsdb.pixels.daemon.cache.CacheWorker;
+import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author hank
@@ -28,7 +36,16 @@ import io.pixelsdb.pixels.daemon.cache.CacheWorker;
  */
 public class HeartbeatWorker implements Server
 {
-    private CacheWorker.CacheManagerRegister cacheManagerRegister;
+    private static final Logger logger = LogManager.getLogger(HeartbeatWorker.class);
+    private static final AtomicInteger currentStatus = new AtomicInteger(NodeStatus.READY.StatusCode);
+    private final HeartbeatConfig heartbeatConfig = new HeartbeatConfig();
+    private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+    private String hostName;
+    private WorkerRegister workerRegister;
+    private boolean initializeSuccess = false;
+    private CountDownLatch runningLatch;
+
+
     @Override
     public boolean isRunning()
     {
@@ -45,5 +62,37 @@ public class HeartbeatWorker implements Server
     public void run()
     {
 
+    }
+
+    /**
+     * Register to update worker node status and keep its lease alive.
+     * It should be run periodically by a scheduled executor.
+     * */
+    private static class WorkerRegister implements Runnable
+    {
+        private final String coordinatorKey;
+        private final Lease leaseClient;
+        private final long leaseId;
+
+        WorkerRegister(String coordinatorKey, Lease leaseClient, long leaseId)
+        {
+            this.coordinatorKey = coordinatorKey;
+            this.leaseClient = leaseClient;
+            this.leaseId = leaseId;
+        }
+
+        @Override
+        public void run()
+        {
+            leaseClient.keepAliveOnce(leaseId);
+            EtcdUtil.Instance().putKeyValueWithLeaseId(coordinatorKey,
+                    String.valueOf(currentStatus.get()), leaseId);
+        }
+
+        public void stop()
+        {
+            leaseClient.revoke(leaseId);
+            leaseClient.close();
+        }
     }
 }

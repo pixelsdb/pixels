@@ -171,6 +171,10 @@ public class HeartbeatCoordinator implements Server
         }
     }
 
+    /**
+     * Register to update coordinator node status and keep its lease alive.
+     * It should be run periodically by a scheduled executor.
+     * */
     private static class CoordinatorRegister implements Runnable
     {
         private final String coordinatorKey;
