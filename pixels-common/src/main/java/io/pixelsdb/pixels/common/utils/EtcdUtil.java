@@ -141,6 +141,33 @@ public class EtcdUtil
     }
 
     /**
+     * get the key value with this prefix.
+     *
+     * @param prefix the prefix
+     * @return the key value, if there are multiple key values with the prefix, return the first key value
+     */
+    public KeyValue getKeyValueByPrefix(String prefix)
+    {
+        KeyValue keyValue = null;
+        GetOption getOption = GetOption.newBuilder().withPrefix(
+                ByteSequence.from(prefix, StandardCharsets.UTF_8)).build();
+        try
+        {
+            List<KeyValue> keyValues = this.client.getKVClient().get(
+                    ByteSequence.from(prefix, StandardCharsets.UTF_8), getOption).get().getKvs();
+            if (keyValues.size() > 0)
+            {
+                keyValue = keyValues.get(0);
+            }
+        }
+        catch (Exception e)
+        {
+            logger.error("error when get key-values by prefix.", e);
+        }
+        return keyValue;
+    }
+
+    /**
      * put key-value into etcd.
      *
      * @param key
@@ -214,7 +241,7 @@ public class EtcdUtil
      * @param leaseId lease id
      * @return revision id, 0L if error occurs.
      */
-    public long putKeyValueWithLeaseId(String key, String value, long leaseId) throws Exception
+    public long putKeyValueWithLeaseId(String key, String value, long leaseId)
     {
         PutOption putOption = PutOption.newBuilder().withLeaseId(leaseId).build();
         CompletableFuture<PutResponse> putResponse = this.client.getKVClient().put(

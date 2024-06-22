@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.daemon.cache;
 import com.google.common.collect.ImmutableList;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KeyValue;
-import io.etcd.jetcd.Lease;
 import io.etcd.jetcd.Watch;
 import io.etcd.jetcd.options.WatchOption;
 import io.etcd.jetcd.watch.WatchEvent;
@@ -40,223 +39,146 @@ import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.common.server.Server;
+import io.pixelsdb.pixels.daemon.heartbeat.NodeStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * CacheCoordinator is responsible for the following tasks:
  * 1. caching balance. It assigns each file a caching location, which are updated into etcd for global synchronization, and maintains a dynamic caching balance in the cluster.
- * 3. caching node monitor. It monitors all caching nodes(CacheManager) in the cluster, and update running status(available, busy, dead, etc.) of caching nodes.
+ * 3. caching node monitor. It monitors all cache workers in the cluster, and update running status(available, busy, dead, etc.) of caching nodes.
  *
  * @author guodong
  * @author hank
  */
-// todo cache location compaction. Cache locations for older versions still exist after being used.
+// TODO: cache location compaction. Cache locations for older versions still exist after being used.
 public class CacheCoordinator implements Server
 {
-    enum CoordinatorStatus
-    {
-        DEAD(-1), INIT(0), READY(1);
-
-        public final int StatusCode;
-        CoordinatorStatus(int statusCode)
-        {
-            this.StatusCode = statusCode;
-        }
-    }
-
     private static final Logger logger = LogManager.getLogger(CacheCoordinator.class);
-    private final EtcdUtil etcdUtil;
     private final PixelsCacheConfig cacheConfig;
-    private final ScheduledExecutorService scheduledExecutor;
     private MetadataService metadataService = null;
-    private String hostName;
     private Storage storage = null;
-    // coordinator status: 0: init, 1: ready; -1: dead
-    private AtomicInteger coordinatorStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
-    private CacheCoordinatorRegister cacheCoordinatorRegister = null;
     private boolean initializeSuccess = false;
     private CountDownLatch runningLatch;
 
     public CacheCoordinator()
     {
-        this.etcdUtil = EtcdUtil.Instance();
         this.cacheConfig = new PixelsCacheConfig();
-        this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
-        this.hostName = System.getenv("HOSTNAME");
-        logger.debug("HostName from system env: " + hostName);
-        if (hostName == null)
-        {
-            try
-            {
-                this.hostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: " + hostName);
-            }
-            catch (UnknownHostException e)
-            {
-                logger.debug("Hostname is null. Exit");
-                return;
-            }
-        }
         initialize();
     }
 
     /**
-     * Initialize Coordinator:
-     *
-     * 1. check if there is an existing coordinator, if yes, return.
-     * 2. register the coordinator.
-     * 3. create the storage instance that is used to get the metadata of the storage.
-     * 4. check the local and the global cache versions, update the cache plan if needed.
-     *
+     * Initialize cache coordinator:
      * <p>
-     *     3 and 4 are only executed when the cache is enabled.
+     * 1. create the storage instance that is used to get the metadata of the storage;
+     * 2. check the local and the global cache versions, update the cache plan if needed.
      * </p>
      */
     private void initialize()
     {
-        // 1. if another cache coordinator exists, stop the initialization.
-        KeyValue coordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
-        if (coordinatorKV != null && coordinatorKV.getLease() > 0)
-        {
-            /**
-             * Issue #181:
-             * When the lease of the coordinator key exists, wait for the lease ttl to expire.
-             */
-            try
-            {
-                Thread.sleep(cacheConfig.getNodeLeaseTTL() * 1000);
-            } catch (InterruptedException e)
-            {
-                logger.error(e.getMessage());
-                e.printStackTrace();
-            }
-            coordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
-            if (coordinatorKV != null && coordinatorKV.getLease() > 0)
-            {
-                // another coordinator exists
-                logger.error("Another coordinator exists, exit...");
-                return;
-            }
-        }
-
         try
         {
-            // 2. register the coordinator
-            Lease leaseClient = etcdUtil.getClient().getLeaseClient();
-            long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_COORDINATOR_LITERAL, hostName, leaseId);
-            this.cacheCoordinatorRegister = new CacheCoordinatorRegister(leaseClient, leaseId);
-            scheduledExecutor.scheduleAtFixedRate(cacheCoordinatorRegister,
-                    0, cacheConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             if (cacheConfig.isCacheEnabled())
             {
-                // 3. create the storage instance.
+                // 1. create the storage instance
                 if (storage == null)
                 {
                     storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
                 }
-                // 4. check version consistency
-                int cache_version = 0, layout_version = 0;
+                // 2. check version consistency
+                int cacheVersion = 0, layoutVersion = 0;
                 this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
-                KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
+                KeyValue cacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (null != cacheVersionKV)
                 {
-                    cache_version = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                    cacheVersion = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
                 }
-                KeyValue layoutVersionKV = etcdUtil.getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
+                KeyValue layoutVersionKV = EtcdUtil.Instance().getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
                 if (null != layoutVersionKV)
                 {
-                    layout_version = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                    layoutVersion = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
                 }
-                if (cache_version < layout_version)
+                if (cacheVersion < layoutVersion)
                 {
                     logger.debug("Current cache version is left behind of current layout version, update the cache...");
-                    updateCachePlan(layout_version);
+                    updateCachePlan(layoutVersion);
                 }
+
+                logger.info("Cache coordinator on is initialized");
             }
-            coordinatorStatus.set(CoordinatorStatus.READY.StatusCode);
+            else
+            {
+                logger.info("Cache is disabled, nothing to initialize");
+            }
             initializeSuccess = true;
-            logger.info("CacheCoordinator on " + hostName + " has started.");
         } catch (Exception e)
         {
-            logger.error("failed to initialize CacheCoordinator", e);
+            logger.error("failed to initialize cache coordinator", e);
         }
     }
 
     @Override
     public void run()
     {
-        logger.info("Starting Coordinator");
         if (!initializeSuccess)
         {
-            logger.error("Initialization failed, stop now...");
+            logger.error("Cache coordinator initialization failed, exit now...");
             return;
         }
-        runningLatch = new CountDownLatch(1);
 
-        // watch layout version change, and update the cache plan and the local cache version
-        Watch.Watcher watcher = null;
-        if (cacheConfig.isCacheEnabled())
+        if (!cacheConfig.isCacheEnabled())
         {
-            watcher = etcdUtil.getClient().getWatchClient().watch(
-                    ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8),
-                    WatchOption.DEFAULT, watchResponse ->
-                    {
-                        for (WatchEvent event : watchResponse.getEvents())
-                        {
-                            if (event.getEventType() == WatchEvent.EventType.PUT)
-                            {
-                                // listen to the PUT even on the LAYOUT VERSION that can be changed by rainbow.
-                                if (coordinatorStatus.get() == CoordinatorStatus.READY.StatusCode)
-                                {
-                                    try
-                                    {
-                                        // this coordinator is ready.
-                                        logger.debug("Update cache distribution");
-                                        // update the cache distribution
-                                        int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                                        updateCachePlan(layoutVersion);
-                                        // update cache version, notify cache managers on each node to update cache.
-                                        logger.debug("Update cache version to " + layoutVersion);
-                                        etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
-                                    } catch (IOException | MetadataException e)
-                                    {
-                                        logger.error("failed to update cache distribution", e);
-                                    }
-                                } else if (coordinatorStatus.get() == CoordinatorStatus.DEAD.StatusCode)
-                                {
-                                    // coordinator is shutdown.
-                                    runningLatch.countDown();
-                                }
-                                break;
-                            }
-                        }
-                    });
+            logger.info("Cache is disabled, exit...");
+            return;
         }
+
+        logger.info("Starting cache coordinator");
+        runningLatch = new CountDownLatch(1);
+        // watch layout version change, and update the cache plan and the local cache version
+        Watch.Watcher watcher = EtcdUtil.Instance().getClient().getWatchClient().watch(
+                ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8),
+                WatchOption.DEFAULT, watchResponse ->
+                {
+                    for (WatchEvent event : watchResponse.getEvents())
+                    {
+                        if (event.getEventType() == WatchEvent.EventType.PUT)
+                        {
+                            // listen to the PUT even on the LAYOUT VERSION that can be changed by rainbow.
+                            try
+                            {
+                                // this coordinator is ready.
+                                logger.debug("Update cache distribution");
+                                // update the cache distribution
+                                int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
+                                updateCachePlan(layoutVersion);
+                                // update cache version, notify cache managers on each node to update cache.
+                                logger.debug("Update cache version to " + layoutVersion);
+                                EtcdUtil.Instance().putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
+                            } catch (IOException | MetadataException e)
+                            {
+                                logger.error("Failed to update cache distribution", e);
+                            }
+                            break;
+                        }
+                    }
+                });
         try
         {
-            // Wait for this coordinator to be shutdown.
+            // Wait for this coordinator to be shutdown
+            logger.info("Cache coordinator is running");
             runningLatch.await();
         } catch (InterruptedException e)
         {
-            logger.error(e.getMessage());
-            e.printStackTrace();
+            logger.error("Cache coordinator interrupted when waiting on the running latch", e);
         } finally
         {
             if (watcher != null)
@@ -269,22 +191,13 @@ public class CacheCoordinator implements Server
     @Override
     public boolean isRunning()
     {
-        int status = coordinatorStatus.get();
-        return status == CoordinatorStatus.INIT.StatusCode ||
-                status == CoordinatorStatus.READY.StatusCode;
+        return this.runningLatch.getCount() > 0;
     }
 
     @Override
     public void shutdown()
     {
-        coordinatorStatus.set(CoordinatorStatus.DEAD.StatusCode);
-        logger.debug("Shutting down Coordinator...");
-        scheduledExecutor.shutdownNow();
-        if (cacheCoordinatorRegister != null)
-        {
-            cacheCoordinatorRegister.stop();
-        }
-        etcdUtil.delete(Constants.CACHE_COORDINATOR_LITERAL);
+        logger.debug("Shutting down cache coordinator...");
         if (metadataService != null)
         {
             try
@@ -293,7 +206,7 @@ public class CacheCoordinator implements Server
             } catch (InterruptedException e)
             {
                 logger.error("Failed to shutdown rpc channel for metadata service " +
-                        "while shutting down Coordinator.", e);
+                        "while shutting down cache coordinator.", e);
             }
         }
         if (storage != null)
@@ -303,7 +216,7 @@ public class CacheCoordinator implements Server
                 storage.close();
             } catch (IOException e)
             {
-                logger.error("Failed to close cache storage while shutting down Coordinator.", e);
+                logger.error("Failed to close cache storage while shutting down cache coordinator.", e);
             }
         }
         if (runningLatch != null)
@@ -311,7 +224,7 @@ public class CacheCoordinator implements Server
             runningLatch.countDown();
         }
         EtcdUtil.Instance().getClient().close();
-        logger.info("Coordinator on '" + hostName + "' is shutdown.");
+        logger.info("Cache coordinator is shutdown");
     }
 
     /**
@@ -319,15 +232,14 @@ public class CacheCoordinator implements Server
      * 1. for all files, decide which files to cache
      * 2. for each file, decide which node to cache it
      * */
-    private void updateCachePlan(int layoutVersion)
-            throws MetadataException, IOException
+    private void updateCachePlan(int layoutVersion) throws MetadataException, IOException
     {
         Layout layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
         // select: decide which files to cache
         assert layout != null;
         String[] paths = select(layout);
         // allocate: decide which node to cache each file
-        List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
+        List<KeyValue> nodes = EtcdUtil.Instance().getKeyValuesByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
         if (nodes == null || nodes.isEmpty())
         {
             logger.info("Nodes is null or empty, no updates");
@@ -340,7 +252,7 @@ public class CacheCoordinator implements Server
             KeyValue node = nodes.get(i);
             // key: host_[hostname]; value: [status]. available if status == 1.
             if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) ==
-                    CacheManager.CacheNodeStatus.READY.StatusCode)
+                    NodeStatus.READY.StatusCode)
             {
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey()
                         .toString(StandardCharsets.UTF_8).substring(5));
@@ -355,8 +267,7 @@ public class CacheCoordinator implements Server
      * @return the file paths
      * @throws IOException
      */
-    private String[] select(Layout layout)
-            throws IOException
+    private String[] select(Layout layout) throws IOException
     {
         String[] compactPaths = layout.getCompactPathUris();
         List<String> files = new ArrayList<>();
@@ -384,8 +295,7 @@ public class CacheCoordinator implements Server
      * @param layoutVersion
      * @throws IOException
      */
-    private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion)
-            throws IOException
+    private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion) throws IOException
     {
         CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes, size);
         for (int i = 0; i < size; i++)
@@ -394,7 +304,7 @@ public class CacheCoordinator implements Server
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
             logger.debug(files.size() + " files are allocated to " + node + " at version" + layoutVersion);
-            etcdUtil.putKeyValue(key, String.join(";", files));
+            EtcdUtil.Instance().putKeyValue(key, String.join(";", files));
         }
     }
 
@@ -406,8 +316,7 @@ public class CacheCoordinator implements Server
      * @return
      * @throws IOException
      */
-    private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size)
-            throws IOException
+    private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size) throws IOException
     {
         CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
@@ -460,7 +369,7 @@ public class CacheCoordinator implements Server
                         }
                     } else
                     {
-                        throw new BalancerException("absolute balancer failed to balance paths.");
+                        throw new BalancerException("absolute balancer failed to balance paths");
                     }
                 } else
                 {
@@ -474,7 +383,7 @@ public class CacheCoordinator implements Server
                 }
             } else
             {
-                throw new BalancerException("replica balancer failed to balance paths.");
+                throw new BalancerException("replica balancer failed to balance paths");
             }
         } catch (BalancerException e)
         {
@@ -484,39 +393,13 @@ public class CacheCoordinator implements Server
         return locationDistribution;
     }
 
-    private List<HostAddress> toHostAddress(String[] hosts) {
+    private List<HostAddress> toHostAddress(String[] hosts)
+    {
         ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-        for (String host : hosts) {
+        for (String host : hosts)
+        {
             builder.add(HostAddress.fromString(host));
         }
         return builder.build();
-    }
-
-    /**
-     * TODO: there may be a gap between two calls of keepAliveOnce.
-     */
-    private static class CacheCoordinatorRegister
-            implements Runnable
-    {
-        private final Lease leaseClient;
-        private final long leaseId;
-
-        CacheCoordinatorRegister(Lease leaseClient, long leaseId)
-        {
-            this.leaseClient = leaseClient;
-            this.leaseId = leaseId;
-        }
-
-        @Override
-        public void run()
-        {
-            leaseClient.keepAliveOnce(leaseId);
-        }
-
-        public void stop()
-        {
-            leaseClient.revoke(leaseId);
-            leaseClient.close();
-        }
     }
 }

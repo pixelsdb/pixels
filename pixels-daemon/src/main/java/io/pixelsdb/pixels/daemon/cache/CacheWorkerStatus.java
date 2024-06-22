@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,18 +17,19 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.encoding;
-
-import java.io.IOException;
+package io.pixelsdb.pixels.daemon.cache;
 
 /**
- * @author guodong
  * @author hank
+ * @create 2024-06-22
  */
-public abstract class Decoder implements AutoCloseable
+public enum CacheWorkerStatus
 {
-    public abstract boolean hasNext() throws IOException;
+    UNHEALTHY(-1), READY(0), UPDATING(1), OUT_OF_SIZE(2);
 
-    @Override
-    abstract public void close() throws IOException;
+    public final int StatusCode;
+    CacheWorkerStatus(int statusCode)
+    {
+        this.StatusCode = statusCode;
+    }
 }

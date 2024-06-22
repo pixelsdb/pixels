@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2019 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,18 +17,21 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.encoding;
+package io.pixelsdb.pixels.daemon.cache;
 
-import java.io.IOException;
+import org.junit.Test;
 
 /**
  * @author guodong
- * @author hank
  */
-public abstract class Decoder implements AutoCloseable
+public class TestCacheCoordinator
 {
-    public abstract boolean hasNext() throws IOException;
-
-    @Override
-    abstract public void close() throws IOException;
+    @Test
+    public void test() throws InterruptedException
+    {
+        CacheCoordinator cacheCoordinator = new CacheCoordinator();
+        Thread thread = new Thread(cacheCoordinator);
+        thread.start();
+        thread.join();
+    }
 }
