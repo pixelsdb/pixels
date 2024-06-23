@@ -3,7 +3,9 @@
 //
 
 #include "PixelsScanFunction.hpp"
+#include "physical/StorageArrayScheduler.h"
 #include "profiler/CountProfiler.h"
+
 namespace duckdb {
 
 bool PixelsScanFunction::enable_filter_pushdown = false;
@@ -134,7 +136,7 @@ unique_ptr<FunctionData> PixelsScanFunction::PixelsScanBind(
     }
 
     // sort the pxl file by file name, so that all SSD arrays can be fully utilized
-    sort(files.begin(), files.end(), compare_file_name());
+//    sort(files.begin(), files.end(), compare_file_name());
 
 	auto footerCache = std::make_shared<PixelsFooterCache>();
 	auto builder = std::make_shared<PixelsReaderBuilder>();
@@ -164,17 +166,17 @@ unique_ptr<GlobalTableFunctionState> PixelsScanFunction::PixelsScanInitGlobal(
 
 	auto result = make_uniq<PixelsReadGlobalState>();
 
-	result->readers = std::vector<shared_ptr<PixelsReader>>(bind_data.files.size(), nullptr);
-
 	result->initialPixelsReader = bind_data.initialPixelsReader;
-	result->readers[0] = bind_data.initialPixelsReader;
-
-	result->file_index = 0;
 
     int max_threads = std::stoi(ConfigFactory::Instance().getProperty("pixel.threads"));
     if (max_threads <= 0) {
         max_threads = (int) bind_data.files.size();
     }
+
+    result->storageArrayScheduler = std::make_shared<StorageArrayScheduler>(bind_data.files, max_threads);
+
+    result->file_index.resize(result->storageArrayScheduler->getDeviceSum());
+
 	result->max_threads = max_threads;
 
 	result->batch_index = 0;
@@ -192,6 +194,8 @@ unique_ptr<LocalTableFunctionState> PixelsScanFunction::PixelsScanInitLocal(
 	auto &gstate = (PixelsReadGlobalState &)*gstate_p;
 
 	auto result = make_uniq<PixelsReadLocalState>();
+
+    result->deviceID = gstate.storageArrayScheduler->acquireDeviceId();
 
 	result->column_ids = input.column_ids;
 
@@ -383,14 +387,15 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
         throw InvalidArgumentException("PixelsScanInitLocal: file open error.");
     }
 
+    auto& StorageInstance = parallel_state.storageArrayScheduler;
     // In the following two cases, the state ends:
     // 1. When PixelsScanInitLocal invokes this function, if all files are
     // fetched by other threads, this means this thread doesn't need do anything, so just return false;
     // 2. When PixelsScanImplementation invokes this function (scan_data.next_file_index > -1), if
-    // scan_data.next_file_index >= (int) parallel_state.readers.size(), it means the current file is already
+    // scan_data.next_file_index >= (int) StorageInstance.getFileSum(scan_data.deviceID), it means the current file is already
     // done, so the function return false.
-    if ((is_init_state && parallel_state.file_index >= parallel_state.readers.size()) ||
-            scan_data.next_file_index >= parallel_state.readers.size()) {
+    if ((is_init_state && parallel_state.file_index.at(scan_data.deviceID) >= StorageInstance->getFileSum(scan_data.deviceID)) ||
+            scan_data.next_file_index >= StorageInstance->getFileSum(scan_data.deviceID)) {
 		::BufferPool::Reset();
 		// if async io is enabled, we need to unregister uring buffer
 		if(ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io")) {
@@ -406,10 +411,10 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
 
     scan_data.curr_file_index = scan_data.next_file_index;
     scan_data.curr_batch_index = scan_data.next_batch_index;
-    scan_data.next_file_index = parallel_state.file_index;
-    scan_data.next_batch_index = scan_data.next_file_index;
+    scan_data.next_file_index = parallel_state.file_index.at(scan_data.deviceID);
+    scan_data.next_batch_index = StorageInstance->getBatchID(scan_data.deviceID, scan_data.next_file_index);
     scan_data.curr_file_name = scan_data.next_file_name;
-    parallel_state.file_index++;
+    parallel_state.file_index.at(scan_data.deviceID)++;
     parallel_lock.unlock();
     // The below code uses global state but no race happens, so we don't need the lock anymore
     
@@ -426,21 +431,15 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
         auto currPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(scan_data.currPixelsRecordReader);
         currPixelsRecordReader->asyncReadComplete((int)scan_data.column_names.size());
     }
-    if(scan_data.next_file_index < parallel_state.readers.size()) {
-        if (parallel_state.readers[scan_data.next_file_index]) {
-            scan_data.next_file_name = bind_data.files.at(scan_data.next_file_index);
-            scan_data.nextReader = parallel_state.readers[scan_data.next_file_index];
-        } else {
-            auto footerCache = std::make_shared<PixelsFooterCache>();
-            auto builder = std::make_shared<PixelsReaderBuilder>();
-            shared_ptr<::Storage> storage = StorageFactory::getInstance()->getStorage(::Storage::file);
-            scan_data.next_file_name = bind_data.files.at(scan_data.next_file_index);
-            scan_data.nextReader = builder->setPath(bind_data.files.at(scan_data.next_file_index))
-                    ->setStorage(storage)
-                    ->setPixelsFooterCache(footerCache)
-                    ->build();
-            parallel_state.readers[scan_data.next_file_index] = scan_data.nextReader;
-        }
+    if(scan_data.next_file_index < StorageInstance->getFileSum(scan_data.deviceID)) {
+        auto footerCache = std::make_shared<PixelsFooterCache>();
+        auto builder = std::make_shared<PixelsReaderBuilder>();
+        shared_ptr<::Storage> storage = StorageFactory::getInstance()->getStorage(::Storage::file);
+        scan_data.next_file_name = StorageInstance->getFileName(scan_data.deviceID, scan_data.next_file_index);
+        scan_data.nextReader = builder->setPath(scan_data.next_file_name)
+                ->setStorage(storage)
+                ->setPixelsFooterCache(footerCache)
+                ->build();
 
         PixelsReaderOption option = GetPixelsReaderOption(scan_data, parallel_state);
         scan_data.nextPixelsRecordReader = scan_data.nextReader->read(option);
