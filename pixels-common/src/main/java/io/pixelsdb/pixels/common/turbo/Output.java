@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.common.turbo;
 
 import java.util.ArrayList;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * The base class for the output of a cloud function.
  * @author hank
@@ -191,7 +193,7 @@ public abstract class Output
 
     public void setOutputs(ArrayList<String> outputs)
     {
-        this.outputs = outputs;
+        this.outputs = requireNonNull(outputs, "outputs is null");
     }
 
     public synchronized void addOutput(String output)
@@ -205,7 +207,7 @@ public abstract class Output
         simpleOutput.setRequestId(this.requestId);
         simpleOutput.setSuccessful(this.successful);
         simpleOutput.setErrorMessage(this.errorMessage != null ? this.errorMessage : "");
-        simpleOutput.setNumOutputs(this.outputs != null ? this.outputs.size() : 0);
+        simpleOutput.setNumOutputs(this.outputs.size());
         return simpleOutput;
     }
 }
