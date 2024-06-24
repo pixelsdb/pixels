@@ -19,14 +19,19 @@
  */
 package io.pixelsdb.pixels.daemon.cache;
 
+import org.junit.Test;
+
 /**
  * @author guodong
  */
-public class MockCacheCoordinator
+public class TestCacheWorker
 {
-    public static void main(String[] args)
+    @Test
+    public void test() throws InterruptedException
     {
-        CacheCoordinator cacheCoordinator = new CacheCoordinator();
-        cacheCoordinator.run();
+        CacheWorker cacheWorker = new CacheWorker();
+        Thread thread = new Thread(cacheWorker);
+        thread.start();
+        thread.join();
     }
 }

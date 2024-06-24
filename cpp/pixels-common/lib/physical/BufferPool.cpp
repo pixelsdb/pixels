@@ -14,23 +14,36 @@ thread_local int BufferPool::currBufferIdx = 1;
 thread_local int BufferPool::nextBufferIdx = 0;
 std::shared_ptr<DirectIoLib> BufferPool::directIoLib;
 
-void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> bytes) {
+void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> bytes, std::vector<std::string> columnNames) {
 	assert(colIds.size() == bytes.size());
 	int fsBlockSize = std::stoi(ConfigFactory::Instance().getProperty("localfs.block.size"));
+    std::string columnSizePath = ConfigFactory::Instance().getProperty("pixel.column.size.path");
+    std::shared_ptr<ColumnSizeCSVReader> csvReader;
+    if (!columnSizePath.empty()) {
+        csvReader = std::make_shared<ColumnSizeCSVReader>(columnSizePath);
+    }
+
+    // give the maximal column size, which is stored in csv reader
 	if(!BufferPool::isInitialized) {
         currBufferIdx = 0;
         nextBufferIdx = 1;
 		directIoLib = std::make_shared<DirectIoLib>(fsBlockSize);
 		for(int i = 0; i < colIds.size(); i++) {
 			uint32_t colId = colIds.at(i);
-			uint64_t byte = bytes.at(i);
+            std::string columnName = columnNames[colId];
             for(int idx = 0; idx < 2; idx++) {
-                auto buffer = BufferPool::directIoLib->allocateDirectBuffer(byte + static_cast<int64_t>(EXTRA_POOL_SIZE));
+                std::shared_ptr<ByteBuffer> buffer;
+                if (columnSizePath.empty()) {
+                    buffer = BufferPool::directIoLib->allocateDirectBuffer(bytes.at(i) + EXTRA_POOL_SIZE);
+                } else {
+                    buffer = BufferPool::directIoLib->allocateDirectBuffer(csvReader->get(columnName));
+                }
+
                 BufferPool::nrBytes[colId] = buffer->size();
                 BufferPool::buffers[idx][colId] = buffer;
             }
 		}
-		BufferPool::colCount = bytes.size();
+		BufferPool::colCount = colIds.size();
 		BufferPool::isInitialized = true;
 	} else {
 		// check if resize the buffer is needed
@@ -38,6 +51,7 @@ void BufferPool::Initialize(std::vector<uint32_t> colIds, std::vector<uint64_t> 
 		for (int i = 0; i < colIds.size(); i++) {
 			uint32_t colId = colIds.at(i);
 			uint64_t byte = bytes.at(i);
+            std::string columnName = columnNames[colId];
 			if (BufferPool::nrBytes.find(colId) == BufferPool::nrBytes.end()) {
 				throw InvalidArgumentException("BufferPool::Initialize: no such the column id.");
 			}
