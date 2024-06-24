@@ -128,20 +128,20 @@ public class ScanInput extends Input
         this.output = output;
     }
 
-    public static String[] generateOutputPaths(String outputFolder, int numSplits)
+    public static List<String> generateOutputPaths(String outputFolder, int numSplits)
     {
         requireNonNull(outputFolder, "outputFolder is null");
         checkArgument(numSplits > 0, "numSplits is non-positive");
+        ImmutableList.Builder<String> builder = ImmutableList.builderWithExpectedSize(numSplits);
         if (!outputFolder.endsWith("/"))
         {
             outputFolder += "/";
         }
-        String[] outputPaths = new String[numSplits];
         for (int i = 0; i < numSplits; ++i)
         {
-            outputPaths[i] = outputFolder + "scan_" + i;
+            builder.add(outputFolder + "scan_" + i);
         }
-        return outputPaths;
+        return builder.build();
     }
 
     /**
@@ -152,18 +152,8 @@ public class ScanInput extends Input
     public static List<String> generateOutputPaths(ScanInput scanInput)
     {
         requireNonNull(scanInput, "scanInput is null");
-        String folder = requireNonNull(scanInput.getOutput().getPath(), "output folder is null");
+        String outputFolder = scanInput.getOutput().getPath();
         int numSplits = scanInput.getTableInfo().getInputSplits().size();
-        checkArgument(numSplits > 0, "input splits is empty");
-        ImmutableList.Builder<String> builder = ImmutableList.builderWithExpectedSize(numSplits);
-        if (!folder.endsWith("/"))
-        {
-            folder += "/";
-        }
-        for (int i = 0; i < numSplits; ++i)
-        {
-            builder.add(folder + "scan_" + i);
-        }
-        return builder.build();
+        return generateOutputPaths(outputFolder, numSplits);
     }
 }
