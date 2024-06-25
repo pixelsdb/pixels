@@ -127,7 +127,7 @@ public class RdbLayoutDao extends LayoutDao
      * @return
      */
     public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, long version,
-                                                          MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
+                                                  MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
         if(table == null)
         {

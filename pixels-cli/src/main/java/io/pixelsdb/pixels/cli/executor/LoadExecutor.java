@@ -47,7 +47,7 @@ public class LoadExecutor implements CommandExecutor
     {
         String schemaName = ns.getString("schema");
         String tableName = ns.getString("table");
-        String origin = ns.getString("original_data_path");
+        String origin = ns.getString("origin");
         int rowNum = Integer.parseInt(ns.getString("row_num"));
         String regex = ns.getString("row_regex");
         int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
@@ -66,7 +66,7 @@ public class LoadExecutor implements CommandExecutor
         MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
 
         Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex,
-                encodingLevel, nullsPadding);
+                encodingLevel, nullsPadding, metadataService);
 
         // source already exist, producer option is false, add list of source to the queue
         List<String> fileList = storage.listPaths(origin);
@@ -104,13 +104,11 @@ public class LoadExecutor implements CommandExecutor
     private boolean startConsumers(int concurrency, BlockingQueue<String> inputFiles, Parameters parameters,
                                    ConcurrentLinkedQueue<File> loadedFiles)
     {
-        ConfigFactory configFactory = ConfigFactory.Instance();
-
         boolean success = false;
         try
         {
             // initialize the extra parameters for data loading
-            success = parameters.initExtra(configFactory);
+            success = parameters.initExtra();
         } catch (MetadataException | InterruptedException e)
         {
             e.printStackTrace();

@@ -25,7 +25,6 @@ import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Ordered;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 
 import java.util.Arrays;
@@ -44,6 +43,7 @@ public class Parameters
     private int[] orderMapping;
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
+    private final MetadataService metadataService;
 
     public List<Path> getLoadingPaths()
     {
@@ -81,7 +81,7 @@ public class Parameters
     }
 
     public Parameters(String dbName, String tableName, int maxRowNum, String regex,
-                      EncodingLevel encodingLevel, boolean nullsPadding)
+                      EncodingLevel encodingLevel, boolean nullsPadding, MetadataService metadataService)
     {
         this.dbName = dbName;
         this.tableName = tableName;
@@ -90,22 +90,18 @@ public class Parameters
         this.loadingPaths = null;
         this.encodingLevel = encodingLevel;
         this.nullsPadding = nullsPadding;
+        this.metadataService = metadataService;
     }
 
     /**
      * Initialize the extra parameters, including schema and order mapping.
      * If loading path is not set in the constructor, this method will set it to the ordered path in metadata.
-     * @param configFactory the config factory of pixels.
      * @return true if successful.
      * @throws MetadataException
      * @throws InterruptedException
      */
-    public boolean initExtra(ConfigFactory configFactory) throws MetadataException, InterruptedException
+    public boolean initExtra() throws MetadataException, InterruptedException
     {
-        // init metadata service
-        String metaHost = configFactory.getProperty("metadata.server.host");
-        int metaPort = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
-        MetadataService metadataService = new MetadataService(metaHost, metaPort);
         // get columns of the specified table
         List<Column> columns = metadataService.getColumns(dbName, tableName, false);
         int colSize = columns.size();
@@ -118,27 +114,14 @@ public class Parameters
             originalColTypes[i] = columns.get(i).getType();
         }
         // get the latest layout for writing
-        List<Layout> layouts = metadataService.getLayouts(dbName, tableName);
-        Layout writingLayout = null;
-        long writingLayoutVersion = -1;
-        for (Layout layout : layouts)
-        {
-            if (layout.isWritable())
-            {
-                if (layout.getVersion() > writingLayoutVersion)
-                {
-                    writingLayout = layout;
-                    writingLayoutVersion = layout.getVersion();
-                }
-            }
-        }
+        Layout writableLayout = metadataService.getWritableLayout(dbName, tableName);
         // no layouts for writing currently
-        if (writingLayout == null)
+        if (writableLayout == null)
         {
             return false;
         }
         // get the column order of the latest writing layout
-        Ordered ordered = writingLayout.getOrdered();
+        Ordered ordered = writableLayout.getOrdered();
         List<String> layoutColumnOrder = ordered.getColumnOrder();
         // check size consistency
         if (layoutColumnOrder.size() != colSize)
@@ -178,13 +161,13 @@ public class Parameters
         // get path of loading
         if(this.loadingPaths == null)
         {
-            this.loadingPaths = writingLayout.getOrderedPaths();
+            this.loadingPaths = writableLayout.getOrderedPaths();
             validateOrderedOrCompactPaths(this.loadingPaths);
         }
         // init the params
         this.schema = schemaBuilder.toString();
         this.orderMapping = orderMapping;
-        metadataService.shutdown();
+        // Issue #658: do not shut down metadata service here.
         return true;
     }
 }

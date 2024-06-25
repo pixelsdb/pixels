@@ -109,10 +109,12 @@ public class Main
             {
                 System.out.println("Supported commands:\n" +
                         "LOAD\n" +
+                        "COMPACT\n" +
+                        "IMPORT\n" +
+                        "STAT\n" +
                         "QUERY\n" +
                         "COPY\n" +
-                        "COMPACT\n" +
-                        "STAT");
+                        "FILE_META");
                 System.out.println("{command} -h to show the usage of a command.\nexit / quit / -q to exit.\n");
                 continue;
             }
@@ -124,8 +126,8 @@ public class Main
                 ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL LOAD")
                         .defaultHelp(true);
 
-                argumentParser.addArgument("-o", "--original_data_path").required(true)
-                        .help("specify the path of original data");
+                argumentParser.addArgument("-o", "--origin").required(true)
+                        .help("specify the path of original data files");
                 argumentParser.addArgument("-s", "--schema").required(true)
                         .help("specify the name of database");
                 argumentParser.addArgument("-t", "--table").required(true)
@@ -302,13 +304,79 @@ public class Main
                 }
             }
 
+            if (command.equals("IMPORT"))
+            {
+                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL IMPORT")
+                        .defaultHelp(true);
+
+                argumentParser.addArgument("-s", "--schema").required(true)
+                        .help("specify the schema name");
+                argumentParser.addArgument("-t", "--table").required(true)
+                        .help("specify the table name");
+                argumentParser.addArgument("-l", "--layout").required(true)
+                        .help("specify the layout of the files, can be 'ordered' or 'compact'");
+                argumentParser.addArgument("-p", "--path").required(true)
+                        .help("specify the path of the directory that contains the files");
+
+                Namespace ns;
+                try
+                {
+                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                } catch (ArgumentParserException e)
+                {
+                    argumentParser.handleError(e);
+                    continue;
+                }
+
+                try
+                {
+                    ImportExecutor statExecutor = new ImportExecutor();
+                    statExecutor.execute(ns, command);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            }
+
+            if (command.equals("FILE_META"))
+            {
+                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels File Metadata Explorer")
+                        .defaultHelp(true);
+
+                argumentParser.addArgument("-f", "--file").required(true)
+                        .help("specify the full path of the file, containing the storage scheme");
+
+                Namespace ns;
+                try
+                {
+                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                } catch (ArgumentParserException e)
+                {
+                    argumentParser.handleError(e);
+                    continue;
+                }
+
+                try
+                {
+                    FileMetaExecutor statExecutor = new FileMetaExecutor();
+                    statExecutor.execute(ns, command);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            }
+
             if (!command.equals("QUERY") &&
                     !command.equals("LOAD") &&
                     !command.equals("COPY") &&
                     !command.equals("COMPACT") &&
-                    !command.equals("STAT"))
+                    !command.equals("STAT") &&
+                    !command.equals("IMPORT") &&
+                    !command.equals("FILE_META"))
             {
-                System.out.println("Command error");
+                System.out.println("Command '" + command + "' not found");
             }
         }
         // Use exit to terminate other threads and invoke the shutdown hooks.
@@ -331,7 +399,7 @@ public class Main
         } catch (SQLException e)
         {
             System.out.println("SQL: " + id + "\n" + sql);
-            System.out.println("Error msg: " + e.getMessage());
+            System.out.println("Error message: " + e.getMessage());
         }
         return end - start;
     }

@@ -538,9 +538,9 @@ public class MetadataService
 
     /**
      * Get the readable layouts of a table.
-     * @param schemaName
-     * @param tableName
-     * @return
+     * @param schemaName the schema name
+     * @param tableName the table name
+     * @return the readable layouts of the table
      * @throws MetadataException
      */
     public List<Layout> getLayouts(String schemaName, String tableName) throws MetadataException
@@ -585,7 +585,6 @@ public class MetadataService
 
     public Layout getLatestLayout(String schemaName, String tableName) throws MetadataException
     {
-
         String token = UUID.randomUUID().toString();
         MetadataProto.GetLayoutRequest request = MetadataProto.GetLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -593,7 +592,25 @@ public class MetadataService
                 .setTableName(tableName)
                 .setLayoutVersion(-1)
                 .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.ALL).build();
+        return internalGetLayout(request);
+    }
 
+    /**
+     * Get the writable layout of the table. Each table should have exact one writable layout.
+     * @param schemaName schema name of the table
+     * @param tableName name of the table
+     * @return the writable layout
+     * @throws MetadataException
+     */
+    public Layout getWritableLayout(String schemaName, String tableName) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetLayoutRequest request = MetadataProto.GetLayoutRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName)
+                .setTableName(tableName)
+                .setLayoutVersion(-1)
+                .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.READ_WRITE).build();
         return internalGetLayout(request);
     }
 
