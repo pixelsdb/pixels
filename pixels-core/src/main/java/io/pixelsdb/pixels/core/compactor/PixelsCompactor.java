@@ -97,12 +97,12 @@ public class PixelsCompactor
     {
         this.schema = requireNonNull(schema, "schema is null");
         this.compactLayout = requireNonNull(compactLayout, "compactLayout is null");
-        checkArgument(pixelStride > 0, "pixel stripe is not positive");
+        checkArgument(pixelStride > 0, "pixelStride is not positive");
         this.pixelStride = pixelStride;
-        this.compressionKind = requireNonNull(compressionKind);
+        this.compressionKind = requireNonNull(compressionKind, "compressionKind is null");
         checkArgument(compressionBlockSize > 0, "compression block size is not positive");
         this.compressionBlockSize = compressionBlockSize;
-        this.timeZone = requireNonNull(timeZone);
+        this.timeZone = requireNonNull(timeZone, "timeZone is null");
         this.chunkAlignment = Integer.parseInt(ConfigFactory.Instance().getProperty("column.chunk.alignment"));
         checkArgument(this.chunkAlignment >= 0, "column.chunk.alignment must >= 0");
         this.chunkPaddingBuffer = new byte[this.chunkAlignment];
@@ -116,14 +116,30 @@ public class PixelsCompactor
 
         this.fileColStatRecorders = requireNonNull(fileColStatRecorders, "file column stat reader is null");
 
-        checkArgument(!requireNonNull(rowGroupInfoBuilderList).isEmpty());
-        checkArgument(!requireNonNull(rowGroupStatBuilderList).isEmpty());
-        checkArgument(!requireNonNull(rowGroupFooterBuilderList).isEmpty());
-        checkArgument(!requireNonNull(rowGroupPaths).isEmpty());
+        checkArgument(!requireNonNull(rowGroupInfoBuilderList, "rowGroupInfoBuilderList is null").isEmpty(),
+                "rowGroupInfoBuilderList is empty");
+        checkArgument(!requireNonNull(rowGroupStatBuilderList, "rowGroupStatBuilderList is null").isEmpty(),
+                "rowGroupStatBuilderList is empty");
+        checkArgument(!requireNonNull(rowGroupFooterBuilderList, "rowGroupFooterBuilderList is null").isEmpty(),
+                "rowGroupFooterBuilderList is empty");
+        checkArgument(!requireNonNull(rowGroupPaths, "rowGroupPaths is null").isEmpty(),
+                "rowGroupPaths is empty");
+        checkArgument(rowGroupInfoBuilderList.size() == rowGroupStatBuilderList.size() &&
+                rowGroupStatBuilderList.size() == rowGroupFooterBuilderList.size() &&
+                rowGroupFooterBuilderList.size() == rowGroupPaths.size(),
+                "lengths of the row group lists are not consistent");
         this.rowGroupInfoBuilderList = ImmutableList.copyOf(rowGroupInfoBuilderList);
         this.rowGroupStatBuilderList = ImmutableList.copyOf(rowGroupStatBuilderList);
         this.rowGroupFooterBuilderList = ImmutableList.copyOf(rowGroupFooterBuilderList);
         this.rowGroupPaths = ImmutableList.copyOf(rowGroupPaths);
+    }
+
+    /**
+     * @return the number of row groups to be compact in this compactor
+     */
+    public int getNumRowGroup()
+    {
+        return this.rowGroupInfoBuilderList.size();
     }
 
     public static class Builder
@@ -146,10 +162,10 @@ public class PixelsCompactor
         private long fileContentLength = 0L;
         private int fileRowNum = 0;
         private PhysicalWriter fsWriter = null;
-        private List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList = new LinkedList<>();
-        private List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList = new LinkedList<>();
-        private List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList = new LinkedList<>();
-        private List<String> rowGroupPaths = new LinkedList<>();
+        private final List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList = new LinkedList<>();
+        private final List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList = new LinkedList<>();
+        private final List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList = new LinkedList<>();
+        private final List<String> rowGroupPaths = new LinkedList<>();
 
         private Builder()
         {
@@ -158,9 +174,8 @@ public class PixelsCompactor
         /**
          * set schema is optional, if schema is not set, the schema read from the first source file will be used as this.schema.
          * and this.schema will be used as the schema of the compacted file.
-         *
-         * @param schema
-         * @return
+         * @param schema the optional schema
+         * @return the compactor itself
          */
         public PixelsCompactor.Builder setSchema(TypeDescription schema)
         {

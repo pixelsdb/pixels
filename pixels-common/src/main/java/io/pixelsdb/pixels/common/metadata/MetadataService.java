@@ -29,9 +29,11 @@ import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
@@ -1004,15 +1006,15 @@ public class MetadataService
         return false;
     }
 
-    public boolean addFile(File file) throws MetadataException
+    public boolean addFiles(Collection<File> files) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.AddFileRequest request = MetadataProto.AddFileRequest.newBuilder()
+        MetadataProto.AddFilesRequest request = MetadataProto.AddFilesRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
-                .setFile(file.toProto()).build();
+                .addAllFiles(files.stream().map(File::toProto).collect(Collectors.toList())).build();
         try
         {
-            MetadataProto.AddFileResponse response = this.stub.addFile(request);
+            MetadataProto.AddFilesResponse response = this.stub.addFiles(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()

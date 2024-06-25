@@ -61,6 +61,13 @@ public abstract class FileDao implements Dao<MetadataProto.File>
      */
     abstract public long insert (MetadataProto.File file);
 
+    /**
+     * Insert the batch of files into metadata.
+     * @param files the batch of files
+     * @return true if insert is successful
+     */
+    abstract public boolean insertBatch(List<MetadataProto.File> files);
+
     abstract public boolean update (MetadataProto.File file);
 
     abstract public boolean deleteByIds (List<Long> ids);

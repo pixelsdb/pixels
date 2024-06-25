@@ -56,7 +56,7 @@ service MetadataService {
     rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
     rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
     rpc DeletePaths (DeletePathsRequest) returns (DeletePathsResponse);
-    rpc AddFile (AddFileRequest) returns (AddFileResponse);
+    rpc AddFiles (AddFilesRequest) returns (AddFilesResponse);
     rpc GetFiles (GetFilesRequest) returns (GetFilesResponse);
     rpc UpdateFile (UpdateFileRequest) returns (UpdateFileResponse);
     rpc DeleteFiles (DeleteFilesRequest) returns (DeleteFilesResponse);
@@ -149,9 +149,8 @@ message Path {
 message File {
     uint64 id = 1;
     string name = 2;
-    optional string locality = 3;
-    int32 numRowGroup = 4;
-    uint64 pathId = 5;
+    int32 numRowGroup = 3;
+    uint64 pathId = 4;
 }
 
 message SchemaVersion {
@@ -556,12 +555,12 @@ message DeletePathsResponse {
 }
 
 // file
-message AddFileRequest {
+message AddFilesRequest {
     RequestHeader header = 1;
-    File file = 2;
+    repeated File files = 2;
 }
 
-message AddFileResponse {
+message AddFilesResponse {
     ResponseHeader header = 1;
 }
 

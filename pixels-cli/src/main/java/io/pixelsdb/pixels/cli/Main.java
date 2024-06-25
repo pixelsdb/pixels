@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.cli;
 
 import io.pixelsdb.pixels.cli.executor.*;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Storage;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
@@ -27,6 +28,7 @@ import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 
 import java.sql.*;
+import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
 
@@ -138,8 +140,6 @@ public class Main
                         .help("specify the encoding level for data loading");
                 argumentParser.addArgument("-p", "--nulls_padding").setDefault(false)
                         .help("specify whether nulls padding is enabled");
-                argumentParser.addArgument("-l", "--loading_data_paths")
-                        .help("specify the paths where the data is loaded into");
 
                 Namespace ns;
                 try
@@ -337,13 +337,13 @@ public class Main
     }
 
     /**
-     * Check if the order or compact path from pixels metadata is valid.
+     * Check if the order or compact paths from pixels metadata is valid.
      * @param paths the order or compact paths from pixels metadata.
      */
-    public static void validateOrderOrCompactPath(String[] paths)
+    public static void validateOrderedOrCompactPaths(String[] paths)
     {
         requireNonNull(paths, "paths is null");
-        checkArgument(paths.length > 0, "path must contain at least one valid directory");
+        checkArgument(paths.length > 0, "paths must contain at least one valid directory");
         try
         {
             Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths[0]);
@@ -351,11 +351,34 @@ public class Main
             {
                 Storage.Scheme scheme = Storage.Scheme.fromPath(paths[i]);
                 checkArgument(firstScheme.equals(scheme),
-                        "all the directories in the path must have the same storage scheme");
+                        "all the directories in the paths must have the same storage scheme");
             }
         } catch (Throwable e)
         {
-            throw new RuntimeException("failed to parse storage scheme from path", e);
+            throw new RuntimeException("failed to parse storage scheme from paths", e);
+        }
+    }
+
+    /**
+     * Check if the order or compact paths from pixels metadata is valid.
+     * @param paths the order or compact paths from pixels metadata.
+     */
+    public static void validateOrderedOrCompactPaths(List<Path> paths)
+    {
+        requireNonNull(paths, "paths is null");
+        checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
+        try
+        {
+            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths.get(0).getUri());
+            for (int i = 1; i < paths.size(); ++i)
+            {
+                Storage.Scheme scheme = Storage.Scheme.fromPath(paths.get(i).getUri());
+                checkArgument(firstScheme.equals(scheme),
+                        "all the directories in the paths must have the same storage scheme");
+            }
+        } catch (Throwable e)
+        {
+            throw new RuntimeException("failed to parse storage scheme from paths", e);
         }
     }
 }

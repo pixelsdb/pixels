@@ -33,7 +33,6 @@ import static java.util.Objects.requireNonNull;
 public class File extends Base
 {
     private String name;
-    private String locality;
     private int numRowGroup;
     private long pathId;
 
@@ -45,14 +44,6 @@ public class File extends Base
     {
         this.setId(file.getId());
         this.name = file.getName();
-        if (file.hasLocality())
-        {
-            this.locality = file.getLocality();
-        }
-        else
-        {
-            this.locality = null;
-        }
         this.numRowGroup = file.getNumRowGroup();
         this.pathId = file.getPathId();
     }
@@ -65,16 +56,6 @@ public class File extends Base
     public void setName(String name)
     {
         this.name = name;
-    }
-
-    public String getLocality()
-    {
-        return locality;
-    }
-
-    public void setLocality(String locality)
-    {
-        this.locality = locality;
     }
 
     public int getNumRowGroup()
@@ -126,10 +107,6 @@ public class File extends Base
     {
         MetadataProto.File.Builder builder = MetadataProto.File.newBuilder()
                 .setId(this.getId()).setName(this.name).setNumRowGroup(this.numRowGroup);
-        if (this.locality != null)
-        {
-            builder.setLocality(this.locality);
-        }
         return builder.setPathId(this.pathId).build();
     }
 }

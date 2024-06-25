@@ -24,14 +24,14 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Ordered;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 
-import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.List;
 
-import static io.pixelsdb.pixels.cli.Main.validateOrderOrCompactPath;
+import static io.pixelsdb.pixels.cli.Main.validateOrderedOrCompactPaths;
 
 public class Parameters
 {
@@ -39,13 +39,13 @@ public class Parameters
     private final String tableName;
     private final int maxRowNum;
     private final String regex;
-    private String[] loadingPaths;
+    private List<Path> loadingPaths;
     private String schema;
     private int[] orderMapping;
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
 
-    public String[] getLoadingPaths()
+    public List<Path> getLoadingPaths()
     {
         return loadingPaths;
     }
@@ -81,13 +81,13 @@ public class Parameters
     }
 
     public Parameters(String dbName, String tableName, int maxRowNum, String regex,
-                      EncodingLevel encodingLevel, boolean nullsPadding, @Nullable String[] loadingPaths)
+                      EncodingLevel encodingLevel, boolean nullsPadding)
     {
         this.dbName = dbName;
         this.tableName = tableName;
         this.maxRowNum = maxRowNum;
         this.regex = regex;
-        this.loadingPaths = loadingPaths;
+        this.loadingPaths = null;
         this.encodingLevel = encodingLevel;
         this.nullsPadding = nullsPadding;
     }
@@ -178,8 +178,8 @@ public class Parameters
         // get path of loading
         if(this.loadingPaths == null)
         {
-            this.loadingPaths = writingLayout.getOrderedPathUris();
-            validateOrderOrCompactPath(this.loadingPaths);
+            this.loadingPaths = writingLayout.getOrderedPaths();
+            validateOrderedOrCompactPaths(this.loadingPaths);
         }
         // init the params
         this.schema = schemaBuilder.toString();

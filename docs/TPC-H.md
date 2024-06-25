@@ -52,8 +52,7 @@ contains multiple input files. In case that the TPC-H table has multiple parts, 
 `-c` to the number of parts to improve the data loading performance.
 Optionally, we can use `-e` to specify the encoding level (ranges 0 - 2) for data loading.
 The default encoding level is 2, which is the highest encoding level that provides the best compression ratio.
-Encoding level 0 disables encoding. It is also possible to use the `-l` parameter to load the data into other
-paths instead of the table's paths defined in the `CREATE TABLE` DDL statement.
+Encoding level 0 disables encoding.
 
 As we don't use pixels-cache for TPC-H, there is no need to load the cache.
 Otherwise, we can load the cached table into pixels-cache using:
