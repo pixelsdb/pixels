@@ -53,6 +53,7 @@ public class RdbFileDao extends FileDao
                 MetadataProto.File.Builder builder = MetadataProto.File.newBuilder()
                         .setId(id)
                         .setName(rs.getString("FILE_NAME"))
+                        .setNumRowGroup(rs.getInt("FILE_NUM_RG"))
                         .setPathId(rs.getLong("PATHS_PATH_ID"));
                 String locality = rs.getString("FILE_LOCALITY");
                 if (locality != null)
@@ -82,6 +83,7 @@ public class RdbFileDao extends FileDao
                 MetadataProto.File.Builder builder = MetadataProto.File.newBuilder()
                         .setId(rs.getLong("FILE_ID"))
                         .setName(rs.getString("FILE_NAME"))
+                        .setNumRowGroup(rs.getInt("FILE_NUM_RG"))
                         .setPathId(rs.getLong("PATHS_PATH_ID"));
                 String locality = rs.getString("FILE_LOCALITY");
                 if (locality != null)
@@ -126,7 +128,8 @@ public class RdbFileDao extends FileDao
         String sql = "INSERT INTO FILES(" +
                 "`FILE_NAME`," +
                 "`FILE_LOCALITY`," +
-                "`PATHS_PATH_ID`) VALUES (?,?,?)";
+                "`FILE_NUM_RG`," +
+                "`PATHS_PATH_ID`) VALUES (?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, file.getName());
@@ -138,7 +141,8 @@ public class RdbFileDao extends FileDao
             {
                 pst.setNull(2, Types.VARCHAR);
             }
-            pst.setLong(3, file.getPathId());
+            pst.setInt(3, file.getNumRowGroup());
+            pst.setLong(4, file.getPathId());
             if (pst.executeUpdate() == 1)
             {
                 ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
@@ -170,13 +174,15 @@ public class RdbFileDao extends FileDao
         String sql = "UPDATE FILES\n" +
                 "SET\n" +
                 "`FILE_NAME` = ?," +
-                "`FILE_LOCALITY` = ?\n" +
+                "`FILE_LOCALITY` = ?," +
+                "`FILE_NUM_RG` = ?\n" +
                 "WHERE `FILE_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, file.getName());
             pst.setString(2, file.getLocality());
-            pst.setLong(3, file.getId());
+            pst.setInt(3, file.getNumRowGroup());
+            pst.setLong(4, file.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {

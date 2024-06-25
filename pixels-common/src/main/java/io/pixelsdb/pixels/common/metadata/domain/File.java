@@ -34,6 +34,7 @@ public class File extends Base
 {
     private String name;
     private String locality;
+    private int numRowGroup;
     private long pathId;
 
     public File()
@@ -52,6 +53,7 @@ public class File extends Base
         {
             this.locality = null;
         }
+        this.numRowGroup = file.getNumRowGroup();
         this.pathId = file.getPathId();
     }
 
@@ -73,6 +75,16 @@ public class File extends Base
     public void setLocality(String locality)
     {
         this.locality = locality;
+    }
+
+    public int getNumRowGroup()
+    {
+        return numRowGroup;
+    }
+
+    public void setNumRowGroup(int numRowGroup)
+    {
+        this.numRowGroup = numRowGroup;
     }
 
     public long getPathId()
@@ -112,7 +124,8 @@ public class File extends Base
     @Override
     public MetadataProto.File toProto()
     {
-        MetadataProto.File.Builder builder = MetadataProto.File.newBuilder().setId(this.getId()).setName(this.name);
+        MetadataProto.File.Builder builder = MetadataProto.File.newBuilder()
+                .setId(this.getId()).setName(this.name).setNumRowGroup(this.numRowGroup);
         if (this.locality != null)
         {
             builder.setLocality(this.locality);
