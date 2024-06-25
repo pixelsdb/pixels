@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.cli.executor;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -26,8 +27,12 @@ import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import net.sourceforge.argparse4j.inf.Namespace;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -74,7 +79,7 @@ public class ImportExecutor implements CommandExecutor
         metadataService.shutdown();
     }
 
-    private static List<File> getImportFiles(boolean ordered, Layout writableLayout, List<String> filePaths)
+    private static List<File> getImportFiles(boolean ordered, Layout writableLayout, List<String> filePaths) throws IOException
     {
         List<Path> dirPaths = ordered ? writableLayout.getOrderedPaths() : writableLayout.getCompactPaths();
         List<File> importFiles = new LinkedList<>();
@@ -82,11 +87,19 @@ public class ImportExecutor implements CommandExecutor
         for (String filePath : filePaths)
         {
             Path dirPath = dirPaths.get(pathId++ % dirPaths.size());
-            File importFile = new File();
-            importFile.setName(filePath.substring(filePath.lastIndexOf("/")));
-            // TODO: set num row group.
-            importFile.setPathId(dirPath.getId());
-            importFiles.add(importFile);
+            Storage storage = StorageFactory.Instance().getStorage(filePath);
+            try (PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
+                    .setPath(filePath).setStorage(storage).setEnableCache(false)
+                    .setCacheOrder(ImmutableList.of()).setPixelsCacheReader(null)
+                    .setPixelsFooterCache(new PixelsFooterCache()).build())
+            {
+                int numRowGroup = pixelsReader.getRowGroupNum();
+                File importFile = new File();
+                importFile.setName(filePath.substring(filePath.lastIndexOf("/")));
+                importFile.setNumRowGroup(numRowGroup);
+                importFile.setPathId(dirPath.getId());
+                importFiles.add(importFile);
+            }
         }
         return importFiles;
     }
