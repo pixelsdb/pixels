@@ -73,7 +73,7 @@ public class CopyExecutor implements CommandExecutor
         for (int i = 0; i < n; ++i)
         {
             String destination_ = destination;
-            // Issue #192: make copy multi-threaded.
+            // Issue #192: make copy multithreaded.
             for (Status s : files)
             {
                 String sourceName = s.getName();

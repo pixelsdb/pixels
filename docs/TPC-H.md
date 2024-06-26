@@ -46,8 +46,8 @@ LOAD -o file:///data/tpch/100g/partsupp -s tpch -t partsupp -n 360370 -r \| -c 1
 LOAD -o file:///data/tpch/100g/region -s tpch -t region -n 10 -r \| -c 1
 LOAD -o file:///data/tpch/100g/supplier -s tpch -t supplier -n 333340 -r \| -c 1
 ```
-It may take half an hour if data is loaded in a single thread. The last parameter `-c` of the `LOAD` command is the maximum number
-of threads used for loading data. It only effects when the input directory (specified by `-o`)
+It may take half an hour if data is loaded in a single thread. The last parameter `-c` of the `LOAD` command is the
+maximum number of threads used for loading data. It only effects when the input directory (specified by `-o`)
 contains multiple input files. In case that the TPC-H table has multiple parts, you can set
 `-c` to the number of parts to improve the data loading performance.
 Optionally, we can use `-e` to specify the encoding level (ranges 0 - 2) for data loading.
@@ -60,6 +60,17 @@ Otherwise, we can load the cached table into pixels-cache using:
 ./sbin/load-cache.sh layout_version
 ```
 `layout_version` is the version of the table's layout that specifies the columns we want to cache.
+
+### *Import Existing Files
+If we already have the Pixels files of a table, we can put these files into the ordered or compact writable
+path(s) of the table and import these files' information into Pixels metadata using the `IMPORT` command:
+```bash
+IMPORT -s schema_name -t table_name -l ordered|compact
+```
+`-l` can be either `ordered` or `compact`. It indicates whether the Pixels files are of the ordered or compact storage
+layout. Note it is our responsibility to ensure the Pixels files are already put in the corresponding writable path(s)
+before executing import. This command is usually useful when the table is loaded by legacy pixels-cli that did not
+save the file information into Pixels metadata.
 
 ## Run Queries
 Connect to trino-cli:

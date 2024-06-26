@@ -54,15 +54,6 @@ public class ImportExecutor implements CommandExecutor
                 layoutName.equalsIgnoreCase("compact"),
                 "layout must be 'ordered' or 'compact'");
         boolean ordered = layoutName.equalsIgnoreCase("ordered");
-        String path = ns.getString("path");
-
-        if (!path.endsWith("/"))
-        {
-            path += "/";
-        }
-
-        Storage storage = StorageFactory.Instance().getStorage(path);
-        List<String> filePaths = storage.listPaths(path);
 
         String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
         int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
@@ -74,32 +65,35 @@ public class ImportExecutor implements CommandExecutor
             return;
         }
 
-        List<File> importFiles = getImportFiles(ordered, writableLayout, filePaths);
+        List<File> importFiles = getImportFiles(ordered, writableLayout);
         metadataService.addFiles(importFiles);
         metadataService.shutdown();
     }
 
-    private static List<File> getImportFiles(boolean ordered, Layout writableLayout, List<String> filePaths) throws IOException
+    private static List<File> getImportFiles(boolean ordered, Layout writableLayout) throws IOException
     {
         List<Path> dirPaths = ordered ? writableLayout.getOrderedPaths() : writableLayout.getCompactPaths();
         List<File> importFiles = new LinkedList<>();
-        int pathId = 0;
-        for (String filePath : filePaths)
+        for (Path dirPath : dirPaths)
         {
-            Path dirPath = dirPaths.get(pathId++ % dirPaths.size());
-            Storage storage = StorageFactory.Instance().getStorage(filePath);
-            try (PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setPath(filePath).setStorage(storage).setEnableCache(false)
-                    .setCacheOrder(ImmutableList.of()).setPixelsCacheReader(null)
-                    .setPixelsFooterCache(new PixelsFooterCache()).build())
+            String dirPathUri = dirPath.getUri();
+            Storage storage = StorageFactory.Instance().getStorage(dirPathUri);
+            List<String> filePaths = storage.listPaths(dirPathUri);
+            for (String filePath : filePaths)
             {
-                int numRowGroup = pixelsReader.getRowGroupNum();
-                File importFile = new File();
-                // do not contain '/' at the beginning of the file name
-                importFile.setName(filePath.substring(filePath.lastIndexOf("/") + 1));
-                importFile.setNumRowGroup(numRowGroup);
-                importFile.setPathId(dirPath.getId());
-                importFiles.add(importFile);
+                try (PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
+                        .setPath(filePath).setStorage(storage).setEnableCache(false)
+                        .setCacheOrder(ImmutableList.of()).setPixelsCacheReader(null)
+                        .setPixelsFooterCache(new PixelsFooterCache()).build())
+                {
+                    int numRowGroup = pixelsReader.getRowGroupNum();
+                    File importFile = new File();
+                    // do not contain '/' at the beginning of the file name
+                    importFile.setName(filePath.substring(filePath.lastIndexOf("/") + 1));
+                    importFile.setNumRowGroup(numRowGroup);
+                    importFile.setPathId(dirPath.getId());
+                    importFiles.add(importFile);
+                }
             }
         }
         return importFiles;

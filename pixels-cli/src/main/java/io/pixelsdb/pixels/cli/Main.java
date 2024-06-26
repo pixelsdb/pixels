@@ -315,8 +315,6 @@ public class Main
                         .help("specify the table name");
                 argumentParser.addArgument("-l", "--layout").required(true)
                         .help("specify the layout of the files, can be 'ordered' or 'compact'");
-                argumentParser.addArgument("-p", "--path").required(true)
-                        .help("specify the path of the directory that contains the files");
 
                 Namespace ns;
                 try
