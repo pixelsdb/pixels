@@ -70,11 +70,11 @@ public class ImportExecutor implements CommandExecutor
         {
             List<File> importFiles = getImportFiles(ordered, writableLayout);
             metadataService.addFiles(importFiles);
-            System.out.println("Execute command " + command + " successful");
+            System.out.println(command + " is successful");
         }
         catch (Exception e)
         {
-            System.out.println("Execute command " + command + " failed");
+            System.out.println(command + " failed");
             e.printStackTrace();
         }
         long endTime = System.currentTimeMillis();

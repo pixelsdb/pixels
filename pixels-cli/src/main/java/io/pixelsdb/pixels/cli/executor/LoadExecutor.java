@@ -81,10 +81,10 @@ public class LoadExecutor implements CommandExecutor
         if (startConsumers(threadNum, inputFiles, parameters, loadedFiles))
         {
             metadataService.addFiles(loadedFiles);
-            System.out.println("Execute command " + command + " successful");
+            System.out.println(command + " is successful");
         } else
         {
-            System.out.println("Execute command " + command + " failed");
+            System.out.println(command + " failed");
         }
 
         long endTime = System.currentTimeMillis();
