@@ -206,7 +206,7 @@ public class StatExecutor implements CommandExecutor
         }
 
         long endTime = System.currentTimeMillis();
-        System.out.println("Elapsed time: " + (endTime - startTime) / 1000 + "s.");
+        System.out.println("Elapsed time: " + (endTime - startTime) / 1000.0 + "s.");
         metadataService.shutdown();
     }
 }

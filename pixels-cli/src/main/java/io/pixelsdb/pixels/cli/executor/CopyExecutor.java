@@ -113,6 +113,6 @@ public class CopyExecutor implements CommandExecutor
 
         long endTime = System.currentTimeMillis();
         System.out.println((copiedNum.get()/n) + " file(s) are copied " + n + " time(s) by "
-                + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
+                + threadNum + " threads in " + (endTime - startTime) / 1000.0 + "s.");
     }
 }
