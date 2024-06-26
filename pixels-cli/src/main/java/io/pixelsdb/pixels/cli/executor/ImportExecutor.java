@@ -95,7 +95,8 @@ public class ImportExecutor implements CommandExecutor
             {
                 int numRowGroup = pixelsReader.getRowGroupNum();
                 File importFile = new File();
-                importFile.setName(filePath.substring(filePath.lastIndexOf("/")));
+                // do not contain '/' at the beginning of the file name
+                importFile.setName(filePath.substring(filePath.lastIndexOf("/") + 1));
                 importFile.setNumRowGroup(numRowGroup);
                 importFile.setPathId(dirPath.getId());
                 importFiles.add(importFile);
