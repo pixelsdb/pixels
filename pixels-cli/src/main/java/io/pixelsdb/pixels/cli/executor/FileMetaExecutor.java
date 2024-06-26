@@ -30,6 +30,6 @@ public class FileMetaExecutor implements CommandExecutor
     @Override
     public void execute(Namespace ns, String command) throws Exception
     {
-
+        throw new UnsupportedOperationException("FILE_META is currently not supported");
     }
 }
