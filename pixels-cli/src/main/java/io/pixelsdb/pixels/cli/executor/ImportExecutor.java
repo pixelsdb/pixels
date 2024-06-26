@@ -61,12 +61,25 @@ public class ImportExecutor implements CommandExecutor
         Layout writableLayout = metadataService.getWritableLayout(schemaName, tableName);
         if (writableLayout == null)
         {
-            System.err.println("no writable layout on table '" + schemaName + "." + tableName + "' for data import");
+            System.err.println("No writable layout on table '" + schemaName + "." + tableName + "'.");
             return;
         }
 
-        List<File> importFiles = getImportFiles(ordered, writableLayout);
-        metadataService.addFiles(importFiles);
+        long startTime = System.currentTimeMillis();
+        try
+        {
+            List<File> importFiles = getImportFiles(ordered, writableLayout);
+            metadataService.addFiles(importFiles);
+            System.out.println("Execute command " + command + " successful");
+        }
+        catch (Exception e)
+        {
+            System.out.println("Execute command " + command + " failed");
+            e.printStackTrace();
+        }
+        long endTime = System.currentTimeMillis();
+        System.out.println("Pixels files in the " + layoutName + " writable path(s) of table '" +
+                schemaName + "." + tableName + "' are imported in " + (endTime - startTime) / 1000.0 + "s.");
         metadataService.shutdown();
     }
 

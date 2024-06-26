@@ -89,7 +89,7 @@ public class LoadExecutor implements CommandExecutor
 
         long endTime = System.currentTimeMillis();
         System.out.println("Text files in '" + origin + "' are loaded by " + threadNum +
-                " threads in " + (endTime - startTime) / 1000 + "s.");
+                " threads in " + (endTime - startTime) / 1000.0 + "s.");
         metadataService.shutdown();
     }
 
