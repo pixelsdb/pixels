@@ -73,7 +73,7 @@ public class CopyExecutor implements CommandExecutor
         for (int i = 0; i < n; ++i)
         {
             String destination_ = destination;
-            // Issue #192: make copy multi-threaded.
+            // Issue #192: make copy multithreaded.
             for (Status s : files)
             {
                 String sourceName = s.getName();
@@ -113,6 +113,6 @@ public class CopyExecutor implements CommandExecutor
 
         long endTime = System.currentTimeMillis();
         System.out.println((copiedNum.get()/n) + " file(s) are copied " + n + " time(s) by "
-                + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
+                + threadNum + " threads in " + (endTime - startTime) / 1000.0 + "s.");
     }
 }

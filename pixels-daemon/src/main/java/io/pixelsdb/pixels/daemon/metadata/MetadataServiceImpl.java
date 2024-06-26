@@ -760,13 +760,13 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void addFile(MetadataProto.AddFileRequest request,
-                        StreamObserver<MetadataProto.AddFileResponse> responseObserver)
+    public void addFiles(MetadataProto.AddFilesRequest request,
+                        StreamObserver<MetadataProto.AddFilesResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        if (this.fileDao.insert(request.getFile()) > 0)
+        if (this.fileDao.insertBatch(request.getFilesList()))
         {
             headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
         }
@@ -775,7 +775,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             headerBuilder.setErrorCode(METADATA_ADD_FILE_FAILED).setErrorMsg("add file failed");
         }
 
-        MetadataProto.AddFileResponse response = MetadataProto.AddFileResponse.newBuilder()
+        MetadataProto.AddFilesResponse response = MetadataProto.AddFilesResponse.newBuilder()
                 .setHeader(headerBuilder).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();

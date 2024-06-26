@@ -318,7 +318,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
     `FILE_ID` INT NOT NULL AUTO_INCREMENT,
     `FILE_NAME` VARCHAR(128) NOT NULL,
-    `FILE_LOCALITY` VARCHAR(128) NULL DEFAULT 'on which server or node this file is stored, only used for vsdfs',
+    `FILE_NUM_RG` INT NOT NULL,
     `PATHS_PATH_ID` BIGINT NOT NULL,
     PRIMARY KEY (`FILE_ID`),
     INDEX `fk_FILES_PATHS_idx` (`PATHS_PATH_ID` ASC),
