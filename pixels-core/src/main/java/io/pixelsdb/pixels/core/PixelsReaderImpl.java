@@ -187,7 +187,7 @@ public class PixelsReaderImpl implements PixelsReader
             {
                 throw new PixelsFileVersionInvalidException(fileVersion);
             }
-            if (!fileMagic.contentEquals(Constants.MAGIC))
+            if (!fileMagic.contentEquals(Constants.FILE_MAGIC))
             {
                 throw new PixelsFileMagicInvalidException(fileMagic);
             }

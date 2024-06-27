@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
+import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -74,7 +75,7 @@ public class ImportExecutor implements CommandExecutor
         }
         catch (Exception e)
         {
-            System.out.println(command + " failed");
+            System.err.println(command + " failed");
             e.printStackTrace();
         }
         long endTime = System.currentTimeMillis();
@@ -91,9 +92,14 @@ public class ImportExecutor implements CommandExecutor
         {
             String dirPathUri = dirPath.getUri();
             Storage storage = StorageFactory.Instance().getStorage(dirPathUri);
-            List<String> filePaths = storage.listPaths(dirPathUri);
-            for (String filePath : filePaths)
+            List<Status> fileStatuses = storage.listStatus(dirPathUri);
+            for (Status fileStatus : fileStatuses)
             {
+                if (fileStatus.isDirectory())
+                {
+                    continue;
+                }
+                String filePath = fileStatus.getPath();
                 try (PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
                         .setPath(filePath).setStorage(storage).setEnableCache(false)
                         .setCacheOrder(ImmutableList.of()).setPixelsCacheReader(null)
@@ -106,6 +112,10 @@ public class ImportExecutor implements CommandExecutor
                     importFile.setNumRowGroup(numRowGroup);
                     importFile.setPathId(dirPath.getId());
                     importFiles.add(importFile);
+                } catch (IOException e)
+                {
+                    System.err.println("import file '" + filePath + "' failed");
+                    e.printStackTrace();
                 }
             }
         }

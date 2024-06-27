@@ -202,6 +202,7 @@ public class StatExecutor implements CommandExecutor
             }
         } catch (SQLException e)
         {
+            System.err.println(command + "failed");
             e.printStackTrace();
         }
 

@@ -288,7 +288,7 @@ public class PixelsCompactor
                     fsReader.close();
                     throw new PixelsFileVersionInvalidException(fileVersion);
                 }
-                if (!fileMagic.contentEquals(Constants.MAGIC))
+                if (!fileMagic.contentEquals(Constants.FILE_MAGIC))
                 {
                     fsReader.close();
                     throw new PixelsFileMagicInvalidException(fileMagic);
@@ -523,7 +523,7 @@ public class PixelsCompactor
     private PixelsProto.PostScript buildPostScript()
     {
         return PixelsProto.PostScript.newBuilder()
-                .setVersion(Constants.VERSION)
+                .setVersion(PixelsVersion.currentVersion().getVersion())
                 .setContentLength(fileContentLength)
                 .setNumberOfRows(fileRowNum)
                 .setCompression(compressionKind)
@@ -532,7 +532,7 @@ public class PixelsCompactor
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(false) // Issue #521: we do not compact partitioned files.
                 .setColumnChunkAlignment(chunkAlignment)
-                .setMagic(Constants.MAGIC)
+                .setMagic(Constants.FILE_MAGIC)
                 .build();
     }
 
