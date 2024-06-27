@@ -931,7 +931,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         // build streamHeader
         PixelsStreamProto.StreamHeader.Builder streamHeaderBuilder = PixelsStreamProto.StreamHeader.newBuilder();
         writeTypes(streamHeaderBuilder, schema);
-        streamHeaderBuilder.setVersion(Constants.FILE_VERSION)
+        streamHeaderBuilder.setVersion(PixelsVersion.currentVersion().getVersion())
                 .setPixelStride(columnWriterOption.getPixelStride())
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(partitioned)

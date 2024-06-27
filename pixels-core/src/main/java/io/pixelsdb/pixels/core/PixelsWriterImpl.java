@@ -699,7 +699,7 @@ public class PixelsWriterImpl implements PixelsWriter
 
         // build PostScript
         postScript = PixelsProto.PostScript.newBuilder()
-                .setVersion(Constants.FILE_VERSION)
+                .setVersion(PixelsVersion.currentVersion().getVersion())
                 .setContentLength(fileContentLength)
                 .setNumberOfRows(fileRowNum)
                 .setCompression(compressionKind)
