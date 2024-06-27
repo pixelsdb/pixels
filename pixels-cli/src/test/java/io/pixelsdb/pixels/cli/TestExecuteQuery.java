@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.cli;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import io.pixelsdb.pixels.core.PixelsProto;
 import org.junit.Test;
 
 /**
@@ -30,5 +33,9 @@ public class TestExecuteQuery
     @Test
     public void test()
     {
+        PixelsProto.PostScript postScript = PixelsProto.PostScript.newBuilder().build();
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        String json = gson.toJson(postScript);
+        System.out.println(json);
     }
 }
