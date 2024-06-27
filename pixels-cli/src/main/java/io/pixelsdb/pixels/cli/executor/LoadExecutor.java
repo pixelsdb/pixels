@@ -84,7 +84,7 @@ public class LoadExecutor implements CommandExecutor
             System.out.println(command + " is successful");
         } else
         {
-            System.out.println(command + " failed");
+            System.err.println(command + " failed");
         }
 
         long endTime = System.currentTimeMillis();
@@ -149,7 +149,7 @@ public class LoadExecutor implements CommandExecutor
             }
         } else
         {
-            System.out.println("Parameters initialization error.");
+            System.err.println("Parameters initialization error.");
         }
         return res;
     }

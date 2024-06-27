@@ -36,7 +36,6 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReaderStreamImpl;
 import io.pixelsdb.pixels.core.utils.BlockingMap;
-import io.pixelsdb.pixels.core.PixelsStreamProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -53,7 +52,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static io.netty.handler.codec.http.HttpHeaderNames.CONNECTION;
 import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
-import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
+import static io.pixelsdb.pixels.common.utils.Constants.FILE_MAGIC;
 import static java.lang.Thread.sleep;
 
 /**
@@ -284,11 +283,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
             throws InvalidProtocolBufferException, IndexOutOfBoundsException
     {
         // check MAGIC
-        int magicLength = MAGIC.getBytes().length;
+        int magicLength = FILE_MAGIC.getBytes().length;
         byte[] magicBytes = new byte[magicLength];
         byteBuf.getBytes(0, magicBytes);
         String magic = new String(magicBytes);
-        if (!magic.contentEquals(Constants.MAGIC))
+        if (!magic.contentEquals(Constants.FILE_MAGIC))
         {
             throw new PixelsFileMagicInvalidException(magic);
         }

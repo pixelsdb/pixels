@@ -23,8 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created at: 10/19/21
- * Author: hank
+ * @author hank
+ * @date 2021-10-19
  */
 public class OriginProjectionPattern
 {
@@ -40,7 +40,6 @@ public class OriginProjectionPattern
     {
         this.accessedColumns = accessedColumns;
     }
-
 
     public void addAccessedColumns(int accessedColumn)
     {

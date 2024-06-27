@@ -141,6 +141,7 @@ public class QueryExecutor implements CommandExecutor
                 timeWriter.flush();
             } catch (Exception e)
             {
+                System.err.println(command + "failed");
                 e.printStackTrace();
             }
         } else

@@ -183,7 +183,9 @@ public class CompactExecutor implements CommandExecutor
                     compactFiles.offer(compactFile);
                 } catch (IOException e)
                 {
+                    System.err.println("write compact file '" + targetFilePath + "' failed");
                     e.printStackTrace();
+                    return;
                 }
                 System.out.println("Compact file '" + targetFilePath + "' is built in " +
                         ((System.currentTimeMillis() - threadStart) / 1000.0) + "s");

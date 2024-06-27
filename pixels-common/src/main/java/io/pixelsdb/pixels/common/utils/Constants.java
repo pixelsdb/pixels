@@ -24,8 +24,8 @@ package io.pixelsdb.pixels.common.utils;
  */
 public final class Constants
 {
-    public static final int VERSION = 1;
-    public static final String MAGIC = "PIXELS";
+    public static final int FILE_VERSION = 1;
+    public static final String FILE_MAGIC = "PIXELS";
 
     public static final int DEFAULT_HDFS_BLOCK_SIZE = 256 * 1024 * 1024;
     public static final int HDFS_BUFFER_SIZE = 8 * 1024 * 1024;
