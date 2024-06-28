@@ -145,13 +145,13 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             {
                 pathsBuilder.add(MetadataProto.Path.newBuilder()
                         .setUri(basePathUri + "v-" + layoutVersion + "-compact")
-                        .setIsCompact(true).setLayoutId(layoutId).build());
+                        .setType(MetadataProto.Path.Type.COMPACT).setLayoutId(layoutId).build());
             }
             else
             {
                 pathsBuilder.add(MetadataProto.Path.newBuilder()
                         .setUri(basePathUri + "v-" + layoutVersion + "-ordered")
-                        .setIsCompact(false).setLayoutId(layoutId).build());
+                        .setType(MetadataProto.Path.Type.ORDERED).setLayoutId(layoutId).build());
             }
         }
         return pathsBuilder.build();
@@ -343,7 +343,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         {
             headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" + request.getSchemaName() + "' not found");
         }
-        if(layouts != null && layouts.isEmpty() == false)
+        if(layouts != null && !layouts.isEmpty())
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
             response = MetadataProto.GetLayoutsResponse.newBuilder()

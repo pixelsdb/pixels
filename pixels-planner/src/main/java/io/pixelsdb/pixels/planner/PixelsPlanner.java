@@ -1569,8 +1569,14 @@ public class PixelsPlanner
                 ProjectionPattern projectionPattern = projectionsIndex.search(columnSet);
                 if (projectionPattern != null)
                 {
-                    logger.debug("suitable projection pattern is found, path='" + projectionPattern.getPaths() + '\'');
-                    compactPaths = projectionPattern.getPaths();
+                    logger.debug("suitable projection pattern is found, pathIds='" + Arrays.toString(projectionPattern.getPathIds()) + '\'');
+                    long[] projectionPathIds = projectionPattern.getPathIds();
+                    Map<Long, Path> projectionPaths = layout.getProjectionPaths();
+                    compactPaths = new String[projectionPathIds.length];
+                    for (int i = 0; i < projectionPathIds.length; ++i)
+                    {
+                        compactPaths[i] = projectionPaths.get(projectionPathIds[i]).getUri();
+                    }
                 }
                 else
                 {

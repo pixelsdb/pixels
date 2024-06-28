@@ -139,9 +139,14 @@ message Range {
 }
 
 message Path {
+    enum Type {
+        ORDERED = 0;
+        COMPACT = 1;
+        PROJECTION = 2;
+    }
     uint64 id = 1;
     string uri = 2;
-    bool isCompact = 3;
+    Type type = 3;
     uint64 layoutId = 4;
     optional uint64 rangeId = 5;
 }
@@ -177,8 +182,9 @@ message Layout {
     repeated Path compactPaths = 8;
     string splits = 9;
     string projections = 10;
-    uint64 tableId = 11;
-    uint64 schemaVersionId = 12;
+    repeated Path projectionPaths = 11;
+    uint64 tableId = 12;
+    uint64 schemaVersionId = 13;
 }
 
 message View {
