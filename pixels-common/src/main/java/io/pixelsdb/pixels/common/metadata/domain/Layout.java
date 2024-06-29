@@ -45,6 +45,9 @@ public class Layout extends Base
     private String splitsJson;
     private Projections projections;
     private String projectionsJson;
+    /**
+     * All the paths of the all the projections of this layout.
+     */
     private Map<Long, Path> projectionPaths;
     private String[] projectionPathUris;
     private long tableId;

@@ -29,6 +29,9 @@ import java.util.List;
 public class OriginProjectionPattern
 {
     private List<Integer> accessedColumns = new ArrayList<>();
+    /**
+     * The ids of the paths of this projection.
+     */
     private long[] pathIds;
 
     public List<Integer> getAccessedColumns()
