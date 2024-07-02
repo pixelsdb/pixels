@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.planner.PixelsPlanner.getFilePaths;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -1290,7 +1291,7 @@ public class StarlingPlanner
             int rowGroupNum = splits.getNumRowGroupInFile();
 
             // get compact path
-            String[] compactPaths;
+            List<Path> compactPaths;
             if (projectionReadEnabled)
             {
                 ProjectionsIndex projectionsIndex = IndexFactory.Instance().getProjectionsIndex(schemaTableName);
@@ -1312,17 +1313,23 @@ public class StarlingPlanner
                 ProjectionPattern projectionPattern = projectionsIndex.search(columnSet);
                 if (projectionPattern != null)
                 {
-                    logger.debug("suitable projection pattern is found, path='" + projectionPattern.getPaths() + '\'');
-                    compactPaths = projectionPattern.getPaths();
+                    logger.debug("suitable projection pattern is found, pathIds='" + Arrays.toString(projectionPattern.getPathIds()) + '\'');
+                    long[] projectionPathIds = projectionPattern.getPathIds();
+                    Map<Long, Path> projectionPaths = layout.getProjectionPaths();
+                    compactPaths = new ArrayList<>(projectionPathIds.length);
+                    for (long projectionPathId : projectionPathIds)
+                    {
+                        compactPaths.add(projectionPaths.get(projectionPathId));
+                    }
                 }
                 else
                 {
-                    compactPaths = layout.getCompactPathUris();
+                    compactPaths = layout.getCompactPaths();
                 }
             }
             else
             {
-                compactPaths = layout.getCompactPathUris();
+                compactPaths = layout.getCompactPaths();
             }
             logger.debug("using compact path: " + Joiner.on(";").join(compactPaths));
 
@@ -1332,7 +1339,7 @@ public class StarlingPlanner
                 // 1. add splits in orderedPath
                 if (orderedPathEnabled)
                 {
-                    List<String> orderedPaths = storage.listPaths(layout.getOrderedPathUris());
+                    List<String> orderedPaths = getFilePaths(layout.getOrderedPaths(), metadataService);
 
                     for (int i = 0; i < orderedPaths.size();)
                     {
@@ -1349,7 +1356,7 @@ public class StarlingPlanner
                 // 2. add splits in compactPath
                 if (compactPathEnabled)
                 {
-                    List<String> compactFilePaths = storage.listPaths(compactPaths);
+                    List<String> compactFilePaths = getFilePaths(compactPaths, metadataService);
 
                     int curFileRGIdx;
                     for (String path : compactFilePaths)
@@ -1364,7 +1371,7 @@ public class StarlingPlanner
                     }
                 }
             }
-            catch (IOException e)
+            catch (Exception e)
             {
                 throw new IOException("failed to get input information from storage", e);
             }

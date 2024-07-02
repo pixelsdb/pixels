@@ -19,16 +19,23 @@
  */
 package io.pixelsdb.pixels.cli;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import io.pixelsdb.pixels.core.PixelsProto;
 import org.junit.Test;
 
 /**
  * @author hank
  * @create 2023-12-06
  */
-public class TestExecuteQuery
+public class TestPrintProtobuf
 {
     @Test
-    public void test()
+    public void test() throws InvalidProtocolBufferException
     {
+        PixelsProto.PostScript postScript = PixelsProto.PostScript.newBuilder().setVersion(1)
+                .setCompression(PixelsProto.CompressionKind.LZ4).setCompressionBlockSize(3).build();
+        String json = JsonFormat.printer().print(postScript);
+        System.out.println(json);
     }
 }

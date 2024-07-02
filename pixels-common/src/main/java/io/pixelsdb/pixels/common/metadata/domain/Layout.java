@@ -22,7 +22,9 @@ package io.pixelsdb.pixels.common.metadata.domain;
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermission;
 
@@ -43,6 +45,11 @@ public class Layout extends Base
     private String splitsJson;
     private Projections projections;
     private String projectionsJson;
+    /**
+     * All the paths of the all the projections of this layout.
+     */
+    private Map<Long, Path> projectionPaths;
+    private String[] projectionPathUris;
     private long tableId;
 
     public Layout() { }
@@ -87,6 +94,15 @@ public class Layout extends Base
         this.splits = JSON.parseObject(this.splitsJson, Splits.class);
         this.projectionsJson = layout.getProjections();
         this.projections = JSON.parseObject(this.projectionsJson, Projections.class);
+        List<Path> paths = Path.convertPaths(layout.getProjectionPathsList());
+        this.projectionPaths = new HashMap<>(paths.size());
+        this.projectionPathUris = new String[paths.size()];
+        for (int i = 0; i < this.projectionPathUris.length; ++i)
+        {
+            Path path = paths.get(i);
+            this.projectionPathUris[i] = path.getUri();
+            this.projectionPaths.put(path.getId(), path);
+        }
         this.tableId = layout.getTableId();
     }
 
@@ -251,6 +267,30 @@ public class Layout extends Base
     public void setProjectionsJson(String projectionsJson)
     {
         this.projectionsJson = projectionsJson;
+    }
+
+    public Map<Long, Path> getProjectionPaths()
+    {
+        return projectionPaths;
+    }
+
+    public String[] getProjectionPathUris()
+    {
+        if (this.projectionPathUris == null)
+        {
+            this.projectionPathUris = new String[this.projectionPaths.size()];
+            int i = 0;
+            for (Path path : this.projectionPaths.values())
+            {
+                this.projectionPathUris[i++] = path.getUri();
+            }
+        }
+        return this.projectionPathUris;
+    }
+
+    public void setProjectionPaths(Map<Long, Path> projectionPaths)
+    {
+        this.projectionPaths = projectionPaths;
     }
 
     public long getTableId()

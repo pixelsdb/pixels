@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.netty.handler.codec.http.HttpHeaderNames.*;
 import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
-import static io.pixelsdb.pixels.common.utils.Constants.MAGIC;
+import static io.pixelsdb.pixels.common.utils.Constants.FILE_MAGIC;
 import static io.pixelsdb.pixels.core.writer.ColumnWriter.newColumnWriter;
 import static java.util.Objects.requireNonNull;
 
@@ -931,18 +931,18 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         // build streamHeader
         PixelsStreamProto.StreamHeader.Builder streamHeaderBuilder = PixelsStreamProto.StreamHeader.newBuilder();
         writeTypes(streamHeaderBuilder, schema);
-        streamHeaderBuilder.setVersion(Constants.VERSION)
+        streamHeaderBuilder.setVersion(PixelsVersion.currentVersion().getVersion())
                 .setPixelStride(columnWriterOption.getPixelStride())
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(partitioned)
                 .setColumnChunkAlignment(CHUNK_ALIGNMENT)
-                .setMagic(Constants.MAGIC)
+                .setMagic(Constants.FILE_MAGIC)
                 .build();
         PixelsStreamProto.StreamHeader streamHeader = streamHeaderBuilder.build();
         int streamHeaderLength = streamHeader.getSerializedSize();
 
         // write and flush streamHeader
-        byte[] magicBytes = MAGIC.getBytes();
+        byte[] magicBytes = FILE_MAGIC.getBytes();
         byteBuf.writeBytes(magicBytes);
         byteBuf.writeInt(streamHeaderLength);
         byteBuf.writeBytes(streamHeader.toByteArray());
