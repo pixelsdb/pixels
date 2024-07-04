@@ -35,10 +35,10 @@ public class ReplicaBalancer extends Balancer
 {
     private boolean balanced = false;
     private int roundIndex = 0;
-    private List<HostAddress> nodes;
-    private Map<HostAddress, Integer> nodesCacheStats = new HashMap<>();
-    private Map<String, Set<HostAddress>> origin = new HashMap<>();
-    private Map<String, HostAddress> result = new HashMap<>();
+    private final List<HostAddress> nodes;
+    private final Map<HostAddress, Integer> nodesCacheStats = new HashMap<>();
+    private final Map<String, Set<HostAddress>> origin = new HashMap<>();
+    private final Map<String, HostAddress> result = new HashMap<>();
 
     /**
      *
@@ -48,7 +48,8 @@ public class ReplicaBalancer extends Balancer
     {
         requireNonNull(nodes, "nodes is null");
         checkArgument(!nodes.isEmpty(), "nodes is empty");
-        for (HostAddress node : nodes) {
+        for (HostAddress node : nodes)
+        {
             nodesCacheStats.put(node, 0);
         }
         this.nodes = ImmutableList.copyOf(nodes);

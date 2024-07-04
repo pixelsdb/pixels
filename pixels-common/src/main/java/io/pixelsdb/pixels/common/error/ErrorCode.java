@@ -64,6 +64,18 @@ public class ErrorCode
     public static final int METADATA_UPDATE_PEER_PATH_FAILED = (ERROR_BASE_METADATA + 32);
     public static final int METADATA_DELETE_PEER_PATHS_FAILED = (ERROR_BASE_METADATA + 33);
     public static final int METADATA_ADD_SCHEMA_VERSION_FAILED = (ERROR_BASE_METADATA + 34);
+    public static final int METADATA_ADD_RANGE_INDEX_FAILED = (ERROR_BASE_METADATA + 35);
+    public static final int METADATA_RANGE_INDEX_NOT_FOUND = (ERROR_BASE_METADATA + 36);
+    public static final int METADATA_UPDATE_RANGE_INDEX_FAILED = (ERROR_BASE_METADATA + 37);
+    public static final int METADATA_DELETE_RANGE_INDEX_FAILED = (ERROR_BASE_METADATA + 38);
+    public static final int METADATA_ADD_RANGE_FAILED = (ERROR_BASE_METADATA + 39);
+    public static final int METADATA_GET_RANGES_FAILED = (ERROR_BASE_METADATA + 40);
+    public static final int METADATA_RANGE_NOT_FOUNT = (ERROR_BASE_METADATA + 41);
+    public static final int METADATA_DELETE_RANGE_FAILED = (ERROR_BASE_METADATA + 42);
+    public static final int METADATA_ADD_FILE_FAILED = (ERROR_BASE_METADATA + 43);
+    public static final int METADATA_GET_FILES_FAILED = (ERROR_BASE_METADATA + 44);
+    public static final int METADATA_UPDATE_FILE_FAILED = (ERROR_BASE_METADATA + 45);
+    public static final int METADATA_DELETE_FILES_FAILED = (ERROR_BASE_METADATA + 46);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue

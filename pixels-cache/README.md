@@ -74,7 +74,7 @@ If you have modified the `etcd` urls, please change the `ENDPOINTS` property in 
 
 Instead of starting all Pixels daemons on the same (single) node using `$PIXELS_HOME/sbin/start-pixels.sh`,
 start the `PixelsCoordinator` daemon that hosts cache coordinator on the master node,
-and start the `PixelsDataNode` daemon that hosts cache manager on each worker node.
+and start the `PixelsWorker` daemon that hosts cache manager on each worker node.
 
 On each worker node, pin the cache in memory using:
 ```bash

@@ -28,7 +28,9 @@ public enum PixelsVersion
 {
     V1(1);
 
-    private int version;
+    private final int version;
+
+    private static final PixelsVersion CURRENT_VERSION = V1;
 
     PixelsVersion(int version)
     {
@@ -51,11 +53,11 @@ public enum PixelsVersion
 
     public static boolean matchVersion(int otherVersion)
     {
-        return otherVersion == V1.version;
+        return otherVersion == CURRENT_VERSION.version;
     }
 
     public static PixelsVersion currentVersion()
     {
-        return V1;
+        return CURRENT_VERSION;
     }
 }

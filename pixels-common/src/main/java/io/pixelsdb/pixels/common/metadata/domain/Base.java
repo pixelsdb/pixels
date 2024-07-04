@@ -19,12 +19,14 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import com.google.protobuf.MessageOrBuilder;
+
 import java.io.Serializable;
 
 /**
  * @author hank
  */
-public class Base implements Serializable
+public abstract class Base implements Serializable
 {
     private long id;
 
@@ -37,6 +39,8 @@ public class Base implements Serializable
     {
         this.id = id;
     }
+
+    public abstract MessageOrBuilder toProto();
 
     @Override
     public int hashCode()

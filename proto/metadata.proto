@@ -44,10 +44,22 @@ service MetadataService {
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
     rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
-    rpc CreatePath (CreatePathRequest) returns (CreatePathResponse);
+    rpc AddRangeIndex (AddRangeIndexRequest) returns (AddRangeIndexResponse);
+    rpc GetRangeIndex (GetRangeIndexRequest) returns (GetRangeIndexResponse);
+    rpc UpdateRangeIndex (UpdateRangeIndexRequest) returns (UpdateRangeIndexResponse);
+    rpc DeleteRangeIndex (DeleteRangeIndexRequest) returns (DeleteRangeIndexResponse);
+    rpc AddRange (AddRangeRequest) returns (AddRangeResponse);
+    rpc GetRange (GetRangeRequest) returns (GetRangeResponse);
+    rpc GetRanges (GetRangesRequest) returns (GetRangesResponse);
+    rpc DeleteRange (DeleteRangeRequest) returns (DeleteRangeResponse);
+    rpc AddPath (AddPathRequest) returns (AddPathResponse);
     rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
     rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
     rpc DeletePaths (DeletePathsRequest) returns (DeletePathsResponse);
+    rpc AddFiles (AddFilesRequest) returns (AddFilesResponse);
+    rpc GetFiles (GetFilesRequest) returns (GetFilesResponse);
+    rpc UpdateFile (UpdateFileRequest) returns (UpdateFileResponse);
+    rpc DeleteFiles (DeleteFilesRequest) returns (DeleteFilesResponse);
     rpc CreatePeerPath (CreatePeerPathRequest) returns (CreatePeerPathResponse);
     rpc GetPeerPaths (GetPeerPathsRequest) returns (GetPeerPathsResponse);
     rpc UpdatePeerPath (UpdatePeerPathRequest) returns (UpdatePeerPathResponse);
@@ -113,23 +125,37 @@ message PeerPath {
 message RangeIndex {
     uint64 id = 1;
     bytes indexStruct = 2;
-    uint64 tableId = 3;
-    uint64 keyColumnId = 4;
+    string keyColumns = 3;
+    uint64 tableId = 4;
+    uint64 schemaVersionId = 5;
 }
 
 message Range {
     uint64 id = 1;
-    bytes recordStats = 2;
-    uint64 parentId = 3;
-    uint64 rangeIndexId = 4;
+    bytes min = 2;
+    bytes max = 3;
+    optional uint64 parentId = 4;
+    uint64 rangeIndexId = 5;
 }
 
 message Path {
+    enum Type {
+        ORDERED = 0;
+        COMPACT = 1;
+        PROJECTION = 2;
+    }
     uint64 id = 1;
     string uri = 2;
-    bool isCompact = 3;
+    Type type = 3;
     uint64 layoutId = 4;
     optional uint64 rangeId = 5;
+}
+
+message File {
+    uint64 id = 1;
+    string name = 2;
+    int32 numRowGroup = 3;
+    uint64 pathId = 4;
 }
 
 message SchemaVersion {
@@ -137,7 +163,6 @@ message SchemaVersion {
     repeated Column columns = 2;
     uint64 transTs = 3;
     uint64 tableId = 4;
-    optional uint64 rangeIndexId = 5;
 }
 
 enum Permission {
@@ -157,8 +182,9 @@ message Layout {
     repeated Path compactPaths = 8;
     string splits = 9;
     string projections = 10;
-    uint64 schemaVersionId = 11;
+    repeated Path projectionPaths = 11;
     uint64 tableId = 12;
+    uint64 schemaVersionId = 13;
 }
 
 message View {
@@ -372,6 +398,83 @@ message UpdateLayoutResponse {
     ResponseHeader header = 1;
 }
 
+// range index
+message AddRangeIndexRequest {
+    RequestHeader header = 1;
+    RangeIndex rangeIndex = 2;
+}
+
+message AddRangeIndexResponse {
+    ResponseHeader header = 1;
+}
+
+message GetRangeIndexRequest {
+    RequestHeader header = 1;
+    int64 tableId = 2;
+}
+
+message GetRangeIndexResponse {
+    ResponseHeader header = 1;
+    RangeIndex rangeIndex = 2;
+}
+
+message UpdateRangeIndexRequest {
+    RequestHeader header = 1;
+    RangeIndex rangeIndex = 2;
+}
+
+message UpdateRangeIndexResponse {
+    ResponseHeader header = 1;
+};
+
+message DeleteRangeIndexRequest {
+    RequestHeader header = 1;
+    int64 tableId = 2;
+}
+
+message DeleteRangeIndexResponse {
+    ResponseHeader header = 1;
+};
+
+// range
+message AddRangeRequest {
+    RequestHeader header = 1;
+    Range range = 2;
+}
+
+message AddRangeResponse {
+    ResponseHeader header = 1;
+};
+
+message GetRangeRequest {
+    RequestHeader header = 1;
+    int64 rangeId = 2;
+}
+
+message GetRangeResponse {
+    ResponseHeader header = 1;
+    Range range = 2;
+}
+
+message GetRangesRequest {
+    RequestHeader header = 1;
+    int64 rangeIndexId = 2;
+}
+
+message GetRangesResponse {
+    ResponseHeader header = 1;
+    repeated Range ranges = 2;
+}
+
+message DeleteRangeRequest {
+    RequestHeader header = 1;
+    int64 rangeId = 2;
+}
+
+message DeleteRangeResponse {
+    ResponseHeader header = 1;
+};
+
 // peer
 message CreatePeerRequest {
     RequestHeader header = 1;
@@ -417,12 +520,12 @@ message DeletePeerResponse {
 }
 
 // path
-message CreatePathRequest {
+message AddPathRequest {
     RequestHeader header = 1;
     Path path = 2;
 }
 
-message CreatePathResponse {
+message AddPathResponse {
     ResponseHeader header = 1;
 }
 
@@ -441,9 +544,7 @@ message GetPathsResponse {
 
 message UpdatePathRequest {
     RequestHeader header = 1;
-    uint64 pathId = 2;
-    string uri = 3;
-    bool isCompact = 4;
+    Path path = 2;
 }
 
 message UpdatePathResponse {
@@ -459,6 +560,45 @@ message DeletePathsResponse {
     ResponseHeader header = 1;
 }
 
+// file
+message AddFilesRequest {
+    RequestHeader header = 1;
+    repeated File files = 2;
+}
+
+message AddFilesResponse {
+    ResponseHeader header = 1;
+}
+
+message GetFilesRequest {
+    RequestHeader header = 1;
+    uint64 pathId = 2;
+}
+
+message GetFilesResponse {
+    ResponseHeader header = 1;
+    repeated File files = 2;
+}
+
+message UpdateFileRequest {
+    RequestHeader header = 1;
+    File file = 2;
+}
+
+message UpdateFileResponse {
+    ResponseHeader header = 1;
+}
+
+message DeleteFilesRequest {
+    RequestHeader header = 1;
+    repeated uint64 fileIds = 2;
+}
+
+message DeleteFilesResponse {
+    ResponseHeader header = 1;
+}
+
+// peer path
 message CreatePeerPathRequest {
     RequestHeader header = 1;
     PeerPath peerPath = 2;

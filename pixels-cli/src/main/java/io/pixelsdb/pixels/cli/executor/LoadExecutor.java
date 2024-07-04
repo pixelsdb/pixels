@@ -23,6 +23,8 @@ import io.pixelsdb.pixels.cli.load.Consumer;
 import io.pixelsdb.pixels.cli.load.Parameters;
 import io.pixelsdb.pixels.cli.load.PixelsConsumer;
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -31,9 +33,8 @@ import net.sourceforge.argparse4j.inf.Namespace;
 
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-
-import static io.pixelsdb.pixels.cli.Main.validateOrderOrCompactPath;
 
 /**
  * @author hank
@@ -46,23 +47,13 @@ public class LoadExecutor implements CommandExecutor
     {
         String schemaName = ns.getString("schema");
         String tableName = ns.getString("table");
-        String origin = ns.getString("original_data_path");
+        String origin = ns.getString("origin");
         int rowNum = Integer.parseInt(ns.getString("row_num"));
         String regex = ns.getString("row_regex");
-        String paths = ns.getString("loading_data_paths");
         int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
         EncodingLevel encodingLevel = EncodingLevel.from(Integer.parseInt(ns.getString("encoding_level")));
         System.out.println("encoding level: " + encodingLevel);
         boolean nullsPadding = Boolean.parseBoolean(ns.getString("nulls_padding"));
-        String[] loadingDataPaths = null;
-        if (paths != null)
-        {
-            loadingDataPaths = paths.split(";");
-            if (loadingDataPaths.length > 0)
-            {
-                validateOrderOrCompactPath(loadingDataPaths);
-            }
-        }
 
         if (!origin.endsWith("/"))
         {
@@ -70,41 +61,54 @@ public class LoadExecutor implements CommandExecutor
         }
 
         Storage storage = StorageFactory.Instance().getStorage(origin);
+        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
+        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
+        MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
 
         Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex,
-                encodingLevel, nullsPadding, loadingDataPaths);
+                encodingLevel, nullsPadding, metadataService);
 
         // source already exist, producer option is false, add list of source to the queue
         List<String> fileList = storage.listPaths(origin);
-        BlockingQueue<String> fileQueue = new LinkedBlockingQueue<>(fileList.size());
+        BlockingQueue<String> inputFiles = new LinkedBlockingQueue<>(fileList.size());
+        ConcurrentLinkedQueue<File> loadedFiles = new ConcurrentLinkedQueue<>();
         for (String filePath : fileList)
         {
-            fileQueue.add(storage.ensureSchemePrefix(filePath));
+            inputFiles.add(storage.ensureSchemePrefix(filePath));
         }
 
         long startTime = System.currentTimeMillis();
-        if (startConsumer(threadNum, fileQueue, parameters))
+        if (startConsumers(threadNum, inputFiles, parameters, loadedFiles))
         {
-            System.out.println("Execute command " + command + " successful");
+            metadataService.addFiles(loadedFiles);
+            System.out.println(command + " is successful");
         } else
         {
-            System.out.println("Execute command " + command + " failed");
+            System.err.println(command + " failed");
         }
 
         long endTime = System.currentTimeMillis();
         System.out.println("Text files in '" + origin + "' are loaded by " + threadNum +
-                " threads in " + (endTime - startTime) / 1000 + "s.");
+                " threads in " + (endTime - startTime) / 1000.0 + "s.");
+        metadataService.shutdown();
     }
 
-    private boolean startConsumer(int threadNum, BlockingQueue<String> queue, Parameters parameters)
+    /**
+     * Start concurrent consumers that consumes the input (source) files and load them into pixels files of a table.
+     * @param concurrency the number of threads for data loading
+     * @param inputFiles the queue of the paths of input files
+     * @param parameters the parameters for data loading, e.g., the schema name and table name
+     * @param loadedFiles the information of the loaded pixels files
+     * @return true if consumers complete successfully
+     */
+    private boolean startConsumers(int concurrency, BlockingQueue<String> inputFiles, Parameters parameters,
+                                   ConcurrentLinkedQueue<File> loadedFiles)
     {
-        ConfigFactory configFactory = ConfigFactory.Instance();
-
         boolean success = false;
         try
         {
             // initialize the extra parameters for data loading
-            success = parameters.initExtra(configFactory);
+            success = parameters.initExtra();
         } catch (MetadataException | InterruptedException e)
         {
             e.printStackTrace();
@@ -113,12 +117,12 @@ public class LoadExecutor implements CommandExecutor
         boolean res = false;
         if (success)
         {
-            Consumer[] consumers = new Consumer[threadNum];
+            Consumer[] consumers = new Consumer[concurrency];
             try
             {
-                for (int i = 0; i < threadNum; i++)
+                for (int i = 0; i < concurrency; i++)
                 {
-                    PixelsConsumer pixelsConsumer = new PixelsConsumer(queue, parameters, i);
+                    PixelsConsumer pixelsConsumer = new PixelsConsumer(inputFiles, parameters, loadedFiles);
                     consumers[i] = pixelsConsumer;
                     pixelsConsumer.start();
                 }
@@ -145,7 +149,7 @@ public class LoadExecutor implements CommandExecutor
             }
         } else
         {
-            System.out.println("Parameters initialization error.");
+            System.err.println("Parameters initialization error.");
         }
         return res;
     }

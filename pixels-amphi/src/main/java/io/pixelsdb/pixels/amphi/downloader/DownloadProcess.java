@@ -43,8 +43,7 @@ import java.util.stream.Collectors;
  * Built as the main method to download partial data to the local storage.
  */
 public class DownloadProcess {
-    public static void main(String[] args)
-            throws IOException, IllegalArgumentException, MetadataException
+    public static void main(String[] args) throws IOException, IllegalArgumentException, MetadataException
     {
         // Load configuration
         String configFilePath = args[0];
@@ -59,48 +58,58 @@ public class DownloadProcess {
         String outputDirectory;
         Path outputDirPath;
 
-        if (configContent != null) {
+        if (configContent != null)
+        {
             JSONObject configJson = JSON.parseObject(configContent);
 
             metadataServiceHost = configJson.getString("MetadataServiceHost");
-            if (metadataServiceHost == null) {
+            if (metadataServiceHost == null)
+            {
                 throw new IllegalArgumentException("MetadataServiceHost is missing in the configuration file.");
             }
 
-            if (!configJson.containsKey("MetadataServicePort")) {
+            if (!configJson.containsKey("MetadataServicePort"))
+            {
                 throw new IllegalArgumentException("MetadataServicePort is missing in the configuration file.");
             }
             metadataServicePort = configJson.getIntValue("MetadataServicePort");
 
             schemaName = configJson.getString("SchemaName");
-            if (schemaName == null) {
+            if (schemaName == null)
+            {
                 throw new IllegalArgumentException("SchemaName is missing in the configuration file.");
             }
 
             schemaData = configJson.getJSONArray("SchemaData");
-            if (schemaData == null) {
+            if (schemaData == null)
+            {
                 throw new IllegalArgumentException("SchemaData is missing in the configuration file.");
             }
 
             inputStorage = configJson.getString("InputStorage");
-            if (inputStorage == null) {
+            if (inputStorage == null)
+            {
                 throw new IllegalArgumentException("InputStorage is missing in the configuration file.");
             }
 
             outputStorage = configJson.getString("OutputStorage");
-            if (outputStorage == null) {
+            if (outputStorage == null)
+            {
                 throw new IllegalArgumentException("OutputStorage is missing in the configuration file.");
             }
 
             outputDirectory = configJson.getString("OutputDirectory");
-            if (outputDirectory == null) {
+            if (outputDirectory == null)
+            {
                 throw new IllegalArgumentException("OutputDirectory is missing in the configuration file.");
             }
             outputDirPath = Paths.get(outputDirectory);
-            if (!Files.exists(outputDirPath)) {
+            if (!Files.exists(outputDirPath))
+            {
                 throw new IllegalArgumentException("The output directory does not exist.");
             }
-        } else {
+        } else
+        {
             throw new IllegalArgumentException("Configuration file content is empty or wrongly formatted.");
         }
 
@@ -117,7 +126,8 @@ public class DownloadProcess {
         {
             JSONObject tableData = schemaData.getJSONObject(i);
             String tableName = tableData.getString("table");
-            if (tableName == null) {
+            if (tableName == null)
+            {
                 throw new IllegalArgumentException("Table is missing in the SchemaData.");
             }
 
@@ -132,7 +142,8 @@ public class DownloadProcess {
             // Get input path
             Layout layout = metadataService.getLatestLayout(schemaName, tableName);
             String path = layout.getOrderedPathUris()[0];
-            if (path == null) {
+            if (path == null)
+            {
                 throw new MetadataException("Failed to get a valid path for: " + schemaName + ", " + tableName);
             }
             List<Status> statuses = inputStorageInstance.listStatus(path);
@@ -140,13 +151,17 @@ public class DownloadProcess {
 
             // Manage output directory
             Path tableDir = outputDirPath.resolve(tableName);
-            try {
-                if (!Files.exists(tableDir)) {
+            try
+            {
+                if (!Files.exists(tableDir))
+                {
                     Files.createDirectory(tableDir);
-                } else {
+                } else
+                {
                     System.out.println("Directory already exists: " + tableDir);
                 }
-            } catch (IOException e) {
+            } catch (IOException e)
+            {
                 new IOException("Cannot create directory: " + tableDir);
             }
 
@@ -168,9 +183,11 @@ public class DownloadProcess {
     private static String readConfigFile(String filePath)
             throws IOException
     {
-        try {
+        try
+        {
             return new String(Files.readAllBytes(Paths.get(filePath)));
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             throw new IOException("Configuration file for download process does not exist: " + e.getMessage());
         }
     }

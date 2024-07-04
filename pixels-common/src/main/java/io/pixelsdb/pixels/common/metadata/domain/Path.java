@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.util.List;
@@ -33,8 +34,28 @@ import static java.util.Objects.requireNonNull;
  */
 public class Path extends Base
 {
+    public enum Type
+    {
+        ORDERED, COMPACT, PROJECTION;
+
+        public static Type valueOf(int number)
+        {
+            switch (number)
+            {
+                case 0:
+                    return ORDERED;
+                case 1:
+                    return COMPACT;
+                case 2:
+                    return PROJECTION;
+                default:
+                    throw new InvalidArgumentException("invalid number for Path.Type");
+            }
+        }
+    }
+
     private String uri;
-    private boolean isCompact;
+    private Type type;
     private long layoutId;
     private long rangeId = 0; // 0 is an invalid id in SQL
 
@@ -44,7 +65,7 @@ public class Path extends Base
     {
         this.setId(path.getId());
         this.uri = path.getUri();
-        this.isCompact = path.getIsCompact();
+        this.type = Type.valueOf(path.getType().getNumber());
         this.layoutId = path.getLayoutId();
         if (path.hasRangeId())
         {
@@ -90,14 +111,14 @@ public class Path extends Base
         this.uri = uri;
     }
 
-    public boolean isCompact()
+    public Type getType()
     {
-        return isCompact;
+        return type;
     }
 
-    public void setCompact(boolean compact)
+    public void setType(Type type)
     {
-        isCompact = compact;
+        this.type = type;
     }
 
     public long getLayoutId()
@@ -126,15 +147,16 @@ public class Path extends Base
         return "Path{" +
                 ", pathId='" + this.getId() + '\'' +
                 ", uri='" + uri + '\'' +
-                ", isCompact='" + isCompact + '\'' +
+                ", type='" + type.name() + '\'' +
                 ", layoutId='" + layoutId + '\'' +
                 ", rangeId='" + rangeId + '\'' + '}';
     }
 
-    private MetadataProto.Path toProto()
+    @Override
+    public MetadataProto.Path toProto()
     {
         MetadataProto.Path.Builder builder = MetadataProto.Path.newBuilder()
-                .setId(this.getId()).setUri(this.uri).setIsCompact(this.isCompact).setLayoutId(this.layoutId);
+                .setId(this.getId()).setUri(this.uri).setTypeValue(this.type.ordinal()).setLayoutId(this.layoutId);
         if (this.rangeId > 0)
         {
             builder.setRangeId(this.rangeId);

@@ -36,15 +36,16 @@ set(pixels_common_cxx
         lib/physical/BufferPool.cpp
         include/physical/natives/DirectUringRandomAccessFile.h
         lib/physical/natives/DirectUringRandomAccessFile.cpp
-        )
+		include/utils/ColumnSizeCSVReader.h lib/utils/ColumnSizeCSVReader.cpp
+        include/physical/StorageArrayScheduler.h lib/physical/StorageArrayScheduler.cpp)
 
 include_directories(include)
 
-if(NOT DEFINED ENV{PIXELS_HOME})
-	message(FATAL_ERROR "You must set PIXELS_HOME environment variable. The value should be set to the Pixels base directory.")
+if(NOT DEFINED ENV{PIXELS_SRC})
+	message(FATAL_ERROR "You must set PIXELS_SRC environment variable. The value should be set to the Pixels base directory.")
 endif()
 
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS $ENV{PIXELS_HOME}/proto/pixels.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS $ENV{PIXELS_SRC}/proto/pixels.proto)
 
 add_library(pixels-common ${pixels_common_cxx} ${PROTO_SRCS} ${PROTO_HDRS})
 

@@ -699,7 +699,7 @@ public class PixelsWriterImpl implements PixelsWriter
 
         // build PostScript
         postScript = PixelsProto.PostScript.newBuilder()
-                .setVersion(Constants.VERSION)
+                .setVersion(PixelsVersion.currentVersion().getVersion())
                 .setContentLength(fileContentLength)
                 .setNumberOfRows(fileRowNum)
                 .setCompression(compressionKind)
@@ -708,7 +708,7 @@ public class PixelsWriterImpl implements PixelsWriter
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(partitioned)
                 .setColumnChunkAlignment(CHUNK_ALIGNMENT)
-                .setMagic(Constants.MAGIC)
+                .setMagic(Constants.FILE_MAGIC)
                 .build();
 
         // build FileTail

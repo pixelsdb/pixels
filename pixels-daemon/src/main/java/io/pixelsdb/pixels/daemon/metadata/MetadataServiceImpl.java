@@ -49,8 +49,11 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     private final TableDao tableDao = DaoFactory.Instance().getTableDao();
     private final ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
     private final LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
+    private final RangeDao rangeDao = DaoFactory.Instance().getRangeDao();
+    private final RangeIndexDao rangeIndexDao = DaoFactory.Instance().getRangeIndexDao();
     private final ViewDao viewDao = DaoFactory.Instance().getViewDao();
     private final PathDao pathDao = DaoFactory.Instance().getPathDao();
+    private final FileDao fileDao = DaoFactory.Instance().getFileDao();
     private final PeerDao peerDao = DaoFactory.Instance().getPeerDao();
     private final PeerPathDao peerPathDao = DaoFactory.Instance().getPeerPathDao();
     private final SchemaVersionDao schemaVersionDao = DaoFactory.Instance().getSchemaVersionDao();
@@ -142,24 +145,21 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             {
                 pathsBuilder.add(MetadataProto.Path.newBuilder()
                         .setUri(basePathUri + "v-" + layoutVersion + "-compact")
-                        .setIsCompact(true).setLayoutId(layoutId).build());
+                        .setType(MetadataProto.Path.Type.COMPACT).setLayoutId(layoutId).build());
             }
             else
             {
                 pathsBuilder.add(MetadataProto.Path.newBuilder()
                         .setUri(basePathUri + "v-" + layoutVersion + "-ordered")
-                        .setIsCompact(false).setLayoutId(layoutId).build());
+                        .setType(MetadataProto.Path.Type.ORDERED).setLayoutId(layoutId).build());
             }
         }
         return pathsBuilder.build();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
-    public void getSchemas(MetadataProto.GetSchemasRequest request, StreamObserver<MetadataProto.GetSchemasResponse> responseObserver)
+    public void getSchemas(MetadataProto.GetSchemasRequest request,
+                           StreamObserver<MetadataProto.GetSchemasResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -186,12 +186,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
-    public void getTable(MetadataProto.GetTableRequest request, StreamObserver<MetadataProto.GetTableResponse> responseObserver)
+    public void getTable(MetadataProto.GetTableRequest request,
+                         StreamObserver<MetadataProto.GetTableResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -229,7 +226,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void updateRowCount(MetadataProto.UpdateRowCountRequest request, StreamObserver<MetadataProto.UpdateRowCountResponse> responseObserver)
+    public void updateRowCount(MetadataProto.UpdateRowCountRequest request,
+                               StreamObserver<MetadataProto.UpdateRowCountResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -270,12 +268,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
-    public void getTables(MetadataProto.GetTablesRequest request, StreamObserver<MetadataProto.GetTablesResponse> responseObserver)
+    public void getTables(MetadataProto.GetTablesRequest request,
+                          StreamObserver<MetadataProto.GetTablesResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -316,12 +311,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
-    public void getLayouts(MetadataProto.GetLayoutsRequest request, StreamObserver<MetadataProto.GetLayoutsResponse> responseObserver)
+    public void getLayouts(MetadataProto.GetLayoutsRequest request,
+                           StreamObserver<MetadataProto.GetLayoutsResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -351,7 +343,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         {
             headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" + request.getSchemaName() + "' not found");
         }
-        if(layouts != null && layouts.isEmpty() == false)
+        if(layouts != null && !layouts.isEmpty())
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
             response = MetadataProto.GetLayoutsResponse.newBuilder()
@@ -368,12 +360,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
-    public void getLayout(MetadataProto.GetLayoutRequest request, StreamObserver<MetadataProto.GetLayoutResponse> responseObserver)
+    public void getLayout(MetadataProto.GetLayoutRequest request,
+                          StreamObserver<MetadataProto.GetLayoutResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -443,7 +432,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void addLayout (MetadataProto.AddLayoutRequest request, StreamObserver<MetadataProto.AddLayoutResponse> responseObserver)
+    public void addLayout (MetadataProto.AddLayoutRequest request,
+                           StreamObserver<MetadataProto.AddLayoutResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -464,7 +454,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void updateLayout (MetadataProto.UpdateLayoutRequest request, StreamObserver<MetadataProto.UpdateLayoutResponse> responseObserver)
+    public void updateLayout (MetadataProto.UpdateLayoutRequest request,
+                              StreamObserver<MetadataProto.UpdateLayoutResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -485,7 +476,181 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void createPath(MetadataProto.CreatePathRequest request, StreamObserver<MetadataProto.CreatePathResponse> responseObserver)
+    public void addRangeIndex(MetadataProto.AddRangeIndexRequest request,
+                                 StreamObserver<MetadataProto.AddRangeIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (rangeIndexDao.insert(request.getRangeIndex()) > 0)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_RANGE_INDEX_FAILED).setErrorMsg("add range index failed");
+        }
+
+        MetadataProto.AddRangeIndexResponse response = MetadataProto.AddRangeIndexResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getRangeIndex(MetadataProto.GetRangeIndexRequest request,
+                              StreamObserver<MetadataProto.GetRangeIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.GetRangeIndexResponse response;
+        MetadataProto.RangeIndex rangeIndex = rangeIndexDao.getByTableId(request.getTableId());
+        if (rangeIndex != null)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.GetRangeIndexResponse.newBuilder().setRangeIndex(rangeIndex).setHeader(headerBuilder).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_RANGE_INDEX_NOT_FOUND).setErrorMsg("range index with table id '" +
+                            request.getTableId() + "' is not found");
+            response = MetadataProto.GetRangeIndexResponse.newBuilder().setHeader(headerBuilder).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updateRangeIndex(MetadataProto.UpdateRangeIndexRequest request,
+                                 StreamObserver<MetadataProto.UpdateRangeIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        if (rangeIndexDao.update(request.getRangeIndex()))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_RANGE_INDEX_FAILED).setErrorMsg("make sure the range index exists");
+        }
+        MetadataProto.UpdateRangeIndexResponse response = MetadataProto.UpdateRangeIndexResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deleteRangeIndex(MetadataProto.DeleteRangeIndexRequest request,
+                                 StreamObserver<MetadataProto.DeleteRangeIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        if (rangeIndexDao.deleteByTableId(request.getTableId()))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_RANGE_INDEX_FAILED).setErrorMsg("delete range index failed");
+        }
+        MetadataProto.DeleteRangeIndexResponse response = MetadataProto.DeleteRangeIndexResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void addRange(MetadataProto.AddRangeRequest request,
+                            StreamObserver<MetadataProto.AddRangeResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (rangeDao.insert(request.getRange()) > 0)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_RANGE_FAILED).setErrorMsg("add range failed");
+        }
+
+        MetadataProto.AddRangeResponse response = MetadataProto.AddRangeResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getRange(MetadataProto.GetRangeRequest request,
+                         StreamObserver<MetadataProto.GetRangeResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.GetRangeResponse response;
+        MetadataProto.Range range = rangeDao.getById(request.getRangeId());
+        if (range != null)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.GetRangeResponse.newBuilder().setRange(range).setHeader(headerBuilder).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_RANGE_NOT_FOUNT).setErrorMsg("range with id '" +
+                    request.getRangeId() + "' is not found");
+            response = MetadataProto.GetRangeResponse.newBuilder().setHeader(headerBuilder).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getRanges(MetadataProto.GetRangesRequest request,
+                          StreamObserver<MetadataProto.GetRangesResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.GetRangesResponse response;
+        List<MetadataProto.Range> ranges = rangeDao.getAllByRangeIndexId(request.getRangeIndexId());
+        if (ranges != null)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.GetRangesResponse.newBuilder().addAllRanges(ranges).setHeader(headerBuilder).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_RANGES_FAILED).setErrorMsg("get ranges with range index id '" +
+                    request.getRangeIndexId() + "' failed");
+            response = MetadataProto.GetRangesResponse.newBuilder().setHeader(headerBuilder).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deleteRange(MetadataProto.DeleteRangeRequest request,
+                            StreamObserver<MetadataProto.DeleteRangeResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        if (rangeDao.deleteById(request.getRangeId()))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_RANGE_FAILED).setErrorMsg("delete range failed");
+        }
+        MetadataProto.DeleteRangeResponse response = MetadataProto.DeleteRangeResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void addPath(MetadataProto.AddPathRequest request,
+                           StreamObserver<MetadataProto.AddPathResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -496,17 +661,18 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED).setErrorMsg("create path failed");
+            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED).setErrorMsg("add path failed");
         }
 
-        MetadataProto.CreatePathResponse response = MetadataProto.CreatePathResponse.newBuilder()
+        MetadataProto.AddPathResponse response = MetadataProto.AddPathResponse.newBuilder()
                 .setHeader(headerBuilder).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
     @Override
-    public void getPaths(MetadataProto.GetPathsRequest request, StreamObserver<MetadataProto.GetPathsResponse> responseObserver)
+    public void getPaths(MetadataProto.GetPathsRequest request,
+                         StreamObserver<MetadataProto.GetPathsResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -551,14 +717,12 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void updatePath(MetadataProto.UpdatePathRequest request, StreamObserver<MetadataProto.UpdatePathResponse> responseObserver)
+    public void updatePath(MetadataProto.UpdatePathRequest request,
+                           StreamObserver<MetadataProto.UpdatePathResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
-
-        MetadataProto.Path path = MetadataProto.Path.newBuilder()
-                .setId(request.getPathId()).setUri(request.getUri()).setIsCompact(request.getIsCompact()).build();
-        if (this.pathDao.update(path))
+        if (this.pathDao.update(request.getPath()))
         {
             headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
         }
@@ -574,7 +738,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void deletePaths(MetadataProto.DeletePathsRequest request, StreamObserver<MetadataProto.DeletePathsResponse> responseObserver)
+    public void deletePaths(MetadataProto.DeletePathsRequest request,
+                            StreamObserver<MetadataProto.DeletePathsResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -595,7 +760,97 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void createPeerPath(MetadataProto.CreatePeerPathRequest request, StreamObserver<MetadataProto.CreatePeerPathResponse> responseObserver)
+    public void addFiles(MetadataProto.AddFilesRequest request,
+                        StreamObserver<MetadataProto.AddFilesResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.fileDao.insertBatch(request.getFilesList()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_FILE_FAILED).setErrorMsg("add file failed");
+        }
+
+        MetadataProto.AddFilesResponse response = MetadataProto.AddFilesResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getFiles(MetadataProto.GetFilesRequest request,
+                         StreamObserver<MetadataProto.GetFilesResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetFilesResponse.Builder responseBuilder = MetadataProto.GetFilesResponse.newBuilder();
+        List<MetadataProto.File> files = this.fileDao.getAllByPathId(request.getPathId());
+        if (files != null)
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+            responseBuilder.addAllFiles(files).setHeader(headerBuilder);
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_FILES_FAILED).setErrorMsg("get files by path id failed");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updateFile(MetadataProto.UpdateFileRequest request,
+                           StreamObserver<MetadataProto.UpdateFileResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        if (this.fileDao.update(request.getFile()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_FILE_FAILED).setErrorMsg("update file failed");
+        }
+
+        MetadataProto.UpdateFileResponse response = MetadataProto.UpdateFileResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deleteFiles(MetadataProto.DeleteFilesRequest request,
+                            StreamObserver<MetadataProto.DeleteFilesResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.fileDao.deleteByIds(request.getFileIdsList()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_FILES_FAILED).setErrorMsg("delete files failed");
+        }
+
+        MetadataProto.DeleteFilesResponse response = MetadataProto.DeleteFilesResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void createPeerPath(MetadataProto.CreatePeerPathRequest request,
+                               StreamObserver<MetadataProto.CreatePeerPathResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -616,7 +871,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void getPeerPaths(MetadataProto.GetPeerPathsRequest request, StreamObserver<MetadataProto.GetPeerPathsResponse> responseObserver)
+    public void getPeerPaths(MetadataProto.GetPeerPathsRequest request,
+                             StreamObserver<MetadataProto.GetPeerPathsResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -661,7 +917,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void updatePeerPath(MetadataProto.UpdatePeerPathRequest request, StreamObserver<MetadataProto.UpdatePeerPathResponse> responseObserver)
+    public void updatePeerPath(MetadataProto.UpdatePeerPathRequest request,
+                               StreamObserver<MetadataProto.UpdatePeerPathResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -685,7 +942,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void deletePeerPaths(MetadataProto.DeletePeerPathsRequest request, StreamObserver<MetadataProto.DeletePeerPathsResponse> responseObserver)
+    public void deletePeerPaths(MetadataProto.DeletePeerPathsRequest request,
+                                StreamObserver<MetadataProto.DeletePeerPathsResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -706,7 +964,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void createPeer(MetadataProto.CreatePeerRequest request, StreamObserver<MetadataProto.CreatePeerResponse> responseObserver)
+    public void createPeer(MetadataProto.CreatePeerRequest request,
+                           StreamObserver<MetadataProto.CreatePeerResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -727,7 +986,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void getPeer(MetadataProto.GetPeerRequest request, StreamObserver<MetadataProto.GetPeerResponse> responseObserver)
+    public void getPeer(MetadataProto.GetPeerRequest request,
+                        StreamObserver<MetadataProto.GetPeerResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -772,7 +1032,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void updatePeer(MetadataProto.UpdatePeerRequest request, StreamObserver<MetadataProto.UpdatePeerResponse> responseObserver)
+    public void updatePeer(MetadataProto.UpdatePeerRequest request,
+                           StreamObserver<MetadataProto.UpdatePeerResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -793,7 +1054,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void deletePeer(MetadataProto.DeletePeerRequest request, StreamObserver<MetadataProto.DeletePeerResponse> responseObserver)
+    public void deletePeer(MetadataProto.DeletePeerRequest request,
+                           StreamObserver<MetadataProto.DeletePeerResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -836,7 +1098,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
      * @param responseObserver
      */
     @Override
-    public void getColumns(MetadataProto.GetColumnsRequest request, StreamObserver<MetadataProto.GetColumnsResponse> responseObserver)
+    public void getColumns(MetadataProto.GetColumnsRequest request,
+                           StreamObserver<MetadataProto.GetColumnsResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -861,7 +1124,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
                     request.getSchemaName() + "' not found");
         }
-        if(columns != null && columns.isEmpty() == false)
+        if(columns != null && !columns.isEmpty())
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
             response = MetadataProto.GetColumnsResponse.newBuilder()
@@ -881,7 +1144,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void updateColumn (MetadataProto.UpdateColumnRequest request, StreamObserver<MetadataProto.UpdateColumnResponse> responseObserver)
+    public void updateColumn (MetadataProto.UpdateColumnRequest request,
+                              StreamObserver<MetadataProto.UpdateColumnResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -903,10 +1167,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void createSchema(MetadataProto.CreateSchemaRequest request,
                              StreamObserver<MetadataProto.CreateSchemaResponse> responseObserver)
@@ -940,10 +1200,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void dropSchema(MetadataProto.DropSchemaRequest request,
                            StreamObserver<MetadataProto.DropSchemaResponse> responseObserver)
@@ -967,10 +1223,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
     public void createTable(MetadataProto.CreateTableRequest request,
                             StreamObserver<MetadataProto.CreateTableResponse> responseObserver)
@@ -1111,12 +1363,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
-    public void dropTable(MetadataProto.DropTableRequest request, StreamObserver<MetadataProto.DropTableResponse> responseObserver)
+    public void dropTable(MetadataProto.DropTableRequest request,
+                          StreamObserver<MetadataProto.DropTableResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -1138,12 +1387,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
-    public void existTable(MetadataProto.ExistTableRequest request, StreamObserver<MetadataProto.ExistTableResponse> responseObserver)
+    public void existTable(MetadataProto.ExistTableRequest request,
+                           StreamObserver<MetadataProto.ExistTableResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -1194,12 +1440,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
-    /**
-     * @param request
-     * @param responseObserver
-     */
     @Override
-    public void existSchema(MetadataProto.ExistSchemaRequest request, StreamObserver<MetadataProto.ExistSchemaResponse> responseObserver)
+    public void existSchema(MetadataProto.ExistSchemaRequest request,
+                            StreamObserver<MetadataProto.ExistSchemaResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -1225,7 +1468,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void createView(MetadataProto.CreateViewRequest request, StreamObserver<MetadataProto.CreateViewResponse> responseObserver)
+    public void createView(MetadataProto.CreateViewRequest request,
+                           StreamObserver<MetadataProto.CreateViewResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -1277,7 +1521,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void existView(MetadataProto.ExistViewRequest request, StreamObserver<MetadataProto.ExistViewResponse> responseObserver)
+    public void existView(MetadataProto.ExistViewRequest request,
+                          StreamObserver<MetadataProto.ExistViewResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -1325,7 +1570,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void getViews(MetadataProto.GetViewsRequest request, StreamObserver<MetadataProto.GetViewsResponse> responseObserver)
+    public void getViews(MetadataProto.GetViewsRequest request,
+                         StreamObserver<MetadataProto.GetViewsResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -1366,7 +1612,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void getView(MetadataProto.GetViewRequest request, StreamObserver<MetadataProto.GetViewResponse> responseObserver)
+    public void getView(MetadataProto.GetViewRequest request,
+                        StreamObserver<MetadataProto.GetViewResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -1404,7 +1651,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void dropView(MetadataProto.DropViewRequest request, StreamObserver<MetadataProto.DropViewResponse> responseObserver)
+    public void dropView(MetadataProto.DropViewRequest request,
+                         StreamObserver<MetadataProto.DropViewResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());

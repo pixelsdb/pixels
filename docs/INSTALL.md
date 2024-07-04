@@ -312,15 +312,15 @@ Then, start the daemons of Pixels using:
 ```
 The essential services of Pixels, such as the metadata server, transaction manager, cache coordinator, cache manager, and metrics server, are running in these daemons.
 
-To start Pixels in a cluster, edit `PIXELS_HOME/sbin/datanodes` and list all the datanodes in this file.
+To start Pixels in a cluster, edit `PIXELS_HOME/sbin/workers` and list all the worker nodes in this file.
 Each line in this file is in the following format:
 ```config
-hostname_of_the_datanode pixels_home_of_the_datanode
+hostname_of_the_worker pixels_home_of_the_worker
 ```
-`pixels_home_of_the_datanode` is optional if the datanode has the same `PIXELS_HOME` as the coordinator node where you run
+`pixels_home_of_the_worker` is optional if the worker has the same `PIXELS_HOME` as the coordinator node where you run
 `start_pixels.sh`.
 
-You can also start Pixels coordinator and datanodes separately using `PIXELS_HOME/start-coordinator` and `PIXELS_HOME/start-datanode.sh`.
+You can also start Pixels coordinator and workers separately using `PIXELS_HOME/start-coordinator` and `PIXELS_HOME/start-workers.sh`.
 
 > Note: You can also add JVM OPTS for Pixels daemons in `PIXELS_HOME/bin/jvm.config`. This is useful for profiling and remote debugging.
 
@@ -344,4 +344,4 @@ Run `SHOW SCHEMAS` in trino-cli, the result should be as follows if everything i
 By now, Pixels has been installed in the EC2 instance. The aforementioned instructions should also
 work in other kinds of VMs or physical servers.
 
-Run the script `PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels, or run `PIXELS_HOME/stop-coordinator` and `PIXELS_HOME/stop-datanode.sh` to stop the coordinator and datanodes, respectively.
+Run the script `PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels, or run `PIXELS_HOME/stop-coordinator` and `PIXELS_HOME/stop-workers.sh` to stop the coordinator and workers, respectively.

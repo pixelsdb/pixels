@@ -10,6 +10,15 @@ ConfigFactory & ConfigFactory::Instance() {
 }
 
 ConfigFactory::ConfigFactory() {
+    if(std::getenv("PIXELS_SRC") == nullptr) {
+        throw InvalidArgumentException("The environment variable 'PIXELS_SRC' is not set. ");
+    }
+    pixelsSrc = std::string(std::getenv("PIXELS_SRC"));
+    std::cout<<"PIXELS_SRC is "<<pixelsSrc<<std::endl;
+    if(pixelsSrc.back() != '/') {
+        pixelsSrc += "/";
+    }
+
 	if(std::getenv("PIXELS_HOME") == nullptr) {
 		throw InvalidArgumentException("The environment variable 'PIXELS_HOME' is not set. ");
 	}
@@ -55,4 +64,8 @@ bool ConfigFactory::boolCheckProperty(std::string key) {
 
 std::string ConfigFactory::getPixelsDirectory() {
 	return pixelsHome;
+}
+
+std::string ConfigFactory::getPixelsSourceDirectory() {
+    return pixelsSrc;
 }
