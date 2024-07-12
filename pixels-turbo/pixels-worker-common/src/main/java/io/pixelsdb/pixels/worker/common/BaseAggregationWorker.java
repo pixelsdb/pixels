@@ -137,6 +137,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
             WorkerCommon.initStorage(inputStorageInfo);
             WorkerCommon.initStorage(outputStorageInfo);
 
+            logger.info("start get output schema");
             TypeDescription fileSchema = WorkerCommon.getFileSchemaFromPaths(
                     WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputFiles);
             /*
@@ -149,6 +150,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
             TypeDescription inputSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
 
             // start aggregation.
+            logger.info("start aggregation");
             for (int i = 0; i < functionTypes.length; ++i)
             {
                 if (functionTypes[i] == FunctionType.COUNT)
@@ -193,6 +195,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                 throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
             }
 
+            logger.info("start write aggregation result");
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
             PixelsWriter pixelsWriter = WorkerCommon.getWriter(aggregator.getOutputSchema(),
                     WorkerCommon.getStorage(outputStorageInfo.getScheme()),

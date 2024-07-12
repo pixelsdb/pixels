@@ -310,6 +310,8 @@ public class TestStreamWorker {
     // 跑之前删一下minio上面的中间结果
     @Test
     public void testWorkerNonPipelined() throws ExecutionException, InterruptedException {
+        System.out.println("NOTE: 跑之前删一下minio上面的中间结果");
+
         WorkerContext contextScan = new WorkerContext(LogManager.getLogger(BaseScanWorker.class), new WorkerMetrics(), "0");
         ScanWorker scanWorker1 = new ScanWorker(contextScan);
         ScanWorker scanWorker2 = new ScanWorker(contextScan);
@@ -333,6 +335,7 @@ public class TestStreamWorker {
         System.out.println(JSON.toJSONString(aggOutput));
 
         executor.shutdown();
+        System.out.println("NOTE: 跑之前删过minio上面的中间结果了吗？");
     }
 
     static final int test2NumHashes = 3;
@@ -537,6 +540,7 @@ public class TestStreamWorker {
     public void test2NonPipelined() throws ExecutionException, InterruptedException {
         // orders JOIN customer
         // 6 partition workers (5 for orders table + 1 for customer table) fully connected to 3 partitioned join workers
+        System.out.println("NOTE: 跑之前删一下minio上面的中间结果");
 
         WorkerContext contextScan = new WorkerContext(LogManager.getLogger(BasePartitionWorker.class), new WorkerMetrics(), "0");
         PartitionWorker partitionWorker1 = new PartitionWorker(contextScan);
@@ -572,6 +576,7 @@ public class TestStreamWorker {
         }
 
         executor.shutdown();
+        System.out.println("NOTE: 跑之前删过minio上面的中间结果了吗？");
     }
 
     /**

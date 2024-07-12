@@ -106,6 +106,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
             Aggregator aggregator;
             if (partialAggregationPresent)
             {
+                logger.info("start get output schema");
                 logger.debug("start get output schema, outputStorageInfo scheme = " + outputStorageInfo.getScheme() + ", region = " + outputStorageInfo.getRegion());
                 TypeDescription inputSchema = StreamWorkerCommon.getSchemaFromSplits(StreamWorkerCommon.getStorage(inputStorageInfo.getScheme()),
                         inputSplits);  // XXX: The better way is to include the schema in the header of the first rowBatch, or to call a readBatch(0) to ensure the header is parsed
@@ -126,7 +127,11 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                         partialAggregationInfo.isPartition(),
                         partialAggregationInfo.getNumPartition());
                 if (outputFolder.endsWith("_0"))  // Only one worker is responsible for passing the schema to the next level.
-                    StreamWorkerCommon.passSchemaToNextLevel(aggregator.getOutputSchema(), outputStorageInfo, event.getOutput());
+                {
+                    logger.info("start write schema to next level worker");
+                    StreamWorkerCommon.passSchemaToNextLevel(aggregator.getOutputSchema(), outputStorageInfo,
+                            event.getOutput());
+                }
             }
             else
             {
@@ -175,7 +180,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                 logger.info("start write aggregation result");
                 String outputPath = event.getOutput().getPath();
                 WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
-                logger.debug("start get writer " + outputStorageInfo.getScheme());
+                logger.debug("get writer " + outputStorageInfo.getScheme());
                 PixelsWriter pixelsWriter =  // outputStorageInfo.getScheme() == mock ? this.pixelsWriter :
                         StreamWorkerCommon.getWriter(aggregator.getOutputSchema(),
                         StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
