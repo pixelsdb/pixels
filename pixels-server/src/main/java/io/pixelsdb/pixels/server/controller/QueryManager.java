@@ -344,12 +344,12 @@ public class QueryManager
         if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             // submit it to the mpp connection
-            properties = this.costEffectiveConnProp;
+            properties = new Properties(this.costEffectiveConnProp);
         }
         else if (request.getExecutionHint() == ExecutionHint.IMMEDIATE)
         {
             // submit it to the pixels-turbo connection
-            properties = this.immediateConnProp;
+            properties = new Properties(this.immediateConnProp);
         }
         else
         {
