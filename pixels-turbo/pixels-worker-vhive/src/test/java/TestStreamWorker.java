@@ -98,18 +98,18 @@ public class TestStreamWorker {
 
         tableInfo.setInputSplits(
                 new ArrayList<>(Arrays.asList(
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094611_106.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094613_107.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094615_108.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094617_109.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094619_110.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094621_111.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094623_112.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094624_113.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094626_114.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094628_115.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094630_116.pxl", 0, 1))),
-                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094632_117.pxl", 0, 1)))
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145803_5.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145805_6.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145807_7.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145809_8.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145811_9.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145813_10.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145815_11.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145817_12.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145819_13.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145821_14.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145822_15.pxl", 0, 1))),
+                        new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145824_16.pxl", 0, 1)))
                 ))
         );
 //                genScanInputSplitsList.get(workerId));
@@ -143,18 +143,18 @@ public class TestStreamWorker {
         tableInfo.setBase(true);
 
         tableInfo.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094634_118.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094636_119.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094637_120.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094639_121.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094641_122.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094643_123.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094645_124.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094647_125.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094649_126.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094650_127.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094652_128.pxl", 0, 1))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094654_129.pxl", 0, 1)))
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145826_17.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145828_18.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145830_19.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145832_20.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145834_21.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145836_22.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145838_23.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145840_24.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145842_25.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145843_26.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145845_27.pxl", 0, 1))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145847_28.pxl", 0, 1)))
         ));
 
         tableInfo.setStorageInfo(inputStorageInfo);
@@ -341,45 +341,45 @@ public class TestStreamWorker {
     static final int test2NumHashes = 3;
     static final List<List<InputSplit>> test2ScanInputSplitsArray = Arrays.asList(
             Arrays.asList(
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094611_106.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094613_107.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094615_108.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094617_109.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094619_110.pxl", 0, 1)))
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145803_5.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145805_6.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145807_7.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145809_8.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145811_9.pxl", 0, 1)))
             ),
             Arrays.asList(
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094621_111.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094623_112.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094624_113.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094626_114.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094628_115.pxl", 0, 1)))
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145813_10.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145815_11.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145817_12.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145819_13.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145821_14.pxl", 0, 1)))
             ),
             Arrays.asList(
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094630_116.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094632_117.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094634_118.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094636_119.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094637_120.pxl", 0, 1)))
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145822_15.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145824_16.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145826_17.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145828_18.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145830_19.pxl", 0, 1)))
             ),
             Arrays.asList(
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094639_121.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094641_122.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094643_123.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094645_124.pxl", 0, 1)))
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145832_20.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145834_21.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145836_22.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145838_23.pxl", 0, 1)))
             ),
             Arrays.asList(
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094647_125.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094649_126.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094650_127.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094652_128.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240615094654_129.pxl", 0, 1)))
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145840_24.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145842_25.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145843_26.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145845_27.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20240712145847_28.pxl", 0, 1)))
             ),
             Arrays.asList(
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240615094153_0.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240615094155_1.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240615094156_2.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240615094158_3.pxl", 0, 1))),
-                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240615094159_4.pxl", 0, 1)))
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240712145754_0.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240712145756_1.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240712145757_2.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240712145758_3.pxl", 0, 1))),
+                    new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/customer/v-0-ordered/20240712145800_4.pxl", 0, 1)))
             )
     );
     static final int test2NumScanWorkers = test2ScanInputSplitsArray.size();
