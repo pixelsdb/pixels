@@ -21,10 +21,12 @@ package io.pixelsdb.pixels.worker.vhive.utils;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.serializer.SerializerFeature;
+import io.pixelsdb.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.worker.vhive.StreamWorkerCommon;
 import one.profiler.AsyncProfiler;
-import org.apache.commons.net.ftp.FTP;
-import org.apache.commons.net.ftp.FTPClient;
+import io.pixelsdb.pixels.common.physical.Storage;
 
+import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -33,77 +35,33 @@ import java.util.Arrays;
 
 public class Utils
 {
+    private static final Storage minio = StreamWorkerCommon.getStorage(Storage.Scheme.minio);
     private static final AsyncProfiler PROFILER = AsyncProfiler.getInstance();
     private static final String EVENT = System.getenv("PROFILING_EVENT");
-    private static final String FTP_HOST = System.getenv("FTP_HOST");
-    private static final String FTP_PORT = System.getenv("FTP_PORT");
-    private static final String FTP_USERNAME = System.getenv("FTP_USERNAME");
-    private static final String FTP_PASSWORD = System.getenv("FTP_PASSWORD");
-    private static final String FTP_WORKDIR = System.getenv("FTP_WORKDIR");
-
-    private static void createDirectoryTree(FTPClient client, String dirTree) throws IOException
-    {
-        if (dirTree.startsWith(client.printWorkingDirectory()))
-        {
-            dirTree = dirTree.substring(client.printWorkingDirectory().length());
-        }
-        //tokenize the string and attempt to change into each directory level.  If you cannot, then start creating.
-        String[] directories = dirTree.split("/");
-        for (String dir : directories)
-        {
-            if (!dir.isEmpty())
-            {
-                if (!client.changeWorkingDirectory(dir))
-                {
-                    if (!client.makeDirectory(dir))
-                    {
-                        throw new IOException("Unable to create remote directory '" + dir + "'.  error='" + client.getReplyString() + "'");
-                    }
-                    if (!client.changeWorkingDirectory(dir))
-                    {
-                        throw new IOException("Unable to change into newly created remote directory '" + dir + "'.  error='" + client.getReplyString() + "'");
-                    }
-                }
-            }
-        }
-    }
-
-    public static void append(String src, String dest) throws IOException
-    {
-        // append the log file to FTP server
-        FTPClient ftpClient = new FTPClient();
-        ftpClient.connect(FTP_HOST, Integer.parseInt(FTP_PORT));
-        ftpClient.login(FTP_USERNAME, FTP_PASSWORD);
-        ftpClient.enterLocalPassiveMode();
-        ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
-
-        dest = String.format("%s/%s", FTP_WORKDIR, dest);
-        String dir = dest.substring(0, dest.lastIndexOf("/"));
-        createDirectoryTree(ftpClient, dir);
-
-        FileInputStream inputStream = new FileInputStream(src);
-        ftpClient.appendFile(dest, inputStream);
-        inputStream.close();
-        ftpClient.logout();
-    }
+    private static final String LOG_WORKDIR = System.getenv("LOG_WORKDIR");
 
     public static void upload(String src, String dest) throws IOException
     {
-        // store the JFR profiling file to FTP server
-        FTPClient ftpClient = new FTPClient();
-        ftpClient.connect(FTP_HOST, Integer.parseInt(FTP_PORT));
-        ftpClient.login(FTP_USERNAME, FTP_PASSWORD);
-        ftpClient.enterLocalPassiveMode();
-        ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+        // write to the log file
+        dest = String.format("%s/%s", LOG_WORKDIR, dest);
+        // String dir = dest.substring(0, dest.lastIndexOf("/"));
+        // minio.mkdirs(dir);
 
-        dest = String.format("%s/%s", FTP_WORKDIR, dest);
-        String dir = dest.substring(0, dest.lastIndexOf("/"));
-        createDirectoryTree(ftpClient, dir);
+        try (FileInputStream iStream = new FileInputStream(src);
+             DataOutputStream oStream = minio.create(dest, false, Constants.S3_BUFFER_SIZE)) {
 
-        FileInputStream inputStream = new FileInputStream(src);
-        ftpClient.storeFile(dest, inputStream);
-        inputStream.close();
-        ftpClient.logout();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+
+            while ((bytesRead = iStream.read(buffer)) != -1) {
+                oStream.write(buffer, 0, bytesRead);
+            }
+
+            oStream.flush();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void dump(String filename, Object... contents) throws IOException
