@@ -48,6 +48,6 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinStreamWorker
     @Override
     public WorkerType getWorkerType()
     {
-        return WorkerType.PARTITIONED_JOIN;
+        return WorkerType.PARTITIONED_JOIN_STREAMING;
     }
 }

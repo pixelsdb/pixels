@@ -17,37 +17,34 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.vhive;
+package io.pixelsdb.pixels.invoker.vhive;
 
+import io.pixelsdb.pixels.common.turbo.FunctionService;
+import io.pixelsdb.pixels.common.turbo.Invoker;
+import io.pixelsdb.pixels.common.turbo.InvokerProvider;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
-import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
-import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
-import io.pixelsdb.pixels.worker.common.BasePartitionWorker;
-import io.pixelsdb.pixels.worker.common.WorkerContext;
-import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
-public class PartitionStreamWorker extends BasePartitionStreamWorker implements RequestHandler<PartitionInput, PartitionOutput>
+public class PartitionStreamInvokerProvider implements InvokerProvider
 {
-    public PartitionStreamWorker(WorkerContext context)
+    private static final ConfigFactory config = ConfigFactory.Instance();
+
+    @Override
+    public Invoker createInvoker()
     {
-        super(context);
+        String partitionWorker = config.getProperty("partition.worker.name");
+        return new PartitionStreamInvoker(partitionWorker);
     }
 
     @Override
-    public PartitionOutput handleRequest(PartitionInput input)
-    {
-        return process(input);
-    }
-
-    @Override
-    public String getRequestId()
-    {
-        return this.context.getRequestId();
-    }
-
-    @Override
-    public WorkerType getWorkerType()
+    public WorkerType workerType()
     {
         return WorkerType.PARTITION_STREAMING;
+    }
+
+    @Override
+    public boolean compatibleWith(FunctionService functionService)
+    {
+        return functionService.equals(FunctionService.vhive);
     }
 }

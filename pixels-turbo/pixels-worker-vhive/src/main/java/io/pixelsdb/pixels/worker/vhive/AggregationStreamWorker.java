@@ -47,6 +47,6 @@ public class AggregationStreamWorker extends BaseAggregationStreamWorker impleme
     @Override
     public WorkerType getWorkerType()
     {
-        return WorkerType.AGGREGATION;
+        return WorkerType.AGGREGATION_STREAMING;
     }
 }
