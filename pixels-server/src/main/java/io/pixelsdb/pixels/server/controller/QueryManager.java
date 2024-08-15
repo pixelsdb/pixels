@@ -365,10 +365,8 @@ public class QueryManager
                 this.runningQueries.put(traceToken, query);
                 long pendingTimeMs = System.currentTimeMillis() - query.getReceivedTimeMs();
                 long start = System.currentTimeMillis();
+                
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
-                long finishTimestampMs = System.currentTimeMillis();
-                long executeTimeMs = finishTimestampMs - start;
-
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -390,6 +388,9 @@ public class QueryManager
 
                 resultSet.close();
                 statement.close();
+
+                long finishTimestampMs = System.currentTimeMillis();
+                long executeTimeMs = finishTimestampMs - start;
 
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
                         request.getExecutionHint(), columnPrintSizes, columnNames, rows, pendingTimeMs,
