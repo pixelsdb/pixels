@@ -63,7 +63,7 @@ public class CopyExecutor implements CommandExecutor
         Storage sourceStorage = StorageFactory.Instance().getStorage(source);
         Storage destStorage = StorageFactory.Instance().getStorage(destination);
 
-        List<Status> files =  sourceStorage.listStatus(source);
+        List<Status> fileStatuses =  sourceStorage.listStatus(source);
         long blockSize = Long.parseLong(configFactory.getProperty("block.size"));
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
@@ -73,10 +73,10 @@ public class CopyExecutor implements CommandExecutor
         for (int i = 0; i < n; ++i)
         {
             String destination_ = destination;
-            // Issue #192: make copy multi-threaded.
-            for (Status s : files)
+            // Issue #192: make copy multithreaded.
+            for (Status fileStatus : fileStatuses)
             {
-                String sourceName = s.getName();
+                String sourceName = fileStatus.getName();
                 if (!sourceName.contains(postfix))
                 {
                     continue;
@@ -90,10 +90,10 @@ public class CopyExecutor implements CommandExecutor
                         if (sourceStorage.getScheme() == destStorage.getScheme() &&
                                 destStorage.supportDirectCopy())
                         {
-                            destStorage.directCopy(s.getPath(), destPath);
+                            destStorage.directCopy(fileStatus.getPath(), destPath);
                         } else
                         {
-                            DataInputStream inputStream = sourceStorage.open(s.getPath());
+                            DataInputStream inputStream = sourceStorage.open(fileStatus.getPath());
                             DataOutputStream outputStream = destStorage.create(destPath, false,
                                     Constants.HDFS_BUFFER_SIZE, replication, blockSize);
                             IOUtils.copyBytes(inputStream, outputStream,
@@ -102,6 +102,7 @@ public class CopyExecutor implements CommandExecutor
                         copiedNum.incrementAndGet();
                     } catch (IOException e)
                     {
+                        System.err.println("copy file '" + fileStatus.getPath() + "' failed");
                         e.printStackTrace();
                     }
                 });
@@ -113,6 +114,6 @@ public class CopyExecutor implements CommandExecutor
 
         long endTime = System.currentTimeMillis();
         System.out.println((copiedNum.get()/n) + " file(s) are copied " + n + " time(s) by "
-                + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
+                + threadNum + " threads in " + (endTime - startTime) / 1000.0 + "s.");
     }
 }

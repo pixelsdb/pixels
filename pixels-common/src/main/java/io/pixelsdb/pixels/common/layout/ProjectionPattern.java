@@ -22,10 +22,7 @@ package io.pixelsdb.pixels.common.layout;
 import io.pixelsdb.pixels.common.metadata.domain.OriginProjectionPattern;
 import io.pixelsdb.pixels.common.metadata.domain.Projections;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author hank
@@ -35,7 +32,7 @@ public class ProjectionPattern
 {
     // it seems that this.pattern can be a Set.
     private final ColumnSet columnSet;
-    private String[] paths;
+    private long[] pathIds;
 
     public ProjectionPattern()
     {
@@ -57,14 +54,14 @@ public class ProjectionPattern
         return this.columnSet;
     }
 
-    public void setPaths(String... paths)
+    public void setPathIds(long... pathIds)
     {
-        this.paths = paths;
+        this.pathIds = pathIds;
     }
 
-    public String[] getPaths()
+    public long[] getPathIds()
     {
-        return paths;
+        return pathIds;
     }
 
     public boolean containsColumn(String column)
@@ -77,14 +74,14 @@ public class ProjectionPattern
     {
         if (this.columnSet.isEmpty())
         {
-            return "paths: " + paths + ", pattern is empty";
+            return "pathIds: " + Arrays.toString(pathIds) + ", pattern is empty";
         }
         StringBuilder builder = new StringBuilder();
         for (String column : this.columnSet.getColumns())
         {
             builder.append(",").append(column);
         }
-        return "paths: " + paths + ", pattern: " + builder.substring(1);
+        return "pathIds: " + Arrays.toString(pathIds) + ", pattern: " + builder.substring(1);
     }
 
     public static List<ProjectionPattern> buildPatterns(List<String> columns, Projections projectionInfo)
@@ -105,7 +102,7 @@ public class ProjectionPattern
                 pattern.addColumn(columns.get(column));
             }
             // set split size of each pattern
-            pattern.setPaths(originProjPattern.getPaths());
+            pattern.setPathIds(originProjPattern.getPathIds());
 
             ColumnSet columnSet = pattern.getColumnSet();
 

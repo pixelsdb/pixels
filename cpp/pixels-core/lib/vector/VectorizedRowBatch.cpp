@@ -118,4 +118,3 @@ void VectorizedRowBatch::increment(int size) {
 uint64_t VectorizedRowBatch::remaining() {
     return rowCount - current;
 }
-

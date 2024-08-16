@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,16 +17,14 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.cache;
 
-/**
- * @author guodong
- */
-public class MockCacheManager
-{
-    public static void main(String[] args)
-    {
-        CacheManager cacheManager = new CacheManager();
-        cacheManager.run();
-    }
-}
+// grpc protocol for pixels-retina.
+
+syntax = "proto3";
+
+option java_multiple_files = false;
+option java_package = "io.pixelsdb.pixels.retina";
+option java_outer_classname = "RetinaProto";
+
+package retina.proto;
+

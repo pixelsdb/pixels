@@ -50,16 +50,10 @@ public class RdbFileDao extends FileDao
             ResultSet rs = st.executeQuery("SELECT * FROM FILES WHERE FILE_ID=" + id);
             if (rs.next())
             {
-                MetadataProto.File.Builder builder = MetadataProto.File.newBuilder()
-                        .setId(id)
+                return MetadataProto.File.newBuilder().setId(id)
                         .setName(rs.getString("FILE_NAME"))
-                        .setPathId(rs.getLong("PATHS_PATH_ID"));
-                String locality = rs.getString("FILE_LOCALITY");
-                if (locality != null)
-                {
-                    builder.setLocality(locality);
-                }
-                return builder.build();
+                        .setNumRowGroup(rs.getInt("FILE_NUM_RG"))
+                        .setPathId(rs.getLong("PATHS_PATH_ID")).build();
             }
         } catch (SQLException e)
         {
@@ -82,12 +76,8 @@ public class RdbFileDao extends FileDao
                 MetadataProto.File.Builder builder = MetadataProto.File.newBuilder()
                         .setId(rs.getLong("FILE_ID"))
                         .setName(rs.getString("FILE_NAME"))
+                        .setNumRowGroup(rs.getInt("FILE_NUM_RG"))
                         .setPathId(rs.getLong("PATHS_PATH_ID"));
-                String locality = rs.getString("FILE_LOCALITY");
-                if (locality != null)
-                {
-                    builder.setLocality(locality);
-                }
                 files.add(builder.build());
             }
             return files;
@@ -125,19 +115,12 @@ public class RdbFileDao extends FileDao
         Connection conn = db.getConnection();
         String sql = "INSERT INTO FILES(" +
                 "`FILE_NAME`," +
-                "`FILE_LOCALITY`," +
+                "`FILE_NUM_RG`," +
                 "`PATHS_PATH_ID`) VALUES (?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, file.getName());
-            if (file.hasLocality())
-            {
-                pst.setString(2, file.getLocality());
-            }
-            else
-            {
-                pst.setNull(2, Types.VARCHAR);
-            }
+            pst.setInt(2, file.getNumRowGroup());
             pst.setLong(3, file.getPathId());
             if (pst.executeUpdate() == 1)
             {
@@ -164,18 +147,44 @@ public class RdbFileDao extends FileDao
     }
 
     @Override
+    public boolean insertBatch(List<MetadataProto.File> files)
+    {
+        Connection conn = db.getConnection();
+        String sql = "INSERT INTO FILES(" +
+                "`FILE_NAME`," +
+                "`FILE_NUM_RG`," +
+                "`PATHS_PATH_ID`) VALUES (?,?,?)";
+        try (PreparedStatement pst = conn.prepareStatement(sql))
+        {
+            for (MetadataProto.File file : files)
+            {
+                pst.setString(1, file.getName());
+                pst.setInt(2, file.getNumRowGroup());
+                pst.setLong(3, file.getPathId());
+                pst.addBatch();
+            }
+            pst.executeBatch();
+            return true;
+        } catch (SQLException e)
+        {
+            log.error("insertBatch in RdbFileDao", e);
+        }
+        return false;
+    }
+
+    @Override
     public boolean update(MetadataProto.File file)
     {
         Connection conn = db.getConnection();
         String sql = "UPDATE FILES\n" +
                 "SET\n" +
                 "`FILE_NAME` = ?," +
-                "`FILE_LOCALITY` = ?\n" +
+                "`FILE_NUM_RG` = ?\n" +
                 "WHERE `FILE_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, file.getName());
-            pst.setString(2, file.getLocality());
+            pst.setInt(2, file.getNumRowGroup());
             pst.setLong(3, file.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)

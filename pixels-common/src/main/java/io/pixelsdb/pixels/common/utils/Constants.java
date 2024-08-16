@@ -24,8 +24,7 @@ package io.pixelsdb.pixels.common.utils;
  */
 public final class Constants
 {
-    public static final int VERSION = 1;
-    public static final String MAGIC = "PIXELS";
+    public static final String FILE_MAGIC = "PIXELS";
 
     public static final int DEFAULT_HDFS_BLOCK_SIZE = 256 * 1024 * 1024;
     public static final int HDFS_BUFFER_SIZE = 8 * 1024 * 1024;
@@ -42,9 +41,9 @@ public final class Constants
 
     public static final String LAYOUT_VERSION_LITERAL = "layout_version";
     public static final String CACHE_VERSION_LITERAL = "cache_version";
-    public static final String CACHE_COORDINATOR_LITERAL = "coordinator";
-    public static final String CACHE_NODE_STATUS_LITERAL = "node_";
-    public static final String CACHE_LOCATION_LITERAL = "location_";
+    public static final String HEARTBEAT_COORDINATOR_LITERAL = "heartbeat_coordinator_";
+    public static final String HEARTBEAT_WORKER_LITERAL = "heartbeat_worker_";
+    public static final String CACHE_LOCATION_LITERAL = "cache_location_";
     public static final int MAX_BLOCK_ID_LEN = 20480;
 
     /*

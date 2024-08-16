@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.cli;
 
 import io.pixelsdb.pixels.cli.executor.*;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Storage;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
@@ -27,6 +28,7 @@ import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 
 import java.sql.*;
+import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
 
@@ -107,10 +109,12 @@ public class Main
             {
                 System.out.println("Supported commands:\n" +
                         "LOAD\n" +
+                        "COMPACT\n" +
+                        "IMPORT\n" +
+                        "STAT\n" +
                         "QUERY\n" +
                         "COPY\n" +
-                        "COMPACT\n" +
-                        "STAT");
+                        "FILE_META");
                 System.out.println("{command} -h to show the usage of a command.\nexit / quit / -q to exit.\n");
                 continue;
             }
@@ -122,8 +126,8 @@ public class Main
                 ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL LOAD")
                         .defaultHelp(true);
 
-                argumentParser.addArgument("-o", "--original_data_path").required(true)
-                        .help("specify the path of original data");
+                argumentParser.addArgument("-o", "--origin").required(true)
+                        .help("specify the path of original data files");
                 argumentParser.addArgument("-s", "--schema").required(true)
                         .help("specify the name of database");
                 argumentParser.addArgument("-t", "--table").required(true)
@@ -138,8 +142,6 @@ public class Main
                         .help("specify the encoding level for data loading");
                 argumentParser.addArgument("-p", "--nulls_padding").setDefault(false)
                         .help("specify whether nulls padding is enabled");
-                argumentParser.addArgument("-l", "--loading_data_paths")
-                        .help("specify the paths where the data is loaded into");
 
                 Namespace ns;
                 try
@@ -302,13 +304,77 @@ public class Main
                 }
             }
 
+            if (command.equals("IMPORT"))
+            {
+                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL IMPORT")
+                        .defaultHelp(true);
+
+                argumentParser.addArgument("-s", "--schema").required(true)
+                        .help("specify the schema name");
+                argumentParser.addArgument("-t", "--table").required(true)
+                        .help("specify the table name");
+                argumentParser.addArgument("-l", "--layout").required(true)
+                        .help("specify the layout of the files, can be 'ordered' or 'compact'");
+
+                Namespace ns;
+                try
+                {
+                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                } catch (ArgumentParserException e)
+                {
+                    argumentParser.handleError(e);
+                    continue;
+                }
+
+                try
+                {
+                    ImportExecutor statExecutor = new ImportExecutor();
+                    statExecutor.execute(ns, command);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            }
+
+            if (command.equals("FILE_META"))
+            {
+                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels File Metadata Explorer")
+                        .defaultHelp(true);
+
+                argumentParser.addArgument("-f", "--file").required(true)
+                        .help("specify the full path of the file, containing the storage scheme");
+
+                Namespace ns;
+                try
+                {
+                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                } catch (ArgumentParserException e)
+                {
+                    argumentParser.handleError(e);
+                    continue;
+                }
+
+                try
+                {
+                    FileMetaExecutor statExecutor = new FileMetaExecutor();
+                    statExecutor.execute(ns, command);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            }
+
             if (!command.equals("QUERY") &&
                     !command.equals("LOAD") &&
                     !command.equals("COPY") &&
                     !command.equals("COMPACT") &&
-                    !command.equals("STAT"))
+                    !command.equals("STAT") &&
+                    !command.equals("IMPORT") &&
+                    !command.equals("FILE_META"))
             {
-                System.out.println("Command error");
+                System.out.println("Command '" + command + "' not found");
             }
         }
         // Use exit to terminate other threads and invoke the shutdown hooks.
@@ -331,19 +397,19 @@ public class Main
         } catch (SQLException e)
         {
             System.out.println("SQL: " + id + "\n" + sql);
-            System.out.println("Error msg: " + e.getMessage());
+            System.out.println("Error message: " + e.getMessage());
         }
         return end - start;
     }
 
     /**
-     * Check if the order or compact path from pixels metadata is valid.
+     * Check if the order or compact paths from pixels metadata is valid.
      * @param paths the order or compact paths from pixels metadata.
      */
-    public static void validateOrderOrCompactPath(String[] paths)
+    public static void validateOrderedOrCompactPaths(String[] paths)
     {
         requireNonNull(paths, "paths is null");
-        checkArgument(paths.length > 0, "path must contain at least one valid directory");
+        checkArgument(paths.length > 0, "paths must contain at least one valid directory");
         try
         {
             Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths[0]);
@@ -351,11 +417,34 @@ public class Main
             {
                 Storage.Scheme scheme = Storage.Scheme.fromPath(paths[i]);
                 checkArgument(firstScheme.equals(scheme),
-                        "all the directories in the path must have the same storage scheme");
+                        "all the directories in the paths must have the same storage scheme");
             }
         } catch (Throwable e)
         {
-            throw new RuntimeException("failed to parse storage scheme from path", e);
+            throw new RuntimeException("failed to parse storage scheme from paths", e);
+        }
+    }
+
+    /**
+     * Check if the order or compact paths from pixels metadata is valid.
+     * @param paths the order or compact paths from pixels metadata.
+     */
+    public static void validateOrderedOrCompactPaths(List<Path> paths)
+    {
+        requireNonNull(paths, "paths is null");
+        checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
+        try
+        {
+            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths.get(0).getUri());
+            for (int i = 1; i < paths.size(); ++i)
+            {
+                Storage.Scheme scheme = Storage.Scheme.fromPath(paths.get(i).getUri());
+                checkArgument(firstScheme.equals(scheme),
+                        "all the directories in the paths must have the same storage scheme");
+            }
+        } catch (Throwable e)
+        {
+            throw new RuntimeException("failed to parse storage scheme from paths", e);
         }
     }
 }

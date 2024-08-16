@@ -380,7 +380,7 @@ bool PixelsRecordReaderImpl::read() {
 			colIds.emplace_back(chunk.columnId);
 			bytes.emplace_back(chunk.length);
         }
-		::BufferPool::Initialize(colIds, bytes);
+		::BufferPool::Initialize(colIds, bytes, fileSchema->getFieldNames());
         ::DirectUringRandomAccessFile::RegisterBufferFromPool(colIds);
 		std::vector<std::shared_ptr<ByteBuffer>> originalByteBuffers;
 		for(int i = 0; i < colIds.size(); i++) {

@@ -36,7 +36,8 @@ set(pixels_common_cxx
         lib/physical/BufferPool.cpp
         include/physical/natives/DirectUringRandomAccessFile.h
         lib/physical/natives/DirectUringRandomAccessFile.cpp
-        )
+		include/utils/ColumnSizeCSVReader.h lib/utils/ColumnSizeCSVReader.cpp
+        include/physical/StorageArrayScheduler.h lib/physical/StorageArrayScheduler.cpp)
 
 include_directories(include)
 

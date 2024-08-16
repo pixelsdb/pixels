@@ -23,13 +23,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created at: 10/19/21
- * Author: hank
+ * @author hank
+ * @date 2021-10-19
  */
 public class OriginProjectionPattern
 {
     private List<Integer> accessedColumns = new ArrayList<>();
-    private String[] paths;
+    /**
+     * The ids of the paths of this projection.
+     */
+    private long[] pathIds;
 
     public List<Integer> getAccessedColumns()
     {
@@ -41,19 +44,18 @@ public class OriginProjectionPattern
         this.accessedColumns = accessedColumns;
     }
 
-
     public void addAccessedColumns(int accessedColumn)
     {
         this.accessedColumns.add(accessedColumn);
     }
 
-    public String[] getPaths()
+    public long[] getPathIds()
     {
-        return paths;
+        return pathIds;
     }
 
-    public void setPaths(String... path)
+    public void setPathIds(long... pathIds)
     {
-        this.paths = path;
+        this.pathIds = pathIds;
     }
 }

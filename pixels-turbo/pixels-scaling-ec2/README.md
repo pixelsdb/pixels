@@ -19,9 +19,9 @@ Login AWS, create an EC2 instance with 8GB disk, install Pixels components follo
 This instance will be used to create the OS image for the worker nodes in the MPP cluster.
 You can skip the installation of MySQL, etcd and Grafana, as these components are only needed on the coordinator node.
 For Pixels, editing and putting `pixels.properties` into `PIXELS_HOME` is enough if you do not use `pixels-cache`.
-Otherwise, fully install Pixels, and ensure you can start it as a datanode using:
+Otherwise, fully install Pixels, and ensure you can start it as a worker using:
 ```bash
-$PIXELS_HOME/bin/start-datanode.sh -daemon
+$PIXELS_HOME/bin/start-daemon.sh worker -daemon
 ```
 For Trino, set `coordinator=false` in `config.properties`, thus Trino will be started as a worker.
 

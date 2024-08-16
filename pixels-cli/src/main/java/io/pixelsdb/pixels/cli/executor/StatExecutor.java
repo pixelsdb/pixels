@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.cli.executor;
 
 import com.facebook.presto.jdbc.PrestoDriver;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.cli.Main;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -36,7 +37,6 @@ import java.sql.*;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.cli.Main.validateOrderOrCompactPath;
 
 /**
  * @author hank
@@ -64,14 +64,14 @@ public class StatExecutor implements CommandExecutor
                 if (orderedEnabled)
                 {
                     String[] orderedPaths = layout.getOrderedPathUris();
-                    validateOrderOrCompactPath(orderedPaths);
+                    Main.validateOrderedOrCompactPaths(orderedPaths);
                     Storage storage = StorageFactory.Instance().getStorage(orderedPaths[0]);
                     files.addAll(storage.listPaths(orderedPaths));
                 }
                 if (compactEnabled)
                 {
                     String[] compactPaths = layout.getCompactPathUris();
-                    validateOrderOrCompactPath(compactPaths);
+                    Main.validateOrderedOrCompactPaths(compactPaths);
                     Storage storage = StorageFactory.Instance().getStorage(compactPaths[0]);
                     files.addAll(storage.listPaths(compactPaths));
                 }
@@ -202,11 +202,12 @@ public class StatExecutor implements CommandExecutor
             }
         } catch (SQLException e)
         {
+            System.err.println(command + "failed");
             e.printStackTrace();
         }
 
         long endTime = System.currentTimeMillis();
-        System.out.println("Elapsed time: " + (endTime - startTime) / 1000 + "s.");
+        System.out.println("Elapsed time: " + (endTime - startTime) / 1000.0 + "s.");
         metadataService.shutdown();
     }
 }

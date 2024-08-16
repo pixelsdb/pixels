@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PATHS` (
     `PATH_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `PATH_URI` VARCHAR(4096) NOT NULL,
-    `PATH_IS_COMPACT` TINYINT NOT NULL COMMENT 'True if the files in this path are compact.',
+    `PATH_TYPE` TINYINT NOT NULL COMMENT 'Valid value can be 0 (ordered), 1 (compact), or 2 (projection).',
     `LAYOUTS_LAYOUT_ID` BIGINT NOT NULL,
     `RANGES_RANGE_ID` BIGINT NULL DEFAULT NULL,
     PRIMARY KEY (`PATH_ID`),
@@ -318,7 +318,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
     `FILE_ID` INT NOT NULL AUTO_INCREMENT,
     `FILE_NAME` VARCHAR(128) NOT NULL,
-    `FILE_LOCALITY` VARCHAR(128) NULL DEFAULT 'on which server or node this file is stored, only used for vsdfs',
+    `FILE_NUM_RG` INT NOT NULL,
     `PATHS_PATH_ID` BIGINT NOT NULL,
     PRIMARY KEY (`FILE_ID`),
     INDEX `fk_FILES_PATHS_idx` (`PATHS_PATH_ID` ASC),

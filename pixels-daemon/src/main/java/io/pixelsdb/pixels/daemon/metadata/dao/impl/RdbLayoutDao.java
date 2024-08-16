@@ -57,20 +57,22 @@ public class RdbLayoutDao extends LayoutDao
             {
                 List<MetadataProto.Path> orderedPaths = new ArrayList<>();
                 List<MetadataProto.Path> compactPaths = new ArrayList<>();
-                this.splitPaths(pathDao.getAllByLayoutId(id), orderedPaths, compactPaths);
+                List<MetadataProto.Path> projectionPaths = new ArrayList<>();
+                this.splitPaths(pathDao.getAllByLayoutId(id), orderedPaths, compactPaths, projectionPaths);
                 MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
-                .setId(id)
-                .setVersion(rs.getLong("LAYOUT_VERSION"))
-                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
-                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
-                .setOrdered(rs.getString("LAYOUT_ORDERED"))
-                .addAllOrderedPaths(orderedPaths)
-                .setCompact(rs.getString("LAYOUT_COMPACT"))
-                .addAllCompactPaths(compactPaths)
-                .setSplits(rs.getString("LAYOUT_SPLITS"))
-                .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
-                .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID"))
-                .setTableId(rs.getLong("TBLS_TBL_ID")).build();
+                        .setId(id)
+                        .setVersion(rs.getLong("LAYOUT_VERSION"))
+                        .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
+                        .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
+                        .setOrdered(rs.getString("LAYOUT_ORDERED"))
+                        .addAllOrderedPaths(orderedPaths)
+                        .setCompact(rs.getString("LAYOUT_COMPACT"))
+                        .addAllCompactPaths(compactPaths)
+                        .setSplits(rs.getString("LAYOUT_SPLITS"))
+                        .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
+                        .addAllProjectionPaths(projectionPaths)
+                        .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID"))
+                        .setTableId(rs.getLong("TBLS_TBL_ID")).build();
                 return layout;
             }
         } catch (SQLException e)
@@ -81,19 +83,29 @@ public class RdbLayoutDao extends LayoutDao
         return null;
     }
 
-    private void splitPaths(List<MetadataProto.Path> sourcePaths,
-                                 List<MetadataProto.Path> orderedPaths,
-                                 List<MetadataProto.Path> compactPaths)
+    /**
+     * Split the paths of this layout into the compact, layout, and projection paths.
+     * @param sourcePaths the paths of this layout
+     * @param orderedPaths the ordered paths list
+     * @param compactPaths the compact paths list
+     * @param projectionPaths the projection paths list
+     */
+    private void splitPaths(List<MetadataProto.Path> sourcePaths, List<MetadataProto.Path> orderedPaths,
+                            List<MetadataProto.Path> compactPaths, List<MetadataProto.Path> projectionPaths)
     {
         for (MetadataProto.Path path : sourcePaths)
         {
-            if (path.getIsCompact())
+            if (path.getType() == MetadataProto.Path.Type.COMPACT)
             {
                 compactPaths.add(path);
             }
-            else
+            else if (path.getType() == MetadataProto.Path.Type.ORDERED)
             {
                 orderedPaths.add(path);
+            }
+            else if (path.getType() == MetadataProto.Path.Type.PROJECTION)
+            {
+                projectionPaths.add(path);
             }
         }
     }
@@ -127,7 +139,7 @@ public class RdbLayoutDao extends LayoutDao
      * @return
      */
     public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, long version,
-                                                          MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
+                                                  MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
         if(table == null)
         {
@@ -156,20 +168,22 @@ public class RdbLayoutDao extends LayoutDao
                 long layoutId = rs.getLong("LAYOUT_ID");
                 List<MetadataProto.Path> orderedPaths = new ArrayList<>();
                 List<MetadataProto.Path> compactPaths = new ArrayList<>();
-                this.splitPaths(pathDao.getAllByLayoutId(layoutId), orderedPaths, compactPaths);
+                List<MetadataProto.Path> projectionPaths = new ArrayList<>();
+                this.splitPaths(pathDao.getAllByLayoutId(layoutId), orderedPaths, compactPaths, projectionPaths);
                 MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
-                .setId(layoutId)
-                .setVersion(rs.getLong("LAYOUT_VERSION"))
-                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
-                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
-                .setOrdered(rs.getString("LAYOUT_ORDERED"))
-                .addAllOrderedPaths(orderedPaths)
-                .setCompact(rs.getString("LAYOUT_COMPACT"))
-                .addAllCompactPaths(compactPaths)
-                .setSplits(rs.getString("LAYOUT_SPLITS"))
-                .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
-                .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID"))
-                .setTableId(table.getId()).build();
+                        .setId(layoutId)
+                        .setVersion(rs.getLong("LAYOUT_VERSION"))
+                        .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
+                        .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
+                        .setOrdered(rs.getString("LAYOUT_ORDERED"))
+                        .addAllOrderedPaths(orderedPaths)
+                        .setCompact(rs.getString("LAYOUT_COMPACT"))
+                        .addAllCompactPaths(compactPaths)
+                        .setSplits(rs.getString("LAYOUT_SPLITS"))
+                        .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
+                        .addAllProjectionPaths(projectionPaths)
+                        .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID"))
+                        .setTableId(table.getId()).build();
                 layouts.add(layout);
             }
             return layouts;

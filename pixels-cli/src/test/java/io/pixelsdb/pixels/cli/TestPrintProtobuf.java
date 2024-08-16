@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,16 +17,25 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.cache;
+package io.pixelsdb.pixels.cli;
+
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import io.pixelsdb.pixels.core.PixelsProto;
+import org.junit.Test;
 
 /**
- * @author guodong
+ * @author hank
+ * @create 2023-12-06
  */
-public class MockCacheCoordinator
+public class TestPrintProtobuf
 {
-    public static void main(String[] args)
+    @Test
+    public void test() throws InvalidProtocolBufferException
     {
-        CacheCoordinator cacheCoordinator = new CacheCoordinator();
-        cacheCoordinator.run();
+        PixelsProto.PostScript postScript = PixelsProto.PostScript.newBuilder().setVersion(1)
+                .setCompression(PixelsProto.CompressionKind.LZ4).setCompressionBlockSize(3).build();
+        String json = JsonFormat.printer().print(postScript);
+        System.out.println(json);
     }
 }
