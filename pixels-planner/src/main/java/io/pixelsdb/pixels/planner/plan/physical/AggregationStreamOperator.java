@@ -59,7 +59,7 @@ public class AggregationStreamOperator extends AggregationOperator
                 for (AggregationInput aggrInput : this.finalAggrInputs)
                 {
                     this.finalAggrOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.AGGREGATION).invoke(aggrInput);
+                            .getInvoker(WorkerType.AGGREGATION_STREAMING).invoke(aggrInput);
                 }
 //                waitForCompletion(this.finalAggrOutputs);
 //            } catch (InterruptedException e)
@@ -93,7 +93,7 @@ public class AggregationStreamOperator extends AggregationOperator
                     for (ScanInput scanInput : this.scanInputs)
                     {
                         this.scanOutputs[i++] = InvokerFactory.Instance()
-                                .getInvoker(WorkerType.SCAN).invoke(scanInput);
+                                .getInvoker(WorkerType.SCAN_STREAMING).invoke(scanInput);
                     }
                 }
 
