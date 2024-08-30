@@ -10,5 +10,5 @@ $PIXELS_HOME/sbin/start-coordinator.sh -daemon
 
 sleep 5
 
-$PIXELS_HOME/sbin/start-datanode.sh -daemon
+$PIXELS_HOME/sbin/start-workers.sh -daemon
 

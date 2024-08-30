@@ -42,6 +42,8 @@ Parameter `-n` is the number of lines in each row-group, and parameter`-c` is th
 See [TPC-H Load Data](TPC-H.md#load-data) for the usage of other parameters.
 It may take a few minutes to load the data using 40 threads (and 40 CPU cores).
 
+Refer to [Import Existing Files](TPC-H.md#import-existing-files) if the table was previously loaded by a legacy pixels-cli.
+
 ## Run Queries
 Connect to trino-cli:
 ```bash

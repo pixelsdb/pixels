@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2019 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,18 +17,21 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.cli;
+package io.pixelsdb.pixels.daemon.cache;
 
 import org.junit.Test;
 
 /**
- * @author hank
- * @create 2023-12-06
+ * @author guodong
  */
-public class TestExecuteQuery
+public class TestCacheWorker
 {
     @Test
-    public void test()
+    public void test() throws InterruptedException
     {
+        CacheWorker cacheWorker = new CacheWorker();
+        Thread thread = new Thread(cacheWorker);
+        thread.start();
+        thread.join();
     }
 }

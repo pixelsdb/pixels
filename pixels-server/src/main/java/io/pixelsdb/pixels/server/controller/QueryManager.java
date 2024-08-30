@@ -344,12 +344,12 @@ public class QueryManager
         if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             // submit it to the mpp connection
-            properties = this.costEffectiveConnProp;
+            properties = new Properties(this.costEffectiveConnProp);
         }
         else if (request.getExecutionHint() == ExecutionHint.IMMEDIATE)
         {
             // submit it to the pixels-turbo connection
-            properties = this.immediateConnProp;
+            properties = new Properties(this.immediateConnProp);
         }
         else
         {
@@ -365,10 +365,8 @@ public class QueryManager
                 this.runningQueries.put(traceToken, query);
                 long pendingTimeMs = System.currentTimeMillis() - query.getReceivedTimeMs();
                 long start = System.currentTimeMillis();
+                
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
-                long finishTimestampMs = System.currentTimeMillis();
-                long executeTimeMs = finishTimestampMs - start;
-
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -390,6 +388,9 @@ public class QueryManager
 
                 resultSet.close();
                 statement.close();
+
+                long finishTimestampMs = System.currentTimeMillis();
+                long executeTimeMs = finishTimestampMs - start;
 
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
                         request.getExecutionHint(), columnPrintSizes, columnNames, rows, pendingTimeMs,

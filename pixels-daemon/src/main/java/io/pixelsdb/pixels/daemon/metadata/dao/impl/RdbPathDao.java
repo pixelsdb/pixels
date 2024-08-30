@@ -53,7 +53,7 @@ public class RdbPathDao extends PathDao
                 MetadataProto.Path path = MetadataProto.Path.newBuilder()
                         .setId(id)
                         .setUri(rs.getString("PATH_URI"))
-                        .setIsCompact(rs.getBoolean("PATH_IS_COMPACT"))
+                        .setTypeValue(rs.getInt("PATH_TYPE"))
                         .setLayoutId(rs.getLong("LAYOUTS_LAYOUT_ID"))
                         // Issue #437: range id is set to 0 if it is null in metadata.
                         .setRangeId(rs.getLong("RANGES_RANGE_ID")).build();
@@ -80,7 +80,7 @@ public class RdbPathDao extends PathDao
                 MetadataProto.Path path = MetadataProto.Path.newBuilder()
                         .setId(rs.getLong("PATH_ID"))
                         .setUri(rs.getString("PATH_URI"))
-                        .setIsCompact(rs.getBoolean("PATH_IS_COMPACT"))
+                        .setTypeValue(rs.getInt("PATH_TYPE"))
                         .setLayoutId(layoutId)
                         // Issue #437: range id is set to 0 if it is null in metadata.
                         .setRangeId(rs.getLong("RANGES_RANGE_ID")).build();
@@ -108,7 +108,7 @@ public class RdbPathDao extends PathDao
                 MetadataProto.Path path = MetadataProto.Path.newBuilder()
                         .setId(rs.getLong("PATH_ID"))
                         .setUri(rs.getString("PATH_URI"))
-                        .setIsCompact(rs.getBoolean("PATH_IS_COMPACT"))
+                        .setTypeValue(rs.getInt("PATH_TYPE"))
                         .setLayoutId(rs.getLong("LAYOUTS_LAYOUT_ID"))
                         .setRangeId(rangeId).build();
                 paths.add(path);
@@ -148,13 +148,13 @@ public class RdbPathDao extends PathDao
         Connection conn = db.getConnection();
         String sql = "INSERT INTO PATHS(" +
                 "`PATH_URI`," +
-                "`PATH_IS_COMPACT`," +
+                "`PATH_TYPE`," +
                 "`LAYOUTS_LAYOUT_ID`," +
                 "`RANGES_RANGE_ID`) VALUES (?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, path.getUri());
-            pst.setBoolean(2, path.getIsCompact());
+            pst.setInt(2, path.getTypeValue());
             pst.setLong(3, path.getLayoutId());
             if (path.hasRangeId())
             {
@@ -200,7 +200,7 @@ public class RdbPathDao extends PathDao
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, path.getUri());
-            pst.setBoolean(2, path.getIsCompact());
+            pst.setInt(2, path.getTypeValue());
             pst.setLong(3, path.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)

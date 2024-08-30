@@ -24,26 +24,26 @@ import org.apache.hadoop.fs.FileStatus;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Created at: 20/08/2021
- * Author: hank
+ * @author hank
+ * @date 2021-08-20
  */
 public class Status implements Comparable
 {
-    private String path;
-    private long length;
-    private boolean isdir;
-    private short replication;
+    private final String path;
+    private final long length;
+    private final boolean isDir;
+    private final short replication;
 
     public Status()
     {
         this(null, 0, false, 0);
     }
 
-    public Status(String path, long length, boolean isdir, int replication)
+    public Status(String path, long length, boolean isDir, int replication)
     {
         this.path = path;
         this.length = length;
-        this.isdir = isdir;
+        this.isDir = isDir;
         this.replication = (short) replication;
     }
 
@@ -52,7 +52,7 @@ public class Status implements Comparable
         requireNonNull(hdfs);
         this.path = hdfs.getPath().toString();
         this.length = hdfs.getLen();
-        this.isdir = hdfs.isDirectory();
+        this.isDir = hdfs.isDirectory();
         this.replication = hdfs.getReplication();
     }
 
@@ -83,7 +83,7 @@ public class Status implements Comparable
      */
     public boolean isFile()
     {
-        return !isdir;
+        return !isDir;
     }
 
     /**
@@ -93,7 +93,7 @@ public class Status implements Comparable
      */
     public boolean isDirectory()
     {
-        return isdir;
+        return isDir;
     }
 
     /**
@@ -177,7 +177,7 @@ public class Status implements Comparable
         sb.append(getClass().getSimpleName());
         sb.append("{");
         sb.append("path=" + path);
-        sb.append("; isDirectory=" + isdir);
+        sb.append("; isDirectory=" + isDir);
         if (!isDirectory())
         {
             sb.append("; length=" + length);

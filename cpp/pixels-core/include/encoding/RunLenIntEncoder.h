@@ -23,7 +23,7 @@ class RunLenIntEncoder: public Encoder {
 public:
     // PENDING: we need a type to denote that this encoder is not inited (INIT)
     enum EncodingType {
-        INIT, SHORT_REPEAT, DIRECT, PATCHED_BASE, DELTA
+        SHORT_REPEAT, DIRECT, PATCHED_BASE, DELTA, INIT
     };
     // -----------------------------------------------------------
     // Construtors 

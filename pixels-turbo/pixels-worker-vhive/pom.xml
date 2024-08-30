@@ -126,16 +126,6 @@
             <artifactId>grpc-stub</artifactId>
             <optional>true</optional>
         </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-core</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.retry</groupId>
-            <artifactId>spring-retry</artifactId>
-            <optional>true</optional>
-        </dependency>
 
         <!-- asynchttpclient -->
         <dependency>

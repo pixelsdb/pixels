@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.cli.load;
 
+import io.pixelsdb.pixels.common.metadata.domain.File;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -31,9 +33,12 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -47,13 +52,13 @@ public class PixelsConsumer extends Consumer
     public static final AtomicInteger GlobalTargetPathId = new AtomicInteger(0);
     private final BlockingQueue<String> queue;
     private final Parameters parameters;
-    private final int consumerId;
+    private final ConcurrentLinkedQueue<File> loadedFiles;
 
-    public PixelsConsumer(BlockingQueue<String> queue, Parameters parameters, int consumerId)
+    public PixelsConsumer(BlockingQueue<String> queue, Parameters parameters, ConcurrentLinkedQueue<File> loadedFiles)
     {
         this.queue = queue;
         this.parameters = parameters;
-        this.consumerId = consumerId;
+        this.loadedFiles = loadedFiles;
     }
 
     @Override
@@ -66,7 +71,7 @@ public class PixelsConsumer extends Consumer
         boolean isRunning = true;
         try
         {
-            final String[] targetPaths = parameters.getLoadingPaths();
+            final List<Path> targetPaths = parameters.getLoadingPaths();
             String schemaStr = parameters.getSchema();
             int[] orderMapping = parameters.getOrderMapping();
             int maxRowNum = parameters.getMaxRowNum();
@@ -92,8 +97,10 @@ public class PixelsConsumer extends Consumer
             String line;
 
             boolean initPixelsFile = true;
+            String targetFileName = null;
             String targetFilePath;
             PixelsWriter pixelsWriter = null;
+            Path currTargetPath = null;
             int rowCounter = 0;
 
             while (isRunning)
@@ -111,7 +118,7 @@ public class PixelsConsumer extends Consumer
                     {
                         if (initPixelsFile)
                         {
-                            if(line.length() == 0)
+                            if(line.isEmpty())
                             {
                                 System.err.println("thread: " + currentThread().getName() + " got empty line.");
                                 continue;
@@ -119,15 +126,17 @@ public class PixelsConsumer extends Consumer
                             // we create a new pixels file if we can read a next line from the source file
 
                             // choose the target output directory using round-robin
-                            int targetPathId = GlobalTargetPathId.getAndIncrement() % targetPaths.length;
-                            String targetDirPath = targetPaths[targetPathId];
+                            int targetPathId = GlobalTargetPathId.getAndIncrement() % targetPaths.size();
+                            currTargetPath = targetPaths.get(targetPathId);
+                            String targetDirPath = currTargetPath.getUri();
                             Storage targetStorage = StorageFactory.Instance().getStorage(targetDirPath);
 
                             if (!targetDirPath.endsWith("/"))
                             {
                                 targetDirPath += "/";
                             }
-                            targetFilePath = targetDirPath + DateUtil.getCurTime() + ".pxl";
+                            targetFileName = DateUtil.getCurTime() + ".pxl";
+                            targetFilePath = targetDirPath + targetFileName;
 
                             pixelsWriter = PixelsWriterImpl.newBuilder()
                                     .setSchema(schema)
@@ -185,7 +194,7 @@ public class PixelsConsumer extends Consumer
                                 pixelsWriter.addRowBatch(rowBatch);
                                 rowBatch.reset();
                             }
-                            pixelsWriter.close();
+                            closeWriterAndAddFile(pixelsWriter, targetFileName, currTargetPath);
                             rowCounter = 0;
                             initPixelsFile = true;
                         }
@@ -207,7 +216,7 @@ public class PixelsConsumer extends Consumer
                     pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();
                 }
-                pixelsWriter.close();
+                closeWriterAndAddFile(pixelsWriter, targetFileName, currTargetPath);
             }
         } catch (InterruptedException e)
         {
@@ -219,7 +228,26 @@ public class PixelsConsumer extends Consumer
         } finally
         {
             System.out.println(currentThread().getName() + ":" + count);
-            System.out.println("Exit PixelsConsumer, " + currentThread().getName() + ", time: " + DateUtil.formatTime(new Date()));
+            System.out.println("Exit PixelsConsumer, thread: " + currentThread().getName() +
+                    ", time: " + DateUtil.formatTime(new Date()));
         }
+    }
+
+    /**
+     * Close the pixels writer and add the file to loaded file queue.
+     * Files in the loaded files queue will be saved in metadata.
+     * @param pixelsWriter the pixels writer
+     * @param fileName the file name without directory path
+     * @param filePath the path of the directory where the file was written
+     * @throws IOException
+     */
+    private void closeWriterAndAddFile(PixelsWriter pixelsWriter, String fileName, Path filePath) throws IOException
+    {
+        pixelsWriter.close();
+        File loadedFile = new File();
+        loadedFile.setName(fileName);
+        loadedFile.setNumRowGroup(pixelsWriter.getNumRowGroup());
+        loadedFile.setPathId(filePath.getId());
+        this.loadedFiles.offer(loadedFile);
     }
 }

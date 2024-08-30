@@ -23,7 +23,7 @@ function get_private_ip {
 # start trino node
 # replace dummies in configurations
 # ~/opt/trino-server/etc/config.properties replace coordinator-ip-dummy with the private ip of coordinator
-sed -i 's/coordinator-ip-dummy/$coordinator_ip/g' /home/ubuntu/opt/trino-server/etc/config.properties
+sed -i "s/coordinator-ip-dummy/$coordinator_ip/g" /home/ubuntu/opt/trino-server/etc/config.properties
 
 # ~/opt/trino-server/etc/node.properties replace instance-id-dummy with the real instance id
 instance_id=$(get_instance_id)

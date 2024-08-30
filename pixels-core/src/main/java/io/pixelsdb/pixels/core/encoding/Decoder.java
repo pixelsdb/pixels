@@ -27,8 +27,7 @@ import java.io.IOException;
  */
 public abstract class Decoder implements AutoCloseable
 {
-    public abstract boolean hasNext()
-            throws IOException;
+    public abstract boolean hasNext() throws IOException;
 
     @Override
     abstract public void close() throws IOException;

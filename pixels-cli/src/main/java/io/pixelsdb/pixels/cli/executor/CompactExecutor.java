@@ -20,9 +20,12 @@
 package io.pixelsdb.pixels.cli.executor;
 
 import com.google.common.base.Joiner;
+import io.pixelsdb.pixels.cli.Main;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
+import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
@@ -35,11 +38,11 @@ import net.sourceforge.argparse4j.inf.Namespace;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static io.pixelsdb.pixels.cli.Main.validateOrderOrCompactPath;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -63,7 +66,6 @@ public class CompactExecutor implements CommandExecutor
         // get compact layout
         MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
         List<Layout> layouts = metadataService.getLayouts(schemaName, tableName);
-        metadataService.shutdown();
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = null;
         for (Layout layout1 : layouts)
@@ -91,15 +93,16 @@ public class CompactExecutor implements CommandExecutor
 
         // get input file paths
         ConfigFactory configFactory = ConfigFactory.Instance();
-        validateOrderOrCompactPath(layout.getOrderedPathUris());
-        validateOrderOrCompactPath(layout.getCompactPathUris());
+        Main.validateOrderedOrCompactPaths(layout.getOrderedPathUris());
+        Main.validateOrderedOrCompactPaths(layout.getCompactPathUris());
         // PIXELS-399: it is not a problem if the order or compact path contains multiple directories
         Storage orderStorage = StorageFactory.Instance().getStorage(layout.getOrderedPathUris()[0]);
         Storage compactStorage = StorageFactory.Instance().getStorage(layout.getCompactPathUris()[0]);
         long blockSize = Long.parseLong(configFactory.getProperty("block.size"));
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
         List<Status> statuses = orderStorage.listStatus(layout.getOrderedPathUris());
-        String[] targetPaths = layout.getCompactPathUris();
+        List<Path> targetPaths = layout.getCompactPaths();
+        ConcurrentLinkedQueue<File> compactFiles = new ConcurrentLinkedQueue<>();
         int targetPathId = 0;
 
         // compact
@@ -132,36 +135,37 @@ public class CompactExecutor implements CommandExecutor
                 }
             }
 
-            String targetDirPath = targetPaths[targetPathId++];
-            targetPathId %= targetPaths.length;
+            Path targetPath = targetPaths.get(targetPathId++);
+            String targetDirPath = targetPath.getUri();
+            targetPathId %= targetPaths.size();
             if (!targetDirPath.endsWith("/"))
             {
                 targetDirPath += "/";
             }
-            String targetFilePath = targetDirPath + DateUtil.getCurTime() + "_compact.pxl";
+            String targetFileName = DateUtil.getCurTime() + "_compact.pxl";
+            String targetFilePath = targetDirPath + targetFileName;
 
             System.out.println("(" + thdId + ") " + sourcePaths.size() +
                     " ordered files to be compacted into '" + targetFilePath + "'.");
 
-            PixelsCompactor.Builder compactorBuilder =
-                    PixelsCompactor.newBuilder()
-                            .setSourcePaths(sourcePaths)
-                            /**
-                             * Issue #192:
-                             * No need to deep copy compactLayout as it is never modified in-place
-                             * (e.g., call setters to change some members). Thus it is safe to use
-                             * the current reference of compactLayout even if the compactors will
-                             * be running multiple threads.
-                             *
-                             * Deep copy it if it is in-place modified in the future.
-                             */
-                            .setCompactLayout(compactLayout)
-                            .setInputStorage(orderStorage)
-                            .setOutputStorage(compactStorage)
-                            .setPath(targetFilePath)
-                            .setBlockSize(blockSize)
-                            .setReplication(replication)
-                            .setBlockPadding(false);
+            PixelsCompactor.Builder compactorBuilder = PixelsCompactor.newBuilder()
+                    .setSourcePaths(sourcePaths)
+                    /**
+                     * Issue #192:
+                     * No need to deep copy compactLayout as it is never modified in-place
+                     * (e.g., call setters to change some members). Thus, it is safe to use
+                     * the current reference of compactLayout even if the compactors will
+                     * be running multiple threads.
+                     *
+                     * Deep copy it if it is in-place modified in the future.
+                     */
+                    .setCompactLayout(compactLayout)
+                    .setInputStorage(orderStorage)
+                    .setOutputStorage(compactStorage)
+                    .setPath(targetFilePath)
+                    .setBlockSize(blockSize)
+                    .setReplication(replication)
+                    .setBlockPadding(false);
 
             long threadStart = System.currentTimeMillis();
             compactExecutor.execute(() -> {
@@ -172,9 +176,16 @@ public class CompactExecutor implements CommandExecutor
                     PixelsCompactor pixelsCompactor = compactorBuilder.build();
                     pixelsCompactor.compact();
                     pixelsCompactor.close();
+                    File compactFile = new File();
+                    compactFile.setName(targetFileName);
+                    compactFile.setNumRowGroup(pixelsCompactor.getNumRowGroup());
+                    compactFile.setPathId(targetPath.getId());
+                    compactFiles.offer(compactFile);
                 } catch (IOException e)
                 {
+                    System.err.println("write compact file '" + targetFilePath + "' failed");
                     e.printStackTrace();
+                    return;
                 }
                 System.out.println("Compact file '" + targetFilePath + "' is built in " +
                         ((System.currentTimeMillis() - threadStart) / 1000.0) + "s");
@@ -184,10 +195,12 @@ public class CompactExecutor implements CommandExecutor
         // Issue #192: wait for the compaction to complete.
         compactExecutor.shutdown();
         while (!compactExecutor.awaitTermination(100, TimeUnit.SECONDS));
+        metadataService.addFiles(compactFiles);
 
         long endTime = System.currentTimeMillis();
         System.out.println("Pixels files in '" + Joiner.on(";").join(layout.getOrderedPathUris()) + "' are compacted into '" +
                 Joiner.on(";").join(layout.getCompactPathUris()) + "' by " + threadNum + " threads in " +
                 (endTime - startTime) / 1000 + "s.");
+        metadataService.shutdown();
     }
 }
