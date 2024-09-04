@@ -35,6 +35,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -114,6 +115,8 @@ public class PixelsConsumer extends Consumer
 
                     System.out.println("loading data from: " + originalFilePath);
 
+                    // loaded rows use the same timestamp
+                    Timestamp timestamp = new Timestamp(System.currentTimeMillis());
                     while ((line = reader.readLine()) != null)
                     {
                         if (initPixelsFile)
@@ -158,7 +161,7 @@ public class PixelsConsumer extends Consumer
                         rowCounter++;
 
                         String[] colsInLine = line.split(regex);
-                        for (int i = 0; i < columnVectors.length; i++)
+                        for (int i = 0; i < columnVectors.length - 1; i++)
                         {
                             try
                             {
@@ -179,6 +182,8 @@ public class PixelsConsumer extends Consumer
                                 e.printStackTrace();
                             }
                         }
+                        // add hidden timestamp column value
+                        columnVectors[columnVectors.length - 1].add(timestamp);
 
                         if (rowBatch.size >= rowBatch.getMaxSize())
                         {
