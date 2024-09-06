@@ -36,6 +36,8 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinatorFactory;
 import io.pixelsdb.pixels.planner.plan.PlanOptimizer;
 import io.pixelsdb.pixels.planner.plan.logical.*;
 import io.pixelsdb.pixels.planner.plan.logical.Table;
@@ -137,23 +139,26 @@ public class PixelsPlanner
 
     public Operator getRootOperator() throws IOException, MetadataException
     {
+        Operator rootOperator;
         if (this.rootTable.getTableType() == Table.TableType.BASE)
         {
-            return this.getScanOperator((BaseTable) this.rootTable);
+            rootOperator = this.getScanOperator((BaseTable) this.rootTable);
         }
         else if (this.rootTable.getTableType() == Table.TableType.JOINED)
         {
-            return this.getJoinOperator((JoinedTable) this.rootTable, Optional.empty());
+            rootOperator =  this.getJoinOperator((JoinedTable) this.rootTable, Optional.empty());
         }
         else if (this.rootTable.getTableType() == Table.TableType.AGGREGATED)
         {
-            return this.getAggregationOperator((AggregatedTable) this.rootTable);
+            rootOperator =  this.getAggregationOperator((AggregatedTable) this.rootTable);
         }
         else
         {
             throw new UnsupportedOperationException("root table type '" +
                     this.rootTable.getTableType() + "' is currently not supported");
         }
+        PlanCoordinatorFactory.Instance().createPlanCoordinator(transId, rootOperator);
+        return rootOperator;
     }
 
     public double getScanSize()

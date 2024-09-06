@@ -30,15 +30,20 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.aggregation.Aggregator;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.executor.scan.Scanner;
+import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
+import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
+import io.pixelsdb.pixels.turbo.TurboProto;
+import io.pixelsdb.pixels.turbo.WorkerCoordinateServiceGrpc;
 import org.apache.logging.log4j.Logger;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -81,13 +86,20 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
 
         try
         {
+            int stageId = event.getStageId();
+            long transId = event.getTransId();
+            String ip = WorkerCommon.getIpAddress();
+            int port = WorkerCommon.getPort();
+            CFWorkerInfo workerInfo = new CFWorkerInfo(ip, port, transId, stageId, "scan", Collections.emptyList());
+            workerCoordinatorService = new WorkerCoordinateService("10.168.4.4", 18894);
+            workerCoordinatorService.registerWorker(workerInfo);
+
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
                     new WorkerThreadFactory(exceptionHandler));
 
-            long transId = event.getTransId();
             requireNonNull(event.getTableInfo(), "even.tableInfo is null");
             StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();

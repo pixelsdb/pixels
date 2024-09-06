@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.worker.common;
 
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 
 /**
  * @author hank
@@ -29,6 +31,7 @@ import io.pixelsdb.pixels.common.turbo.Output;
 public abstract class Worker<I extends Input, O extends Output>
 {
     protected final WorkerContext context;
+    protected WorkerCoordinateService workerCoordinatorService;
 
     public Worker(WorkerContext context)
     {

@@ -60,6 +60,10 @@ public class ScanInput extends Input
     private OutputInfo output;
 
     /**
+     * The stage of the scan worker
+     */
+    private int stageId;
+    /**
      * Default constructor for Jackson.
      */
     public ScanInput()
@@ -127,6 +131,10 @@ public class ScanInput extends Input
     {
         this.output = output;
     }
+
+    public void setStageId(int stageId) { this.stageId = stageId; }
+
+    public int getStageId() { return stageId; }
 
     public static List<String> generateOutputPaths(String outputFolder, int numSplits)
     {
