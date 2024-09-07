@@ -10,7 +10,6 @@ import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
 import io.pixelsdb.pixels.daemon.turbo.QueryScheduleServer;
-import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateServer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -92,10 +91,6 @@ public class DaemonMain
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
-                    // start coordinator server
-                    int coordinatorPort = Integer.parseInt(config.getProperty("worker.coordinate.server.port"));
-                    WorkerCoordinateServer workerCoordinatorServer = new WorkerCoordinateServer(coordinatorPort);
-                    container.addServer("worker_coordinator", workerCoordinatorServer);
                     if (cacheEnabled)
                     {
                         // start cache coordinator
