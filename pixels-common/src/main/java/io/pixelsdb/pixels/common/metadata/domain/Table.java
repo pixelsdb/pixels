@@ -20,8 +20,12 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.annotation.JSONField;
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.daemon.MetadataProto;
+
+import java.util.List;
+import java.util.Optional;
 
 public class Table extends Base
 {
@@ -30,6 +34,7 @@ public class Table extends Base
     private Storage.Scheme storageScheme;
     private long rowCount;
     private long schemaId;
+    private Optional<List<Layout>> layouts;
 
     public Table()
     {
@@ -37,11 +42,26 @@ public class Table extends Base
 
     public Table(MetadataProto.Table table)
     {
+        this(table, null);
+    }
+
+    public Table(MetadataProto.Table table, List<MetadataProto.Layout> layouts)
+    {
         this.name = table.getName();
         this.type = table.getType();
         this.storageScheme = Storage.Scheme.from(table.getStorageScheme());
         this.rowCount = table.getRowCount();
         this.schemaId = table.getSchemaId();
+        if (layouts != null && !layouts.isEmpty())
+        {
+            ImmutableList.Builder<Layout> layoutsBuilder = ImmutableList.builder();
+            layouts.forEach(layout -> layoutsBuilder.add(new Layout(layout)));
+            this.layouts = Optional.of(layoutsBuilder.build());
+        }
+        else
+        {
+            this.layouts = Optional.empty();
+        }
     }
 
     public String getName()
@@ -93,6 +113,16 @@ public class Table extends Base
     public void setSchemaId(long schemaId)
     {
         this.schemaId = schemaId;
+    }
+
+    public Optional<List<Layout>> getLayouts()
+    {
+        return layouts;
+    }
+
+    public void setLayouts(List<Layout> layouts)
+    {
+        this.layouts = Optional.ofNullable(layouts);
     }
 
     @Override

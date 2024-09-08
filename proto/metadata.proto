@@ -174,7 +174,7 @@ enum Permission {
 message Layout {
     uint64 id = 1;
     uint64 version = 2;
-    uint64 createAt = 3;
+    uint64 createAt = 3; // The milliseconds since Unix epoch at which this layout is created.
     Permission permission = 4;
     string ordered = 5;
     repeated Path orderedPaths = 6;
@@ -266,11 +266,13 @@ message GetTableRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     string tableName = 3;
+    bool withLayouts = 4; // the default value of bool is false in proto3
 }
 
 message GetTableResponse {
     ResponseHeader header = 1;
     Table table = 2;
+    repeated Layout layouts = 3;
 }
 
 message GetTablesRequest {

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.metadata.domain;
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,9 @@ import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermis
 public class Layout extends Base
 {
     private long version;
+    /**
+     * The milliseconds since Unix epoch at which this layout is created.
+     */
     private long createAt;
     private Permission permission;
     private Ordered ordered;
@@ -326,5 +330,11 @@ public class Layout extends Base
                 .setOrdered(this.getOrderedJson()).setCompact(this.getCompactJson())
                 .setVersion(this.getVersion()).setProjections(this.getProjectionsJson())
                 .setTableId(this.getTableId()).build();
+    }
+
+    public SimpleLayout toSimpleLayout()
+    {
+        return new SimpleLayout(this.version, new Date(this.createAt), this.permission,
+                this.orderedPathUris, this.compactPathUris);
     }
 }
