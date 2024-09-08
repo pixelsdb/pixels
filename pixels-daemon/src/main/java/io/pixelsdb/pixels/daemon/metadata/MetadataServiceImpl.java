@@ -158,6 +158,89 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void createSchema(MetadataProto.CreateSchemaRequest request,
+                             StreamObserver<MetadataProto.CreateSchemaResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Schema schema= MetadataProto.Schema.newBuilder()
+                .setName(request.getSchemaName())
+                .setDesc(request.getSchemaDesc()).build();
+        if (schemaDao.exists(schema))
+        {
+            headerBuilder.setErrorCode(METADATA_SCHEMA_EXIST).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' already exist");
+        }
+        else
+        {
+            if (schemaDao.insert(schema))
+            {
+                headerBuilder.setErrorCode(0).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_FAILED).setErrorMsg("failed to add schema");
+            }
+        }
+        MetadataProto.CreateSchemaResponse response = MetadataProto.CreateSchemaResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void dropSchema(MetadataProto.DropSchemaRequest request,
+                           StreamObserver<MetadataProto.DropSchemaResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (schemaDao.deleteByName(request.getSchemaName()))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_SCHEMA_FAILED).setErrorMsg("failed to delete schema '" +
+                    request.getSchemaName() + "'");
+        }
+        MetadataProto.DropSchemaResponse response = MetadataProto.DropSchemaResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void existSchema(MetadataProto.ExistSchemaRequest request,
+                            StreamObserver<MetadataProto.ExistSchemaResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Schema schema = MetadataProto.Schema.newBuilder()
+                .setId(-1).setName(request.getSchemaName()).build();
+        MetadataProto.ExistSchemaResponse response;
+        if (schemaDao.exists(schema))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.ExistSchemaResponse.newBuilder()
+                    .setExists(true).setHeader(headerBuilder.build()).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.ExistSchemaResponse.newBuilder()
+                    .setExists(false).setHeader(headerBuilder.build()).build();
+        }
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void getSchemas(MetadataProto.GetSchemasRequest request,
                            StreamObserver<MetadataProto.GetSchemasResponse> responseObserver)
     {
@@ -187,6 +270,223 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void createTable(MetadataProto.CreateTableRequest request,
+                            StreamObserver<MetadataProto.CreateTableResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        MetadataProto.Table table = MetadataProto.Table.newBuilder()
+                .setName(request.getTableName())
+                .setType("user")
+                .setStorageScheme(request.getStorageScheme())
+                .setSchemaId(schema.getId()).build();
+        if (tableDao.exists(table))
+        {
+            headerBuilder.setErrorCode(METADATA_TABLE_EXIST).setErrorMsg("table '" +
+                    request.getSchemaName() + "." + request.getTableName() + "' already exist");
+        }
+        else
+        {
+            List<MetadataProto.Column> columns = request.getColumnsList();
+            /**
+             * Issue #196:
+             * Check the data types before inserting the table into metadata.
+             */
+            boolean typesValid = true;
+            String invalidType = "";
+            for (MetadataProto.Column column : columns)
+            {
+                if (!TypeDescription.isValid(column.getType()))
+                {
+                    typesValid = false;
+                    invalidType = column.getType();
+                    break;
+                }
+            }
+            if (typesValid)
+            {
+                if (tableDao.insert(table))
+                {
+                    // to get table id from database.
+                    try
+                    {
+                        table = tableDao.getByNameAndSchema(table.getName(), schema);
+                        if (columns.size() == columnDao.insertBatch(table, columns))
+                        {
+                            columns = columnDao.getByTable(table, false);
+                            // Issue #437: TODO - use real transaction timestamp for schema version.
+                            MetadataProto.SchemaVersion schemaVersion = buildInitSchemaVersion(table.getId(), columns, 0);
+                            long schemaVersionId = schemaVersionDao.insert(schemaVersion);
+                            if (schemaVersionId > 0)
+                            {
+                                MetadataProto.Layout layout = buildInitLayout(table.getId(), schemaVersionId, columns);
+                                long layoutId = layoutDao.insert(layout);
+                                if (layoutId > 0)
+                                {
+                                    List<MetadataProto.Path> orderedPaths = buildInitPaths(layoutId, layout.getVersion(),
+                                            request.getBasePathUrisList(), false);
+                                    boolean allSuccess = true;
+                                    for (MetadataProto.Path orderedPath : orderedPaths)
+                                    {
+                                        if (pathDao.insert(orderedPath) <= 0)
+                                        {
+                                            allSuccess = false;
+                                            break;
+                                        }
+                                    }
+                                    if (allSuccess)
+                                    {
+                                        List<MetadataProto.Path> compactPaths = buildInitPaths(layoutId, layout.getVersion(),
+                                                request.getBasePathUrisList(), true);
+                                        for (MetadataProto.Path compactPath : compactPaths)
+                                        {
+                                            if (pathDao.insert(compactPath) <= 0)
+                                            {
+                                                allSuccess = false;
+                                                break;
+                                            }
+                                        }
+                                        if (allSuccess)
+                                        {
+                                            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                        } else
+                                        {
+                                            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
+                                                    .setErrorMsg("failed to add compact paths for table '" +
+                                                            request.getSchemaName() + "." + request.getTableName() + "'");
+                                        }
+                                    } else
+                                    {
+                                        headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
+                                                .setErrorMsg("failed to add ordered paths for table '" +
+                                                        request.getSchemaName() + "." + request.getTableName() + "'");
+                                    }
+                                } else
+                                {
+                                    headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
+                                            .setErrorMsg("failed to add layout for table '" +
+                                                    request.getSchemaName() + "." + request.getTableName() + "'");
+                                }
+                            } else
+                            {
+                                headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
+                                        .setErrorMsg("failed to add schema version for table '" +
+                                                request.getSchemaName() + "." + request.getTableName() + "'");
+                            }
+                        } else
+                        {
+                            headerBuilder.setErrorCode(METADATA_ADD_COLUMNS_FAILED).setErrorMsg(
+                                    "failed to add columns to table '" + request.getSchemaName() + "." + request.getTableName() + "'");
+                        }
+                    } catch (Throwable e)
+                    {
+                        String msg = "failed to create the other components for table '" +
+                                request.getSchemaName() + "." + request.getTableName() + "'";
+                        log.error(msg, e);
+                        headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg(msg);
+                        // cascade delete the inconsistent states in metadata
+                        tableDao.deleteByNameAndSchema(table.getName(), schema);
+                    }
+                } else
+                {
+                    headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg("failed to add table '" +
+                            request.getSchemaName() + "." + request.getTableName() + "'");
+                }
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_UNKNOWN_DATA_TYPE).setErrorMsg(
+                        "unknown data type '" + invalidType + "'");
+            }
+        }
+
+        MetadataProto.CreateTableResponse response = MetadataProto.CreateTableResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void dropTable(MetadataProto.DropTableRequest request,
+                          StreamObserver<MetadataProto.DropTableResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        if (tableDao.deleteByNameAndSchema(request.getTableName(), schema))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_TABLE_FAILED).setErrorMsg("failed to delete table '" +
+                    request.getSchemaName() + "." + request.getTableName() + "'");
+        }
+        MetadataProto.DropTableResponse response = MetadataProto.DropTableResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void existTable(MetadataProto.ExistTableRequest request,
+                           StreamObserver<MetadataProto.ExistTableResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.ExistTableResponse response;
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        if (schema == null)
+        {
+            /**
+             * Issue #183:
+             * We firstly check the existence of the schema.
+             */
+            schema = MetadataProto.Schema.newBuilder().setId(-1).setName(request.getSchemaName()).build();
+            if (!schemaDao.exists(schema))
+            {
+                headerBuilder.setErrorCode(0).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg(
+                        "failed to get schema '" + request.getSchemaName() + "'");
+            }
+            response = MetadataProto.ExistTableResponse.newBuilder()
+                    .setExists(false).setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            return;
+        }
+        MetadataProto.Table table = MetadataProto.Table.newBuilder()
+                .setId(-1)
+                .setName(request.getTableName())
+                .setSchemaId(schema.getId()).build();
+
+        if (tableDao.exists(table))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.ExistTableResponse.newBuilder()
+                    .setExists(true).setHeader(headerBuilder.build()).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.ExistTableResponse.newBuilder()
+                    .setExists(false).setHeader(headerBuilder.build()).build();
+        }
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void getTable(MetadataProto.GetTableRequest request,
                          StreamObserver<MetadataProto.GetTableResponse> responseObserver)
     {
@@ -209,10 +509,31 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             }
             else
             {
-                header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
-                response = MetadataProto.GetTableResponse.newBuilder()
-                        .setHeader(header)
-                        .setTable(table).build();
+                if (request.getWithLayouts())
+                {
+                    // version < 0 means get all versions
+                    List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, -1,
+                            MetadataProto.GetLayoutRequest.PermissionRange.READABLE);
+                    if (layouts == null || layouts.isEmpty())
+                    {
+                        header = headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND)
+                                .setErrorMsg("no layout for table '" +
+                                request.getSchemaName() + "." + request.getTableName() + "'").build();
+                        response = MetadataProto.GetTableResponse.newBuilder()
+                                .setHeader(header).build();
+                    }
+                    else
+                    {
+                        header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+                        response = MetadataProto.GetTableResponse.newBuilder().setHeader(header)
+                                .setTable(table).addAllLayouts(layouts).build();
+                    }
+                }
+                else
+                {
+                    header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+                    response = MetadataProto.GetTableResponse.newBuilder().setHeader(header).setTable(table).build();
+                }
             }
         }
         else
@@ -1163,306 +1484,6 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
 
         MetadataProto.UpdateColumnResponse response = MetadataProto.UpdateColumnResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void createSchema(MetadataProto.CreateSchemaRequest request,
-                             StreamObserver<MetadataProto.CreateSchemaResponse> responseObserver)
-    {
-        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        MetadataProto.Schema schema= MetadataProto.Schema.newBuilder()
-        .setName(request.getSchemaName())
-        .setDesc(request.getSchemaDesc()).build();
-        if (schemaDao.exists(schema))
-        {
-            headerBuilder.setErrorCode(METADATA_SCHEMA_EXIST).setErrorMsg("schema '" +
-                    request.getSchemaName() + "' already exist");
-        }
-        else
-        {
-            if (schemaDao.insert(schema))
-            {
-                headerBuilder.setErrorCode(0).setErrorMsg("");
-            }
-            else
-            {
-                headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_FAILED).setErrorMsg("failed to add schema");
-            }
-        }
-        MetadataProto.CreateSchemaResponse response = MetadataProto.CreateSchemaResponse.newBuilder()
-                .setHeader(headerBuilder.build()).build();
-
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void dropSchema(MetadataProto.DropSchemaRequest request,
-                           StreamObserver<MetadataProto.DropSchemaResponse> responseObserver)
-    {
-        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        if (schemaDao.deleteByName(request.getSchemaName()))
-        {
-            headerBuilder.setErrorCode(0).setErrorMsg("");
-        }
-        else
-        {
-            headerBuilder.setErrorCode(METADATA_DELETE_SCHEMA_FAILED).setErrorMsg("failed to delete schema '" +
-                    request.getSchemaName() + "'");
-        }
-        MetadataProto.DropSchemaResponse response = MetadataProto.DropSchemaResponse.newBuilder()
-                .setHeader(headerBuilder.build()).build();
-
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void createTable(MetadataProto.CreateTableRequest request,
-                            StreamObserver<MetadataProto.CreateTableResponse> responseObserver)
-    {
-        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
-        MetadataProto.Table table = MetadataProto.Table.newBuilder()
-        .setName(request.getTableName())
-        .setType("user")
-        .setStorageScheme(request.getStorageScheme())
-        .setSchemaId(schema.getId()).build();
-        if (tableDao.exists(table))
-        {
-            headerBuilder.setErrorCode(METADATA_TABLE_EXIST).setErrorMsg("table '" +
-                    request.getSchemaName() + "." + request.getTableName() + "' already exist");
-        }
-        else
-        {
-            List<MetadataProto.Column> columns = request.getColumnsList();
-            /**
-             * Issue #196:
-             * Check the data types before inserting the table into metadata.
-             */
-            boolean typesValid = true;
-            String invalidType = "";
-            for (MetadataProto.Column column : columns)
-            {
-                if (!TypeDescription.isValid(column.getType()))
-                {
-                    typesValid = false;
-                    invalidType = column.getType();
-                    break;
-                }
-            }
-            if (typesValid)
-            {
-                if (tableDao.insert(table))
-                {
-                    // to get table id from database.
-                    try
-                    {
-                        table = tableDao.getByNameAndSchema(table.getName(), schema);
-                        if (columns.size() == columnDao.insertBatch(table, columns))
-                        {
-                            columns = columnDao.getByTable(table, false);
-                            // Issue #437: TODO - use real transaction timestamp for schema version.
-                            MetadataProto.SchemaVersion schemaVersion = buildInitSchemaVersion(table.getId(), columns, 0);
-                            long schemaVersionId = schemaVersionDao.insert(schemaVersion);
-                            if (schemaVersionId > 0)
-                            {
-                                MetadataProto.Layout layout = buildInitLayout(table.getId(), schemaVersionId, columns);
-                                long layoutId = layoutDao.insert(layout);
-                                if (layoutId > 0)
-                                {
-                                    List<MetadataProto.Path> orderedPaths = buildInitPaths(layoutId, layout.getVersion(),
-                                            request.getBasePathUrisList(), false);
-                                    boolean allSuccess = true;
-                                    for (MetadataProto.Path orderedPath : orderedPaths)
-                                    {
-                                        if (pathDao.insert(orderedPath) <= 0)
-                                        {
-                                            allSuccess = false;
-                                            break;
-                                        }
-                                    }
-                                    if (allSuccess)
-                                    {
-                                        List<MetadataProto.Path> compactPaths = buildInitPaths(layoutId, layout.getVersion(),
-                                                request.getBasePathUrisList(), true);
-                                        for (MetadataProto.Path compactPath : compactPaths)
-                                        {
-                                            if (pathDao.insert(compactPath) <= 0)
-                                            {
-                                                allSuccess = false;
-                                                break;
-                                            }
-                                        }
-                                        if (allSuccess)
-                                        {
-                                            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
-                                        } else
-                                        {
-                                            headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
-                                                    .setErrorMsg("failed to add compact paths for table '" +
-                                                            request.getSchemaName() + "." + request.getTableName() + "'");
-                                        }
-                                    } else
-                                    {
-                                        headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)
-                                                .setErrorMsg("failed to add ordered paths for table '" +
-                                                        request.getSchemaName() + "." + request.getTableName() + "'");
-                                    }
-                                } else
-                                {
-                                    headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
-                                            .setErrorMsg("failed to add layout for table '" +
-                                                    request.getSchemaName() + "." + request.getTableName() + "'");
-                                }
-                            } else
-                            {
-                                headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_VERSION_FAILED)
-                                        .setErrorMsg("failed to add schema version for table '" +
-                                                request.getSchemaName() + "." + request.getTableName() + "'");
-                            }
-                        } else
-                        {
-                            headerBuilder.setErrorCode(METADATA_ADD_COLUMNS_FAILED).setErrorMsg(
-                                    "failed to add columns to table '" + request.getSchemaName() + "." + request.getTableName() + "'");
-                        }
-                    } catch (Throwable e)
-                    {
-                        String msg = "failed to create the other components for table '" +
-                                request.getSchemaName() + "." + request.getTableName() + "'";
-                        log.error(msg, e);
-                        headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg(msg);
-                        // cascade delete the inconsistent states in metadata
-                        tableDao.deleteByNameAndSchema(table.getName(), schema);
-                    }
-                } else
-                {
-                    headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg("failed to add table '" +
-                            request.getSchemaName() + "." + request.getTableName() + "'");
-                }
-            }
-            else
-            {
-                headerBuilder.setErrorCode(METADATA_UNKNOWN_DATA_TYPE).setErrorMsg(
-                        "unknown data type '" + invalidType + "'");
-            }
-        }
-
-        MetadataProto.CreateTableResponse response = MetadataProto.CreateTableResponse.newBuilder()
-                .setHeader(headerBuilder.build()).build();
-
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void dropTable(MetadataProto.DropTableRequest request,
-                          StreamObserver<MetadataProto.DropTableResponse> responseObserver)
-    {
-        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
-        if (tableDao.deleteByNameAndSchema(request.getTableName(), schema))
-        {
-            headerBuilder.setErrorCode(0).setErrorMsg("");
-        }
-        else
-        {
-            headerBuilder.setErrorCode(METADATA_DELETE_TABLE_FAILED).setErrorMsg("failed to delete table '" +
-                    request.getSchemaName() + "." + request.getTableName() + "'");
-        }
-        MetadataProto.DropTableResponse response = MetadataProto.DropTableResponse.newBuilder()
-                .setHeader(headerBuilder.build()).build();
-
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void existTable(MetadataProto.ExistTableRequest request,
-                           StreamObserver<MetadataProto.ExistTableResponse> responseObserver)
-    {
-        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        MetadataProto.ExistTableResponse response;
-        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
-        if (schema == null)
-        {
-            /**
-             * Issue #183:
-             * We firstly check the existence of the schema.
-             */
-            schema = MetadataProto.Schema.newBuilder().setId(-1).setName(request.getSchemaName()).build();
-            if (!schemaDao.exists(schema))
-            {
-                headerBuilder.setErrorCode(0).setErrorMsg("");
-            }
-            else
-            {
-                headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg(
-                        "failed to get schema '" + request.getSchemaName() + "'");
-            }
-            response = MetadataProto.ExistTableResponse.newBuilder()
-                    .setExists(false).setHeader(headerBuilder.build()).build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-            return;
-        }
-        MetadataProto.Table table = MetadataProto.Table.newBuilder()
-        .setId(-1)
-        .setName(request.getTableName())
-        .setSchemaId(schema.getId()).build();
-
-        if (tableDao.exists(table))
-        {
-            headerBuilder.setErrorCode(0).setErrorMsg("");
-            response = MetadataProto.ExistTableResponse.newBuilder()
-                    .setExists(true).setHeader(headerBuilder.build()).build();
-        }
-        else
-        {
-            headerBuilder.setErrorCode(0).setErrorMsg("");
-            response = MetadataProto.ExistTableResponse.newBuilder()
-                    .setExists(false).setHeader(headerBuilder.build()).build();
-        }
-
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void existSchema(MetadataProto.ExistSchemaRequest request,
-                            StreamObserver<MetadataProto.ExistSchemaResponse> responseObserver)
-    {
-        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        MetadataProto.Schema schema = MetadataProto.Schema.newBuilder()
-                .setId(-1).setName(request.getSchemaName()).build();
-        MetadataProto.ExistSchemaResponse response;
-        if (schemaDao.exists(schema))
-        {
-            headerBuilder.setErrorCode(0).setErrorMsg("");
-            response = MetadataProto.ExistSchemaResponse.newBuilder()
-                    .setExists(true).setHeader(headerBuilder.build()).build();
-        }
-        else
-        {
-            headerBuilder.setErrorCode(0).setErrorMsg("");
-            response = MetadataProto.ExistSchemaResponse.newBuilder()
-                    .setExists(false).setHeader(headerBuilder.build()).build();
-        }
-
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

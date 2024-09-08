@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.metadata;
 
+import com.google.common.collect.ImmutableList;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.MetadataException;
@@ -194,11 +195,16 @@ public class MetadataService
 
     public Table getTable(String schemaName, String tableName) throws MetadataException
     {
+        return getTable(schemaName, tableName, false);
+    }
+
+    public Table getTable(String schemaName, String tableName, boolean withLayouts) throws MetadataException
+    {
         Table table = null;
         String token = UUID.randomUUID().toString();
         MetadataProto.GetTableRequest request = MetadataProto.GetTableRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).build();
+                .setSchemaName(schemaName).setTableName(tableName).setWithLayouts(withLayouts).build();
         try
         {
             MetadataProto.GetTableResponse response = this.stub.getTable(request);
@@ -211,7 +217,7 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            table = new Table(response.getTable());
+            table = new Table(response.getTable(), response.getLayoutsList());
         }
         catch (Exception e)
         {
@@ -222,7 +228,7 @@ public class MetadataService
 
     public List<Table> getTables(String schemaName) throws MetadataException
     {
-        List<Table> tables = new ArrayList<>();
+        ImmutableList.Builder<Table> tablesBuilder = ImmutableList.builder();
         String token = UUID.randomUUID().toString();
         MetadataProto.GetTablesRequest request = MetadataProto.GetTablesRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -239,13 +245,13 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            response.getTablesList().forEach(table -> tables.add(new Table(table)));
+            response.getTablesList().forEach(table -> tablesBuilder.add(new Table(table)));
         }
         catch (Exception e)
         {
             throw new MetadataException("failed to get tables from metadata", e);
         }
-        return tables;
+        return tablesBuilder.build();
     }
 
     public boolean existTable(String schemaName, String tableName) throws MetadataException
@@ -545,7 +551,7 @@ public class MetadataService
      */
     public List<Layout> getLayouts(String schemaName, String tableName) throws MetadataException
     {
-        List<Layout> layouts = new ArrayList<>();
+        ImmutableList.Builder<Layout> layoutsBuilder = ImmutableList.builder();
         String token = UUID.randomUUID().toString();
         MetadataProto.GetLayoutsRequest request = MetadataProto.GetLayoutsRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -562,13 +568,13 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            response.getLayoutsList().forEach(layout -> layouts.add(new Layout(layout)));
+            response.getLayoutsList().forEach(layout -> layoutsBuilder.add(new Layout(layout)));
         }
         catch (Exception e)
         {
             throw new MetadataException("failed to get layouts from metadata", e);
         }
-        return layouts;
+        return layoutsBuilder.build();
     }
 
     public Layout getLayout(String schemaName, String tableName, int version) throws MetadataException

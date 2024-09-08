@@ -31,6 +31,9 @@ import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermis
 public class Layout extends Base
 {
     private long version;
+    /**
+     * The milliseconds since Unix epoch at which this layout is created.
+     */
     private long createAt;
     private Permission permission;
     private Ordered ordered;
