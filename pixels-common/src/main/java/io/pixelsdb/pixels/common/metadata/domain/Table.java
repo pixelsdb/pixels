@@ -36,9 +36,7 @@ public class Table extends Base
     private long schemaId;
     private Optional<List<Layout>> layouts;
 
-    public Table()
-    {
-    }
+    public Table() { }
 
     public Table(MetadataProto.Table table)
     {
