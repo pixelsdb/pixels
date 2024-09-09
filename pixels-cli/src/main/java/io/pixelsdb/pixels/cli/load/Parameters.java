@@ -169,7 +169,7 @@ public class Parameters
                     .append(",");
         }
         // add timestamp column
-        schemaBuilder.append("pixels_commit_timestamp:timestamp>");
+        schemaBuilder.append("pixels_commit_timestamp:long>");
 
         // get path of loading
         if(this.loadingPaths == null)
