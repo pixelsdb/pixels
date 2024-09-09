@@ -35,7 +35,6 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -116,7 +115,7 @@ public class PixelsConsumer extends Consumer
                     System.out.println("loading data from: " + originalFilePath);
 
                     // loaded rows use the same timestamp
-                    Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+                    long timestamp = parameters.getTimestamp();
                     while ((line = reader.readLine()) != null)
                     {
                         if (initPixelsFile)
