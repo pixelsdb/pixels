@@ -23,10 +23,14 @@ import io.pixelsdb.pixels.cli.load.Consumer;
 import io.pixelsdb.pixels.cli.load.Parameters;
 import io.pixelsdb.pixels.cli.load.PixelsConsumer;
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.transaction.TransService;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import net.sourceforge.argparse4j.inf.Namespace;
 
@@ -59,11 +63,18 @@ public class LoadExecutor implements CommandExecutor
             origin += "/";
         }
 
+        TransService transService = new TransService(
+                ConfigFactory.Instance().getProperty("trans.server.host"),
+                Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port")));
+
+        TransContext context;
+        context = transService.beginTrans(false);
+
         Storage storage = StorageFactory.Instance().getStorage(origin);
         MetadataService metadataService = MetadataService.Instance();
 
         Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex,
-                encodingLevel, nullsPadding, metadataService);
+                encodingLevel, nullsPadding, metadataService, context.getTransId(), context.getTimestamp());
 
         // source already exist, producer option is false, add list of source to the queue
         List<String> fileList = storage.listPaths(origin);
@@ -83,6 +94,8 @@ public class LoadExecutor implements CommandExecutor
         {
             System.err.println(command + " failed");
         }
+
+        transService.commitTrans(context.getTransId(), context.getTimestamp());
 
         long endTime = System.currentTimeMillis();
         System.out.println("Text files in '" + origin + "' are loaded by " + threadNum +
