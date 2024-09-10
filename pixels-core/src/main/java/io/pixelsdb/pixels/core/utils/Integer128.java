@@ -73,22 +73,26 @@ public class Integer128 implements Comparable<Integer128>
      */
     public static Integer128 fromBigEndian(byte[] bytes)
     {
-        if (bytes.length >= 16) {
+        if (bytes.length >= 16)
+        {
             int offset = bytes.length - Long.BYTES;
             long low = fromBigEndianBytes(bytes, offset);
 
             offset -= Long.BYTES;
             long high = fromBigEndianBytes(bytes, offset);
 
-            for (int i = 0; i < offset; i++) {
-                if (bytes[i] != (high >> 63)) {
+            for (int i = 0; i < offset; i++)
+            {
+                if (bytes[i] != (high >> 63))
+                {
                     throw new ArithmeticException("Overflow");
                 }
             }
 
             return Integer128.valueOf(high, low);
         }
-        else if (bytes.length > 8) {
+        else if (bytes.length > 8)
+        {
             // read the last 8 bytes into low
             int offset = bytes.length - Long.BYTES;
             long low = fromBigEndianBytes(bytes, offset);
@@ -102,17 +106,20 @@ public class Integer128 implements Comparable<Integer128>
 
             return Integer128.valueOf(high, low);
         }
-        else if (bytes.length == 8) {
+        else if (bytes.length == 8)
+        {
             long low = fromBigEndianBytes(bytes, 0);
             long high = (low >> 63);
 
             return Integer128.valueOf(high, low);
         }
-        else {
+        else
+        {
             long high = (bytes[0] >> 7);
             long low = high;
-            for (int i = 0; i < bytes.length; i++) {
-                low = (low << 8) | (bytes[i] & 0xFF);
+            for (byte aByte : bytes)
+            {
+                low = (low << 8) | (aByte & 0xFF);
             }
 
             return Integer128.valueOf(high, low);
@@ -121,7 +128,8 @@ public class Integer128 implements Comparable<Integer128>
 
     public static Integer128 valueOf(long[] value)
     {
-        if (value.length != 2) {
+        if (value.length != 2)
+        {
             throw new IllegalArgumentException("Expected long[2]");
         }
 
@@ -144,7 +152,8 @@ public class Integer128 implements Comparable<Integer128>
     {
         long low = value.longValue();
         long high;
-        try {
+        try
+        {
             high = value.shiftRight(64).longValueExact();
         }
         catch (ArithmeticException e) {
@@ -161,10 +170,10 @@ public class Integer128 implements Comparable<Integer128>
 
     public void add(long high, long low)
     {
-        // TODO: optimize.
         BigInteger res = this.toBigInteger().add(new BigInteger(toBigEndianBytes(high, low)));
         this.low = res.longValue();
-        try {
+        try
+        {
             this.high = res.shiftRight(64).longValueExact();
         }
         catch (ArithmeticException e) {
@@ -175,10 +184,12 @@ public class Integer128 implements Comparable<Integer128>
     @Override
     public boolean equals(Object o)
     {
-        if (this == o) {
+        if (this == o)
+        {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (o == null || getClass() != o.getClass())
+        {
             return false;
         }
         Integer128 that = (Integer128) o;
@@ -224,7 +235,8 @@ public class Integer128 implements Comparable<Integer128>
 
     public long toLongExact()
     {
-        if (high != (low >> 63)) {
+        if (high != (low >> 63))
+        {
             throw new ArithmeticException("Overflow");
         }
 
@@ -239,7 +251,8 @@ public class Integer128 implements Comparable<Integer128>
     public static int compare(long leftHigh, long leftLow, long rightHigh, long rightLow)
     {
         int comparison = Long.compare(leftHigh, rightHigh);
-        if (comparison == 0) {
+        if (comparison == 0)
+        {
             comparison = Long.compareUnsigned(leftLow, rightLow);
         }
 
@@ -266,7 +279,8 @@ public class Integer128 implements Comparable<Integer128>
 
     public static void toBigEndianBytes(long value, byte[] bytes, int offset)
     {
-        for(int i = 7; i >= 0; --i) {
+        for(int i = 7; i >= 0; --i)
+        {
             bytes[offset+i] = (byte)((int)(value & 255L));
             value >>= 8;
         }
