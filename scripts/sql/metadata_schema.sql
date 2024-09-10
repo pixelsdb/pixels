@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`LAYOUTS` (
 -- Table `pixels_metadata`.`VIEWS`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
-    `VIEW_ID` BIGINT NOT NULL,
+    `VIEW_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `VIEW_NAME` VARCHAR(128) NOT NULL,
     `VIEW_TYPE` VARCHAR(128) NULL,
     `VIEW_DATA` LONGTEXT NOT NULL,
