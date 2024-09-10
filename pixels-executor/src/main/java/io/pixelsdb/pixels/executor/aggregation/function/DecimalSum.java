@@ -23,6 +23,10 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.Integer128;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
+import io.pixelsdb.pixels.core.vector.LongDecimalColumnVector;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.core.TypeDescription.MAX_SHORT_DECIMAL_SCALE;
 
 /**
  * @author hank
@@ -30,19 +34,32 @@ import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
  */
 public class DecimalSum extends SingleColumnFunction
 {
+    private final TypeDescription inputType;
     private final TypeDescription outputType;
+    private final boolean inputIsLong;
+    private final boolean outputIsLong;
     private Integer128 longValue;
     private long shortValue = 0;
-    private boolean isLong = false;
 
-    protected DecimalSum(TypeDescription outputType)
+    protected DecimalSum(TypeDescription inputType, TypeDescription outputType)
     {
+        this.inputType = inputType;
         this.outputType = outputType;
-        if (outputType.getPrecision() > 18)
+        this.inputIsLong = inputType.getPrecision() > MAX_SHORT_DECIMAL_SCALE;
+
+        if (outputType.getPrecision() > MAX_SHORT_DECIMAL_SCALE)
         {
-            this.isLong = true;
+            this.outputIsLong = true;
             this.longValue = new Integer128(0L, 0L);
         }
+        else
+        {
+            this.outputIsLong = false;
+        }
+
+        // Issue #647: check input and output data type.
+        checkArgument(!this.inputIsLong || this.outputIsLong,
+                "the output type must be long decimal if the input type is long decimal");
     }
 
     @Override
@@ -50,14 +67,23 @@ public class DecimalSum extends SingleColumnFunction
     {
         if (inputVector.noNulls || !inputVector.isNull[rowId])
         {
-            DecimalColumnVector decimalColumnVector = (DecimalColumnVector) inputVector;
-            if (isLong)
+            if (inputIsLong)
             {
-                longValue.add(decimalColumnVector.vector[rowId*2], decimalColumnVector.vector[rowId*2+1]);
+                LongDecimalColumnVector decimalColumnVector = (LongDecimalColumnVector) inputVector;
+                // Issue #647: if the input type is long decimal, the output type must be long decimal too.
+                longValue.add(decimalColumnVector.vector[rowId * 2], decimalColumnVector.vector[rowId * 2 + 1]);
             }
             else
             {
-                shortValue += decimalColumnVector.vector[rowId];
+                DecimalColumnVector decimalColumnVector = (DecimalColumnVector) inputVector;
+                // Issue #647: if the input type is short decimal, the output could be short or long decimal.
+                if (outputIsLong)
+                {
+                    longValue.add(0L, decimalColumnVector.vector[rowId]);
+                } else
+                {
+                    shortValue += decimalColumnVector.vector[rowId];
+                }
             }
         }
     }
@@ -65,7 +91,7 @@ public class DecimalSum extends SingleColumnFunction
     @Override
     public void output(ColumnVector outputVector)
     {
-        if (isLong)
+        if (outputIsLong)
         {
             outputVector.add(longValue);
         }
@@ -78,6 +104,6 @@ public class DecimalSum extends SingleColumnFunction
     @Override
     public Function buildCopy()
     {
-        return new DecimalSum(this.outputType);
+        return new DecimalSum(this.inputType, this.outputType);
     }
 }
