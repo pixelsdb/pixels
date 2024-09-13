@@ -30,15 +30,21 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.aggregation.Aggregator;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.executor.scan.Scanner;
+import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
+import io.pixelsdb.pixels.planner.coordinate.TaskBatch;
+import io.pixelsdb.pixels.planner.coordinate.TaskInfo;
+import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
+import io.pixelsdb.pixels.worker.common.*;
 import org.apache.logging.log4j.Logger;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -49,19 +55,18 @@ import java.util.concurrent.TimeUnit;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Scan a table split.
+ * Scan a table split under HTTP Streaming mode.
+ * Implemented c.f. {@link io.pixelsdb.pixels.worker.common.BaseScanWorker}.
  *
- * @author tiannan
- * @author hank
- * @create 2022-03
- * @update 2023-04-23 (moved from pixels-worker-lambda to here as the base worker implementation)
+ * @author jasha64
+ * @create 2023-09-04
  */
-public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
+public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
 {
     private final Logger logger;
     private final WorkerMetrics workerMetrics;
 
-    public BaseScanWorker(WorkerContext context)
+    public BaseScanStreamWorker(WorkerContext context)
     {
         super(context);
         this.logger = context.getLogger();
@@ -81,131 +86,131 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
 
         try
         {
+            int stageId = event.getStageId();
+            long transId = event.getTransId();
+            String ip = WorkerCommon.getIpAddress();
+            int port = WorkerCommon.getPort();
+            CFWorkerInfo workerInfo = new CFWorkerInfo(ip, port, transId, stageId, "scan", Collections.emptyList());
+            workerCoordinatorService = new WorkerCoordinateService("10.168.4.4", 18894);
+            io.pixelsdb.pixels.common.task.Worker<CFWorkerInfo> worker = workerCoordinatorService.registerWorker(workerInfo);
+
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
                     new WorkerThreadFactory(exceptionHandler));
 
-            long transId = event.getTransId();
-            requireNonNull(event.getTableInfo(), "even.tableInfo is null");
-            StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
-            List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
-            boolean[] scanProjection = requireNonNull(event.getScanProjection(),
-                    "event.scanProjection is null");
-            boolean partialAggregationPresent = event.isPartialAggregationPresent();
-            String outputFolder = event.getOutput().getPath();
-            StorageInfo outputStorageInfo = event.getOutput().getStorageInfo();
-            if (!outputFolder.endsWith("/"))
-            {
-                outputFolder += "/";
-            }
-            boolean encoding = event.getOutput().isEncoding();
-
-            WorkerCommon.initStorage(inputStorageInfo);
-            WorkerCommon.initStorage(outputStorageInfo);
-
-            String[] includeCols = event.getTableInfo().getColumnsToRead();
-            TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
-
-            Aggregator aggregator;
-            if (partialAggregationPresent)
-            {
-                logger.info("start get output schema");
-                TypeDescription inputSchema = WorkerCommon.getFileSchemaFromSplits(
-                        WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
-                inputSchema = WorkerCommon.getResultSchema(inputSchema, includeCols);
-                PartialAggregationInfo partialAggregationInfo = event.getPartialAggregationInfo();
-                requireNonNull(partialAggregationInfo, "event.partialAggregationInfo is null");
-                boolean[] groupKeyProjection = new boolean[partialAggregationInfo.getGroupKeyColumnAlias().length];
-                Arrays.fill(groupKeyProjection, true);
-                aggregator = new Aggregator(WorkerCommon.rowBatchSize, inputSchema,
-                        partialAggregationInfo.getGroupKeyColumnAlias(),
-                        partialAggregationInfo.getGroupKeyColumnIds(), groupKeyProjection,
-                        partialAggregationInfo.getAggregateColumnIds(),
-                        partialAggregationInfo.getResultColumnAlias(),
-                        partialAggregationInfo.getResultColumnTypes(),
-                        partialAggregationInfo.getFunctionTypes(),
-                        partialAggregationInfo.isPartition(),
-                        partialAggregationInfo.getNumPartition());
-            }
-            else
-            {
-                aggregator = null;
-            }
-
-            logger.info("start scan and aggregate");
-            /*
-             * Issue #681:
-             * For table scan without partial aggregation, a scan worker may output less output files than those
-             * generated by ScanInput.generateOutputPaths(). This is because the input files specified in the input
-             * splits may contain less row groups than expected. In Pixels-Turbo, we assume a scan worker always use
-             * the first N output file paths in this case. Therefore, we build a thread-safe queue for the expected
-             * output paths here. It will be polled when the scan worker finally writes an output file.
-             */
-            Queue<String> outputPaths = new ConcurrentLinkedQueue<>(
-                    ScanInput.generateOutputPaths(outputFolder, inputSplits.size()));
-            for (InputSplit inputSplit : inputSplits)
-            {
-                List<InputInfo> scanInputs = inputSplit.getInputInfos();
-                /*
-                 * Issue #435:
-                 * For table scan without partial aggregation, the path in output info is a folder.
-                 * Each scan input split generates an output file in this folder.
-                 */
-                threadPool.execute(() -> {
-                    try
-                    {
-                        scanFile(transId, scanInputs, includeCols, inputStorageInfo.getScheme(),
-                                scanProjection, filter, outputPaths, scanOutput, encoding, outputStorageInfo.getScheme(),
-                                partialAggregationPresent, aggregator);
+            TaskBatch batch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
+            int splitId = 0;
+            WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
+            while (!batch.isEndOfTasks()) {
+                List<TaskInfo> tasks = batch.getTasks();
+                for (TaskInfo task : tasks) {
+                    ScanInput scanInput = JSON.parseObject(task.getPayload(), ScanInput.class);
+                    requireNonNull(scanInput.getTableInfo(), "scanInput.tableInfo is null");
+                    StorageInfo inputStorageInfo = scanInput.getTableInfo().getStorageInfo();
+                    List<InputSplit> inputSplits = scanInput.getTableInfo().getInputSplits();
+                    boolean[] scanProjection = requireNonNull(scanInput.getScanProjection(),
+                            "event.scanProjection is null");
+                    boolean partialAggregationPresent = scanInput.isPartialAggregationPresent();
+                    String outputFolder = scanInput.getOutput().getPath();
+                    StorageInfo outputStorageInfo = scanInput.getOutput().getStorageInfo();
+                    if (!outputFolder.endsWith("/")) {
+                        outputFolder += "/";
                     }
-                    catch (Throwable e)
-                    {
-                        throw new WorkerException("error during scan", e);
-                    }
-                });
-            }
-            threadPool.shutdown();
-            try
-            {
-                while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
-            } catch (InterruptedException e)
-            {
-                throw new WorkerException("interrupted while waiting for the termination of scan", e);
-            }
+                    boolean encoding = scanInput.getOutput().isEncoding();
 
-            if (exceptionHandler.hasException())
-            {
-                throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
-            }
+                    WorkerCommon.initStorage(inputStorageInfo);
+                    WorkerCommon.initStorage(outputStorageInfo);
 
-            logger.info("start write aggregation result");
-            if (partialAggregationPresent)
-            {
-                String outputPath = event.getOutput().getPath();
-                WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
-                PixelsWriter pixelsWriter = WorkerCommon.getWriter(aggregator.getOutputSchema(),
-                        WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                        aggregator.isPartition(), aggregator.getGroupKeyColumnIdsInResult());
-                aggregator.writeAggrOutput(pixelsWriter);
-                pixelsWriter.close();
-                if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
-                {
-                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
-                    {
-                        // Wait for 10ms and see if the output file is visible.
-                        TimeUnit.MILLISECONDS.sleep(10);
+                    String[] includeCols = scanInput.getTableInfo().getColumnsToRead();
+                    TableScanFilter filter = JSON.parseObject(scanInput.getTableInfo().getFilter(), TableScanFilter.class);
+
+                    Aggregator aggregator;
+                    if (partialAggregationPresent) {
+                        logger.info("start get output schema");
+                        TypeDescription inputSchema = WorkerCommon.getFileSchemaFromSplits(
+                                WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
+                        inputSchema = WorkerCommon.getResultSchema(inputSchema, includeCols);
+                        PartialAggregationInfo partialAggregationInfo = event.getPartialAggregationInfo();
+                        requireNonNull(partialAggregationInfo, "event.partialAggregationInfo is null");
+                        boolean[] groupKeyProjection = new boolean[partialAggregationInfo.getGroupKeyColumnAlias().length];
+                        Arrays.fill(groupKeyProjection, true);
+                        aggregator = new Aggregator(WorkerCommon.rowBatchSize, inputSchema,
+                                partialAggregationInfo.getGroupKeyColumnAlias(),
+                                partialAggregationInfo.getGroupKeyColumnIds(), groupKeyProjection,
+                                partialAggregationInfo.getAggregateColumnIds(),
+                                partialAggregationInfo.getResultColumnAlias(),
+                                partialAggregationInfo.getResultColumnTypes(),
+                                partialAggregationInfo.getFunctionTypes(),
+                                partialAggregationInfo.isPartition(),
+                                partialAggregationInfo.getNumPartition());
+                    } else {
+                        aggregator = null;
                     }
+
+                    logger.info("start scan and aggregate");
+                    /*
+                     * Issue #681:
+                     * For table scan without partial aggregation, a scan worker may output less output files than those
+                     * generated by ScanInput.generateOutputPaths(). This is because the input files specified in the input
+                     * splits may contain less row groups than expected. In Pixels-Turbo, we assume a scan worker always use
+                     * the first N output file paths in this case. Therefore, we build a thread-safe queue for the expected
+                     * output paths here. It will be polled when the scan worker finally writes an output file.
+                     */
+                    Queue<String> outputPaths = new ConcurrentLinkedQueue<>(
+                            ScanInput.generateOutputPaths(outputFolder, inputSplits.size()));
+                    for (InputSplit inputSplit : inputSplits) {
+                        List<InputInfo> scanInputs = inputSplit.getInputInfos();
+                        /*
+                         * Issue #435:
+                         * For table scan without partial aggregation, the path in output info is a folder.
+                         * Each scan input split generates an output file in this folder.
+                         */
+                        threadPool.execute(() -> {
+                            try {
+                                scanFile(transId, scanInputs, includeCols, inputStorageInfo.getScheme(),
+                                        scanProjection, filter, outputPaths, scanOutput, encoding, outputStorageInfo.getScheme(),
+                                        partialAggregationPresent, aggregator);
+                            } catch (Throwable e) {
+                                throw new WorkerException("error during scan", e);
+                            }
+                        });
+                    }
+                    threadPool.shutdown();
+                    try {
+                        while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                    } catch (InterruptedException e) {
+                        throw new WorkerException("interrupted while waiting for the termination of scan", e);
+                    }
+
+                    if (exceptionHandler.hasException()) {
+                        throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+                    }
+
+                    logger.info("start write aggregation result");
+                    if (partialAggregationPresent) {
+                        String outputPath = scanInput.getOutput().getPath();
+                        PixelsWriter pixelsWriter = WorkerCommon.getWriter(aggregator.getOutputSchema(),
+                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
+                                aggregator.isPartition(), aggregator.getGroupKeyColumnIdsInResult());
+                        aggregator.writeAggrOutput(pixelsWriter);
+                        pixelsWriter.close();
+                        if (outputStorageInfo.getScheme() == Storage.Scheme.minio) {
+                            while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath)) {
+                                // Wait for 10ms and see if the output file is visible.
+                                TimeUnit.MILLISECONDS.sleep(10);
+                            }
+                        }
+                        workerMetrics.addOutputCostNs(writeCostTimer.stop());
+                        workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                        workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+                        scanOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
+                    }
+                    WorkerCommon.setPerfMetrics(scanOutput, workerMetrics);
                 }
-                workerMetrics.addOutputCostNs(writeCostTimer.stop());
-                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-                scanOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
             }
-
             scanOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
-            WorkerCommon.setPerfMetrics(scanOutput, workerMetrics);
             return scanOutput;
         } catch (Throwable e)
         {
@@ -241,6 +246,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
     {
         PixelsWriter pixelsWriter = null;
         String outputPath = null;
+        // We can just throw out any exception because Pixels handles all exceptions centrally.
         Scanner scanner = null;
         if (partialAggregate)
         {
