@@ -58,7 +58,7 @@ public class ScanStreamOperator extends ScanOperator
             this.scanOutputs = new CompletableFuture[size];
             for (int i = 0; i < size; i++)
             {
-                this.scanOutputs[i++] = InvokerFactory.Instance()
+                this.scanOutputs[i] = InvokerFactory.Instance()
                         .getInvoker(WorkerType.SCAN_STREAM).invoke(scanInputs.get(i));
             }
 
