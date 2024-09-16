@@ -47,10 +47,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
 
@@ -160,6 +157,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                      */
                     Queue<String> outputPaths = new ConcurrentLinkedQueue<>(
                             ScanInput.generateOutputPaths(outputFolder, inputSplits.size()));
+                    CountDownLatch latch = new CountDownLatch(inputSplits.size());
                     for (InputSplit inputSplit : inputSplits) {
                         List<InputInfo> scanInputs = inputSplit.getInputInfos();
                         /*
@@ -172,21 +170,13 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                                 scanFile(transId, scanInputs, includeCols, inputStorageInfo.getScheme(),
                                         scanProjection, filter, outputPaths, scanOutput, encoding, outputStorageInfo.getScheme(),
                                         partialAggregationPresent, aggregator);
+                                latch.countDown();
                             } catch (Throwable e) {
                                 throw new WorkerException("error during scan", e);
                             }
                         });
                     }
-                    threadPool.shutdown();
-                    try {
-                        while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
-                    } catch (InterruptedException e) {
-                        throw new WorkerException("interrupted while waiting for the termination of scan", e);
-                    }
-
-                    if (exceptionHandler.hasException()) {
-                        throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
-                    }
+                    latch.await();
 
                     logger.info("start write aggregation result");
                     if (partialAggregationPresent) {
@@ -209,6 +199,18 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                     }
                     WorkerCommon.setPerfMetrics(scanOutput, workerMetrics);
                 }
+                workerCoordinatorService.completeTasks(worker.getWorkerId(), batch.getTasks());
+                batch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
+            }
+            threadPool.shutdown();
+            try {
+                while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+            } catch (InterruptedException e) {
+                throw new WorkerException("interrupted while waiting for the termination of scan", e);
+            }
+
+            if (exceptionHandler.hasException()) {
+                throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
             }
             scanOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return scanOutput;
