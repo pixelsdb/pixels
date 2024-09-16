@@ -26,8 +26,12 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.IndexFactory;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.server.HostPort;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -45,21 +49,80 @@ import static io.pixelsdb.pixels.common.error.ErrorCode.*;
  */
 public class MetadataService
 {
+    private static final Logger logger = LogManager.getLogger(MetadataService.class);
+    private static final HostPort hostPort;
+    private static final MetadataService instance;
+
+    static
+    {
+        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
+        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
+        hostPort = new HostPort(metadataHost, metadataPort);
+        instance = new MetadataService(metadataHost, metadataPort);
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    instance.shutdown();
+                } catch (InterruptedException e)
+                {
+                    logger.error("failed to shut down metadata service to the configured metadata server " + hostPort, e);
+                }
+            }
+        }));
+    }
+
+    /**
+     * Get the default metadata service instance connecting to the metadata host:port configured in
+     * PIXELS_HOME/pixels.properties. This default instance will be automatically shut down when the process
+     * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
+     * @return
+     */
+    public static MetadataService Instance()
+    {
+        return instance;
+    }
+
+    /**
+     * This method should only be used to connect to a metadata server that is not configured through
+     * PIXELS_HOME/pixels.properties. <b>Note</b> to shut down the metadata service when it is not to be used.
+     * @param host the host name of the metadata server
+     * @param port the port of the metadata server
+     * @return the created metadata service instance
+     */
+    public static MetadataService CreateInstance(String host, int port)
+    {
+        if (hostPort.equals(host, port))
+        {
+            return instance;
+        }
+        return new MetadataService(host, port);
+    }
+
     private final ManagedChannel channel;
     private final MetadataServiceGrpc.MetadataServiceBlockingStub stub;
+    private boolean isShutDown;
 
-    public MetadataService(String host, int port)
+    private MetadataService(String host, int port)
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
-        this.channel = ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext().build();
+        this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
         this.stub = MetadataServiceGrpc.newBlockingStub(channel);
+        this.isShutDown = false;
     }
 
-    public void shutdown() throws InterruptedException
+    public synchronized void shutdown() throws InterruptedException
     {
-        this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        if (!this.isShutDown)
+        {
+            // Wait for at most 5 seconds, this should be enough to shut down an RPC client.
+            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            this.isShutDown = true;
+        }
     }
 
     public boolean createSchema(String schemaName) throws MetadataException
@@ -1053,6 +1116,38 @@ public class MetadataService
             throw new MetadataException("failed to add file", e);
         }
         return false;
+    }
+
+    /**
+     * Get the file id of the file given the full uri path containing the storage scheme prefix.
+     * @param filePathUri the file path uri containing the storage scheme prefix
+     * @return the id of the file, valid file id should be a positive integer
+     * @throws MetadataException if failed to request the file id
+     */
+    public long getFileId(String filePathUri) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetFileIdRequest request = MetadataProto.GetFileIdRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setFilePathUri(filePathUri).build();
+        try
+        {
+            MetadataProto.GetFileIdResponse response = this.stub.getFileId(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return response.getFileId();
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get file id", e);
+        }
     }
 
     public List<File> getFiles(long pathId) throws MetadataException

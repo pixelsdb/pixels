@@ -90,6 +90,32 @@ public class RdbFileDao extends FileDao
     }
 
     @Override
+    public MetadataProto.File getByPathIdAndFileName(long pathId, String fileName)
+    {
+        Connection conn = db.getConnection();
+        String sql = "SELECT FILE_ID, FILE_NUM_RG FROM FILES WHERE PATHS_PATH_ID=? AND FILE_NAME=?";
+        try (PreparedStatement st = conn.prepareStatement(sql))
+        {
+            st.setLong(1, pathId);
+            st.setString(2, fileName);
+            ResultSet rs = st.executeQuery();
+            if (rs.next())
+            {
+                return MetadataProto.File.newBuilder()
+                        .setId(rs.getLong("FILE_ID"))
+                        .setName(fileName)
+                        .setNumRowGroup(rs.getInt("FILE_NUM_RG"))
+                        .setPathId(pathId).build();
+            }
+        } catch (SQLException e)
+        {
+            log.error("getByPathIdAndFileName in RdbFileDao", e);
+        }
+
+        return null;
+    }
+
+    @Override
     public boolean exists(MetadataProto.File file)
     {
         Connection conn = db.getConnection();

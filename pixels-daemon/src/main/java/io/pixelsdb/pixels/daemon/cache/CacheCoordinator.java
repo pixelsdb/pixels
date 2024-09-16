@@ -96,7 +96,7 @@ public class CacheCoordinator implements Server
                 }
                 // 2. check version consistency
                 int cacheVersion = 0, layoutVersion = 0;
-                this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+                this.metadataService = MetadataService.Instance();
                 KeyValue cacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (null != cacheVersionKV)
                 {
@@ -200,14 +200,8 @@ public class CacheCoordinator implements Server
         logger.debug("Shutting down cache coordinator...");
         if (metadataService != null)
         {
-            try
-            {
-                metadataService.shutdown();
-            } catch (InterruptedException e)
-            {
-                logger.error("Failed to shutdown rpc channel for metadata service " +
-                        "while shutting down cache coordinator.", e);
-            }
+            // Issue #708: no need the shut down the metadata service instance created using the configured host and port.
+            metadataService = null;
         }
         if (storage != null)
         {

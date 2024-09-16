@@ -74,8 +74,9 @@ public class ErrorCode
     public static final int METADATA_DELETE_RANGE_FAILED = (ERROR_BASE_METADATA + 42);
     public static final int METADATA_ADD_FILE_FAILED = (ERROR_BASE_METADATA + 43);
     public static final int METADATA_GET_FILES_FAILED = (ERROR_BASE_METADATA + 44);
-    public static final int METADATA_UPDATE_FILE_FAILED = (ERROR_BASE_METADATA + 45);
-    public static final int METADATA_DELETE_FILES_FAILED = (ERROR_BASE_METADATA + 46);
+    public static final int METADATA_GET_FILE_ID_FAILED = (ERROR_BASE_METADATA + 45);
+    public static final int METADATA_UPDATE_FILE_FAILED = (ERROR_BASE_METADATA + 46);
+    public static final int METADATA_DELETE_FILES_FAILED = (ERROR_BASE_METADATA + 47);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue

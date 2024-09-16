@@ -135,11 +135,9 @@ public class AmphiServiceImpl extends AmphiServiceGrpc.AmphiServiceImplBase
     public void coordinateQuery(AmphiProto.CoordinateQueryRequest request, StreamObserver<AmphiProto.CoordinateQueryResponse> responseObserver)
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
-        String metadataHost = configFactory.getProperty("metadata.server.host");
-        int metadataPort = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
         String trinoEndpoint = configFactory.getProperty("presto.jdbc.url");
 
-        MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
+        MetadataService metadataService = MetadataService.Instance();
         Coordinator coordinator = new Coordinator(metadataService);
         boolean inCloud = false;
 

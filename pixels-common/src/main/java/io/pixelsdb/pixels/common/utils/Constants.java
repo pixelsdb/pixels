@@ -69,18 +69,6 @@ public final class Constants
      */
     public static final String AI_LOCK_PATH_PREFIX = "/pixels_ai_lock/";
 
-    public static final String LOCAL_FS_ID_KEY = "pixels_storage_local_id";
-    // the prefix for keys of local fs metadata (i.e. file path -> file id).
-    public static final String LOCAL_FS_META_PREFIX = "pixels_storage_local_meta:";
-
-    public static final String S3_ID_KEY = "pixels_storage_s3_id";
-    // the prefix for keys of s3 metadata (i.e. file path -> file id).
-    public static final String S3_META_PREFIX = "pixels_storage_s3_meta:";
-
-    public static final String MINIO_ID_KEY = "pixels_storage_minio_id";
-    // the prefix for keys of minio metadata (i.e. file path -> file id).
-    public static final String MINIO_META_PREFIX = "pixels_storage_minio_meta:";
-
     public static final String REDIS_ID_KEY = "pixels_storage_redis_id";
     // the prefix for keys of redis metadata (i.e. file path -> file id).
     public static final String REDIS_META_PREFIX = "pixels_storage_redis_meta:";

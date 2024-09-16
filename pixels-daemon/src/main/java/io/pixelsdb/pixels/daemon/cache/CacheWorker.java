@@ -109,7 +109,7 @@ public class CacheWorker implements Server
                         .setHostName(hostName)
                         .setCacheConfig(cacheConfig)
                         .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
-                this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+                this.metadataService = MetadataService.Instance();
 
                 // 2. update cache if necessary.
                 // If the cache is new created using start-vm.sh script, the local cache version would be zero.
@@ -260,14 +260,8 @@ public class CacheWorker implements Server
         logger.info("Shutting down cache worker...");
         if (metadataService != null)
         {
-            try
-            {
-                metadataService.shutdown();
-            } catch (InterruptedException e)
-            {
-                logger.error("Failed to shutdown rpc channel for metadata service " +
-                        "while shutting down cache worker.", e);
-            }
+            // Issue #708: no need the shut down the metadata service instance created using the configured host and port.
+            metadataService = null;
         }
         if (cacheWriter != null)
         {
