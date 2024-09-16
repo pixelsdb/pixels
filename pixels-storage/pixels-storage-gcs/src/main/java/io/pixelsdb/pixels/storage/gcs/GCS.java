@@ -23,26 +23,22 @@ import com.google.api.gax.paging.Page;
 import com.google.cloud.ReadChannel;
 import com.google.cloud.WriteChannel;
 import com.google.cloud.storage.*;
-import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.exception.StorageException;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
 
 import java.io.*;
 import java.nio.channels.Channels;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.*;
+import static io.pixelsdb.pixels.common.utils.Constants.GCS_BUFFER_SIZE;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -62,17 +58,7 @@ public class GCS implements Storage
 
     static
     {
-        EnableCache = Boolean.parseBoolean(
-                ConfigFactory.Instance().getProperty("cache.enabled"));
-        if (EnableCache)
-        {
-            /**
-             * Issue #222:
-             * The etcd file id is only used for cache coordination.
-             * Thus, we do not initialize the id key when cache is disabled.
-             */
-            InitId(GCS_ID_KEY);
-        }
+        EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
     }
 
     /**
@@ -170,8 +156,7 @@ public class GCS implements Storage
     @Override
     public List<String> listPaths(String... path) throws IOException
     {
-        return this.listStatus(path).stream().map(Status::getPath)
-                .collect(Collectors.toList());
+        return this.listStatus(path).stream().map(Status::getPath).collect(Collectors.toList());
     }
 
     @Override
@@ -210,48 +195,21 @@ public class GCS implements Storage
             {
                 throw new IOException("Path '" + path + "' is not valid.");
             }
-            // try to generate the id in etcd if it does not exist.
-            if (!this.existsOrGenIdSucc(p))
+            MetadataService metadataService = MetadataService.Instance();
+            try
             {
-                throw new IOException("Path '" + path + "' does not exist.");
+                path = ensureSchemePrefix(path);
+                return metadataService.getFileId(path);
+            } catch (MetadataException e)
+            {
+                throw new IOException("failed to get file id from metadata, path=" + path, e);
             }
-            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(p.toString()));
-            return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
         }
         else
         {
             // Issue #222: return an arbitrary id when cache is disable.
             return path.hashCode();
         }
-    }
-
-    private String getPathKey(String path)
-    {
-        return GCS_META_PREFIX + path;
-    }
-
-    private boolean existsOrGenIdSucc(ObjectPath path) throws IOException
-    {
-        if (!EnableCache)
-        {
-            throw new StorageException("Should not check or generate file id when cache is disabled");
-        }
-        if (!path.valid)
-        {
-            throw new IOException("Path '" + path + "' is not valid.");
-        }
-        if (EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null)
-        {
-            return true;
-        }
-        if (this.existsInGCS(path))
-        {
-            // the file id does not exist, register a new id for this file.
-            long id = GenerateId(GCS_ID_KEY);
-            EtcdUtil.Instance().putKeyValue(getPathKey(path.toString()), Long.toString(id));
-            return true;
-        }
-        return false;
     }
 
     /**
@@ -368,10 +326,6 @@ public class GCS implements Storage
         }
         if (!this.existsInGCS(p))
         {
-            if (EnableCache)
-            {
-                EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
-            }
             // Issue #170: path-not-exist is not an exception for deletion.
             return false;
         }
@@ -411,10 +365,6 @@ public class GCS implements Storage
             {
                 throw new IOException("Failed to delete object '" + p + "' from GCS.", e);
             }
-        }
-        if (EnableCache)
-        {
-            EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
         }
         return true;
     }
