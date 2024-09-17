@@ -31,12 +31,16 @@ import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.core.vector.*;
-import org.apache.parquet.avro.AvroParquetWriter;
-import org.apache.parquet.hadoop.ParquetWriter;
+import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
+import io.pixelsdb.pixels.core.vector.LongColumnVector;
+import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-
+import org.apache.parquet.avro.AvroParquetWriter;
+import org.apache.parquet.hadoop.ParquetWriter;
 import org.junit.Test;
 
 import java.io.File;
@@ -44,10 +48,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
-
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericRecord;
 
 public class TestPeerDownloader
 {
@@ -59,7 +59,7 @@ public class TestPeerDownloader
         String hostAddr = "ec2-18-218-128-203.us-east-2.compute.amazonaws.com";
 
         // get layout
-        MetadataService metadataService = new MetadataService(hostAddr, 18888);
+        MetadataService metadataService = MetadataService.CreateInstance(hostAddr, 18888);
         List<Layout> layouts = metadataService.getLayouts("tpch_1g", "lineitem");
         System.out.println("existing number of layouts: " + layouts.size());
         System.out.println("layout: " + layouts.get(0));

@@ -52,9 +52,7 @@ public class StatExecutor implements CommandExecutor
         boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
         boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
 
-        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
-        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
-        MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
+        MetadataService metadataService = MetadataService.Instance();
         List<Layout> layouts = metadataService.getLayouts(schemaName, tableName);
         List<String> files = new LinkedList<>();
         for (Layout layout : layouts)
@@ -208,6 +206,5 @@ public class StatExecutor implements CommandExecutor
 
         long endTime = System.currentTimeMillis();
         System.out.println("Elapsed time: " + (endTime - startTime) / 1000.0 + "s.");
-        metadataService.shutdown();
     }
 }

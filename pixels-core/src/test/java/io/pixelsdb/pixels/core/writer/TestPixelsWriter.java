@@ -350,10 +350,10 @@ public class TestPixelsWriter
                             .setOverwrite(true)
                             .setCacheConfig(cacheConfig)
                             .build();
-            String directory = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_1_compact";
+            String directory = "hdfs://node01:9000/pixels/pixels/test_105/v_1_compact";
             long cacheLength = 0L;
             List<Status> fileStatuses = storage.listStatus(directory);
-            MetadataService metadataService = new MetadataService("dbiir10", 18888);
+            MetadataService metadataService = MetadataService.CreateInstance("node10", 18888);
             Layout layout = metadataService.getLayout("pixels", "test_105", 0);
             Compact compact = layout.getCompact();
             int cacheBorder = compact.getCacheBorder();

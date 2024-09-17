@@ -33,14 +33,15 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.impl.SqlParserImpl;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.util.*;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TestPlanAnalysis
 {
@@ -55,7 +56,7 @@ public class TestPlanAnalysis
     @Before
     public void init()
     {
-        this.instance = new MetadataService(hostAddr, 18888);
+        this.instance = MetadataService.CreateInstance(hostAddr, 18888);
         SqlParser.Config parserConfig = SqlParser.configBuilder()
                 .setLex(Lex.MYSQL_ANSI)
                 .setParserFactory(SqlParserImpl.FACTORY)

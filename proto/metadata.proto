@@ -58,6 +58,7 @@ service MetadataService {
     rpc DeletePaths (DeletePathsRequest) returns (DeletePathsResponse);
     rpc AddFiles (AddFilesRequest) returns (AddFilesResponse);
     rpc GetFiles (GetFilesRequest) returns (GetFilesResponse);
+    rpc GetFileId (GetFileIdRequest) returns (GetFileIdResponse);
     rpc UpdateFile (UpdateFileRequest) returns (UpdateFileResponse);
     rpc DeleteFiles (DeleteFilesRequest) returns (DeleteFilesResponse);
     rpc CreatePeerPath (CreatePeerPathRequest) returns (CreatePeerPathResponse);
@@ -580,6 +581,16 @@ message GetFilesRequest {
 message GetFilesResponse {
     ResponseHeader header = 1;
     repeated File files = 2;
+}
+
+message GetFileIdRequest {
+    RequestHeader header = 1;
+    string filePathUri = 2; // the uri of the file containing the storage scheme prefix
+}
+
+message GetFileIdResponse {
+    ResponseHeader header = 1;
+    uint64 fileId = 2;
 }
 
 message UpdateFileRequest {

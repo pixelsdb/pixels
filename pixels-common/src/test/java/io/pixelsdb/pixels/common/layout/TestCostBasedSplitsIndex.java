@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.common.layout;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.SchemaTableName;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.junit.Test;
 
 /**
@@ -34,9 +33,7 @@ public class TestCostBasedSplitsIndex
     @Test
     public void test() throws MetadataException
     {
-        MetadataService metadataService = new MetadataService(
-                ConfigFactory.Instance().getProperty("metadata.server.host"),
-                Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port")));
+        MetadataService metadataService = MetadataService.Instance();
 
         CostBasedSplitsIndex index = new CostBasedSplitsIndex(0L, 0L, metadataService,
                 new SchemaTableName("tpch", "orders"),4, 8);

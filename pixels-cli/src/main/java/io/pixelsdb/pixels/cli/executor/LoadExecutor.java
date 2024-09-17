@@ -27,7 +27,6 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import net.sourceforge.argparse4j.inf.Namespace;
 
@@ -61,9 +60,7 @@ public class LoadExecutor implements CommandExecutor
         }
 
         Storage storage = StorageFactory.Instance().getStorage(origin);
-        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
-        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
-        MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
+        MetadataService metadataService = MetadataService.Instance();
 
         Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex,
                 encodingLevel, nullsPadding, metadataService);
@@ -90,7 +87,6 @@ public class LoadExecutor implements CommandExecutor
         long endTime = System.currentTimeMillis();
         System.out.println("Text files in '" + origin + "' are loaded by " + threadNum +
                 " threads in " + (endTime - startTime) / 1000.0 + "s.");
-        metadataService.shutdown();
     }
 
     /**

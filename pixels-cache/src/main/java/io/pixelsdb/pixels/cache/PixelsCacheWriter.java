@@ -173,14 +173,12 @@ public class PixelsCacheWriter
                 radix = PixelsCacheUtil.loadRadixIndex(indexFile);
                 // build cachedColumnChunks for PixelsCacheWriter.
                 int cachedVersion = PixelsCacheUtil.getIndexVersion(indexFile);
-                MetadataService metadataService = new MetadataService(
-                        cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+                MetadataService metadataService = MetadataService.Instance();
                 Layout cachedLayout = metadataService.getLayout(
                         cacheConfig.getSchema(), cacheConfig.getTable(), cachedVersion);
                 Compact compact = cachedLayout.getCompact();
                 int cacheBorder = compact.getCacheBorder();
                 cachedColumnChunks.addAll(compact.getColumnChunkOrder().subList(0, cacheBorder));
-                metadataService.shutdown();
             }
             //   else, create a new radix tree, and initialize the index and cache file.
             else

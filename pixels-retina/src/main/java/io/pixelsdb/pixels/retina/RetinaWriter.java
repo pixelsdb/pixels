@@ -69,9 +69,7 @@ public class RetinaWriter
         prop.setProperty("block.size", configFactory.getProperty("block.size"));
         prop.setProperty("block.replication", configFactory.getProperty("block.replication"));
 
-        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
-        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
-        metadataService = new MetadataService(metadataHost, metadataPort);
+        metadataService = MetadataService.Instance();
     }
 
     TypeDescription getSchema(String schemaName, String tableName) throws MetadataException

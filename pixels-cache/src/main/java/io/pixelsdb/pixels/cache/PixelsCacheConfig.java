@@ -62,16 +62,6 @@ public class PixelsCacheConfig
         return Long.parseLong(configFactory.getProperty("cache.size"));
     }
 
-    public String getMetaHost()
-    {
-        return configFactory.getProperty("metadata.server.host");
-    }
-
-    public int getMetaPort()
-    {
-        return Integer.parseInt(configFactory.getProperty("metadata.server.port"));
-    }
-
     public String getStorageScheme()
     {
          return configFactory.getProperty("cache.storage.scheme");

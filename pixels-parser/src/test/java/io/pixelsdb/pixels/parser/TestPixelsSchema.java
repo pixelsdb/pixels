@@ -44,7 +44,7 @@ public class TestPixelsSchema
     @Before
     public void init()
     {
-        this.instance = new MetadataService(hostAddr, 18888);
+        this.instance = MetadataService.CreateInstance(hostAddr, 18888);
     }
 
     @After

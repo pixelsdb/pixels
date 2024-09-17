@@ -19,12 +19,12 @@
  */
 package io.pixelsdb.pixels.storage.s3;
 
-import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.storage.s3.io.S3InputStream;
 import io.pixelsdb.pixels.storage.s3.io.S3OutputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -35,7 +35,6 @@ import software.amazon.awssdk.services.s3.waiters.S3Waiter;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -88,13 +87,6 @@ public abstract class AbstractS3 implements Storage
     public AbstractS3() { }
 
     public abstract void reconnect();
-
-    /**
-     * Get the key for the file metadata (e.g., file id) in etcd.
-     * @param path
-     * @return
-     */
-    abstract protected String getPathKey(String path);
 
     @Override
     abstract public Scheme getScheme();
@@ -213,13 +205,15 @@ public abstract class AbstractS3 implements Storage
             {
                 throw new IOException("Path '" + path + "' is not valid.");
             }
-            // try to generate the id in etcd if it does not exist.
-            if (!this.existsOrGenIdSucc(p))
+            MetadataService metadataService = MetadataService.Instance();
+            try
             {
-                throw new IOException("Path '" + path + "' does not exist.");
+                path = ensureSchemePrefix(path);
+                return metadataService.getFileId(path);
+            } catch (MetadataException e)
+            {
+                throw new IOException("failed to get file id from metadata, path=" + path, e);
             }
-            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(p.toString()));
-            return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
         }
         else
         {
@@ -328,10 +322,6 @@ public abstract class AbstractS3 implements Storage
         }
         if (!this.existsInS3(p))
         {
-            if (EnableCache)
-            {
-                EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
-            }
             // Issue #170: path-not-exist is not an exception for deletion.
             return false;
         }
@@ -375,10 +365,6 @@ public abstract class AbstractS3 implements Storage
             {
                 throw new IOException("Failed to delete object '" + p + "' from S3.", e);
             }
-        }
-        if (EnableCache)
-        {
-            EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
         }
         return true;
     }
@@ -478,8 +464,6 @@ public abstract class AbstractS3 implements Storage
             throw new IOException("Failed to check the existence of '" + path + "'", e);
         }
     }
-
-    abstract protected boolean existsOrGenIdSucc(ObjectPath path) throws IOException;
 
     @Override
     public boolean isFile(String path) throws IOException

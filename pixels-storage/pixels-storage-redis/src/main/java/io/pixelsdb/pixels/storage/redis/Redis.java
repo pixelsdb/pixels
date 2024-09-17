@@ -19,12 +19,12 @@
  */
 package io.pixelsdb.pixels.storage.redis;
 
-import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.storage.redis.io.RedisOutputStream;
 import redis.clients.jedis.JedisPooled;
 
@@ -36,9 +36,6 @@ import java.util.Objects;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.REDIS_ID_KEY;
-import static io.pixelsdb.pixels.common.utils.Constants.REDIS_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -54,22 +51,12 @@ public class Redis implements Storage
     private static final boolean EnableCache;
     private static String hostName = "localhost";
     private static int port = 6379;
-    private static String userName = "";
-    private static String password = "";
+    private static String userName;
+    private static String password;
 
     static
     {
-        EnableCache = Boolean.parseBoolean(
-                ConfigFactory.Instance().getProperty("cache.enabled"));
-        if (EnableCache)
-        {
-            /**
-             * Issue #222:
-             * The etcd file id is only used for cache coordination.
-             * Thus, we do not initialize the id key when cache is disabled.
-             */
-            InitId(REDIS_ID_KEY);
-        }
+        EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
         String endpoint = ConfigFactory.Instance().getProperty("redis.endpoint");
         userName = ConfigFactory.Instance().getProperty("redis.access.key");
         password = ConfigFactory.Instance().getProperty("redis.secret.key");
@@ -229,19 +216,21 @@ public class Redis implements Storage
         path = dropSchemePrefix(path);
         if (EnableCache)
         {
-            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
-            return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
+            MetadataService metadataService = MetadataService.Instance();
+            try
+            {
+                path = ensureSchemePrefix(path);
+                return metadataService.getFileId(path);
+            } catch (MetadataException e)
+            {
+                throw new IOException("failed to get file id from metadata, path=" + path, e);
+            }
         }
         else
         {
             // Issue #222: return an arbitrary id when cache is disable.
             return path.hashCode();
         }
-    }
-
-    private String getPathKey(String path)
-    {
-        return REDIS_META_PREFIX + path;
     }
 
     @Override
