@@ -105,9 +105,12 @@ public class StageCoordinator
         this.workerIdToWorkers.put(worker.getWorkerId(), worker);
         this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndexAssigner.getAndIncrement());
         this.workers.add(worker);
-        if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
+        if (this.workers.size() == this.fixedWorkerNum)
         {
-            this.lock.notifyAll();
+            synchronized (this.lock)
+            {
+                this.lock.notifyAll();
+            }
         }
     }
 
@@ -130,15 +133,18 @@ public class StageCoordinator
             for (int i = 0; i < WorkerTaskParallelism; ++i)
             {
                 Task task = this.taskQueue.pollPendingAndRun(worker);
-                if (!this.taskQueue.hasPending())
-                {
-                    this.lock.notifyAll();
-                }
                 if (task == null)
                 {
                     break;
                 }
                 tasks.add(task);
+            }
+            if (!this.taskQueue.hasPending())
+            {
+                synchronized (this.lock)
+                {
+                    this.lock.notifyAll();
+                }
             }
             return tasks;
         }
