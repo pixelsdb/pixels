@@ -41,10 +41,9 @@ public final class Constants
 
     public static final String LAYOUT_VERSION_LITERAL = "layout_version";
     public static final String CACHE_VERSION_LITERAL = "cache_version";
+    public static final String CACHE_LOCATION_LITERAL = "cache_location_";
     public static final String HEARTBEAT_COORDINATOR_LITERAL = "heartbeat_coordinator_";
     public static final String HEARTBEAT_WORKER_LITERAL = "heartbeat_worker_";
-    public static final String CACHE_LOCATION_LITERAL = "cache_location_";
-    public static final int MAX_BLOCK_ID_LEN = 20480;
 
     /*
      * Issue #649:

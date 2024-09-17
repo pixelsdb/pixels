@@ -16,6 +16,4 @@ HOST_1=localhost
 ENDPOINTS=$HOST_1:2379
 etcdctl --endpoints=$ENDPOINTS put cache_version 0
 etcdctl --endpoints=$ENDPOINTS put layout_version 0
-etcdctl --endpoints=$ENDPOINTS del coordinator
-etcdctl --endpoints=$ENDPOINTS del --prefix node_
-etcdctl --endpoints=$ENDPOINTS del --prefix location_
+etcdctl --endpoints=$ENDPOINTS del --prefix cache_location_
