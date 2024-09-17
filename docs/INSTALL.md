@@ -322,7 +322,8 @@ hostname_of_the_worker pixels_home_of_the_worker
 
 You can also start Pixels coordinator and workers separately using `PIXELS_HOME/start-coordinator` and `PIXELS_HOME/start-workers.sh`.
 
-> Note: You can also add JVM OPTS for Pixels daemons in `PIXELS_HOME/bin/jvm.config`. This is useful for profiling and remote debugging.
+> Note: You can also add JVM OPTS for Pixels daemons in `PIXELS_HOME/bin/coordinator-jvm.config` and `PIXELS_HOME/bin/worker-jvm.config`. 
+> This is useful for profiling and remote debugging.
 
 After starting Pixels, enter the home of trino-server and start Trino:
 ```bash
