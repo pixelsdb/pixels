@@ -63,14 +63,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# Set JVM options file path or use default JVM options
-JVM_OPTIONS_FILE="$PIXELS_HOME/$DAEMON_ROLE-bin/jvm.config"
-if [ -z "$PIXELS_JVM_OPTS" ]; then
-  if [ -e "$JVM_OPTIONS_FILE" ]; then
-    PIXELS_JVM_OPTS=$(tr '\n' ' ' < "$JVM_OPTIONS_FILE")
-  else
-    echo "jvm.config is not found, using default jvm configurations"
-    PIXELS_JVM_OPTS="-Xmx1024M -server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+DisableExplicitGC -Djava.awt.headless=true"
+if [ $OPERATION = "stop" ]; then
+  echo "using simple jvm configuration for stop operation"
+  PIXELS_JVM_OPTS="-Xmx1024M -server -XX:+UseG1GC"
+else
+  # Set JVM options file path or use default JVM options
+  JVM_OPTIONS_FILE="$PIXELS_HOME/bin/$DAEMON_ROLE-jvm.config"
+  if [ -z "$PIXELS_JVM_OPTS" ]; then
+    if [ -e "$JVM_OPTIONS_FILE" ]; then
+      PIXELS_JVM_OPTS=$(tr '\n' ' ' < "$JVM_OPTIONS_FILE")
+    else
+      echo "$DAEMON_ROLE-jvm.config is not found, using default jvm configuration"
+      PIXELS_JVM_OPTS="-Xmx1024M -server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+DisableExplicitGC -Djava.awt.headless=true"
+    fi
   fi
 fi
 
