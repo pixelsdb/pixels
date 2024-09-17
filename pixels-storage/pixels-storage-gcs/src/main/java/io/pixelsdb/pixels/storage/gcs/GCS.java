@@ -50,8 +50,8 @@ public class GCS implements Storage
 {
     private static final String SchemePrefix = Scheme.gcs.name() + "://";
 
-    protected final static boolean EnableCache;
-    protected final static int RequestsPerBatch = 100;
+    private final static boolean EnableCache;
+    private final static int RequestsPerBatch = 100;
 
     private static String projectId = null;
     private static String location = null;
