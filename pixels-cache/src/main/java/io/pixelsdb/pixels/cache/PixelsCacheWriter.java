@@ -205,6 +205,11 @@ public class PixelsCacheWriter
         return indexFile;
     }
 
+    public MemoryMappedFile getCacheFile()
+    {
+        return cacheFile;
+    }
+
     /**
      * DO NOT USE THIS METHOD. Only for unit test.
      * @return
@@ -249,13 +254,7 @@ public class PixelsCacheWriter
 
     public boolean isCacheEmpty ()
     {
-        /**
-         * There are no concurrent updates on the cache,
-         * thus we don't have to synchronize the access to cachedColumnChunks.
-         */
-        return PixelsCacheUtil.getCacheStatus(this.cacheFile) == PixelsCacheUtil.CacheStatus.EMPTY.getId() &&
-                PixelsCacheUtil.getCacheSize(this.cacheFile) == 0;
-        // return cachedColumnChunks == null || cachedColumnChunks.isEmpty();
+        return PixelsCacheUtil.isCacheFileEmpty(this.cacheFile);
     }
 
     /**

@@ -61,7 +61,7 @@ public class CacheWorker implements Server
      */
     private String hostName;
     private boolean initializeSuccess = false;
-    private int localCacheVersion = 0;
+    private int localCacheVersion = -1;
     private CountDownLatch runningLatch;
 
     public CacheWorker()
@@ -113,7 +113,7 @@ public class CacheWorker implements Server
 
                 // 2. update cache if necessary.
                 // If the cache is new created using start-vm.sh script, the local cache version would be zero.
-                localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
+                localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile(), cacheWriter.getCacheFile());
                 logger.debug("Local cache version: " + localCacheVersion);
                 // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
                 KeyValue globalCacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);

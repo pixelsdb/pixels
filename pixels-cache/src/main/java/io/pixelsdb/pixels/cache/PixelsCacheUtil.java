@@ -346,9 +346,37 @@ public class PixelsCacheUtil
         indexFile.setIntVolatile(10, version);
     }
 
-    public static int getIndexVersion(MemoryMappedFile indexFile)
+    /**
+     * This method is only to be used when the cache is known to be not empty.
+     * @param indexFile the index file
+     * @return the local cache version in the index file
+     */
+    protected static int getIndexVersion(MemoryMappedFile indexFile)
     {
         return indexFile.getIntVolatile(10);
+    }
+
+    /**
+     * @param indexFile the index file of the local cache
+     * @param cacheFile the cache file of the local cache
+     * @return the local cache version in the index file, or -1 when the local cache is empty
+     */
+    public static int getIndexVersion(MemoryMappedFile indexFile, MemoryMappedFile cacheFile)
+    {
+        if (isCacheFileEmpty(cacheFile))
+        {
+            return -1;
+        }
+        return indexFile.getIntVolatile(10);
+    }
+
+    public static boolean isCacheFileEmpty(MemoryMappedFile cacheFile)
+    {
+        /* There are no concurrent updates on the cache,
+         * thus we don't have to synchronize the access to cachedColumnChunks.
+         */
+        return PixelsCacheUtil.getCacheStatus(cacheFile) == PixelsCacheUtil.CacheStatus.EMPTY.getId() &&
+                PixelsCacheUtil.getCacheSize(cacheFile) == 0;
     }
 
     /**
