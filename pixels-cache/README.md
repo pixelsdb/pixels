@@ -79,7 +79,7 @@ On each worker node, pin the cache in memory using:
 sudo ./sbin/pin-cache.sh
 ```
 
-Then on each node of the cluster, create a new data layout for the cached table, and update `layout_version` in Etcd to trigger cache building or replacement.
+Then create a new data layout for the cached table, and update `layout_version` in Etcd to trigger cache building or replacement.
 
 To stop Pixels, run `$PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels daemons on each node, and run `$PIXELS_HOME/sbin/unpin-cache.sh` to release the memory that is
 pinned by the cache on each worker node.
