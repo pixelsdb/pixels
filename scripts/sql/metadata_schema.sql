@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PATHS` (
     `PATH_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `PATH_URI` VARCHAR(1024) NOT NULL COMMENT 'The storage path uri containing the storage scheme prefix.',
+    `PATH_URI` VARCHAR(512) NOT NULL COMMENT 'The storage path uri containing the storage scheme prefix.',
     `PATH_TYPE` TINYINT NOT NULL COMMENT 'Valid value can be 0 (ordered), 1 (compact), or 2 (projection).',
     `LAYOUTS_LAYOUT_ID` BIGINT NOT NULL,
     `RANGES_RANGE_ID` BIGINT NULL DEFAULT NULL,
