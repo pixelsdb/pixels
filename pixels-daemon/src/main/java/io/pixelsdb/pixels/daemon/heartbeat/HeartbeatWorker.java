@@ -174,9 +174,7 @@ public class HeartbeatWorker implements Server
         public void run()
         {
             leaseClient.keepAliveOnce(leaseId);
-            EtcdUtil.Instance().putKeyValueWithLeaseId(workerKey,
-                    String.valueOf(currentStatus.get()), leaseId);
-            logger.info("worker lease: key=" + workerKey + ", lease id=" + leaseId + ", status=" + currentStatus);
+            EtcdUtil.Instance().putKeyValueWithLeaseId(workerKey, String.valueOf(currentStatus.get()), leaseId);
         }
 
         public void stop()
