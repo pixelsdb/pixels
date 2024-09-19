@@ -24,8 +24,12 @@ import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataCache;
+import io.pixelsdb.pixels.common.server.HostPort;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
 import io.pixelsdb.pixels.daemon.TransServiceGrpc;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.TimeUnit;
 
@@ -36,8 +40,58 @@ import java.util.concurrent.TimeUnit;
  */
 public class TransService
 {
+    private static final Logger logger = LogManager.getLogger(TransService.class);
+    private static final HostPort hostPort;
+    private static final TransService instance;
+
+    static
+    {
+        String transHost = ConfigFactory.Instance().getProperty("trans.server.host");
+        int transPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
+        hostPort = new HostPort(transHost, transPort);
+        instance = new TransService(transHost, transPort);
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run() {
+                try
+                {
+                    instance.shutdown();
+                } catch (InterruptedException e)
+                {
+                    logger.error("failed to shut down trans service to the configured metadata server " + hostPort, e);
+                }
+            }
+        }));
+    }
+
+    /**
+     * Get the default trans service instance connecting to the trans host:port configured in
+     * PIXELS_HOME/pixels.properties. This default instance will be automatically shut down when the process
+     * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
+     * @return
+     */
+    public static TransService Instance() { return instance; }
+
+    /**
+     * This method should only be used to connect to a trans server that is not configured through
+     * PIXELS_HOME/pixels.properties. <b>Note</b> to shut down the trans service when it is not to be used.
+     * @param host the host name of the trans server
+     * @param port the port of the trans server
+     * @return the created trans service instance
+     */
+    public static TransService CreateInstance(String host, int port)
+    {
+        if (hostPort.equals(host, port))
+        {
+            return instance;
+        }
+        return new TransService(host, port);
+    }
+
     private final ManagedChannel channel;
     private final TransServiceGrpc.TransServiceBlockingStub stub;
+    private boolean isShutDown;
 
     public TransService(String host, int port)
     {
@@ -46,11 +100,16 @@ public class TransService
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
         this.stub = TransServiceGrpc.newBlockingStub(channel);
+        this.isShutDown = false;
     }
 
-    public void shutdown() throws InterruptedException
+    public synchronized void shutdown() throws InterruptedException
     {
-        this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        if (!this.isShutDown)
+        {
+            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            this.isShutDown = true;
+        }
     }
 
     /**
