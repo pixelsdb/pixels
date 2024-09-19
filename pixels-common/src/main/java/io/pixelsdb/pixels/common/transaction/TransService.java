@@ -24,7 +24,6 @@ import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataCache;
-import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.server.HostPort;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
