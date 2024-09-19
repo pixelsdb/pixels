@@ -243,8 +243,7 @@ public class PixelsCompactor
             return this;
         }
 
-        public PixelsCompactor build()
-                throws IOException
+        public PixelsCompactor build() throws IOException
         {
             // check arguments
             if (sourcePaths == null || compactLayout == null || builderInputStorage == null ||

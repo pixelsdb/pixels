@@ -82,7 +82,7 @@ public class RdbPathDao extends PathDao
                         .setId(rs.getLong("PATH_ID"))
                         .setUri(pathUri)
                         .setTypeValue(rs.getInt("PATH_TYPE"))
-                        .setLayoutId(rs.getLong("PATHS_PATH_ID"))
+                        .setLayoutId(rs.getLong("LAYOUTS_LAYOUT_ID"))
                         // Issue #437: range id is set to 0 if it is null in metadata.
                         .setRangeId(rs.getLong("RANGES_RANGE_ID")).build();
             }
