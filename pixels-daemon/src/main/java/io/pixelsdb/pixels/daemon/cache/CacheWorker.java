@@ -140,8 +140,7 @@ public class CacheWorker implements Server
         }
     }
 
-    private void updateLocalCache(int version)
-            throws MetadataException
+    private void updateLocalCache(int version) throws MetadataException
     {
         Layout matchedLayout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
         if (matchedLayout != null)
@@ -152,10 +151,12 @@ public class CacheWorker implements Server
             int status = 0;
             if (cacheWriter.isCacheEmpty())
             {
+                logger.debug("Cache update all for layout version " + version);
                 status = cacheWriter.updateAll(version, matchedLayout);
             }
             else
             {
+                logger.debug("Cache update incremental for layout version " + version);
                 status = cacheWriter.updateIncremental(version, matchedLayout);
             }
             cacheStatus.set(status);
@@ -200,7 +201,8 @@ public class CacheWorker implements Server
                                 if (version > localCacheVersion)
                                 {
                                     // The new version is newer, update the local cache.
-                                    logger.debug("New global version is greater than the local version, update the local cache.");
+                                    logger.debug("New global cache version " + version + " is greater than the local version " +
+                                            localCacheVersion + ", update the local cache.");
                                     try
                                     {
                                         updateLocalCache(version);
@@ -208,6 +210,11 @@ public class CacheWorker implements Server
                                     {
                                         logger.error("Failed to update local cache.", e);
                                     }
+                                }
+                                else
+                                {
+                                    logger.debug("New global cache version " + version + " is equal to or less than the local version " +
+                                            localCacheVersion);
                                 }
                             } else if (cacheStatus.get() == CacheWorkerStatus.UPDATING.StatusCode)
                             {

@@ -249,7 +249,7 @@ public class CacheCoordinator implements Server
                     NodeStatus.READY.StatusCode)
             {
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey()
-                        .toString(StandardCharsets.UTF_8).substring(5));
+                        .toString(StandardCharsets.UTF_8).substring(Constants.HEARTBEAT_WORKER_LITERAL.length()));
             }
         }
         allocate(paths, hosts, hostIndex, layoutVersion);
@@ -297,7 +297,7 @@ public class CacheCoordinator implements Server
             HostAddress node = nodes[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
-            logger.debug(files.size() + " files are allocated to " + node + " at version" + layoutVersion);
+            logger.debug(files.size() + " files are allocated to " + node + " at layout version" + layoutVersion);
             EtcdUtil.Instance().putKeyValue(key, String.join(";", files));
         }
     }
