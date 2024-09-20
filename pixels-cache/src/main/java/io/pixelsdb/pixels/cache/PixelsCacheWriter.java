@@ -235,16 +235,14 @@ public class PixelsCacheWriter
         {
             // get the caching file list
             String key = Constants.CACHE_LOCATION_LITERAL + version + "_" + host;
-            logger.info("pixels cache writer get cache plan, key=" + key);
             KeyValue keyValue = etcdUtil.getKeyValue(key);
             if (keyValue == null)
             {
-                logger.info("Found no allocated files. No updates are needed. " + key);
+                logger.warn("Found no allocated files, no updates are performed, key=" + key);
                 return 0;
             }
             String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
             String[] files = fileStr.split(";");
-            logger.info("files to cache: " + fileStr);
             return internalUpdateAll(version, layout, files);
         }
         catch (IOException e)
@@ -367,8 +365,11 @@ public class PixelsCacheWriter
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
             if(pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
             {
-                // TODO: Now the strategy for handling incomplete files is discarding them directly. This may lead to certain column chunks not being read into the cache as expected.
-                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " + pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " + file + ". This file will be ignored.");
+                // TODO: Now the strategy for handling incomplete files is discarding them directly.
+                //  This may lead to certain column chunks not being read into the cache as expected.
+                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
+                        pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " +
+                        file + ". This file will be ignored.");
                 continue;
             }
             int physicalLen;
@@ -397,7 +398,8 @@ public class PixelsCacheWriter
                     byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                     cacheFile.setBytes(currCacheOffset, columnChunk);
                     logger.debug(
-                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnChunk.length);
+                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " +
+                                    currCacheOffset + ", length: " + columnChunk.length);
                     currCacheOffset += physicalLen;
                 }
             }
@@ -463,11 +465,15 @@ public class PixelsCacheWriter
             PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file);
             if(physicalReader.getRowGroupNum() < rowGroupNumInLayout)
             {
-                // TODO: Now the strategy for handling incomplete files is discarding them directly. This may lead to certain column chunks not being read into the cache as expected.
-                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " + physicalReader.getRowGroupNum() + " row groups are found in " + file + ". This file was ignored before.");
+                // TODO: Now the strategy for handling incomplete files is discarding them directly.
+                //  This may lead to certain column chunks not being read into the cache as expected.
+                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
+                        physicalReader.getRowGroupNum() + " row groups are found in " +
+                        file + ". This file was ignored before.");
                 continue;
             }
-            // TODO: in case of block id was changed, the survived column chunks in this block can not survive in the cache update.
+            // TODO: in case of block id was changed,
+            //  the survived column chunks in this block can not survive in the cache update.
             // This problem only affects the efficiency, but it is better to resolve it.
             long blockId = physicalReader.getCurrentBlockId();
             for (String survivedColumnChunk : survivedColumnChunks)
@@ -543,8 +549,11 @@ public class PixelsCacheWriter
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
             if(pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
             {
-                // TODO: Now the strategy for handling incomplete files is discarding them directly. This may lead to certain column chunks not being read into the cache as expected.
-                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " + pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " + file + ". This file will be ignored.");
+                // TODO: Now the strategy for handling incomplete files is discarding them directly.
+                //  This may lead to certain column chunks not being read into the cache as expected.
+                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
+                        pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " +
+                        file + ". This file will be ignored.");
                 continue;
             }
             int physicalLen;
