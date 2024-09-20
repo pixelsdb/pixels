@@ -63,9 +63,7 @@ public class LoadExecutor implements CommandExecutor
             origin += "/";
         }
 
-        TransService transService = new TransService(
-                ConfigFactory.Instance().getProperty("trans.server.host"),
-                Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port")));
+        TransService transService = TransService.Instance();
 
         TransContext context;
         context = transService.beginTrans(false);
