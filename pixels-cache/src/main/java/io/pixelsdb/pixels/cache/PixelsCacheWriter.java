@@ -65,8 +65,8 @@ public class PixelsCacheWriter
     private long currentIndexOffset;
     private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
     private long cacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET; // this is only used in the write() method.
-    private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
-    private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
+    private final ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
+    private final ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
     private Set<String> cachedColumnChunks = new HashSet<>();
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
@@ -84,9 +84,9 @@ public class PixelsCacheWriter
         this.etcdUtil = etcdUtil;
         this.host = host;
         this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
-        if (cachedColumnChunks != null && cachedColumnChunks.isEmpty() == false)
+        if (cachedColumnChunks != null && !cachedColumnChunks.isEmpty())
         {
-            cachedColumnChunks.addAll(cachedColumnChunks);
+            this.cachedColumnChunks.addAll(cachedColumnChunks);
         }
     }
 
@@ -158,8 +158,7 @@ public class PixelsCacheWriter
             return this;
         }
 
-        public PixelsCacheWriter build()
-                throws Exception
+        public PixelsCacheWriter build() throws Exception
         {
             MemoryMappedFile cacheFile = new MemoryMappedFile(builderCacheLocation, builderCacheSize);
             MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
@@ -375,23 +374,22 @@ public class PixelsCacheWriter
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
-            for (int i = 0; i < cacheColumnChunkOrders.size(); i++)
+            for (String cacheColumnChunkOrder : cacheColumnChunkOrders)
             {
-                String[] columnChunkIdStr = cacheColumnChunkOrders.get(i).split(":");
+                String[] columnChunkIdStr = cacheColumnChunkOrder.split(":");
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
-                physicalLen = (int) chunkIndex.getChunkLength();
+                physicalLen = chunkIndex.getChunkLength();
                 physicalOffset = chunkIndex.getChunkOffset();
                 if (currCacheOffset + physicalLen >= cacheFile.getSize())
                 {
                     logger.debug("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
                     status = 2;
                     break outer_loop;
-                }
-                else
+                } else
                 {
                     radix.put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
                             new PixelsCacheIdx(currCacheOffset, physicalLen));
@@ -404,10 +402,7 @@ public class PixelsCacheWriter
                 }
             }
         }
-        for (String cachedColumnChunk : cacheColumnChunkOrders)
-        {
-            cachedColumnChunks.add(cachedColumnChunk);
-        }
+        cachedColumnChunks.addAll(cacheColumnChunkOrders);
         logger.debug("Cache writer ends at offset: " + currCacheOffset);
         // flush index
         flushIndex();
@@ -430,8 +425,7 @@ public class PixelsCacheWriter
      * @return
      * @throws IOException
      */
-    private int internalUpdateIncremental(int version, Layout layout, String[] files)
-            throws IOException
+    private int internalUpdateIncremental(int version, Layout layout, String[] files) throws IOException
     {
         int status = 0;
         /**
@@ -482,9 +476,8 @@ public class PixelsCacheWriter
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
                 PixelsCacheIdx curCacheIdx = oldRadix.get(blockId, rowGroupId, columnId);
-                survivedIdxes.add(
-                        new PixelsCacheEntry(new PixelsCacheKey(
-                                physicalReader.getCurrentBlockId(), rowGroupId, columnId), curCacheIdx));
+                survivedIdxes.add(new PixelsCacheEntry(new PixelsCacheKey(
+                        physicalReader.getCurrentBlockId(), rowGroupId, columnId), curCacheIdx));
             }
         }
         // ascending order according to the offset in cache file.
@@ -506,7 +499,8 @@ public class PixelsCacheWriter
              *    wait for the readCount to be cleared (become zero).
              */
             PixelsCacheUtil.beginIndexWrite(indexFile);
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             status = -1;
             logger.error("Failed to get write permission on index.", e);
@@ -559,9 +553,9 @@ public class PixelsCacheWriter
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
-            for (int i = 0; i < newCachedColumnChunks.size(); i++)
+            for (String newCachedColumnChunk : newCachedColumnChunks)
             {
-                String[] columnChunkIdStr = newCachedColumnChunks.get(i).split(":");
+                String[] columnChunkIdStr = newCachedColumnChunk.split(":");
                 short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                 short columnId = Short.parseShort(columnChunkIdStr[1]);
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
@@ -604,7 +598,8 @@ public class PixelsCacheWriter
              *    wait for the readCount to be cleared (become zero).
              */
             PixelsCacheUtil.beginIndexWrite(indexFile);
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             status = -1;
             logger.error("Failed to get write permission on index.", e);
@@ -618,10 +613,7 @@ public class PixelsCacheWriter
         // flush index
         flushIndex();
         // save the new cached column chunks into cachedColumnChunks.
-        for (String newColumnChunk : newCachedColumnChunks)
-        {
-            this.cachedColumnChunks.add(newColumnChunk);
-        }
+        this.cachedColumnChunks.addAll(newCachedColumnChunks);
         // update cache version
         PixelsCacheUtil.setIndexVersion(indexFile, version);
         PixelsCacheUtil.setCacheStatus(cacheFile, PixelsCacheUtil.CacheStatus.OK.getId());
@@ -670,7 +662,8 @@ public class PixelsCacheWriter
                         if (copiedBytes + buffer.length <= fileLength)
                         {
                             bytesToCopy = buffer.length;
-                        } else
+                        }
+                        else
                         {
                             bytesToCopy = (int) (fileLength - copiedBytes);
                         }
@@ -682,7 +675,8 @@ public class PixelsCacheWriter
                     reader.close();
                     writer.flush();
                     writer.close();
-                } catch (IOException e)
+                }
+                catch (IOException e)
                 {
                     logger.error("failed to copy file", e);
                     success = false;
@@ -698,11 +692,13 @@ public class PixelsCacheWriter
                     return path;
                 }
 
-            } else
+            }
+            else
             {
                 return path;
             }
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             logger.error("failed to ensure the locality of a file/data object.", e);
         }
@@ -800,8 +796,6 @@ public class PixelsCacheWriter
             childId = childId | ((long) key << 56);  // leader
             childId = childId | n.offset;  // offset
             nodeBuffer.putLong(childId);
-//            indexFile.putLong(currentIndexOffset, childId);
-//            currentIndexOffset += 8;
         }
         byte[] nodeBytes = new byte[node.getChildren().size() * 8];
         nodeBuffer.flip();

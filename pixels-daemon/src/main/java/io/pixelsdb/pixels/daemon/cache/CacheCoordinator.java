@@ -29,16 +29,17 @@ import io.pixelsdb.pixels.cache.CacheLocationDistribution;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
 import io.pixelsdb.pixels.common.balance.Balancer;
-import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.balance.ReplicaBalancer;
 import io.pixelsdb.pixels.common.exception.BalancerException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Location;
-import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
@@ -231,70 +232,62 @@ public class CacheCoordinator implements Server
         Layout layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
         // select: decide which files to cache
         assert layout != null;
-        String[] paths = select(layout);
+        List<String> filePaths = select(layout);
         // allocate: decide which node to cache each file
-        List<KeyValue> nodes = EtcdUtil.Instance().getKeyValuesByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
-        if (nodes == null || nodes.isEmpty())
+        List<KeyValue> workerNodes = EtcdUtil.Instance().getKeyValuesByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
+        if (workerNodes == null || workerNodes.isEmpty())
         {
             logger.info("Nodes is null or empty, no updates");
             return;
         }
-        HostAddress[] hosts = new HostAddress[nodes.size()];
+        HostAddress[] workerHosts = new HostAddress[workerNodes.size()];
         int hostIndex = 0;
-        for (int i = 0; i < nodes.size(); i++)
+        for (KeyValue node : workerNodes)
         {
-            KeyValue node = nodes.get(i);
             // key: host_[hostname]; value: [status]. available if status == 1.
             if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) ==
                     NodeStatus.READY.StatusCode)
             {
-                hosts[hostIndex++] = HostAddress.fromString(node.getKey()
+                workerHosts[hostIndex++] = HostAddress.fromString(node.getKey()
                         .toString(StandardCharsets.UTF_8).substring(Constants.HEARTBEAT_WORKER_LITERAL.length()));
             }
         }
-        allocate(paths, hosts, hostIndex, layoutVersion);
+        allocate(filePaths, workerHosts, hostIndex, layoutVersion);
     }
 
     /**
-     * get the file paths under the compact path of the first layout.
-     * @param layout
+     * Get the file paths under the compact path of the storage layout to be cached.
+     * @param layout the storage layout to be cached
      * @return the file paths
-     * @throws IOException
+     * @throws MetadataException if fails to get file paths under the layout
      */
-    private String[] select(Layout layout) throws IOException
+    private List<String> select(Layout layout) throws MetadataException
     {
-        String[] compactPaths = layout.getCompactPathUris();
-        List<String> files = new ArrayList<>();
-        List<Status> statuses = storage.listStatus(compactPaths);
-        if (statuses != null)
+        List<Path> compactPaths = layout.getCompactPaths();
+        List<String> filePaths = new LinkedList<>();
+        // Issue #723: files are managed in metadata, do not get file paths from storage.
+        for (Path compactPath : compactPaths)
         {
-            for (Status status : statuses)
-            {
-                if (status.isFile())
-                {
-                    files.add(status.getPath());
-                }
-            }
+            this.metadataService.getFiles(compactPath.getId()).forEach(
+                    file -> filePaths.add(File.getFilePath(compactPath, file)));
         }
-        String[] result = new String[files.size()];
-        files.toArray(result);
-        return result;
+        return filePaths;
     }
 
     /**
-     * allocate (maps) file paths to nodes, and persists the result in etcd.
-     * @param paths
-     * @param nodes
-     * @param size
-     * @param layoutVersion
-     * @throws IOException
+     * Allocate (map) file paths to worker nodes, and persists the result (cache tasks) in etcd.
+     * @param filePaths the paths of the files to cache
+     * @param workers the hostnames of the worker nodes
+     * @param size the number of worker to allocate the cache tasks
+     * @param layoutVersion the version of the new layout to be cached
+     * @throws IOException if fails to allocate cache locations
      */
-    private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion) throws IOException
+    private void allocate(List<String> filePaths, HostAddress[] workers, int size, int layoutVersion) throws IOException
     {
-        CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes, size);
+        CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(filePaths, workers, size);
         for (int i = 0; i < size; i++)
         {
-            HostAddress node = nodes[i];
+            HostAddress node = workers[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
             logger.debug(files.size() + " files are allocated to " + node + " at layout version" + layoutVersion);
@@ -310,7 +303,7 @@ public class CacheCoordinator implements Server
      * @return
      * @throws IOException
      */
-    private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size) throws IOException
+    private CacheLocationDistribution assignCacheLocations(List<String> paths, HostAddress[] nodes, int size) throws IOException
     {
         CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
