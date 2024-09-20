@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.cache;
 
-import io.pixelsdb.pixels.common.balance.HostAddress;
+import io.pixelsdb.pixels.common.server.HostAddress;
 
 import java.util.HashMap;
 import java.util.HashSet;

@@ -79,8 +79,6 @@ public class TestPeerDownloader
         {
             System.out.println(status.getPath());
         }
-
-        metadataService.shutdown();
     }
 
     /* Read pxl from s3 and retrieve the columns needed */

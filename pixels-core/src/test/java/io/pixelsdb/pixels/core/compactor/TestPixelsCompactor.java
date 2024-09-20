@@ -101,7 +101,6 @@ public class TestPixelsCompactor
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }
-        metadataService.shutdown();
     }
 
     @SuppressWarnings("Duplicates")
@@ -166,7 +165,6 @@ public class TestPixelsCompactor
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }
-        metadataService.shutdown();
     }
 
     @Test

@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.balance;
 
 import io.pixelsdb.pixels.common.exception.BalancerException;
+import io.pixelsdb.pixels.common.server.HostAddress;
 
 import java.util.Map;
 import java.util.Set;

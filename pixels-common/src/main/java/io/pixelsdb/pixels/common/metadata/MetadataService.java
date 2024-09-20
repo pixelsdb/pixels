@@ -26,17 +26,14 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.IndexFactory;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.server.HostPort;
+import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -50,15 +47,14 @@ import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 public class MetadataService
 {
     private static final Logger logger = LogManager.getLogger(MetadataService.class);
-    private static final HostPort hostPort;
-    private static final MetadataService instance;
+    private static final MetadataService defaultInstance;
+    private static final Map<HostAddress, MetadataService> otherInstances = new HashMap<>();
 
     static
     {
         String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
         int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
-        hostPort = new HostPort(metadataHost, metadataPort);
-        instance = new MetadataService(metadataHost, metadataPort);
+        defaultInstance = new MetadataService(metadataHost, metadataPort);
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
         {
             @Override
@@ -66,10 +62,15 @@ public class MetadataService
             {
                 try
                 {
-                    instance.shutdown();
+                    defaultInstance.shutdown();
+                    for (MetadataService otherMetadataService : otherInstances.values())
+                    {
+                        otherMetadataService.shutdown();
+                    }
+                    otherInstances.clear();
                 } catch (InterruptedException e)
                 {
-                    logger.error("failed to shut down metadata service to the configured metadata server " + hostPort, e);
+                    logger.error("failed to shut down metadata service", e);
                 }
             }
         }));
@@ -83,23 +84,27 @@ public class MetadataService
      */
     public static MetadataService Instance()
     {
-        return instance;
+        return defaultInstance;
     }
 
     /**
      * This method should only be used to connect to a metadata server that is not configured through
-     * PIXELS_HOME/pixels.properties. <b>Note</b> to shut down the metadata service when it is not to be used.
+     * PIXELS_HOME/pixels.properties. <b>No need</b> to manually shut down the returned metadata service.
      * @param host the host name of the metadata server
      * @param port the port of the metadata server
      * @return the created metadata service instance
      */
     public static MetadataService CreateInstance(String host, int port)
     {
-        if (hostPort.equals(host, port))
+        HostAddress address = HostAddress.fromParts(host, port);
+        MetadataService metadataService = otherInstances.get(address);
+        if (metadataService != null)
         {
-            return instance;
+            return metadataService;
         }
-        return new MetadataService(host, port);
+        metadataService = new MetadataService(host, port);
+        otherInstances.put(address, metadataService);
+        return metadataService;
     }
 
     private final ManagedChannel channel;
@@ -115,7 +120,7 @@ public class MetadataService
         this.isShutDown = false;
     }
 
-    public synchronized void shutdown() throws InterruptedException
+    private synchronized void shutdown() throws InterruptedException
     {
         if (!this.isShutDown)
         {
