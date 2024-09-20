@@ -249,7 +249,7 @@ public class CacheCoordinator implements Server
                     NodeStatus.READY.StatusCode)
             {
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey()
-                        .toString(StandardCharsets.UTF_8).substring(5));
+                        .toString(StandardCharsets.UTF_8).substring(Constants.HEARTBEAT_WORKER_LITERAL.length()));
             }
         }
         allocate(paths, hosts, hostIndex, layoutVersion);
