@@ -297,7 +297,8 @@ public class CacheCoordinator implements Server
             HostAddress node = nodes[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
-            logger.debug(files.size() + " files are allocated to " + node + " at version" + layoutVersion);
+            logger.info(files.size() + " files are allocated to " + node + " at version" + layoutVersion);
+            logger.info("coordinator put cache plan, key=" + key + ", value=" + String.join(";", files));
             EtcdUtil.Instance().putKeyValue(key, String.join(";", files));
         }
     }

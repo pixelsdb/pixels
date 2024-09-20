@@ -235,14 +235,16 @@ public class PixelsCacheWriter
         {
             // get the caching file list
             String key = Constants.CACHE_LOCATION_LITERAL + version + "_" + host;
+            logger.info("pixels cache writer get cache plan, key=" + key);
             KeyValue keyValue = etcdUtil.getKeyValue(key);
             if (keyValue == null)
             {
-                logger.debug("Found no allocated files. No updates are needed. " + key);
+                logger.info("Found no allocated files. No updates are needed. " + key);
                 return 0;
             }
             String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
             String[] files = fileStr.split(";");
+            logger.info("files to cache: " + fileStr);
             return internalUpdateAll(version, layout, files);
         }
         catch (IOException e)
@@ -313,8 +315,7 @@ public class PixelsCacheWriter
         flushIndex();
     }
 
-    private int internalUpdateAll(int version, Layout layout, String[] files)
-            throws IOException
+    private int internalUpdateAll(int version, Layout layout, String[] files) throws IOException
     {
         int status = 0;
         // get the new caching layout
@@ -332,7 +333,8 @@ public class PixelsCacheWriter
              *    wait for the readCount to be cleared (become zero).
              */
             PixelsCacheUtil.beginIndexWrite(indexFile);
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             status = -1;
             logger.error("Failed to get write permission on index.", e);
