@@ -31,7 +31,6 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.impl.SqlParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -69,12 +68,6 @@ public class TestPixelsParser
 
         this.tpchPixelsParser = new PixelsParser(this.instance, "tpch", tpchParserConfig, properties);
         this.clickbenchPixelsParser = new PixelsParser(this.instance, "clickbench", clickbenchParserConfig, properties);
-    }
-
-    @After
-    public void shutdown() throws InterruptedException
-    {
-        this.instance.shutdown();
     }
 
     @Test

@@ -130,16 +130,6 @@ public class QueryManager
              */
             this.queryScheduleService = new QueryScheduleService(scheduleServerHost, scheduleServerPort, false);
             this.transService = TransService.Instance();
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                queryScheduleService.shutdown();
-                try
-                {
-                    transService.shutdown();
-                } catch (InterruptedException e)
-                {
-                    log.error("failed to shutdown query schedule service or transaction service", e);
-                }
-            }));
         } catch (QueryScheduleException e)
         {
             throw new QueryServerException("failed to initialize query schedule service", e);

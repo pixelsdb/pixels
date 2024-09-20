@@ -69,12 +69,6 @@ public class TestPlanAnalysis
         this.clickbenchPixelsParser = new PixelsParser(this.instance, "clickbench", parserConfig, properties);
     }
 
-    @After
-    public void shutdown() throws InterruptedException
-    {
-        this.instance.shutdown();
-    }
-
     @Test
     public void testPlanAnalysisSimple() throws SqlParseException
     {

@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -49,12 +48,6 @@ public class TestCoordinator
     public void init()
     {
         this.instance = MetadataService.CreateInstance(hostAddr, 18888);
-    }
-
-    @After
-    public void shutdown() throws InterruptedException
-    {
-        this.instance.shutdown();
     }
 
     @Test

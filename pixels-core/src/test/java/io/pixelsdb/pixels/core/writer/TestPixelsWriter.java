@@ -388,7 +388,6 @@ public class TestPixelsWriter
             cacheWriter.flush();
             long flushEndNano = System.nanoTime();
             System.out.println("Flush time cost: " + (flushEndNano - flushStartNano) + "ns");
-            metadataService.shutdown();
         }
         catch (Exception e)
         {

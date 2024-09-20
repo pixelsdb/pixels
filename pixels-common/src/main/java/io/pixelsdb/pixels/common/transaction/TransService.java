@@ -24,13 +24,15 @@ import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataCache;
-import io.pixelsdb.pixels.common.server.HostPort;
+import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
 import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -41,25 +43,29 @@ import java.util.concurrent.TimeUnit;
 public class TransService
 {
     private static final Logger logger = LogManager.getLogger(TransService.class);
-    private static final HostPort hostPort;
-    private static final TransService instance;
+    private static final TransService defaultInstance;
+    private static final Map<HostAddress, TransService> otherInstances = new HashMap<>();
 
     static
     {
         String transHost = ConfigFactory.Instance().getProperty("trans.server.host");
         int transPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
-        hostPort = new HostPort(transHost, transPort);
-        instance = new TransService(transHost, transPort);
+        defaultInstance = new TransService(transHost, transPort);
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
         {
             @Override
             public void run() {
                 try
                 {
-                    instance.shutdown();
+                    defaultInstance.shutdown();
+                    for (TransService otherTransService : otherInstances.values())
+                    {
+                        otherTransService.shutdown();
+                    }
+                    otherInstances.clear();
                 } catch (InterruptedException e)
                 {
-                    logger.error("failed to shut down trans service to the configured metadata server " + hostPort, e);
+                    logger.error("failed to shut down trans service", e);
                 }
             }
         }));
@@ -71,29 +77,36 @@ public class TransService
      * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
      * @return
      */
-    public static TransService Instance() { return instance; }
+    public static TransService Instance()
+    {
+        return defaultInstance;
+    }
 
     /**
      * This method should only be used to connect to a trans server that is not configured through
-     * PIXELS_HOME/pixels.properties. <b>Note</b> to shut down the trans service when it is not to be used.
+     * PIXELS_HOME/pixels.properties. <b>No need</b> to manually shut down the returned trans service.
      * @param host the host name of the trans server
      * @param port the port of the trans server
      * @return the created trans service instance
      */
     public static TransService CreateInstance(String host, int port)
     {
-        if (hostPort.equals(host, port))
+        HostAddress address = HostAddress.fromParts(host, port);
+        TransService transService = otherInstances.get(address);
+        if (transService != null)
         {
-            return instance;
+            return transService;
         }
-        return new TransService(host, port);
+        transService = new TransService(host, port);
+        otherInstances.put(address, transService);
+        return transService;
     }
 
     private final ManagedChannel channel;
     private final TransServiceGrpc.TransServiceBlockingStub stub;
     private boolean isShutDown;
 
-    public TransService(String host, int port)
+    private TransService(String host, int port)
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
@@ -103,7 +116,7 @@ public class TransService
         this.isShutDown = false;
     }
 
-    public synchronized void shutdown() throws InterruptedException
+    private synchronized void shutdown() throws InterruptedException
     {
         if (!this.isShutDown)
         {

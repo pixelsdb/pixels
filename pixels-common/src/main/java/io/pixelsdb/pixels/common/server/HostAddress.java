@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.pixelsdb.pixels.common.balance;
+package io.pixelsdb.pixels.common.server;
 
 import java.net.InetAddress;
 import java.net.URI;
