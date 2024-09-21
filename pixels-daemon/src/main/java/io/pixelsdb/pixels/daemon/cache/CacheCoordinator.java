@@ -339,7 +339,7 @@ public class CacheCoordinator implements Server
             if (replicaBalancer.isBalanced())
             {
                 boolean enableAbsolute = Boolean.parseBoolean(
-                        ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
+                        ConfigFactory.Instance().getProperty("cache.absolute.balancer.enabled"));
                 if (enableAbsolute)
                 {
                     Balancer absoluteBalancer = new AbsoluteBalancer();

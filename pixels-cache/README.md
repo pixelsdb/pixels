@@ -20,7 +20,7 @@ The cache is read and updated as follows:
 5. Each Presto/Trino WorkerNode executes query splits with caching information (whether the column chunks in the query split are cached or not), and calls `PixelsCacheReader` to read the cached column chunks locally (if any).
 
 ## Installation
-Install Pixels following the instructions [here](../docs/INSTALL.md), but do not start Pixels before finishing the following configurations.
+Install Pixels following the instructions [HERE](../docs/INSTALL.md), but do not start Pixels before finishing the following configurations.
 
 Check the following settings related to pixels-cache in `$PIXELS_HOME/pixels.properties` on each node:
 ```properties
@@ -38,18 +38,19 @@ cache.storage.scheme=hdfs
 cache.schema=pixels
 # which table to be cached
 cache.table=test_105
-# lease ttl must be larger than heartbeat period
-lease.ttl.seconds=20
-# heartbeat period must be larger than 0
-heartbeat.period.seconds=10
-# set to false if storage.scheme is S3
-enable.absolute.balancer=true
+# set to true if cache.storage.scheme is a locality sensitive storage such as hdfs
+cache.absolute.balancer.enabled=true
 # set to true to enable pixels-cache
 cache.enabled=true
 # set to true to read cache without memory copy
 cache.read.direct=true
+
+# heartbeat lease ttl must be larger than heartbeat period
+heartbeat.lease.ttl.seconds=20
+# heartbeat period must be larger than 0
+heartbeat.period.seconds=10
 ```
-The above values are a good default setting for each node to cache up-to 64GB data of table `pixels.test_105` stored on HDFS.
+The above values are a good default setting for each node to cache up-to 64GB data of table `pixels.test_105` stored on `HDFS`.
 Change the `cache.schema`, `cache.table`, and `cache.storage.scheme` to cache a different table that is stored in a different storage system.
 
 On each worker node, create and mount an in-memory file system with 65GB capacity:
@@ -68,24 +69,41 @@ Set up the cache before starting Pixels:
 It initializes some states in etcd for the cache.
 If you have modified the `etcd` urls, please change the `ENDPOINTS` property in `reset-cache.sh` as well.
 
-## Start Pixels (with Cache)
+## Start Pixels (with cache)
 
 Enter `PIXELS_HOME` and start all Pixels daemons using:
 ```bash
 ./sbin/start-pixels.sh
 ```
 If starting the daemons in a cluster of multiple nodes, set the hostnames of the worker nodes in `$PIXELS_HOME/sbin/workers`
-and run `start-pixels.sh` on the coordinator node.
+and run `start-pixels.sh` on the coordinator node. Each line in `$PIXELS_HOME/sbin/workers` is the hostname of a
+worker node. If the worker node has a different `PIXELS_HOME` environment variable than the coordinator node, append
+the `PIXELS_HOME` variable to the hostname, separate by a space like this:
+```properties
+worker1 /home/pixels/worker1_pixels_home
+worker2 /home/pixels/worker2_pixels_home
+...
+```
 
 On each worker node, pin the cache in memory using:
 ```bash
 sudo -E ./sbin/pin-cache.sh
 ```
 
-Then create a new data layout for the cached table, and update `layout_version` in Etcd to trigger cache building or replacement:
+Then create a new data layout for the cached table, and update `layout_version` of the cached table in etcd to trigger 
+cache loading or replacement:
 ```bash
 ./sbin/load-cache.sh {layout-version}
 ```
 
-To stop Pixels, run `./sbin/stop-pixels.sh` to stop all Pixels daemons on the coordinator node, 
-and run `sudo -E ./sbin/unpin-cache.sh` to release the memory pinned for the cache on each worker node.
+To stop Pixels, run:
+```bash
+./sbin/stop-pixels.sh
+```
+on the coordinator node to stop all Pixels daemons in the cluster. Then, run:
+```bash
+sudo -E ./sbin/unpin-cache.sh
+```
+on each worker node to release the memory pinned for the cache.
+After than, you can delete the shared-memory files at `cache.location` and `index.location` on each worker node to
+finally release the memory occupied by the cache.
