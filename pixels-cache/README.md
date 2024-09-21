@@ -70,16 +70,22 @@ If you have modified the `etcd` urls, please change the `ENDPOINTS` property in 
 
 ## Start Pixels (with Cache)
 
-Instead of starting all Pixels daemons on the same (single) node using `$PIXELS_HOME/sbin/start-pixels.sh`,
-start the `PixelsCoordinator` daemon that hosts cache coordinator on the master node,
-and start the `PixelsWorker` daemon that hosts cache manager on each worker node.
+Enter `PIXELS_HOME` and start all Pixels daemons using:
+```bash
+./sbin/start-pixels.sh
+```
+If starting the daemons in a cluster of multiple nodes, set the hostnames of the worker nodes in `$PIXELS_HOME/sbin/workers`
+and run `start-pixels.sh` on the coordinator node.
 
 On each worker node, pin the cache in memory using:
 ```bash
-sudo ./sbin/pin-cache.sh
+sudo -E ./sbin/pin-cache.sh
 ```
 
-Then create a new data layout for the cached table, and update `layout_version` in Etcd to trigger cache building or replacement.
+Then create a new data layout for the cached table, and update `layout_version` in Etcd to trigger cache building or replacement:
+```bash
+./sbin/load-cache.sh {layout-version}
+```
 
-To stop Pixels, run `$PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels daemons on each node, and run `$PIXELS_HOME/sbin/unpin-cache.sh` to release the memory that is
-pinned by the cache on each worker node.
+To stop Pixels, run `./sbin/stop-pixels.sh` to stop all Pixels daemons on the coordinator node, 
+and run `sudo -E ./sbin/unpin-cache.sh` to release the memory pinned for the cache on each worker node.
