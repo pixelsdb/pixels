@@ -164,7 +164,8 @@ public class CacheCoordinator implements Server
                                 // update cache version, notify cache managers on each node to update cache.
                                 logger.debug("Update cache version to " + layoutVersion);
                                 EtcdUtil.Instance().putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
-                            } catch (IOException | MetadataException e)
+                            }
+                            catch (IOException | MetadataException e)
                             {
                                 logger.error("Failed to update cache distribution", e);
                             }
@@ -177,10 +178,12 @@ public class CacheCoordinator implements Server
             // Wait for this coordinator to be shutdown
             logger.info("Cache coordinator is running");
             runningLatch.await();
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             logger.error("Cache coordinator interrupted when waiting on the running latch", e);
-        } finally
+        }
+        finally
         {
             if (watcher != null)
             {
@@ -209,7 +212,8 @@ public class CacheCoordinator implements Server
             try
             {
                 storage.close();
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 logger.error("Failed to close cache storage while shutting down cache coordinator.", e);
             }
@@ -354,11 +358,13 @@ public class CacheCoordinator implements Server
                             String path = entry.getKey();
                             locationDistribution.addCacheLocation(host, path);
                         }
-                    } else
+                    }
+                    else
                     {
                         throw new BalancerException("absolute balancer failed to balance paths");
                     }
-                } else
+                }
+                else
                 {
                     Map<String, HostAddress> balanced = replicaBalancer.getAll();
                     for (Map.Entry<String, HostAddress> entry : balanced.entrySet())
@@ -368,7 +374,8 @@ public class CacheCoordinator implements Server
                         locationDistribution.addCacheLocation(host, path);
                     }
                 }
-            } else
+            }
+            else
             {
                 throw new BalancerException("replica balancer failed to balance paths");
             }
