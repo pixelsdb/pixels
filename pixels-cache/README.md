@@ -20,6 +20,16 @@ The cache is read and updated as follows:
 5. Each Presto/Trino WorkerNode executes query splits with caching information (whether the column chunks in the query split are cached or not), and calls `PixelsCacheReader` to read the cached column chunks locally (if any).
 
 ## Installation
+
+### Install vmtouch
+Find `vmtouch-1.3.1.tar.xz` in `scripts/tars` under the Pixels source code folder and decompress it to anywhere.
+Enter the decompressed folder, run:
+```bash
+make install
+```
+to build and install vmtouch to the operating system.
+
+### Install Pixels
 Install Pixels following the instructions [HERE](../docs/INSTALL.md), but do not start Pixels before finishing the following configurations.
 
 Check the following settings related to pixels-cache in `$PIXELS_HOME/pixels.properties` on each node:
@@ -53,6 +63,7 @@ heartbeat.period.seconds=10
 The above values are a good default setting for each node to cache up-to 64GB data of table `pixels.test_105` stored on `HDFS`.
 Change the `cache.schema`, `cache.table`, and `cache.storage.scheme` to cache a different table that is stored in a different storage system.
 
+### Mount In-memory File System
 On each worker node, create and mount an in-memory file system with 65GB capacity:
 ```bash
 sudo mkdir -p /mnt/ramfs
@@ -67,7 +78,8 @@ Set up the cache before starting Pixels:
 ```
 `reset-cache.sh` is only needed for the first time of initializing pixels-cache.
 It initializes some states in etcd for the cache.
-If you have modified the `etcd` urls, please change the `ENDPOINTS` property in `reset-cache.sh` as well.
+If you have modified the `etcd` hostname and port in `$PIXELS_HOME/pixels.properties`, change the `ENDPOINTS` property
+in `reset-cache.sh` as well.
 
 ## Start Pixels (with cache)
 
@@ -89,12 +101,16 @@ On each worker node, pin the cache in memory using:
 ```bash
 sudo -E ./sbin/pin-cache.sh
 ```
+Modify `CACHE_PATH` if it is not consistent with the mount point of the in-memory file system storing
+the cache and index files.
 
 Then create a new data layout for the cached table, and update `layout_version` of the cached table in etcd to trigger 
 cache loading or replacement:
 ```bash
 ./sbin/load-cache.sh {layout-version}
 ```
+If you have modified the `etcd` hostname and port in `$PIXELS_HOME/pixels.properties`, change the `ENDPOINTS` property
+in `load-cache.sh` as well.
 
 To stop Pixels, run:
 ```bash
