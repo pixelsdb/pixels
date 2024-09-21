@@ -90,9 +90,9 @@ public class TestPartitionCacheReader {
         config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
         config.addProperty("cache.schema", "pixels");
         config.addProperty("cache.table", "test_mock");
-        config.addProperty("lease.ttl.seconds", "20");
+        config.addProperty("heartbeat.lease.ttl.seconds", "20");
         config.addProperty("heartbeat.period.seconds", "10");
-        config.addProperty("enable.absolute.balancer", "false");
+        config.addProperty("cache.absolute.balancer.enabled", "false");
         config.addProperty("cache.enabled", "true");
         config.addProperty("enabled.storage.schemes", "mock");
 

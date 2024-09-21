@@ -304,9 +304,9 @@ Then we get three dashboards `Node Exporter` and `JVM Exporter` in Grafana.
 These dashboards can be used to monitor the performance metrics of the instance.
 
 ## Start Pixels
-Enter `PIXELS_HOME`, execute `./sbin/reset-cache.sh` for the first time of starting Pixels if pixels-cache is enabled.
+Enter `PIXELS_HOME`, follow the [pixels-cache document](../pixels-cache/README.md) to configure and start Pixels if pixels-cache is enabled.
 
-Then, start the daemons of Pixels using:
+If pixels-cache is not enabled, directly start the daemons of Pixels using:
 ```bash
 ./sbin/start-pixels.sh
 ```

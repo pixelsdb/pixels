@@ -84,7 +84,7 @@ public class PixelsCacheConfig
 
     public int getNodeLeaseTTL()
     {
-        int ttl = Integer.parseInt(configFactory.getProperty("lease.ttl.seconds"));
+        int ttl = Integer.parseInt(configFactory.getProperty("heartbeat.lease.ttl.seconds"));
         int heartbeat = Integer.parseInt(configFactory.getProperty("heartbeat.period.seconds"));
         checkArgument(ttl > heartbeat);
         return ttl;

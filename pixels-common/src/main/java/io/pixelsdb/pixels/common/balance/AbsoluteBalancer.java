@@ -28,6 +28,8 @@ import java.util.*;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * Ensure the allocation of file paths to nodes is absolutely balanced while ensuring the data
+ * locality at best effort.
  * @author hank
  * @create 2019-07-28
  */
@@ -104,7 +106,7 @@ public class AbsoluteBalancer extends Balancer
 
         boolean balanced = false;
 
-        while (balanced == false)
+        while (!balanced)
         {
             // we try to move elements from peaks to valleys.
             if (peak.isEmpty() || valley.isEmpty())
@@ -140,9 +142,9 @@ public class AbsoluteBalancer extends Balancer
             balanced = this.isBalanced();
         }
 
-        if (peak.isEmpty() == false && balanced == false)
+        if (!peak.isEmpty() && !balanced)
         {
-            if (valley.isEmpty() == false)
+            if (!valley.isEmpty())
             {
                 throw new BalancerException("vally is not empty in the final balancing stage.");
             }
@@ -155,7 +157,7 @@ public class AbsoluteBalancer extends Balancer
                 }
             }
 
-            while (balanced == false)
+            while (!balanced)
             {
                 // we try to move elements from peaks to valleys.
                 if (peak.isEmpty() || valley.isEmpty())

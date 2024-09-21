@@ -350,7 +350,7 @@ public class PixelsCacheWriter
         radix.removeAll();
         long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
-                ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
+                ConfigFactory.Instance().getProperty("cache.absolute.balancer.enabled"));
         int rowGroupNumInLayout = compact.getNumRowGroupInFile();
         outer_loop:
         for (String file : files)
@@ -530,7 +530,7 @@ public class PixelsCacheWriter
         logger.debug("Start cache append...");
         List<PixelsCacheEntry> newIdxes = new ArrayList<>();
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
-                ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
+                ConfigFactory.Instance().getProperty("cache.absolute.balancer.enabled"));
         outer_loop:
         for (String file : files)
         {
