@@ -68,14 +68,6 @@ sudo mount -t tmpfs -o size=65g tmpfs /mnt/ramfs
 The `size` parameter of the mount command should be larger than or equal to the sum of `cache.size` and `index.size` in
 `PIXELS_HOME/pixels.properties`, but must be smaller than the available physical memory size.
 
-Set up the cache before starting Pixels:
-```bash
-./sbin/reset-cache.sh
-```
-`reset-cache.sh` is only needed for the first time of initializing pixels-cache.
-It initializes some states in etcd for the cache.
-If you have modified the `etcd` hostname and port in `$PIXELS_HOME/pixels.properties`, change the `ENDPOINTS` property
-in `reset-cache.sh` as well.
 
 ## Start Pixels (with cache)
 
@@ -117,14 +109,29 @@ Currently, we only cache the full compact files with the same number of row grou
 If you have modified the `etcd` hostname and port in `$PIXELS_HOME/pixels.properties`, change the `ENDPOINTS` property
 in `load-cache.sh` as well.
 
+## Stop Pixels and clear cache
 To stop Pixels, run:
 ```bash
 ./sbin/stop-pixels.sh
 ```
-on the coordinator node to stop all Pixels daemons in the cluster. Then, run:
+on the coordinator node to stop all Pixels daemons in the cluster.
+
+The cache does not lost when Pixels is stopped. And it can be reused the next time Pixels is started.
+
+To clear the cache and free the memory, run:
 ```bash
 sudo -E ./sbin/unpin-cache.sh
 ```
 on each worker node to release the memory pinned for the cache.
 After than, you can delete the shared-memory files at `cache.location` and `index.location` on each worker node to
 finally release the memory occupied by the cache.
+You can also umount the in-memory file system. This is optional. The in-memory file system will be
+automatically umount when the operating system is restarted.
+
+Then, run:
+```bash
+./sbin/reset-cache.sh
+```
+on any node in the cluster to reset the states related to pixels-cache in etcd.
+If you have modified the `etcd` hostname and port in `$PIXELS_HOME/pixels.properties`, change the `ENDPOINTS` property
+in `reset-cache.sh` as well.
