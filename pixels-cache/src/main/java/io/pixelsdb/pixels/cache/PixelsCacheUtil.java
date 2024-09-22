@@ -31,6 +31,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * pixels cache header
  * index:
@@ -510,13 +513,23 @@ public class PixelsCacheUtil
         return cacheFile.getLongVolatile(8);
     }
 
-    public static int hashcode(byte[] bytes) {
+    public static int hashcode(byte[] bytes)
+    {
         int var1 = 1;
 
-        for(int var3 = 0; var3 < bytes.length; ++var3) {
-            var1 = 31 * var1 + bytes[var3];
+        for (byte aByte : bytes)
+        {
+            var1 = 31 * var1 + aByte;
         }
 
         return var1;
+    }
+
+    public static String getHostnameFromCacheLocationLiteral(String cacheLocationLiteral)
+    {
+        String[] splits = requireNonNull(cacheLocationLiteral, "cacheLocationLiteral is null").split("_");
+        checkArgument(splits.length > Constants.HOSTNAME_INDEX_IN_CACHE_LOCATION_LITERAL,
+                "invalid cacheLocationLiteral: " + cacheLocationLiteral);
+        return splits[Constants.HOSTNAME_INDEX_IN_CACHE_LOCATION_LITERAL];
     }
 }
