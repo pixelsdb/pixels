@@ -24,16 +24,18 @@ import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsProto;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteOrder;
 
 /**
  * @author guodong
+ * @author hank
  */
-public class PixelsPhysicalReader
+public class PixelsPhysicalReader implements Closeable
 {
     private final PhysicalReader physicalReader;
-    private final PixelsProto.FileTail fileTail;
+    private PixelsProto.FileTail fileTail;
 
     public PixelsPhysicalReader(Storage storage, String path) throws IOException
     {
@@ -41,7 +43,7 @@ public class PixelsPhysicalReader
         this.fileTail = readFileTail();
     }
 
-    private PixelsProto.FileTail readFileTail()
+    private PixelsProto.FileTail readFileTail() throws IOException
     {
         if (physicalReader != null)
         {
@@ -58,7 +60,7 @@ public class PixelsPhysicalReader
             }
             catch (IOException e)
             {
-                e.printStackTrace();
+                throw new IOException("failed to read file tail", e);
             }
         }
         return null;
@@ -83,7 +85,6 @@ public class PixelsPhysicalReader
         byte[] content = new byte[length];
         physicalReader.seek(offset);
         physicalReader.readFully(content);
-
         return content;
     }
 
@@ -93,7 +94,7 @@ public class PixelsPhysicalReader
         PixelsProto.RowGroupFooter rowGroupFooter = readRowGroupFooter(rowGroupId);
         PixelsProto.ColumnChunkIndex chunkIndex =
                 rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
-        int physicalLen = (int) chunkIndex.getChunkLength();
+        int physicalLen = chunkIndex.getChunkLength();
         long physicalOffset = chunkIndex.getChunkOffset();
         return read(physicalOffset, physicalLen);
 
@@ -123,5 +124,12 @@ public class PixelsPhysicalReader
     public long getRowGroupNum() throws IOException
     {
         return fileTail.getFooter().getRowGroupInfosCount();
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        this.physicalReader.close();
+        this.fileTail = null;
     }
 }
