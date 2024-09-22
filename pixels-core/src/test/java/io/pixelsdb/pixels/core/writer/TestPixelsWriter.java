@@ -316,16 +316,17 @@ public class TestPixelsWriter
                     .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
             rowBatch = recordReader.readBatch();
-            LongColumnVector nationkeyVector = (LongColumnVector) rowBatch.cols[0];
+            LongColumnVector nationKeyVector = (LongColumnVector) rowBatch.cols[0];
             BinaryColumnVector nameVector = (BinaryColumnVector) rowBatch.cols[1];
-            LongColumnVector regionkeyVector = (LongColumnVector) rowBatch.cols[2];
+            LongColumnVector regionKeyVector = (LongColumnVector) rowBatch.cols[2];
             BinaryColumnVector commentVector = (BinaryColumnVector) rowBatch.cols[3];
             for (int i = 0; i < rowBatch.size; ++i)
             {
                 String name = new String(nameVector.vector[i], nameVector.start[i], nameVector.lens[i]);
                 String comment = new String(commentVector.vector[i], commentVector.start[i], commentVector.lens[i]);
-                System.out.println(nationkeyVector.vector[i] + ", " + name + ", " + regionkeyVector.vector[i] + ", " + comment);
+                System.out.println(nationKeyVector.vector[i] + ", " + name + ", " + regionKeyVector.vector[i] + ", " + comment);
             }
+            pixelsReader.close();
         }
         catch (IOException e)
         {

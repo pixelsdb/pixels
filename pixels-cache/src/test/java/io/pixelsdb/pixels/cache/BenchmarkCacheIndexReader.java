@@ -189,8 +189,6 @@ public class BenchmarkCacheIndexReader {
         config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
 
         config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
-        config.addProperty("cache.schema", "pixels");
-        config.addProperty("cache.table", "test_mock");
         config.addProperty("heartbeat.lease.ttl.seconds", "20");
         config.addProperty("heartbeat.period.seconds", "10");
         config.addProperty("cache.absolute.balancer.enabled", "false");
@@ -235,8 +233,6 @@ public class BenchmarkCacheIndexReader {
         config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
 
         config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
-        config.addProperty("cache.schema", "pixels");
-        config.addProperty("cache.table", "test_mock");
         config.addProperty("heartbeat.lease.ttl.seconds", "20");
         config.addProperty("heartbeat.period.seconds", "10");
         config.addProperty("cache.absolute.balancer.enabled", "false");
@@ -283,8 +279,6 @@ public class BenchmarkCacheIndexReader {
         config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
 
         config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
-        config.addProperty("cache.schema", "pixels");
-        config.addProperty("cache.table", "test_mock");
         config.addProperty("heartbeat.lease.ttl.seconds", "20");
         config.addProperty("heartbeat.period.seconds", "10");
         config.addProperty("cache.absolute.balancer.enabled", "false");
@@ -346,8 +340,6 @@ public class BenchmarkCacheIndexReader {
         config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
 
         config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
-        config.addProperty("cache.schema", "pixels");
-        config.addProperty("cache.table", "test_mock");
         config.addProperty("heartbeat.lease.ttl.seconds", "20");
         config.addProperty("heartbeat.period.seconds", "10");
         config.addProperty("cache.absolute.balancer.enabled", "false");
@@ -392,8 +384,6 @@ public class BenchmarkCacheIndexReader {
         config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
 
         config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
-        config.addProperty("cache.schema", "pixels");
-        config.addProperty("cache.table", "test_mock");
         config.addProperty("heartbeat.lease.ttl.seconds", "20");
         config.addProperty("heartbeat.period.seconds", "10");
         config.addProperty("cache.absolute.balancer.enabled", "false");
@@ -435,8 +425,6 @@ public class BenchmarkCacheIndexReader {
         config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
 
         config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
-        config.addProperty("cache.schema", "pixels");
-        config.addProperty("cache.table", "test_mock");
         config.addProperty("heartbeat.lease.ttl.seconds", "20");
         config.addProperty("heartbeat.period.seconds", "10");
         config.addProperty("cache.absolute.balancer.enabled", "false");

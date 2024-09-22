@@ -44,10 +44,6 @@ index.location=/mnt/ramfs/pixels.index
 index.size=1073741824
 # the scheme of the storage system to be cached
 cache.storage.scheme=hdfs
-# which schema to be cached
-cache.schema=pixels
-# which table to be cached
-cache.table=test_105
 # set to true if cache.storage.scheme is a locality sensitive storage such as hdfs
 cache.absolute.balancer.enabled=true
 # set to true to enable pixels-cache
@@ -61,7 +57,7 @@ heartbeat.lease.ttl.seconds=20
 heartbeat.period.seconds=10
 ```
 The above values are a good default setting for each node to cache up-to 64GB data of table `pixels.test_105` stored on `HDFS`.
-Change the `cache.schema`, `cache.table`, and `cache.storage.scheme` to cache a different table that is stored in a different storage system.
+Change `cache.storage.scheme` to cache the data stored in a different storage system.
 
 ### Mount In-memory File System
 On each worker node, create and mount an in-memory file system with 65GB capacity:
@@ -107,8 +103,17 @@ the cache and index files.
 Then create a new data layout for the cached table, and update `layout_version` of the cached table in etcd to trigger 
 cache loading or replacement:
 ```bash
-./sbin/load-cache.sh {layout-version}
+./sbin/load-cache.sh {schema_name}.{table_name}:{layout_version}
+# e.g., ./sbin/load-cache.sh tpch.lineitem:1
 ```
+`schema_name` and `table_name` specifies which table to cache.
+Whereas `layout_version` specifies which layout version of the table to cache.
+Note that pixels-cache only caches data in the compact path of the layout, so ensure the table is compacted on the layout.
+See examples of compacting tables [HERE](../docs/TPC-H.md#data-compaction).
+Currently, we only cache the full compact files with the same number of row groups defined by 
+`numRowGroupInFile` in the `LAYOUT_COMPACT` field of the layout in metadata. The tail compact file 
+(if exists) with less row groups than `numRowGroupInFile` will be ignored in cache loading or replacement.
+
 If you have modified the `etcd` hostname and port in `$PIXELS_HOME/pixels.properties`, change the `ENDPOINTS` property
 in `load-cache.sh` as well.
 

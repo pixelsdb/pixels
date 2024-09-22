@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.cache;
 
 import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.physical.*;
@@ -67,13 +66,12 @@ public class PixelsCacheWriter
     private long cacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET; // this is only used in the write() method.
     private final ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private final ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
-    private Set<String> cachedColumnChunks = new HashSet<>();
+    private final Set<String> cachedColumnChunks = new HashSet<>();
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
                               Storage storage,
                               PixelsRadix radix,
-                              Set<String> cachedColumnChunks,
                               EtcdUtil etcdUtil,
                               String host)
     {
@@ -84,10 +82,6 @@ public class PixelsCacheWriter
         this.etcdUtil = etcdUtil;
         this.host = host;
         this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
-        if (cachedColumnChunks != null && !cachedColumnChunks.isEmpty())
-        {
-            this.cachedColumnChunks.addAll(cachedColumnChunks);
-        }
     }
 
     public static class Builder
@@ -164,20 +158,11 @@ public class PixelsCacheWriter
             MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
             PixelsRadix radix;
             // check if cache and index exists.
-            Set<String> cachedColumnChunks = new HashSet<>();
             // if overwrite is not true, and cache and index file already exists, reconstruct radix from existing index.
             if (!builderOverwrite && PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile))
             {
                 // cache exists in local cache file and index, reload the index.
                 radix = PixelsCacheUtil.loadRadixIndex(indexFile);
-                // build cachedColumnChunks for PixelsCacheWriter.
-                int cachedVersion = PixelsCacheUtil.getIndexVersion(indexFile);
-                MetadataService metadataService = MetadataService.Instance();
-                Layout cachedLayout = metadataService.getLayout(
-                        cacheConfig.getSchema(), cacheConfig.getTable(), cachedVersion);
-                Compact compact = cachedLayout.getCompact();
-                int cacheBorder = compact.getCacheBorder();
-                cachedColumnChunks.addAll(compact.getColumnChunkOrder().subList(0, cacheBorder));
             }
             //   else, create a new radix tree, and initialize the index and cache file.
             else
@@ -189,8 +174,7 @@ public class PixelsCacheWriter
 
             Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
 
-            return new PixelsCacheWriter(cacheFile, indexFile, storage, radix,
-                    cachedColumnChunks, etcdUtil, builderHostName);
+            return new PixelsCacheWriter(cacheFile, indexFile, storage, radix, etcdUtil, builderHostName);
         }
     }
 
@@ -246,7 +230,7 @@ public class PixelsCacheWriter
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error("failed to update local cache fully", e);
             return -1;
         }
     }
@@ -287,7 +271,7 @@ public class PixelsCacheWriter
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error("failed to update local cache incrementally", e);
             return -1;
         }
     }
@@ -339,14 +323,7 @@ public class PixelsCacheWriter
         }
 
         // update cache content
-        if (cachedColumnChunks == null || cachedColumnChunks.isEmpty())
-        {
-            cachedColumnChunks = new HashSet<>(cacheColumnChunkOrders.size());
-        }
-        else
-        {
-            cachedColumnChunks.clear();
-        }
+        cachedColumnChunks.clear();
         radix.removeAll();
         long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
