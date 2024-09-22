@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.cache;
 
 import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.physical.*;
@@ -67,13 +66,12 @@ public class PixelsCacheWriter
     private long cacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET; // this is only used in the write() method.
     private final ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private final ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
-    private Set<String> cachedColumnChunks = new HashSet<>();
+    private final Set<String> cachedColumnChunks = new HashSet<>();
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
                               Storage storage,
                               PixelsRadix radix,
-                              Set<String> cachedColumnChunks,
                               EtcdUtil etcdUtil,
                               String host)
     {
@@ -84,10 +82,6 @@ public class PixelsCacheWriter
         this.etcdUtil = etcdUtil;
         this.host = host;
         this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
-        if (cachedColumnChunks != null && !cachedColumnChunks.isEmpty())
-        {
-            this.cachedColumnChunks.addAll(cachedColumnChunks);
-        }
     }
 
     public static class Builder
@@ -164,20 +158,11 @@ public class PixelsCacheWriter
             MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
             PixelsRadix radix;
             // check if cache and index exists.
-            Set<String> cachedColumnChunks = new HashSet<>();
             // if overwrite is not true, and cache and index file already exists, reconstruct radix from existing index.
             if (!builderOverwrite && PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile))
             {
                 // cache exists in local cache file and index, reload the index.
                 radix = PixelsCacheUtil.loadRadixIndex(indexFile);
-                // build cachedColumnChunks for PixelsCacheWriter.
-                int cachedVersion = PixelsCacheUtil.getIndexVersion(indexFile);
-                MetadataService metadataService = MetadataService.Instance();
-                Layout cachedLayout = metadataService.getLayout(
-                        cacheConfig.getSchema(), cacheConfig.getTable(), cachedVersion);
-                Compact compact = cachedLayout.getCompact();
-                int cacheBorder = compact.getCacheBorder();
-                cachedColumnChunks.addAll(compact.getColumnChunkOrder().subList(0, cacheBorder));
             }
             //   else, create a new radix tree, and initialize the index and cache file.
             else
@@ -189,8 +174,7 @@ public class PixelsCacheWriter
 
             Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
 
-            return new PixelsCacheWriter(cacheFile, indexFile, storage, radix,
-                    cachedColumnChunks, etcdUtil, builderHostName);
+            return new PixelsCacheWriter(cacheFile, indexFile, storage, radix, etcdUtil, builderHostName);
         }
     }
 
@@ -246,7 +230,7 @@ public class PixelsCacheWriter
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error("failed to update local cache fully", e);
             return -1;
         }
     }
@@ -287,7 +271,7 @@ public class PixelsCacheWriter
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error("failed to update local cache incrementally", e);
             return -1;
         }
     }
@@ -339,14 +323,7 @@ public class PixelsCacheWriter
         }
 
         // update cache content
-        if (cachedColumnChunks == null || cachedColumnChunks.isEmpty())
-        {
-            cachedColumnChunks = new HashSet<>(cacheColumnChunkOrders.size());
-        }
-        else
-        {
-            cachedColumnChunks.clear();
-        }
+        cachedColumnChunks.clear();
         radix.removeAll();
         long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
@@ -361,44 +338,46 @@ public class PixelsCacheWriter
                 // may be removed later.
                 file = ensureLocality(file);
             }
-            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
-            if(pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
+            try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
             {
-                // TODO: Now the strategy for handling incomplete files is discarding them directly.
-                //  This may lead to certain column chunks not being read into the cache as expected.
-                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
-                        pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " +
-                        file + ". This file will be ignored.");
-                continue;
-            }
-            int physicalLen;
-            long physicalOffset;
-            // update radix and cache content
-            for (String cacheColumnChunkOrder : cacheColumnChunkOrders)
-            {
-                String[] columnChunkIdStr = cacheColumnChunkOrder.split(":");
-                short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
-                short columnId = Short.parseShort(columnChunkIdStr[1]);
-                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
-                PixelsProto.ColumnChunkIndex chunkIndex =
-                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
-                physicalLen = chunkIndex.getChunkLength();
-                physicalOffset = chunkIndex.getChunkOffset();
-                if (currCacheOffset + physicalLen >= cacheFile.getSize())
+                if (pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
                 {
-                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
-                    status = 2;
-                    break outer_loop;
-                } else
+                    // TODO: Now the strategy for handling incomplete files is discarding them directly.
+                    //  This may lead to certain column chunks not being read into the cache as expected.
+                    logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
+                            pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " +
+                            file + ". This file will be ignored.");
+                    continue;
+                }
+                int physicalLen;
+                long physicalOffset;
+                // update radix and cache content
+                for (String cacheColumnChunkOrder : cacheColumnChunkOrders)
                 {
-                    radix.put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
-                            new PixelsCacheIdx(currCacheOffset, physicalLen));
-                    byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
-                    cacheFile.setBytes(currCacheOffset, columnChunk);
-                    logger.debug(
-                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " +
-                                    currCacheOffset + ", length: " + columnChunk.length);
-                    currCacheOffset += physicalLen;
+                    String[] columnChunkIdStr = cacheColumnChunkOrder.split(":");
+                    short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
+                    short columnId = Short.parseShort(columnChunkIdStr[1]);
+                    PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
+                    PixelsProto.ColumnChunkIndex chunkIndex =
+                            rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+                    physicalLen = chunkIndex.getChunkLength();
+                    physicalOffset = chunkIndex.getChunkOffset();
+                    if (currCacheOffset + physicalLen >= cacheFile.getSize())
+                    {
+                        logger.debug("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
+                        status = 2;
+                        break outer_loop;
+                    } else
+                    {
+                        radix.put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
+                                new PixelsCacheIdx(currCacheOffset, physicalLen));
+                        byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
+                        cacheFile.setBytes(currCacheOffset, columnChunk);
+                        logger.debug(
+                                "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " +
+                                        currCacheOffset + ", length: " + columnChunk.length);
+                        currCacheOffset += physicalLen;
+                    }
                 }
             }
         }
@@ -456,28 +435,30 @@ public class PixelsCacheWriter
         int rowGroupNumInLayout = compact.getNumRowGroupInFile();
         for (String file : files)
         {
-            PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file);
-            if(physicalReader.getRowGroupNum() < rowGroupNumInLayout)
+            try (PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file))
             {
-                // TODO: Now the strategy for handling incomplete files is discarding them directly.
-                //  This may lead to certain column chunks not being read into the cache as expected.
-                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
-                        physicalReader.getRowGroupNum() + " row groups are found in " +
-                        file + ". This file was ignored before.");
-                continue;
-            }
-            // TODO: in case of block id was changed,
-            //  the survived column chunks in this block can not survive in the cache update.
-            // This problem only affects the efficiency, but it is better to resolve it.
-            long blockId = physicalReader.getCurrentBlockId();
-            for (String survivedColumnChunk : survivedColumnChunks)
-            {
-                String[] columnChunkIdStr = survivedColumnChunk.split(":");
-                short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
-                short columnId = Short.parseShort(columnChunkIdStr[1]);
-                PixelsCacheIdx curCacheIdx = oldRadix.get(blockId, rowGroupId, columnId);
-                survivedIdxes.add(new PixelsCacheEntry(new PixelsCacheKey(
-                        physicalReader.getCurrentBlockId(), rowGroupId, columnId), curCacheIdx));
+                if (physicalReader.getRowGroupNum() < rowGroupNumInLayout)
+                {
+                    // TODO: Now the strategy for handling incomplete files is discarding them directly.
+                    //  This may lead to certain column chunks not being read into the cache as expected.
+                    logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
+                            physicalReader.getRowGroupNum() + " row groups are found in " +
+                            file + ". This file was ignored before.");
+                    continue;
+                }
+                // TODO: in case of block id was changed,
+                //  the survived column chunks in this block can not survive in the cache update.
+                // This problem only affects the efficiency, but it is better to resolve it.
+                long blockId = physicalReader.getCurrentBlockId();
+                for (String survivedColumnChunk : survivedColumnChunks)
+                {
+                    String[] columnChunkIdStr = survivedColumnChunk.split(":");
+                    short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
+                    short columnId = Short.parseShort(columnChunkIdStr[1]);
+                    PixelsCacheIdx curCacheIdx = oldRadix.get(blockId, rowGroupId, columnId);
+                    survivedIdxes.add(new PixelsCacheEntry(new PixelsCacheKey(
+                            physicalReader.getCurrentBlockId(), rowGroupId, columnId), curCacheIdx));
+                }
             }
         }
         // ascending order according to the offset in cache file.
@@ -540,45 +521,46 @@ public class PixelsCacheWriter
                 // may be removed later.
                 file = ensureLocality(file);
             }
-            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
-            if(pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
+            try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
             {
-                // TODO: Now the strategy for handling incomplete files is discarding them directly.
-                //  This may lead to certain column chunks not being read into the cache as expected.
-                logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
-                        pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " +
-                        file + ". This file will be ignored.");
-                continue;
-            }
-            int physicalLen;
-            long physicalOffset;
-            // update radix and cache content
-            for (String newCachedColumnChunk : newCachedColumnChunks)
-            {
-                String[] columnChunkIdStr = newCachedColumnChunk.split(":");
-                short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
-                short columnId = Short.parseShort(columnChunkIdStr[1]);
-                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
-                PixelsProto.ColumnChunkIndex chunkIndex =
-                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
-                physicalLen = chunkIndex.getChunkLength();
-                physicalOffset = chunkIndex.getChunkOffset();
-                if (newCacheOffset + physicalLen >= cacheFile.getSize())
+                if (pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
                 {
-                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + newCacheOffset);
-                    status = 2;
-                    break outer_loop;
+                    // TODO: Now the strategy for handling incomplete files is discarding them directly.
+                    //  This may lead to certain column chunks not being read into the cache as expected.
+                    logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
+                            pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " +
+                            file + ". This file will be ignored.");
+                    continue;
                 }
-                else
+                int physicalLen;
+                long physicalOffset;
+                // update radix and cache content
+                for (String newCachedColumnChunk : newCachedColumnChunks)
                 {
-                    newIdxes.add(new PixelsCacheEntry(
-                            new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
-                            new PixelsCacheIdx(newCacheOffset, physicalLen)));
-                    byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
-                    cacheFile.setBytes(newCacheOffset, columnChunk);
-                    logger.debug(
-                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + newCacheOffset + ", length: " + columnChunk.length);
-                    newCacheOffset += physicalLen;
+                    String[] columnChunkIdStr = newCachedColumnChunk.split(":");
+                    short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
+                    short columnId = Short.parseShort(columnChunkIdStr[1]);
+                    PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
+                    PixelsProto.ColumnChunkIndex chunkIndex =
+                            rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+                    physicalLen = chunkIndex.getChunkLength();
+                    physicalOffset = chunkIndex.getChunkOffset();
+                    if (newCacheOffset + physicalLen >= cacheFile.getSize())
+                    {
+                        logger.debug("Cache writes have exceeded cache size. Break. Current size: " + newCacheOffset);
+                        status = 2;
+                        break outer_loop;
+                    } else
+                    {
+                        newIdxes.add(new PixelsCacheEntry(
+                                new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
+                                new PixelsCacheIdx(newCacheOffset, physicalLen)));
+                        byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
+                        cacheFile.setBytes(newCacheOffset, columnChunk);
+                        logger.debug(
+                                "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + newCacheOffset + ", length: " + columnChunk.length);
+                        newCacheOffset += physicalLen;
+                    }
                 }
             }
         }

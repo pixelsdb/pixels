@@ -29,6 +29,7 @@ import io.pixelsdb.pixels.cache.PixelsCacheUtil;
 import io.pixelsdb.pixels.cache.PixelsCacheWriter;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.Constants;
@@ -41,6 +42,8 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * pixels cache manager.
@@ -119,13 +122,21 @@ public class CacheWorker implements Server
                 KeyValue globalCacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (globalCacheVersionKV != null)
                 {
-                    int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                    // Issue #636: get schema and table name from etcd instead of config file.
+                    String value = globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8);
+                    String[] splits = value.split(":");
+                    checkArgument(splits.length == 2, "invalid value for key '" +
+                            Constants.CACHE_VERSION_LITERAL + "' in etcd: " + value);
+                    SchemaTableName schemaTableName = new SchemaTableName(splits[0]);
+                    int globalCacheVersion = Integer.parseInt(splits[1]);
+                    checkArgument(globalCacheVersion >= 0,
+                            "invalid cache version in etcd: " + globalCacheVersion);
                     logger.debug("Current global cache version: " + globalCacheVersion);
                     // if cache file exists already. we need check local cache version with global cache version stored in etcd.
                     if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion)
                     {
                         // If global version is ahead the local one, update local cache.
-                        updateLocalCache(globalCacheVersion);
+                        updateLocalCache(schemaTableName, globalCacheVersion);
                     }
                 }
             }
@@ -140,15 +151,16 @@ public class CacheWorker implements Server
         }
     }
 
-    private void updateLocalCache(int version) throws MetadataException
+    private void updateLocalCache(SchemaTableName schemaTableName, int version) throws MetadataException
     {
-        Layout matchedLayout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
+        Layout matchedLayout = metadataService.getLayout(
+                schemaTableName.getSchemaName(), schemaTableName.getTableName(), version);
         if (matchedLayout != null)
         {
             // update cache status
             cacheStatus.set(CacheWorkerStatus.UPDATING.StatusCode);
             // update cache content
-            int status = 0;
+            int status;
             if (cacheWriter.isCacheEmpty())
             {
                 logger.debug("Cache update all for layout version " + version);
@@ -193,19 +205,28 @@ public class CacheWorker implements Server
                         if (event.getEventType() == WatchEvent.EventType.PUT)
                         {
                             // Get a new cache layout version.
-                            int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
                             if (cacheStatus.get() == CacheWorkerStatus.READY.StatusCode)
                             {
                                 // Ready to update the local cache.
-                                logger.debug("Cache version update detected, new global version is (" + version + ").");
-                                if (version > localCacheVersion)
+                                String value = event.getKeyValue().getValue().toString(StandardCharsets.UTF_8);
+                                String[] splits = value.split(":");
+                                checkArgument(splits.length == 2, "invalid value for key '" +
+                                        Constants.CACHE_VERSION_LITERAL + "' in etcd: " + value);
+                                SchemaTableName schemaTableName = new SchemaTableName(splits[0]);
+                                int globalCacheVersion = Integer.parseInt(splits[1]);
+                                checkArgument(globalCacheVersion >= 0,
+                                        "invalid cache version in etcd: " + globalCacheVersion);
+                                logger.debug("Cache version update detected, new global version is (" +
+                                        globalCacheVersion + ").");
+                                if (globalCacheVersion > localCacheVersion)
                                 {
                                     // The new version is newer, update the local cache.
-                                    logger.debug("New global cache version " + version + " is greater than the local version " +
-                                            localCacheVersion + ", update the local cache.");
+                                    logger.debug("New global cache version " + globalCacheVersion +
+                                            " is greater than the local version " + localCacheVersion +
+                                            ", update the local cache.");
                                     try
                                     {
-                                        updateLocalCache(version);
+                                        updateLocalCache(schemaTableName, globalCacheVersion);
                                     } catch (MetadataException e)
                                     {
                                         logger.error("Failed to update local cache.", e);
@@ -213,14 +234,14 @@ public class CacheWorker implements Server
                                 }
                                 else
                                 {
-                                    logger.debug("New global cache version " + version + " is equal to or less than the local version " +
-                                            localCacheVersion);
+                                    logger.debug("New global cache version " + globalCacheVersion +
+                                            " is equal to or less than the local version " + localCacheVersion);
                                 }
                             } else if (cacheStatus.get() == CacheWorkerStatus.UPDATING.StatusCode)
                             {
                                 // The local cache is updating, ignore the new version.
-                                logger.warn("The local cache is updating for version (" + localCacheVersion + "), " +
-                                        "ignore the new cache version (" + version + ").");
+                                String value = event.getKeyValue().getValue().toString(StandardCharsets.UTF_8);
+                                logger.warn("The local cache is updating, ignore the global cache version (" + value + ").");
                             } else
                             {
                                 // Shutdown this node manager.

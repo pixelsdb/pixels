@@ -25,6 +25,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class PixelsCacheConfig
 {
@@ -65,16 +66,6 @@ public class PixelsCacheConfig
     public String getStorageScheme()
     {
          return configFactory.getProperty("cache.storage.scheme");
-    }
-
-    public String getSchema()
-    {
-        return configFactory.getProperty("cache.schema");
-    }
-
-    public String getTable()
-    {
-        return configFactory.getProperty("cache.table");
     }
 
     public String getHDFSConfigDir()

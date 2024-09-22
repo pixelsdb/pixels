@@ -42,6 +42,7 @@ public final class Constants
     public static final String LAYOUT_VERSION_LITERAL = "layout_version";
     public static final String CACHE_VERSION_LITERAL = "cache_version";
     public static final String CACHE_LOCATION_LITERAL = "cache_location_";
+    public static final int HOSTNAME_INDEX_IN_CACHE_LOCATION_LITERAL = 3;
     public static final String HEARTBEAT_COORDINATOR_LITERAL = "heartbeat_coordinator_";
     public static final String HEARTBEAT_WORKER_LITERAL = "heartbeat_worker_";
 
