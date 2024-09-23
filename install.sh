@@ -53,6 +53,9 @@ fi
 
 if [ $CP_BIN -eq 1 ]; then
   cp -v ./scripts/bin/* $PIXELS_HOME/bin
+# the cpp config file should also be copied
+  mkdir -p $PIXELS_HOME/cpp
+  cp -v ./cpp/pixels-pixels-cxx.properties $PIXELS_HOME/cpp/
 fi
 
 echo "Installing pixels-daemons..."
