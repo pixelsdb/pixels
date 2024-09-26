@@ -314,6 +314,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                 workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
                 workerMetrics.addOutputCostNs(writeCostTimer.getElapsedNs());
                 numRowGroup = pixelsWriter.getNumRowGroup();
+                scanOutput.addOutput(outputPath, numRowGroup);
             }
             else
             {
