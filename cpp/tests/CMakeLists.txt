@@ -21,7 +21,6 @@ target_link_libraries(
         GTest::gtest_main
         pixels-common
         pixels-core
-
 )
 
 include(GoogleTest)
