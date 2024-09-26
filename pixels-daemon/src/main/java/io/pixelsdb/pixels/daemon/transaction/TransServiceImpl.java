@@ -39,14 +39,15 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {
     private static final Logger log = LogManager.getLogger(TransServiceImpl.class);
 
-    public static final AtomicLong TransId = new AtomicLong(0);
+    public static final AtomicLong TransId = new AtomicLong(1);
+    public static final AtomicLong TransTimestamp = new AtomicLong(1);
     /**
      * Issue #174:
      * In this issue, we have not fully implemented the logic related to the watermarks.
      * So we use two atomic longs to simulate the watermarks.
      */
-    public static final AtomicLong LowWatermark = new AtomicLong(0);
-    public static final AtomicLong HighWatermark = new AtomicLong(0);
+    public static final AtomicLong LowWatermark = new AtomicLong(1);
+    public static final AtomicLong HighWatermark = new AtomicLong(1);
 
     public TransServiceImpl () { }
 
@@ -55,7 +56,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                            StreamObserver<TransProto.BeginTransResponse> responseObserver)
     {
         long transId = TransId.getAndIncrement(); // incremental transaction id
-        long timestamp = HighWatermark.get();
+        long timestamp = request.getReadOnly() ? HighWatermark.get() : TransTimestamp.getAndIncrement();
         TransProto.BeginTransResponse response = TransProto.BeginTransResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS)
                 .setTransId(transId)
