@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.lock;
 
 import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -37,11 +38,11 @@ public class EtcdAutoIncrement
     private EtcdAutoIncrement() { }
 
     /**
-     * Initialize the id (set init value to '0') by the id key.
+     * Initialize the id (set init value to '1') by the id key.
      * This method is idempotent.
-     * @param idKey
+     * @param idKey the key of the auto-increment id
      */
-    public static void InitId(String idKey)
+    public static void InitId(String idKey) throws EtcdException
     {
         EtcdUtil etcd = EtcdUtil.Instance();
         EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
@@ -53,28 +54,55 @@ public class EtcdAutoIncrement
             KeyValue idKV = etcd.getKeyValue(idKey);
             if (idKV == null)
             {
-                etcd.putKeyValue(idKey, "0");
+                // Issue #729: set init value to 1 instead of 0.
+                etcd.putKeyValue(idKey, "1");
             }
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             logger.error(e);
-            e.printStackTrace();
-        } finally
+            throw new EtcdException("failed to ", e);
+        }
+        finally
         {
             try
             {
                 writeLock.release();
-            } catch (Exception e)
+            }
+            catch (EtcdException e)
             {
                 logger.error(e);
-                e.printStackTrace();
+                throw new EtcdException("failed to release write lock", e);
             }
         }
     }
 
-    public static long GenerateId(String idKey)
+    /**
+     * Get a new incremental id and increase the id in etcd by 1.
+     * @param idKey the key of the auto-increment id
+     * @return the new id
+     * @throws EtcdException if failed to interact with etcd
+     */
+    public static long GenerateId(String idKey) throws EtcdException
     {
-        long id = 0;
+        Segment segment = GenerateId(idKey, 1);
+        if (segment.valid() && segment.length == 1)
+        {
+            return segment.getStart();
+        }
+        return 0;
+    }
+
+    /**
+     * Get a new segment of incremental ids and increase the id in etcd by the step.
+     * @param idKey the key of the auto-increment id
+     * @param step the step, i.e., the number of ids to get
+     * @return the segment of auto-increment ids
+     * @throws EtcdException if failed to interact with etcd
+     */
+    public static Segment GenerateId(String idKey, long step) throws EtcdException
+    {
+        Segment segment;
         EtcdUtil etcd = EtcdUtil.Instance();
         EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
                 AI_LOCK_PATH_PREFIX + idKey);
@@ -85,25 +113,64 @@ public class EtcdAutoIncrement
             KeyValue idKV = etcd.getKeyValue(idKey);
             if (idKV != null)
             {
-                id = Long.parseLong(new String(idKV.getValue().getBytes()));
-                id++;
-                etcd.putKeyValue(idKey, id + "");
+                long start = Long.parseLong(new String(idKV.getValue().getBytes()));
+                start += step;
+                etcd.putKeyValue(idKey, String.valueOf(start));
+                segment = new Segment(start, step);
             }
-        } catch (Exception e)
+            else
+            {
+                throw new EtcdException("the key value of the id " + idKey + " does not exist in etcd");
+            }
+        }
+        catch (EtcdException e)
         {
             logger.error(e);
-            e.printStackTrace();
-        } finally
+            throw new EtcdException("failed to increment the id", e);
+        }
+        finally
         {
             try
             {
                 writeLock.release();
-            } catch (Exception e)
+            } catch (EtcdException e)
             {
                 logger.error(e);
-                e.printStackTrace();
+                throw new EtcdException("failed to release write lock", e);
             }
         }
-        return id;
+        return segment;
+    }
+
+    public static class Segment
+    {
+        private final long start;
+        private final long length;
+
+        public Segment(long start, long length)
+        {
+            this.start = start;
+            this.length = length;
+        }
+
+        public long getStart()
+        {
+            return start;
+        }
+
+        public long getLength()
+        {
+            return length;
+        }
+
+        public boolean valid()
+        {
+            return this.start > 0 && this.length > 0;
+        }
+
+        public boolean isEmpty()
+        {
+            return this.length > 0;
+        }
     }
 }
