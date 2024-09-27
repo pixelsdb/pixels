@@ -35,7 +35,7 @@ public class PersistentAutoIncrement
 {
     private final String idKey;
     private final AtomicLong id;
-    private EtcdAutoIncrement.Segment segment;
+    private final AtomicLong count;
 
     public PersistentAutoIncrement(String idKey) throws EtcdException
     {
@@ -43,7 +43,23 @@ public class PersistentAutoIncrement
         EtcdAutoIncrement.InitId(idKey);
         EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP);
         this.id = new AtomicLong(segment.getStart());
+        this.count = new AtomicLong(segment.getLength());
     }
 
-
+    public long getAndIncrement() throws EtcdException
+    {
+        long value = this.id.getAndIncrement();
+        if (this.count.getAndDecrement() > 0 && value < this.id.get())
+        {
+            return value;
+        }
+        else
+        {
+            EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP, segment -> {
+                this.id.set(segment.getStart());
+                this.count.set(segment.getLength());
+            });
+            return this.getAndIncrement();
+        }
+    }
 }

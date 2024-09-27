@@ -86,7 +86,7 @@ public class EtcdAutoIncrement
     public static long GenerateId(String idKey) throws EtcdException
     {
         Segment segment = GenerateId(idKey, 1);
-        if (segment.valid() && segment.length == 1)
+        if (segment.isValid() && segment.length == 1)
         {
             return segment.getStart();
         }
@@ -117,6 +117,10 @@ public class EtcdAutoIncrement
                 start += step;
                 etcd.putKeyValue(idKey, String.valueOf(start));
                 segment = new Segment(start, step);
+                if (!segment.isValid())
+                {
+                    throw new EtcdException("invalid segment for id key " + idKey + " from etcd");
+                }
             }
             else
             {
@@ -142,6 +146,58 @@ public class EtcdAutoIncrement
         return segment;
     }
 
+    /**
+     * Get a new segment of incremental ids and increase the id in etcd by the step.
+     * @param idKey the key of the auto-increment id
+     * @param step the step, i.e., the number of ids to get
+     * @param processor the processor of the segment acquired from etcd
+     * @throws EtcdException if failed to interact with etcd
+     */
+    public static void GenerateId(String idKey, long step, SegmentProcessor processor) throws EtcdException
+    {
+        EtcdUtil etcd = EtcdUtil.Instance();
+        EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
+                AI_LOCK_PATH_PREFIX + idKey);
+        EtcdMutex writeLock = readWriteLock.writeLock();
+        try
+        {
+            writeLock.acquire();
+            KeyValue idKV = etcd.getKeyValue(idKey);
+            if (idKV != null)
+            {
+                long start = Long.parseLong(new String(idKV.getValue().getBytes()));
+                start += step;
+                etcd.putKeyValue(idKey, String.valueOf(start));
+                Segment segment = new Segment(start, step);
+                if (!segment.isValid())
+                {
+                    throw new EtcdException("invalid segment for id key " + idKey + " from etcd");
+                }
+                processor.process(segment);
+            }
+            else
+            {
+                throw new EtcdException("the key value of the id " + idKey + " does not exist in etcd");
+            }
+        }
+        catch (EtcdException e)
+        {
+            logger.error(e);
+            throw new EtcdException("failed to increment the id", e);
+        }
+        finally
+        {
+            try
+            {
+                writeLock.release();
+            } catch (EtcdException e)
+            {
+                logger.error(e);
+                throw new EtcdException("failed to release write lock", e);
+            }
+        }
+    }
+
     public static class Segment
     {
         private final long start;
@@ -163,7 +219,7 @@ public class EtcdAutoIncrement
             return length;
         }
 
-        public boolean valid()
+        public boolean isValid()
         {
             return this.start > 0 && this.length > 0;
         }
@@ -172,5 +228,16 @@ public class EtcdAutoIncrement
         {
             return this.length > 0;
         }
+    }
+
+    /**
+     * The processor to be called to process the segment acquired from etcd.
+     */
+    public static interface SegmentProcessor
+    {
+        /**
+         * @param segment the segment acquired from etcd, must be valid
+         */
+        void process(Segment segment);
     }
 }
