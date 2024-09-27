@@ -58,10 +58,10 @@ public class EtcdAutoIncrement
                 etcd.putKeyValue(idKey, "1");
             }
         }
-        catch (Exception e)
+        catch (EtcdException e)
         {
             logger.error(e);
-            throw new EtcdException("failed to ", e);
+            throw new EtcdException("failed to initialize the id key", e);
         }
         finally
         {

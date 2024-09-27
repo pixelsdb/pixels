@@ -68,6 +68,7 @@ public final class Constants
      * The prefix for read-write lock used in etcd auto-increment id.
      */
     public static final String AI_LOCK_PATH_PREFIX = "/pixels_ai_lock/";
+    public static final long AI_DEFAULT_STEP = 1000;
 
     public static final String CF_OUTPUT_STATE_KEY_PREFIX = "pixels_turbo_cf_output";
 }
