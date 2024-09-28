@@ -114,8 +114,7 @@ public class EtcdAutoIncrement
             if (idKV != null)
             {
                 long start = Long.parseLong(new String(idKV.getValue().getBytes()));
-                start += step;
-                etcd.putKeyValue(idKey, String.valueOf(start));
+                etcd.putKeyValue(idKey, String.valueOf(start + step));
                 segment = new Segment(start, step);
                 if (!segment.isValid())
                 {
@@ -166,8 +165,7 @@ public class EtcdAutoIncrement
             if (idKV != null)
             {
                 long start = Long.parseLong(new String(idKV.getValue().getBytes()));
-                start += step;
-                etcd.putKeyValue(idKey, String.valueOf(start));
+                etcd.putKeyValue(idKey, String.valueOf(start + step));
                 Segment segment = new Segment(start, step);
                 if (!segment.isValid())
                 {

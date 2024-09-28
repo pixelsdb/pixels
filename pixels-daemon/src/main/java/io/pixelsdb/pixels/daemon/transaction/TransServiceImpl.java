@@ -57,7 +57,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     public static final AtomicLong lowWatermark;
     public static final AtomicLong highWatermark;
 
-    private static final ScheduledExecutorService watermarksCheckpointer;
+    private static final ScheduledExecutorService watermarksCheckpoint;
 
     static
     {
@@ -85,9 +85,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             {
                 highWatermark = new AtomicLong(Long.parseLong(highWatermarkKv.getValue().toString(StandardCharsets.UTF_8)));
             }
-            watermarksCheckpointer = Executors.newSingleThreadScheduledExecutor();
+            watermarksCheckpoint = Executors.newSingleThreadScheduledExecutor();
             int period = Constants.TRANS_WATERMARKS_CHECKPOINT_PERIOD_SEC;
-            watermarksCheckpointer.scheduleAtFixedRate(() -> {
+            watermarksCheckpoint.scheduleAtFixedRate(() -> {
                 EtcdUtil.Instance().putKeyValue(Constants.TRANS_LOW_WATERMARK_KEY, Long.toString(lowWatermark.get()));
                 EtcdUtil.Instance().putKeyValue(Constants.TRANS_HIGH_WATERMARK_KEY, Long.toString(highWatermark.get()));
             }, period, period, TimeUnit.SECONDS);
