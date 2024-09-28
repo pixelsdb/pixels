@@ -98,6 +98,7 @@ public class ErrorCode
     public static final int TRANS_CONTEXT_NOT_FOUND = (ERROR_TRANS + 4);
     public static final int TRANS_COMMIT_FAILED = (ERROR_TRANS + 5);
     public static final int TRANS_ROLLBACK_FAILED = (ERROR_TRANS + 6);
+    public static final int TRANS_GENERATE_ID_OR_TS_FAILED = (ERROR_TRANS + 7);
 
     // begin error code for query schedule
     private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;

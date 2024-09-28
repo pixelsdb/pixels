@@ -53,6 +53,9 @@ public final class Constants
     public static final String TRANS_CONTEXT_VM_COST_CENTS_KEY = "trans_vm_cost_cents";
     public static final String TRANS_CONTEXT_CF_COST_CENTS_KEY = "trans_cf_cost_cents";
     public static final String TRANS_CONTEXT_SCAN_BYTES_KEY = "trans_scan_bytes";
+    public static final String TRANS_HIGH_WATERMARK_KEY = "trans_high_watermark";
+    public static final String TRANS_LOW_WATERMARK_KEY = "trans_low_watermark";
+    public static final int TRANS_WATERMARKS_CHECKPOINT_PERIOD_SEC = 10;
 
     /**
      * The time in seconds that a relaxed query can be postponed for execution.
