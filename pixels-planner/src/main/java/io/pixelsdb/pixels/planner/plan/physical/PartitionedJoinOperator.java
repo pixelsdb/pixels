@@ -50,6 +50,8 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     protected final List<PartitionInput> largePartitionInputs;
     protected CompletableFuture<? extends Output>[] smallPartitionOutputs = null;
     protected CompletableFuture<? extends Output>[] largePartitionOutputs = null;
+    protected int smallPartitionStageId;
+    protected int largePartitionStageId;
 
     public PartitionedJoinOperator(String name, List<PartitionInput> smallPartitionInputs,
                                    List<PartitionInput> largePartitionInputs,
@@ -134,7 +136,12 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     @Override
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
-        int joinStageId = planCoordinator.assignStageId();
+        this.parentStageId = parentStageId;
+        this.joinStageId = planCoordinator.assignStageId();
+        for (JoinInput joinInput : this.joinInputs)
+        {
+            joinInput.setStageId(this.joinStageId);
+        }
         StageDependency joinStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
         StageCoordinator joinStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
         planCoordinator.addStageCoordinator(joinStageCoordinator, joinStageDependency);
@@ -169,8 +176,12 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
 
             if (!smallPartitionInputs.isEmpty())
             {
-                int partitionStageId = planCoordinator.assignStageId();
-                StageDependency partitionStageDependency = new StageDependency(partitionStageId, joinStageId, true);
+                this.smallPartitionStageId = planCoordinator.assignStageId();
+                for (PartitionInput partitionInput : this.smallPartitionInputs)
+                {
+                    partitionInput.setStageId(this.smallPartitionStageId);
+                }
+                StageDependency partitionStageDependency = new StageDependency(smallPartitionStageId, joinStageId, true);
                 List<Task> tasks = new ArrayList<>();
                 int taskId = 0;
                 for (PartitionInput partitionInput : this.smallPartitionInputs)
@@ -182,14 +193,18 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                         tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                     }
                 }
-                StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks);
+                StageCoordinator partitionStageCoordinator = new StageCoordinator(smallPartitionStageId, tasks);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
             }
 
             if (!largePartitionInputs.isEmpty())
             {
-                int partitionStageId = planCoordinator.assignStageId();
-                StageDependency partitionStageDependency = new StageDependency(partitionStageId, joinStageId, true);
+                this.largePartitionStageId = planCoordinator.assignStageId();
+                for (PartitionInput partitionInput : this.largePartitionInputs)
+                {
+                    partitionInput.setStageId(this.largePartitionStageId);
+                }
+                StageDependency partitionStageDependency = new StageDependency(largePartitionStageId, joinStageId, true);
                 List<Task> tasks = new ArrayList<>();
                 int taskId = 0;
                 for (PartitionInput partitionInput : this.largePartitionInputs)
@@ -201,7 +216,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                         tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                     }
                 }
-                StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks);
+                StageCoordinator partitionStageCoordinator = new StageCoordinator(largePartitionStageId, tasks);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
             }
         }

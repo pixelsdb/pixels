@@ -44,6 +44,8 @@ public abstract class SingleStageJoinOperator extends JoinOperator
     protected JoinOperator smallChild = null;
     protected JoinOperator largeChild = null;
     protected CompletableFuture<? extends Output>[] joinOutputs = null;
+    protected int parentStageId;
+    protected int joinStageId;
 
     public SingleStageJoinOperator(String name, boolean complete, JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
@@ -104,7 +106,12 @@ public abstract class SingleStageJoinOperator extends JoinOperator
     @Override
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
-        int joinStageId = planCoordinator.assignStageId();
+        this.parentStageId = parentStageId;
+        this.joinStageId = planCoordinator.assignStageId();
+        for (JoinInput joinInput : this.joinInputs)
+        {
+            joinInput.setStageId(this.joinStageId);
+        }
         StageDependency joinStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
         StageCoordinator joinStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
         planCoordinator.addStageCoordinator(joinStageCoordinator, joinStageDependency);
