@@ -56,6 +56,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
     private final long transId;
+    private final long timestamp;
     private final int RGStart;
     private int RGLen;
     private final boolean enableMetrics;
@@ -144,6 +145,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.footer = footer;
         this.option = option;
         this.transId = option.getTransId();
+        this.timestamp = option.getTimestamp();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
@@ -330,7 +332,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                         IntegerStatsRecorder timestampStats = (IntegerStatsRecorder) StatsRecorder.create(columnSchemas.get(columnSchemas.size() - 1),
                                                 rgColumnStatistics.get(rgColumnStatistics.size() - 1));
                         // check if the row group is qualified
-                        if (timestampStats.getMinimum() > transId)
+                        if (timestampStats.getMinimum() > this.timestamp)
                         {
                             includedRGs[i] = false;
                         }
@@ -400,7 +402,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                         IntegerStatsRecorder timestampStats = (IntegerStatsRecorder) StatsRecorder.create(columnSchemas.get(columnSchemas.size() - 1),
                                 rgColumnStatistics.get(rgColumnStatistics.size() - 1));
                         // check if the row group is qualified
-                        if (timestampStats.getMinimum()> transId)
+                        if (timestampStats.getMinimum()> this.timestamp)
                         {
                             includedRGs[i] = false;
                         }
@@ -433,7 +435,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 IntegerStatsRecorder timestampStats = (IntegerStatsRecorder) StatsRecorder.create(columnSchemas.get(columnSchemas.size() - 1),
                         rgColumnStatistics.get(rgColumnStatistics.size() - 1));
                 // check if the row group is qualified
-                if (timestampStats.getMinimum() > transId)
+                if (timestampStats.getMinimum() > this.timestamp)
                 {
                     includedRGs[i] = false;
                 }

@@ -239,6 +239,7 @@ public class PeerDownloader
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
+        // no need to set option timestamp, as we have to download all data
 
         // iterate a batch of pixels files of size `writeRate`
         for (int i = 0; i * writeRate < sourcePaths.size(); i++)
