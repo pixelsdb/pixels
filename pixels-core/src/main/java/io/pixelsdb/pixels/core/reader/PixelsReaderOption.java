@@ -34,7 +34,7 @@ public class PixelsReaderOption
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
     private boolean enableEncodedColumnVector = false; // whether read encoded column vectors directly when possible
     private long transId = -1L;
-    private long timestamp = -1L;
+    private long timestamp = -1L; // -1 means no need to consider the timestamp when reading data
     private int rgStart = 0;
     private int rgLen = -1;     // -1 means reading to the end of the file
 

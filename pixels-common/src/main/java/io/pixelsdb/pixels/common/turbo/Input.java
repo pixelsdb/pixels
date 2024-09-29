@@ -33,11 +33,17 @@ public abstract class Input
      */
     private long transId;
 
+    /**
+     * The timestamp of the transaction.
+     */
+    private long timestamp;
+
     private String operatorName;
 
-    public Input(long transId)
+    public Input(long transId, long timestamp)
     {
         this.transId = transId;
+        this.timestamp = timestamp;
         // Issue #468: operatorName is optional, it is to be set by the setter.
         this.operatorName = null;
     }
@@ -50,6 +56,16 @@ public abstract class Input
     public void setTransId(long transId)
     {
         this.transId = transId;
+    }
+
+    public long getTimestamp()
+    {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp)
+    {
+        this.timestamp = timestamp;
     }
 
     /**
