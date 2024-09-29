@@ -5,7 +5,6 @@
 
 #ifndef EXAMPLE_C_PIXELSSCANFUNCTION_HPP
 #define EXAMPLE_C_PIXELSSCANFUNCTION_HPP
-
 #include "duckdb.hpp"
 #include <fstream>
 #include <iostream>
@@ -47,11 +46,11 @@
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/enums/file_compression_type.hpp"
-#include "duckdb/common/field_writer.hpp"
+//#include "duckdb/common/field_writer.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/hive_partitioning.hpp"
 #include "duckdb/common/union_by_name.hpp"
-#include "duckdb/common/types/chunk_collection.hpp"
+//#include "duckdb/common/types/chunk_collection.hpp"
 #include "duckdb/function/copy_function.hpp"
 #include "duckdb/function/table_function.hpp"
 #include "duckdb/main/client_context.hpp"

@@ -61,7 +61,7 @@ In order to run the code in CLion, we should set the cmake configuration in CLio
 In `"setting"`->`"Build,Execution,Deployment"`->`"CMake"`, set `"Generator"` as `"Let CMake decide"`, and
 set `CMake options` as:
 ```shell
--DDUCKDB_OOT_EXTENSION_NAMES="pixels" -DDUCKDB_OOT_EXTENSION_PIXELS_PATH=${PIXELS_SRC}/cpp -DDUCKDB_OOT_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_OOT_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_SRC}/cpp/include -DCMAKE_PREFIX_PATH=${PIXELS_SRC}/cpp/third-party/protobuf/cmake/build
+-DDUCKDB_EXTENSION_NAMES="pixels" -DDUCKDB_EXTENSION_PIXELS_PATH=${PIXELS_SRC}/cpp -DDUCKDB_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_SRC}/cpp/include -DCMAKE_PREFIX_PATH=${PIXELS_SRC}/cpp/third-party/protobuf/cmake/build
 ```
 
 ### Benchmark

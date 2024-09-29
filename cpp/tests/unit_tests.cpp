@@ -644,7 +644,7 @@ TEST(reader, runLengthTest) {
         decoderValues[i++] = decoder.next();
         // std::cout << "result: " << decoderValues[i - 1] << std::endl;
     }
-    assert(arrayEquals<long>(decoderValues, values));
+    assert(arrayEquals<long>(decoderValues, values,TestRowNum));
     delete[] values;
     delete[] decoderValues;
 }
