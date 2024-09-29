@@ -15,15 +15,13 @@
 
 namespace duckdb {
 
-
-
     // Pixels Scan Replacemet for duckdb 1.0
 unique_ptr<TableRef> PixelsScanReplacement(ClientContext &context,ReplacementScanInput &input,
                                                optional_ptr<ReplacementScanData> data){
     auto table_name=ReplacementScan::GetFullPath(input);
-    if(!ReplacementScan::CanReplace(table_name,{"pixels"})){
-        return nullptr;
-    }
+//    if(!ReplacementScan::CanReplace(table_name,{"pixels"})){
+//        return nullptr;
+//    }
     auto lower_name = StringUtil::Lower(table_name);
 	if (!StringUtil::EndsWith(lower_name, ".pxl") && !StringUtil::Contains(lower_name, ".pxl?")) {
 		return nullptr;
@@ -38,19 +36,6 @@ unique_ptr<TableRef> PixelsScanReplacement(ClientContext &context,ReplacementSca
     }
     return std::move(table_function);
 }
-//unique_ptr<TableRef> PixelsScanReplacement(ClientContext &context, const string &table_name,
-//                                           ReplacementScanData *data) {
-//	auto lower_name = StringUtil::Lower(table_name);
-//	if (!StringUtil::EndsWith(lower_name, ".pxl") && !StringUtil::Contains(lower_name, ".pxl?")) {
-//		return nullptr;
-//	}
-//	auto table_function = make_uniq<TableFunctionRef>();
-//	vector<unique_ptr<ParsedExpression>> children;
-//	children.push_back(make_uniq<ConstantExpression>(Value(table_name)));
-//	table_function->function = make_uniq<FunctionExpression>("pixels_scan", std::move(children));
-//	return std::move(table_function);
-//}
-
 
 void PixelsExtension::Load(DuckDB &db) {
 	Connection con(*db.instance);

@@ -28,7 +28,7 @@ CLIENT_FLAGS :=
 
 EXTENSION_FLAGS=-DDUCKDB_EXTENSION_NAMES="pixels" -DDUCKDB_EXTENSION_PIXELS_PATH="$(PROJ_DIR)" \
 -DDUCKDB_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_EXTENSION_PIXELS_INCLUDE_PATH="$(PROJ_DIR)include" \
--DCMAKE_PREFIX_PATH=$(PROJ_DIR)third-party/protobuf/cmake/build
+-DCMAKE_PREFIX_PATH=$(PROJ_DIR)third-party/protobuf/cmake/build -DPIXELS_SRC="$(dirname $(pwd))"
 
 pull:
 	git submodule init
@@ -57,7 +57,3 @@ release: deps
 	mkdir -p build/release && \
 	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S pixels-duckdb/ -B build/release && \
 	cmake --build build/release --config Release
-
-
-
-

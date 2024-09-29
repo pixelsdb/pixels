@@ -1,6 +1,6 @@
 -- Run the following statements in Presto/Trino to create the Pixels database for TPC-H
 
-CREATE SCHEMA IF NOT EXISTS tpch_300_encoding;
+CREATE SCHEMA IF NOT EXISTS tpch_300;
 
 USE tpch_300_encoding;
 
