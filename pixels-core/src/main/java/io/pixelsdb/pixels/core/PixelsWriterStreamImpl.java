@@ -43,6 +43,7 @@ import java.util.Optional;
 import java.util.TimeZone;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.netty.handler.codec.http.HttpHeaderNames.*;
@@ -146,9 +147,9 @@ public class PixelsWriterStreamImpl implements PixelsWriter
      * On the other hand, In partitioned mode, we send at most one row group to each upper-level worker (for now), and
      *  so we do not need to translate fileName to URI at construction time.
      */
-    private java.net.URI uri;
+    private URI uri;
     private final String fileName;
-    private final List<String> fileNames;
+    private final List<URI> uris;
 
     private final AsyncHttpClient httpClient;
     /**
@@ -246,7 +247,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         this.byteBuf = Unpooled.directBuffer();
         this.uri = uri;
         this.fileName = fileName;
-        this.fileNames = fileNames;
+        this.uris = fileNames.stream().map(URI::create).collect(Collectors.toList());
         this.httpClient = Dsl.asyncHttpClient();
     }
 
@@ -560,7 +561,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                     uri = URI.create(fileNameToUri(fileName));
                 }
                 Request req = httpClient
-                        .preparePost(partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString())
+                        .preparePost(partitioned ? uris.get(currHashValue).toString() : uri.toString())
                         .addHeader(CONTENT_TYPE, "application/x-protobuf")
                         .addHeader(CONTENT_LENGTH, 0)
                         .addHeader(CONNECTION, CLOSE)
@@ -754,8 +755,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             uri = URI.create(fileNameToUri(fileName));
         }
         logger.debug("Sending row group with length: " + byteBuf.writerIndex() +
-                " to endpoint: " + (partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString()));
-        Request req = httpClient.preparePost(partitioned ? fileNameToUri(fileNames.get(currHashValue)) : uri.toString())
+                " to endpoint: " + (partitioned ? uris.get(currHashValue) : uri.toString()));
+        Request req = httpClient.preparePost(partitioned ? uris.get(currHashValue).toString() : uri.toString())
                 .setBody(byteBuf.nioBuffer())
                 .addHeader("X-Partition-Id", String.valueOf(partitionId))
                 .addHeader(CONTENT_TYPE, "application/x-protobuf")

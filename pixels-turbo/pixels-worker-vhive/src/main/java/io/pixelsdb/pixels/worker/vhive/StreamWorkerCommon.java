@@ -139,13 +139,13 @@ public class StreamWorkerCommon extends WorkerCommon
                                           Storage leftStorage, Storage rightStorage,
                                           AtomicReference<TypeDescription> leftSchema,
                                           AtomicReference<TypeDescription> rightSchema,
-                                          List<String> leftPaths, List<String> rightPaths)
+                                          List<String> leftEndpoints, List<String> rightEndpoints)
     {
         requireNonNull(executor, "executor is null");
         requireNonNull(leftSchema, "leftSchema is null");
         requireNonNull(rightSchema, "rightSchema is null");
-        requireNonNull(leftPaths, "leftPaths is null");
-        requireNonNull(rightPaths, "rightPaths is null");
+        requireNonNull(leftEndpoints, "leftPaths is null");
+        requireNonNull(rightEndpoints, "rightPaths is null");
         if (leftStorage == http && rightStorage == http)
         {
             // streaming mode
@@ -153,8 +153,7 @@ public class StreamWorkerCommon extends WorkerCommon
             Future<?> leftFuture = executor.submit(() -> {
                 try
                 {
-                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(
-                            PixelsWriterStreamImpl.getSchemaPort(leftPaths.get(0)));
+                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(leftEndpoints.get(0));
                     leftSchema.set(pixelsReader.getFileSchema());
                     pixelsReader.close();
                 } catch (Exception e)
@@ -165,8 +164,7 @@ public class StreamWorkerCommon extends WorkerCommon
             Future<?> rightFuture = executor.submit(() -> {
                 try
                 {
-                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(
-                            PixelsWriterStreamImpl.getSchemaPort(rightPaths.get(0)));
+                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(rightEndpoints.get(0));
                     rightSchema.set(pixelsReader.getFileSchema());
                     pixelsReader.close();
                     // XXX: This `close()` makes the test noticeably slower. Will need to look into it.
@@ -184,8 +182,8 @@ public class StreamWorkerCommon extends WorkerCommon
                 logger.error("interrupted while waiting for the termination of schema read", e);
             }
         } else
-            WorkerCommon.getFileSchemaFromPaths(executor, leftStorage, rightStorage, leftSchema, rightSchema, leftPaths,
-                    rightPaths);
+            WorkerCommon.getFileSchemaFromPaths(executor, leftStorage, rightStorage, leftSchema, rightSchema,
+                    leftEndpoints, rightEndpoints);
     }
 
     public static PixelsReader getReader(String filePath, Storage storage) throws UnsupportedOperationException
@@ -198,19 +196,17 @@ public class StreamWorkerCommon extends WorkerCommon
         return getReader(storageScheme, path, false, -1);
     }
 
-    public static PixelsReader getReader(Storage.Scheme storageScheme, String path, boolean partitioned,
+    public static PixelsReader getReader(Storage.Scheme storageScheme, String endpoint, boolean partitioned,
                                          int numPartitions) throws Exception
     {
         requireNonNull(storageScheme, "storageInfo is null");
-        requireNonNull(path, "fileName is null");
+        requireNonNull(endpoint, "fileName is null");
         if (storageScheme == Storage.Scheme.mock)
         {
-            logger.debug("getReader streaming mode, path: " + path +
-                    ", port: " + PixelsWriterStreamImpl.getOrSetPort(path));
-            return new PixelsReaderStreamImpl("http://localhost:" + PixelsWriterStreamImpl.getOrSetPort(path) + "/",
-                    partitioned, numPartitions);
+            logger.debug("getReader streaming mode: " + endpoint);
+            return new PixelsReaderStreamImpl(endpoint, partitioned, numPartitions);
         }
-        else return WorkerCommon.getReader(path, WorkerCommon.getStorage(storageScheme));
+        else return WorkerCommon.getReader(endpoint, WorkerCommon.getStorage(storageScheme));
     }
 
     public static PixelsWriter getWriter(TypeDescription schema, Storage storage,
@@ -230,17 +226,17 @@ public class StreamWorkerCommon extends WorkerCommon
                                          String outputPath, boolean encoding,
                                          boolean isPartitioned, int partitionId,
                                          List<Integer> keyColumnIds,
-                                         List<String> outputPaths, boolean isSchemaWriter)
+                                         List<String> outputEndpoints, boolean isSchemaWriter)
     {
         if (storage != null && storage.getScheme() != Storage.Scheme.mock)
             return WorkerCommon.getWriter(schema, storage, outputPath, encoding, isPartitioned, keyColumnIds);
-        logger.debug("getWriter streaming mode, path: " + outputPath + ", paths: " + outputPaths +
+        logger.debug("getWriter streaming mode, path: " + outputPath + ", endpoints: " + outputEndpoints +
                 ", isSchemaWriter: " + isSchemaWriter);
         requireNonNull(schema, "schema is null");
         requireNonNull(outputPath, "fileName is null");
         checkArgument(!isPartitioned || keyColumnIds != null,
                 "keyColumnIds is null whereas isPartitioned is true");
-        checkArgument(!isPartitioned || outputPaths != null,
+        checkArgument(!isPartitioned || outputEndpoints != null,
                 "outputPaths is null whereas isPartitioned is true");
 
         PixelsWriterStreamImpl.Builder builder = PixelsWriterStreamImpl.newBuilder();
@@ -252,13 +248,11 @@ public class StreamWorkerCommon extends WorkerCommon
                 .setPartitionId(isPartitioned ? partitionId : -1);
         if (!isPartitioned)
         {
-            if (isSchemaWriter)
-                builder.setUri(URI.create("http://localhost:" + PixelsWriterStreamImpl.getSchemaPort(outputPath) + "/"));
-            builder.setFileName(outputPath);
+            builder.setUri(URI.create(outputPath));
         }
         else
         {
-            builder.setFileNames(outputPaths)
+            builder.setFileNames(outputEndpoints)
                     .setPartKeyColumnIds(keyColumnIds);
         }
         return builder.build();
