@@ -162,6 +162,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     private final List<TypeDescription> children;
     private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
 
+    ////////////////////////////////////////////////////////////////////////////
+    // deprecated
     private static final BlockingMap<String, Integer> pathToPort = new BlockingMap<>();
     private static final ConcurrentHashMap<String, Integer> pathToSchemaPort = new ConcurrentHashMap<>();
     // We allocate data ports in ascending order, starting from `firstPort`;
@@ -170,7 +172,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     private static final AtomicInteger nextPort = new AtomicInteger(firstPort);
     private static final AtomicInteger schemaPorts = new AtomicInteger(firstPort - 1);
 
-    public static int getPort(String path)
+    private static int getPort(String path)
     {
         // XXX: Ideally, the getPort() should block until the server started. Otherwise, the server may not be ready
         // when the client tries to connect.
@@ -188,7 +190,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         }
     }
 
-    public static int getOrSetPort(String path)
+    private static int getOrSetPort(String path)
     {
         if (pathToPort.exist(path))
         {
@@ -202,7 +204,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         }
     }
 
-    public static void setPort(String path, int port)
+    private static void setPort(String path, int port)
     {
         pathToPort.put(path, port);
     }
@@ -216,6 +218,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     {
         return "http://localhost:" + getPort(fileName) + "/";
     }
+    // above are deprecated
+    ////////////////////////////////////////////////////////////////////////////
 
     private PixelsWriterStreamImpl(TypeDescription schema, int pixelStride, int rowGroupSize,
                                    PixelsProto.CompressionKind compressionKind, int compressionBlockSize,
@@ -247,7 +251,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         this.byteBuf = Unpooled.directBuffer();
         this.uri = uri;
         this.fileName = fileName;
-        this.uris = fileNames.stream().map(URI::create).collect(Collectors.toList());
+        this.uris = fileNames == null ? null : fileNames.stream().map(URI::create).collect(Collectors.toList());
         this.httpClient = Dsl.asyncHttpClient();
     }
 
@@ -554,7 +558,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             // In partitioned mode, the server closes automatically when it receives all its partitions. No need to send
             //  a close request.
             // Schema servers also close automatically and do not need close requests.
-            if (!partitioned && uri.getPort() >= firstPort)
+            if (!partitioned && partitionId > -2)
             {
                 if (!partitioned && uri == null)
                 {
@@ -761,50 +765,92 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 .addHeader("X-Partition-Id", String.valueOf(partitionId))
                 .addHeader(CONTENT_TYPE, "application/x-protobuf")
                 .addHeader(CONTENT_LENGTH, byteBuf.readableBytes())
-                .addHeader(CONNECTION, partitioned || uri.getPort() < firstPort ? CLOSE : "keep-alive")
+                .addHeader(CONNECTION, partitioned || partitionId == -2 ? CLOSE : "keep-alive")
                 .build();
         // In partitioned mode, we send only 1 row group to each upper-level worker, and so we set the connection to
         //  CLOSE after sending the row group.
+        // partitionId == -2 means the writer is a schema writer, which should also close the connection after sending
+        //  the row group.
 
-        // DESIGN: We use Spring retry here to retry the HTTP request in case of connection failure,
+        // DESIGN: We use a retry here to retry the HTTP request in case of connection failure,
         //  because the HTTP server may not be ready when the client tries to connect.
         try
         {
             outstandingHTTPRequestSemaphore.acquire();
-            CompletableFuture<Response> future = new CompletableFuture<>();
-            httpClient.executeRequest(req, new AsyncCompletionHandler<Response>()
+            int maxAttempts = 30000;
+            long backoffMillis = 10;
+            int attempt = 0;
+            boolean success = false;
+
+            while (!success)
             {
-
-                @Override
-                public Response onCompleted(Response response) throws Exception
-                {
-                    byteBuf.clear();
-                    future.complete(response);
-                    if (response.getStatusCode() != 200)
+                try {
+                    CompletableFuture<Response> future = new CompletableFuture<>();
+                    httpClient.executeRequest(req, new AsyncCompletionHandler<Response>()
                     {
-                        throw new IOException("Failed to send row group to server, status code: " + response.getStatusCode());
-                    }
-                    outstandingHTTPRequestSemaphore.release();
-                    return response;
-                }
 
-                @Override
-                public void onThrowable(Throwable t)
+                        @Override
+                        public Response onCompleted(Response response) throws Exception
+                        {
+                            byteBuf.clear();
+                            future.complete(response);
+                            if (response.getStatusCode() != 200)
+                            {
+                                throw new IOException("Failed to send row group to server, status code: " + response.getStatusCode());
+                            }
+                            outstandingHTTPRequestSemaphore.release();
+                            return response;
+                        }
+
+                        @Override
+                        public void onThrowable(Throwable t)
+                        {
+                            if (t instanceof java.net.ConnectException)
+                            {
+                                future.completeExceptionally(t);
+                            } else
+                            {
+                                byteBuf.clear();
+                                logger.error(t.getMessage());
+                                outstandingHTTPRequestSemaphore.release();
+                                future.completeExceptionally(t);
+                            }
+                        }
+                    });
+
+                    future.get();
+                    // If no exception, the request was successful, so we break out of the loop
+                    success = true;
+                } catch (ExecutionException e)
                 {
-                    if (t instanceof java.net.ConnectException)
+                    Throwable cause = e.getCause();
+                    if (cause instanceof java.net.ConnectException)
                     {
-                        future.completeExceptionally(t);
+                        attempt++;
+                        // logger.debug("HTTP connection refused. Retrying... Exception message: " + cause.getMessage());
+                        if (attempt < maxAttempts)
+                        {
+                            try {
+                                Thread.sleep(backoffMillis);
+                            } catch (InterruptedException interruptedException)
+                            {
+                                Thread.currentThread().interrupt();
+                                throw new RuntimeException("Retry interrupted", interruptedException);
+                            }
+                        } else
+                        {
+                            throw new RuntimeException("Max retry attempts reached. Failing the request.", cause);
+                        }
                     } else
                     {
-                        byteBuf.clear();
-                        logger.error("unknown network error", t);
-                        outstandingHTTPRequestSemaphore.release();
-                        future.completeExceptionally(t);
+                        throw new RuntimeException("Non-retryable error occurred", cause);
                     }
+                } catch (InterruptedException e)
+                {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Retry interrupted", e);
                 }
-            });
-
-            future.get();
+            }
         } catch (Throwable e)
         {
             logger.error("error when sending data", e);

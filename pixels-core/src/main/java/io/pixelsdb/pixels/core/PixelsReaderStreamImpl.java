@@ -136,7 +136,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 FullHttpRequest req = (FullHttpRequest) msg;
                 if (req.method() != HttpMethod.POST)
                 {
-                    sendResponseAndClose(ctx, req, NOT_FOUND);
+                    sendResponseAndClose(ctx, req, NOT_FOUND, false);
                     return;
                 }
                 if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf"))
@@ -144,12 +144,20 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     // silent reject
                     return;
                 }
+                int partitionId = Integer.parseInt(req.headers().get("X-Partition-Id"));
                 logger.debug("Incoming packet on port: " + httpPort +
                         ", content_length header: " + req.headers().get("content-length") +
                         ", connection header: " + req.headers().get("connection") +
                         ", partition ID header: " + req.headers().get("X-Partition-Id") +
                         ", HTTP request object body total length: " + req.content().readableBytes());
 
+                // schema packet: only 1 packet expected, so close the connection immediately
+                // partitioned mode: close the connection if all partitions received
+                // else (non-partitioned mode, data packet): close connection if empty packet received
+                boolean needCloseParentChannel = partitionId == -2 ||
+                        (partitioned && numPartitionsReceived.get() == numPartitions) ||
+                        (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
+                                req.content().readableBytes() == 0);
                 ByteBuf byteBuf = req.content();
                 try
                 {
@@ -169,7 +177,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         } catch (IOException e)
                         {
                             logger.error("Invalid stream header values: ", e);
-                            sendResponseAndClose(ctx, req, BAD_REQUEST);
+                            sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
                             return;
                         }
                     } else if (partitioned)
@@ -182,24 +190,23 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 } catch (InvalidProtocolBufferException | IndexOutOfBoundsException e)
                 {
                     logger.error("Malformed or corrupted stream header", e);
-                    sendResponseAndClose(ctx, req, BAD_REQUEST);
+                    sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
                     return;
                 }
 
                 // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the
-                //  client is a data writer (port >= 50100) rather than a schema writer. In the latter case,
+                //  client is a data writer rather than a schema writer (partitionId == -2). In the latter case,
                 //  the schema packet has been processed when parsing the stream header above.
-                if (httpPort >= 50100)
+                if (partitionId > -2)
                 {
                     byteBuf.retain();
                     if (!partitioned) byteBufSharedQueue.add(byteBuf);
                     else
                     {
-                        int partitionId = Integer.parseInt(req.headers().get("X-Partition-Id"));
                         if (partitionId < 0 || partitionId >= numPartitions)
                         {
                             logger.warn("Client sent invalid partitionId value: " + partitionId);
-                            sendResponseAndClose(ctx, req, BAD_REQUEST);
+                            sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
                             return;
                         }
                         byteBufBlockingMap.put(partitionId, byteBuf);
@@ -212,10 +219,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     }
                 }
 
-                sendResponseAndClose(ctx, req, HttpResponseStatus.OK);
+                sendResponseAndClose(ctx, req, HttpResponseStatus.OK, needCloseParentChannel);
             }
 
-            private void sendResponseAndClose(ChannelHandlerContext ctx, FullHttpRequest req, HttpResponseStatus status)
+            private void sendResponseAndClose(ChannelHandlerContext ctx, FullHttpRequest req, HttpResponseStatus status,
+                                              boolean needCloseParentChannel)
             {
                 FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), status);
                 response.headers()
@@ -233,18 +241,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 });
                 if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()))
                    f.addListener(ChannelFutureListener.CLOSE);
-                // schema port: only 1 packet expected, so close the connection immediately
-                // partitioned mode: close connection if all partitions received
-                // else (non-partitioned mode, data port): close connection if empty packet received
-                if (httpPort < 50100 || (partitioned && numPartitionsReceived.get() == numPartitions) ||
-                        (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
-                                req.content().readableBytes() == 0))
+                if (needCloseParentChannel)
                 {
                     f.addListener(future -> {
                         // shutdown the server
                         ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
-                        // Can delete the port from the map of open ports, but not necessary
-                        // PixelsWriterStreamImpl.delPort(httpPort);
                     });
                 }
             }
