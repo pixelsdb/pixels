@@ -20,8 +20,6 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.worker.common.*;
-import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -31,20 +29,23 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.join.Partitioner;
+import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
+import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 import io.pixelsdb.pixels.planner.plan.physical.domain.MultiOutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
+import io.pixelsdb.pixels.worker.common.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -58,6 +59,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
 {
     private static final Logger logger = LogManager.getLogger(BasePartitionedJoinStreamWorker.class);
     private final WorkerMetrics workerMetrics;
+    private final WorkerCoordinateService workerCoordinateService;
+    private io.pixelsdb.pixels.common.task.Worker<CFWorkerInfo> worker;
 
     public BasePartitionedJoinStreamWorker(WorkerContext context)
     {
@@ -65,6 +68,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         // this.logger = context.getLogger();
         this.workerMetrics = context.getWorkerMetrics();
         this.workerMetrics.clear();
+        this.workerCoordinateService = new WorkerCoordinateService("128.110.218.225", 18894);
     }
 
     @Override
@@ -86,6 +90,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
+            int stageId = event.getStageId();
             requireNonNull(event.getSmallTable(), "event.smallTable is null");
             StorageInfo leftInputStorageInfo = event.getSmallTable().getStorageInfo();
             List<String> leftPartitioned = event.getSmallTable().getInputFiles();
@@ -112,6 +117,11 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             boolean[] rightProjection = event.getJoinInfo().getLargeProjection();
             JoinType joinType = event.getJoinInfo().getJoinType();
             List<Integer> hashValues = event.getJoinInfo().getHashValues();
+            checkArgument(hashValues.size() == 1, "Multiple hash values are not supported");
+            // PixelsRecordReaderStreamImpl is not thread-safe, so we can only use one instance
+            //  at the same time, i.e. only one hash value per worker.
+            // However, currently we do ensure that each worker only processes one hash value in PixelsPlanner:
+            //  wherever `new PartitionedJoinInfo()` is called, the hash values are always a singleton list.
             int numPartition = event.getJoinInfo().getNumPartition();
             logger.info("small table: " + event.getSmallTable().getTableName() +
                     ", large table: " + event.getLargeTable().getTableName() +
@@ -150,12 +160,28 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
+
+            // `registerWorker()` might awake the dependent workers, so it should be called just before
+            //  the current worker listens on its HTTP port and is ready to receive streaming packets.
+            CFWorkerInfo workerInfo = new CFWorkerInfo(
+                    InetAddress.getLocalHost().getHostAddress(), -1,
+                    transId, stageId, event.getOperatorName(),
+                    event.getJoinInfo().getHashValues()
+            );
+            logger.debug("register worker, local address: " + workerInfo.getIp()
+                    + ", transId: " + workerInfo.getTransId() + ", stageId: " + workerInfo.getStageId());
+            worker = workerCoordinateService.registerWorker(workerInfo);
+
             logger.debug("getSchemaFromPaths, left input: " + leftPartitioned +
                     ", right input: " + rightPartitioned);
             StreamWorkerCommon.getSchemaFromPaths(threadPool,
                     StreamWorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
                     StreamWorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
-                    leftSchema, rightSchema, leftPartitioned, rightPartitioned);
+                    leftSchema, rightSchema,
+                    Collections.singletonList("http://localhost:18688/"),
+                    Collections.singletonList("http://localhost:18686/"));
+            // XXX: Better to ensure the subsequent data reader is up immediately after the schema is ready,
+            //  to avoid retries on the writer side.
             /*
              * Issue #450:
              * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
@@ -176,7 +202,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             for (int i = 0; i < leftPartitioned.size(); i += leftSplitSize)
             {
                 List<String> parts = new LinkedList<>();
-                // todo: maybe allow 1 join worker to use multiple ports to read input in parallel, so as to build the hash table in parallel.
+                // XXX: Can allow 1 join worker to use multiple ports to read input in parallel, so as to
+                //  build the hash table in parallel.
                 for (int j = i; j < i + leftSplitSize && j < leftPartitioned.size(); ++j)
                 {
                     parts.add(leftPartitioned.get(j));
@@ -185,7 +212,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     try
                     {
                         buildHashTable(transId, joiner, parts, leftColumnsToRead, leftInputStorageInfo.getScheme(),
-                                hashValues, 1, workerMetrics);  // todo: numPartition is hardcoded for now
+                                hashValues, event.getSmallPartitionWorkerNum(), workerMetrics);
                     }
                     catch (Throwable e)
                     {
@@ -236,10 +263,10 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                                     joinWithRightTableAndPartition(
                                             transId, joiner, parts, rightColumnsToRead,
                                             rightInputStorageInfo.getScheme(), hashValues,
-                                            5, outputPartitionInfo, result, workerMetrics) :
+                                            event.getLargePartitionWorkerNum(), outputPartitionInfo, result, workerMetrics) :
                                     joinWithRightTable(transId, joiner, parts, rightColumnsToRead,
-                                            rightInputStorageInfo.getScheme(), hashValues, 5,
-                                            result.get(0), workerMetrics);  // todo: modify hardcoded parameters
+                                            rightInputStorageInfo.getScheme(), hashValues,
+                                            event.getLargePartitionWorkerNum(), result.get(0), workerMetrics);
                         } catch (Throwable e)
                         {
                             throw new WorkerException("error during hash join", e);
@@ -270,9 +297,9 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 {
                     pixelsWriter = StreamWorkerCommon.getWriter(joiner.getJoinedSchema(),
                             StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                            encoding, true, -1, Arrays.stream(  // todo: parse the operator name
+                            encoding, true, -1, Arrays.stream(
                                             outputPartitionInfo.getKeyColumnIds()).boxed().
-                                    collect(Collectors.toList()));  // XXX: Should use multi output
+                                    collect(Collectors.toList()));
                     for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
                     {
                         ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
@@ -320,7 +347,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                                 StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                                 encoding, true, -1, Arrays.stream(
                                                 outputPartitionInfo.getKeyColumnIds()).boxed().
-                                        collect(Collectors.toList()));  // XXX: Should use multi output
+                                        collect(Collectors.toList()));
                         joiner.writeLeftOuterAndPartition(pixelsWriter, StreamWorkerCommon.rowBatchSize,
                                 outputPartitionInfo.getNumPartition(), outputPartitionInfo.getKeyColumnIds());
                     }
@@ -345,6 +372,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     }
                 }
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
+                workerCoordinateService.terminateWorker(worker.getWorkerId());
             } catch (Throwable e)
             {
                 throw new WorkerException(
@@ -379,6 +407,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
     protected static void buildHashTable(long transId, Joiner joiner, List<String> leftParts, String[] leftCols,
                                          Storage.Scheme leftScheme, List<Integer> hashValues, int numPartition,
                                          WorkerMetrics workerMetrics) throws IOException {
+        // In streaming mode, numPartition is the total number of partition workers, i.e. the number of incoming packets.
         logger.debug("building hash table for the left table, partition paths: " + leftParts);
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
         WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
@@ -393,32 +422,16 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 PixelsReader pixelsReader = null;
                 try
                 {
-                    pixelsReader = StreamWorkerCommon.getReader(leftScheme, leftPartitioned, true, numPartition);
+                    pixelsReader = StreamWorkerCommon.getReader(leftScheme, "http://localhost:18688/", true, numPartition);
                     readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    // TODO
-                    Set<Integer> leftHashValues = new HashSet<>(numPartition);
-                    for (int hashValue = 0; hashValue < numPartition; ++hashValue)  // XXX: Should this be numPartition or numShards?
-                    {
-                        leftHashValues.add(hashValue);
-                    }
-//                    Set<Integer> leftHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-//                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
-//                    {
-//                        leftHashValues.add(rgInfo.getPartitionInfo().getHashValue());
-//                    }
                     for (int hashValue : hashValues)
-                    // XXX: Currently, PixelsRecordReaderStreamImpl is not thread-safe, so we can only use one instance
-                    //      at the same time, i.e. only one hash value per worker.
                     {
-                        if (!leftHashValues.contains(hashValue))
-                        {
-                            continue;
-                        }
                         PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, leftCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rowBatch;
                         PixelsRecordReader recordReader = pixelsReader.read(option);
+                        // XXX: perhaps do not need to re-initialize the record reader for each hash value.
                         if (recordReader == null) continue;
                         checkArgument(recordReader.isValid(), "failed to get record reader");
 
@@ -503,7 +516,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 PixelsReader pixelsReader = null;
                 try
                 {
-                    pixelsReader = StreamWorkerCommon.getReader(rightScheme, rightPartitioned, true, numPartition);
+                    pixelsReader = StreamWorkerCommon.getReader(rightScheme, "http://localhost:18686/", true, numPartition);
                     readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
                     Set<Integer> rightHashValues = new HashSet<>(numPartition);
@@ -622,7 +635,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 PixelsReader pixelsReader = null;
                 try
                 {
-                    pixelsReader = StreamWorkerCommon.getReader(rightScheme, rightPartitioned, true, numPartition);
+                    pixelsReader = StreamWorkerCommon.getReader(rightScheme, "http://localhost:18686/", true, numPartition);
                     readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
                     Set<Integer> rightHashValues = new HashSet<>(numPartition);

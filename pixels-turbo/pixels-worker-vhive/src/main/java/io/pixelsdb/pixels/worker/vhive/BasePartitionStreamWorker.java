@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import com.alibaba.fastjson.JSON;
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsWriter;
@@ -30,6 +31,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.Partitioner;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.executor.scan.Scanner;
+import io.pixelsdb.pixels.planner.coordinate.*;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
@@ -39,6 +41,7 @@ import io.pixelsdb.pixels.worker.common.*;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -46,6 +49,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static java.util.Objects.requireNonNull;
 
@@ -58,12 +62,17 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
 {
     private final Logger logger;
     private final WorkerMetrics workerMetrics;
+    private final WorkerCoordinateService workerCoordinateService;
+    private io.pixelsdb.pixels.common.task.Worker<CFWorkerInfo> worker;
+    // todo: manage lease, maybe use `scheduledExecutor.scheduleAtFixedRate()` (where?)
 
     public BasePartitionStreamWorker(WorkerContext context)
     {
         super(context);
         this.logger = context.getLogger();
         this.workerMetrics = context.getWorkerMetrics();
+        this.workerCoordinateService = new WorkerCoordinateService("128.110.218.225", 18894);
+        // Hardcoded for Cloudlab. todo: Need to figure out how to get the daemon IP dynamically.
     }
 
     @Override
@@ -86,6 +95,7 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                     new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
+            int stageId = event.getStageId();
             requireNonNull(event.getTableInfo(), "event.tableInfo is null");
             StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
@@ -100,6 +110,15 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                     "output.storageInfo is null");
             String outputPath = event.getOutput().getPath();
             boolean encoding = event.getOutput().isEncoding();
+
+            CFWorkerInfo workerInfo = new CFWorkerInfo(
+                    InetAddress.getLocalHost().getHostAddress(), -1,
+                    transId, stageId, event.getOperatorName(),
+                    IntStream.range(0, numPartition).boxed().collect(Collectors.toList())
+            );
+            logger.debug("register worker, local address: " + workerInfo.getIp()
+                    + ", transId: " + workerInfo.getTransId() + ", stageId: " + workerInfo.getStageId());
+            worker = workerCoordinateService.registerWorker(workerInfo);
 
             StreamWorkerCommon.initStorage(inputStorageInfo);
             StreamWorkerCommon.initStorage(outputStorageInfo);
@@ -157,16 +176,27 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                 outputPaths.add(outputPath + "/" + hash);
             }
 
-            String[] operatorNameDivided = event.getOperatorName().split("/");
-            // Parse the numerator and denominator as integers
-            int workerId = Integer.parseInt(operatorNameDivided[0]);
-            int workerTotalNum = Integer.parseInt(operatorNameDivided[1]);
-            if (workerId == 0)
-                // Only one worker (per table) is responsible for passing the schema to the next level, though it needs to pass the schema to every worker on the next level.
-                StreamWorkerCommon.passSchemaToNextLevel(writerSchema.get(), outputStorageInfo, outputPaths);
+            List<CFWorkerInfo> downStreamWorkers = workerCoordinateService.getDownstreamWorkers(worker.getWorkerId())
+                    .stream()
+                    .sorted(Comparator.comparing(worker -> worker.getHashValues().get(0)))
+                    .collect(ImmutableList.toImmutableList());
+            List<String> outputEndpoints = downStreamWorkers.stream()
+                    .map(CFWorkerInfo::getIp)
+                    .map(ip -> "http://" + ip + ":"
+                            + (Objects.equals(event.getTableInfo().getTableName(), "part") ? "18688" : "18686") + "/")
+                    // .map(URI::create)
+                    .collect(Collectors.toList());
+            // todo: Need to pass whether the table is the large table or the small table here into the partition worker.
+            //  Perhaps add a boolean field in the PartitionInput class.
+            //  Currently, we hardcode the table name for this - the large table (rightTable for join) uses port 18686
+            //  while the small table (leftTable for join) uses port 18688.
+
+            StreamWorkerCommon.passSchemaToNextLevel(writerSchema.get(), outputStorageInfo, outputEndpoints);
             PixelsWriter pixelsWriter = StreamWorkerCommon.getWriter(writerSchema.get(),
                     StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                    true, workerId, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()), outputPaths, false);
+                    true, 0,  // todo: hardcoded for now, need to pass the actual value
+                    Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()),
+                    outputEndpoints, false);
             Set<Integer> hashValues = new HashSet<>(numPartition);
             for (int hash = 0; hash < numPartition; ++hash)
             {
@@ -190,6 +220,8 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
 
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             StreamWorkerCommon.setPerfMetrics(partitionOutput, workerMetrics);
+
+            workerCoordinateService.terminateWorker(worker.getWorkerId());
             return partitionOutput;
         }
         catch (Throwable e)
