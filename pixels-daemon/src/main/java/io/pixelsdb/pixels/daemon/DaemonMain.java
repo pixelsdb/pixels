@@ -10,7 +10,6 @@ import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
 import io.pixelsdb.pixels.daemon.turbo.QueryScheduleServer;
-import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateServer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
