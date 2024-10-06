@@ -91,7 +91,6 @@ public class DaemonMain
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
-
                     if (cacheEnabled)
                     {
                         // start cache coordinator
