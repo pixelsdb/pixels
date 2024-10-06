@@ -67,7 +67,6 @@ if [ -z "$(ls -A $PIXELS_HOME/lib)" ]; then
   )Make sure to put the jdbc connector of MySQL into '$PIXELS_HOME/lib'!$(tput sgr 0)"
 fi
 
-<<END
 echo "Installing config file..."
 if [ -z "$(find $PIXELS_HOME -name "pixels.properties")" ]; then
   cp -v ./pixels-common/src/main/resources/pixels.properties $PIXELS_HOME
@@ -82,7 +81,6 @@ else
     cp -v ./pixels-common/src/main/resources/pixels.properties $PIXELS_HOME
   fi
 fi
-END
 
 echo "$(
   tput setaf 1
