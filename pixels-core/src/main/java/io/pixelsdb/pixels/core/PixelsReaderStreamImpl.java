@@ -307,7 +307,9 @@ public class PixelsReaderStreamImpl implements PixelsReader
         // consume the padding bytes
         byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8));
         if (CHUNK_ALIGNMENT != 0)
+        {
             byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, CHUNK_ALIGNMENT));
+        }
         // At this point, the readerIndex of the byteBuf is past the streamHeader and at the start of
         // the actual rowGroups.
 

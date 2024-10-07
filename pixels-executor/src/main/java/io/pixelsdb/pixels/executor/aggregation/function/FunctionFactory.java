@@ -38,7 +38,7 @@ public class FunctionFactory
     private FunctionFactory() { }
 
     public Function createFunction(FunctionType functionType,
-                                   TypeDescription inputType,TypeDescription outputType)
+                                   TypeDescription inputType, TypeDescription outputType)
     {
         switch (functionType)
         {
@@ -62,7 +62,7 @@ public class FunctionFactory
             case LONG:
                 return new BigintSum();
             case DECIMAL:
-                return new DecimalSum(outputType);
+                return new DecimalSum(inputType, outputType);
             default:
                 // TODO: support more types.
                 throw new UnsupportedOperationException(

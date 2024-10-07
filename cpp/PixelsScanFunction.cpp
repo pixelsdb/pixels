@@ -130,19 +130,23 @@ unique_ptr<FunctionData> PixelsScanFunction::PixelsScanBind(
 	if (input.inputs[0].IsNull()) {
 		throw ParserException("Pixels reader cannot take NULL list as parameter");
 	}
-    auto files = MultiFileReader::GetFileList(context, input.inputs[0], "Pixels", FileGlobOptions::ALLOW_EMPTY);
+    auto multi_file_reader= MultiFileReader::CreateDefault("PixelsScan");
+
+    auto file_list=multi_file_reader->CreateFileList(context,input.inputs[0]);
+
+    auto files=file_list->GetPaths();
+    // parse *
     if (files.empty()) {
         throw InvalidArgumentException("The number of pxl file should be positive. ");
     }
-
     // sort the pxl file by file name, so that all SSD arrays can be fully utilized
-//    sort(files.begin(), files.end(), compare_file_name());
+    sort(files.begin(), files.end(), compare_file_name());
 
 	auto footerCache = std::make_shared<PixelsFooterCache>();
 	auto builder = std::make_shared<PixelsReaderBuilder>();
 
-	shared_ptr<::Storage> storage = StorageFactory::getInstance()->getStorage(::Storage::file);
-	shared_ptr<PixelsReader> pixelsReader = builder
+	std::shared_ptr<::Storage> storage = StorageFactory::getInstance()->getStorage(::Storage::file);
+	std::shared_ptr<PixelsReader> pixelsReader = builder
 	                                 ->setPath(files.at(0))
 	                                 ->setStorage(storage)
 	                                 ->setPixelsFooterCache(footerCache)
@@ -434,7 +438,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     if(scan_data.next_file_index < StorageInstance->getFileSum(scan_data.deviceID)) {
         auto footerCache = std::make_shared<PixelsFooterCache>();
         auto builder = std::make_shared<PixelsReaderBuilder>();
-        shared_ptr<::Storage> storage = StorageFactory::getInstance()->getStorage(::Storage::file);
+        std::shared_ptr<::Storage> storage = StorageFactory::getInstance()->getStorage(::Storage::file);
         scan_data.next_file_name = StorageInstance->getFileName(scan_data.deviceID, scan_data.next_file_index);
         scan_data.nextReader = builder->setPath(scan_data.next_file_name)
                 ->setStorage(storage)

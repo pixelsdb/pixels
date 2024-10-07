@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.balance;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.pixelsdb.pixels.common.server.HostAddress;
 
 import java.util.*;
 

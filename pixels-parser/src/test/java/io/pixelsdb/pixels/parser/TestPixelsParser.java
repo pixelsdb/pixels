@@ -24,22 +24,19 @@ import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.externalize.RelJsonWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.impl.SqlParserImpl;
-
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.junit.Assert.assertTrue;
-
 import java.util.Properties;
+
+import static org.junit.Assert.assertTrue;
 
 public class TestPixelsParser
 {
@@ -54,7 +51,7 @@ public class TestPixelsParser
     @Before
     public void init()
     {
-        this.instance = new MetadataService(hostAddr, 18888);
+        this.instance = MetadataService.CreateInstance(hostAddr, 18888);
         SqlParser.Config tpchParserConfig = SqlParser.configBuilder()
                 .setLex(Lex.MYSQL_ANSI)
                 .setParserFactory(SqlParserImpl.FACTORY)
@@ -71,12 +68,6 @@ public class TestPixelsParser
 
         this.tpchPixelsParser = new PixelsParser(this.instance, "tpch", tpchParserConfig, properties);
         this.clickbenchPixelsParser = new PixelsParser(this.instance, "clickbench", clickbenchParserConfig, properties);
-    }
-
-    @After
-    public void shutdown() throws InterruptedException
-    {
-        this.instance.shutdown();
     }
 
     @Test

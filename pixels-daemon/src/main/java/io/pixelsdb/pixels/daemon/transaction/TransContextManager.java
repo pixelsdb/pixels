@@ -22,8 +22,8 @@ package io.pixelsdb.pixels.daemon.transaction;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.daemon.TransProto;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Objects.requireNonNull;
 
@@ -47,9 +47,16 @@ public class TransContextManager
     }
 
     private final Map<Long, TransContext> transIdToContext = new HashMap<>();
+    /**
+     * Two different transactions will not have the same transaction id, so we can store the running transactions
+     * using a tree set and sort the transaction contexts by transaction timestamp and id.
+     */
+    private final Set<TransContext> runningReadOnlyTrans = new TreeSet<>();
+    private final Set<TransContext> runningWriteTrans = new TreeSet<>();
+
     private final Map<String, Long> traceIdToTransId = new HashMap<>();
     private final Map<Long, String> transIdToTraceId = new HashMap<>();
-    private volatile int readOnlyConcurrency;
+    private final AtomicInteger readOnlyConcurrency = new AtomicInteger(0);
 
     private TransContextManager() { }
 
@@ -59,7 +66,12 @@ public class TransContextManager
         this.transIdToContext.put(context.getTransId(), context);
         if (context.isReadOnly())
         {
-            this.readOnlyConcurrency++;
+            this.readOnlyConcurrency.incrementAndGet();
+            this.runningReadOnlyTrans.add(context);
+        }
+        else
+        {
+            this.runningWriteTrans.add(context);
         }
     }
 
@@ -69,21 +81,7 @@ public class TransContextManager
         if (context != null)
         {
             context.setStatus(TransProto.TransStatus.COMMIT);
-            if (context.isReadOnly())
-            {
-                this.readOnlyConcurrency--;
-            }
-            else
-            {
-                // only clear the context of write transactions
-                this.transIdToContext.remove(transId);
-                String traceId = this.transIdToTraceId.remove(transId);
-                if (traceId != null)
-                {
-                    this.traceIdToTransId.remove(traceId);
-                }
-            }
-            return true;
+            return terminateTrans(context);
         }
         return false;
     }
@@ -94,27 +92,53 @@ public class TransContextManager
         if (context != null)
         {
             context.setStatus(TransProto.TransStatus.ROLLBACK);
-            if (context.isReadOnly())
-            {
-                this.readOnlyConcurrency--;
-            }
-            else
-            {
-                // only clear the context of write transactions
-                String traceId = this.transIdToTraceId.remove(transId);
-                if (traceId != null)
-                {
-                    this.traceIdToTransId.remove(traceId);
-                }
-            }
-            return true;
+            return terminateTrans(context);
         }
         return false;
+    }
+
+    private boolean terminateTrans(TransContext context)
+    {
+        if (context.isReadOnly())
+        {
+            this.readOnlyConcurrency.decrementAndGet();
+            this.runningReadOnlyTrans.remove(context);
+        }
+        else
+        {
+            // only clear the context of write transactions
+            this.transIdToContext.remove(context.getTransId());
+            this.runningWriteTrans.remove(context);
+            String traceId = this.transIdToTraceId.remove(context.getTransId());
+            if (traceId != null)
+            {
+                this.traceIdToTransId.remove(traceId);
+            }
+        }
+        return true;
     }
 
     public synchronized TransContext getTransContext(long transId)
     {
         return this.transIdToContext.get(transId);
+    }
+
+    public synchronized long getMinRunningTransTimestamp(boolean readOnly)
+    {
+        Iterator<TransContext> iterator;
+        if (readOnly)
+        {
+            iterator = this.runningReadOnlyTrans.iterator();
+        }
+        else
+        {
+            iterator = this.runningWriteTrans.iterator();
+        }
+        if (iterator.hasNext())
+        {
+            return iterator.next().getTimestamp();
+        }
+        return 0;
     }
 
     public synchronized boolean isTransExist(long transId)
@@ -152,8 +176,8 @@ public class TransContextManager
     {
         if (readOnly)
         {
-            return this.readOnlyConcurrency;
+            return this.readOnlyConcurrency.get();
         }
-        return this.transIdToContext.size() - this.readOnlyConcurrency;
+        return this.transIdToContext.size() - this.readOnlyConcurrency.get();
     }
 }

@@ -68,6 +68,33 @@ public class RdbPathDao extends PathDao
     }
 
     @Override
+    public MetadataProto.Path getByPathUri(String pathUri)
+    {
+        Connection conn = db.getConnection();
+        String sql = "SELECT * FROM PATHS WHERE PATH_URI=?";
+        try (PreparedStatement st = conn.prepareStatement(sql))
+        {
+            st.setString(1, pathUri);
+            ResultSet rs = st.executeQuery();
+            if (rs.next())
+            {
+                return MetadataProto.Path.newBuilder()
+                        .setId(rs.getLong("PATH_ID"))
+                        .setUri(pathUri)
+                        .setTypeValue(rs.getInt("PATH_TYPE"))
+                        .setLayoutId(rs.getLong("LAYOUTS_LAYOUT_ID"))
+                        // Issue #437: range id is set to 0 if it is null in metadata.
+                        .setRangeId(rs.getLong("RANGES_RANGE_ID")).build();
+            }
+        } catch (SQLException e)
+        {
+            log.error("getByPathUri in RdbPathDao", e);
+        }
+
+        return null;
+    }
+
+    @Override
     public List<MetadataProto.Path> getAllByLayoutId(long layoutId)
     {
         Connection conn = db.getConnection();

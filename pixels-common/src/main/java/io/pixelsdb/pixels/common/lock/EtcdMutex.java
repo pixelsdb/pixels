@@ -21,9 +21,9 @@ package io.pixelsdb.pixels.common.lock;
 
 import com.google.common.collect.Maps;
 import io.etcd.jetcd.Client;
+import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.utils.StringUtil;
 
-import java.io.IOException;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,7 +44,7 @@ public class EtcdMutex implements InterProcessLock
 
     /**
      * @param client client
-     * @param path   the path to lock
+     * @param path the path to lock
      */
     public EtcdMutex(Client client, String path)
     {
@@ -79,17 +79,24 @@ public class EtcdMutex implements InterProcessLock
      * can call acquire re-entrantly. Each call to acquire must be balanced by a call
      * to {@link #release()}
      *
-     * @throws Exception errors, connection interruptions
+     * @throws EtcdException errors, connection interruptions
      */
-    public void acquire() throws Exception
+    public void acquire() throws EtcdException
     {
-        if (!this.internalLock(Long.MAX_VALUE, TimeUnit.SECONDS))
+        try
         {
-            throw new IOException("Lost connection while trying to acquire lock: " + this.basePath);
+            if (!this.internalLock(Long.MAX_VALUE, TimeUnit.SECONDS))
+            {
+                throw new EtcdException("Lost connection while trying to acquire lock: " + this.basePath);
+            }
+        }
+        catch (EtcdException e)
+        {
+            throw new EtcdException("failed to acquire lock", e);
         }
     }
 
-    private boolean internalLock(long time, TimeUnit unit) throws Exception
+    private boolean internalLock(long time, TimeUnit unit) throws EtcdException
     {
         Thread currentThread = Thread.currentThread();
         EtcdMutex.LockData lockData = this.threadData.get(currentThread);
@@ -115,16 +122,16 @@ public class EtcdMutex implements InterProcessLock
     }
 
     /**
-     * Acquire the mutex - blocks until it's available or the given time expires. Note: the same thread
+     * Acquire the mutex - blocks until it is available or the given time expires. Note: the same thread
      * can call acquire re-entrantly. Each call to acquire that returns true must be balanced by a call
      * to {@link #release()}
      *
      * @param time time to wait
      * @param unit time unit
      * @return true if the mutex was acquired, false if not
-     * @throws Exception errors, connection interruptions
+     * @throws EtcdException errors, connection interruptions
      */
-    public boolean acquire(long time, TimeUnit unit) throws Exception
+    public boolean acquire(long time, TimeUnit unit) throws EtcdException
     {
         return this.internalLock(time, unit);
     }
@@ -136,16 +143,16 @@ public class EtcdMutex implements InterProcessLock
      */
     public boolean isAcquiredInThisProcess()
     {
-        return this.threadData.size() > 0;
+        return !this.threadData.isEmpty();
     }
 
     /**
      * Perform one release of the mutex if the calling thread is the same thread that acquired it. If the
      * thread had made multiple calls to acquire, the mutex will still be held when this method returns.
      *
-     * @throws Exception errors, interruptions, current thread does not own the lock
+     * @throws EtcdException errors, interruptions, current thread does not own the lock
      */
-    public void release() throws Exception
+    public void release() throws EtcdException
     {
         Thread currentThread = Thread.currentThread();
         LockData lockData = threadData.get(currentThread);

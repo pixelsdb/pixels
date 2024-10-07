@@ -120,8 +120,6 @@ public class QueryManager
     {
         String scheduleServerHost = ConfigFactory.Instance().getProperty("query.schedule.server.host");
         int scheduleServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
-        String transServerHost = ConfigFactory.Instance().getProperty("trans.server.host");
-        int transServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
         try
         {
             /*
@@ -131,17 +129,7 @@ public class QueryManager
              * metrics for cluster auto-scaling, so we set scalingEnabled to false.
              */
             this.queryScheduleService = new QueryScheduleService(scheduleServerHost, scheduleServerPort, false);
-            this.transService = new TransService(transServerHost, transServerPort);
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                queryScheduleService.shutdown();
-                try
-                {
-                    transService.shutdown();
-                } catch (InterruptedException e)
-                {
-                    log.error("failed to shutdown query schedule service or transaction service", e);
-                }
-            }));
+            this.transService = TransService.Instance();
         } catch (QueryScheduleException e)
         {
             throw new QueryServerException("failed to initialize query schedule service", e);
@@ -344,12 +332,12 @@ public class QueryManager
         if (request.getExecutionHint() == ExecutionHint.RELAXED || request.getExecutionHint() == ExecutionHint.BEST_OF_EFFORT)
         {
             // submit it to the mpp connection
-            properties = this.costEffectiveConnProp;
+            properties = new Properties(this.costEffectiveConnProp);
         }
         else if (request.getExecutionHint() == ExecutionHint.IMMEDIATE)
         {
             // submit it to the pixels-turbo connection
-            properties = this.immediateConnProp;
+            properties = new Properties(this.immediateConnProp);
         }
         else
         {
@@ -365,10 +353,8 @@ public class QueryManager
                 this.runningQueries.put(traceToken, query);
                 long pendingTimeMs = System.currentTimeMillis() - query.getReceivedTimeMs();
                 long start = System.currentTimeMillis();
+                
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
-                long finishTimestampMs = System.currentTimeMillis();
-                long executeTimeMs = finishTimestampMs - start;
-
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
                 String[] columnNames = new String[columnCount];
@@ -390,6 +376,9 @@ public class QueryManager
 
                 resultSet.close();
                 statement.close();
+
+                long finishTimestampMs = System.currentTimeMillis();
+                long executeTimeMs = finishTimestampMs - start;
 
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
                         request.getExecutionHint(), columnPrintSizes, columnNames, rows, pendingTimeMs,

@@ -60,11 +60,8 @@ public class CompactExecutor implements CommandExecutor
         int threadNum = Integer.parseInt(ns.getString("concurrency"));
         ExecutorService compactExecutor = Executors.newFixedThreadPool(threadNum);
 
-        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
-        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
-
         // get compact layout
-        MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
+        MetadataService metadataService = MetadataService.Instance();
         List<Layout> layouts = metadataService.getLayouts(schemaName, tableName);
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = null;
@@ -201,6 +198,5 @@ public class CompactExecutor implements CommandExecutor
         System.out.println("Pixels files in '" + Joiner.on(";").join(layout.getOrderedPathUris()) + "' are compacted into '" +
                 Joiner.on(";").join(layout.getCompactPathUris()) + "' by " + threadNum + " threads in " +
                 (endTime - startTime) / 1000 + "s.");
-        metadataService.shutdown();
     }
 }

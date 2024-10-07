@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.storage.hdfs;
 
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -27,8 +29,6 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -40,6 +40,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * It is tested that this implementation is compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
  *
@@ -50,6 +52,12 @@ public final class HDFS implements Storage
 {
     private static final Logger logger = LogManager.getLogger(HDFS.class);
     private static final String SchemePrefix = Scheme.hdfs.name() + "://";
+    private static final boolean EnableCache;
+
+    static
+    {
+        EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
+    }
 
     private final FileSystem fs;
     private final Configuration conf;
@@ -183,40 +191,29 @@ public final class HDFS implements Storage
     @Override
     public long getFileId(String path) throws IOException
     {
-        FSDataInputStream rawReader = fs.open(new Path(path));
-        HdfsDataInputStream hdis;
-        if (rawReader instanceof HdfsDataInputStream)
+        /* Issue #708:
+         * Previously, we used the id of the first (and only) block of each file as the file id. This requires
+         * the file to be opened with HdfsDataInputStream and has only one data block. As we have recently added
+         * the FILES metadata table, we can generate and get file ids from the metadata service instead.
+         */
+        requireNonNull(path, "path is null");
+        if (EnableCache)
         {
-            hdis = (HdfsDataInputStream) rawReader;
+            MetadataService metadataService = MetadataService.Instance();
             try
             {
-                List<LocatedBlock> locatedBlocks = hdis.getAllBlocks();
-                if (locatedBlocks == null)
-                {
-                    throw new IOException("Failed to list blocks in HDFS file.");
-                }
-                if (locatedBlocks.size() != 1)
-                {
-                    throw new IOException("Only one block is expected per file, however there is (are) " +
-                            locatedBlocks.size() + ".");
-                }
-                return locatedBlocks.get(0).getBlock().getBlockId();
-            }
-            catch (IOException e)
+                path = ensureSchemePrefix(path);
+                return metadataService.getFileId(path);
+            } catch (MetadataException e)
             {
-                throw e;
+                throw new IOException("failed to get file id from metadata, path=" + path, e);
             }
         }
-        try
+        else
         {
-            rawReader.close();
+            // Issue #708: return an arbitrary id when cache is disable.
+            return path.hashCode();
         }
-        catch (IOException e)
-        {
-            throw e;
-        }
-
-        return -1;
     }
 
     @Override
@@ -276,7 +273,7 @@ public final class HDFS implements Storage
                 throw new IOException("I/O error occurs when get hosts and names from block locations.", e);
             }
         }
-        return hosts.toArray(new String[hosts.size()]);
+        return hosts.toArray(new String[0]);
     }
 
     @Override

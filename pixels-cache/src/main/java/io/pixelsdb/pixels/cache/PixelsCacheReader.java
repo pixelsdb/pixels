@@ -34,8 +34,7 @@ import java.util.List;
  * @author guodong
  * @author hank
  */
-public class PixelsCacheReader
-        implements AutoCloseable
+public class PixelsCacheReader implements AutoCloseable
 {
     private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
     // private static CacheLogger cacheLogger = new CacheLogger();
@@ -61,10 +60,10 @@ public class PixelsCacheReader
      *     So that 16 bytes is more than enough.
      * </p>
      */
-    private byte[] nodeData = new byte[256 * 8 + 16];
-    private ByteBuffer childrenBuffer = ByteBuffer.wrap(nodeData);
+    private final byte[] nodeData = new byte[256 * 8 + 16];
+    private final ByteBuffer childrenBuffer = ByteBuffer.wrap(nodeData);
 
-    private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
+    private final ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
 
 //    static
 //    {
@@ -140,7 +139,8 @@ public class PixelsCacheReader
         try
         {
             lease = PixelsCacheUtil.beginIndexRead(indexFile);
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             logger.error("Failed to get read permission on index.", e);
             /**

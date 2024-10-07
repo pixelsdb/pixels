@@ -31,6 +31,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * pixels cache header
  * index:
@@ -346,9 +349,37 @@ public class PixelsCacheUtil
         indexFile.setIntVolatile(10, version);
     }
 
-    public static int getIndexVersion(MemoryMappedFile indexFile)
+    /**
+     * This method is only to be used when the cache is known to be not empty.
+     * @param indexFile the index file
+     * @return the local cache version in the index file
+     */
+    protected static int getIndexVersion(MemoryMappedFile indexFile)
     {
         return indexFile.getIntVolatile(10);
+    }
+
+    /**
+     * @param indexFile the index file of the local cache
+     * @param cacheFile the cache file of the local cache
+     * @return the local cache version in the index file, or -1 when the local cache is empty
+     */
+    public static int getIndexVersion(MemoryMappedFile indexFile, MemoryMappedFile cacheFile)
+    {
+        if (isCacheFileEmpty(cacheFile))
+        {
+            return -1;
+        }
+        return indexFile.getIntVolatile(10);
+    }
+
+    public static boolean isCacheFileEmpty(MemoryMappedFile cacheFile)
+    {
+        /* There are no concurrent updates on the cache,
+         * thus we don't have to synchronize the access to cachedColumnChunks.
+         */
+        return PixelsCacheUtil.getCacheStatus(cacheFile) == PixelsCacheUtil.CacheStatus.EMPTY.getId() &&
+                PixelsCacheUtil.getCacheSize(cacheFile) == 0;
     }
 
     /**
@@ -482,13 +513,23 @@ public class PixelsCacheUtil
         return cacheFile.getLongVolatile(8);
     }
 
-    public static int hashcode(byte[] bytes) {
+    public static int hashcode(byte[] bytes)
+    {
         int var1 = 1;
 
-        for(int var3 = 0; var3 < bytes.length; ++var3) {
-            var1 = 31 * var1 + bytes[var3];
+        for (byte aByte : bytes)
+        {
+            var1 = 31 * var1 + aByte;
         }
 
         return var1;
+    }
+
+    public static String getHostnameFromCacheLocationLiteral(String cacheLocationLiteral)
+    {
+        String[] splits = requireNonNull(cacheLocationLiteral, "cacheLocationLiteral is null").split("_");
+        checkArgument(splits.length > Constants.HOSTNAME_INDEX_IN_CACHE_LOCATION_LITERAL,
+                "invalid cacheLocationLiteral: " + cacheLocationLiteral);
+        return splits[Constants.HOSTNAME_INDEX_IN_CACHE_LOCATION_LITERAL];
     }
 }

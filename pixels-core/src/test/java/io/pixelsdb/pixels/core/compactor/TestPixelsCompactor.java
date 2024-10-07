@@ -48,7 +48,7 @@ public class TestPixelsCompactor
             throws MetadataException, IOException, InterruptedException
     {
         // get compact layout
-        MetadataService metadataService = new MetadataService("dbiir01", 18888);
+        MetadataService metadataService = MetadataService.CreateInstance("node01", 18888);
         List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = layouts.get(0);
@@ -66,7 +66,7 @@ public class TestPixelsCompactor
 
         // get input file paths
         Storage storage = StorageFactory.Instance().getStorage("hdfs");
-        List<Status> statuses = storage.listStatus("hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order");
+        List<Status> statuses = storage.listStatus("hdfs://node01:9000/pixels/pixels/test_105/v_0_order");
 
         // compact
         int NO = 0;
@@ -79,7 +79,7 @@ public class TestPixelsCompactor
             }
             long start = System.currentTimeMillis();
 
-            String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_compact/" +
+            String filePath = "hdfs://node01:9000/pixels/pixels/test_105/v_0_compact/" +
                     NO + "_" +
                     DateUtil.getCurTime() +
                     ".compact.pxl";
@@ -101,7 +101,6 @@ public class TestPixelsCompactor
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }
-        metadataService.shutdown();
     }
 
     @SuppressWarnings("Duplicates")
@@ -110,7 +109,7 @@ public class TestPixelsCompactor
             throws MetadataException, IOException, InterruptedException
     {
         // get compact layout
-        MetadataService metadataService = new MetadataService("dbiir01", 18888);
+        MetadataService metadataService = MetadataService.CreateInstance("node01", 18888);
         List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = null;
@@ -128,7 +127,7 @@ public class TestPixelsCompactor
 
         // get input file paths
         Storage storage = StorageFactory.Instance().getStorage("hdfs");
-        List<Status> statuses = storage.listStatus("hdfs://dbiir01:9000/pixels/pixels/test_105/v_" +
+        List<Status> statuses = storage.listStatus("hdfs://node01:9000/pixels/pixels/test_105/v_" +
                 layout.getVersion() + "_order");
 
         // compact
@@ -144,7 +143,7 @@ public class TestPixelsCompactor
 
             long start = System.currentTimeMillis();
 
-            String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_compact/" +
+            String filePath = "hdfs://node01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_compact/" +
                     NO + "_" +
                     DateUtil.getCurTime() +
                     ".compact.pxl";
@@ -166,20 +165,16 @@ public class TestPixelsCompactor
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }
-        metadataService.shutdown();
     }
 
     @Test
     public void testContent()
             throws IOException
     {
-        String filePath = "hdfs://presto00:9000/pixels/pixels/testnull_pixels/compact.3.pxl";
+        String filePath = "hdfs://node01:9000/pixels/pixels/testnull_pixels/compact.3.pxl";
         //String filePath = "hdfs://presto00:9000/pixels/testNull_pixels/201806190954180.pxl";
         Storage storage = StorageFactory.Instance().getStorage("hdfs");
-        PixelsReader reader = PixelsReaderImpl.newBuilder()
-                .setStorage(storage)
-                .setPath(filePath)
-                .build();
+        PixelsReader reader = PixelsReaderImpl.newBuilder().setStorage(storage).setPath(filePath).build();
 
         PixelsReaderOption option = new PixelsReaderOption();
         String[] cols = {"Domain", "SamplePercent"};
@@ -203,7 +198,6 @@ public class TestPixelsCompactor
             {
                 break;
             }
-
         }
     }
 }

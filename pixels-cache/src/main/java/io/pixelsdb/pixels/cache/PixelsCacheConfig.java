@@ -25,6 +25,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class PixelsCacheConfig
 {
@@ -62,29 +63,9 @@ public class PixelsCacheConfig
         return Long.parseLong(configFactory.getProperty("cache.size"));
     }
 
-    public String getMetaHost()
-    {
-        return configFactory.getProperty("metadata.server.host");
-    }
-
-    public int getMetaPort()
-    {
-        return Integer.parseInt(configFactory.getProperty("metadata.server.port"));
-    }
-
     public String getStorageScheme()
     {
          return configFactory.getProperty("cache.storage.scheme");
-    }
-
-    public String getSchema()
-    {
-        return configFactory.getProperty("cache.schema");
-    }
-
-    public String getTable()
-    {
-        return configFactory.getProperty("cache.table");
     }
 
     public String getHDFSConfigDir()
@@ -94,7 +75,7 @@ public class PixelsCacheConfig
 
     public int getNodeLeaseTTL()
     {
-        int ttl = Integer.parseInt(configFactory.getProperty("lease.ttl.seconds"));
+        int ttl = Integer.parseInt(configFactory.getProperty("heartbeat.lease.ttl.seconds"));
         int heartbeat = Integer.parseInt(configFactory.getProperty("heartbeat.period.seconds"));
         checkArgument(ttl > heartbeat);
         return ttl;

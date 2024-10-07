@@ -114,7 +114,7 @@ public class DownloadProcess {
         }
 
         // Retrieve metadata from host
-        MetadataService metadataService = new MetadataService(metadataServiceHost, metadataServicePort);
+        MetadataService metadataService = MetadataService.CreateInstance(metadataServiceHost, metadataServicePort);
         Storage inputStorageInstance = StorageFactory.Instance().getStorage(inputStorage);
         Storage outputStorageInstance = StorageFactory.Instance().getStorage(outputStorage);
 

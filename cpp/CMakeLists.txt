@@ -10,7 +10,7 @@ include_directories(include)
 set(EXTENSION_SOURCES
         pixels_extension.cpp
         PixelsScanFunction.cpp
-        )
+)
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 
 find_package(Protobuf REQUIRED)
@@ -35,8 +35,13 @@ target_link_libraries(
         pixels-core
 )
 
+
+# Add the subdirectory that contains the build_loadable_extension definition
+
 set(PARAMETERS "-warnings")
 build_loadable_extension(${TARGET_NAME} ${PARAMETERS} ${EXTENSION_SOURCES})
+
+message("duckdb export set: ${DUCKDB_EXPORT_SET}" )
 
 install(
         TARGETS ${EXTENSION_NAME} pixels-core pixels-common

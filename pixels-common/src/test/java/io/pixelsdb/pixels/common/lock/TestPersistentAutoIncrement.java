@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,29 +17,25 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.utils;
+package io.pixelsdb.pixels.common.lock;
 
 import io.pixelsdb.pixels.common.exception.EtcdException;
+import io.pixelsdb.pixels.common.utils.Constants;
 import org.junit.Test;
 
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
-
 /**
- * @create 2021-08-28
  * @author hank
+ * @create 2024-09-28
  */
-public class TestAutoIncrement
+public class TestPersistentAutoIncrement
 {
     @Test
-    public void testEtcdAutoIncrement() throws EtcdException
+    public void test() throws EtcdException
     {
-        long id = GenerateId("test-id");
-        System.out.println(id);
-        id = GenerateId("test-id");
-        System.out.println(id);
-        id = GenerateId("test-id");
-        System.out.println(id);
-        id = GenerateId("test-id");
-        System.out.println(id);
+        PersistentAutoIncrement pai = new PersistentAutoIncrement(Constants.AI_TRANS_TS_KEY);
+        for (int i = 0; i < 2048; ++i)
+        {
+            System.out.println(pai.getAndIncrement());
+        }
     }
 }

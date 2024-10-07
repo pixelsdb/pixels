@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,29 +17,21 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.utils;
-
-import io.pixelsdb.pixels.common.exception.EtcdException;
-import org.junit.Test;
-
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
+package io.pixelsdb.pixels.common.exception;
 
 /**
- * @create 2021-08-28
  * @author hank
+ * @create 2024-09-26
  */
-public class TestAutoIncrement
+public class EtcdException extends Exception
 {
-    @Test
-    public void testEtcdAutoIncrement() throws EtcdException
+    public EtcdException(String message)
     {
-        long id = GenerateId("test-id");
-        System.out.println(id);
-        id = GenerateId("test-id");
-        System.out.println(id);
-        id = GenerateId("test-id");
-        System.out.println(id);
-        id = GenerateId("test-id");
-        System.out.println(id);
+        super(message);
+    }
+
+    public EtcdException(String message, Throwable cause)
+    {
+        super(message, cause);
     }
 }

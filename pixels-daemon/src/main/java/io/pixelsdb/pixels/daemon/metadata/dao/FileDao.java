@@ -40,6 +40,8 @@ public abstract class FileDao implements Dao<MetadataProto.File>
 
     public abstract List<MetadataProto.File> getAllByPathId(long pathId);
 
+    public abstract MetadataProto.File getByPathIdAndFileName(long pathId, String fileName);
+
     public boolean save (MetadataProto.File file)
     {
         if (exists(file))
