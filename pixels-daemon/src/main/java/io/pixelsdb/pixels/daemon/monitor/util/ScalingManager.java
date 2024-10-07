@@ -78,7 +78,7 @@ public class ScalingManager {
     InstanceState instanceState(String id) {
         return instanceMap.get(id);
     }
-    
+
     public void expandOne() {
         for (String id : instanceMap.keySet()) {
             if (instanceState(id).equals(InstanceState.STOPPED)) {

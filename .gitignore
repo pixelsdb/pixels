@@ -28,3 +28,4 @@ resources/*.xml
 *.so
 *.o
 .vscode
+*Proto.java
