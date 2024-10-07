@@ -8,6 +8,7 @@ import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatCoordinator;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
+import io.pixelsdb.pixels.daemon.monitor.MonitorServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
 import io.pixelsdb.pixels.daemon.turbo.QueryScheduleServer;
 import org.apache.logging.log4j.LogManager;
@@ -70,12 +71,14 @@ public class DaemonMain
             ServerContainer container = new ServerContainer();
             ConfigFactory config = ConfigFactory.Instance();
             boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
+            boolean autoScalingEnabled = Boolean.parseBoolean(config.getProperty("vm.auto.scaling.enabled"));
 
             if (role.equalsIgnoreCase("coordinator"))
             {
                 int metadataServerPort = Integer.parseInt(config.getProperty("metadata.server.port"));
                 int transServerPort = Integer.parseInt(config.getProperty("trans.server.port"));
                 int queryScheduleServerPort = Integer.parseInt(config.getProperty("query.schedule.server.port"));
+                int monitorServerPort = Integer.parseInt(config.getProperty("monitor.server.port"));
 
                 try
                 {
@@ -91,6 +94,11 @@ public class DaemonMain
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
+                    if (autoScalingEnabled) {
+                        // start monitor server
+                        MonitorServer monitorServer = new MonitorServer(monitorServerPort);
+                        container.addServer("monitor", monitorServer);
+                    }
                     if (cacheEnabled)
                     {
                         // start cache coordinator
