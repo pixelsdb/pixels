@@ -1,20 +1,19 @@
 package io.pixelsdb.pixels.scaling;
 
 import io.pixelsdb.pixels.common.transaction.TransContextCache;
-import io.pixelsdb.pixels.common.turbo.MetricsCollector;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class Ec2MetricsCollector extends MetricsCollector {
+public class MetricsCollector extends io.pixelsdb.pixels.common.turbo.MetricsCollector {
     private final TransContextCache transContextCache;
     private final MonitorClient monitorClient;
     private final int period;
     private final ScheduledExecutorService metricsReporter;
 
-    protected Ec2MetricsCollector() {
+    protected MetricsCollector() {
         // Starting a background thread to report query concurrency periodically.
         this.transContextCache = TransContextCache.Instance();
         this.monitorClient = new MonitorClient(ConfigFactory.Instance().getProperty("monitor.metrics.name"),
