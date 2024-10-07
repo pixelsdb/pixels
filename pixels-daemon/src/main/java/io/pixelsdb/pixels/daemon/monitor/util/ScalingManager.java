@@ -78,11 +78,7 @@ public class ScalingManager {
     InstanceState instanceState(String id) {
         return instanceMap.get(id);
     }
-
-    /**
-     * expand an instance
-     * 如果现在已经有stopped的worker instance，则无需新建instance
-     */
+    
     public void expandOne() {
         for (String id : instanceMap.keySet()) {
             if (instanceState(id).equals(InstanceState.STOPPED)) {
@@ -113,11 +109,6 @@ public class ScalingManager {
         System.out.println("Create Instance successfully. The Amazon EC2 Instance ID is " + instanceId);
     }
 
-    /**
-     * 扩展多个节点
-     *
-     * @param count 扩展节点数量
-     */
     public void expandSome(int count) {
         if (count <= 0) return;
         List<String> stoppedInstances = new ArrayList<>();
