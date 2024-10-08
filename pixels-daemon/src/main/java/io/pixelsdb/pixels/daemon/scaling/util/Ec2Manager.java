@@ -48,8 +48,8 @@ public class Ec2Manager implements InstanceManager
         this.amiId = config.getProperty("vm.ami.id");
         this.keyName = config.getProperty("vm.key.name");
         this.securityGroups = Arrays.asList(config.getProperty("vm.security.groups").split(","));
-        String accessKeyId = config.getProperty("vm.access.key.id");
-        String secretAccessKey = config.getProperty("vm.secret.access.key");
+        String accessKeyId = System.getenv("AWS_ACCESS_KEY_ID");
+        String secretAccessKey = System.getenv("AWS_SECRET_ACCESS_KEY");
         AwsBasicCredentials awsCreds = AwsBasicCredentials.create(
                 accessKeyId,
                 secretAccessKey);
