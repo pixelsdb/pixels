@@ -74,7 +74,7 @@ public class ScalingManager
     {
         log.debug("Stop a VM, id = " + id);
         instanceManager.stopInstance(id);
-        instanceMap.put(id, InstanceState.RUNNING);
+        instanceMap.put(id, InstanceState.STOPPED);
     }
 
     private void createOneInstanceAndStart()
