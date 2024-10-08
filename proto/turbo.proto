@@ -200,7 +200,8 @@ message CollectMetricsRequest {
 message CollectMetricsResponse {
 }
 
-message CheckMetricsRequest {}
+message CheckMetricsRequest {
+}
 
 message CheckMetricsResponse {
   string alarm_message = 1;

@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.daemon.scaling.util;
 
 import java.util.Map;
 
-public interface VmManager
+public interface InstanceManager
 {
     static final String PREFIX = "Auto-VM-";
     public String createInstance(String name);

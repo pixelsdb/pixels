@@ -46,7 +46,7 @@ public class TestEc2Manager
     @Test
     public void testCreateInstance()
     {
-        String instanceId = ec2Manager.createInstance(VmManager.PREFIX + UUID.randomUUID());
+        String instanceId = ec2Manager.createInstance(InstanceManager.PREFIX + UUID.randomUUID());
     }
 
     @Test

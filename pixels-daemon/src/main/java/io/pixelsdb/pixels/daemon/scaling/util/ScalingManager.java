@@ -29,7 +29,7 @@ public class ScalingManager
 {
     private static final Logger log = LogManager
             .getLogger(ScalingManager.class);
-    private final VmManager vmManager;
+    private final InstanceManager instanceManager;
     private Map<String, InstanceState> instanceMap;
 
     public enum InstanceState
@@ -41,8 +41,8 @@ public class ScalingManager
     public ScalingManager()
     {
         ConfigFactory config = ConfigFactory.Instance();
-        vmManager = new Ec2Manager();
-        instanceMap = vmManager.initInstanceStateMap();
+        instanceManager = new Ec2Manager();
+        instanceMap = instanceManager.initInstanceStateMap();
     }
 
     InstanceState instanceState(String id)
@@ -56,7 +56,7 @@ public class ScalingManager
         {
             if (instanceState(id).equals(InstanceState.STOPPED))
             {
-                vmManager.startInstance(id);
+                instanceManager.startInstance(id);
                 return;
             }
         }
@@ -66,21 +66,21 @@ public class ScalingManager
     private void startOne(String id)
     {
         log.debug("Start a VM, id = " + id);
-        vmManager.startInstance(id);
+        instanceManager.startInstance(id);
         instanceMap.put(id, InstanceState.RUNNING);
     }
 
     private void stopOne(String id)
     {
         log.debug("Stop a VM, id = " + id);
-        vmManager.stopInstance(id);
+        instanceManager.stopInstance(id);
         instanceMap.put(id, InstanceState.RUNNING);
     }
 
     private void createOneInstanceAndStart()
     {
-        String instanceId = vmManager
-                .createInstance(vmManager.PREFIX + UUID.randomUUID());
+        String instanceId = instanceManager
+                .createInstance(instanceManager.PREFIX + UUID.randomUUID());
         instanceMap.put(instanceId, InstanceState.RUNNING);
         log.debug("Create a new VM, id = " + instanceId);
     }

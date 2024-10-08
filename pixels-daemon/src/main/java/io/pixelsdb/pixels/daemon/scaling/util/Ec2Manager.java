@@ -33,7 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class Ec2Manager implements VmManager
+public class Ec2Manager implements InstanceManager
 {
     private final Ec2Client ec2;
     private final String keyName;
@@ -124,20 +124,6 @@ public class Ec2Manager implements VmManager
     @Override
     public Map<String, ScalingManager.InstanceState> initInstanceStateMap()
     {
-
-        ConfigFactory config = ConfigFactory.Instance();
-        String amiId = config.getProperty("vm.ami.id");
-        String keyName = config.getProperty("vm.key.name");
-        String accessKeyId = config.getProperty("vm.access.key.id");
-        String secretAccessKey = config.getProperty("vm.secret.access.key");
-        AwsBasicCredentials awsCreds = AwsBasicCredentials.create(
-                accessKeyId,
-                secretAccessKey);
-        Ec2Client ec2Client = Ec2Client.builder()
-                .region(Region.US_EAST_2)
-                .credentialsProvider(StaticCredentialsProvider.create(awsCreds))
-                .build();
-
         Map<String, ScalingManager.InstanceState> instanceMap = new HashMap<>();
         String nextToken = null;
         try
