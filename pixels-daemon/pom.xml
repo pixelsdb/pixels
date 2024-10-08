@@ -21,18 +21,6 @@
         <mainClass>io.pixelsdb.pixels.daemon.DaemonMain</mainClass>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>bom</artifactId>
-                <version>2.21.20</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
         <dependency>
             <groupId>io.pixelsdb</groupId>
@@ -194,7 +182,7 @@
                                     </excludes>
                                 </filter>
                             </filters>
-                            <transformers>
+                            <transformers>a
                                 <!-- ServicesResourceTransformer merges the resources in META-INF/services -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer

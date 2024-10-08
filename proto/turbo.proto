@@ -187,3 +187,21 @@ message GetMemoryRequest {
 message GetMemoryResponse {
   uint64 memoryMB = 1;
 }
+
+service ScalingService {
+  rpc CollectMetrics (stream CollectMetricsRequest) returns (stream CollectMetricsResponse);
+  rpc CheckMetrics (CheckMetricsRequest) returns (CheckMetricsResponse);
+}
+
+message CollectMetricsRequest {
+  uint32 queryConcurrency = 1;
+}
+
+message CollectMetricsResponse {
+}
+
+message CheckMetricsRequest {}
+
+message CheckMetricsResponse {
+  string alarm_message = 1;
+}

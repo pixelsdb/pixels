@@ -8,7 +8,7 @@ import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatCoordinator;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
-import io.pixelsdb.pixels.daemon.monitor.MonitorServer;
+import io.pixelsdb.pixels.daemon.scaling.ScalingMetricsServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
 import io.pixelsdb.pixels.daemon.turbo.QueryScheduleServer;
 import org.apache.logging.log4j.LogManager;
@@ -78,7 +78,7 @@ public class DaemonMain
                 int metadataServerPort = Integer.parseInt(config.getProperty("metadata.server.port"));
                 int transServerPort = Integer.parseInt(config.getProperty("trans.server.port"));
                 int queryScheduleServerPort = Integer.parseInt(config.getProperty("query.schedule.server.port"));
-                int monitorServerPort = Integer.parseInt(config.getProperty("monitor.server.port"));
+                int scalingMetricsServerPort = Integer.parseInt(config.getProperty("scaling.metrics.server.port"));
 
                 try
                 {
@@ -96,8 +96,8 @@ public class DaemonMain
                     container.addServer("query_schedule", queryScheduleServer);
                     if (autoScalingEnabled) {
                         // start monitor server
-                        MonitorServer monitorServer = new MonitorServer(monitorServerPort);
-                        container.addServer("monitor", monitorServer);
+                        ScalingMetricsServer scalingMetricsServer = new ScalingMetricsServer(scalingMetricsServerPort);
+                        container.addServer("scaling_metrics", scalingMetricsServer);
                     }
                     if (cacheEnabled)
                     {
