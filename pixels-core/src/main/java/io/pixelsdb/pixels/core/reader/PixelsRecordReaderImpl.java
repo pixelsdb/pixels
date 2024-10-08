@@ -34,6 +34,7 @@ import io.pixelsdb.pixels.core.stats.ColumnStats;
 import io.pixelsdb.pixels.core.stats.IntegerStatsRecorder;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -1006,10 +1007,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         VectorizedRowBatch resultRowBatch;
         if (reuse)
         {
-            if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
+            if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != resultColumns.length)
             {
                 this.resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
-                this.resultRowBatch.projectionSize = includedColumnNum;
+                this.resultRowBatch.projectionSize = resultColumns.length;
             }
             this.resultRowBatch.reset();
             this.resultRowBatch.ensureSize(batchSize, false);
@@ -1017,97 +1018,209 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         } else
         {
             resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
-            resultRowBatch.projectionSize = includedColumnNum;
+            resultRowBatch.projectionSize = resultColumns.length;
         }
 
         int rgRowCount = 0;
         int curBatchSize = 0;
-        ColumnVector[] columnVectors = resultRowBatch.cols;
-
-        if (curRGIdx < targetRGNum)
+        if (this.timestamp != -1L)
         {
-            rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
-        }
+            ColumnVector[] columnVectors = new ColumnVector[resultRowBatch.cols.length + 1];
+            System.arraycopy(resultRowBatch.cols, 0, columnVectors, 0, resultRowBatch.cols.length);
+            columnVectors[columnVectors.length - 1] = new LongColumnVector(batchSize);
+            int readRowInRG = 0;
 
-        while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
-        {
-            // update current batch size
-            curBatchSize = rgRowCount - curRowInRG;
-            if (curBatchSize + resultRowBatch.size >= batchSize)
+            if (curRGIdx < targetRGNum)
             {
-                curBatchSize = batchSize - resultRowBatch.size;
+                rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
             }
 
-            // read vectors
-            for (int i = 0; i < resultColumns.length; i++)
+            while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
             {
-                if (!columnVectors[i].duplicated)
+                // update current batch size
+                curBatchSize = rgRowCount - curRowInRG;
+                if (curBatchSize + resultRowBatch.size >= batchSize)
                 {
-                    PixelsProto.RowGroupFooter rowGroupFooter = rowGroupFooters[curRGIdx];
-                    PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
-                            .getColumnChunkEncodings(resultColumns[i]);
-                    int index = curRGIdx * includedColumns.length + resultColumns[i];
-                    PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
-                            .getColumnChunkIndexEntries(resultColumns[i]);
-                    readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
-                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                    curBatchSize = batchSize - resultRowBatch.size;
                 }
-            }
 
-            // update current row index in the row group
-            curRowInRG += curBatchSize;
-            //preRowInRG = curRowInRG; // keep in sync with curRowInRG.
-            rowIndex += curBatchSize;
-            resultRowBatch.size += curBatchSize;
-            // update row group index if current row index exceeds max row count in the row group
-            if (curRowInRG >= rgRowCount)
-            {
-                curRGIdx++;
-                //preRGIdx = curRGIdx; // keep in sync with curRGIdx
-                // if not end of file, update row count
-                if (curRGIdx < targetRGNum)
+                // read vectors not included timestamp
+                PixelsProto.RowGroupFooter rowGroupFooter = rowGroupFooters[curRGIdx];
+                for (int i = 0; i < resultColumns.length; i++)
                 {
-                    rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
-                    // refresh resultColumnsEncoded for reading the column vectors in the next row group.
-                    PixelsProto.RowGroupEncoding rgEncoding = rowGroupFooters[curRGIdx].getRowGroupEncoding();
-                    for (int i = 0; i < includedColumnNum; i++)
+                    if (!columnVectors[i].duplicated)
                     {
-                        this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
-                                PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
+                        PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
+                                .getColumnChunkEncodings(resultColumns[i]);
+                        int index = curRGIdx * includedColumns.length + resultColumns[i];
+                        PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                                .getColumnChunkIndexEntries(resultColumns[i]);
+                        readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
+                                postScript.getPixelStride(), readRowInRG, columnVectors[i], chunkIndex);
                     }
                 }
-                // if end of file, set result vectorized row batch endOfFile
-                else
+
+                // read timestamp
+                int timestampColId = includedColumns.length - 1;
+                PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
+                        .getColumnChunkEncodings(timestampColId);
+                int index = curRGIdx * includedColumns.length + timestampColId;
+                PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                        .getColumnChunkIndexEntries(timestampColId);
+                readers[readers.length - 1].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
+                        postScript.getPixelStride(), readRowInRG, columnVectors[columnVectors.length - 1], chunkIndex);
+
+                // update current row index in the row group
+                curRowInRG += curBatchSize;
+                rowIndex += curBatchSize;
+                readRowInRG += curBatchSize;
+
+                LongColumnVector timestampVector = (LongColumnVector) columnVectors[columnVectors.length - 1];
+                int [] selectedRows = new int[curBatchSize];
+                int addedRows = 0;
+                for (int i = 0; i < curBatchSize; i++)
                 {
-                    checkValid = false; // Issue #105: to reject continuous read.
-                    resultRowBatch.endOfFile = true;
-                    this.endOfFile = true;
+                    if (timestampVector.vector[i] <= this.timestamp)
+                    {
+                        selectedRows[addedRows] = i;
+                        addedRows++;
+                    }
+                }
+
+                resultRowBatch.size += addedRows;
+
+                // copy the filtered rows to the result row batch
+                for (int i = 0; i < columnVectors.length - 1; i++)
+                {
+                    if (!columnVectors[i].duplicated)
+                    {
+                        resultRowBatch.cols[i].addSelected(selectedRows, 0, addedRows, columnVectors[i]);
+                    }
+                }
+
+                // update row group index if current row index exceeds max row count in the row group
+                if (curRowInRG >= rgRowCount) {
+                    curRGIdx++;
+                    //preRGIdx = curRGIdx; // keep in sync with curRGIdx
+                    // if not end of file, update row count
+                    if (curRGIdx < targetRGNum) {
+                        rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                        // refresh resultColumnsEncoded for reading the column vectors in the next row group.
+                        PixelsProto.RowGroupEncoding rgEncoding = rowGroupFooters[curRGIdx].getRowGroupEncoding();
+                        for (int i = 0; i < includedColumnNum; i++) {
+                            this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
+                                    PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
+                        }
+                    }
+                    // if end of file, set result vectorized row batch endOfFile
+                    else {
+                        checkValid = false; // Issue #105: to reject continuous read.
+                        resultRowBatch.endOfFile = true;
+                        this.endOfFile = true;
+                        break;
+                    }
+                    //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
+                    curRowInRG = 0;
+                }
+                if (this.enableEncodedVector) {
+                    /**
+                     * Issue #374:
+                     * Dictionary column vector can not contain data from multiple column chunks,
+                     * hence we do not pad the row batch with rows from the next row group.
+                     */
                     break;
                 }
-                //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
-                curRowInRG = 0;
             }
-            if (this.enableEncodedVector)
-            {
-                /**
-                 * Issue #374:
-                 * Dictionary column vector can not contain data from multiple column chunks,
-                 * hence we do not pad the row batch with rows from the next row group.
-                 */
-                break;
+
+            for (ColumnVector cv : columnVectors) {
+                if (cv.duplicated) {
+                    // copyFrom() is actually a shallow copy
+                    // rename copyFrom() to duplicate(), so it is more readable
+                    cv.duplicate(columnVectors[cv.originVecId]);
+                }
             }
         }
-
-        for (ColumnVector cv : columnVectors)
+        else
         {
-            if (cv.duplicated)
+            ColumnVector[] columnVectors = resultRowBatch.cols;
+
+            if (curRGIdx < targetRGNum)
             {
-                // copyFrom() is actually a shallow copy
-                // rename copyFrom() to duplicate(), so it is more readable
-                cv.duplicate(columnVectors[cv.originVecId]);
+                rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+            }
+
+            while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
+            {
+                // update current batch size
+                curBatchSize = rgRowCount - curRowInRG;
+                if (curBatchSize + resultRowBatch.size >= batchSize)
+                {
+                    curBatchSize = batchSize - resultRowBatch.size;
+                }
+
+                // read vectors
+                for (int i = 0; i < resultColumns.length; i++)
+                {
+                    if (!columnVectors[i].duplicated)
+                    {
+                        PixelsProto.RowGroupFooter rowGroupFooter = rowGroupFooters[curRGIdx];
+                        PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
+                                .getColumnChunkEncodings(resultColumns[i]);
+                        int index = curRGIdx * includedColumns.length + resultColumns[i];
+                        PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                                .getColumnChunkIndexEntries(resultColumns[i]);
+                        readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
+                                postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                    }
+                }
+
+                // update current row index in the row group
+                curRowInRG += curBatchSize;
+                //preRowInRG = curRowInRG; // keep in sync with curRowInRG.
+                rowIndex += curBatchSize;
+                resultRowBatch.size += curBatchSize;
+                // update row group index if current row index exceeds max row count in the row group
+                if (curRowInRG >= rgRowCount) {
+                    curRGIdx++;
+                    //preRGIdx = curRGIdx; // keep in sync with curRGIdx
+                    // if not end of file, update row count
+                    if (curRGIdx < targetRGNum) {
+                        rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                        // refresh resultColumnsEncoded for reading the column vectors in the next row group.
+                        PixelsProto.RowGroupEncoding rgEncoding = rowGroupFooters[curRGIdx].getRowGroupEncoding();
+                        for (int i = 0; i < includedColumnNum; i++) {
+                            this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
+                                    PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
+                        }
+                    }
+                    // if end of file, set result vectorized row batch endOfFile
+                    else {
+                        checkValid = false; // Issue #105: to reject continuous read.
+                        resultRowBatch.endOfFile = true;
+                        this.endOfFile = true;
+                        break;
+                    }
+                    //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
+                    curRowInRG = 0;
+                }
+                if (this.enableEncodedVector) {
+                    /**
+                     * Issue #374:
+                     * Dictionary column vector can not contain data from multiple column chunks,
+                     * hence we do not pad the row batch with rows from the next row group.
+                     */
+                    break;
+                }
+            }
+
+            for (ColumnVector cv : columnVectors) {
+                if (cv.duplicated) {
+                    // copyFrom() is actually a shallow copy
+                    // rename copyFrom() to duplicate(), so it is more readable
+                    cv.duplicate(columnVectors[cv.originVecId]);
+                }
             }
         }
-
         return resultRowBatch;
     }
 
