@@ -21,20 +21,21 @@ package io.pixelsdb.pixels.planner;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
+import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinatorFactory;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateServer;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 import io.pixelsdb.pixels.planner.plan.physical.Operator;
+import io.pixelsdb.pixels.planner.plan.physical.SingleStageJoinBatchOperator;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import static io.pixelsdb.pixels.planner.TestPixelsPlanner.CreateChainPartitionedBroadcastJoinOperator;
 
 /**
  * @author hank
@@ -50,10 +51,10 @@ public class TestWorkerCoordinateServer
     @Before
     public void startServer() throws IOException, MetadataException
     {
-        workerCoordinatorServer = new WorkerCoordinateServer(8088);
+        workerCoordinatorServer = new WorkerCoordinateServer(18886);
         threadPool.submit(workerCoordinatorServer);
-        workerCoordinatorService = new WorkerCoordinateService("localhost", 8088);
-        Operator joinOperator = CreateChainPartitionedBroadcastJoinOperator();
+        workerCoordinatorService = new WorkerCoordinateService("localhost", 18886);
+        Operator joinOperator = new SingleStageJoinBatchOperator("", false, Collections.emptyList(), JoinAlgorithm.BROADCAST);
         PlanCoordinatorFactory.Instance().createPlanCoordinator(1000, joinOperator);
     }
 
@@ -61,7 +62,7 @@ public class TestWorkerCoordinateServer
     public void testRegisterWorker() throws WorkerCoordinateException
     {
         CFWorkerInfo workerInfo = new CFWorkerInfo(
-                "localhost", 8080, 1000, 1, "op1", null);
+                "localhost", 8080, 1000, 0, "op1", null);
         workerCoordinatorService.registerWorker(workerInfo);
     }
 

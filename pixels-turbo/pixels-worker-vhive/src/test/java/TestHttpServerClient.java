@@ -148,7 +148,7 @@ public class TestHttpServerClient
         Storage fileStorage = StorageFactory.Instance().getStorage(Storage.Scheme.file);
         PixelsReaderImpl.Builder reader = PixelsReaderImpl.newBuilder()
                 .setStorage(fileStorage)
-                .setPath("/home/jasha/pixels-tpch/nation/v-0-ordered/20230814143629_105.pxl")
+                .setPath("/home/jasha/pixels-tpch/nation-unittest/v-0-ordered/20230814143629_105.pxl")
                 .setEnableCache(false)
                 .setPixelsFooterCache(new PixelsFooterCache());
         PixelsReaderOption option = new PixelsReaderOption();

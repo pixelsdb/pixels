@@ -34,12 +34,14 @@ public abstract class Input
     private long transId;
 
     private String operatorName;
+    private int stageId;
 
     public Input(long transId)
     {
         this.transId = transId;
         // Issue #468: operatorName is optional, it is to be set by the setter.
         this.operatorName = null;
+        this.stageId = -1;
     }
 
     public long getTransId()
@@ -50,6 +52,15 @@ public abstract class Input
     public void setTransId(long transId)
     {
         this.transId = transId;
+    }
+
+    public int getStageId()
+    {
+        return stageId;
+    }
+    public void setStageId(int stageId)
+    {
+        this.stageId = stageId;
     }
 
     /**
