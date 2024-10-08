@@ -76,7 +76,7 @@
         <dep.trino.version>405</dep.trino.version>
 
         <!-- storage systems -->
-        <dep.hadoop.version>3.3.1</dep.hadoop.version>
+        <dep.hadoop.version>3.4.0</dep.hadoop.version>
         <dep.ozone.version>0.5.0-beta</dep.ozone.version>
         <dep.awssdk.version>2.17.231</dep.awssdk.version>
         <dep.awssdk.preview.version>2.17.231-PREVIEW</dep.awssdk.preview.version>
