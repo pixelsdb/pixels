@@ -115,7 +115,11 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
      */
     private boolean[] resultColumnsEncoded;
     private int includedColumnNum = 0; // the number of columns to read, include the hidden timestamp column if set.
-    private int qualifiedRowNum = 0; // the number of qualified rows in this split.
+    /**
+     * the number of qualified rows in this split.
+     * If the timestamp is set, the final value is set after filtering by timestamp in {@link #readBatch(int, boolean)}.
+     */
+    private int qualifiedRowNum = 0;
     private boolean endOfFile = false;
 
     private int targetRGNum = 0;         // number of target row groups
@@ -208,7 +212,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         includedColumnNum = 0;
         String[] optionIncludedCols = option.getIncludedCols();
         // if size of cols is 0, create an empty row batch
-        if (optionIncludedCols.length == 0)
+        if (this.timestamp == -1L && optionIncludedCols.length == 0)
         {
             checkValid = true;
             // Issue #103: init the following members as null.
@@ -474,7 +478,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
         }
 
-        if (includedColumnNum == 0)
+        if (this.timestamp == -1L && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -621,7 +625,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
          * project nothing, must be count(*).
          * qualifiedRowNum and endOfFile have been set in prepareRead();
          */
-        if (includedColumnNum == 0)
+        if (this.timestamp == -1L && includedColumnNum == 0)
         {
             if (!endOfFile)
             {
@@ -874,7 +878,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
         }
 
-        if (includedColumnNum == 0)
+        if (this.timestamp == -1L && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -988,7 +992,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         }
 
         // project nothing, must be count(*)
-        if (includedColumnNum == 0)
+        if (this.timestamp == -1L && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -1089,6 +1093,9 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
 
                 resultRowBatch.size += addedRows;
 
+                // update qualified row number
+                this.qualifiedRowNum += addedRows;
+
                 // copy the filtered rows to the result row batch
                 for (int i = 0; i < columnVectors.length - 1; i++)
                 {
@@ -1122,7 +1129,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
                     curRowInRG = 0;
                 }
-                if (this.enableEncodedVector) {
+                if (this.enableEncodedVector)
+                {
                     /**
                      * Issue #374:
                      * Dictionary column vector can not contain data from multiple column chunks,
