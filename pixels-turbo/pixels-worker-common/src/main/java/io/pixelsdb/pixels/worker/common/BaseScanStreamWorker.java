@@ -97,9 +97,15 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
                     new WorkerThreadFactory(exceptionHandler));
 
-            TaskBatch batch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
-            int splitId = 0;
+            String outputFolder = event.getOutput().getPath();
+            if (!outputFolder.endsWith("/")) {
+                outputFolder += "/";
+            }
+            Queue<String> outputPaths = new ConcurrentLinkedQueue<>(
+                    ScanInput.generateOutputPaths(outputFolder, 100));
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
+
+            TaskBatch batch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
             while (!batch.isEndOfTasks()) {
                 List<TaskInfo> tasks = batch.getTasks();
                 for (TaskInfo task : tasks) {
@@ -110,11 +116,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                     boolean[] scanProjection = requireNonNull(scanInput.getScanProjection(),
                             "event.scanProjection is null");
                     boolean partialAggregationPresent = scanInput.isPartialAggregationPresent();
-                    String outputFolder = scanInput.getOutput().getPath();
                     StorageInfo outputStorageInfo = scanInput.getOutput().getStorageInfo();
-                    if (!outputFolder.endsWith("/")) {
-                        outputFolder += "/";
-                    }
                     boolean encoding = scanInput.getOutput().isEncoding();
 
                     WorkerCommon.initStorage(inputStorageInfo);
@@ -155,8 +157,7 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                      * the first N output file paths in this case. Therefore, we build a thread-safe queue for the expected
                      * output paths here. It will be polled when the scan worker finally writes an output file.
                      */
-                    Queue<String> outputPaths = new ConcurrentLinkedQueue<>(
-                            ScanInput.generateOutputPaths(outputFolder, inputSplits.size()));
+
                     CountDownLatch latch = new CountDownLatch(inputSplits.size());
                     for (InputSplit inputSplit : inputSplits) {
                         List<InputInfo> scanInputs = inputSplit.getInputInfos();
