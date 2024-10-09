@@ -105,10 +105,6 @@
             <artifactId>log4j-slf4j-impl</artifactId>
             <optional>true</optional>
         </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-planner</artifactId>
-        </dependency>
     </dependencies>
 
     <build>

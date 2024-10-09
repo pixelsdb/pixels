@@ -50,18 +50,13 @@ public class ScanStreamOperator extends ScanOperator
         {
             // there is no previous stage for scan operator, hence executePrev() never throws exceptions
             // stream scan will invoke workers less than scanInputs
-            int size = this.scanInputs.size() / intraWorkerParallelism;
-            if (size * intraWorkerParallelism < this.scanInputs.size())
+            this.scanOutputs = new CompletableFuture[this.scanInputs.size()];
+            int i = 0;
+            for (ScanInput scanInput : this.scanInputs)
             {
-                size++;
+                this.scanOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.SCAN_STREAM).invoke(scanInput);
             }
-            this.scanOutputs = new CompletableFuture[size];
-            for (int i = 0; i < size; i++)
-            {
-                this.scanOutputs[i] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.SCAN_STREAM).invoke(scanInputs.get(i));
-            }
-
             return this.scanOutputs;
         });
     }
