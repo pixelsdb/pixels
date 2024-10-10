@@ -86,6 +86,14 @@ public class TimeColumnVector extends ColumnVector
         this.scratchTime = new Time(0);
     }
 
+    public TimeColumnVector(TimeColumnVector timeColumnVector)
+    {
+        super(timeColumnVector);
+        this.times = timeColumnVector.times == null ? null : timeColumnVector.times.clone();
+        this.precision = timeColumnVector.precision;
+        this.scratchTime = new Time(timeColumnVector.scratchTime.getTime());
+    }
+
     /**
      * Return the number of rows.
      *
@@ -547,6 +555,12 @@ public class TimeColumnVector extends ColumnVector
                 System.arraycopy(oldTime, 0, times, 0, oldTime.length);
             }
         }
+    }
+
+    @Override
+    public TimeColumnVector clone()
+    {
+        return new TimeColumnVector(this);
     }
 
     @Override

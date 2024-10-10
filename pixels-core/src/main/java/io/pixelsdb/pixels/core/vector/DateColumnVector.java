@@ -83,6 +83,13 @@ public class DateColumnVector extends ColumnVector
         scratchDate = new Date(0);
     }
 
+    public DateColumnVector(DateColumnVector dateColumnVector)
+    {
+        super(dateColumnVector);
+        this.dates = dateColumnVector.dates == null ? null : dateColumnVector.dates.clone();
+        this.scratchDate = new Date(dateColumnVector.scratchDate.getTime());
+    }
+
     /**
      * Return the number of rows.
      *
@@ -456,6 +463,16 @@ public class DateColumnVector extends ColumnVector
                 System.arraycopy(oldTime, 0, dates, 0, oldTime.length);
             }
         }
+    }
+
+    @Override
+    public DateColumnVector clone()
+    {
+        /**
+         * Because the class has a final field that points to a mutable object,
+         * the clone implementation mechanism cannot work.
+         */
+        return new DateColumnVector(this);
     }
 
     @Override

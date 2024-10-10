@@ -1030,7 +1030,17 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         if (this.timestamp != -1L)
         {
             ColumnVector[] columnVectors = new ColumnVector[resultRowBatch.cols.length + 1];
-            System.arraycopy(resultRowBatch.cols, 0, columnVectors, 0, resultRowBatch.cols.length);
+            for (int i = 0; i < resultRowBatch.cols.length; i++)
+            {
+                try
+                {
+                    columnVectors[i] = resultRowBatch.cols[i].clone();
+                }
+                catch (CloneNotSupportedException e)
+                {
+                    throw new IOException("Failed to clone column vector.", e);
+                }
+            }
             columnVectors[columnVectors.length - 1] = new LongColumnVector(batchSize);
             int readRowInRG = 0;
 

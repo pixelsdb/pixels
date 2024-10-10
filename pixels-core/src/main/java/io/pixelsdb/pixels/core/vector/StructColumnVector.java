@@ -251,4 +251,23 @@ public class StructColumnVector extends ColumnVector
             fields[i].unFlatten();
         }
     }
+
+    @Override
+    public StructColumnVector clone()
+    {
+        try
+        {
+            StructColumnVector cloned = (StructColumnVector) super.clone();
+            cloned.fields = new ColumnVector[this.fields.length];
+            for (int i = 0; i < this.fields.length; i++)
+            {
+                cloned.fields[i] = this.fields[i] == null ? null : this.fields[i].clone();
+            }
+            return cloned;
+        }
+        catch (CloneNotSupportedException e)
+        {
+            throw new AssertionError();
+        }
+    }
 }
