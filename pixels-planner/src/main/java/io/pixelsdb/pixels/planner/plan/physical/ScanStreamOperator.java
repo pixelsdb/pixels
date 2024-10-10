@@ -35,12 +35,9 @@ import java.util.concurrent.CompletableFuture;
 public class ScanStreamOperator extends ScanOperator
 {
     private static final CompletableFuture<Void> Completed = CompletableFuture.completedFuture(null);
-    private int intraWorkerParallelism;
     public ScanStreamOperator(String name, List<ScanInput> scanInputs)
     {
         super(name, scanInputs);
-        intraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance()
-                .getProperty("executor.intra.worker.parallelism"));
     }
 
     @Override
