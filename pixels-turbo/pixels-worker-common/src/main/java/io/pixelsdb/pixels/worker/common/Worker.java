@@ -31,7 +31,6 @@ import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 public abstract class Worker<I extends Input, O extends Output>
 {
     protected final WorkerContext context;
-    protected WorkerCoordinateService workerCoordinatorService;
 
     public Worker(WorkerContext context)
     {

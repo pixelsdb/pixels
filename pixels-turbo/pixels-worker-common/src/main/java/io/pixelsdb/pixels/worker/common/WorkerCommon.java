@@ -69,13 +69,17 @@ public class WorkerCommon
     protected static final int pixelStride;
     protected static final int rowGroupSize;
     protected static int port;
+    protected static String coordinatorIp;
+    protected static int coordinatorPort;
 
     static
     {
         rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
         pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
-        port = 50010;
+        port = Integer.parseInt(configFactory.getProperty("executor.worker.exchange.port"));
+        coordinatorIp = configFactory.getProperty("worker.coordinate.server.host");
+        coordinatorPort = Integer.parseInt(configFactory.getProperty("worker.coordinate.server.port"));
     }
 
     public static void initStorage(StorageInfo storageInfo)
@@ -468,7 +472,8 @@ public class WorkerCommon
         output.setNumWriteRequests(collector.getNumWriteRequests());
     }
 
-    public static String getIpAddress() {
+    public static String getIpAddress()
+    {
         try {
             Enumeration<NetworkInterface> allNetInterfaces = NetworkInterface.getNetworkInterfaces();
             InetAddress ip = null;
@@ -492,7 +497,18 @@ public class WorkerCommon
         return "";
     }
 
-    public static int getPort() {
+    public static int getPort()
+    {
         return port++;
+    }
+
+    public static String getCoordinatorIp()
+    {
+        return coordinatorIp;
+    }
+
+    public static int getCoordinatorPort()
+    {
+        return coordinatorPort;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -52,16 +52,17 @@ import java.util.concurrent.*;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Scan a table split under HTTP Streaming mode.
+ * Scan multiple table splits under HTTP Streaming mode.
  * Implemented c.f. {@link io.pixelsdb.pixels.worker.common.BaseScanWorker}.
  *
- * @author jasha64
- * @create 2023-09-04
+ * @author jasha64 huasiy
+ * @create 2024-10-10
  */
 public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
 {
     private final Logger logger;
     private final WorkerMetrics workerMetrics;
+    protected WorkerCoordinateService workerCoordinatorService;
 
     public BaseScanStreamWorker(WorkerContext context)
     {
@@ -87,8 +88,10 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
             long transId = event.getTransId();
             String ip = WorkerCommon.getIpAddress();
             int port = WorkerCommon.getPort();
+            String coordinatorIp = WorkerCommon.getCoordinatorIp();
+            int coordinatorPort = WorkerCommon.getCoordinatorPort();
             CFWorkerInfo workerInfo = new CFWorkerInfo(ip, port, transId, stageId, "scan", Collections.emptyList());
-            workerCoordinatorService = new WorkerCoordinateService("10.168.4.4", 18894);
+            workerCoordinatorService = new WorkerCoordinateService(coordinatorIp, coordinatorPort);
             io.pixelsdb.pixels.common.task.Worker<CFWorkerInfo> worker = workerCoordinatorService.registerWorker(workerInfo);
 
             int cores = Runtime.getRuntime().availableProcessors();
@@ -101,11 +104,11 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
             if (!outputFolder.endsWith("/")) {
                 outputFolder += "/";
             }
-            Queue<String> outputPaths = new ConcurrentLinkedQueue<>(
-                    ScanInput.generateOutputPaths(outputFolder, 100));
+            Queue<String> outputPaths = new ConcurrentLinkedQueue<>();
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
 
             TaskBatch batch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
+            int numSplit = 0;
             while (!batch.isEndOfTasks()) {
                 List<TaskInfo> tasks = batch.getTasks();
                 for (TaskInfo task : tasks) {
@@ -159,6 +162,8 @@ public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
                      */
 
                     CountDownLatch latch = new CountDownLatch(inputSplits.size());
+                    outputPaths.addAll(ScanInput.generateOutputPaths(outputFolder, numSplit, inputSplits.size()));
+                    numSplit += inputSplits.size();
                     for (InputSplit inputSplit : inputSplits) {
                         List<InputInfo> scanInputs = inputSplit.getInputInfos();
                         /*
