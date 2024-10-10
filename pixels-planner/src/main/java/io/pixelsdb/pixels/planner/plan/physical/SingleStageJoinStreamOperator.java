@@ -19,12 +19,19 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+
+import static io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.waitForCompletion;
 
 /**
  * @author hank
@@ -32,6 +39,8 @@ import java.util.concurrent.CompletableFuture;
  */
 public class SingleStageJoinStreamOperator extends SingleStageJoinOperator
 {
+    private static final Logger logger = LogManager.getLogger(SingleStageJoinStreamOperator.class);
+
     public SingleStageJoinStreamOperator(String name, boolean complete,
                                          JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
@@ -47,14 +56,74 @@ public class SingleStageJoinStreamOperator extends SingleStageJoinOperator
     @Override
     public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
-        // TODO: implement
-        return null;
+        return executePrev().handle((result, exception) ->
+        {
+            if (exception != null)
+            {
+                throw new CompletionException("failed to complete the previous stages", exception);
+            }
+            joinOutputs = new CompletableFuture[joinInputs.size()];
+            for (int i = 0; i < joinInputs.size(); ++i)
+            {
+                JoinInput joinInput = joinInputs.get(i);
+                if (joinAlgo == JoinAlgorithm.BROADCAST)
+                {
+                    joinOutputs[i] = InvokerFactory.Instance()
+                            .getInvoker(WorkerType.BROADCAST_JOIN_STREAMING).invoke(joinInput);
+                }
+                else if (joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
+                {
+//                    joinOutputs[i] = InvokerFactory.Instance()
+//                            .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(joinInput);
+                    throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+                }
+                else
+                {
+                    throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+                }
+            }
+
+            logger.debug("invoke " + this.getName());
+            return joinOutputs;
+        });
     }
 
     @Override
     public CompletableFuture<Void> executePrev()
     {
-        // TODO: implement
-        return null;
+        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
+        operatorService.execute(() ->
+        {
+            try
+            {
+                CompletableFuture<CompletableFuture<? extends Output>[]> smallChildFuture = null;
+                if (smallChild != null)
+                {
+                    throw new InterruptedException();
+                }
+                CompletableFuture<CompletableFuture<? extends Output>[]> largeChildFuture = null;
+                if (largeChild != null)
+                {
+                    throw new InterruptedException();
+                }
+                if (smallChildFuture != null)
+                {
+                    CompletableFuture<? extends Output>[] smallChildOutputs = smallChildFuture.join();
+                    waitForCompletion(smallChildOutputs);
+                }
+                if (largeChildFuture != null)
+                {
+                    CompletableFuture<? extends Output>[] largeChildOutputs = largeChildFuture.join();
+                    waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
+                }
+                prevStagesFuture.complete(null);
+            }
+            catch (InterruptedException e)
+            {
+                throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
+            }
+        });
+
+        return prevStagesFuture;
     }
 }
