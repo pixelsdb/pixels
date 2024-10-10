@@ -19,14 +19,19 @@
  */
 package io.pixelsdb.pixels.daemon.scaling.policy;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.daemon.scaling.policy.helper.FixedSizeQueue;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class BasicPolicy extends Policy
 {
     private static final Logger log = LogManager.getLogger(BasicPolicy.class);
-    private static final int UPPER_BOUND = 3;
-    private static final int LOWER_BOUND = 2;
+    private static final double UPPER_BOUND = 3;
+    private static final double LOWER_BOUND = 0.75;
+    Integer reportPeriod = Integer.parseInt(ConfigFactory.Instance().getProperty("query.concurrency.report.period.sec"));
+    private FixedSizeQueue scalingInQueue = new FixedSizeQueue(60 / reportPeriod);
+    private FixedSizeQueue scalingOutQueue = new FixedSizeQueue(30 / reportPeriod);
 
     @Override
     public void doAutoScaling()
@@ -34,14 +39,16 @@ public class BasicPolicy extends Policy
         try
         {
             int queryConcurrency = metricsQueue.take();
-            if (queryConcurrency < LOWER_BOUND)
+            scalingInQueue.add(queryConcurrency);
+            scalingOutQueue.add(queryConcurrency);
+            if (scalingInQueue.getAverage() <= LOWER_BOUND)
             {
-                log.info("Debug: reduce one vm");
-                scalingManager.reduceOne();
-            } else if (queryConcurrency > UPPER_BOUND)
+                log.info("Debug: reduce 50% vm");
+                scalingManager.multiplyInstance(0.5f);
+            } else if (scalingOutQueue.getAverage() >= UPPER_BOUND)
             {
-                log.info("Debug: expand one vm");
-                scalingManager.expandOne();
+                log.info("Debug: expand 100% vm");
+                scalingManager.multiplyInstance(2f);
             }
         } catch (InterruptedException e)
         {
