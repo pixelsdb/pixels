@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.worker.common;
 
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 
 /**
  * @author hank

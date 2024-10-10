@@ -33,6 +33,11 @@ public abstract class Input
      */
     private long transId;
 
+    /**
+     * The stage of worker.
+     */
+    private int stageId;
+
     private String operatorName;
 
     public Input(long transId)
@@ -51,6 +56,10 @@ public abstract class Input
     {
         this.transId = transId;
     }
+
+    public void setStageId(int stageId) { this.stageId = stageId; }
+
+    public int getStageId() { return stageId; }
 
     /**
      * Operator name is optional, it might be null if not set.

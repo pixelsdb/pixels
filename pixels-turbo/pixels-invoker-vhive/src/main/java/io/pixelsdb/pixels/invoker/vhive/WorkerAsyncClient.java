@@ -128,4 +128,13 @@ public class WorkerAsyncClient
                 .build();
         return this.stub.process(request);
     }
+
+    public ListenableFuture<TurboProto.WorkerResponse> scanStream(ScanInput input)
+    {
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.SCAN_STREAM))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
+                .build();
+        return this.stub.process(request);
+    }
 }

@@ -19,7 +19,10 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.turbo.WorkerType;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
 import java.util.List;
@@ -31,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public class ScanStreamOperator extends ScanOperator
 {
+    private static final CompletableFuture<Void> Completed = CompletableFuture.completedFuture(null);
     public ScanStreamOperator(String name, List<ScanInput> scanInputs)
     {
         super(name, scanInputs);
@@ -39,14 +43,24 @@ public class ScanStreamOperator extends ScanOperator
     @Override
     public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
-        // TODO: implement
-        return null;
+        return executePrev().handle((result, exception) ->
+        {
+            // there is no previous stage for scan operator, hence executePrev() never throws exceptions
+            // stream scan will invoke workers less than scanInputs
+            this.scanOutputs = new CompletableFuture[this.scanInputs.size()];
+            int i = 0;
+            for (ScanInput scanInput : this.scanInputs)
+            {
+                this.scanOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.SCAN_STREAM).invoke(scanInput);
+            }
+            return this.scanOutputs;
+        });
     }
 
     @Override
     public CompletableFuture<Void> executePrev()
     {
-        // TODO: implement
-        return null;
+        return Completed;
     }
 }
