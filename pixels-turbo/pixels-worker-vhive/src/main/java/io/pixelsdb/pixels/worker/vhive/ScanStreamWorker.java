@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -26,6 +26,13 @@ import io.pixelsdb.pixels.worker.common.BaseScanStreamWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
 
+/**
+ * Process a scan input under HTTP Streaming mode.
+ * Implemented c.f. {@link io.pixelsdb.pixels.worker.vhive.utils.RequestHandler}.
+ *
+ * @author huasiy
+ * @create 2024-10-10
+ */
 public class ScanStreamWorker extends BaseScanStreamWorker implements RequestHandler<ScanInput, ScanOutput>
 {
     public ScanStreamWorker(WorkerContext context)

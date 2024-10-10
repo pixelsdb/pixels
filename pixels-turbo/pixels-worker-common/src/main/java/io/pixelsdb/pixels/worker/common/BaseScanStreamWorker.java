@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -52,16 +52,17 @@ import java.util.concurrent.*;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Scan a table split under HTTP Streaming mode.
+ * Scan multiple table splits under HTTP Streaming mode.
  * Implemented c.f. {@link io.pixelsdb.pixels.worker.common.BaseScanWorker}.
  *
- * @author jasha64
- * @create 2023-09-04
+ * @author jasha64 huasiy
+ * @create 2024-10-10
  */
 public class BaseScanStreamWorker extends Worker<ScanInput, ScanOutput>
 {
     private final Logger logger;
     private final WorkerMetrics workerMetrics;
+    protected WorkerCoordinateService workerCoordinatorService;
 
     public BaseScanStreamWorker(WorkerContext context)
     {

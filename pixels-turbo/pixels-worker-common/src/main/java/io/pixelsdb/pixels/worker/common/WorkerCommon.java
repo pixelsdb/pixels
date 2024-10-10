@@ -75,7 +75,7 @@ public class WorkerCommon
         rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
         pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
-        port = 50010;
+        port = Integer.parseInt(configFactory.getProperty("executor.worker.exchange.port"));
     }
 
     public static void initStorage(StorageInfo storageInfo)
