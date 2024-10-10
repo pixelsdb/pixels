@@ -46,6 +46,11 @@ public class FixedSizeQueue
         sum += value;
     }
 
+    public  void clear() {
+        queue.clear();
+        sum = 0;
+    }
+
     public double getAverage()
     {
         if (queue.isEmpty())
