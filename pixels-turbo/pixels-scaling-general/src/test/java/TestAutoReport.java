@@ -24,12 +24,13 @@ import org.junit.Test;
 public class TestAutoReport
 {
     @Test
-    public void test()
+    public void test() throws InterruptedException
     {
         if (MetricsCollector.Instance().isPresent())
         {
             System.out.println("reporting...");
             MetricsCollector.Instance().get().report();
+            Thread.sleep(10000);
         }
     }
 }

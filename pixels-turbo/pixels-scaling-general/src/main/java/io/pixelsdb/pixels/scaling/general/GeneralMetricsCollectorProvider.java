@@ -23,17 +23,17 @@ import io.pixelsdb.pixels.common.turbo.MachineService;
 import io.pixelsdb.pixels.common.turbo.MetricsCollector;
 import io.pixelsdb.pixels.common.turbo.MetricsCollectorProvider;
 
-public class Ec2MetricsCollectorProvider implements MetricsCollectorProvider
+public class GeneralMetricsCollectorProvider implements MetricsCollectorProvider
 {
     @Override
     public MetricsCollector createMetricsCollector()
     {
-        return new Ec2MetricsCollector();
+        return new GeneralMetricsCollector();
     }
 
     @Override
     public boolean compatibleWith(MachineService machineService)
     {
-        return machineService.equals(MachineService.ec2);
+        return machineService.equals(MachineService.general);
     }
 }
