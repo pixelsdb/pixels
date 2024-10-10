@@ -17,23 +17,23 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.scaling.general;
+package io.pixelsdb.pixels.daemon.scaling.policy.helper;
 
-import io.pixelsdb.pixels.common.turbo.MachineService;
-import io.pixelsdb.pixels.common.turbo.MetricsCollector;
-import io.pixelsdb.pixels.common.turbo.MetricsCollectorProvider;
+import org.junit.Test;
 
-public class Ec2MetricsCollectorProvider implements MetricsCollectorProvider
+public class TestFixedSizeQueue
 {
-    @Override
-    public MetricsCollector createMetricsCollector()
-    {
-        return new Ec2MetricsCollector();
+    @Test
+    public void test() {
+        FixedSizeQueue queue = new FixedSizeQueue(3);
+        queue.add(10);
+        queue.add(20);
+        queue.add(30);
+        System.out.println("Queue: " + queue);
+        System.out.println("Average: " + queue.getAverage());
+        queue.add(40);
+        System.out.println("Queue: " + queue);
+        System.out.println("Average: " + queue.getAverage());
     }
 
-    @Override
-    public boolean compatibleWith(MachineService machineService)
-    {
-        return machineService.equals(MachineService.ec2);
-    }
 }

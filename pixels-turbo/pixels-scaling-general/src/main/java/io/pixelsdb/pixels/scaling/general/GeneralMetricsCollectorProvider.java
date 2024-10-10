@@ -17,20 +17,23 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+package io.pixelsdb.pixels.scaling.general;
 
+import io.pixelsdb.pixels.common.turbo.MachineService;
 import io.pixelsdb.pixels.common.turbo.MetricsCollector;
-import org.junit.Test;
+import io.pixelsdb.pixels.common.turbo.MetricsCollectorProvider;
 
-public class TestAutoReport
+public class GeneralMetricsCollectorProvider implements MetricsCollectorProvider
 {
-    @Test
-    public void test() throws InterruptedException
+    @Override
+    public MetricsCollector createMetricsCollector()
     {
-        if (MetricsCollector.Instance().isPresent())
-        {
-            System.out.println("reporting...");
-            MetricsCollector.Instance().get().report();
-            Thread.sleep(10000);
-        }
+        return new GeneralMetricsCollector();
+    }
+
+    @Override
+    public boolean compatibleWith(MachineService machineService)
+    {
+        return machineService.equals(MachineService.general);
     }
 }

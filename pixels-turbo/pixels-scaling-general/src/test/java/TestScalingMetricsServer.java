@@ -24,9 +24,10 @@ import org.junit.Test;
 public class TestScalingMetricsServer
 {
     @Test
-    public void test()
+    public void test() throws InterruptedException
     {
         ScalingMetricsClient client = new ScalingMetricsClient(54333);
         client.reportMetric(5);
+        Thread.sleep(10000);
     }
 }

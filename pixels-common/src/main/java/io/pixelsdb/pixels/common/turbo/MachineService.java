@@ -29,6 +29,7 @@ package io.pixelsdb.pixels.common.turbo;
 public enum MachineService
 {
     ec2,  // AWS EC2
+    general,
     ;
 
     /**
