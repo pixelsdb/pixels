@@ -28,10 +28,10 @@ public class BasicPolicy extends Policy
 {
     private static final Logger log = LogManager.getLogger(BasicPolicy.class);
     Integer reportPeriod = Integer.parseInt(ConfigFactory.Instance().getProperty("query.concurrency.report.period.sec"));
-    private double lastAverage = 0;
-    private int count = 0;
-    private final int scalingInQueueSize = 5 * 60 / reportPeriod;
-    private final int scalingOutQueueSize = 5 * 60 / reportPeriod;
+    private final static int MINUTES = 60;
+    private double lastMetric = 0;
+    private final int scalingInQueueSize = 5 * MINUTES / reportPeriod;
+    private final int scalingOutQueueSize = 5 * MINUTES / reportPeriod;
     private FixedSizeQueue scalingInQueue = new FixedSizeQueue(scalingInQueueSize);
     private FixedSizeQueue scalingOutQueue = new FixedSizeQueue(scalingOutQueueSize);
 
@@ -43,15 +43,7 @@ public class BasicPolicy extends Policy
             int queryConcurrency = metricsQueue.take();
             scalingInQueue.add(queryConcurrency);
             scalingOutQueue.add(queryConcurrency);
-            count++;
-            if (count >= scalingOutQueueSize)
-            {
-                count = 0;
-                lastAverage = scalingOutQueue.getAverage();
-                scalingOutQueue.clear();
-            }
-
-            if (scalingOutQueue.getAverage() > 2 && lastAverage > 2)
+            if (queryConcurrency > 2 && lastMetric > 2)
             {
                 log.info("Debug: expand 100% vm");
                 scalingManager.multiplyInstance(2.0f);
@@ -64,6 +56,7 @@ public class BasicPolicy extends Policy
                 log.info("Debug: reduce 75% vm");
                 scalingManager.multiplyInstance(0.25f);
             }
+            lastMetric = queryConcurrency;
         } catch (InterruptedException e)
         {
             throw new RuntimeException(e);

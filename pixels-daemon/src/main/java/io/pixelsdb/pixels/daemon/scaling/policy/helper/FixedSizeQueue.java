@@ -22,6 +22,24 @@ package io.pixelsdb.pixels.daemon.scaling.policy.helper;
 import java.util.LinkedList;
 import java.util.Queue;
 
+/**
+ * FixedSizeQueue is a fixed-capacity queue that automatically removes the head element
+ * when a new element is added and the queue is full. It also provides a method to calculate
+ * the average of the elements in the queue.
+ *
+ * <p>Thread-safety:
+ * This class is not thread-safe. If multiple threads access an instance of FixedSizeQueue
+ * concurrently, external synchronization is required.
+ *
+ * <p>Important considerations:
+ * - This queue automatically removes the head element if the capacity is exceeded when adding
+ *   new elements.
+ * - It only supports numeric elements as it includes an average calculation method.
+ *
+ * @author zhujiaxuan
+ * @create 2024-10-10
+ */
+
 public class FixedSizeQueue
 {
     private final int maxSize;
@@ -30,11 +48,16 @@ public class FixedSizeQueue
 
     public FixedSizeQueue(int size)
     {
+        assert(size > 0);
         this.maxSize = size;
         this.queue = new LinkedList<>();
         this.sum = 0;
     }
 
+    /**
+     * add a new element
+     * @param value
+     */
     public void add(int value)
     {
         if (queue.size() == maxSize)
@@ -46,11 +69,17 @@ public class FixedSizeQueue
         sum += value;
     }
 
-    public  void clear() {
+    /**
+     * clear all the elements in the queue
+     */
+    public void clear() {
         queue.clear();
         sum = 0;
     }
 
+    /**
+     * @return the average of the elements in the queue
+     */
     public double getAverage()
     {
         if (queue.isEmpty())
