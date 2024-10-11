@@ -64,13 +64,13 @@ public class ScanInput extends Input
      */
     public ScanInput()
     {
-        super(-1);
+        super(-1, -1);
     }
 
-    public ScanInput(long transId, ScanTableInfo tableInfo, boolean[] scanProjection,
+    public ScanInput(long transId, long timestamp, ScanTableInfo tableInfo, boolean[] scanProjection,
                      boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo, OutputInfo output)
     {
-        super(transId);
+        super(transId, timestamp);
         this.tableInfo = tableInfo;
         this.scanProjection = scanProjection;
         this.partialAggregationPresent = partialAggregationPresent;

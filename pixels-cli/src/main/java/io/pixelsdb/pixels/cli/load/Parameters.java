@@ -44,6 +44,8 @@ public class Parameters
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
     private final MetadataService metadataService;
+    private final long transId;
+    private final long timestamp;
 
     public List<Path> getLoadingPaths()
     {
@@ -80,8 +82,12 @@ public class Parameters
         return nullsPadding;
     }
 
-    public Parameters(String dbName, String tableName, int maxRowNum, String regex,
-                      EncodingLevel encodingLevel, boolean nullsPadding, MetadataService metadataService)
+    public long getTransId() { return transId; }
+
+    public long getTimestamp() { return timestamp; }
+
+    public Parameters(String dbName, String tableName, int maxRowNum, String regex, EncodingLevel encodingLevel,
+                      boolean nullsPadding, MetadataService metadataService, long transId, long timestamp)
     {
         this.dbName = dbName;
         this.tableName = tableName;
@@ -91,6 +97,8 @@ public class Parameters
         this.encodingLevel = encodingLevel;
         this.nullsPadding = nullsPadding;
         this.metadataService = metadataService;
+        this.transId = transId;
+        this.timestamp = timestamp;
     }
 
     /**
@@ -148,6 +156,10 @@ public class Parameters
         {
             String name = layoutColumnOrder.get(i);
             String type = originalColTypes[orderMapping[i]];
+            if(name.equalsIgnoreCase("pixels_commit_timestamp"))
+            {
+                return false;
+            }
             /**
              * Issue #100:
              * Refer TypeDescription, ColumnReader, and ColumnWriter for how Pixels
@@ -156,7 +168,8 @@ public class Parameters
             schemaBuilder.append(name).append(":").append(type)
                     .append(",");
         }
-        schemaBuilder.replace(schemaBuilder.length() - 1, schemaBuilder.length(), ">");
+        // add timestamp column
+        schemaBuilder.append("pixels_commit_timestamp:long>");
 
         // get path of loading
         if(this.loadingPaths == null)

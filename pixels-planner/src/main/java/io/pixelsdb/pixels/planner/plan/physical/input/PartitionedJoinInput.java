@@ -48,11 +48,12 @@ public class PartitionedJoinInput extends JoinInput
      */
     public PartitionedJoinInput() { }
 
-    public PartitionedJoinInput(long transId, PartitionedTableInfo smallTable, PartitionedTableInfo largeTable,
-                                PartitionedJoinInfo joinInfo, boolean partialAggregationPresent,
-                                PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
+    public PartitionedJoinInput(long transId, long timestamp, PartitionedTableInfo smallTable,
+                                PartitionedTableInfo largeTable, PartitionedJoinInfo joinInfo,
+                                boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo,
+                                MultiOutputInfo output)
     {
-        super(transId, partialAggregationPresent, partialAggregationInfo, output);
+        super(transId, timestamp, partialAggregationPresent, partialAggregationInfo, output);
         this.smallTable = smallTable;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;

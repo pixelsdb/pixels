@@ -445,4 +445,22 @@ public class LongDecimalColumnVector extends ColumnVector
             }
         }
     }
+
+    @Override
+    public LongDecimalColumnVector clone()
+    {
+        try
+        {
+            LongDecimalColumnVector cloned = (LongDecimalColumnVector) super.clone();
+            /**
+             * ENDIAN and DEFAULT_UNSCALED_VALUE are constants and do not need to be cloned.
+             */
+            cloned.vector = this.vector == null ? null : this.vector.clone();
+            return cloned;
+        }
+        catch (CloneNotSupportedException e)
+        {
+            throw new AssertionError();
+        }
+    }
 }

@@ -95,7 +95,7 @@ public class TestPixelsPlanner
 
         MetadataCache.Instance().initCache(123456);
         PixelsPlanner joinExecutor = new PixelsPlanner(
-                123456, root, false, true, Optional.empty());
+                123456, 123456, root, false, true, Optional.empty());
 
         Operator joinOperator = joinExecutor.getRootOperator();
     }
@@ -186,7 +186,7 @@ public class TestPixelsPlanner
 
         MetadataCache.Instance().initCache(123456);
         PixelsPlanner joinExecutor = new PixelsPlanner(
-                123456, root, false, true, Optional.empty());
+                123456, 123456, root, false, true, Optional.empty());
 
         return joinExecutor.getRootOperator();
     }
@@ -267,7 +267,7 @@ public class TestPixelsPlanner
 
         MetadataCache.Instance().initCache(123456);
         PixelsPlanner joinExecutor = new PixelsPlanner(
-                123456, root, false, true, Optional.empty());
+                123456, 123456, root, false, true, Optional.empty());
 
         Operator joinOperator = joinExecutor.getRootOperator();
     }

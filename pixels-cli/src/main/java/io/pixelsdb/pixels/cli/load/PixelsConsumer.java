@@ -114,6 +114,8 @@ public class PixelsConsumer extends Consumer
 
                     System.out.println("loading data from: " + originalFilePath);
 
+                    // loaded rows use the same timestamp
+                    long timestamp = parameters.getTimestamp();
                     while ((line = reader.readLine()) != null)
                     {
                         if (initPixelsFile)
@@ -158,7 +160,7 @@ public class PixelsConsumer extends Consumer
                         rowCounter++;
 
                         String[] colsInLine = line.split(regex);
-                        for (int i = 0; i < columnVectors.length; i++)
+                        for (int i = 0; i < columnVectors.length - 1; i++)
                         {
                             try
                             {
@@ -179,6 +181,8 @@ public class PixelsConsumer extends Consumer
                                 e.printStackTrace();
                             }
                         }
+                        // add hidden timestamp column value
+                        columnVectors[columnVectors.length - 1].add(timestamp);
 
                         if (rowBatch.size >= rowBatch.getMaxSize())
                         {

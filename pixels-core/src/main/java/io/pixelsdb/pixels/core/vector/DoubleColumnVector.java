@@ -304,4 +304,22 @@ public class DoubleColumnVector extends ColumnVector
             }
         }
     }
+
+    @Override
+    public DoubleColumnVector clone()
+    {
+        try
+        {
+            DoubleColumnVector cloned = (DoubleColumnVector) super.clone();
+            cloned.vector = this.vector == null ? null : this.vector.clone();
+            /**
+             * NULL_VALUE is a constant and does not need to be cloned.
+             */
+            return cloned;
+        }
+        catch (CloneNotSupportedException e)
+        {
+            throw new AssertionError();
+        }
+    }
 }

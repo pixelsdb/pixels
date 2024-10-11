@@ -311,6 +311,21 @@ public class LongColumnVector extends ColumnVector
     }
 
     @Override
+    public LongColumnVector clone()
+    {
+        try
+        {
+            LongColumnVector cloned = (LongColumnVector) super.clone();
+            cloned.vector = this.vector == null ? null : this.vector.clone();
+            return cloned;
+        }
+        catch (CloneNotSupportedException e)
+        {
+            throw new AssertionError();
+        }
+    }
+
+    @Override
     public void close()
     {
         super.close();

@@ -75,6 +75,7 @@ public class PixelsPlanner
     private final boolean compactPathEnabled;
     private final Storage storage;
     private final long transId;
+    private final long timestamp;
 
     /**
      * The data size in bytes to be scanned by the input query.
@@ -115,10 +116,11 @@ public class PixelsPlanner
      * @param metadataService the metadata service to access Pixels metadata
      * @throws IOException
      */
-    public PixelsPlanner(long transId, Table rootTable, boolean orderedPathEnabled, boolean compactPathEnabled,
-                         Optional<MetadataService> metadataService) throws IOException
+    public PixelsPlanner(long transId, long timestamp, Table rootTable, boolean orderedPathEnabled,
+                         boolean compactPathEnabled, Optional<MetadataService> metadataService) throws IOException
     {
         this.transId = transId;
+        this.timestamp = timestamp;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
         checkArgument(rootTable.getTableType() == Table.TableType.BASE ||
                         rootTable.getTableType() == Table.TableType.JOINED ||
@@ -178,6 +180,7 @@ public class PixelsPlanner
         {
             ScanInput scanInput = new ScanInput();
             scanInput.setTransId(transId);
+            scanInput.setTimestamp(timestamp);
             ScanTableInfo tableInfo = new ScanTableInfo();
             ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                     .builderWithExpectedSize(IntraWorkerParallelism);
@@ -243,6 +246,7 @@ public class PixelsPlanner
             {
                 ScanInput scanInput = new ScanInput();
                 scanInput.setTransId(transId);
+                scanInput.setTimestamp(timestamp);
                 ScanTableInfo tableInfo = new ScanTableInfo();
                 ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                         .builderWithExpectedSize(IntraWorkerParallelism);
@@ -309,6 +313,7 @@ public class PixelsPlanner
         {
             AggregationInput finalAggrInput = new AggregationInput();
             finalAggrInput.setTransId(transId);
+            finalAggrInput.setTimestamp(timestamp);
             AggregatedTableInfo aggregatedTableInfo = new AggregatedTableInfo();
             aggregatedTableInfo.setTableName(aggregatedTable.getTableName());
             aggregatedTableInfo.setBase(false);
@@ -471,6 +476,7 @@ public class PixelsPlanner
                         PartitionedJoinInput rightJoinInput = (PartitionedJoinInput) joinInput;
                         PartitionedChainJoinInput chainJoinInput = new PartitionedChainJoinInput();
                         chainJoinInput.setTransId(transId);
+                        chainJoinInput.setTimestamp(timestamp);
                         chainJoinInput.setJoinInfo(rightJoinInput.getJoinInfo());
                         chainJoinInput.setOutput(rightJoinInput.getOutput());
                         chainJoinInput.setSmallTable(rightJoinInput.getSmallTable());
@@ -644,6 +650,7 @@ public class PixelsPlanner
 
                 BroadcastChainJoinInput broadcastChainJoinInput = new BroadcastChainJoinInput();
                 broadcastChainJoinInput.setTransId(transId);
+                broadcastChainJoinInput.setTimestamp(timestamp);
                 broadcastChainJoinInput.setChainTables(chainTableInfos);
                 List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
                 chainJoinInfos.add(chainJoinInfo);
@@ -871,7 +878,7 @@ public class PixelsPlanner
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
-                            transId, leftTableInfo, rightTableInfo, joinInfo,
+                            transId, timestamp, leftTableInfo, rightTableInfo, joinInfo,
                             false, null, output);
 
                     joinInputs.add(joinInput);
@@ -919,7 +926,7 @@ public class PixelsPlanner
                     MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
-                            transId, rightTableInfo, leftTableInfo, joinInfo,
+                            transId, timestamp, rightTableInfo, leftTableInfo, joinInfo,
                             false, null, output);
 
                     joinInputs.add(joinInput);
@@ -1274,6 +1281,7 @@ public class PixelsPlanner
         {
             PartitionInput partitionInput = new PartitionInput();
             partitionInput.setTransId(transId);
+            partitionInput.setTimestamp(timestamp);
             ScanTableInfo tableInfo = new ScanTableInfo();
             ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                     .builderWithExpectedSize(IntraWorkerParallelism);
@@ -1377,7 +1385,7 @@ public class PixelsPlanner
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
                         joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
                         leftProjection, rightProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
-                 joinInput = new PartitionedJoinInput(transId, leftTableInfo, rightTableInfo, joinInfo,
+                 joinInput = new PartitionedJoinInput(transId, timestamp, leftTableInfo, rightTableInfo, joinInfo,
                          false, null, output);
             }
             else
@@ -1385,7 +1393,7 @@ public class PixelsPlanner
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
                         rightProjection, leftProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
-                joinInput = new PartitionedJoinInput(transId, rightTableInfo, leftTableInfo, joinInfo,
+                joinInput = new PartitionedJoinInput(transId, timestamp, rightTableInfo, leftTableInfo, joinInfo,
                         false, null, output);
             }
 

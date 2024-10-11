@@ -789,6 +789,29 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     @Override
+    public BinaryColumnVector clone()
+    {
+        try
+        {
+            BinaryColumnVector cloned = (BinaryColumnVector) super.clone();
+            cloned.vector = new byte[this.vector.length][];
+            for (int i = 0; i < this.vector.length; ++i)
+            {
+                cloned.vector[i] = this.vector[i] == null ? null : this.vector[i].clone();
+            }
+            cloned.start = this.start == null ? null : this.start.clone();
+            cloned.lens = this.lens == null ? null : this.lens.clone();
+            cloned.buffer = this.buffer == null ? null : this.buffer.clone();
+            cloned.smallBuffer = this.smallBuffer == null ? null : this.smallBuffer.clone();
+            return cloned;
+        }
+        catch (CloneNotSupportedException e)
+        {
+            throw new AssertionError();
+        }
+    }
+
+    @Override
     public void close()
     {
         super.close();

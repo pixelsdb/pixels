@@ -367,6 +367,23 @@ public class DictionaryColumnVector extends ColumnVector
     }
 
     @Override
+    public DictionaryColumnVector clone()
+    {
+        try
+        {
+            DictionaryColumnVector cloned = (DictionaryColumnVector) super.clone();
+            cloned.dictArray = this.dictArray == null ? null : this.dictArray.clone();
+            cloned.dictOffsets = this.dictOffsets == null ? null : this.dictOffsets.clone();
+            cloned.ids = this.ids == null ? null : this.ids.clone();
+            return cloned;
+        }
+        catch (CloneNotSupportedException e)
+        {
+            throw new AssertionError();
+        }
+    }
+
+    @Override
     public void close()
     {
         super.close();
