@@ -71,7 +71,7 @@ public class ScalingMetricsServer implements Server
             this.rpcServer.start();
             log.info("Server started, listening on " + port);
             this.running = true;
-            log.info("MonitorServer is running");
+            log.info("ScalingMetricsServer is running");
             this.rpcServer.awaitTermination();
         } catch (IOException e)
         {
