@@ -105,12 +105,6 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
      */
     private int[] resultColumns;
     /**
-     * The target rows to read after filtering by predicate and timestamp.
-     * The key is the row group id, and the value is a boolean array,
-     * each element represents a row in the row group, if true, the row is qualified.
-     */
-    private Map<Integer, boolean[]> targetRows;
-    /**
      * The ith element is true if the ith column in the resultSchema should use encoded column vectors.
      */
     private boolean[] resultColumnsEncoded;
