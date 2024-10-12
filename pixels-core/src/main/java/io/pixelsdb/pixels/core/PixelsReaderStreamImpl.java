@@ -174,20 +174,23 @@ public class PixelsReaderStreamImpl implements PixelsReader
                                 //  due to concurrent modifications of the `recordReaders` list
                                 recordReader.lateInitialization(streamHeader);
                             }
-                        } catch (IOException e)
+                        }
+                        catch (IOException e)
                         {
                             logger.error("Invalid stream header values: ", e);
                             sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
                             return;
                         }
-                    } else if (partitioned)
+                    }
+                    else if (partitioned)
                     {
                         // In partitioned mode, every packet brings a streamHeader to prevent errors from possibly
                         // out-of-order packet arrivals, so we need to parse it, but do not need the return value
                         // (except for the first incoming packet processed above).
                         parseStreamHeader(byteBuf);
                     }
-                } catch (InvalidProtocolBufferException | IndexOutOfBoundsException e)
+                }
+                catch (InvalidProtocolBufferException | IndexOutOfBoundsException e)
                 {
                     logger.error("Malformed or corrupted stream header", e);
                     sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
@@ -254,7 +257,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
             try
             {
                 this.httpServer.serve(httpPort);
-            } catch (InterruptedException e)
+            }
+            catch (InterruptedException e)
             {
                 logger.error("HTTP server interrupted", e);
             }
@@ -413,7 +417,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
         try
         {
             streamHeaderLatch.await();
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             logger.error("Interrupted while waiting for stream header", e);
         }
@@ -435,7 +440,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
         try
         {
             streamHeaderLatch.await();
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             logger.error("Interrupted while waiting for stream header", e);
         }
@@ -525,7 +531,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
             {
                 streamHeaderLatch.await();
                 while (!byteBufSharedQueue.isEmpty() && !byteBufBlockingMap.isEmpty()) sleep(20);
-            } catch (InterruptedException e)
+            }
+            catch (InterruptedException e)
             {
                 throw new RuntimeException(e);
             }
@@ -533,11 +540,13 @@ public class PixelsReaderStreamImpl implements PixelsReader
             try
             {
                 if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(5, TimeUnit.SECONDS);
-            } catch (TimeoutException e)
+            }
+            catch (TimeoutException e)
             {
                 logger.warn("In close(), HTTP server did not shut down in 5 seconds, doing forceful shutdown");
                 this.httpServerFuture.cancel(true);
-            } catch (InterruptedException | ExecutionException e)
+            }
+            catch (InterruptedException | ExecutionException e)
             {
                 logger.error("Exception during HTTP server shutdown", e);
             } finally
@@ -547,7 +556,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     try
                     {
                         recordReader.close();
-                    } catch (IOException e)
+                    }
+                    catch (IOException e)
                     {
                         logger.error("Exception while closing record reader", e);
                     }
