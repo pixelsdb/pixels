@@ -133,15 +133,18 @@ public class StageCoordinator
             for (int i = 0; i < WorkerTaskParallelism; ++i)
             {
                 Task task = this.taskQueue.pollPendingAndRun(worker);
-                if (!this.taskQueue.hasPending())
-                {
-                    this.lock.notifyAll();
-                }
                 if (task == null)
                 {
                     break;
                 }
                 tasks.add(task);
+            }
+            if (!this.taskQueue.hasPending())
+            {
+                synchronized (this.lock)
+                {
+                    this.lock.notifyAll();
+                }
             }
             return tasks;
         }

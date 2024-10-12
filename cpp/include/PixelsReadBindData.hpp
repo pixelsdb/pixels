@@ -17,8 +17,8 @@
 namespace duckdb {
 
 struct PixelsReadBindData : public TableFunctionData {
-	shared_ptr<PixelsReader> initialPixelsReader;
-	shared_ptr<TypeDescription> fileSchema;
+	std::shared_ptr<PixelsReader> initialPixelsReader;
+	std::shared_ptr<TypeDescription> fileSchema;
 	vector<string> files;
 	atomic<idx_t> curFileId;
 };

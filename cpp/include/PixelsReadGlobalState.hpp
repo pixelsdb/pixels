@@ -19,7 +19,7 @@ struct PixelsReadGlobalState : public GlobalTableFunctionState {
 	mutex lock;
 
 	//! The initial reader from the bind phase
-	shared_ptr<PixelsReader> initialPixelsReader;
+	std::shared_ptr<PixelsReader> initialPixelsReader;
 
 	//! Mutexes to wait for a file that is currently being opened
 	unique_ptr<mutex[]> file_mutexes;

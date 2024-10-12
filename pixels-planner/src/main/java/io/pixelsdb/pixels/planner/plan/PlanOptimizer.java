@@ -72,9 +72,7 @@ public class PlanOptimizer
     private PlanOptimizer()
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
-        String host = configFactory.getProperty("metadata.server.host");
-        int port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
-        metadataService = new MetadataService(host, port);
+        metadataService = MetadataService.Instance();
         String thresholdMB = configFactory.getProperty("join.broadcast.threshold.mb");
         broadcastThresholdBytes = Long.parseLong(thresholdMB) * 1024L * 1024L;
         String thresholdRows = configFactory.getProperty("join.broadcast.threshold.rows");

@@ -19,9 +19,6 @@
  */
 package io.pixelsdb.pixels.storage.s3;
 
-import io.pixelsdb.pixels.common.exception.StorageException;
-import io.pixelsdb.pixels.common.physical.ObjectPath;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
@@ -33,11 +30,6 @@ import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.time.Duration;
-
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.S3_ID_KEY;
-import static io.pixelsdb.pixels.common.utils.Constants.S3_META_PREFIX;
 
 /**
  * For S3, we assume that each table is stored in a separate folder
@@ -59,20 +51,6 @@ public final class S3 extends AbstractS3
     private static final String SchemePrefix = Scheme.s3.name() + "://";
 
     private S3AsyncClient s3Async;
-
-    static
-    {
-        if (EnableCache)
-        {
-            /**
-             * Issue #222:
-             * The etcd file id is only used for cache coordination.
-             * Thus, we do not initialize the id key when cache is disabled.
-             */
-
-            InitId(S3_ID_KEY);
-        }
-    }
 
     public S3()
     {
@@ -113,21 +91,6 @@ public final class S3 extends AbstractS3
     }
 
     @Override
-    protected String getPathKey(String path)
-    {
-        return S3_META_PREFIX + path;
-    }
-
-    private String getPathFrom(String key)
-    {
-        if (key.startsWith(S3_META_PREFIX))
-        {
-            return key.substring(S3_META_PREFIX.length());
-        }
-        return null;
-    }
-
-    @Override
     public Scheme getScheme()
     {
         return Scheme.s3;
@@ -159,31 +122,6 @@ public final class S3 extends AbstractS3
         {
             s3Async.close();
         }
-    }
-
-    @Override
-    protected boolean existsOrGenIdSucc(ObjectPath path) throws IOException
-    {
-        if (!EnableCache)
-        {
-            throw new StorageException("Should not check or generate file id when cache is disabled");
-        }
-        if (!path.valid)
-        {
-            throw new IOException("Path '" + path.toString() + "' is not valid.");
-        }
-        if (EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null)
-        {
-            return true;
-        }
-        if (this.existsInS3(path))
-        {
-            // the file id does not exist, register a new id for this file.
-            long id = GenerateId(S3_ID_KEY);
-            EtcdUtil.Instance().putKeyValue(getPathKey(path.toString()), Long.toString(id));
-            return true;
-        }
-        return false;
     }
 
     public S3AsyncClient getAsyncClient()

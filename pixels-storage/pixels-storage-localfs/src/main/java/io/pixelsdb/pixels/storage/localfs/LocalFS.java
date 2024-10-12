@@ -19,7 +19,8 @@
  */
 package io.pixelsdb.pixels.storage.localfs;
 
-import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.physical.FilePath;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -27,18 +28,12 @@ import io.pixelsdb.pixels.common.physical.natives.DirectRandomAccessFile;
 import io.pixelsdb.pixels.common.physical.natives.MappedRandomAccessFile;
 import io.pixelsdb.pixels.common.physical.natives.PixelsRandomAccessFile;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_ID_KEY;
-import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -59,25 +54,12 @@ public final class LocalFS implements Storage
         EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
         EnableMmap = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.mmap"));
 
-        if (EnableCache)
-        {
-            /**
-             * Issue #222:
-             * The etcd file id is only used for cache coordination.
-             * Thus, we do not initialize the id key when cache is disabled.
-             */
-            InitId(LOCAL_FS_ID_KEY);
-        }
+        // Issue #708: file id is now generated in the metadata, we do not need the etcd generated file id.
     }
 
     private static final String SchemePrefix = Scheme.file.name() + "://";
 
     public LocalFS() { }
-
-    private String getPathKey(String path)
-    {
-        return LOCAL_FS_META_PREFIX + path;
-    }
 
     @Override
     public Scheme getScheme()
@@ -187,18 +169,15 @@ public final class LocalFS implements Storage
         requireNonNull(path, "path is null");
         if (EnableCache)
         {
-            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
-            if (kv == null)
+            MetadataService metadataService = MetadataService.Instance();
+            try
             {
-                /**
-                 * Issue #158:
-                 * Create an id for this file if it does not exist in etcd.
-                 */
-                long id = GenerateId(LOCAL_FS_ID_KEY);
-                EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
-                return id;
+                path = ensureSchemePrefix(path);
+                return metadataService.getFileId(path);
+            } catch (MetadataException e)
+            {
+                throw new IOException("failed to get file id from metadata, path=" + path, e);
             }
-            return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
         }
         else
         {
@@ -345,13 +324,7 @@ public final class LocalFS implements Storage
                 }
             }
         }
-        /*
-         * Attempt to delete the key, but it does not need to be existed.
-         */
-        if (EnableCache)
-        {
-            EtcdUtil.Instance().deleteByPrefix(getPathKey(path));
-        }
+
         return subDeleted && file.delete();
     }
 

@@ -12,6 +12,9 @@ executor_output_folder=/pixels-turbo/output/
 minio_access_key=pixels
 minio_secret_key=turbo
 
+# export environment variables
+export PIXELS_HOME=/home/ubuntu/opt/pixels/
+
 function get_instance_id {
     echo $(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 }

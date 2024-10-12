@@ -58,6 +58,7 @@
         <module>pixels-turbo/pixels-scaling-ec2</module>
         <module>pixels-turbo/pixels-worker-vhive</module>
         <module>pixels-turbo/pixels-invoker-vhive</module>
+        <module>pixels-turbo/pixels-scaling-general</module>
     </modules>
 
     <properties>
@@ -210,6 +211,11 @@
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-scaling-ec2</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-scaling-general</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

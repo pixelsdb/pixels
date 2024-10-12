@@ -144,28 +144,28 @@ public class PixelsCompactor
 
     public static class Builder
     {
-        private TypeDescription schema = null;
-        private List<String> sourcePaths = null;
-        private CompactLayout compactLayout = null;
+        private TypeDescription builderSchema = null;
+        private List<String> builderSourcePaths = null;
+        private CompactLayout builderCompactLayout = null;
         private TimeZone builderTimeZone = TimeZone.getDefault();
         private Storage builderInputStorage = null;
         private Storage builderOutputStorage = null;
         private String builderFilePath = null;
-        private StatsRecorder[] fileColStatRecorders;
+        private StatsRecorder[] builderFileColStatRecorders;
         private long builderBlockSize = DEFAULT_HDFS_BLOCK_SIZE;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
         private boolean builderOverwrite = false;
-        private PixelsProto.CompressionKind compressionKind = null;
-        private int compressionBlockSize = 1;
-        private int pixelStride = 0;
-        private long fileContentLength = 0L;
-        private int fileRowNum = 0;
-        private PhysicalWriter fsWriter = null;
-        private final List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList = new LinkedList<>();
-        private final List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList = new LinkedList<>();
-        private final List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList = new LinkedList<>();
-        private final List<String> rowGroupPaths = new LinkedList<>();
+        private PixelsProto.CompressionKind builderCompressionKind = null;
+        private int builderCompressionBlockSize = 1;
+        private int builderPixelStride = 0;
+        private long builderFileContentLength = 0L;
+        private int builderFileRowNum = 0;
+        private PhysicalWriter builderFsWriter = null;
+        private final List<PixelsProto.RowGroupInformation.Builder> builderRowGroupInfoBuilderList = new LinkedList<>();
+        private final List<PixelsProto.RowGroupStatistic.Builder> builderRowGroupStatBuilderList = new LinkedList<>();
+        private final List<PixelsProto.RowGroupFooter.Builder> builderRowGroupFooterBuilderList = new LinkedList<>();
+        private final List<String> builderRowGroupPaths = new LinkedList<>();
 
         private Builder()
         {
@@ -179,19 +179,19 @@ public class PixelsCompactor
          */
         public PixelsCompactor.Builder setSchema(TypeDescription schema)
         {
-            this.schema = schema;
+            this.builderSchema = schema;
             return this;
         }
 
         public PixelsCompactor.Builder setSourcePaths(List<String> sourcePaths)
         {
-            this.sourcePaths = ImmutableList.copyOf(requireNonNull(sourcePaths));
+            this.builderSourcePaths = ImmutableList.copyOf(requireNonNull(sourcePaths));
             return this;
         }
 
         public PixelsCompactor.Builder setCompactLayout(CompactLayout compactLayout)
         {
-            this.compactLayout = requireNonNull(compactLayout);
+            this.builderCompactLayout = requireNonNull(compactLayout);
             return this;
         }
 
@@ -243,20 +243,19 @@ public class PixelsCompactor
             return this;
         }
 
-        public PixelsCompactor build()
-                throws IOException
+        public PixelsCompactor build() throws IOException
         {
             // check arguments
-            if (sourcePaths == null || compactLayout == null || builderInputStorage == null ||
+            if (builderSourcePaths == null || builderCompactLayout == null || builderInputStorage == null ||
                     builderOutputStorage == null || builderFilePath == null)
             {
                 throw new IllegalArgumentException("Missing argument(s) to build PixelsCompactor");
             }
 
             // read each source file footer
-            for (int i = 0; i < sourcePaths.size(); i++)
+            for (int i = 0; i < builderSourcePaths.size(); i++)
             {
-                String path = sourcePaths.get(i);
+                String path = builderSourcePaths.get(i);
                 PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderInputStorage, path);
                 if (fsReader == null)
                 {
@@ -296,37 +295,37 @@ public class PixelsCompactor
 
                 if (i == 0)
                 {
-                    compressionKind = fileTail.getPostscript().getCompression();
-                    compressionBlockSize = fileTail.getPostscript().getCompressionBlockSize();
-                    pixelStride = fileTail.getPostscript().getPixelStride();
+                    builderCompressionKind = fileTail.getPostscript().getCompression();
+                    builderCompressionBlockSize = fileTail.getPostscript().getCompressionBlockSize();
+                    builderPixelStride = fileTail.getPostscript().getPixelStride();
 
-                    if (schema == null)
+                    if (builderSchema == null)
                     {
-                        schema = TypeDescription.createSchema(fileTail.getFooter().getTypesList());
+                        builderSchema = TypeDescription.createSchema(fileTail.getFooter().getTypesList());
                     }
 
-                    List<TypeDescription> childrenSchema = schema.getChildren();
+                    List<TypeDescription> childrenSchema = builderSchema.getChildren();
                     checkArgument(!requireNonNull(childrenSchema).isEmpty());
-                    fileColStatRecorders = new StatsRecorder[childrenSchema.size()];
+                    builderFileColStatRecorders = new StatsRecorder[childrenSchema.size()];
                     for (int j = 0; j < childrenSchema.size(); ++j)
                     {
-                        this.fileColStatRecorders[j] = StatsRecorder
+                        this.builderFileColStatRecorders[j] = StatsRecorder
                                 .create(childrenSchema.get(j)); // to be updated when compacting
                     }
                 }
 
-                fileContentLength += postScript.getContentLength(); // init fileContentLength
-                fileRowNum += postScript.getNumberOfRows(); // init fileRowNum
+                builderFileContentLength += postScript.getContentLength(); // init fileContentLength
+                builderFileRowNum += postScript.getNumberOfRows(); // init fileRowNum
 
                 PixelsProto.Footer footer = fileTail.getFooter();
                 // init rowGroupStatisticList
                 for (PixelsProto.RowGroupStatistic stat : footer.getRowGroupStatsList())
                 {
-                    rowGroupStatBuilderList.add(stat.toBuilder());
+                    builderRowGroupStatBuilderList.add(stat.toBuilder());
                 }
                 for (PixelsProto.RowGroupInformation info : footer.getRowGroupInfosList())
                 {
-                    rowGroupInfoBuilderList.add(info.toBuilder()); // footerOffset to be updated when compacting
+                    builderRowGroupInfoBuilderList.add(info.toBuilder()); // footerOffset to be updated when compacting
                     long footerOffset = info.getFooterOffset();
                     long footerLength = info.getFooterLength();
                     fsReader.seek(footerOffset);
@@ -334,32 +333,32 @@ public class PixelsCompactor
                     fsReader.readFully(footerBuffer);
                     PixelsProto.RowGroupFooter rowGroupFooter =
                             PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
-                    rowGroupFooterBuilderList
+                    builderRowGroupFooterBuilderList
                             .add(rowGroupFooter.toBuilder()); // chunkOffset to be updated when compacting
-                    rowGroupPaths.add(path);
+                    builderRowGroupPaths.add(path);
                 }
                 fsReader.close();
             }
 
-            fsWriter = PhysicalWriterUtil.newPhysicalWriter(builderOutputStorage, builderFilePath, builderBlockSize,
-                    builderReplication, builderBlockPadding, builderOverwrite);
+            builderFsWriter = PhysicalWriterUtil.newPhysicalWriter(builderOutputStorage, builderFilePath,
+                    builderBlockSize, builderReplication, builderBlockPadding, builderOverwrite);
 
             return new PixelsCompactor(
-                    schema,
-                    compactLayout,
-                    pixelStride,
-                    compressionKind,
-                    compressionBlockSize,
+                    builderSchema,
+                    builderCompactLayout,
+                    builderPixelStride,
+                    builderCompressionKind,
+                    builderCompressionBlockSize,
                     builderTimeZone,
-                    fileContentLength,
-                    fileRowNum,
+                    builderFileContentLength,
+                    builderFileRowNum,
                     builderInputStorage,
-                    fsWriter,
-                    fileColStatRecorders,
-                    rowGroupInfoBuilderList,
-                    rowGroupStatBuilderList,
-                    rowGroupFooterBuilderList,
-                    rowGroupPaths);
+                    builderFsWriter,
+                    builderFileColStatRecorders,
+                    builderRowGroupInfoBuilderList,
+                    builderRowGroupStatBuilderList,
+                    builderRowGroupFooterBuilderList,
+                    builderRowGroupPaths);
         }
     }
 

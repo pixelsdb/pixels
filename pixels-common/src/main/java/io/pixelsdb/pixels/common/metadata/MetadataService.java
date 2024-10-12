@@ -19,19 +19,21 @@
  */
 package io.pixelsdb.pixels.common.metadata;
 
+import com.google.common.collect.ImmutableList;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.IndexFactory;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.server.HostAddress;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -44,21 +46,88 @@ import static io.pixelsdb.pixels.common.error.ErrorCode.*;
  */
 public class MetadataService
 {
+    private static final Logger logger = LogManager.getLogger(MetadataService.class);
+    private static final MetadataService defaultInstance;
+    private static final Map<HostAddress, MetadataService> otherInstances = new HashMap<>();
+
+    static
+    {
+        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
+        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
+        defaultInstance = new MetadataService(metadataHost, metadataPort);
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    defaultInstance.shutdown();
+                    for (MetadataService otherMetadataService : otherInstances.values())
+                    {
+                        otherMetadataService.shutdown();
+                    }
+                    otherInstances.clear();
+                } catch (InterruptedException e)
+                {
+                    logger.error("failed to shut down metadata service", e);
+                }
+            }
+        }));
+    }
+
+    /**
+     * Get the default metadata service instance connecting to the metadata host:port configured in
+     * PIXELS_HOME/pixels.properties. This default instance will be automatically shut down when the process
+     * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
+     * @return
+     */
+    public static MetadataService Instance()
+    {
+        return defaultInstance;
+    }
+
+    /**
+     * This method should only be used to connect to a metadata server that is not configured through
+     * PIXELS_HOME/pixels.properties. <b>No need</b> to manually shut down the returned metadata service.
+     * @param host the host name of the metadata server
+     * @param port the port of the metadata server
+     * @return the created metadata service instance
+     */
+    public static MetadataService CreateInstance(String host, int port)
+    {
+        HostAddress address = HostAddress.fromParts(host, port);
+        MetadataService metadataService = otherInstances.get(address);
+        if (metadataService != null)
+        {
+            return metadataService;
+        }
+        metadataService = new MetadataService(host, port);
+        otherInstances.put(address, metadataService);
+        return metadataService;
+    }
+
     private final ManagedChannel channel;
     private final MetadataServiceGrpc.MetadataServiceBlockingStub stub;
+    private boolean isShutDown;
 
-    public MetadataService(String host, int port)
+    private MetadataService(String host, int port)
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
-        this.channel = ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext().build();
+        this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
         this.stub = MetadataServiceGrpc.newBlockingStub(channel);
+        this.isShutDown = false;
     }
 
-    public void shutdown() throws InterruptedException
+    private synchronized void shutdown() throws InterruptedException
     {
-        this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        if (!this.isShutDown)
+        {
+            // Wait for at most 5 seconds, this should be enough to shut down an RPC client.
+            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            this.isShutDown = true;
+        }
     }
 
     public boolean createSchema(String schemaName) throws MetadataException
@@ -194,11 +263,16 @@ public class MetadataService
 
     public Table getTable(String schemaName, String tableName) throws MetadataException
     {
+        return getTable(schemaName, tableName, false);
+    }
+
+    public Table getTable(String schemaName, String tableName, boolean withLayouts) throws MetadataException
+    {
         Table table = null;
         String token = UUID.randomUUID().toString();
         MetadataProto.GetTableRequest request = MetadataProto.GetTableRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).build();
+                .setSchemaName(schemaName).setTableName(tableName).setWithLayouts(withLayouts).build();
         try
         {
             MetadataProto.GetTableResponse response = this.stub.getTable(request);
@@ -211,7 +285,7 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            table = new Table(response.getTable());
+            table = new Table(response.getTable(), response.getLayoutsList());
         }
         catch (Exception e)
         {
@@ -222,7 +296,7 @@ public class MetadataService
 
     public List<Table> getTables(String schemaName) throws MetadataException
     {
-        List<Table> tables = new ArrayList<>();
+        ImmutableList.Builder<Table> tablesBuilder = ImmutableList.builder();
         String token = UUID.randomUUID().toString();
         MetadataProto.GetTablesRequest request = MetadataProto.GetTablesRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -239,13 +313,13 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            response.getTablesList().forEach(table -> tables.add(new Table(table)));
+            response.getTablesList().forEach(table -> tablesBuilder.add(new Table(table)));
         }
         catch (Exception e)
         {
             throw new MetadataException("failed to get tables from metadata", e);
         }
-        return tables;
+        return tablesBuilder.build();
     }
 
     public boolean existTable(String schemaName, String tableName) throws MetadataException
@@ -545,7 +619,7 @@ public class MetadataService
      */
     public List<Layout> getLayouts(String schemaName, String tableName) throws MetadataException
     {
-        List<Layout> layouts = new ArrayList<>();
+        ImmutableList.Builder<Layout> layoutsBuilder = ImmutableList.builder();
         String token = UUID.randomUUID().toString();
         MetadataProto.GetLayoutsRequest request = MetadataProto.GetLayoutsRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -562,13 +636,13 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            response.getLayoutsList().forEach(layout -> layouts.add(new Layout(layout)));
+            response.getLayoutsList().forEach(layout -> layoutsBuilder.add(new Layout(layout)));
         }
         catch (Exception e)
         {
             throw new MetadataException("failed to get layouts from metadata", e);
         }
-        return layouts;
+        return layoutsBuilder.build();
     }
 
     public Layout getLayout(String schemaName, String tableName, int version) throws MetadataException
@@ -1047,6 +1121,38 @@ public class MetadataService
             throw new MetadataException("failed to add file", e);
         }
         return false;
+    }
+
+    /**
+     * Get the file id of the file given the full uri path containing the storage scheme prefix.
+     * @param filePathUri the file path uri containing the storage scheme prefix
+     * @return the id of the file, valid file id should be a positive integer
+     * @throws MetadataException if failed to request the file id
+     */
+    public long getFileId(String filePathUri) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetFileIdRequest request = MetadataProto.GetFileIdRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setFilePathUri(filePathUri).build();
+        try
+        {
+            MetadataProto.GetFileIdResponse response = this.stub.getFileId(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return response.getFileId();
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get file id", e);
+        }
     }
 
     public List<File> getFiles(long pathId) throws MetadataException

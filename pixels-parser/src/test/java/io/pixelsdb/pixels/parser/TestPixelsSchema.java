@@ -27,7 +27,6 @@ import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.schema.Statistic;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -44,13 +43,7 @@ public class TestPixelsSchema
     @Before
     public void init()
     {
-        this.instance = new MetadataService(hostAddr, 18888);
-    }
-
-    @After
-    public void shutdown() throws InterruptedException
-    {
-        this.instance.shutdown();
+        this.instance = MetadataService.CreateInstance(hostAddr, 18888);
     }
 
     @Test

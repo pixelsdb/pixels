@@ -38,6 +38,8 @@ public abstract class PathDao implements Dao<MetadataProto.Path>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
+    public abstract MetadataProto.Path getByPathUri(String pathUri);
+
     public abstract List<MetadataProto.Path> getAllByLayoutId(long layoutId);
 
     public abstract List<MetadataProto.Path> getAllByRangeId(long rangeId);

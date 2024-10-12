@@ -33,6 +33,11 @@ public abstract class Input
      */
     private long transId;
 
+    /**
+     * The stage of worker.
+     */
+    private int stageId;
+
     private String operatorName;
     private int stageId;
 

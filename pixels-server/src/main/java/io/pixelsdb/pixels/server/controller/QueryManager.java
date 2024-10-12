@@ -120,8 +120,6 @@ public class QueryManager
     {
         String scheduleServerHost = ConfigFactory.Instance().getProperty("query.schedule.server.host");
         int scheduleServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("query.schedule.server.port"));
-        String transServerHost = ConfigFactory.Instance().getProperty("trans.server.host");
-        int transServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
         try
         {
             /*
@@ -131,17 +129,7 @@ public class QueryManager
              * metrics for cluster auto-scaling, so we set scalingEnabled to false.
              */
             this.queryScheduleService = new QueryScheduleService(scheduleServerHost, scheduleServerPort, false);
-            this.transService = new TransService(transServerHost, transServerPort);
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                queryScheduleService.shutdown();
-                try
-                {
-                    transService.shutdown();
-                } catch (InterruptedException e)
-                {
-                    log.error("failed to shutdown query schedule service or transaction service", e);
-                }
-            }));
+            this.transService = TransService.Instance();
         } catch (QueryScheduleException e)
         {
             throw new QueryServerException("failed to initialize query schedule service", e);

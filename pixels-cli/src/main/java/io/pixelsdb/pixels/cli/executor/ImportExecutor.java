@@ -27,7 +27,6 @@ import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
@@ -56,9 +55,7 @@ public class ImportExecutor implements CommandExecutor
                 "layout must be 'ordered' or 'compact'");
         boolean ordered = layoutName.equalsIgnoreCase("ordered");
 
-        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
-        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
-        MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
+        MetadataService metadataService = MetadataService.Instance();
         Layout writableLayout = metadataService.getWritableLayout(schemaName, tableName);
         if (writableLayout == null)
         {
@@ -81,7 +78,6 @@ public class ImportExecutor implements CommandExecutor
         long endTime = System.currentTimeMillis();
         System.out.println("Pixels files in the " + layoutName + " writable path(s) of table '" +
                 schemaName + "." + tableName + "' are imported in " + (endTime - startTime) / 1000.0 + "s.");
-        metadataService.shutdown();
     }
 
     private static List<File> getImportFiles(boolean ordered, Layout writableLayout) throws IOException

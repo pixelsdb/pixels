@@ -29,16 +29,18 @@ import io.pixelsdb.pixels.cache.CacheLocationDistribution;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
 import io.pixelsdb.pixels.common.balance.Balancer;
-import io.pixelsdb.pixels.common.balance.HostAddress;
 import io.pixelsdb.pixels.common.balance.ReplicaBalancer;
 import io.pixelsdb.pixels.common.exception.BalancerException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.SchemaTableName;
+import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Location;
-import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
@@ -51,6 +53,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * CacheCoordinator is responsible for the following tasks:
@@ -95,22 +99,31 @@ public class CacheCoordinator implements Server
                     storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
                 }
                 // 2. check version consistency
-                int cacheVersion = 0, layoutVersion = 0;
-                this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+                int cacheVersion = -1, layoutVersion = -1;
+                SchemaTableName schemaTableName = null;
+                this.metadataService = MetadataService.Instance();
                 KeyValue cacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (null != cacheVersionKV)
                 {
                     cacheVersion = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
                 }
                 KeyValue layoutVersionKV = EtcdUtil.Instance().getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
-                if (null != layoutVersionKV)
+                if (layoutVersionKV != null)
                 {
-                    layoutVersion = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                    // Issue #636: get schema and table name from etcd instead of config file.
+                    String value = layoutVersionKV.getValue().toString(StandardCharsets.UTF_8);
+                    String[] splits = value.split(":");
+                    checkArgument(splits.length == 2, "invalid value for key '" +
+                            Constants.LAYOUT_VERSION_LITERAL + "' in etcd: " + value);
+                    schemaTableName = new SchemaTableName(splits[0]);
+                    layoutVersion = Integer.parseInt(splits[1]);
+                    checkArgument(layoutVersion >= 0,
+                            "invalid layout version in etcd: " + layoutVersion);
                 }
-                if (cacheVersion < layoutVersion)
+                if (cacheVersion >= 0 && layoutVersion >= 0 && cacheVersion < layoutVersion)
                 {
                     logger.debug("Current cache version is left behind of current layout version, update the cache...");
-                    updateCachePlan(layoutVersion);
+                    updateCachePlan(schemaTableName, layoutVersion);
                 }
 
                 logger.info("Cache coordinator on is initialized");
@@ -158,12 +171,21 @@ public class CacheCoordinator implements Server
                                 // this coordinator is ready.
                                 logger.debug("Update cache distribution");
                                 // update the cache distribution
-                                int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                                updateCachePlan(layoutVersion);
+                                String value = event.getKeyValue().getValue().toString(StandardCharsets.UTF_8);
+                                // Issue #636: get schema and table name from etcd instead of config file.
+                                String[] splits = value.split(":");
+                                checkArgument(splits.length == 2, "invalid value for key '" +
+                                        Constants.LAYOUT_VERSION_LITERAL + "' in etcd: " + value);
+                                SchemaTableName schemaTableName = new SchemaTableName(splits[0]);
+                                int layoutVersion = Integer.parseInt(splits[1]);
+                                checkArgument(layoutVersion >= 0,
+                                        "invalid layout version in etcd: " + layoutVersion);
+                                updateCachePlan(schemaTableName, layoutVersion);
                                 // update cache version, notify cache managers on each node to update cache.
                                 logger.debug("Update cache version to " + layoutVersion);
-                                EtcdUtil.Instance().putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
-                            } catch (IOException | MetadataException e)
+                                EtcdUtil.Instance().putKeyValue(Constants.CACHE_VERSION_LITERAL, value);
+                            }
+                            catch (IOException | MetadataException e)
                             {
                                 logger.error("Failed to update cache distribution", e);
                             }
@@ -176,10 +198,12 @@ public class CacheCoordinator implements Server
             // Wait for this coordinator to be shutdown
             logger.info("Cache coordinator is running");
             runningLatch.await();
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             logger.error("Cache coordinator interrupted when waiting on the running latch", e);
-        } finally
+        }
+        finally
         {
             if (watcher != null)
             {
@@ -200,21 +224,16 @@ public class CacheCoordinator implements Server
         logger.debug("Shutting down cache coordinator...");
         if (metadataService != null)
         {
-            try
-            {
-                metadataService.shutdown();
-            } catch (InterruptedException e)
-            {
-                logger.error("Failed to shutdown rpc channel for metadata service " +
-                        "while shutting down cache coordinator.", e);
-            }
+            // Issue #708: no need the shut down the metadata service instance created using the configured host and port.
+            metadataService = null;
         }
         if (storage != null)
         {
             try
             {
                 storage.close();
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 logger.error("Failed to close cache storage while shutting down cache coordinator.", e);
             }
@@ -232,78 +251,72 @@ public class CacheCoordinator implements Server
      * 1. for all files, decide which files to cache
      * 2. for each file, decide which node to cache it
      * */
-    private void updateCachePlan(int layoutVersion) throws MetadataException, IOException
+    private void updateCachePlan(SchemaTableName schemaTableName, int layoutVersion)
+            throws MetadataException, IOException
     {
-        Layout layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
+        Layout layout = metadataService.getLayout(
+                schemaTableName.getSchemaName(), schemaTableName.getTableName(), layoutVersion);
         // select: decide which files to cache
         assert layout != null;
-        String[] paths = select(layout);
+        List<String> filePaths = select(layout);
         // allocate: decide which node to cache each file
-        List<KeyValue> nodes = EtcdUtil.Instance().getKeyValuesByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
-        if (nodes == null || nodes.isEmpty())
+        List<KeyValue> workerNodes = EtcdUtil.Instance().getKeyValuesByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
+        if (workerNodes == null || workerNodes.isEmpty())
         {
             logger.info("Nodes is null or empty, no updates");
             return;
         }
-        HostAddress[] hosts = new HostAddress[nodes.size()];
+        HostAddress[] workerHosts = new HostAddress[workerNodes.size()];
         int hostIndex = 0;
-        for (int i = 0; i < nodes.size(); i++)
+        for (KeyValue node : workerNodes)
         {
-            KeyValue node = nodes.get(i);
             // key: host_[hostname]; value: [status]. available if status == 1.
             if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) ==
                     NodeStatus.READY.StatusCode)
             {
-                hosts[hostIndex++] = HostAddress.fromString(node.getKey()
-                        .toString(StandardCharsets.UTF_8).substring(5));
+                workerHosts[hostIndex++] = HostAddress.fromString(node.getKey()
+                        .toString(StandardCharsets.UTF_8).substring(Constants.HEARTBEAT_WORKER_LITERAL.length()));
             }
         }
-        allocate(paths, hosts, hostIndex, layoutVersion);
+        allocate(filePaths, workerHosts, hostIndex, layoutVersion);
     }
 
     /**
-     * get the file paths under the compact path of the first layout.
-     * @param layout
+     * Get the file paths under the compact path of the storage layout to be cached.
+     * @param layout the storage layout to be cached
      * @return the file paths
-     * @throws IOException
+     * @throws MetadataException if fails to get file paths under the layout
      */
-    private String[] select(Layout layout) throws IOException
+    private List<String> select(Layout layout) throws MetadataException
     {
-        String[] compactPaths = layout.getCompactPathUris();
-        List<String> files = new ArrayList<>();
-        List<Status> statuses = storage.listStatus(compactPaths);
-        if (statuses != null)
+        List<Path> compactPaths = layout.getCompactPaths();
+        List<String> filePaths = new LinkedList<>();
+        // Issue #723: files are managed in metadata, do not get file paths from storage.
+        for (Path compactPath : compactPaths)
         {
-            for (Status status : statuses)
-            {
-                if (status.isFile())
-                {
-                    files.add(status.getPath());
-                }
-            }
+            this.metadataService.getFiles(compactPath.getId()).forEach(
+                    file -> filePaths.add(File.getFilePath(compactPath, file)));
         }
-        String[] result = new String[files.size()];
-        files.toArray(result);
-        return result;
+        return filePaths;
     }
 
     /**
-     * allocate (maps) file paths to nodes, and persists the result in etcd.
-     * @param paths
-     * @param nodes
-     * @param size
-     * @param layoutVersion
-     * @throws IOException
+     * Allocate (map) file paths to worker nodes, and persists the result (cache tasks) in etcd.
+     * @param filePaths the paths of the files to cache
+     * @param workers the hostnames of the worker nodes
+     * @param size the number of worker to allocate the cache tasks
+     * @param layoutVersion the version of the new layout to be cached
+     * @throws IOException if fails to allocate cache locations
      */
-    private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion) throws IOException
+    private void allocate(List<String> filePaths, HostAddress[] workers, int size, int layoutVersion) throws IOException
     {
-        CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes, size);
+        CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(filePaths, workers, size);
         for (int i = 0; i < size; i++)
         {
-            HostAddress node = nodes[i];
+            HostAddress node = workers[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
-            logger.debug(files.size() + " files are allocated to " + node + " at version" + layoutVersion);
+            logger.debug(files.size() + " files are allocated to " + node + " at layout version" + layoutVersion);
             EtcdUtil.Instance().putKeyValue(key, String.join(";", files));
         }
     }
@@ -316,7 +329,7 @@ public class CacheCoordinator implements Server
      * @return
      * @throws IOException
      */
-    private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size) throws IOException
+    private CacheLocationDistribution assignCacheLocations(List<String> paths, HostAddress[] nodes, int size) throws IOException
     {
         CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
@@ -352,7 +365,7 @@ public class CacheCoordinator implements Server
             if (replicaBalancer.isBalanced())
             {
                 boolean enableAbsolute = Boolean.parseBoolean(
-                        ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
+                        ConfigFactory.Instance().getProperty("cache.absolute.balancer.enabled"));
                 if (enableAbsolute)
                 {
                     Balancer absoluteBalancer = new AbsoluteBalancer();
@@ -367,11 +380,13 @@ public class CacheCoordinator implements Server
                             String path = entry.getKey();
                             locationDistribution.addCacheLocation(host, path);
                         }
-                    } else
+                    }
+                    else
                     {
                         throw new BalancerException("absolute balancer failed to balance paths");
                     }
-                } else
+                }
+                else
                 {
                     Map<String, HostAddress> balanced = replicaBalancer.getAll();
                     for (Map.Entry<String, HostAddress> entry : balanced.entrySet())
@@ -381,7 +396,8 @@ public class CacheCoordinator implements Server
                         locationDistribution.addCacheLocation(host, path);
                     }
                 }
-            } else
+            }
+            else
             {
                 throw new BalancerException("replica balancer failed to balance paths");
             }

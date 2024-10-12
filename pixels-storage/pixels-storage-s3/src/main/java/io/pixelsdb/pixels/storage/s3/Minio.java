@@ -19,11 +19,8 @@
  */
 package io.pixelsdb.pixels.storage.s3;
 
-import io.pixelsdb.pixels.common.exception.StorageException;
-import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
@@ -35,10 +32,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Objects;
 
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
-import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.MINIO_ID_KEY;
-import static io.pixelsdb.pixels.common.utils.Constants.MINIO_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -64,15 +57,6 @@ public final class Minio extends AbstractS3
 
     static
     {
-        if (EnableCache)
-        {
-            /**
-             * Issue #222:
-             * The etcd file id is only used for cache coordination.
-             * Thus, we do not initialize the id key when cache is disabled.
-             */
-            InitId(MINIO_ID_KEY);
-        }
         minioRegion = ConfigFactory.Instance().getProperty("minio.region");
         minioEndpoint = ConfigFactory.Instance().getProperty("minio.endpoint");
         minioAccessKey = ConfigFactory.Instance().getProperty("minio.access.key");
@@ -142,12 +126,6 @@ public final class Minio extends AbstractS3
         connect();
     }
 
-    @Override
-    protected String getPathKey(String path)
-    {
-        return MINIO_META_PREFIX + path;
-    }
-
     // Reuse S3.Path.
 
     @Override
@@ -178,30 +156,5 @@ public final class Minio extends AbstractS3
         {
             s3.close();
         }
-    }
-
-    @Override
-    protected boolean existsOrGenIdSucc(ObjectPath path) throws IOException
-    {
-        if (!EnableCache)
-        {
-            throw new StorageException("Should not check or generate file id when cache is disabled");
-        }
-        if (!path.valid)
-        {
-            throw new IOException("Path '" + path.toString() + "' is not valid.");
-        }
-        if (EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null)
-        {
-            return true;
-        }
-        if (this.existsInS3(path))
-        {
-            // the file id does not exist, register a new id for this file.
-            long id = GenerateId(MINIO_ID_KEY);
-            EtcdUtil.Instance().putKeyValue(getPathKey(path.toString()), Long.toString(id));
-            return true;
-        }
-        return false;
     }
 }

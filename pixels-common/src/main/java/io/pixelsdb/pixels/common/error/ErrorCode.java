@@ -74,8 +74,9 @@ public class ErrorCode
     public static final int METADATA_DELETE_RANGE_FAILED = (ERROR_BASE_METADATA + 42);
     public static final int METADATA_ADD_FILE_FAILED = (ERROR_BASE_METADATA + 43);
     public static final int METADATA_GET_FILES_FAILED = (ERROR_BASE_METADATA + 44);
-    public static final int METADATA_UPDATE_FILE_FAILED = (ERROR_BASE_METADATA + 45);
-    public static final int METADATA_DELETE_FILES_FAILED = (ERROR_BASE_METADATA + 46);
+    public static final int METADATA_GET_FILE_ID_FAILED = (ERROR_BASE_METADATA + 45);
+    public static final int METADATA_UPDATE_FILE_FAILED = (ERROR_BASE_METADATA + 46);
+    public static final int METADATA_DELETE_FILES_FAILED = (ERROR_BASE_METADATA + 47);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue
@@ -97,6 +98,7 @@ public class ErrorCode
     public static final int TRANS_CONTEXT_NOT_FOUND = (ERROR_TRANS + 4);
     public static final int TRANS_COMMIT_FAILED = (ERROR_TRANS + 5);
     public static final int TRANS_ROLLBACK_FAILED = (ERROR_TRANS + 6);
+    public static final int TRANS_GENERATE_ID_OR_TS_FAILED = (ERROR_TRANS + 7);
 
     // begin error code for query schedule
     private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;

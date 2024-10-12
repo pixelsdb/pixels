@@ -102,6 +102,24 @@ public class File extends Base
         return filesBuilder.build();
     }
 
+    /**
+     * @param path the path containing the file
+     * @param file the file
+     * @return the full absolute path of the file
+     */
+    public static String getFilePath(Path path, File file)
+    {
+        String pathUri = path.getUri();
+        if (pathUri.endsWith("/"))
+        {
+            return pathUri + file.name;
+        }
+        else
+        {
+            return pathUri + "/" + file.name;
+        }
+    }
+
     @Override
     public MetadataProto.File toProto()
     {

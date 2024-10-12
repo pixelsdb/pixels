@@ -123,9 +123,7 @@ public class StarlingPlanner
                         rootTable.getTableType() == Table.TableType.AGGREGATED,
                 "currently, StarlingPlanner only supports scan, join, and aggregation");
         this.config = ConfigFactory.Instance();
-        this.metadataService = metadataService.orElseGet(() ->
-                new MetadataService(config.getProperty("metadata.server.host"),
-                        Integer.parseInt(config.getProperty("metadata.server.port"))));
+        this.metadataService = metadataService.orElseGet(MetadataService::Instance);
         this.fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
         this.projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
         this.orderedPathEnabled = orderedPathEnabled;

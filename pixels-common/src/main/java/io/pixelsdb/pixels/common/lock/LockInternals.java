@@ -25,6 +25,7 @@ import io.etcd.jetcd.options.GetOption;
 import io.etcd.jetcd.options.PutOption;
 import io.etcd.jetcd.options.WatchOption;
 import io.etcd.jetcd.watch.WatchEvent;
+import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.utils.StringUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  **/
 public class LockInternals
 {
-    private static Logger logger = LogManager.getLogger(LockInternals.class);
+    private static final Logger logger = LogManager.getLogger(LockInternals.class);
 
     private final String path;
     private final Client client;
@@ -52,8 +53,8 @@ public class LockInternals
     private final String lockName;
     private boolean verbose = false;
     private Long leaseId = 0L;
-    private static AtomicInteger count = new AtomicInteger(0);
-    private volatile Map<String, Long> pathToVersion = new HashMap<>();
+    private static final AtomicInteger count = new AtomicInteger(0);
+    private final Map<String, Long> pathToVersion = new HashMap<>();
     private ScheduledExecutorService keepAliveService;
 
     public LockInternals(Client client, String path, String lockName)
@@ -83,6 +84,11 @@ public class LockInternals
         return this;
     }
 
+    public String getLockName()
+    {
+        return lockName;
+    }
+
     private void DEBUG(String msg)
     {
         if (verbose)
@@ -91,7 +97,7 @@ public class LockInternals
         }
     }
 
-    String attemptLock(long timeout, TimeUnit unit) throws Exception
+    String attemptLock(long timeout, TimeUnit unit) throws EtcdException
     {
         // startMillis, millisToWait maybe useful later, refer 'InterProcessReadWriteLock' in 'org.apache.curator'
         String ourPath = null;
@@ -111,11 +117,10 @@ public class LockInternals
      * create key
      *
      * @param client the client
-     * @param path   basePath + 'READ' or 'WRIT'
+     * @param path basePath + 'READ' or 'WRIT'
      * @return the key put in etcd, like '/read-write-lock/cf273ce3-23e7-45da-a480-dd5318692f26_READ_0'
-     * @throws Exception
      */
-    public synchronized String createsTheLock(Client client, String path) throws Exception
+    public synchronized String createsTheLock(Client client, String path)
     {
         path = StringUtil.validatePath(path);
         String name = UUID.randomUUID() + path;
@@ -141,7 +146,7 @@ public class LockInternals
         return ourPath;
     }
 
-    private synchronized boolean internalLockLoop(String ourPath, long timeout, TimeUnit unit) throws Exception
+    private synchronized boolean internalLockLoop(String ourPath, long timeout, TimeUnit unit) throws EtcdException
     {
         boolean haveTheLock = false;
         boolean doDelete = false;
@@ -253,7 +258,7 @@ public class LockInternals
                     }
                     else
                     {
-                        // don't try write lock too often
+                        // don't try to acquire write lock too often
                         try
                         {
                             Thread.sleep(1000);
@@ -273,10 +278,10 @@ public class LockInternals
                 }
             }
         }
-        catch (Exception var21)
+        catch (EtcdException e)
         {
             doDelete = true;
-            throw var21;
+            throw e;
         }
         finally
         {
@@ -293,7 +298,7 @@ public class LockInternals
      *
      * @return true if the first key, false if not
      */
-    private boolean canGetWriteLock(String path)
+    private boolean canGetWriteLock(String path) throws EtcdException
     {
         List<KeyValue> children = null;
         try
@@ -302,37 +307,44 @@ public class LockInternals
         }
         catch (Exception e)
         {
-            e.printStackTrace();
+            logger.error("failed to get sorted children when get write lock", e);
+            throw new EtcdException("failed to get sorted children when get write lock", e);
         }
         //only id the first key is myself can get the write-lock
         long revisionOfMyself = this.pathToVersion.get(path);
-        boolean result = revisionOfMyself == children.get(0).getModRevision();
-
-        return result;
+        return revisionOfMyself == children.get(0).getModRevision();
     }
 
     /**
      * get all the key with this prefix, order by MOD or VERSION
      *
      * @return List<KeyValue>
-     * @throws Exception
+     * @throws EtcdException
      */
-    List<KeyValue> getSortedChildren() throws Exception
+    List<KeyValue> getSortedChildren() throws EtcdException
     {
-        List<KeyValue> kvList = client.getKVClient().get(ByteSequence.from(basePath, StandardCharsets.UTF_8),
-                GetOption.newBuilder().withPrefix(ByteSequence.from(basePath, StandardCharsets.UTF_8))
-                        .withSortField(GetOption.SortTarget.MOD).build())
-                .get().getKvs();
-        return kvList;
+        List<KeyValue> kvList;
+        try
+        {
+            kvList = client.getKVClient().get(ByteSequence.from(basePath, StandardCharsets.UTF_8),
+                    GetOption.newBuilder().withPrefix(ByteSequence.from(basePath, StandardCharsets.UTF_8))
+                            .withSortField(GetOption.SortTarget.MOD).build())
+                    .get().getKvs();
+            return kvList;
+        }
+        catch (InterruptedException | ExecutionException e)
+        {
+            throw new EtcdException("failed to get the kv for base path: " + basePath, e);
+        }
     }
 
     /**
      * delete the given key
      *
      * @param ourPath
-     * @throws Exception
+     * @throws EtcdException
      */
-    private void deleteOurPath(String ourPath) throws Exception
+    private void deleteOurPath(String ourPath) throws EtcdException
     {
         try
         {
@@ -343,10 +355,11 @@ public class LockInternals
         catch (InterruptedException | ExecutionException | TimeoutException e)
         {
             DEBUG("[unlock-error]: " + e);
+            throw new EtcdException("failed to get kv for path: " + ourPath, e);
         }
     }
 
-    public void releaseLock(String lockPath) throws Exception
+    public void releaseLock(String lockPath) throws EtcdException
     {
         deleteOurPath(lockPath);
         this.keepAliveService.shutdownNow();
@@ -354,8 +367,8 @@ public class LockInternals
 
     public static class KeepAliveTask implements Runnable
     {
-        private Lease leaseClient;
-        private long leaseId;
+        private final Lease leaseClient;
+        private final long leaseId;
 
         KeepAliveTask(Lease leaseClient, long leaseId)
         {

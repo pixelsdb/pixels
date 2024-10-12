@@ -23,7 +23,6 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -33,7 +32,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 // Connect to remote metadata service and manipulate on the catalog data
 public class TestMetadataService
@@ -45,13 +45,7 @@ public class TestMetadataService
     @Before
     public void init()
     {
-        this.instance = new MetadataService(hostAddr, 18888);
-    }
-
-    @After
-    public void shutdown() throws InterruptedException
-    {
-        this.instance.shutdown();
+        this.instance = MetadataService.CreateInstance(hostAddr, 18888);
     }
 
     @Test

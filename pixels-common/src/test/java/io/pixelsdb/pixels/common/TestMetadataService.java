@@ -23,7 +23,6 @@ import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -37,13 +36,7 @@ public class TestMetadataService
     @Before
     public void init()
     {
-        this.instance = new MetadataService("node01", 18888);
-    }
-
-    @After
-    public void shutdown() throws InterruptedException
-    {
-        this.instance.shutdown();
+        this.instance = MetadataService.CreateInstance("node01", 18888);
     }
 
     @Test

@@ -1,5 +1,5 @@
 #!/bin/bash
 
-echo "Stop vmtouch."
-
 kill $(pidof vmtouch)
+
+echo "vmtouch is stopped."

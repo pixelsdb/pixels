@@ -29,6 +29,7 @@ import io.pixelsdb.pixels.cache.PixelsCacheUtil;
 import io.pixelsdb.pixels.cache.PixelsCacheWriter;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.Constants;
@@ -41,6 +42,8 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * pixels cache manager.
@@ -61,7 +64,7 @@ public class CacheWorker implements Server
      */
     private String hostName;
     private boolean initializeSuccess = false;
-    private int localCacheVersion = 0;
+    private int localCacheVersion = -1;
     private CountDownLatch runningLatch;
 
     public CacheWorker()
@@ -109,23 +112,31 @@ public class CacheWorker implements Server
                         .setHostName(hostName)
                         .setCacheConfig(cacheConfig)
                         .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
-                this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+                this.metadataService = MetadataService.Instance();
 
                 // 2. update cache if necessary.
                 // If the cache is new created using start-vm.sh script, the local cache version would be zero.
-                localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
+                localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile(), cacheWriter.getCacheFile());
                 logger.debug("Local cache version: " + localCacheVersion);
                 // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
                 KeyValue globalCacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (globalCacheVersionKV != null)
                 {
-                    int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                    // Issue #636: get schema and table name from etcd instead of config file.
+                    String value = globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8);
+                    String[] splits = value.split(":");
+                    checkArgument(splits.length == 2, "invalid value for key '" +
+                            Constants.CACHE_VERSION_LITERAL + "' in etcd: " + value);
+                    SchemaTableName schemaTableName = new SchemaTableName(splits[0]);
+                    int globalCacheVersion = Integer.parseInt(splits[1]);
+                    checkArgument(globalCacheVersion >= 0,
+                            "invalid cache version in etcd: " + globalCacheVersion);
                     logger.debug("Current global cache version: " + globalCacheVersion);
                     // if cache file exists already. we need check local cache version with global cache version stored in etcd.
                     if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion)
                     {
                         // If global version is ahead the local one, update local cache.
-                        updateLocalCache(globalCacheVersion);
+                        updateLocalCache(schemaTableName, globalCacheVersion);
                     }
                 }
             }
@@ -140,22 +151,24 @@ public class CacheWorker implements Server
         }
     }
 
-    private void updateLocalCache(int version)
-            throws MetadataException
+    private void updateLocalCache(SchemaTableName schemaTableName, int version) throws MetadataException
     {
-        Layout matchedLayout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
+        Layout matchedLayout = metadataService.getLayout(
+                schemaTableName.getSchemaName(), schemaTableName.getTableName(), version);
         if (matchedLayout != null)
         {
             // update cache status
             cacheStatus.set(CacheWorkerStatus.UPDATING.StatusCode);
             // update cache content
-            int status = 0;
+            int status;
             if (cacheWriter.isCacheEmpty())
             {
+                logger.debug("Cache update all for layout version " + version);
                 status = cacheWriter.updateAll(version, matchedLayout);
             }
             else
             {
+                logger.debug("Cache update incremental for layout version " + version);
                 status = cacheWriter.updateIncremental(version, matchedLayout);
             }
             cacheStatus.set(status);
@@ -192,28 +205,43 @@ public class CacheWorker implements Server
                         if (event.getEventType() == WatchEvent.EventType.PUT)
                         {
                             // Get a new cache layout version.
-                            int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
                             if (cacheStatus.get() == CacheWorkerStatus.READY.StatusCode)
                             {
                                 // Ready to update the local cache.
-                                logger.debug("Cache version update detected, new global version is (" + version + ").");
-                                if (version > localCacheVersion)
+                                String value = event.getKeyValue().getValue().toString(StandardCharsets.UTF_8);
+                                String[] splits = value.split(":");
+                                checkArgument(splits.length == 2, "invalid value for key '" +
+                                        Constants.CACHE_VERSION_LITERAL + "' in etcd: " + value);
+                                SchemaTableName schemaTableName = new SchemaTableName(splits[0]);
+                                int globalCacheVersion = Integer.parseInt(splits[1]);
+                                checkArgument(globalCacheVersion >= 0,
+                                        "invalid cache version in etcd: " + globalCacheVersion);
+                                logger.debug("Cache version update detected, new global version is (" +
+                                        globalCacheVersion + ").");
+                                if (globalCacheVersion > localCacheVersion)
                                 {
                                     // The new version is newer, update the local cache.
-                                    logger.debug("New global version is greater than the local version, update the local cache.");
+                                    logger.debug("New global cache version " + globalCacheVersion +
+                                            " is greater than the local version " + localCacheVersion +
+                                            ", update the local cache.");
                                     try
                                     {
-                                        updateLocalCache(version);
+                                        updateLocalCache(schemaTableName, globalCacheVersion);
                                     } catch (MetadataException e)
                                     {
                                         logger.error("Failed to update local cache.", e);
                                     }
                                 }
+                                else
+                                {
+                                    logger.debug("New global cache version " + globalCacheVersion +
+                                            " is equal to or less than the local version " + localCacheVersion);
+                                }
                             } else if (cacheStatus.get() == CacheWorkerStatus.UPDATING.StatusCode)
                             {
                                 // The local cache is updating, ignore the new version.
-                                logger.warn("The local cache is updating for version (" + localCacheVersion + "), " +
-                                        "ignore the new cache version (" + version + ").");
+                                String value = event.getKeyValue().getValue().toString(StandardCharsets.UTF_8);
+                                logger.warn("The local cache is updating, ignore the global cache version (" + value + ").");
                             } else
                             {
                                 // Shutdown this node manager.
@@ -260,14 +288,8 @@ public class CacheWorker implements Server
         logger.info("Shutting down cache worker...");
         if (metadataService != null)
         {
-            try
-            {
-                metadataService.shutdown();
-            } catch (InterruptedException e)
-            {
-                logger.error("Failed to shutdown rpc channel for metadata service " +
-                        "while shutting down cache worker.", e);
-            }
+            // Issue #708: no need the shut down the metadata service instance created using the configured host and port.
+            metadataService = null;
         }
         if (cacheWriter != null)
         {

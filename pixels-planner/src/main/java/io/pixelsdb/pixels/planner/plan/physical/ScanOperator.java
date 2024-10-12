@@ -79,6 +79,7 @@ public abstract class ScanOperator extends Operator
         int taskId = 0;
         for (ScanInput scanInput : this.scanInputs)
         {
+            scanInput.setStageId(scanStageId);
             List<InputSplit> inputSplits = scanInput.getTableInfo().getInputSplits();
             for (InputSplit inputSplit : inputSplits)
             {

@@ -94,6 +94,12 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
                 service.execute(request, responseObserver);
                 break;
             }
+            case SCAN_STREAM:
+            {
+                ServiceImpl<ScanStreamWorker, ScanInput, ScanOutput> service = new ServiceImpl<>(ScanStreamWorker.class, ScanInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
             default:
                 throw new RuntimeException("Receive invalid function type");
         }

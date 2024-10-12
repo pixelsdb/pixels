@@ -31,7 +31,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  * @create 2022-02-20
  * @author hank
  */
-public class TransContext
+public class TransContext implements Comparable<TransContext>
 {
     private final long transId;
     private final long timestamp;
@@ -108,5 +108,16 @@ public class TransContext
             builder.putProperties((String) entry.getKey(), (String) entry.getValue());
         }
         return builder.build();
+    }
+
+    @Override
+    public int compareTo(TransContext that)
+    {
+        long tsCom = this.timestamp - that.timestamp;
+        if (tsCom != 0)
+        {
+            return tsCom < 0 ? -1 : 1;
+        }
+        return Long.compare(this.transId, that.transId);
     }
 }

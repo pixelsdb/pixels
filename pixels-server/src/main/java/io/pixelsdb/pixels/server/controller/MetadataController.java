@@ -29,7 +29,6 @@ import io.pixelsdb.pixels.common.server.rest.response.GetColumnsResponse;
 import io.pixelsdb.pixels.common.server.rest.response.GetSchemasResponse;
 import io.pixelsdb.pixels.common.server.rest.response.GetTablesResponse;
 import io.pixelsdb.pixels.common.server.rest.response.GetViewsResponse;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.server.constant.RestUrlPath;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -49,9 +48,7 @@ public class MetadataController
 
     static
     {
-        String host = ConfigFactory.Instance().getProperty("metadata.server.host");
-        int port = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
-        metadataService = new MetadataService(host, port);
+        metadataService = MetadataService.Instance();
     }
 
     @PostMapping(value = RestUrlPath.GET_SCHEMAS,

@@ -42,6 +42,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
+
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
 import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
@@ -63,12 +68,18 @@ public class WorkerCommon
     public static final int rowBatchSize;
     protected static final int pixelStride;
     protected static final int rowGroupSize;
+    protected static int port;
+    protected static String coordinatorIp;
+    protected static int coordinatorPort;
 
     static
     {
         rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
         pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
+        port = Integer.parseInt(configFactory.getProperty("executor.worker.exchange.port"));
+        coordinatorIp = configFactory.getProperty("worker.coordinate.server.host");
+        coordinatorPort = Integer.parseInt(configFactory.getProperty("worker.coordinate.server.port"));
     }
 
     public static void initStorage(StorageInfo storageInfo)
@@ -459,5 +470,45 @@ public class WorkerCommon
         output.setTotalWriteBytes(collector.getWriteBytes());
         output.setNumReadRequests(collector.getNumReadRequests());
         output.setNumWriteRequests(collector.getNumWriteRequests());
+    }
+
+    public static String getIpAddress()
+    {
+        try {
+            Enumeration<NetworkInterface> allNetInterfaces = NetworkInterface.getNetworkInterfaces();
+            InetAddress ip = null;
+            while (allNetInterfaces.hasMoreElements()) {
+                NetworkInterface netInterface = (NetworkInterface) allNetInterfaces.nextElement();
+                if (netInterface.isLoopback() || netInterface.isVirtual() || !netInterface.isUp()) {
+                    continue;
+                } else {
+                    Enumeration<InetAddress> addresses = netInterface.getInetAddresses();
+                    while (addresses.hasMoreElements()) {
+                        ip = addresses.nextElement();
+                        if (ip != null && ip instanceof Inet4Address) {
+                            return ip.getHostAddress();
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("failed to get ip" + e.toString());
+        }
+        return "";
+    }
+
+    public static int getPort()
+    {
+        return port++;
+    }
+
+    public static String getCoordinatorIp()
+    {
+        return coordinatorIp;
+    }
+
+    public static int getCoordinatorPort()
+    {
+        return coordinatorPort;
     }
 }

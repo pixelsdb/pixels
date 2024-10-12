@@ -21,6 +21,9 @@ package io.pixelsdb.pixels.common.metadata;
 
 import com.google.common.base.Objects;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * @author tao
  * @author hank
@@ -33,8 +36,18 @@ public class SchemaTableName
 
     public SchemaTableName(String schemaName, String tableName)
     {
-        this.schemaName = schemaName;
-        this.tableName = tableName;
+        this.schemaName = requireNonNull(schemaName, "schemaName is null");
+        this.tableName = requireNonNull(tableName, "tableName is null");
+    }
+
+    public SchemaTableName(String schemaTableName)
+    {
+        requireNonNull(schemaTableName, "schemaTableName is null");
+        int dot = schemaTableName.indexOf(".");
+        checkArgument(dot > 0 && dot < schemaTableName.length() - 1,
+                "schemaTableName " + schemaTableName + " is invalid");
+        this.schemaName = schemaTableName.substring(0, dot);
+        this.tableName = schemaTableName.substring(dot + 1);
     }
 
     public String getSchemaName()

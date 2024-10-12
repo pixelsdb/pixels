@@ -192,8 +192,7 @@ public class HeartbeatCoordinator implements Server
         public void run()
         {
             leaseClient.keepAliveOnce(leaseId);
-            EtcdUtil.Instance().putKeyValueWithLeaseId(coordinatorKey,
-                    String.valueOf(currentStatus.get()), leaseId);
+            EtcdUtil.Instance().putKeyValueWithLeaseId(coordinatorKey, String.valueOf(currentStatus.get()), leaseId);
         }
 
         public void stop()

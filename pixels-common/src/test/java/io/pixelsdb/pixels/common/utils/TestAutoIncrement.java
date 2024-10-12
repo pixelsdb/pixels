@@ -19,18 +19,19 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
+import io.pixelsdb.pixels.common.exception.EtcdException;
 import org.junit.Test;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 
 /**
- * Created at: 8/28/21
- * Author: hank
+ * @create 2021-08-28
+ * @author hank
  */
 public class TestAutoIncrement
 {
     @Test
-    public void testEtcdDao()
+    public void testEtcdAutoIncrement() throws EtcdException
     {
         long id = GenerateId("test-id");
         System.out.println(id);

@@ -192,7 +192,7 @@ public class StorageFactory
         return storageProviders;
     }
 
-    public void closeAll() throws IOException
+    public synchronized void closeAll() throws IOException
     {
         for (Storage.Scheme scheme : storageImpls.keySet())
         {
