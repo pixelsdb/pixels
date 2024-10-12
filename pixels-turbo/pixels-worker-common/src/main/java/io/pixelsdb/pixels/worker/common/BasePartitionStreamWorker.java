@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.vhive;
+package io.pixelsdb.pixels.worker.common;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
@@ -37,7 +37,6 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
-import io.pixelsdb.pixels.worker.common.*;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;

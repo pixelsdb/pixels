@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.worker.vhive;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
-import io.pixelsdb.pixels.worker.common.BasePartitionWorker;
+import io.pixelsdb.pixels.worker.common.BasePartitionStreamWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
 

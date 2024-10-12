@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.vhive;
+package io.pixelsdb.pixels.worker.common;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsReader;
@@ -36,7 +36,6 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import io.pixelsdb.pixels.worker.common.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
