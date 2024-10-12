@@ -73,6 +73,8 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
         this.workerMetrics = context.getWorkerMetrics();
         this.workerCoordinateService = new WorkerCoordinateService("128.110.218.225", 18894);
         // Hardcoded for Cloudlab. todo: Need to figure out how to get the daemon IP dynamically.
+        //  Perhaps add a field in the WorkerContext class to store the daemon IP,
+        //  or to have the Pixels planner pass the daemon IP in the Input.
     }
 
     @Override
