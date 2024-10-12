@@ -98,7 +98,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         if (littleEndian)
         {
             WRITER_ENDIAN = ByteOrder.LITTLE_ENDIAN;
-        } else
+        }
+        else
         {
             WRITER_ENDIAN = ByteOrder.BIG_ENDIAN;
         }
@@ -183,7 +184,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             // ArrayBlockingQueue.take() and .poll() removes element from the queue, so we need to put it back
             setPort(path, ret);
             return ret;
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             logger.error("error when getting port", e);
             return -1;
@@ -522,7 +524,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 {
                     dataLength.addAndGet(writer.write(columnVector, rowBatchSize));
                     future.complete(null);
-                } catch (IOException e)
+                }
+                catch (IOException e)
                 {
                     throw new CompletionException("failed to write column vector", e);
                 }
@@ -591,7 +594,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             {
                 byteBuf.release();
             }
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             logger.error("error when closing writer", e);
         }
@@ -784,10 +788,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter
 
             while (!success)
             {
-                try {
+                try
+                {
                     CompletableFuture<Response> future = new CompletableFuture<>();
-                    httpClient.executeRequest(req, new AsyncCompletionHandler<Response>()
-                    {
+                    httpClient.executeRequest(req, new AsyncCompletionHandler<Response>() {
 
                         @Override
                         public Response onCompleted(Response response) throws Exception
@@ -808,7 +812,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                             if (t instanceof java.net.ConnectException)
                             {
                                 future.completeExceptionally(t);
-                            } else
+                            }
+                            else
                             {
                                 byteBuf.clear();
                                 logger.error(t.getMessage());
@@ -821,37 +826,43 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                     future.get();
                     // If no exception, the request was successful, so we break out of the loop
                     success = true;
-                } catch (ExecutionException e)
+                }
+                catch (ExecutionException e)
                 {
                     Throwable cause = e.getCause();
                     if (cause instanceof java.net.ConnectException)
                     {
                         attempt++;
-                        // logger.debug("HTTP connection refused. Retrying... Exception message: " + cause.getMessage());
                         if (attempt < maxAttempts)
                         {
-                            try {
+                            try
+                            {
                                 Thread.sleep(backoffMillis);
-                            } catch (InterruptedException interruptedException)
+                            }
+                            catch (InterruptedException interruptedException)
                             {
                                 Thread.currentThread().interrupt();
                                 throw new RuntimeException("Retry interrupted", interruptedException);
                             }
-                        } else
+                        }
+                        else
                         {
                             throw new RuntimeException("Max retry attempts reached. Failing the request.", cause);
                         }
-                    } else
+                    }
+                    else
                     {
                         throw new RuntimeException("Non-retryable error occurred", cause);
                     }
-                } catch (InterruptedException e)
+                }
+                catch (InterruptedException e)
                 {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("Retry interrupted", e);
                 }
             }
-        } catch (Throwable e)
+        }
+        catch (Throwable e)
         {
             logger.error("error when sending data", e);
         }

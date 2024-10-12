@@ -324,20 +324,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         logger.debug("In prepareRead(), rowGroupsPosition = " + rowGroupsPosition +
                 ", rowGroupDataLength = " + rowGroupDataLength +
                 ", firstRgFooterPosition = " + (rowGroupsPosition + rowGroupDataLength));
-        // // read all row group footers
-        // byteBuf.readerIndex(rowGroupsPosition);
-        // rowGroupFooters = new ArrayList<>();
-        // targetRGNum = 0;  // n.b. targetRGNum is currently not maintained by the sender, so we have to count it here.
-        // while (byteBuf.isReadable())
-        // {
-        //     byteBuf.readerIndex((int) (byteBuf.readerIndex() + byteBuf.readLong()));  // skip row group data and
-        //     // row group data length, and get to row group footer
-        //     byte[] rgFooterBytes = new byte[byteBuf.readInt()];
-        //     byteBuf.readBytes(rgFooterBytes);
-        //     PixelsStreamProto.StreamRowGroupFooter rgFooter = PixelsStreamProto.StreamRowGroupFooter.parseFrom(rgFooterBytes);
-        //     rowGroupFooters.add(rgFooter);
-        //     targetRGNum++;
-        // }
 
         byteBuf.readerIndex(rowGroupsPosition);
         this.resultColumnsEncoded = new boolean[includedColumnNum];
@@ -500,7 +486,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             this.resultRowBatch.reset();
             this.resultRowBatch.ensureSize(batchSize, false);
             resultRowBatch = this.resultRowBatch;
-        } else
+        }
+        else
         {
             resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
@@ -600,7 +587,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             {
                 curRowGroupByteBuf.release();
                 curRowGroupByteBuf = partitioned ? byteBufBlockingMap.get(curRGIdx) : byteBufSharedQueue.take();
-            } catch (InterruptedException e)
+            }
+            catch (InterruptedException e)
             {
                 e.printStackTrace();
             }
@@ -827,7 +815,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         //     try
         //     {
         //         sleep(20);
-        //     } catch (InterruptedException e)
+        //     }
+        //     catch (InterruptedException e)
         //     {
         //         throw new RuntimeException(e);
         //     }
@@ -849,7 +838,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                     {
                         readers[i].close();
                     }
-                } catch (IOException e)
+                }
+                catch (IOException e)
                 {
                     logger.error("Failed to close column reader.", e);
                     throw new IOException("Failed to close column reader.", e);
@@ -859,13 +849,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                 }
             }
         }
-        // if (rowGroupFooters != null)
-        // {
-        //     for (int i = 0; i < rowGroupFooters.length; ++i)
-        //     {
-        //         rowGroupFooters[i] = null;
-        //     }
-        // }
 
         includedColumnTypes.clear();
         // no need to close resultRowBatch
