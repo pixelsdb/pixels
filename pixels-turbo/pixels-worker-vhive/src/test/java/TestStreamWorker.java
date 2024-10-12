@@ -239,8 +239,10 @@ public class TestStreamWorker {
 //        }
         ScanStreamWorker scanWorker1 = new ScanStreamWorker(contextScan);
         ScanStreamWorker scanWorker2 = new ScanStreamWorker(contextScan);
-        WorkerContext contextAgg = new WorkerContext(LogManager.getLogger(BaseAggregationStreamWorker.class), new WorkerMetrics(), "0");
-        AggregationStreamWorker aggregation = new AggregationStreamWorker(contextAgg);
+//        WorkerContext contextAgg = new WorkerContext(LogManager.getLogger(BaseAggregationStreamWorker.class), new WorkerMetrics(), "0");
+//        AggregationStreamWorker aggregation = new AggregationStreamWorker(contextAgg);
+        WorkerContext contextAgg = new WorkerContext(LogManager.getLogger(BaseAggregationWorker.class), new WorkerMetrics(), "0");
+        AggregationWorker aggregation = new AggregationWorker(contextAgg);
         ExecutorService executor = Executors.newWorkStealingPool();
 
         // 若需改为不采用pipelining的实现，则将下列所有httpStorageInfo改为minioEndpoint，然后将ScanWorker的基类从BaseScanStreamWorker改为BaseScanWorker，其他几个用到的Worker类同理
