@@ -47,9 +47,6 @@ public class StorageInfoBuilder
                 accessKey = ConfigFactory.Instance().getProperty("redis.access.key");
                 secretKey = ConfigFactory.Instance().getProperty("redis.secret.key");
                 break;
-            case mock:  // HTTP storage info. FIXME: This format is only for dev
-                region = "http"; endpoint = ""; accessKey = ""; secretKey = "";
-                break;
             default:
                 region = ""; endpoint = ""; accessKey = ""; secretKey = "";
                 break;

@@ -47,10 +47,9 @@ public class StreamWorkerCommon extends WorkerCommon
 
     public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException
     {
-        if (storageInfo.getScheme() == Storage.Scheme.mock)
+        if (storageInfo.getScheme() == Storage.Scheme.httpstream)
         {
-            // Currently, we use Storage.Scheme.mock to indicate streaming mode,
-            //  where we don't need to initialize anything. Returns immediately.
+            // Streaming mode,  we don't need to initialize anything. Returns immediately.
             if (isOutput)
             {
                 // This is an output storage using HTTP. The opposite side must be waiting for a schema;
@@ -67,8 +66,7 @@ public class StreamWorkerCommon extends WorkerCommon
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, OutputInfo outputInfo)
             throws IOException
     {
-        if (storageInfo.getScheme() != Storage.Scheme.mock ||
-                !Objects.equals(storageInfo.getRegion(), "http"))
+        if (storageInfo.getScheme() != Storage.Scheme.httpstream)
         {
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
@@ -79,8 +77,7 @@ public class StreamWorkerCommon extends WorkerCommon
     public static void passSchemaToNextLevel(TypeDescription schema, StorageInfo storageInfo, String endpoint)
             throws IOException
     {
-        if (storageInfo.getScheme() != Storage.Scheme.mock ||
-                !Objects.equals(storageInfo.getRegion(), "http"))
+        if (storageInfo.getScheme() != Storage.Scheme.httpstream)
         {
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
@@ -97,7 +94,7 @@ public class StreamWorkerCommon extends WorkerCommon
 
     public static Storage getStorage(Storage.Scheme scheme)
     {
-        if (scheme == Storage.Scheme.mock)
+        if (scheme == Storage.Scheme.httpstream)
         {
             return http;
         }
@@ -200,7 +197,7 @@ public class StreamWorkerCommon extends WorkerCommon
     {
         requireNonNull(storageScheme, "storageInfo is null");
         requireNonNull(endpoint, "fileName is null");
-        if (storageScheme == Storage.Scheme.mock)
+        if (storageScheme == Storage.Scheme.httpstream)
         {
             logger.debug("getReader streaming mode: " + endpoint);
             return new PixelsReaderStreamImpl(endpoint, partitioned, numPartitions);
@@ -227,7 +224,7 @@ public class StreamWorkerCommon extends WorkerCommon
                                          List<Integer> keyColumnIds,
                                          List<String> outputEndpoints, boolean isSchemaWriter)
     {
-        if (storage != null && storage.getScheme() != Storage.Scheme.mock)
+        if (storage != null && storage.getScheme() != Storage.Scheme.httpstream)
             return WorkerCommon.getWriter(schema, storage, outputPath, encoding, isPartitioned, keyColumnIds);
         logger.debug("getWriter streaming mode, path: " + outputPath + ", endpoints: " + outputEndpoints +
                 ", isSchemaWriter: " + isSchemaWriter);

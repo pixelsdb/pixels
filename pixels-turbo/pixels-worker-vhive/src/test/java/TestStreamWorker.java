@@ -58,7 +58,7 @@ public class TestStreamWorker {
             ConfigFactory.Instance().getProperty("minio.access.key"),
             ConfigFactory.Instance().getProperty("minio.secret.key"));
     static final int numWorkers = 2;
-    static StorageInfo httpStorageInfo = new StorageInfo(Storage.Scheme.mock, "http", null, null, null);
+    static StorageInfo httpStorageInfo = new StorageInfo(Storage.Scheme.httpstream, null, null, null, null);
 //    static final List<List<InputSplit>> genScanInputSplitsList  = Arrays.asList(
 //            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180829_106.pxl", 0, 1)))),
 //            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180831_107.pxl", 0, 1)))),
