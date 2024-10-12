@@ -46,12 +46,6 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
                 service.execute(request, responseObserver);
                 break;
             }
-            case AGGREGATION_STREAMING:
-            {
-                ServiceImpl<AggregationStreamWorker, AggregationInput, AggregationOutput> service = new ServiceImpl<>(AggregationStreamWorker.class, AggregationInput.class);
-                service.execute(request, responseObserver);
-                break;
-            }
             case BROADCAST_CHAIN_JOIN:
             {
                 ServiceImpl<BroadcastChainJoinWorker, BroadcastChainJoinInput, JoinOutput> service = new ServiceImpl<>(BroadcastChainJoinWorker.class, BroadcastChainJoinInput.class);
@@ -97,12 +91,6 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
             case SCAN:
             {
                 ServiceImpl<ScanWorker, ScanInput, ScanOutput> service = new ServiceImpl<>(ScanWorker.class, ScanInput.class);
-                service.execute(request, responseObserver);
-                break;
-            }
-            case SCAN_STREAMING:
-            {
-                ServiceImpl<ScanStreamWorker, ScanInput, ScanOutput> service = new ServiceImpl<>(ScanStreamWorker.class, ScanInput.class);
                 service.execute(request, responseObserver);
                 break;
             }
