@@ -196,7 +196,7 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
             StreamWorkerCommon.passSchemaToNextLevel(writerSchema.get(), outputStorageInfo, outputEndpoints);
             PixelsWriter pixelsWriter = StreamWorkerCommon.getWriter(writerSchema.get(),
                     StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                    true, 0,  // todo: hardcoded for now, need to pass the actual value
+                    true, 0,  // todo: hardcoded for only 1 partition worker scenario; need to pass the actual value
                     Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()),
                     outputEndpoints, false);
             Set<Integer> hashValues = new HashSet<>(numPartition);
