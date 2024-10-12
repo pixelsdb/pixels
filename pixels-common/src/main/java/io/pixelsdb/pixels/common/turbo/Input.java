@@ -39,7 +39,6 @@ public abstract class Input
     private int stageId;
 
     private String operatorName;
-    private int stageId;
 
     public Input(long transId)
     {
