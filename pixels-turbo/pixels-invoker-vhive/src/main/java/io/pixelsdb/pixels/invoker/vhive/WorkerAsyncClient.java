@@ -75,15 +75,6 @@ public class WorkerAsyncClient
         return this.stub.process(request);
     }
 
-    public ListenableFuture<TurboProto.WorkerResponse> aggregationStreaming(AggregationInput input)
-    {
-        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
-                .setWorkerType(String.valueOf(WorkerType.AGGREGATION_STREAMING))
-                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
-                .build();
-        return this.stub.process(request);
-    }
-
     public ListenableFuture<TurboProto.WorkerResponse> broadcastChainJoin(BroadcastChainJoinInput input)
     {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
@@ -151,15 +142,6 @@ public class WorkerAsyncClient
     {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.SCAN))
-                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
-                .build();
-        return this.stub.process(request);
-    }
-
-    public ListenableFuture<TurboProto.WorkerResponse> scanStreaming(ScanInput input)
-    {
-        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
-                .setWorkerType(String.valueOf(WorkerType.SCAN_STREAMING))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.process(request);

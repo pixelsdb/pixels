@@ -45,7 +45,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+/**
+ * @author jasha64
+ * @create 2023-11-03
+ */
 public class TestStreamWorker {
+    // todo: Has not been updated after integrating worker coordinate service in the workers
 
     static StorageInfo minioEndpoint = new StorageInfo(Storage.Scheme.minio,
             ConfigFactory.Instance().getProperty("minio.region"),

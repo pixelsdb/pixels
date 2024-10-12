@@ -19,17 +19,12 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
-import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author hank
@@ -45,75 +40,14 @@ public class AggregationStreamOperator extends AggregationOperator
     @Override
     public CompletableFuture<CompletableFuture<? extends Output>[]> execute()
     {
-        return executePrev().handle((result, exception) ->
-        {
-            if (exception != null)
-            {
-                throw new CompletionException("failed to complete the previous stages", exception);
-            }
-
-//            try
-//            {
-                this.finalAggrOutputs = new CompletableFuture[this.finalAggrInputs.size()];
-                int i = 0;
-                for (AggregationInput aggrInput : this.finalAggrInputs)
-                {
-                    this.finalAggrOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.AGGREGATION_STREAMING).invoke(aggrInput);
-                }
-//                waitForCompletion(this.finalAggrOutputs);
-//            } catch (InterruptedException e)
-//            {
-//                throw new CompletionException("interrupted when waiting for the completion of this operator", e);
-//            }
-
-            return this.finalAggrOutputs;
-        });
+        // TODO: implement
+        return null;
     }
 
     @Override
     public CompletableFuture<Void> executePrev()
     {
-        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
-        operatorService.execute(() ->
-        {
-//            try
-//            {
-                CompletableFuture<CompletableFuture<? extends Output>[]> childFuture = null;
-                if (this.child != null)
-                {
-                    checkArgument(this.scanInputs.isEmpty(), "scanInputs is not empty");
-                    this.scanOutputs = new CompletableFuture[0];
-                    childFuture = this.child.execute();
-                } else
-                {
-                    checkArgument(!this.scanInputs.isEmpty(), "scanInputs is empty");
-                    this.scanOutputs = new CompletableFuture[this.scanInputs.size()];
-                    int i = 0;
-                    for (ScanInput scanInput : this.scanInputs)
-                    {
-                        this.scanOutputs[i++] = InvokerFactory.Instance()
-                                .getInvoker(WorkerType.SCAN_STREAMING).invoke(scanInput);
-                    }
-                }
-
-//                if (childFuture != null)
-//                {
-//                    waitForCompletion(childFuture.join());
-//                }
-//                if (this.scanOutputs.length > 0)
-//                {
-//                    waitForCompletion(this.scanOutputs);
-//                }
-
-                prevStagesFuture.complete(null);
-//            }
-//            catch (InterruptedException e)
-//            {
-//                throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
-//            }
-        });
-
-        return prevStagesFuture;
+        // TODO: implement
+        return null;
     }
 }
