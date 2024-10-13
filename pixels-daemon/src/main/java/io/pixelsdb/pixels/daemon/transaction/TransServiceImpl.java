@@ -134,12 +134,17 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         {
             // must get transaction context before setTransCommit()
             boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
+            /**
+             * Issue #755:
+             * push the watermarks before setTransCommit()
+             * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
+             */
+            pushWatermarks(readOnly);
             boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
             if (!success)
             {
                 error = ErrorCode.TRANS_COMMIT_FAILED;
             }
-            pushWatermarks(readOnly);
         }
         else
         {
