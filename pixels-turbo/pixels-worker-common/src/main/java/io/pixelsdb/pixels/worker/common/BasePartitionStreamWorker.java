@@ -189,7 +189,7 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                     .collect(Collectors.toList());
             // todo: Need to pass whether the table is the large table or the small table here into the partition worker.
             //  Perhaps add a boolean field in the PartitionInput class.
-            //  Currently, we hardcode the table name for this - the large table (rightTable for join) uses port 18686
+            //  Currently, we hardcode the table name for TPC-H Q14 - the large table (rightTable for join) uses port 18686
             //  while the small table (leftTable for join) uses port 18688.
 
             StreamWorkerCommon.passSchemaToNextLevel(writerSchema.get(), outputStorageInfo, outputEndpoints);
