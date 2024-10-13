@@ -64,7 +64,6 @@ public class LoadExecutor implements CommandExecutor
         }
 
         TransService transService = TransService.Instance();
-
         TransContext context;
         context = transService.beginTrans(false);
 
