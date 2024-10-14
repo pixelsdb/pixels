@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -50,9 +50,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * @author hank
- * @create 2022-05-07
- * @update 2023-04-23 (moved from pixels-worker-lambda to here as the base worker implementation)
+ * @author jasha64
+ * @create 2023-11-23
  */
 public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput, JoinOutput>
 {
