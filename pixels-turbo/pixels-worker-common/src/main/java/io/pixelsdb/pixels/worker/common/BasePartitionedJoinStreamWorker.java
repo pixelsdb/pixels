@@ -523,11 +523,6 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     {
                         rightHashValues.add(hashValue);
                     }
-//                    Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-//                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
-//                    {
-//                        rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
-//                    }
                     for (int hashValue : hashValues)
                     {
                         if (!rightHashValues.contains(hashValue))
@@ -642,11 +637,6 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     {
                         rightHashValues.add(hashValue);
                     }
-//                    Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-//                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
-//                    {
-//                        rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
-//                    }
                     for (int hashValue : hashValues)
                     {
                         if (!rightHashValues.contains(hashValue))

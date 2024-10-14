@@ -49,7 +49,6 @@ public class PartitionStreamInvoker extends VhiveInvoker
     @Override
     public CompletableFuture<Output> invoke(Input input)
     {
-//        log.info(String.format("invoke PartitionInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
         ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().partitionStreaming((PartitionInput) input);
         return genCompletableFuture(future);
     }
