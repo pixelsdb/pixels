@@ -192,12 +192,12 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         if (readOnly)
         {
             long value = lowWatermark.get();
-            if (timestamp >= value)
+            if (timestamp > value)
             {
                 while (!lowWatermark.compareAndSet(value, timestamp))
                 {
                     value = lowWatermark.get();
-                    if (timestamp < value)
+                    if (timestamp <= value)
                     {
                         // it is not an error if there is no need to push the low watermark
                         break;
@@ -207,12 +207,12 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         } else
         {
             long value = highWatermark.get();
-            if (timestamp >= value)
+            if (timestamp > value)
             {
                 while (!highWatermark.compareAndSet(value, timestamp))
                 {
                     value = highWatermark.get();
-                    if (timestamp < value)
+                    if (timestamp <= value)
                     {
                         // it is not an error if there is no need to push the high watermark
                         break;
