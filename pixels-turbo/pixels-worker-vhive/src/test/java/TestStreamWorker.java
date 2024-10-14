@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -59,35 +59,9 @@ public class TestStreamWorker {
             ConfigFactory.Instance().getProperty("minio.secret.key"));
     static final int numWorkers = 2;
     static StorageInfo httpStorageInfo = new StorageInfo(Storage.Scheme.httpstream, null, null, null, null);
-//    static final List<List<InputSplit>> genScanInputSplitsList  = Arrays.asList(
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180829_106.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180831_107.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180833_108.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180835_109.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180837_110.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180839_111.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180841_112.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180844_113.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180846_114.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180848_115.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180850_116.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180852_117.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180854_118.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180856_119.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180858_120.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180900_121.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180902_122.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180904_123.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180906_124.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180908_125.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180910_126.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180912_127.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180914_128.pxl", 0, 1)))),
-//            Arrays.asList(new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/orders/v-0-ordered/20231012180916_129.pxl", 0, 1))))
-//            // n.b. under the ordered layout of Pixels, every .pxl file consists of only 1 row group.
-//            //  However, once we adopt the compact layout, this is not the case. Will have to make sure
-//            //  we actually read the files in full (currently we only read 1 rowGroup from each file)
-//    );
+    // XXX: under the ordered layout of Pixels, every .pxl file consists of only 1 row group.
+    //  However, once we adopt the compact layout, this is not the case. Will have to make sure
+    //  we actually read the files in full (currently we only read 1 rowGroup from each file)
 
     public static ScanInput genScanInput(StorageInfo inputStorageInfo, StorageInfo outputStorageInfo, int workerId)
     {
@@ -202,11 +176,8 @@ public class TestStreamWorker {
     }
 
     @Test
-    public void testStreamWorkerSimple() throws ExecutionException, InterruptedException {
-//        ScanOutput output = (ScanOutput) InvokerFactory.Instance()
-//                .getInvoker(WorkerType.SCAN).invoke(genScanInput(minioEndpoint, minioEndpoint, 0)).get();
-//        System.out.println(JSON.toJSONString(output));
-
+    public void testStreamWorkerSimple()
+    {
         WorkerContext context = new WorkerContext(LogManager.getLogger(TestStreamWorker.class), new WorkerMetrics(), "0");
         ScanWorker worker = new ScanWorker(context);
 
@@ -214,14 +185,6 @@ public class TestStreamWorker {
         System.out.println(JSON.toJSONString(output));
     }
 
-    public void testStreamWorkerToyPipelined() throws ExecutionException, InterruptedException {
-
-    }
-
-    // port 50051 scan worker -> stream上传送partialAggregate的结果 -> port 50052 aggregate
-    //  （scan的结果是不会被其他operator给consume的，所以要传partialAggregate的）
-    // join小表是从硬盘直接读到内存里建HashTable。不存在中间结果写出的情况。所以不适合用来做pipeline的demo
-    //
     // XXX: In this test 1, the lower-level scan workers have constant writer ports while the upper-level aggregation
     //  workers alter their reader ports. However, in test 2, the lower-level partition workers alter their writer ports
     //  while the upper-level join workers have constant reader ports. Need to unify the approach.
@@ -233,22 +196,29 @@ public class TestStreamWorker {
         //  This is a deadlock. So we need to run the two workers in two threads for now.
 
         WorkerContext contextScan = new WorkerContext(LogManager.getLogger(BaseScanStreamWorker.class), new WorkerMetrics(), "0");
+        ScanStreamWorker scanWorker1 = new ScanStreamWorker(contextScan);
+        ScanStreamWorker scanWorker2 = new ScanStreamWorker(contextScan);
+        WorkerContext contextAgg = new WorkerContext(LogManager.getLogger(BaseAggregationWorker.class), new WorkerMetrics(), "0");
+        AggregationWorker aggregation = new AggregationWorker(contextAgg);
+        // XXX: Should be:
+        // WorkerContext contextAgg = new WorkerContext(LogManager.getLogger(BaseAggregationStreamWorker.class), new WorkerMetrics(), "0");
+        // AggregationStreamWorker aggregation = new AggregationStreamWorker(contextAgg);
+        ExecutorService executor = Executors.newWorkStealingPool();
+
+        Future<AggregationOutput> aggFuture = executor.submit(() ->
+                aggregation.process(genAggregationInput(httpStorageInfo, minioEndpoint, 0))
+        );
+        Future<ScanOutput> scanFuture1 = executor.submit(() ->
+                scanWorker1.process(genScanInput(minioEndpoint, httpStorageInfo, 0))
+        );
+        Future<ScanOutput> scanFuture2 = executor.submit(() ->
+                scanWorker2.process(genScanInputWorker2(minioEndpoint, httpStorageInfo, 1))
+        );
+        // To test more scan workers:
 //        List<ScanStreamWorker> scanStreamWorkers = new ArrayList<>();
 //        for (int i = 0; i < numWorkers; i++) {
 //            scanStreamWorkers.add(new ScanStreamWorker(contextScan));
 //        }
-        ScanStreamWorker scanWorker1 = new ScanStreamWorker(contextScan);
-        ScanStreamWorker scanWorker2 = new ScanStreamWorker(contextScan);
-//        WorkerContext contextAgg = new WorkerContext(LogManager.getLogger(BaseAggregationStreamWorker.class), new WorkerMetrics(), "0");
-//        AggregationStreamWorker aggregation = new AggregationStreamWorker(contextAgg);
-        WorkerContext contextAgg = new WorkerContext(LogManager.getLogger(BaseAggregationWorker.class), new WorkerMetrics(), "0");
-        AggregationWorker aggregation = new AggregationWorker(contextAgg);
-        ExecutorService executor = Executors.newWorkStealingPool();
-
-        // 若需改为不采用pipelining的实现，则将下列所有httpStorageInfo改为minioEndpoint，然后将ScanWorker的基类从BaseScanStreamWorker改为BaseScanWorker，其他几个用到的Worker类同理
-        Future<AggregationOutput> aggFuture = executor.submit(() ->
-                aggregation.process(genAggregationInput(httpStorageInfo, minioEndpoint, 0))
-        );
 //        List<Future<ScanOutput>> scanFutures = new ArrayList<>();
 //        for (int i = 0; i < numWorkers; i++) {
 //            int finalI = i;
@@ -256,12 +226,6 @@ public class TestStreamWorker {
 //                    scanWorkers.get(finalI).process(genScanInput(minioEndpoint, httpStorageInfo, finalI))
 //            ));
 //        }
-        Future<ScanOutput> scanFuture1 = executor.submit(() ->
-                scanWorker1.process(genScanInput(minioEndpoint, httpStorageInfo, 0))
-        );
-        Future<ScanOutput> scanFuture2 = executor.submit(() ->
-                scanWorker2.process(genScanInputWorker2(minioEndpoint, httpStorageInfo, 1))
-        );
 
         AggregationOutput aggOutput = aggFuture.get();
         System.out.println(JSON.toJSONString(aggOutput));
@@ -313,11 +277,10 @@ public class TestStreamWorker {
      Both queries should return empty result.
      */
 
-    // 对照组实验
-    // 跑之前删一下minio上面的中间结果
+    // Non-pipelined experiments for performance comparison
     @Test
     public void testWorkerNonPipelined() throws ExecutionException, InterruptedException {
-        System.out.println("NOTE: 跑之前删一下minio上面的中间结果");
+        System.out.println("WARNING: Check that you've cleaned up intermediate results on minio");
 
         WorkerContext contextScan = new WorkerContext(LogManager.getLogger(BaseScanWorker.class), new WorkerMetrics(), "0");
         ScanWorker scanWorker1 = new ScanWorker(contextScan);
@@ -342,7 +305,7 @@ public class TestStreamWorker {
         System.out.println(JSON.toJSONString(aggOutput));
 
         executor.shutdown();
-        System.out.println("NOTE: 跑之前删过minio上面的中间结果了吗？");
+        System.out.println("WARNING: Make sure you've cleaned up intermediate results on minio before running this test");
     }
 
     static final int test2NumHashes = 3;
@@ -413,7 +376,7 @@ public class TestStreamWorker {
             parInfo.setKeyColumnIds(new int[]{0});
             parInfo.setNumPartition(test2NumHashes);
 
-            parInput.setOperatorName(workerId + "/" + (test2NumScanWorkers - 1));  // We use the OperatorName to pass the workerId into the worker
+            parInput.setOperatorName(workerId + "/" + (test2NumScanWorkers - 1));  // We use the OperatorName to pass the workerId into the worker for now
             parInput.setTransId(123456);
             parInput.setTableInfo(tableInfo);
             parInput.setProjection(new boolean[]{true, true, true, true});
@@ -438,7 +401,7 @@ public class TestStreamWorker {
             parInfo.setKeyColumnIds(new int[]{0});
             parInfo.setNumPartition(test2NumHashes);
 
-            parInput.setOperatorName("0/1");  // We use the OperatorName to pass the workerId into the worker
+            parInput.setOperatorName("0/1");  // We use the OperatorName to pass the workerId into the worker for now
             parInput.setTransId(123456);
             parInput.setTableInfo(tableInfo);
             parInput.setProjection(new boolean[]{true, true, true, true});
@@ -497,7 +460,7 @@ public class TestStreamWorker {
         PartitionedTableInfo largeTable = new PartitionedTableInfo();
         largeTable.setTableName("orders");
         largeTable.setColumnsToRead(new String[]{"o_custkey", "o_orderstatus", "o_orderdate", "o_orderkey"});
-        largeTable.setBase(false);  // ???
+        largeTable.setBase(false);
         largeTable.setStorageInfo(inputStorageInfo);
         largeTable.setInputFiles(Collections.singletonList(test2ParJoinInputFilesLargeTable.get(workerId)));
         largeTable.setParallelism(2);
@@ -506,7 +469,7 @@ public class TestStreamWorker {
         PartitionedTableInfo smallTable = new PartitionedTableInfo();
         smallTable.setTableName("customer");
         smallTable.setColumnsToRead(new String[]{"c_custkey", "c_name", "c_address", "c_phone"});
-        smallTable.setBase(false);  // ???
+        smallTable.setBase(false);
         smallTable.setStorageInfo(inputStorageInfo);
         smallTable.setInputFiles(Collections.singletonList(test2ParJoinInputFilesSmallTable.get(workerId)));
         smallTable.setParallelism(2);
@@ -547,7 +510,7 @@ public class TestStreamWorker {
     public void test2NonPipelined() throws ExecutionException, InterruptedException {
         // orders JOIN customer
         // 6 partition workers (5 for orders table + 1 for customer table) fully connected to 3 partitioned join workers
-        System.out.println("NOTE: 跑之前删一下minio上面的中间结果");
+        System.out.println("WARNING: Check that you've cleaned up intermediate results on minio");
 
         WorkerContext contextScan = new WorkerContext(LogManager.getLogger(BasePartitionWorker.class), new WorkerMetrics(), "0");
         PartitionWorker partitionWorker1 = new PartitionWorker(contextScan);
@@ -583,7 +546,7 @@ public class TestStreamWorker {
         }
 
         executor.shutdown();
-        System.out.println("NOTE: 跑之前删过minio上面的中间结果了吗？");
+        System.out.println("WARNING: Make sure you've cleaned up intermediate results on minio before running this test");
     }
 
     /**
