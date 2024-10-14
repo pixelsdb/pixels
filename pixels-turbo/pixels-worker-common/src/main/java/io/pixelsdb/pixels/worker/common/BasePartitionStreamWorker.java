@@ -153,7 +153,8 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
             try
             {
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
-            } catch (InterruptedException e)
+            }
+            catch (InterruptedException e)
             {
                 throw new WorkerException("interrupted while waiting for the termination of partitioning", e);
             }
@@ -252,7 +253,8 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                                String[] columnsToRead, Storage.Scheme inputScheme,
                                TableScanFilter filter, int[] keyColumnIds, boolean[] projection,
                                List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
-                               AtomicReference<TypeDescription> writerSchema) throws IOException {
+                               AtomicReference<TypeDescription> writerSchema) throws IOException
+    {
         Scanner scanner = null;
         Partitioner partitioner = null;
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
@@ -315,11 +317,14 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                 readCostTimer.add(recordReader.getReadTimeNanos());
                 readBytes += recordReader.getCompletedBytes();
                 numReadRequests += recordReader.getNumReadRequests();
-            } catch (Throwable e)
+            }
+            catch (Throwable e)
             {
                 throw new WorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the partitioning result", e);
-            } finally {
+            }
+            finally
+            {
                 if (pixelsReader != null)
                 {
                     pixelsReader.close();

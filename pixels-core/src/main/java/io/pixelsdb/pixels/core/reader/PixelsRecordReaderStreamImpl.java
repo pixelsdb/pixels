@@ -831,7 +831,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                 {
                     logger.error("Failed to close column reader.", e);
                     throw new IOException("Failed to close column reader.", e);
-                } finally
+                }
+                finally
                 {
                     readers[i] = null;
                 }

@@ -95,7 +95,8 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
                 smallChildFuture = smallChild.execute();
                 largeChildFuture = largeChild.execute();
-            } else if (smallChild != null)
+            }
+            else if (smallChild != null)
             {
                 // only small child exists, we should invoke the large table partitioning and execute the small child.
                 checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
@@ -110,7 +111,8 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 }
 
                 logger.debug("invoke large partition of " + this.getName());
-            } else if (largeChild != null)
+            }
+            else if (largeChild != null)
             {
                 // only large child exists, we should invoke the small table partitioning.
                 checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
@@ -126,7 +128,8 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 logger.debug("invoke small partition of " + this.getName());
 
                 largeChildFuture = largeChild.execute();
-            } else
+            }
+            else
             {
                 // no children exist, partition both tables and wait for the small table partitioning.
                 checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");

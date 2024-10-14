@@ -266,7 +266,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                                     joinWithRightTable(transId, joiner, parts, rightColumnsToRead,
                                             rightInputStorageInfo.getScheme(), hashValues,
                                             event.getLargePartitionWorkerNum(), result.get(0), workerMetrics);
-                        } catch (Throwable e)
+                        }
+                        catch (Throwable e)
                         {
                             throw new WorkerException("error during hash join", e);
                         }
@@ -276,7 +277,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 try
                 {
                     while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
-                } catch (InterruptedException e)
+                }
+                catch (InterruptedException e)
                 {
                     throw new WorkerException("interrupted while waiting for the termination of join", e);
                 }
@@ -372,7 +374,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 }
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
                 workerCoordinateService.terminateWorker(worker.getWorkerId());
-            } catch (Throwable e)
+            }
+            catch (Throwable e)
             {
                 throw new WorkerException(
                         "failed to finish writing and close the join result file '" + outputPath + "'", e);
@@ -381,7 +384,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             StreamWorkerCommon.setPerfMetrics(joinOutput, workerMetrics);
             return joinOutput;
-        } catch (Throwable e)
+        }
+        catch (Throwable e)
         {
             logger.error("error during join", e);
             joinOutput.setSuccessful(false);
@@ -405,7 +409,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
      */
     protected static void buildHashTable(long transId, Joiner joiner, List<String> leftParts, String[] leftCols,
                                          Storage.Scheme leftScheme, List<Integer> hashValues, int numPartition,
-                                         WorkerMetrics workerMetrics) throws IOException {
+                                         WorkerMetrics workerMetrics) throws IOException
+    {
         // In streaming mode, numPartition is the total number of partition workers, i.e. the number of incoming packets.
         logger.debug("building hash table for the left table, partition paths: " + leftParts);
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
@@ -450,7 +455,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                         numReadRequests += recordReader.getNumReadRequests();
                     }
                     it.remove();
-                } catch (Throwable e)
+                }
+                catch (Throwable e)
                 {
                     if (e instanceof IOException)
                     {
@@ -459,8 +465,10 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     throw new WorkerException("failed to scan the partitioned file '" +
                             leftPartitioned + "' and build the hash table", e);
                 }
-                finally {
-                    if (pixelsReader != null) {
+                finally
+                {
+                    if (pixelsReader != null)
+                    {
                         logger.debug("closing pixels reader");
                         pixelsReader.close();
                     }
@@ -471,7 +479,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 try
                 {
                     TimeUnit.MILLISECONDS.sleep(100);
-                } catch (InterruptedException e)
+                }
+                catch (InterruptedException e)
                 {
                     throw new WorkerException("interrupted while waiting for the partitioned files");
                 }
@@ -500,7 +509,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
     protected static int joinWithRightTable(
             long transId, Joiner joiner, List<String> rightParts, String[] rightCols, Storage.Scheme rightScheme,
             List<Integer> hashValues, int numPartition, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult,
-            WorkerMetrics workerMetrics) throws IOException {
+            WorkerMetrics workerMetrics) throws IOException
+    {
         int joinedRows = 0;
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
         WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
@@ -559,7 +569,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                         numReadRequests += recordReader.getNumReadRequests();
                     }
                     it.remove();
-                } catch (Throwable e)
+                }
+                catch (Throwable e)
                 {
                     if (e instanceof IOException)
                     {
@@ -568,8 +579,10 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     throw new WorkerException("failed to scan the partitioned file '" +
                             rightPartitioned + "' and do the join", e);
                 }
-                finally {
-                    if (pixelsReader != null) {
+                finally
+                {
+                    if (pixelsReader != null)
+                    {
                         logger.debug("closing pixels reader");
                         pixelsReader.close();
                     }
@@ -580,7 +593,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 try
                 {
                     TimeUnit.MILLISECONDS.sleep(100);
-                } catch (InterruptedException e)
+                }
+                catch (InterruptedException e)
                 {
                     throw new WorkerException("interrupted while waiting for the partitioned files");
                 }
@@ -611,7 +625,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
     protected static int joinWithRightTableAndPartition(
             long transId, Joiner joiner, List<String> rightParts, String[] rightCols, Storage.Scheme rightScheme,
             List<Integer> hashValues, int numPartition, PartitionInfo postPartitionInfo,
-            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics) throws IOException {
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics) throws IOException
+    {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
         Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
                 StreamWorkerCommon.rowBatchSize, joiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
@@ -678,7 +693,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                         numReadRequests += recordReader.getNumReadRequests();
                     }
                     it.remove();
-                } catch (Throwable e)
+                }
+                catch (Throwable e)
                 {
                     if (e instanceof IOException)
                     {
@@ -687,8 +703,10 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     throw new WorkerException("failed to scan the partitioned file '" +
                             rightPartitioned + "' and do the join", e);
                 }
-                finally {
-                    if (pixelsReader != null) {
+                finally
+                {
+                    if (pixelsReader != null)
+                    {
                         logger.debug("closing pixels reader");
                         pixelsReader.close();
                     }
@@ -699,7 +717,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 try
                 {
                     TimeUnit.MILLISECONDS.sleep(100);
-                } catch (InterruptedException e)
+                }
+                catch (InterruptedException e)
                 {
                     throw new WorkerException("interrupted while waiting for the partitioned files");
                 }
