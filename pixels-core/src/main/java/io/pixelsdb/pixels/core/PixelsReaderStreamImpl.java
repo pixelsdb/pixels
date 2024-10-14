@@ -154,7 +154,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 // schema packet: only 1 packet expected, so close the connection immediately
                 // partitioned mode: close the connection if all partitions received
                 // else (non-partitioned mode, data packet): close connection if empty packet received
-                boolean needCloseParentChannel = partitionId == -2 ||
+                boolean needCloseParentChannel = partitionId == PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER ||
                         (partitioned && numPartitionsReceived.get() == numPartitions) ||
                         (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
                                 req.content().readableBytes() == 0);
@@ -198,9 +198,9 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 }
 
                 // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the
-                //  client is a data writer rather than a schema writer (partitionId == -2). In the latter case,
+                //  client is a data writer rather than a schema writer. In the latter case,
                 //  the schema packet has been processed when parsing the stream header above.
-                if (partitionId > -2)
+                if (partitionId != PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER)
                 {
                     byteBuf.retain();
                     if (!partitioned) byteBufSharedQueue.add(byteBuf);

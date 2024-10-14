@@ -108,6 +108,12 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         CHUNK_PADDING_BUFFER = new byte[CHUNK_ALIGNMENT];
     }
 
+    /**
+     * We use the X-Partition-Id header to pass the partition ID in the HTTP streaming mode.
+     * We use -1 to indicate non-partitioned data, and -2 to indicate that this data packet is for passing the schema.
+     */
+    public static final int PARTITION_ID_SCHEMA_WRITER = -2;
+
     private final TypeDescription schema;
     private final int rowGroupSize;
     private final PixelsProto.CompressionKind compressionKind;
@@ -561,7 +567,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             // In partitioned mode, the server closes automatically when it receives all its partitions. No need to send
             //  a close request.
             // Schema servers also close automatically and do not need close requests.
-            if (!partitioned && partitionId > -2)
+            if (!partitioned && partitionId != PARTITION_ID_SCHEMA_WRITER)
             {
                 if (!partitioned && uri == null)
                 {
@@ -762,19 +768,18 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         {
             uri = URI.create(fileNameToUri(fileName));
         }
-        logger.debug("Sending row group with length: " + byteBuf.writerIndex() +
-                " to endpoint: " + (partitioned ? uris.get(currHashValue) : uri.toString()));
-        Request req = httpClient.preparePost(partitioned ? uris.get(currHashValue).toString() : uri.toString())
+        String reqUri = partitioned ? uris.get(currHashValue).toString() : uri.toString();
+        logger.debug("Sending row group with length: " + byteBuf.writerIndex() + " to endpoint: " + reqUri);
+        Request req = httpClient.preparePost(reqUri)
                 .setBody(byteBuf.nioBuffer())
                 .addHeader("X-Partition-Id", String.valueOf(partitionId))
                 .addHeader(CONTENT_TYPE, "application/x-protobuf")
                 .addHeader(CONTENT_LENGTH, byteBuf.readableBytes())
-                .addHeader(CONNECTION, partitioned || partitionId == -2 ? CLOSE : "keep-alive")
+                .addHeader(CONNECTION, partitioned || partitionId == PARTITION_ID_SCHEMA_WRITER ? CLOSE : "keep-alive")
                 .build();
-        // In partitioned mode, we send only 1 row group to each upper-level worker, and so we set the connection to
+        // If it's partitioned mode, we send only 1 row group to each upper-level worker, and so we set the connection to
         //  CLOSE after sending the row group.
-        // partitionId == -2 means the writer is a schema writer, which should also close the connection after sending
-        //  the row group.
+        // If it's a schema writer, we should also close the connection after sending the row group.
 
         // DESIGN: We use a retry here to retry the HTTP request in case of connection failure,
         //  because the HTTP server may not be ready when the client tries to connect.

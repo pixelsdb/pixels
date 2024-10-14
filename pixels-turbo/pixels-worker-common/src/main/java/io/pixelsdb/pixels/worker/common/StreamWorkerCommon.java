@@ -38,6 +38,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.core.PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER;
 import static java.util.Objects.requireNonNull;
 
 public class StreamWorkerCommon extends WorkerCommon
@@ -81,7 +82,8 @@ public class StreamWorkerCommon extends WorkerCommon
         {
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
-        PixelsWriter pixelsWriter = getWriter(schema, null, endpoint, false, false, -2, null, null, true);
+        PixelsWriter pixelsWriter = getWriter(schema, null, endpoint, false, false,
+                PARTITION_ID_SCHEMA_WRITER, null, null, true);
         pixelsWriter.close();  // We utilize the sendRowGroup() in PixelsWriterStreamImpl's close() to send the schema.
     }
 
@@ -241,7 +243,7 @@ public class StreamWorkerCommon extends WorkerCommon
                 .setRowGroupSize(rowGroupSize)
                 .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
                 .setPartitioned(isPartitioned)
-                .setPartitionId(isSchemaWriter ? -2 : (isPartitioned ? partitionId : -1));
+                .setPartitionId(isSchemaWriter ? PARTITION_ID_SCHEMA_WRITER : (isPartitioned ? partitionId : -1));
         if (!isPartitioned)
         {
             builder.setUri(URI.create(outputPath));
