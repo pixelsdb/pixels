@@ -134,12 +134,17 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         {
             // must get transaction context before setTransCommit()
             boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
+            /**
+             * Issue #755:
+             * push the watermarks before setTransCommit()
+             * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
+             */
+            pushWatermarks(readOnly);
             boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
             if (!success)
             {
                 error = ErrorCode.TRANS_COMMIT_FAILED;
             }
-            pushWatermarks(readOnly);
         }
         else
         {
@@ -187,12 +192,12 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         if (readOnly)
         {
             long value = lowWatermark.get();
-            if (timestamp >= value)
+            if (timestamp > value)
             {
                 while (!lowWatermark.compareAndSet(value, timestamp))
                 {
                     value = lowWatermark.get();
-                    if (timestamp < value)
+                    if (timestamp <= value)
                     {
                         // it is not an error if there is no need to push the low watermark
                         break;
@@ -202,12 +207,12 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         } else
         {
             long value = highWatermark.get();
-            if (timestamp >= value)
+            if (timestamp > value)
             {
                 while (!highWatermark.compareAndSet(value, timestamp))
                 {
                     value = highWatermark.get();
-                    if (timestamp < value)
+                    if (timestamp <= value)
                     {
                         // it is not an error if there is no need to push the high watermark
                         break;
