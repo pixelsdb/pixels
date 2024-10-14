@@ -810,18 +810,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     @Override
     public void close() throws IOException
     {
-        // while (!endOfFile)
-        // {
-        //     try
-        //     {
-        //         sleep(20);
-        //     }
-        //     catch (InterruptedException e)
-        //     {
-        //         throw new RuntimeException(e);
-        //     }
-        // }
-
         diskReadBytes = 0L;
         // release chunk buffer
         if (chunkBuffers != null)
