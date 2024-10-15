@@ -197,7 +197,6 @@ public class BooleanColumnReader extends ColumnReader
                              int offset, int size, int pixelStride, final int vectorIndex,
                              ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected)
     {
-        throw new UnsupportedOperationException("Not implemented yet.");
         ByteColumnVector columnVector = (ByteColumnVector) vector;
         int bytesToDeCompact;
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
@@ -256,14 +255,22 @@ public class BooleanColumnReader extends ColumnReader
             }
             else
             {
-                Arrays.fill(columnVector.isNull, i, i + numToRead, false);
+                int k = vectorWriteIndex;
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (selected.get(j - vectorIndex))
+                    {
+                        columnVector.isNull[k++] = false;
+                    }
+                }
             }
             // read content
             if (nullsPadding)
             {
                 bytesToDeCompact = (numToRead + inputSkipBits) / 8;
-                BitUtils.bitWiseDeCompact(columnVector.vector, i, numToRead,
-                        inputBuffer, bitsOrInputIndex, inputSkipBits, littleEndian);
+                // update vectorWriteIndex at the same time
+                vectorWriteIndex += BitUtils.bitWiseDeCompact(columnVector.vector, vectorWriteIndex, numToRead,
+                        inputBuffer, bitsOrInputIndex, inputSkipBits, littleEndian, selected, i - vectorIndex);
                 bitsOrInputIndex += bytesToDeCompact;
                 inputSkipBits = (numToRead + inputSkipBits) % 8;
             }
@@ -275,7 +282,12 @@ public class BooleanColumnReader extends ColumnReader
                 {
                     if (!(hasNull && columnVector.isNull[j]))
                     {
-                        columnVector.vector[j] = bits[bitsOrInputIndex++];
+                        if (selected.get(j - vectorIndex))
+                        {
+                            // update vectorWriteIndex at the same time
+                            columnVector.vector[vectorWriteIndex++] = bits[bitsOrInputIndex];
+                        }
+                        bitsOrInputIndex++;
                     }
                 }
             }

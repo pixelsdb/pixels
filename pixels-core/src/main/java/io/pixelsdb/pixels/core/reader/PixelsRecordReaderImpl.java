@@ -1060,7 +1060,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 int addedRows = 0;
                 for (int i = 0; i < curBatchSize; i++)
                 {
-                    if (timestampVector.vector[i] <= this.timestamp)
+                    if (timestampVector.vector[resultRowBatch.size + i] <= this.timestamp)
                     {
                         selectedRows.set(i);
                         addedRows++;

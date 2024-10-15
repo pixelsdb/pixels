@@ -658,7 +658,7 @@ public class BitUtils
      * @param bitmap determine whether to read the value of the input
      * @param bitmapOffset the offset in the bitmap to start reading
      */
-    public static void bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength,
+    public static int bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength,
                                         ByteBuffer input, int offset, int skipBits, boolean littleEndian,
                                         BitSet bitmap, int bitmapOffset)
     {
@@ -668,20 +668,20 @@ public class BitUtils
         checkArgument(bitmapOffset >= 0, "invalid bitmap offset");
         if (littleEndian)
         {
-            bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset, skipBits, bitmap, bitmapOffset);
+            return bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset, skipBits, bitmap, bitmapOffset);
         }
         else
         {
-            bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset, skipBits, bitmap, bitmapOffset);
+            return bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset, skipBits, bitmap, bitmapOffset);
         }
     }
 
-    private static void bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength,
+    private static int bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength,
                                            ByteBuffer input, int offset, int skipBits,
                                            BitSet bitmap, int bitmapOffset)
     {
         byte bitsLeft = 8, b;
-        int bitmapEnd = bitmapOffset + bitsLength;
+        int bitmapEnd = bitmapOffset + bitsLength, originBitsOffset = bitsOffset;
         b = input.get(offset++);
         for (int i = 7; i >= 0 && bitmapOffset < bitmapEnd; --i)
         {
@@ -707,14 +707,15 @@ public class BitUtils
             }
             bitsLeft = 8;
         }
+        return bitsOffset - originBitsOffset;
     }
 
-    private static void bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength,
+    private static int bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength,
                                            ByteBuffer input, int offset, int skipBits,
                                            BitSet bitmap, int bitmapOffset)
     {
         byte currBit = 0, b;
-        int bitmapEnd = bitmapOffset + bitsLength;
+        int bitmapEnd = bitmapOffset + bitsLength, originBitsOffset = bitsOffset;
         b = input.get(offset++);
         for (int i = 0; i < 8 && bitmapOffset < bitmapEnd; ++i)
         {
@@ -740,6 +741,107 @@ public class BitUtils
             }
             currBit = 0;
         }
+        return bitsOffset - originBitsOffset;
+    }
+
+    /**
+     * Bit de-compaction, this method does not modify the current position in input byte buffer.
+     * It always starts from the first bit of a byte in the input.
+     *
+     * @param bits the de-compact (decode) result, each element is either 0 (false) or 1 (true)
+     * @param bitsOffset the index in bits to start de-compact into
+     * @param bitsLength the number of bits to de-compact
+     * @param input input byte buffer, which can be direct
+     * @param offset starting offset of the input
+     * @param skipBits the number of bits to skip in the first byte read from input, should be < 8
+     * @param littleEndian whether the byte order of input is little endian
+     * @param bitmap determine whether to read the value of the input
+     * @param bitmapOffset the offset in the bitmap to start reading
+     */
+    public static int bitWiseDeCompact(byte[] bits, int bitsOffset, int bitsLength,
+                                        ByteBuffer input, int offset, int skipBits, boolean littleEndian,
+                                        BitSet bitmap, int bitmapOffset)
+    {
+        checkArgument(bitsOffset >= 0 && bitsLength > 0, "invalid bitsOffset or bitsLength");
+        checkArgument(offset >= 0, "invalid input offset");
+        checkArgument(skipBits >=0 && skipBits < 8, "skipBits is out of the range [0, 8)");
+        checkArgument(bitmapOffset >= 0, "invalid bitmap offset");
+        if (littleEndian)
+        {
+            return bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset, skipBits, bitmap, bitmapOffset);
+        }
+        else
+        {
+            return bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset,skipBits, bitmap, bitmapOffset);
+        }
+    }
+
+    private static int bitWiseDeCompactBE(byte[] bits, int bitsOffset, int bitsLength,
+                                           ByteBuffer input, int offset, int skipBits,
+                                           BitSet bitmap, int bitmapOffset)
+    {
+        byte bitsLeft = 8, b;
+        int bitmapEnd = bitmapOffset + bitsLength, originBitsOffset = bitsOffset;
+        b = input.get(offset++);
+        for (int i = 7; i >= 0 && bitmapOffset < bitmapEnd; --i)
+        {
+            if (skipBits-- > 0)
+            {
+                continue;
+            }
+            if (bitmap.get(bitmapOffset++))
+            {
+                bits[bitsOffset++] = (byte) (0x01 & (b >> i));
+            }
+        }
+        for (int i = offset; bitmapOffset < bitmapEnd; ++i)
+        {
+            b = input.get(i);
+            while (bitsLeft > 0 && bitmapOffset < bitmapEnd)
+            {
+                bitsLeft --;
+                if (bitmap.get(bitmapOffset++))
+                {
+                    bits[bitsOffset++] = (byte) (0x01 & (b >> bitsLeft));
+                }
+            }
+            bitsLeft = 8;
+        }
+        return bitsOffset - originBitsOffset;
+    }
+
+    private static int bitWiseDeCompactLE(byte[] bits, int bitsOffset, int bitsLength,
+                                           ByteBuffer input, int offset, int skipBits,
+                                           BitSet bitmap, int bitmapOffset)
+    {
+        byte currBit = 0, b;
+        int bitmapEnd = bitmapOffset + bitsLength, originBitsOffset = bitsOffset;
+        b = input.get(offset++);
+        for (int i = 0; i < 8 && bitmapOffset < bitmapEnd; ++i)
+        {
+            if (skipBits-- > 0)
+            {
+                continue;
+            }
+            if (bitmap.get(bitmapOffset++))
+            {
+                bits[bitsOffset++] = (byte) (0x01 & (b >> i));
+            }
+        }
+        for (int i = offset; bitmapOffset < bitmapEnd; ++i)
+        {
+            b = input.get(i);
+            while (currBit < 8 && bitmapOffset < bitmapEnd)
+            {
+                if (bitmap.get(bitmapOffset++))
+                {
+                    bits[bitsOffset++] = (byte) (0x01 & (b >> currBit));
+                }
+                currBit ++;
+            }
+            currBit = 0;
+        }
+        return bitsOffset - originBitsOffset;
     }
 
     /**
