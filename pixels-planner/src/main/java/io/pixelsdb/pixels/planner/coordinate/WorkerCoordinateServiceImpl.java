@@ -42,7 +42,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.WorkerCoordinateServiceImplBase
 {
-    private static final Logger log = LogManager.getLogger(StageCoordinator.class);
+    private static final Logger log = LogManager.getLogger(WorkerCoordinateServiceImpl.class);
     private static final long WorkerLeasePeriodMs;
 
     static
@@ -59,6 +59,8 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         long workerId = CFWorkerManager.Instance().createWorkerId();
         Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, workerInfo);
         CFWorkerManager.Instance().registerCFWorker(worker);
+        log.debug("register worker, local address: " + workerInfo.getIp() + ", transId: " + workerInfo.getTransId()
+                + ", stageId: " + workerInfo.getStageId() + ", workerId: " + workerId);
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         requireNonNull(planCoordinator, "plan coordinator is not found");
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());

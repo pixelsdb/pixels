@@ -83,12 +83,16 @@ public class PixelsPlanner
 
     static
     {
+        EnabledExchangeMethod = ExchangeMethod.from(
+                ConfigFactory.Instance().getProperty("executor.exchange.method"));
+
         Storage.Scheme inputStorageScheme = Storage.Scheme.from(
                 ConfigFactory.Instance().getProperty("executor.input.storage.scheme"));
         InputStorageInfo = StorageInfoBuilder.BuildFromConfig(inputStorageScheme);
 
-        Storage.Scheme interStorageScheme = Storage.Scheme.from(
-                ConfigFactory.Instance().getProperty("executor.intermediate.storage.scheme"));
+        Storage.Scheme interStorageScheme = EnabledExchangeMethod == ExchangeMethod.batch ?
+                Storage.Scheme.from(ConfigFactory.Instance().getProperty("executor.intermediate.storage.scheme")) :
+                Storage.Scheme.valueOf("httpstream");
         IntermediateStorageInfo = StorageInfoBuilder.BuildFromConfig(interStorageScheme);
         String interStorageFolder = ConfigFactory.Instance().getProperty("executor.intermediate.folder");
         if (!interStorageFolder.endsWith("/"))
@@ -98,8 +102,6 @@ public class PixelsPlanner
         IntermediateFolder = interStorageFolder;
         IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance()
                 .getProperty("executor.intra.worker.parallelism"));
-        EnabledExchangeMethod = ExchangeMethod.from(
-                ConfigFactory.Instance().getProperty("executor.exchange.method"));
     }
 
     /**

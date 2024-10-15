@@ -23,23 +23,19 @@ import com.alibaba.fastjson.JSON;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
-import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
+import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
+import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Created at: 2024-10-10
- * Author: huasiy
- */
-public class ScanStreamInvoker extends VhiveInvoker
+public class PartitionedJoinStreamInvoker extends VhiveInvoker
 {
-    private final Logger log = LogManager.getLogger(ScanInvoker.class);
+    private final Logger log = LogManager.getLogger(PartitionedJoinStreamInvoker.class);
 
-    protected ScanStreamInvoker(String functionName)
+    protected PartitionedJoinStreamInvoker(String functionName)
     {
         super(functionName);
     }
@@ -47,13 +43,13 @@ public class ScanStreamInvoker extends VhiveInvoker
     @Override
     public Output parseOutput(String outputJson)
     {
-        return JSON.parseObject(outputJson, ScanOutput.class);
+        return JSON.parseObject(outputJson, JoinOutput.class);
     }
 
     @Override
     public CompletableFuture<Output> invoke(Input input)
     {
-        ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().scanStream((ScanInput) input);
+        ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().partitionJoinStreaming((PartitionedJoinInput) input);
         return genCompletableFuture(future);
     }
 }

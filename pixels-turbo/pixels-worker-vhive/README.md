@@ -2,8 +2,6 @@
 
 This module is for creating the Docker image for vHive cloud functions.
 
-Currently, you need to modify [pixels-trino/connector/pom.xml](https://github.com/pixelsdb/pixels-trino/blob/master/connector/pom.xml): replace the `pixels-invoker-lambda` with `pixels-invoker-vhive`.
-
 After [building Pixels](https://github.com/pixelsdb/pixels#build-pixels), we have the executable JAR file `target/pixels-worker-vhive-jar-with-dependencies.jar`.
 Also modify the following items in `pixels.properties`:
 ```properties

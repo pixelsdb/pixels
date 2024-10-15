@@ -33,6 +33,7 @@ import org.apache.logging.log4j.Logger;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 
@@ -106,7 +107,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private int curRGIdx = 0;            // index of current reading row group in targetRGs
     private int curRowInRG = 0;          // starting index of values to read by reader in current row group
 
-    // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private ByteBuffer[] chunkBuffers;   // buffers of each chunk in current row group, arranged by chunk's column id
     private ColumnReader[] readers;      // column readers for each target columns
     private final boolean enableEncodedVector;
 
@@ -323,11 +324,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         logger.debug("In prepareRead(), rowGroupsPosition = " + rowGroupsPosition +
                 ", rowGroupDataLength = " + rowGroupDataLength +
                 ", firstRgFooterPosition = " + (rowGroupsPosition + rowGroupDataLength));
-        // byteBuf.readerIndex(rowGroupsPosition + rowGroupDataLength);  // skip row group data and row group data
-        // length, and get to row group footer
-        // byte[] firstRgFooterBytes = new byte[byteBuf.readInt()];
-        // byteBuf.readBytes(firstRgFooterBytes);
-        // StreamProto.StreamRowGroupFooter firstRgFooter = StreamProto.StreamRowGroupFooter.parseFrom(firstRgFooterBytes);
 
         byteBuf.readerIndex(rowGroupsPosition);
         this.resultColumnsEncoded = new boolean[includedColumnNum];
@@ -490,7 +486,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             this.resultRowBatch.reset();
             this.resultRowBatch.ensureSize(batchSize, false);
             resultRowBatch = this.resultRowBatch;
-        } else
+        }
+        else
         {
             resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
@@ -525,12 +522,9 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                 {
                     PixelsProto.ColumnEncoding encoding = curRowGroupStreamFooter.getRowGroupEncoding()
                             .getColumnChunkEncodings(resultColumns[i]);
-                    // int index = curRGIdx * includedColumns.length + resultColumns[i];
                     PixelsProto.ColumnChunkIndex chunkIndex = curRowGroupStreamFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
-                    ByteBuf chunkBuffer = curRowGroupByteBuf.slice((int) chunkIndex.getChunkOffset(),
-                            chunkIndex.getChunkLength());
-                    readers[i].read(chunkBuffer.nioBuffer(), encoding, curRowInRG, curBatchSize,
+                    readers[i].read(chunkBuffers[resultColumns[i]], encoding, curRowInRG, curBatchSize,
                             streamHeader.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                     // don't update statistics in whenComplete as it may be executed in other threads.
                     diskReadBytes += chunkIndex.getChunkLength();
@@ -593,7 +587,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             {
                 curRowGroupByteBuf.release();
                 curRowGroupByteBuf = partitioned ? byteBufBlockingMap.get(curRGIdx) : byteBufSharedQueue.take();
-            } catch (InterruptedException e)
+            }
+            catch (InterruptedException e)
             {
                 e.printStackTrace();
             }
@@ -642,6 +637,66 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             {
                 this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
                         PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
+            }
+
+            // divide the row group data into chunks
+            // DESIGN: Previously, we read chunks one by one in readBatch(), which is slow due to the overhead of
+            //  calling ByteBuf.slice() every time. Now, we read all chunks of current row group at once in advance.
+            if (this.chunkBuffers != null)
+            {
+                Arrays.fill(this.chunkBuffers, null);
+            }
+            this.chunkBuffers = new ByteBuffer[includedColumns.length];
+            List<ChunkId> diskChunks = new ArrayList<>(targetColumns.length);
+            PixelsProto.RowGroupIndex rowGroupIndex =
+                    curRowGroupStreamFooter.getRowGroupIndexEntry();
+            for (int colId : targetColumns)
+            {
+                PixelsProto.ColumnChunkIndex chunkIndex =
+                        rowGroupIndex.getColumnChunkIndexEntries(colId);
+                ChunkId chunk = new ChunkId(0, colId,
+                        chunkIndex.getChunkOffset(),
+                        chunkIndex.getChunkLength());
+                diskChunks.add(chunk);
+            }
+
+            if (!diskChunks.isEmpty())
+            {
+                for (ChunkId chunk : diskChunks)
+                {
+                    /**
+                     * Comments added in Issue #103:
+                     * chunk.rowGroupId does not mean the row group id in the Pixels file,
+                     * it is the index of group that is to be read (some row groups in the file
+                     * may be filtered out by the predicate and will not be read) and it is
+                     * used to calculate the index of chunkBuffers.
+                     */
+                    int rgIdx = chunk.rowGroupId;
+                    int numCols = includedColumns.length;
+                    int colId = chunk.columnId;
+                    /**
+                     * Issue #114:
+                     * The old code segment of chunk reading is remove in this issue.
+                     * Now, if enableMetrics == true, we can add the read performance metrics here.
+                     *
+                     * Examples of how to add performance metrics:
+                     *
+                     * BytesMsCost seekCost = new BytesMsCost();
+                     * seekCost.setBytes(seekDistanceInBytes);
+                     * seekCost.setMs(seekTimeMs);
+                     * readPerfMetrics.addSeek(seekCost);
+                     *
+                     * BytesMsCost readCost = new BytesMsCost();
+                     * readCost.setBytes(bytesRead);
+                     * readCost.setMs(readTimeMs);
+                     * readPerfMetrics.addSeqRead(readCost);
+                     */
+                    chunkBuffers[rgIdx * numCols + colId] =
+                            curRowGroupByteBuf.slice((int) chunk.offset, chunk.length).asReadOnly().nioBuffer();
+                    // don't update statistics in whenComplete as it may be executed in other threads.
+                    diskReadBytes += chunk.length;
+                    memoryUsage += chunk.length;
+                }
             }
         }
         else
@@ -755,18 +810,12 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     @Override
     public void close() throws IOException
     {
-        // while (!endOfFile)
-        // {
-        //     try
-        //     {
-        //         sleep(20);
-        //     } catch (InterruptedException e)
-        //     {
-        //         throw new RuntimeException(e);
-        //     }
-        // }
-
         diskReadBytes = 0L;
+        // release chunk buffer
+        if (chunkBuffers != null)
+        {
+            Arrays.fill(chunkBuffers, null);
+        }
         if (readers != null)
         {
             for (int i = 0; i < readers.length; ++i)
@@ -777,11 +826,13 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
                     {
                         readers[i].close();
                     }
-                } catch (IOException e)
+                }
+                catch (IOException e)
                 {
                     logger.error("Failed to close column reader.", e);
                     throw new IOException("Failed to close column reader.", e);
-                } finally
+                }
+                finally
                 {
                     readers[i] = null;
                 }
@@ -795,5 +846,21 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
 
         // update measurements
         // ...
+    }
+
+    public class ChunkId
+    {
+        public final int rowGroupId;
+        public final int columnId;
+        public final long offset;
+        public final int length;
+
+        public ChunkId(int rowGroupId, int columnId, long offset, int length)
+        {
+            this.rowGroupId = rowGroupId;
+            this.columnId = columnId;
+            this.offset = offset;
+            this.length = length;
+        }
     }
 }
