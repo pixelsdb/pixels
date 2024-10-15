@@ -78,6 +78,7 @@ public class TimestampColumnVector extends ColumnVector
         this.memoryUsage += (long) Long.BYTES * len + Integer.BYTES;
         this.scratchTimestamp = new Timestamp(0);
     }
+
     public int getPrecision()
     {
         return precision;
@@ -515,6 +516,7 @@ public class TimestampColumnVector extends ColumnVector
             }
         }
     }
+
     @Override
     public void close()
     {
