@@ -39,7 +39,7 @@ import java.util.Arrays;
  * The fields are public by design since this is a performance-critical
  * structure that is used in the inner loop of query execution.
  */
-public abstract class ColumnVector implements AutoCloseable, Cloneable
+public abstract class ColumnVector implements AutoCloseable
 {
     /**
      * length is the capacity, i.e., maximum number of values, of this column vector
@@ -98,20 +98,6 @@ public abstract class ColumnVector implements AutoCloseable, Cloneable
         isRepeating = false;
         preFlattenNoNulls = true;
         preFlattenIsRepeating = false;
-    }
-
-    public ColumnVector(ColumnVector columnVector)
-    {
-        this.length = columnVector.length;
-        this.writeIndex = columnVector.writeIndex;
-        this.memoryUsage = columnVector.memoryUsage;
-        this.isRepeating = columnVector.isRepeating;
-        this.duplicated = columnVector.duplicated;
-        this.originVecId = columnVector.originVecId;
-        this.isNull = columnVector.isNull == null ? null : columnVector.isNull.clone();
-        this.noNulls = columnVector.noNulls;
-        this.preFlattenIsRepeating = columnVector.preFlattenIsRepeating;
-        this.preFlattenNoNulls = columnVector.preFlattenNoNulls;
     }
 
     public void add(boolean value)
@@ -432,14 +418,6 @@ public abstract class ColumnVector implements AutoCloseable, Cloneable
      * @param row    the id of the row to print
      */
     public abstract void stringifyValue(StringBuilder buffer, int row);
-
-    @Override
-    public ColumnVector clone() throws CloneNotSupportedException
-    {
-        ColumnVector cloned = (ColumnVector) super.clone();
-        cloned.isNull = this.isNull == null ? null : this.isNull.clone();
-        return cloned;
-    }
 
     @Override
     public void close()

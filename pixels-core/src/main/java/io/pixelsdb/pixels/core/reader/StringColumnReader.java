@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.BitSet;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -492,5 +493,27 @@ public class StringColumnReader extends ColumnReader
             startsBuf = inputBuffer.slice(startsOffset, inputLength - Integer.BYTES - startsOffset).order(byteOrder);
             nextStart = startsBuf.readInt(); // read out the first start offset, which is 0
         }
+    }
+
+    /**
+     * Read selected values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
+     * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
+     * @throws IOException
+     */
+    @Override
+    public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
+                             int offset, int size, int pixelStride, final int vectorIndex,
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected)
+    {
+        throw new UnsupportedOperationException("Not implemented yet.");
     }
 }

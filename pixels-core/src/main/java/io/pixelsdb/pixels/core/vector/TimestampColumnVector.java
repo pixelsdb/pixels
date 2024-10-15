@@ -78,15 +78,6 @@ public class TimestampColumnVector extends ColumnVector
         this.memoryUsage += (long) Long.BYTES * len + Integer.BYTES;
         this.scratchTimestamp = new Timestamp(0);
     }
-
-    public TimestampColumnVector(TimestampColumnVector timestampColumnVector)
-    {
-        super(timestampColumnVector);
-        this.precision = timestampColumnVector.precision;
-        this.times = timestampColumnVector.times == null ? null : timestampColumnVector.times.clone();
-        this.scratchTimestamp = new Timestamp(timestampColumnVector.scratchTimestamp.getTime());
-    }
-
     public int getPrecision()
     {
         return precision;
@@ -524,13 +515,6 @@ public class TimestampColumnVector extends ColumnVector
             }
         }
     }
-
-    @Override
-    public TimestampColumnVector clone()
-    {
-        return new TimestampColumnVector(this);
-    }
-
     @Override
     public void close()
     {

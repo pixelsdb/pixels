@@ -278,19 +278,4 @@ public class ByteColumnVector extends ColumnVector
             }
         }
     }
-
-    @Override
-    public ByteColumnVector clone()
-    {
-        try
-        {
-            ByteColumnVector cloned = (ByteColumnVector) super.clone();
-            cloned.vector = this.vector == null ? null : this.vector.clone();
-            return cloned;
-        }
-        catch (CloneNotSupportedException e)
-        {
-            throw new AssertionError();
-        }
-    }
 }

@@ -388,19 +388,4 @@ public class DecimalColumnVector extends ColumnVector
             }
         }
     }
-
-    @Override
-    public DecimalColumnVector clone()
-    {
-        try
-        {
-            DecimalColumnVector cloned = (DecimalColumnVector) super.clone();
-            cloned.vector = this.vector == null ? null : this.vector.clone();
-            return cloned;
-        }
-        catch (CloneNotSupportedException e)
-        {
-            throw new AssertionError();
-        }
-    }
 }

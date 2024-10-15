@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.BitSet;
 
 /**
  * Pixels timestamp column reader.
@@ -176,5 +177,26 @@ public class TimestampColumnReader extends ColumnReader
             elementIndex += numToRead;
             i += numToRead;
         }
+    }
+
+    /**
+     * Read selected values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
+     * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
+     * @throws IOException
+     */
+    @Override
+    public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
+                             int offset, int size, int pixelStride, final int vectorIndex,
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected) throws IOException
+    {
     }
 }

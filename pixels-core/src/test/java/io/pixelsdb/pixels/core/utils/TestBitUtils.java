@@ -21,6 +21,11 @@ package io.pixelsdb.pixels.core.utils;
 
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
+import java.util.BitSet;
+
+import static io.pixelsdb.pixels.core.utils.BitUtils.bitWiseDeCompact;
+
 /**
  * Created at: 30/04/2021
  * Author: hank
@@ -87,5 +92,23 @@ public class TestBitUtils
         long end = System.currentTimeMillis();
 
         System.out.println((end - start)/1000.0);
+    }
+
+    @Test
+    public void testDeCompactWithBitmap()
+    {
+        ByteBuffer buffer = ByteBuffer.allocate(1);
+        buffer.put((byte) 0b10101010);
+        BitSet bitSet = new BitSet(8);
+        for (int i = 0; i < 8; i += 2)
+        {
+            bitSet.set(i);
+        }
+        boolean[] bits = new boolean[8];
+        bitWiseDeCompact(bits, 0, 4, buffer, 0, 1, true, bitSet, 0);
+        for (int i = 0; i < 8; i++)
+        {
+            System.out.print(bits[i] ? 1 : 0);
+        }
     }
 }

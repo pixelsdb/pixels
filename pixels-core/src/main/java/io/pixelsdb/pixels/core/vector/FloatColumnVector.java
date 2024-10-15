@@ -315,22 +315,4 @@ public class FloatColumnVector extends ColumnVector
             }
         }
     }
-
-    @Override
-    public FloatColumnVector clone()
-    {
-        try
-        {
-            FloatColumnVector cloned = (FloatColumnVector) super.clone();
-            cloned.vector = this.vector == null ? null : this.vector.clone();
-            /**
-             * NULL_VALUE is a constant, so we do not need to clone it.
-             */
-            return cloned;
-        }
-        catch (CloneNotSupportedException e)
-        {
-            throw new AssertionError();
-        }
-    }
 }

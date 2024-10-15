@@ -251,23 +251,4 @@ public class VectorColumnVector extends ColumnVector
         vector[index] = vec;
         isNull[index] = false;
     }
-
-    @Override
-    public VectorColumnVector clone()
-    {
-        try
-        {
-            VectorColumnVector cloned = (VectorColumnVector) super.clone();
-            cloned.vector = new double[this.vector.length][];
-            for (int i = 0; i < this.vector.length; i++)
-            {
-                cloned.vector[i] = this.vector[i] == null ? null : this.vector[i].clone();
-            }
-            return cloned;
-        }
-        catch (CloneNotSupportedException e)
-        {
-            throw new AssertionError();
-        }
-    }
 }
