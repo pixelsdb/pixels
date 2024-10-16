@@ -325,6 +325,5 @@ public class BooleanColumnReader extends ColumnReader
             elementIndex += numToRead;
             i += numToRead;
         }
-        isNull = null;
     }
 }
