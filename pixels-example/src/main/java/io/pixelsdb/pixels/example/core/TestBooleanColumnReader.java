@@ -25,56 +25,57 @@ public class TestBooleanColumnReader
 
         try
         {
-//            // write pixel file
-//            TypeDescription schema = TypeDescription.fromString(schemaStr);
-//            VectorizedRowBatch rowBatch = schema.createRowBatch();
-//            ByteColumnVector a = (ByteColumnVector) rowBatch.cols[0]; // boolean
-//            LongColumnVector b = (LongColumnVector) rowBatch.cols[1]; // long
-//
-//            PixelsWriter pixelsWriter =
-//                    PixelsWriterImpl.newBuilder()
-//                            .setSchema(schema)
-//                            .setPixelStride(10000)
-//                            .setRowGroupSize(64 * 1024 * 1024)
-//                            .setStorage(storage)
-//                            .setPath(pixelsFile)
-//                            .setBlockSize(256 * 1024 * 1024)
-//                            .setReplication((short) 3)
-//                            .setBlockPadding(true)
-//                            .setEncodingLevel(EncodingLevel.EL2)
-//                            .setCompressionBlockSize(1)
-//                            .build();
-//
-//            for (int i = 0; i < 10; i++)
-//            {
-//                int row = rowBatch.size++;
-//                a.vector[row] = (byte) (i % 2);
-//                a.isNull[row] = false;
-//                b.vector[row] = 100 - i;
-//                b.isNull[row] = false;
-//            }
-//            for (int i = 10; i < 20; i++)
-//            {
-//                int row = rowBatch.size++;
-//                a.isNull[row] = true;
-//                b.vector[row] = 100 - i;
-//                b.isNull[row] = false;
-//            }
-//            for (int i = 20; i < 30; i++)
-//            {
-//                int row = rowBatch.size++;
-//                a.vector[row] = (byte) 1;
-//                a.isNull[row] = false;
-//                b.vector[row] = 100 - i;
-//                b.isNull[row] = false;
-//            }
-//            if (rowBatch.size != 0)
-//            {
-//                pixelsWriter.addRowBatch(rowBatch);
-//                System.out.println("A rowBatch of size " + rowBatch.size + " has been written to " + pixelsFile);
-//                rowBatch.reset();
-//            }
-//            pixelsWriter.close();
+            // write pixel file
+            TypeDescription schema = TypeDescription.fromString(schemaStr);
+            VectorizedRowBatch rowBatch = schema.createRowBatch();
+            ByteColumnVector a = (ByteColumnVector) rowBatch.cols[0]; // boolean
+            LongColumnVector b = (LongColumnVector) rowBatch.cols[1]; // long
+
+            PixelsWriter pixelsWriter =
+                    PixelsWriterImpl.newBuilder()
+                            .setSchema(schema)
+                            .setPixelStride(10000)
+                            .setRowGroupSize(64 * 1024 * 1024)
+                            .setStorage(storage)
+                            .setPath(pixelsFile)
+                            .setBlockSize(256 * 1024 * 1024)
+                            .setReplication((short) 3)
+                            .setBlockPadding(true)
+                            .setEncodingLevel(EncodingLevel.EL2)
+                            .setCompressionBlockSize(1)
+                            .setNullsPadding(false)
+                            .build();
+
+            for (int i = 0; i < 10; i++)
+            {
+                int row = rowBatch.size++;
+                a.vector[row] = (byte) (i % 2);
+                a.isNull[row] = false;
+                b.vector[row] = 100 - i;
+                b.isNull[row] = false;
+            }
+            for (int i = 10; i < 20; i++)
+            {
+                int row = rowBatch.size++;
+                a.isNull[row] = true;
+                b.vector[row] = 100 - i;
+                b.isNull[row] = false;
+            }
+            for (int i = 20; i < 30; i++)
+            {
+                int row = rowBatch.size++;
+                a.vector[row] = (byte) 1;
+                a.isNull[row] = false;
+                b.vector[row] = 100 - i;
+                b.isNull[row] = false;
+            }
+            if (rowBatch.size != 0)
+            {
+                pixelsWriter.addRowBatch(rowBatch);
+                System.out.println("A rowBatch of size " + rowBatch.size + " has been written to " + pixelsFile);
+                rowBatch.reset();
+            }
+            pixelsWriter.close();
 
             // read pixel file
             PixelsReader reader = PixelsReaderImpl.newBuilder()

@@ -229,7 +229,11 @@ public class BooleanColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, vectorWriteIndex = vectorIndex;
-        boolean[] isNull = new boolean[size];
+        boolean[] isNull = null;
+        if (!nullsPadding)
+        {
+            isNull = new boolean[size];
+        }
         for (int i = vectorIndex; numLeft > 0;)
         {
             if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
@@ -248,25 +252,39 @@ public class BooleanColumnReader extends ColumnReader
             if (hasNull)
             {
                 bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
-                BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
-                        isNullOffset, isNullSkipBits, littleEndian);
+                if (nullsPadding)
+                {
+                    // read isNull directly into the vector of the column chunk
+                    BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian, selected, i - vectorIndex);
+                }
+                else
+                {
+                    // need to keep isNull for later use
+                    BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian);
+                    // update columnVector.isNull
+                    int k = vectorWriteIndex;
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.isNull[k++] = isNull[j - vectorIndex];
+                        }
+                    }
+                }
                 isNullOffset += bytesToDeCompact;
                 isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
             {
-                Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
-            }
-
-            // update columnVector.isNull
-            int k = vectorWriteIndex;
-            for (int j = i; j < i + numToRead; ++j)
-            {
-                if (selected.get(j - vectorIndex))
+                if (!nullsPadding)
                 {
-                    columnVector.isNull[k++] = isNull[j - vectorIndex];
+                    Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
                 }
+                // update columnVector.isNull
+                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex + selected.cardinality(), false);
             }
 
             // read content
