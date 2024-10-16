@@ -45,18 +45,28 @@ public class TestBooleanColumnReader
 //                            .setCompressionBlockSize(1)
 //                            .build();
 //
-//            for (int i = 0; i < 100; i++)
+//            for (int i = 0; i < 10; i++)
 //            {
 //                int row = rowBatch.size++;
 //                a.vector[row] = (byte) (i % 2);
 //                a.isNull[row] = false;
-//                b.vector[row] = i;
+//                b.vector[row] = 100 - i;
 //                b.isNull[row] = false;
-//                if (rowBatch.size == rowBatch.getMaxSize())
-//                {
-//                    pixelsWriter.addRowBatch(rowBatch);
-//                    rowBatch.reset();
-//                }
+//            }
+//            for (int i = 10; i < 20; i++)
+//            {
+//                int row = rowBatch.size++;
+//                a.isNull[row] = true;
+//                b.vector[row] = 100 - i;
+//                b.isNull[row] = false;
+//            }
+//            for (int i = 20; i < 30; i++)
+//            {
+//                int row = rowBatch.size++;
+//                a.vector[row] = (byte) 1;
+//                a.isNull[row] = false;
+//                b.vector[row] = 100 - i;
+//                b.isNull[row] = false;
 //            }
 //            if (rowBatch.size != 0)
 //            {
@@ -76,7 +86,7 @@ public class TestBooleanColumnReader
             cols[0] = reader.getFileSchema().getFieldNames().get(0);
             PixelsReaderOption option = new PixelsReaderOption();
             option.transId(0);
-            option.timestamp(50);
+            option.timestamp(85);
             option.skipCorruptRecords(true);
             option.tolerantSchemaEvolution(true);
             option.includeCols(cols);

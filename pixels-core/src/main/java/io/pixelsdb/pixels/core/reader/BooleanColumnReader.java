@@ -244,26 +244,31 @@ public class BooleanColumnReader extends ColumnReader
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            boolean[] isNull = new boolean[numToRead];
             if (hasNull)
             {
                 bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
-                BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
-                        isNullOffset, isNullSkipBits, littleEndian, selected, i - vectorIndex);
+                BitUtils.bitWiseDeCompact(isNull, 0, numToRead, inputBuffer,
+                        isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
                 isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
             {
-                int k = vectorWriteIndex;
-                for (int j = i; j < i + numToRead; ++j)
+                Arrays.fill(isNull, false);
+            }
+
+            // update columnVector.isNull
+            int k = vectorWriteIndex;
+            for (int j = i; j < i + numToRead; ++j)
+            {
+                if (selected.get(j - vectorIndex))
                 {
-                    if (selected.get(j - vectorIndex))
-                    {
-                        columnVector.isNull[k++] = false;
-                    }
+                    columnVector.isNull[k++] = isNull[j - i];
                 }
             }
+
             // read content
             if (nullsPadding)
             {
@@ -280,7 +285,7 @@ public class BooleanColumnReader extends ColumnReader
                 // bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    if (!(hasNull && columnVector.isNull[j]))
+                    if (!(hasNull && isNull[j - i]))
                     {
                         if (selected.get(j - vectorIndex))
                         {
@@ -289,8 +294,14 @@ public class BooleanColumnReader extends ColumnReader
                         }
                         bitsOrInputIndex++;
                     }
+                    else if (selected.get(j - vectorIndex))
+                    {
+                        // represent reading a null value
+                        vectorWriteIndex++;
+                    }
                 }
             }
+
             // update variables
             numLeft -= numToRead;
             elementIndex += numToRead;
