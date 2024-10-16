@@ -5,12 +5,10 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
+import io.pixelsdb.pixels.core.reader.DecimalColumnReader;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.core.vector.ByteColumnVector;
-import io.pixelsdb.pixels.core.vector.DateColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.IOException;
 
@@ -22,7 +20,7 @@ public class TestColumnReader
     {
         String pixelsFile = "/home/pixels/data/tpch_5g/test/test.pxl";
         Storage storage = StorageFactory.Instance().getStorage("file");
-        String schemaStr = "struct<a:boolean,b:date,c:long>";
+        String schemaStr = "struct<a:boolean,b:date,c:decimal(5,2),d:long>";
 
         try
         {
@@ -31,7 +29,8 @@ public class TestColumnReader
 //            VectorizedRowBatch rowBatch = schema.createRowBatch();
 //            ByteColumnVector a = (ByteColumnVector) rowBatch.cols[0]; // boolean
 //            DateColumnVector b = (DateColumnVector) rowBatch.cols[1]; // date
-//            LongColumnVector c = (LongColumnVector) rowBatch.cols[2]; // long
+//            DecimalColumnVector c = (DecimalColumnVector) rowBatch.cols[2]; // decimal
+//            LongColumnVector d = (LongColumnVector) rowBatch.cols[3]; // long
 //
 //            PixelsWriter pixelsWriter =
 //                    PixelsWriterImpl.newBuilder()
@@ -54,8 +53,10 @@ public class TestColumnReader
 //                a.vector[row] = (byte) (i % 2);
 //                a.isNull[row] = false;
 //                b.isNull[row] = true;
-//                c.vector[row] = 100 - i;
+//                c.vector[row] = 10000 + i;
 //                c.isNull[row] = false;
+//                d.vector[row] = 100 - i;
+//                d.isNull[row] = false;
 //            }
 //            for (int i = 10; i < 20; i++)
 //            {
@@ -63,8 +64,9 @@ public class TestColumnReader
 //                a.isNull[row] = true;
 //                b.dates[row] = 1000 + i;
 //                b.isNull[row] = false;
-//                c.vector[row] = 100 - i;
-//                c.isNull[row] = false;
+//                c.isNull[row] = true;
+//                d.vector[row] = 100 - i;
+//                d.isNull[row] = false;
 //            }
 //            for (int i = 20; i < 30; i++)
 //            {
@@ -73,8 +75,10 @@ public class TestColumnReader
 //                a.isNull[row] = false;
 //                b.dates[row] = 1000 + i;
 //                b.isNull[row] = false;
-//                c.vector[row] = 100 - i;
+//                c.vector[row] = 10000 + i;
 //                c.isNull[row] = false;
+//                d.vector[row] = 100 - i;
+//                d.isNull[row] = false;
 //            }
 //            if (rowBatch.size != 0)
 //            {
@@ -90,9 +94,10 @@ public class TestColumnReader
                     .setPath(pixelsFile)
                     .setPixelsFooterCache(new PixelsFooterCache())
                     .build();
-            String[] cols = new String[2];
+            String[] cols = new String[3];
             cols[0] = reader.getFileSchema().getFieldNames().get(0);
             cols[1] = reader.getFileSchema().getFieldNames().get(1);
+            cols[2] = reader.getFileSchema().getFieldNames().get(2);
             PixelsReaderOption option = new PixelsReaderOption();
             option.transId(0);
             option.timestamp(85);
