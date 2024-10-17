@@ -151,13 +151,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         ", partition ID header: " + req.headers().get("X-Partition-Id") +
                         ", HTTP request object body total length: " + req.content().readableBytes());
 
-                // schema packet: only 1 packet expected, so close the connection immediately
-                // partitioned mode: close the connection if all partitions received
-                // else (non-partitioned mode, data packet): close connection if empty packet received
-                boolean needCloseParentChannel = partitionId == PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER ||
-                        (partitioned && numPartitionsReceived.get() == numPartitions) ||
-                        (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
-                                req.content().readableBytes() == 0);
                 ByteBuf byteBuf = req.content();
                 try
                 {
@@ -178,7 +171,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         catch (IOException e)
                         {
                             logger.error("Invalid stream header values: ", e);
-                            sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
+                            sendResponseAndClose(ctx, req, BAD_REQUEST, false);
                             return;
                         }
                     }
@@ -193,7 +186,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 catch (InvalidProtocolBufferException | IndexOutOfBoundsException e)
                 {
                     logger.error("Malformed or corrupted stream header", e);
-                    sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
+                    sendResponseAndClose(ctx, req, BAD_REQUEST, false);
                     return;
                 }
 
@@ -209,7 +202,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         if (partitionId < 0 || partitionId >= numPartitions)
                         {
                             logger.warn("Client sent invalid partitionId value: " + partitionId);
-                            sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
+                            sendResponseAndClose(ctx, req, BAD_REQUEST, false);
                             return;
                         }
                         byteBufBlockingMap.put(partitionId, byteBuf);
@@ -222,6 +215,13 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     }
                 }
 
+                // schema packet: only 1 packet expected, so close the connection immediately
+                // partitioned mode: close the connection if all partitions received
+                // else (non-partitioned mode, data packet): close connection if empty packet received
+                boolean needCloseParentChannel = partitionId == PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER ||
+                        (partitioned && numPartitionsReceived.get() == numPartitions) ||
+                        (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
+                                req.content().readableBytes() == 0);
                 sendResponseAndClose(ctx, req, HttpResponseStatus.OK, needCloseParentChannel);
             }
 
@@ -539,11 +539,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
             try
             {
-                if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(5, TimeUnit.SECONDS);
+                if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(300, TimeUnit.SECONDS);
             }
             catch (TimeoutException e)
             {
-                logger.warn("In close(), HTTP server did not shut down in 5 seconds, doing forceful shutdown");
+                logger.warn("In close(), HTTP server did not shut down in 300 seconds, doing forceful shutdown");
                 this.httpServerFuture.cancel(true);
             }
             catch (InterruptedException | ExecutionException e)
