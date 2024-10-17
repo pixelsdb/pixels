@@ -276,6 +276,7 @@ public class DateColumnReader extends ColumnReader
                 // update columnVector.isNull
                 Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex + selected.cardinality(), false);
             }
+
             // read content
             if (decoding)
             {

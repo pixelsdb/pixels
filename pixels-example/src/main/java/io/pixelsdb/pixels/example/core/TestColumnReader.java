@@ -6,6 +6,7 @@ import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
 import io.pixelsdb.pixels.core.reader.DecimalColumnReader;
+import io.pixelsdb.pixels.core.reader.FloatColumnReader;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.*;
@@ -20,17 +21,25 @@ public class TestColumnReader
     {
         String pixelsFile = "/home/pixels/data/tpch_5g/test/test.pxl";
         Storage storage = StorageFactory.Instance().getStorage("file");
-        String schemaStr = "struct<a:boolean,b:date,c:decimal(5,2),d:long>";
+        String schemaStr = "struct<a:boolean,b:date,c:decimal(5,2),d:double,e:float,f:int,g:decimal(30,20),h:string,i:time,j:timestamp,k:vector,l:long>";
 
         try
         {
-            // write pixel file
+//            // write pixel file
 //            TypeDescription schema = TypeDescription.fromString(schemaStr);
 //            VectorizedRowBatch rowBatch = schema.createRowBatch();
 //            ByteColumnVector a = (ByteColumnVector) rowBatch.cols[0]; // boolean
 //            DateColumnVector b = (DateColumnVector) rowBatch.cols[1]; // date
 //            DecimalColumnVector c = (DecimalColumnVector) rowBatch.cols[2]; // decimal
-//            LongColumnVector d = (LongColumnVector) rowBatch.cols[3]; // long
+//            DoubleColumnVector d = (DoubleColumnVector) rowBatch.cols[3]; // double
+//            FloatColumnVector e = (FloatColumnVector) rowBatch.cols[4]; // float
+//            LongColumnVector f = (LongColumnVector) rowBatch.cols[5]; // int
+//            LongDecimalColumnVector g = (LongDecimalColumnVector) rowBatch.cols[6]; // long decimal
+//            BinaryColumnVector h = (BinaryColumnVector) rowBatch.cols[7]; // string
+//            TimeColumnVector m = (TimeColumnVector) rowBatch.cols[8]; // time
+//            TimestampColumnVector j = (TimestampColumnVector) rowBatch.cols[9]; // timestamp
+//            VectorColumnVector k = (VectorColumnVector) rowBatch.cols[10]; // vector
+//            LongColumnVector l = (LongColumnVector) rowBatch.cols[11]; // long
 //
 //            PixelsWriter pixelsWriter =
 //                    PixelsWriterImpl.newBuilder()
@@ -44,7 +53,7 @@ public class TestColumnReader
 //                            .setBlockPadding(true)
 //                            .setEncodingLevel(EncodingLevel.EL2)
 //                            .setCompressionBlockSize(1)
-//                            .setNullsPadding(false)
+//                            .setNullsPadding(true)
 //                            .build();
 //
 //            for (int i = 0; i < 10; i++)
@@ -55,8 +64,21 @@ public class TestColumnReader
 //                b.isNull[row] = true;
 //                c.vector[row] = 10000 + i;
 //                c.isNull[row] = false;
-//                d.vector[row] = 100 - i;
-//                d.isNull[row] = false;
+//                d.isNull[row] = true;
+//                e.vector[row] = 10000 + i;
+//                e.isNull[row] = false;
+//                f.isNull[row] = true;
+//                g.vector[row << 1] = 0;
+//                g.vector[(row << 1) + 1] = 10000 + i;
+//                g.isNull[row] = false;
+//                h.isNull[row] = true;
+//                m.set(row, 1000 * i);
+//                m.isNull[row] = false;
+//                j.isNull[row] = true;
+//                k.setRef(row, new double[]{i + 0.1, i + 0.2});
+//                k.isNull[row] = false;
+//                l.vector[row] = 100 - i;
+//                l.isNull[row] = false;
 //            }
 //            for (int i = 10; i < 20; i++)
 //            {
@@ -65,8 +87,21 @@ public class TestColumnReader
 //                b.dates[row] = 1000 + i;
 //                b.isNull[row] = false;
 //                c.isNull[row] = true;
-//                d.vector[row] = 100 - i;
+//                d.vector[row] = 1000 + i;
 //                d.isNull[row] = false;
+//                e.isNull[row] = true;
+//                f.vector[row] = 1000 + i;
+//                f.isNull[row] = false;
+//                g.isNull[row] = true;
+//                h.setVal(row, String.valueOf(i).getBytes());
+//                h.isNull[row] = false;
+//                m.isNull[row] = true;
+//                j.set(row, 1000 * i);
+//                j.isNull[row] = false;
+//                k.setRef(row, new double[]{i + 0.1, i + 0.2});
+//                k.isNull[row] = false;
+//                l.vector[row] = 100 - i;
+//                l.isNull[row] = false;
 //            }
 //            for (int i = 20; i < 30; i++)
 //            {
@@ -77,8 +112,25 @@ public class TestColumnReader
 //                b.isNull[row] = false;
 //                c.vector[row] = 10000 + i;
 //                c.isNull[row] = false;
-//                d.vector[row] = 100 - i;
+//                d.vector[row] = 1000 + i;
 //                d.isNull[row] = false;
+//                e.vector[row] = 10000 + i;
+//                e.isNull[row] = false;
+//                f.vector[row] = 1000 + i;
+//                f.isNull[row] = false;
+//                g.vector[row << 1] = 0;
+//                g.vector[(row << 1) + 1] = 10000 + i;
+//                g.isNull[row] = false;
+//                h.setVal(row, String.valueOf(i).getBytes());
+//                h.isNull[row] = false;
+//                m.set(row, 1000 * i);
+//                m.isNull[row] = false;
+//                j.set(row, 1000 * i);
+//                j.isNull[row] = false;
+//                k.setRef(row, new double[]{i + 0.1, i + 0.2});
+//                k.isNull[row] = false;
+//                l.vector[row] = 100 - i;
+//                l.isNull[row] = false;
 //            }
 //            if (rowBatch.size != 0)
 //            {
@@ -94,10 +146,18 @@ public class TestColumnReader
                     .setPath(pixelsFile)
                     .setPixelsFooterCache(new PixelsFooterCache())
                     .build();
-            String[] cols = new String[3];
+            String[] cols = new String[11];
             cols[0] = reader.getFileSchema().getFieldNames().get(0);
             cols[1] = reader.getFileSchema().getFieldNames().get(1);
             cols[2] = reader.getFileSchema().getFieldNames().get(2);
+            cols[3] = reader.getFileSchema().getFieldNames().get(3);
+            cols[4] = reader.getFileSchema().getFieldNames().get(4);
+            cols[5] = reader.getFileSchema().getFieldNames().get(5);
+            cols[6] = reader.getFileSchema().getFieldNames().get(6);
+            cols[7] = reader.getFileSchema().getFieldNames().get(7);
+            cols[8] = reader.getFileSchema().getFieldNames().get(8);
+            cols[9] = reader.getFileSchema().getFieldNames().get(9);
+            cols[10] = reader.getFileSchema().getFieldNames().get(10);
             PixelsReaderOption option = new PixelsReaderOption();
             option.transId(0);
             option.timestamp(85);

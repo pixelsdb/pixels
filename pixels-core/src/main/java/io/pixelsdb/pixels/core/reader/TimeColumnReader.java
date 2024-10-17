@@ -197,8 +197,145 @@ public class TimeColumnReader extends ColumnReader
     @Override
     public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                              int offset, int size, int pixelStride, final int vectorIndex,
-                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected)
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected) throws IOException
     {
-        throw new UnsupportedOperationException("Not implemented yet.");
+        TimeColumnVector columnVector = (TimeColumnVector) vector;
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+        if (offset == 0)
+        {
+            if (inputStream != null)
+            {
+                inputStream.close();
+            }
+            this.inputBuffer = input;
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
+            decoder = new RunLenIntDecoder(inputStream, true);
+            isNullOffset = inputBuffer.position() + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
+            hasNull = true;
+            elementIndex = 0;
+        }
+
+        // read without copying the de-compacted content and isNull
+        int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
+        boolean[] isNull = null;
+        if (decoding || !nullsPadding)
+        {
+            isNull = new boolean[size];
+        }
+        for (int i = vectorIndex; numLeft > 0;)
+        {
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+            {
+                // read to the end of the current pixel
+                numToRead = pixelStride - elementIndex % pixelStride;
+            }
+            else
+            {
+                numToRead = numLeft;
+            }
+            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            if (hasNull)
+            {
+                if (!decoding && nullsPadding)
+                {
+                    // read isNull directly into the vector of the column chunk
+                    BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian, selected, i - vectorIndex);
+                }
+                else
+                {
+                    // need to keep isNull for later use
+                    BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian);
+                    // update columnVector.isNull
+                    int k = vectorWriteIndex;
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.isNull[k++] = isNull[j - vectorIndex];
+                        }
+                    }
+                }
+                isNullOffset += bytesToDeCompact;
+                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                columnVector.noNulls = false;
+            }
+            else
+            {
+                if (decoding || !nullsPadding)
+                {
+                    Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
+                }
+                // update columnVector.isNull
+                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex + selected.cardinality(), false);
+            }
+
+            // read content
+            if (decoding)
+            {
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (!(hasNull && isNull[j - vectorIndex]))
+                    {
+                        int value = (int) decoder.next();
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.set(vectorWriteIndex++, value);
+                        }
+                    }
+                    else if (selected.get(j - vectorIndex))
+                    {
+                        vectorWriteIndex++;
+                    }
+                }
+            }
+            else
+            {
+                if (nullsPadding)
+                {
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        int value = inputBuffer.getInt();
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.set(vectorWriteIndex++, value);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (!(hasNull && isNull[j - vectorIndex]))
+                        {
+                            int value = inputBuffer.getInt();
+                            if (selected.get(j - vectorIndex))
+                            {
+                                // If time column is not encoded, it is written as integers instead of longs.
+                                columnVector.set(vectorWriteIndex++, value);
+                            }
+                        }
+                        else if (selected.get(j - vectorIndex))
+                        {
+                            vectorWriteIndex++;
+                        }
+                    }
+                }
+            }
+
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
+        }
     }
 }
