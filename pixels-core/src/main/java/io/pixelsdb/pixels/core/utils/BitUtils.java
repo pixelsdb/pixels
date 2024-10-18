@@ -440,7 +440,7 @@ public class BitUtils
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
         b = input.get(offset++);
-        for (int i = 7; i >= 0 ; --i)
+        for (int i = 7; i >= 0 && bitsOffset < bitsEnd; --i)
         {
             if (skipBits-- > 0)
             {
@@ -448,13 +448,13 @@ public class BitUtils
             }
             bits[bitsOffset++] = (byte) (0x01 & (b >> i));
         }
-        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        for (int i = offset; bitsOffset < bitsEnd; ++i)
         {
             b = input.get(i);
-            while (bitsLeft > 0 && bitsIndex < bitsEnd)
+            while (bitsLeft > 0 && bitsOffset < bitsEnd)
             {
                 bitsLeft --;
-                bits[bitsIndex++] = (byte) (0x01 & (b >> bitsLeft));
+                bits[bitsOffset++] = (byte) (0x01 & (b >> bitsLeft));
             }
             bitsLeft = 8;
         }
@@ -466,7 +466,7 @@ public class BitUtils
         byte currBit = 0, b;
         int bitsEnd = bitsOffset + bitsLength;
         b = input.get(offset++);
-        for (int i = 0; i < 8 ; ++i)
+        for (int i = 0; i < 8 && bitsOffset < bitsEnd; ++i)
         {
             if (skipBits-- > 0)
             {
@@ -474,12 +474,12 @@ public class BitUtils
             }
             bits[bitsOffset++] = (byte) (0x01 & (b >> i));
         }
-        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        for (int i = offset; bitsOffset < bitsEnd; ++i)
         {
             b = input.get(i);
-            while (currBit < 8 && bitsIndex < bitsEnd)
+            while (currBit < 8 && bitsOffset < bitsEnd)
             {
-                bits[bitsIndex++] = (byte) (0x01 & (b >> currBit));
+                bits[bitsOffset++] = (byte) (0x01 & (b >> currBit));
                 currBit ++;
             }
             currBit = 0;
@@ -600,7 +600,7 @@ public class BitUtils
         byte bitsLeft = 8, b;
         int bitsEnd = bitsOffset + bitsLength;
         b = input.getByte(offset++);
-        for (int i = 7; i >= 0; --i)
+        for (int i = 7; i >= 0 && bitsOffset < bitsEnd; --i)
         {
             if (skipBits-- > 0)
             {
@@ -608,13 +608,13 @@ public class BitUtils
             }
             bits[bitsOffset++] = (0x01 & (b >> i)) == 1;
         }
-        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        for (int i = offset; bitsOffset < bitsEnd; ++i)
         {
             b = input.getByte(i);
-            while (bitsLeft > 0 && bitsIndex < bitsEnd)
+            while (bitsLeft > 0 && bitsOffset < bitsEnd)
             {
                 bitsLeft --;
-                bits[bitsIndex++] = (0x01 & (b >> bitsLeft)) == 1;
+                bits[bitsOffset++] = (0x01 & (b >> bitsLeft)) == 1;
             }
             bitsLeft = 8;
         }
@@ -626,7 +626,7 @@ public class BitUtils
         byte currBit = 0, b;
         int bitsEnd = bitsOffset + bitsLength;
         b = input.getByte(offset++);
-        for (int i = 0; i < 8 ; ++i)
+        for (int i = 0; i < 8 && bitsOffset < bitsEnd; ++i)
         {
             if (skipBits-- > 0)
             {
@@ -634,12 +634,12 @@ public class BitUtils
             }
             bits[bitsOffset++] = (0x01 & (b >> i)) == 1;
         }
-        for (int i = offset, bitsIndex = bitsOffset; bitsIndex < bitsEnd; ++i)
+        for (int i = offset; bitsOffset < bitsEnd; ++i)
         {
             b = input.getByte(i);
-            while (currBit < 8 && bitsIndex < bitsEnd)
+            while (currBit < 8 && bitsOffset < bitsEnd)
             {
-                bits[bitsIndex++] = (0x01 & (b >> currBit)) == 1;
+                bits[bitsOffset++] = (0x01 & (b >> currBit)) == 1;
                 currBit ++;
             }
             currBit = 0;

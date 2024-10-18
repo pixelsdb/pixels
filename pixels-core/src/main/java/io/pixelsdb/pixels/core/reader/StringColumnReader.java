@@ -437,7 +437,7 @@ public class StringColumnReader extends ColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull)
                     {
-                        BitUtils.bitWiseDeCompact(isNull, vectorWriteIndex, numToRead, inputBuffer,
+                        BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
                                 isNullOffset, isNullSkipBits, littleEndian);
                         // update columnVector.isNull
                         int k = vectorWriteIndex;
