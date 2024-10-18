@@ -109,20 +109,26 @@ public class VectorColumnReader extends ColumnReader
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    for (int d = 0; d < dimension; d++)
+                    if (!(hasNull && vectorColumnVector.isNull[j]))
                     {
-                        vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
-                        inputIndex += Double.BYTES;
+                        for (int d = 0; d < dimension; d++)
+                        {
+                            vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
+                            inputIndex += Double.BYTES;
+                        }
                     }
                 }
             } else
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    for (int d = 0; d < dimension; d++)
+                    if (!(hasNull && vectorColumnVector.isNull[j]))
                     {
-                        vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
-                        inputIndex += Double.BYTES;
+                        for (int d = 0; d < dimension; d++)
+                        {
+                            vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
+                            inputIndex += Double.BYTES;
+                        }
                     }
                 }
             }
