@@ -12,6 +12,8 @@ import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import static io.pixelsdb.pixels.core.predicate.PixelsPredicate.TRUE_PREDICATE;
 
@@ -21,124 +23,129 @@ public class TestColumnReader
     {
         String pixelsFile = "/home/pixels/data/tpch_5g/test/test.pxl";
         Storage storage = StorageFactory.Instance().getStorage("file");
-        String schemaStr = "struct<a:boolean,b:date,c:decimal(5,2),d:double,e:float,f:int,g:decimal(30,20),h:string,i:time,j:timestamp,k:vector,l:long>";
+        String schemaStr = "struct<a:boolean,b:date,c:decimal(5,2),d:double,e:float,f:int,g:decimal(30,20),h:string,i:time,j:timestamp,k:vector>";
 
         try
         {
-//            // write pixel file
-//            TypeDescription schema = TypeDescription.fromString(schemaStr);
-//            VectorizedRowBatch rowBatch = schema.createRowBatch();
-//            ByteColumnVector a = (ByteColumnVector) rowBatch.cols[0]; // boolean
-//            DateColumnVector b = (DateColumnVector) rowBatch.cols[1]; // date
-//            DecimalColumnVector c = (DecimalColumnVector) rowBatch.cols[2]; // decimal
-//            DoubleColumnVector d = (DoubleColumnVector) rowBatch.cols[3]; // double
-//            FloatColumnVector e = (FloatColumnVector) rowBatch.cols[4]; // float
-//            LongColumnVector f = (LongColumnVector) rowBatch.cols[5]; // int
-//            LongDecimalColumnVector g = (LongDecimalColumnVector) rowBatch.cols[6]; // long decimal
-//            BinaryColumnVector h = (BinaryColumnVector) rowBatch.cols[7]; // string
-//            TimeColumnVector m = (TimeColumnVector) rowBatch.cols[8]; // time
-//            TimestampColumnVector j = (TimestampColumnVector) rowBatch.cols[9]; // timestamp
-//            VectorColumnVector k = (VectorColumnVector) rowBatch.cols[10]; // vector
-//            LongColumnVector l = (LongColumnVector) rowBatch.cols[11]; // long
-//
-//            PixelsWriter pixelsWriter =
-//                    PixelsWriterImpl.newBuilder()
-//                            .setSchema(schema)
-//                            .setPixelStride(10000)
-//                            .setRowGroupSize(64 * 1024 * 1024)
-//                            .setStorage(storage)
-//                            .setPath(pixelsFile)
-//                            .setBlockSize(256 * 1024 * 1024)
-//                            .setReplication((short) 3)
-//                            .setBlockPadding(true)
-//                            .setEncodingLevel(EncodingLevel.EL2)
-//                            .setCompressionBlockSize(1)
-//                            .setNullsPadding(true)
-//                            .build();
-//
-//            for (int i = 0; i < 10; i++)
-//            {
-//                int row = rowBatch.size++;
-//                a.vector[row] = (byte) (i % 2);
-//                a.isNull[row] = false;
-//                b.isNull[row] = true;
-//                c.vector[row] = 10000 + i;
-//                c.isNull[row] = false;
-//                d.isNull[row] = true;
-//                e.vector[row] = 10000 + i;
-//                e.isNull[row] = false;
-//                f.isNull[row] = true;
-//                g.vector[row << 1] = 0;
-//                g.vector[(row << 1) + 1] = 10000 + i;
-//                g.isNull[row] = false;
-//                h.isNull[row] = true;
-//                m.set(row, 1000 * i);
-//                m.isNull[row] = false;
-//                j.isNull[row] = true;
+            // delete pixel file
+            Files.deleteIfExists(Paths.get(pixelsFile));
+
+            // write pixel file
+            TypeDescription schema = TypeDescription.fromString(schemaStr);
+            VectorizedRowBatch rowBatch = schema.createRowBatchWithHiddenColumn();
+            ByteColumnVector a = (ByteColumnVector) rowBatch.cols[0]; // boolean
+            DateColumnVector b = (DateColumnVector) rowBatch.cols[1]; // date
+            DecimalColumnVector c = (DecimalColumnVector) rowBatch.cols[2]; // decimal
+            DoubleColumnVector d = (DoubleColumnVector) rowBatch.cols[3]; // double
+            FloatColumnVector e = (FloatColumnVector) rowBatch.cols[4]; // float
+            LongColumnVector f = (LongColumnVector) rowBatch.cols[5]; // int
+            LongDecimalColumnVector g = (LongDecimalColumnVector) rowBatch.cols[6]; // long decimal
+            BinaryColumnVector h = (BinaryColumnVector) rowBatch.cols[7]; // string
+            TimeColumnVector m = (TimeColumnVector) rowBatch.cols[8]; // time
+            TimestampColumnVector j = (TimestampColumnVector) rowBatch.cols[9]; // timestamp
+            VectorColumnVector k = (VectorColumnVector) rowBatch.cols[10]; // vector
+            LongColumnVector l = (LongColumnVector) rowBatch.cols[11]; // long
+
+            PixelsWriter pixelsWriter =
+                    PixelsWriterImpl.newBuilder()
+                            .setSchema(schema)
+                            .setHasHiddenColumn(true)
+                            .setPixelStride(10000)
+                            .setRowGroupSize(64 * 1024 * 1024)
+                            .setStorage(storage)
+                            .setPath(pixelsFile)
+                            .setBlockSize(256 * 1024 * 1024)
+                            .setReplication((short) 3)
+                            .setBlockPadding(true)
+                            .setEncodingLevel(EncodingLevel.EL2)
+                            .setCompressionBlockSize(1)
+                            .setNullsPadding(true)
+                            .build();
+
+            for (int i = 0; i < 10; i++)
+            {
+                int row = rowBatch.size++;
+                a.vector[row] = (byte) (i % 2);
+                a.isNull[row] = false;
+                b.isNull[row] = true;
+                c.vector[row] = 10000 + i;
+                c.isNull[row] = false;
+                d.isNull[row] = true;
+                e.vector[row] = 10000 + i;
+                e.isNull[row] = false;
+                f.isNull[row] = true;
+                g.vector[row << 1] = 0;
+                g.vector[(row << 1) + 1] = 10000 + i;
+                g.isNull[row] = false;
+                h.isNull[row] = true;
+                m.set(row, 1000 * i);
+                m.isNull[row] = false;
+                j.isNull[row] = true;
+                k.setRef(row, new double[]{i + 0.1, i + 0.2});
+                k.isNull[row] = false;
+                l.vector[row] = 100 - i;
+                l.isNull[row] = false;
+            }
+            for (int i = 10; i < 20; i++)
+            {
+                int row = rowBatch.size++;
+                a.isNull[row] = true;
+                b.dates[row] = 1000 + i;
+                b.isNull[row] = false;
+                c.isNull[row] = true;
+                d.vector[row] = 1000 + i;
+                d.isNull[row] = false;
+                e.isNull[row] = true;
+                f.vector[row] = 1000 + i;
+                f.isNull[row] = false;
+                g.isNull[row] = true;
+                h.setVal(row, String.valueOf(i).getBytes());
+                h.isNull[row] = false;
+                m.isNull[row] = true;
+                j.set(row, 1000 * i);
+                j.isNull[row] = false;
 //                k.setRef(row, new double[]{i + 0.1, i + 0.2});
 //                k.isNull[row] = false;
-//                l.vector[row] = 100 - i;
-//                l.isNull[row] = false;
-//            }
-//            for (int i = 10; i < 20; i++)
-//            {
-//                int row = rowBatch.size++;
-//                a.isNull[row] = true;
-//                b.dates[row] = 1000 + i;
-//                b.isNull[row] = false;
-//                c.isNull[row] = true;
-//                d.vector[row] = 1000 + i;
-//                d.isNull[row] = false;
-//                e.isNull[row] = true;
-//                f.vector[row] = 1000 + i;
-//                f.isNull[row] = false;
-//                g.isNull[row] = true;
-//                h.setVal(row, String.valueOf(i).getBytes());
-//                h.isNull[row] = false;
-//                m.isNull[row] = true;
-//                j.set(row, 1000 * i);
-//                j.isNull[row] = false;
-//                k.setRef(row, new double[]{i + 0.1, i + 0.2});
-//                k.isNull[row] = false;
-//                l.vector[row] = 100 - i;
-//                l.isNull[row] = false;
-//            }
-//            for (int i = 20; i < 30; i++)
-//            {
-//                int row = rowBatch.size++;
-//                a.vector[row] = (byte) 1;
-//                a.isNull[row] = false;
-//                b.dates[row] = 1000 + i;
-//                b.isNull[row] = false;
-//                c.vector[row] = 10000 + i;
-//                c.isNull[row] = false;
-//                d.vector[row] = 1000 + i;
-//                d.isNull[row] = false;
-//                e.vector[row] = 10000 + i;
-//                e.isNull[row] = false;
-//                f.vector[row] = 1000 + i;
-//                f.isNull[row] = false;
-//                g.vector[row << 1] = 0;
-//                g.vector[(row << 1) + 1] = 10000 + i;
-//                g.isNull[row] = false;
-//                h.setVal(row, String.valueOf(i).getBytes());
-//                h.isNull[row] = false;
-//                m.set(row, 1000 * i);
-//                m.isNull[row] = false;
-//                j.set(row, 1000 * i);
-//                j.isNull[row] = false;
-//                k.setRef(row, new double[]{i + 0.1, i + 0.2});
-//                k.isNull[row] = false;
-//                l.vector[row] = 100 - i;
-//                l.isNull[row] = false;
-//            }
-//            if (rowBatch.size != 0)
-//            {
-//                pixelsWriter.addRowBatch(rowBatch);
-//                System.out.println("A rowBatch of size " + rowBatch.size + " has been written to " + pixelsFile);
-//                rowBatch.reset();
-//            }
-//            pixelsWriter.close();
+                k.isNull[row] = true;
+                l.vector[row] = 100 - i;
+                l.isNull[row] = false;
+            }
+            for (int i = 20; i < 30; i++)
+            {
+                int row = rowBatch.size++;
+                a.vector[row] = (byte) 1;
+                a.isNull[row] = false;
+                b.dates[row] = 1000 + i;
+                b.isNull[row] = false;
+                c.vector[row] = 10000 + i;
+                c.isNull[row] = false;
+                d.vector[row] = 1000 + i;
+                d.isNull[row] = false;
+                e.vector[row] = 10000 + i;
+                e.isNull[row] = false;
+                f.vector[row] = 1000 + i;
+                f.isNull[row] = false;
+                g.vector[row << 1] = 0;
+                g.vector[(row << 1) + 1] = 10000 + i;
+                g.isNull[row] = false;
+                h.setVal(row, String.valueOf(i).getBytes());
+                h.isNull[row] = false;
+                m.set(row, 1000 * i);
+                m.isNull[row] = false;
+                j.set(row, 1000 * i);
+                j.isNull[row] = false;
+                k.setRef(row, new double[]{i + 0.1, i + 0.2});
+                k.isNull[row] = false;
+                l.vector[row] = 100 - i;
+                l.isNull[row] = false;
+            }
+            if (rowBatch.size != 0)
+            {
+                pixelsWriter.addRowBatch(rowBatch);
+                System.out.println("A rowBatch of size " + rowBatch.size + " has been written to " + pixelsFile);
+                rowBatch.reset();
+            }
+            pixelsWriter.close();
 
             // read pixel file
             PixelsReader reader = PixelsReaderImpl.newBuilder()
@@ -166,7 +173,7 @@ public class TestColumnReader
             option.includeCols(cols);
             option.predicate(TRUE_PREDICATE);
             PixelsRecordReader recordReader = reader.read(option);
-            int batchSize = 10;
+            int batchSize = 11;
             VectorizedRowBatch resultBatch;
             int len = 0;
             int numRows = 0;
@@ -189,5 +196,8 @@ public class TestColumnReader
         {
             e.printStackTrace();
         }
+
+        // delete pixel file
+        Files.deleteIfExists(Paths.get(pixelsFile));
     }
 }
