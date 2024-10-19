@@ -284,7 +284,8 @@ public class BooleanColumnReader extends ColumnReader
                     Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
                 }
                 // update columnVector.isNull
-                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex + selected.cardinality(), false);
+                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex +
+                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
             }
 
             // read content

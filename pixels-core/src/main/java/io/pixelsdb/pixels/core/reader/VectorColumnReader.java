@@ -216,7 +216,8 @@ public class VectorColumnReader extends ColumnReader
             else
             {
                 Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
-                Arrays.fill(vectorColumnVector.isNull, vectorWriteIndex, vectorWriteIndex + selected.cardinality(), false);
+                Arrays.fill(vectorColumnVector.isNull, vectorWriteIndex, vectorWriteIndex +
+                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
             }
 
             // read content

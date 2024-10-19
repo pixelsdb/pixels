@@ -141,6 +141,27 @@ public abstract class ColumnReader implements Closeable
                                       ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected) throws IOException;
 
     /**
+     * count the number of candidates in the bitSet from start to end
+     *
+     * @param bitSet
+     * @param start
+     * @param end
+     * @return
+     */
+    public static int countCandidates(BitSet bitSet, int start, int end)
+    {
+        int count = 0;
+        for (int i = start; i < end; i++)
+        {
+            if (bitSet.get(i))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
      * Closes this column reader and releases any resources associated
      * with it. If the column reader is already closed then invoking this
      * method has no effect.

@@ -308,7 +308,8 @@ public class IntegerColumnReader extends ColumnReader
                 {
                     Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
                 }
-                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex + selected.cardinality(), false);
+                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex +
+                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
             }
 
             // read content
