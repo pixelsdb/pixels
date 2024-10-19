@@ -43,7 +43,6 @@ public abstract class Input
      */
     private int stageId;
 
-
     private String operatorName;
 
     public Input(long transId, long timestamp)
