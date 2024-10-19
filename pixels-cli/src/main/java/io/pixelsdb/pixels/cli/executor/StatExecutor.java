@@ -109,7 +109,7 @@ public class StatExecutor implements CommandExecutor
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
                 List<PixelsProto.ColumnChunkIndex> chunkIndices =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntriesList();
-                for (int j = 0; j < types.size() - 1; ++j) // remove the hidden timestamp column
+                for (int j = 0; j < types.size(); ++j)
                 {
                     Column column = columnMap.get(types.get(j).getName());
                     long chunkLength = chunkIndices.get(j).getChunkLength();
@@ -119,7 +119,7 @@ public class StatExecutor implements CommandExecutor
             List<TypeDescription> fields = pixelsReader.getFileSchema().getChildren();
             checkArgument(fields.size() == types.size(),
                     "types.size and fields.size are not consistent");
-            for (int i = 0; i < fields.size() - 1; ++i) // remove the hidden timestamp column
+            for (int i = 0; i < fields.size(); ++i)
             {
                 TypeDescription field = fields.get(i);
                 PixelsProto.Type type = types.get(i);
