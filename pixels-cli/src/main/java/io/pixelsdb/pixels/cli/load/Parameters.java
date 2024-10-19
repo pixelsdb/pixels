@@ -156,10 +156,6 @@ public class Parameters
         {
             String name = layoutColumnOrder.get(i);
             String type = originalColTypes[orderMapping[i]];
-            if(name.equalsIgnoreCase("pixels_commit_timestamp"))
-            {
-                return false;
-            }
             /**
              * Issue #100:
              * Refer TypeDescription, ColumnReader, and ColumnWriter for how Pixels
@@ -168,8 +164,7 @@ public class Parameters
             schemaBuilder.append(name).append(":").append(type)
                     .append(",");
         }
-        // add timestamp column
-        schemaBuilder.append("pixels_commit_timestamp:long>");
+        schemaBuilder.replace(schemaBuilder.length() - 1, schemaBuilder.length(), ">");
 
         // get path of loading
         if(this.loadingPaths == null)
