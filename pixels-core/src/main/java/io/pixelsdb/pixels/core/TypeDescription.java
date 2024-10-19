@@ -1308,6 +1308,11 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         return result;
     }
 
+    public VectorizedRowBatch createRowBatchWithHiddenColumn()
+    {
+        return createRowBatchWithHiddenColumn(VectorizedRowBatch.DEFAULT_SIZE);
+    }
+
     /**
      * Get the kind of this type.
      *
