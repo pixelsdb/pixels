@@ -37,6 +37,12 @@ public abstract class Input
      * The timestamp of the transaction.
      */
     private long timestamp;
+    
+    /**
+     * The stage of worker.
+     */
+    private int stageId;
+
 
     private String operatorName;
 
@@ -46,6 +52,7 @@ public abstract class Input
         this.timestamp = timestamp;
         // Issue #468: operatorName is optional, it is to be set by the setter.
         this.operatorName = null;
+        this.stageId = -1;
     }
 
     public long getTransId()
@@ -66,6 +73,16 @@ public abstract class Input
     public void setTimestamp(long timestamp)
     {
         this.timestamp = timestamp;
+    }
+  
+    public int getStageId()
+    {
+        return stageId;
+    }
+  
+    public void setStageId(int stageId)
+    {
+        this.stageId = stageId;
     }
 
     /**

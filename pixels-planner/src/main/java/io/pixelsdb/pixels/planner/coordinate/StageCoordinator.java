@@ -102,12 +102,15 @@ public class StageCoordinator
      */
     public void addWorker(Worker<CFWorkerInfo> worker)
     {
-        this.workerIdToWorkers.put(worker.getWorkerId(), worker);
-        this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndexAssigner.getAndIncrement());
-        this.workers.add(worker);
-        if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
+        synchronized (this.lock)
         {
-            this.lock.notifyAll();
+            this.workerIdToWorkers.put(worker.getWorkerId(), worker);
+            this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndexAssigner.getAndIncrement());
+            this.workers.add(worker);
+            if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
+            {
+                this.lock.notifyAll();
+            }
         }
     }
 
@@ -130,15 +133,18 @@ public class StageCoordinator
             for (int i = 0; i < WorkerTaskParallelism; ++i)
             {
                 Task task = this.taskQueue.pollPendingAndRun(worker);
-                if (!this.taskQueue.hasPending())
-                {
-                    this.lock.notifyAll();
-                }
                 if (task == null)
                 {
                     break;
                 }
                 tasks.add(task);
+            }
+            if (!this.taskQueue.hasPending())
+            {
+                synchronized (this.lock)
+                {
+                    this.lock.notifyAll();
+                }
             }
             return tasks;
         }
@@ -198,7 +204,7 @@ public class StageCoordinator
     /**
      * Block and wait for all the workers on this stage to ready.
      */
-    void waitForAllWorkersReady()
+    public void waitForAllWorkersReady()
     {
         synchronized (this.lock)
         {
@@ -230,6 +236,8 @@ public class StageCoordinator
             }
         }
     }
+    // todo: should we write a "waitForWorkerReady(int workerId)" method in WorkerCoordinateServiceImpl
+    //  for non-wide stages? Currently, we only have "waitForAllWorkersReady()" for wide stages.
 
     /**
      * @return all the workers in this stage coordinator

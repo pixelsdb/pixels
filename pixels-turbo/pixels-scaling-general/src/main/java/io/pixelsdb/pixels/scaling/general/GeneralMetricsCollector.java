@@ -27,14 +27,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class Ec2MetricsCollector extends MetricsCollector
+public class GeneralMetricsCollector extends MetricsCollector
 {
     private final TransContextCache transContextCache;
     private final ScalingMetricsClient scalingMetricsClient;
     private final int period;
     private final ScheduledExecutorService metricsReporter;
 
-    protected Ec2MetricsCollector()
+    protected GeneralMetricsCollector()
     {
         // Starting a background thread to report query concurrency periodically.
         this.transContextCache = TransContextCache.Instance();

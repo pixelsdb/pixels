@@ -144,6 +144,22 @@ public class ScanInput extends Input
         return builder.build();
     }
 
+    public static List<String> generateOutputPaths(String outputFolder, int idx, int numSplits)
+    {
+        requireNonNull(outputFolder, "outputFolder is null");
+        checkArgument(numSplits > 0, "numSplits is non-positive");
+        checkArgument(idx >= 0, "idx is non-positive");
+        ImmutableList.Builder<String> builder = ImmutableList.builderWithExpectedSize(numSplits);
+        if (!outputFolder.endsWith("/"))
+        {
+            outputFolder += "/";
+        }
+        for (int i = idx; i < idx + numSplits; i++) {
+            builder.add(outputFolder + "scan_" + i);
+        }
+        return builder.build();
+    }
+
     /**
      * Generate the absolute paths of the output files for a scan input.
      * @param scanInput the scan input

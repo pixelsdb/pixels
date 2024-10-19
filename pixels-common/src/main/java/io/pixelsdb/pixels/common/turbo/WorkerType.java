@@ -26,11 +26,11 @@ package io.pixelsdb.pixels.common.turbo;
 public enum WorkerType
 {
     UNKNOWN, // The first enum value is the default value.
-    SCAN,
-    PARTITION,
+    SCAN, SCAN_STREAM,
+    PARTITION, PARTITION_STREAMING,
     BROADCAST_JOIN,
     BROADCAST_CHAIN_JOIN,
-    PARTITIONED_JOIN,
+    PARTITIONED_JOIN, PARTITIONED_JOIN_STREAMING,
     PARTITIONED_CHAIN_JOIN,
     AGGREGATION;
 

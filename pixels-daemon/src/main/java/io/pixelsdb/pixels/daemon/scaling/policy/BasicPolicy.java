@@ -19,14 +19,21 @@
  */
 package io.pixelsdb.pixels.daemon.scaling.policy;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.daemon.scaling.policy.helper.FixedSizeQueue;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class BasicPolicy extends Policy
 {
     private static final Logger log = LogManager.getLogger(BasicPolicy.class);
-    private static final int UPPER_BOUND = 3;
-    private static final int LOWER_BOUND = 2;
+    Integer reportPeriod = Integer.parseInt(ConfigFactory.Instance().getProperty("query.concurrency.report.period.sec"));
+    private final static int MINUTES = 60;
+    private double lastMetric = 0;
+    private final int scalingInQueueSize = 5 * MINUTES / reportPeriod;
+    private final int scalingOutQueueSize = 5 * MINUTES / reportPeriod;
+    private FixedSizeQueue scalingInQueue = new FixedSizeQueue(scalingInQueueSize);
+    private FixedSizeQueue scalingOutQueue = new FixedSizeQueue(scalingOutQueueSize);
 
     @Override
     public void doAutoScaling()
@@ -34,15 +41,22 @@ public class BasicPolicy extends Policy
         try
         {
             int queryConcurrency = metricsQueue.take();
-            if (queryConcurrency < LOWER_BOUND)
+            scalingInQueue.add(queryConcurrency);
+            scalingOutQueue.add(queryConcurrency);
+            if (queryConcurrency > 2 && lastMetric > 2)
             {
-                log.info("Debug: reduce one vm");
-                scalingManager.reduceOne();
-            } else if (queryConcurrency > UPPER_BOUND)
+                log.info("Debug: expand 100% vm");
+                scalingManager.multiplyInstance(2.0f);
+            } else if (scalingInQueue.getAverage() >= 0.25 && scalingInQueue.getAverage() < 0.5)
             {
-                log.info("Debug: expand one vm");
-                scalingManager.expandOne();
+                log.info("Debug: reduce 50% vm");
+                scalingManager.multiplyInstance(0.5f);
+            } else if (scalingInQueue.getAverage() >= 0 && scalingInQueue.getAverage() < 0.25)
+            {
+                log.info("Debug: reduce 75% vm");
+                scalingManager.multiplyInstance(0.25f);
             }
+            lastMetric = queryConcurrency;
         } catch (InterruptedException e)
         {
             throw new RuntimeException(e);
