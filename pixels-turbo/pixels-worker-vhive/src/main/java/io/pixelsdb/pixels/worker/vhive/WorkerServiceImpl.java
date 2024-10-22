@@ -58,6 +58,12 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
                 service.execute(request, responseObserver);
                 break;
             }
+            case BROADCAST_JOIN_STREAMING:
+            {
+                ServiceImpl<BroadcastJoinStreamWorker, BroadcastJoinInput, JoinOutput> service = new ServiceImpl<>(BroadcastJoinStreamWorker.class, BroadcastJoinInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
             case PARTITIONED_CHAIN_JOIN:
             {
                 ServiceImpl<PartitionedChainJoinWorker, PartitionedChainJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedChainJoinWorker.class, PartitionedChainJoinInput.class);
