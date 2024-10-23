@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.BitSet;
 
 import static io.pixelsdb.pixels.core.TypeDescription.MAX_SHORT_DECIMAL_PRECISION;
 import static java.util.Objects.requireNonNull;
@@ -120,6 +121,45 @@ public abstract class ColumnReader implements Closeable
     public abstract void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                               int offset, int size, int pixelStride, final int vectorIndex,
                               ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException;
+
+    /**
+     * Read selected values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
+     * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
+     * @throws IOException
+     */
+    public abstract void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
+                                      int offset, int size, int pixelStride, final int vectorIndex,
+                                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected) throws IOException;
+
+    /**
+     * count the number of candidates in the bitSet from start to end
+     *
+     * @param bitSet
+     * @param start
+     * @param end
+     * @return
+     */
+    public static int countCandidates(BitSet bitSet, int start, int end)
+    {
+        int count = 0;
+        for (int i = start; i < end; i++)
+        {
+            if (bitSet.get(i))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
 
     /**
      * Closes this column reader and releases any resources associated

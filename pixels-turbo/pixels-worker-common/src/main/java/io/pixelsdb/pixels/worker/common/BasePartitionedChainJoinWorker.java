@@ -86,6 +86,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
+            long timestamp = event.getTimestamp();
             List<BroadcastTableInfo> chainTables = event.getChainTables();
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
             requireNonNull(chainTables, "leftTables is null");
@@ -173,7 +174,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead), leftColAlias, leftProjection, leftKeyColumnIds,
                     WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead), rightColAlias, rightProjection, rightKeyColumnIds);
             // build the chain joiner.
-            Joiner chainJoiner = buildChainJoiner(transId, threadPool, chainTables, chainJoinInfos,
+            Joiner chainJoiner = buildChainJoiner(transId, timestamp, threadPool, chainTables, chainJoinInfos,
                     partitionJoiner.getJoinedSchema(), workerMetrics);
             logger.info("chain hash table size: " + chainJoiner.getSmallTableSize() + ", duration (ns): " +
                     (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
@@ -210,7 +211,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     leftFutures.add(threadPool.submit(() -> {
                         try
                         {
-                            BasePartitionedJoinWorker.buildHashTable(transId, partitionJoiner, parts, leftColumnsToRead,
+                            BasePartitionedJoinWorker.buildHashTable(transId, timestamp, partitionJoiner, parts, leftColumnsToRead,
                                     leftInputStorageInfo.getScheme(), hashValues, numPartition, workerMetrics);
                         } catch (Throwable e)
                         {
@@ -246,10 +247,10 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                             {
                                 int numJoinedRows = partitionOutput ?
                                         joinWithRightTableAndPartition(
-                                                transId, partitionJoiner, chainJoiner, parts, rightColumnsToRead,
+                                                transId, timestamp, partitionJoiner, chainJoiner, parts, rightColumnsToRead,
                                                 rightInputStorageInfo.getScheme(), hashValues, numPartition,
                                                 outputPartitionInfo, result, workerMetrics) :
-                                        joinWithRightTable(transId, partitionJoiner, chainJoiner, parts, rightColumnsToRead,
+                                        joinWithRightTable(transId, timestamp, partitionJoiner, chainJoiner, parts, rightColumnsToRead,
                                                 rightInputStorageInfo.getScheme(), hashValues, numPartition,
                                                 result.get(0), workerMetrics);
                             } catch (Throwable e)
@@ -336,7 +337,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
     }
 
     private static Joiner buildChainJoiner(
-            long transId, ExecutorService executor, List<BroadcastTableInfo> chainTables,
+            long transId, long timestamp, ExecutorService executor, List<BroadcastTableInfo> chainTables,
             List<ChainJoinInfo> chainJoinInfos, TypeDescription lastResultSchema, WorkerMetrics workerMetrics)
     {
         requireNonNull(executor, "executor is null");
@@ -350,7 +351,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             BroadcastTableInfo t2 = chainTables.get(1);
             ChainJoinInfo currChainJoin = chainJoinInfos.get(0);
             WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
-            Joiner currJoiner = BaseBroadcastChainJoinWorker.buildFirstJoiner(transId, executor, t1, t2, currChainJoin, workerMetrics);
+            Joiner currJoiner = BaseBroadcastChainJoinWorker.buildFirstJoiner(transId, timestamp, executor, t1, t2, currChainJoin, workerMetrics);
             for (int i = 1; i < chainTables.size() - 1; ++i)
             {
                 BroadcastTableInfo currRightTable = chainTables.get(i);
@@ -369,7 +370,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         nextResultSchema, nextChainJoin.getLargeColumnAlias(),
                         nextChainJoin.getLargeProjection(), nextChainTable.getKeyColumnIds());
 
-                BaseBroadcastChainJoinWorker.chainJoin(transId, executor, currJoiner, nextJoiner, currRightTable, workerMetrics);
+                BaseBroadcastChainJoinWorker.chainJoin(transId, timestamp, executor, currJoiner, nextJoiner, currRightTable, workerMetrics);
                 currJoiner = nextJoiner;
                 currChainJoin = nextChainJoin;
             }
@@ -380,7 +381,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     lastChainJoin.getSmallProjection(), currChainJoin.getKeyColumnIds(),
                     lastResultSchema, lastChainJoin.getLargeColumnAlias(),
                     lastChainJoin.getLargeProjection(), lastChainJoin.getKeyColumnIds());
-            BaseBroadcastChainJoinWorker.chainJoin(transId, executor, currJoiner, finalJoiner, lastChainTable, workerMetrics);
+            BaseBroadcastChainJoinWorker.chainJoin(transId, timestamp, executor, currJoiner, finalJoiner, lastChainTable, workerMetrics);
             workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
             return finalJoiner;
         } catch (Throwable e)
@@ -393,6 +394,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
      * Scan the partitioned file of the right table and do the join.
      *
      * @param transId the transaction id used by I/O scheduler
+     * @param timestamp the transaction timestamp
      * @param partitionedJoiner the joiner for the partitioned join
      * @param chainJoiner the joiner of the final chain join
      * @param rightParts the information of partitioned files of the right table
@@ -405,7 +407,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
      * @return the number of joined rows produced in this split
      */
     protected static int joinWithRightTable(
-            long transId, Joiner partitionedJoiner, Joiner chainJoiner, List<String> rightParts, String[] rightCols,
+            long transId, long timestamp, Joiner partitionedJoiner, Joiner chainJoiner, List<String> rightParts, String[] rightCols,
             Storage.Scheme rightScheme, List<Integer> hashValues, int numPartition,
             ConcurrentLinkedQueue<VectorizedRowBatch> joinResult, WorkerMetrics workerMetrics)
     {
@@ -436,7 +438,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         {
                             continue;
                         }
-                        PixelsReaderOption option = WorkerCommon.getReaderOption(transId, rightCols, pixelsReader,
+                        PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, rightCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rightRowBatch;
                         PixelsRecordReader recordReader = pixelsReader.read(option);
@@ -507,6 +509,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
      * Scan the partitioned file of the right table, do the join, and partition the output.
      *
      * @param transId the transaction id used by I/O scheduler
+     * @param timestamp the transaction timestamp
      * @param partitionedJoiner the joiner for the partitioned join
      * @param chainJoiner the joiner for the final chain join
      * @param rightParts the information of partitioned files of the right table
@@ -520,7 +523,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
      * @return the number of joined rows produced in this split
      */
     protected static int joinWithRightTableAndPartition(
-            long transId, Joiner partitionedJoiner, Joiner chainJoiner, List<String> rightParts, String[] rightCols,
+            long transId, long timestamp, Joiner partitionedJoiner, Joiner chainJoiner, List<String> rightParts, String[] rightCols,
             Storage.Scheme rightScheme, List<Integer> hashValues, int numPartition, PartitionInfo postPartitionInfo,
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics)
     {
@@ -554,7 +557,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         {
                             continue;
                         }
-                        PixelsReaderOption option = WorkerCommon.getReaderOption(transId, rightCols, pixelsReader,
+                        PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, rightCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rightBatch;
                         PixelsRecordReader recordReader = pixelsReader.read(option);

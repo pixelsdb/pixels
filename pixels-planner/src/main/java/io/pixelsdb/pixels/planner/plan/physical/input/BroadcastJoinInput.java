@@ -48,11 +48,11 @@ public class BroadcastJoinInput extends JoinInput
      */
     public BroadcastJoinInput() { }
 
-    public BroadcastJoinInput(long transId, BroadcastTableInfo smallTable, BroadcastTableInfo largeTable,
-                              JoinInfo joinInfo, boolean partialAggregationPresent,
-                              PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
+    public BroadcastJoinInput(long transId, long timestamp, BroadcastTableInfo smallTable, BroadcastTableInfo largeTable,
+                              JoinInfo joinInfo, boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo,
+                              MultiOutputInfo output)
     {
-        super(transId, partialAggregationPresent, partialAggregationInfo, output);
+        super(transId, timestamp, partialAggregationPresent, partialAggregationInfo, output);
         this.smallTable = smallTable;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;

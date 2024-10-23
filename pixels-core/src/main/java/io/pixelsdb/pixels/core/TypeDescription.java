@@ -1266,6 +1266,53 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         return createRowBatch(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
+    public VectorizedRowBatch createRowBatchWithHiddenColumn(int maxSize, boolean... useEncodedVector)
+    {
+        VectorizedRowBatch result;
+        if (category == Category.STRUCT)
+        {
+            // hidden column is long type, so no need to encode
+            checkArgument(useEncodedVector.length == 0 || useEncodedVector.length == children.size(),
+                    "there must be 0 or children.size() elements in useEncodedVector");
+            result = new VectorizedRowBatch(children.size() + 1, maxSize);
+            List<String> columnNames = new ArrayList<>();
+            for (int i = 0; i < result.cols.length - 1; ++i)
+            {
+                String fieldName = fieldNames.get(i);
+                ColumnVector cv = children.get(i).createColumn(maxSize,
+                        useEncodedVector.length != 0 && useEncodedVector[i]);
+                int originId = columnNames.indexOf(fieldName);
+                if (originId >= 0)
+                {
+                    cv.duplicated = true;
+                    cv.originVecId = originId;
+                }
+                else
+                {
+                    columnNames.add(fieldName);
+                }
+                result.cols[i] = cv;
+            }
+            // add hidden column
+            result.cols[result.cols.length - 1] = new LongColumnVector(maxSize);
+        }
+        else
+        {
+            checkArgument(useEncodedVector.length == 0 || useEncodedVector.length == 1,
+                    "for null structure type, there can be only 0 or 1 elements in useEncodedVector");
+            result = new VectorizedRowBatch(2, maxSize);
+            result.cols[0] = createColumn(maxSize, useEncodedVector.length == 1 && useEncodedVector[0]);
+            result.cols[1] = new LongColumnVector(maxSize);
+        }
+        result.reset();
+        return result;
+    }
+
+    public VectorizedRowBatch createRowBatchWithHiddenColumn()
+    {
+        return createRowBatchWithHiddenColumn(VectorizedRowBatch.DEFAULT_SIZE);
+    }
+
     /**
      * Get the kind of this type.
      *
@@ -1334,6 +1381,13 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
     public List<TypeDescription> getChildren()
     {
         return children == null ? null : Collections.unmodifiableList(children);
+    }
+
+    public List<TypeDescription> getChildrenWithHiddenColumn()
+    {
+        List<TypeDescription> result = new ArrayList<>(children);
+        result.add(new TypeDescription(Category.LONG));
+        return Collections.unmodifiableList(result);
     }
 
     /**

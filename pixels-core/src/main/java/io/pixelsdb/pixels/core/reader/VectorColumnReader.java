@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.core.vector.VectorColumnVector;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.BitSet;
 
 public class VectorColumnReader extends ColumnReader
 {
@@ -109,23 +110,169 @@ public class VectorColumnReader extends ColumnReader
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    for (int d = 0; d < dimension; d++)
+                    if (!(hasNull && vectorColumnVector.isNull[j]))
                     {
-                        vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
-                        inputIndex += Double.BYTES;
+                        for (int d = 0; d < dimension; d++)
+                        {
+                            vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
+                            inputIndex += Double.BYTES;
+                        }
                     }
                 }
             } else
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    for (int d = 0; d < dimension; d++)
+                    if (!(hasNull && vectorColumnVector.isNull[j]))
                     {
-                        vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
-                        inputIndex += Double.BYTES;
+                        for (int d = 0; d < dimension; d++)
+                        {
+                            vectorColumnVector.vector[j][d] = inputBuffer.getDouble(inputIndex);
+                            inputIndex += Double.BYTES;
+                        }
                     }
                 }
             }
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
+        }
+    }
+
+    /**
+     * Read selected values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
+     * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
+     * @throws IOException
+     */
+    @Override
+    public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
+                             int offset, int size, int pixelStride, final int vectorIndex,
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected)
+    {
+        VectorColumnVector vectorColumnVector = (VectorColumnVector) vector;
+        // keep origin content
+        for (int i = vectorIndex; i < vector.getLength(); ++i)
+        {
+            ((VectorColumnVector) vector).vector[i] = new double[((VectorColumnVector) vector).dimension];
+        }
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+        if (offset == 0)
+        // initialize
+        {
+            this.inputBuffer = input;
+            //this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            inputIndex = inputBuffer.position();
+            // isNull
+            isNullOffset = inputIndex + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
+            // re-init
+            hasNull = true;
+            elementIndex = 0;
+        }
+        // elementIndex points at inputbuffer (?), and is about element instead of bytes (?)
+
+        // read without copying the de-compacted content and isNull
+        int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
+        boolean[] isNull = new boolean[size];
+        for (int i = vectorIndex; numLeft > 0; )
+        {
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+            {
+                // read to the end of the current pixel
+                numToRead = pixelStride - elementIndex % pixelStride;
+            } else
+            {
+                numToRead = numLeft;
+            }
+            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            if (hasNull)
+            {
+                BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
+                        isNullOffset, isNullSkipBits, littleEndian);
+                int k = vectorWriteIndex;
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    vectorColumnVector.isNull[k++] = isNull[j - vectorIndex];
+                }
+                isNullOffset += bytesToDeCompact;
+                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                vectorColumnVector.noNulls = false;
+            }
+            else
+            {
+                Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
+                Arrays.fill(vectorColumnVector.isNull, vectorWriteIndex, vectorWriteIndex +
+                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
+            }
+
+            // read content
+            if (nullsPadding)
+            {
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (!(hasNull && isNull[j - vectorIndex]))
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            for (int d = 0; d < dimension; d++)
+                            {
+                                vectorColumnVector.vector[vectorWriteIndex][d] = inputBuffer.getDouble(inputIndex);
+                                inputIndex += Double.BYTES;
+                            }
+                            vectorWriteIndex++;
+                        }
+                        else
+                        {
+                            inputIndex += dimension * Double.BYTES;
+                        }
+                    }
+                    else if (selected.get(j - vectorIndex))
+                    {
+                        vectorWriteIndex++;
+                    }
+                }
+            } else
+            {
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (!(hasNull && isNull[j - vectorIndex]))
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            for (int d = 0; d < dimension; d++)
+                            {
+                                vectorColumnVector.vector[vectorWriteIndex][d] = inputBuffer.getDouble(inputIndex);
+                                inputIndex += Double.BYTES;
+                            }
+                            vectorWriteIndex++;
+                        }
+                        else
+                        {
+                            inputIndex += dimension * Double.BYTES;
+                        }
+                    }
+                    else if (selected.get(j - vectorIndex))
+                    {
+                        vectorWriteIndex++;
+                    }
+                }
+            }
+
             // update variables
             numLeft -= numToRead;
             elementIndex += numToRead;
