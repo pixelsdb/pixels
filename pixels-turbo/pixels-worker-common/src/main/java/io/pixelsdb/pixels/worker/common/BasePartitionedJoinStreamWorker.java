@@ -66,7 +66,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         // this.logger = context.getLogger();
         this.workerMetrics = context.getWorkerMetrics();
         this.workerMetrics.clear();
-        this.workerCoordinateService = new WorkerCoordinateService("128.110.218.225", 18894);
+        this.workerCoordinateService = new WorkerCoordinateService(WorkerCommon.getCoordinatorIp(), WorkerCommon.getPort());
     }
 
     @Override
