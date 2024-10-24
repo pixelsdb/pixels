@@ -184,14 +184,9 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                     .collect(ImmutableList.toImmutableList());
             List<String> outputEndpoints = downStreamWorkers.stream()
                     .map(CFWorkerInfo::getIp)
-                    .map(ip -> "http://" + ip + ":"
-                            + (Objects.equals(event.getTableInfo().getTableName(), "part") ? "18688" : "18686") + "/")
+                    .map(ip -> "http://" + ip + ":" + (event.isSmallTable() ? "18688" : "18686") + "/")
                     // .map(URI::create)
                     .collect(Collectors.toList());
-            // todo: Need to pass whether the table is the large table or the small table here into the partition worker.
-            //  Perhaps add a boolean field in the PartitionInput class.
-            //  Currently, we hardcode the table name for TPC-H Q14 - the large table (rightTable for join) uses port 18686
-            //  while the small table (leftTable for join) uses port 18688.
 
             StreamWorkerCommon.passSchemaToNextLevel(writerSchema.get(), outputStorageInfo, outputEndpoints);
             PixelsWriter pixelsWriter = StreamWorkerCommon.getWriter(writerSchema.get(),
