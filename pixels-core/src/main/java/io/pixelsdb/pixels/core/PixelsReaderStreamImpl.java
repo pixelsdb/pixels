@@ -84,6 +84,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     // In partitioned mode, we use byteBufBlockingMap to map hash value to corresponding ByteBuf
     private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;
     private final boolean partitioned;
+    private final int httpPort;
     private final AtomicReference<Integer> numPartitionsReceived = new AtomicReference<>(0);
     private final List<PixelsRecordReaderStreamImpl> recordReaders;
 
@@ -113,7 +114,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         this.streamHeader = null;
         URI uri = new URI(endpoint);
         String IP = uri.getHost();
-        int httpPort = uri.getPort();
+        this.httpPort = uri.getPort();
         logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort +
                 ", partitioned: " + partitioned + ", numPartitions: " + numPartitions);
         if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost"))
@@ -543,7 +544,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
             }
             catch (TimeoutException e)
             {
-                logger.warn("In close(), HTTP server did not shut down in 300 seconds, doing forceful shutdown");
+                logger.warn("In close(), HTTP server on port " + httpPort + " did not shut down in 300 seconds, doing forceful shutdown");
                 this.httpServerFuture.cancel(true);
             }
             catch (InterruptedException | ExecutionException e)
