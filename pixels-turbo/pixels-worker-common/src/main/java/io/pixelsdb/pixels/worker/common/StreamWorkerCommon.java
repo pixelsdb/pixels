@@ -133,6 +133,53 @@ public class StreamWorkerCommon extends WorkerCommon
         return WorkerCommon.getFileSchemaFromPaths(storage, paths);
     }
 
+    public static void getSchemaFromTwoPaths(ExecutorService executor,
+                                          Storage leftStorage, Storage rightStorage,
+                                          AtomicReference<TypeDescription> leftSchema,
+                                          AtomicReference<TypeDescription> rightSchema,
+                                          List<InputSplit> leftInputSplits, List<String> rightEndpoints)
+    {
+        requireNonNull(executor, "executor is null");
+        requireNonNull(leftSchema, "leftSchema is null");
+        requireNonNull(rightSchema, "rightSchema is null");
+        requireNonNull(leftInputSplits, "leftPaths is null");
+        requireNonNull(rightEndpoints, "rightPaths is null");
+
+        if (leftStorage != http && rightStorage == http)
+        {
+            Future<?> leftFuture = executor.submit(() -> {
+                try
+                {
+                    leftSchema.set(getFileSchemaFromSplits(leftStorage, leftInputSplits));
+                } catch (IOException | InterruptedException e)
+                {
+                    logger.error("failed to read the file schema for the left table", e);
+                }
+            });
+            Future<?> rightFuture = executor.submit(() -> {
+                try
+                {
+                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(rightEndpoints.get(0));
+                    rightSchema.set(pixelsReader.getFileSchema());
+                    pixelsReader.close();
+                    // XXX: This `close()` makes the test noticeably slower. Will need to look into it.
+                } catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            });
+            try
+            {
+                leftFuture.get();
+                rightFuture.get();
+            } catch (Throwable e)
+            {
+                logger.error("interrupted while waiting for the termination of schema read", e);
+            }
+        } else
+            throw new UnsupportedOperationException("schema is not compatible");
+    }
+
     public static void getSchemaFromPaths(ExecutorService executor,
                                           Storage leftStorage, Storage rightStorage,
                                           AtomicReference<TypeDescription> leftSchema,
