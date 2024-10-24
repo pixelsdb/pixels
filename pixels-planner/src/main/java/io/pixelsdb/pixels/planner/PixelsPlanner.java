@@ -963,6 +963,10 @@ public class PixelsPlanner
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
                         getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
+                for (PartitionInput rightPartitionInput : rightPartitionInputs)
+                {
+                    rightPartitionInput.setSmallTable(join.getJoinEndian() != JoinEndian.SMALL_LEFT);
+                }
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
@@ -998,6 +1002,11 @@ public class PixelsPlanner
                         leftTable, leftInputSplits, leftKeyColumnIds, leftPartitionProjection, numPartition,
                         getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
+                for (PartitionInput leftPartitionInput : leftPartitionInputs)
+                {
+                    leftPartitionInput.setSmallTable(join.getJoinEndian() == JoinEndian.SMALL_LEFT);
+                }
+
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs, leftPartitionProjection);
 
@@ -1006,6 +1015,11 @@ public class PixelsPlanner
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
                         getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
+                for (PartitionInput rightPartitionInput : rightPartitionInputs)
+                {
+                    rightPartitionInput.setSmallTable(join.getJoinEndian() != JoinEndian.SMALL_LEFT);
+                }
+
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
 

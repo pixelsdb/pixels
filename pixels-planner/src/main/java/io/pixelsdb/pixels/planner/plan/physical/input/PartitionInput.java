@@ -51,6 +51,10 @@ public class PartitionInput extends Input
      * The information about the hash partitioning.
      */
     private PartitionInfo partitionInfo;
+    /**
+     * Whether this table is the small table in a join.
+     */
+    private boolean isSmallTable;
 
     /**
      * Default constructor for Jackson.
@@ -108,5 +112,15 @@ public class PartitionInput extends Input
     public void setPartitionInfo(PartitionInfo partitionInfo)
     {
         this.partitionInfo = partitionInfo;
+    }
+
+    public boolean isSmallTable()
+    {
+        return isSmallTable;
+    }
+
+    public void setSmallTable(boolean isSmallTable)
+    {
+        this.isSmallTable = isSmallTable;
     }
 }
