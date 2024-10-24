@@ -104,7 +104,7 @@ public class SingleStageJoinStreamOperator extends SingleStageJoinOperator
                 CompletableFuture<CompletableFuture<? extends Output>[]> largeChildFuture = null;
                 if (largeChild != null)
                 {
-                    throw new InterruptedException();
+                    largeChildFuture = largeChild.execute();
                 }
                 if (smallChildFuture != null)
                 {
@@ -114,7 +114,7 @@ public class SingleStageJoinStreamOperator extends SingleStageJoinOperator
                 if (largeChildFuture != null)
                 {
                     CompletableFuture<? extends Output>[] largeChildOutputs = largeChildFuture.join();
-                    waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
+//                    waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
                 }
                 prevStagesFuture.complete(null);
             }
