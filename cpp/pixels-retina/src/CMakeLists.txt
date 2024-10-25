@@ -4,7 +4,6 @@
 find_library(ROCKS_DB_PATH rocksdb)
 find_package(Threads REQUIRED)
 
-
 # This branch assumes that gRPC and all its dependencies are already installed
 # on this system, so they can be located by find_package().
 
@@ -36,71 +35,37 @@ endif()
 
 ## Retina proto
 # Proto file
-get_filename_component(rg_proto "../proto/retina_service.proto" ABSOLUTE)
-get_filename_component(rg_proto_path "${rg_proto}" PATH)
+get_filename_component(retina_proto "../../../proto/retina.proto" ABSOLUTE)
+get_filename_component(retina_proto_dir "${retina_proto}" DIRECTORY)
 
 # Generated sources
-set(rg_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/retina_service.pb.cc")
-set(rg_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/retina_service.pb.h")
-set(rg_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/retina_service.grpc.pb.cc")
-set(rg_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/retina_service.grpc.pb.h")
+set(retina_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/retina.pb.cc")
+set(retina_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/retina.pb.h")
+set(retina_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/retina.grpc.pb.cc")
+set(retina_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/retina.grpc.pb.h")
 add_custom_command(
-      OUTPUT "${rg_proto_srcs}" "${rg_proto_hdrs}" "${rg_grpc_srcs}" "${rg_grpc_hdrs}"
+      OUTPUT "${retina_proto_srcs}" "${retina_proto_hdrs}" "${retina_grpc_srcs}" "${retina_grpc_hdrs}"
       COMMAND ${_PROTOBUF_PROTOC}
       ARGS --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
         --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
-        -I "${rg_proto_path}"
+        -I "${retina_proto_dir}"
         --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
-        "${rg_proto}"
-      DEPENDS "${rg_proto}")
-
-
-## Retina Writer Proto
-# Proto file
-get_filename_component(rg_writer_proto "../proto/retina_writer.proto" ABSOLUTE)
-get_filename_component(rg_writer_proto_path "${rg_writer_proto}" PATH)
-
-# Generated sources
-set(rg_writer_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/retina_writer.pb.cc")
-set(rg_writer_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/retina_writer.pb.h")
-set(rg_writer_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/retina_writer.grpc.pb.cc")
-set(rg_writer_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/retina_writer.grpc.pb.h")
-add_custom_command(
-      OUTPUT "${rg_writer_proto_srcs}" "${rg_writer_proto_hdrs}" "${rg_writer_grpc_srcs}" "${rg_writer_grpc_hdrs}"
-      COMMAND ${_PROTOBUF_PROTOC}
-      ARGS --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
-        --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
-        -I "${rg_writer_proto_path}"
-        --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
-        "${rg_writer_proto}"
-      DEPENDS "${rg_writer_proto}")
+        "${retina_proto}"
+      DEPENDS "${retina_proto}")
 
 # Include generated *.pb.h files
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
-# rg_grpc_proto
-add_library(rg_grpc_proto
-  ${rg_grpc_srcs}
-  ${rg_grpc_hdrs}
-  ${rg_proto_srcs}
-  ${rg_proto_hdrs})
-target_link_libraries(rg_grpc_proto
+# retina_grpc_proto
+add_library(retina_grpc_proto
+  ${retina_grpc_srcs}
+  ${retina_grpc_hdrs}
+  ${retina_proto_srcs}
+  ${retina_proto_hdrs})
+target_link_libraries(retina_grpc_proto
   ${_REFLECTION}
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
-
-# rg_writer_grpc_proto
-add_library(rg_writer_grpc_proto
-  ${rg_writer_grpc_srcs}
-  ${rg_writer_grpc_hdrs}
-  ${rg_writer_proto_srcs}
-  ${rg_writer_proto_hdrs})
-target_link_libraries(rg_writer_grpc_proto
-  ${_REFLECTION}
-  ${_GRPC_GRPCPP}
-  ${_PROTOBUF_LIBPROTOBUF})
-
-
 
 aux_source_directory(. DIR_LIB_SRCS)
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -114,15 +79,13 @@ add_subdirectory(mq)
 find_package(log4cxx 0.11)
 find_package(fmt)
 
-
 # Targets route_guide_(client|server)
 foreach(_target
   retina_client retina_server)
   add_executable(${_target}
     "${_target}.cc")
   target_link_libraries(${_target}
-    rg_grpc_proto
-    rg_writer_grpc_proto
+    retina_grpc_proto
    # retina
     mq
     memory
@@ -136,16 +99,13 @@ foreach(_target
     ${_PROTOBUF_LIBPROTOBUF})
 endforeach()
 
-
-
-
 # # Targets route_guide_(client|server)
 # foreach(_target
 #   retina_writer_client)
 #   add_executable(${_target}
 #     "${_target}.cc")
 #   target_link_libraries(${_target}
-#     rg_grpc_proto
+#     retina_grpc_proto
 #    # retina
 #     mq
 #     memory
@@ -158,7 +118,3 @@ endforeach()
 #     ${_GRPC_GRPCPP}
 #     ${_PROTOBUF_LIBPROTOBUF})
 # endforeach()
-
-
-
-

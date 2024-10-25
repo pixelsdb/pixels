@@ -23,8 +23,8 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.retina.RetinaWriterProto.FlushRequest;
-import io.pixelsdb.pixels.retina.RetinaWriterProto.FlushResponse;
+import io.pixelsdb.pixels.retina.RetinaProto.FlushRequest;
+import io.pixelsdb.pixels.retina.RetinaProto.FlushResponse;
 import io.pixelsdb.pixels.retina.RetinaWriterServiceGrpc.RetinaWriterServiceImplBase;
 
 import java.io.IOException;

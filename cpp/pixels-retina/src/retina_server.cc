@@ -21,7 +21,7 @@
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
 
-#include "retina_service.grpc.pb.h"
+#include "retina.grpc.pb.h"
 #include "retina_service_impl.h"
 
 /**
@@ -36,21 +36,21 @@ using grpc::ServerReader;
 using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
 using grpc::Status;
-using retina::DeleteRecordRequest;
-using retina::DeleteRecordResponse;
-using retina::InsertRecordRequest;
-using retina::InsertRecordResponse;
-using retina::QueryAck;
-using retina::QueryRecordsRequest;
-using retina::QueryRecordsResponse;
-using retina::QueryVisibilityRequest;
-using retina::QueryVisibilityResponse;
-using retina::RequestHeader;
-using retina::ResponseHeader;
-using retina::RetinaService;
-using retina::UpdateRecordRequest;
-using retina::UpdateRecordResponse;
-using retina::Value;
+using retina::proto::proto::DeleteRecordRequest;
+using retina::proto::DeleteRecordResponse;
+using retina::proto::InsertRecordRequest;
+using retina::proto::InsertRecordResponse;
+using retina::proto::QueryAck;
+using retina::proto::QueryRecordsRequest;
+using retina::proto::QueryRecordsResponse;
+using retina::proto::QueryVisibilityRequest;
+using retina::proto::QueryVisibilityResponse;
+using retina::proto::RequestHeader;
+using retina::proto::ResponseHeader;
+using retina::proto::RetinaService;
+using retina::proto::UpdateRecordRequest;
+using retina::proto::UpdateRecordResponse;
+using retina::proto::Value;
 
 using std::chrono::system_clock;
 

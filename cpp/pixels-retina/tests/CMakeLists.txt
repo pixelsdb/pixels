@@ -15,7 +15,7 @@ find_library(ROCKS_DB_PATH rocksdb)
 
 find_package(GTest REQUIRED)
 enable_testing()
-include_directories(${GTEST_INCLUDE_DIR})
+include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 add_definitions(-DCOMPILE_UNIT_TESTS)
