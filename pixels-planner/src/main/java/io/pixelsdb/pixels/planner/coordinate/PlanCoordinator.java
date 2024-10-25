@@ -66,6 +66,11 @@ public class PlanCoordinator
         checkArgument(stageCoordinator.getStageId() == stageDependency.getCurrentStageId(),
                 "the stageDependency does not belong to the stageCoordinator");
         this.stageCoordinators.put(stageId, stageCoordinator);
+        if (stageDependency.getDownStreamStageId() != -1)
+        {
+            StageCoordinator parentStageCoordinator = this.stageCoordinators.get(stageDependency.getDownStreamStageId());
+            stageCoordinator.setDownStreamWorkerNum(parentStageCoordinator.getFixedWorkerNum());
+        }
         this.stageDependencies.put(stageId, stageDependency);
     }
 

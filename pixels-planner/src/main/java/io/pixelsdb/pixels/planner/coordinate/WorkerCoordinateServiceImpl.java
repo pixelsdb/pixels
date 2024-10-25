@@ -99,22 +99,21 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
             }
             else
             {
-                int workerIndex = planCoordinator.getStageCoordinator(workerInfo.getStageId()).getWorkerIndex(workerId);
-                if (workerIndex < 0)
+                List<Integer> workerIndex = planCoordinator.getStageCoordinator(workerInfo.getStageId()).getWorkerIndex(workerId);
+                if (workerIndex == null)
                 {
                     builder.setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND);
                 }
                 else
                 {
-                    if (workerIndex >= downStreamWorkers.size())
-                    {
-                        builder.setErrorCode(ErrorCode.WORKER_COORDINATE_NO_DOWNSTREAM);
-                    }
-                    else
+                    for (Integer index : workerIndex)
                     {
                         // get the worker with the same index in the downstream stage as the downstream worker
                         builder.setErrorCode(SUCCESS);
-                        builder.addDownstreamWorkers(downStreamWorkers.get(workerIndex).getWorkerInfo().toProto());
+                        if (index < downStreamWorkers.size())
+                        {
+                            builder.addDownstreamWorkers(downStreamWorkers.get(index).getWorkerInfo().toProto());
+                        }
                     }
                 }
             }
