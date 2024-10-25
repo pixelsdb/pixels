@@ -83,16 +83,16 @@ enum CompressionKind {
 message Footer {
     // data schema of this file
     repeated Type types = 1;
-    // hidden timestamp column type
-    optional Type hiddenType = 2;
     // file level column statistics
-    repeated ColumnStatistic columnStats = 3;
-    // file level hidden timestamp column statistics
-    optional ColumnStatistic hiddenColumnStats = 4;
+    repeated ColumnStatistic columnStats = 2;
     // row group information
-    repeated RowGroupInformation rowGroupInfos = 5;
+    repeated RowGroupInformation rowGroupInfos = 3;
     // row group statistics
-    repeated RowGroupStatistic rowGroupStats = 6;
+    repeated RowGroupStatistic rowGroupStats = 4;
+    // hidden timestamp column type
+    optional Type hiddenType = 5;
+    // file level hidden timestamp column statistics
+    optional ColumnStatistic hiddenColumnStats = 6;
     // row group statistics for hidden timestamp columns
     repeated ColumnStatistic hiddenRowGroupStats = 7;
 }
