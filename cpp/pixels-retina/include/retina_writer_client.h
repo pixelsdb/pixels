@@ -24,7 +24,7 @@
 #include <memory>
 #include <string>
 
-#include "retina_writer.grpc.pb.h"
+#include "retina.grpc.pb.h"
 
 /**
  * @author mzp0514
@@ -34,9 +34,9 @@
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
-using retina_writer::proto::FlushRequest;
-using retina_writer::proto::FlushResponse;
-using retina_writer::proto::RetinaWriterService;
+using retina::proto::FlushRequest;
+using retina::proto::FlushResponse;
+using retina::proto::RetinaWriterService;
 
 class RetinaWriterClient {
  public:

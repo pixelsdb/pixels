@@ -25,7 +25,7 @@
 #include <sstream>
 #include <string>
 
-#include "retina_service.grpc.pb.h"
+#include "retina.grpc.pb.h"
 
 /**
  * @author mzp0514
@@ -35,16 +35,16 @@
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
-using retina::DeleteRecordRequest;
-using retina::DeleteRecordResponse;
-using retina::InsertRecordRequest;
-using retina::InsertRecordResponse;
-using retina::RequestHeader;
-using retina::ResponseHeader;
-using retina::RetinaService;
-using retina::UpdateRecordRequest;
-using retina::UpdateRecordResponse;
-using retina::Value;
+using retina::proto::DeleteRecordRequest;
+using retina::proto::DeleteRecordResponse;
+using retina::proto::InsertRecordRequest;
+using retina::proto::InsertRecordResponse;
+using retina::proto::RequestHeader;
+using retina::proto::ResponseHeader;
+using retina::proto::RetinaService;
+using retina::proto::UpdateRecordRequest;
+using retina::proto::UpdateRecordResponse;
+using retina::proto::Value;
 
 class RetinaClient {
  public:
