@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 public class RetinaService
 {
     private final ManagedChannel channel;
-    private final RetinaServiceGrpc.RetinaServiceBlockingStub stub;
+    private final RetinaWorkerServiceGrpc.RetinaWorkerServiceBlockingStub stub;
 
     public RetinaService(String host, int port)
     {
@@ -40,7 +40,7 @@ public class RetinaService
         assert (port > 0 && port <= 65535);
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
-        this.stub = RetinaServiceGrpc.newBlockingStub(channel);
+        this.stub = RetinaWorkerServiceGrpc.newBlockingStub(channel);
     }
 
     public void shutdown() throws InterruptedException

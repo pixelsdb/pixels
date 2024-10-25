@@ -28,8 +28,21 @@ option java_outer_classname = "RetinaProto";
 
 package retina.proto;
 
+/*
+service RetinaCoordinatorService {
+  rpc SplitRange (SplitRangeRequest) returns (SplitRangeResponse);
+  rpc MergeRange (MergeRangeRequest) returns (MergeRangeResponse);
+  rpc DropRange (DropRangeRequest) returns (DropRangeResponse);
+  rpc MoveRange (MoveRangeRequest) returns (MoveRangeResponse);
+  rpc LookupRange (LookupRangeRequest) returns (LookupRangeResponse);
+}
+*/
+
+// The following rpc methods are defined by the old retina implementation.
+// They will be replaced by the new implementation.
+
 // RetinaService and its related messages where from retina_service.proto
-service RetinaService {
+service RetinaWorkerService {
   rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
   rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
   rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
@@ -133,22 +146,4 @@ message QueryVisibilityResponse {
 message QueryAck {
   RequestHeader header = 1;
   sint64 pos = 2;
-}
-
-// RetinaWriterService and its related messages were from retina_writer.proto
-service RetinaWriterService {
-  rpc Flush (FlushRequest) returns (FlushResponse);
-}
-
-message FlushRequest {
-  string schemaName = 1;
-  string tableName = 2;
-  sint32 rgid = 3;
-  string filePath = 4;
-  uint64 pos = 5;
-}
-
-message FlushResponse {
-  int32 errorCode = 1;
-  uint64 pos = 2;
 }
