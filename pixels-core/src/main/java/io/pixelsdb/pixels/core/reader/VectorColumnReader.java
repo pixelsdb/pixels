@@ -22,13 +22,13 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.BitSet;
 
 public class VectorColumnReader extends ColumnReader
 {
@@ -157,7 +157,7 @@ public class VectorColumnReader extends ColumnReader
     @Override
     public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                              int offset, int size, int pixelStride, final int vectorIndex,
-                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected)
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected)
     {
         VectorColumnVector vectorColumnVector = (VectorColumnVector) vector;
         // keep origin content
@@ -216,11 +216,11 @@ public class VectorColumnReader extends ColumnReader
             else
             {
                 Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
-                Arrays.fill(vectorColumnVector.isNull, vectorWriteIndex, vectorWriteIndex +
-                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
+                // update columnVector.isNull later to avoid bitmap unnecessary traversal
             }
 
             // read content
+            int originalVectorWriteIndex = vectorWriteIndex;
             if (nullsPadding)
             {
                 for (int j = i; j < i + numToRead; ++j)
@@ -246,7 +246,8 @@ public class VectorColumnReader extends ColumnReader
                         vectorWriteIndex++;
                     }
                 }
-            } else
+            }
+            else
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
@@ -271,6 +272,12 @@ public class VectorColumnReader extends ColumnReader
                         vectorWriteIndex++;
                     }
                 }
+            }
+
+            // update columnVector.isNull if has no nulls
+            if (!hasNull)
+            {
+                Arrays.fill(vectorColumnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
             }
 
             // update variables

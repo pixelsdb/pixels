@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntDecoder;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.ByteBufferInputStream;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
@@ -32,7 +33,6 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.BitSet;
 
 /**
  * @author guodong, hank
@@ -225,7 +225,7 @@ public class IntegerColumnReader extends ColumnReader
     @Override
     public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                              int offset, int size, int pixelStride, final int vectorIndex,
-                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected) throws IOException
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected) throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
@@ -302,17 +302,18 @@ public class IntegerColumnReader extends ColumnReader
                 isNullOffset += bytesToDeCompact;
                 isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
-            } else
+            }
+            else
             {
                 if (decoding || !nullsPadding)
                 {
                     Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
                 }
-                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex +
-                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
+                // update columnVector.isNull later to avoid bitmap unnecessary traversal
             }
 
             // read content
+            int originalVectorWriteIndex = vectorWriteIndex;
             if (decoding)
             {
                 for (int j = i; j < i + numToRead; ++j)
@@ -397,6 +398,12 @@ public class IntegerColumnReader extends ColumnReader
                         }
                     }
                 }
+            }
+
+            // update columnVector.isNull if has no nulls
+            if (!hasNull)
+            {
+                Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
             }
 
             // update variables

@@ -22,13 +22,13 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.ByteColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.BitSet;
 
 /**
  * @author guodong, hank
@@ -195,7 +195,7 @@ public class BooleanColumnReader extends ColumnReader
     @Override
     public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                              int offset, int size, int pixelStride, final int vectorIndex,
-                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected)
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected)
     {
         ByteColumnVector columnVector = (ByteColumnVector) vector;
         int bytesToDeCompact;
@@ -283,12 +283,11 @@ public class BooleanColumnReader extends ColumnReader
                 {
                     Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
                 }
-                // update columnVector.isNull
-                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex +
-                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
+                // update columnVector.isNull later to avoid bitmap unnecessary traversal
             }
 
             // read content
+            int originalVectorWriteIndex = vectorWriteIndex;
             if (nullsPadding)
             {
                 bytesToDeCompact = (numToRead + inputSkipBits) / 8;
@@ -319,6 +318,12 @@ public class BooleanColumnReader extends ColumnReader
                         vectorWriteIndex++;
                     }
                 }
+            }
+
+            // update columnVector.isNull if has no nulls
+            if (!hasNull)
+            {
+                Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
             }
 
             // update variables

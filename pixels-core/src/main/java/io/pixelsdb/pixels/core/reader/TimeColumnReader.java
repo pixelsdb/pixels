@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntDecoder;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.ByteBufferInputStream;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.TimeColumnVector;
@@ -32,7 +33,6 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.BitSet;
 
 /**
  * Pixels time column reader.
@@ -197,7 +197,7 @@ public class TimeColumnReader extends ColumnReader
     @Override
     public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                              int offset, int size, int pixelStride, final int vectorIndex,
-                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected) throws IOException
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected) throws IOException
     {
         TimeColumnVector columnVector = (TimeColumnVector) vector;
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
@@ -275,12 +275,11 @@ public class TimeColumnReader extends ColumnReader
                 {
                     Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
                 }
-                // update columnVector.isNull
-                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex +
-                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
+                // update columnVector.isNull later to avoid bitmap unnecessary traversal
             }
 
             // read content
+            int originalVectorWriteIndex = vectorWriteIndex;
             if (decoding)
             {
                 for (int j = i; j < i + numToRead; ++j)
@@ -331,6 +330,12 @@ public class TimeColumnReader extends ColumnReader
                         }
                     }
                 }
+            }
+
+            // update columnVector.isNull if has no nulls
+            if (!hasNull)
+            {
+                Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
             }
 
             // update variables

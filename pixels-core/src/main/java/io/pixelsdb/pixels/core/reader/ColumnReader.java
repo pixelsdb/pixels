@@ -21,12 +21,12 @@ package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.BitSet;
 
 import static io.pixelsdb.pixels.core.TypeDescription.MAX_SHORT_DECIMAL_PRECISION;
 import static java.util.Objects.requireNonNull;
@@ -138,28 +138,7 @@ public abstract class ColumnReader implements Closeable
      */
     public abstract void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                                       int offset, int size, int pixelStride, final int vectorIndex,
-                                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected) throws IOException;
-
-    /**
-     * count the number of candidates in the bitSet from start to end
-     *
-     * @param bitSet
-     * @param start
-     * @param end
-     * @return
-     */
-    public static int countCandidates(BitSet bitSet, int start, int end)
-    {
-        int count = 0;
-        for (int i = start; i < end; i++)
-        {
-            if (bitSet.get(i))
-            {
-                count++;
-            }
-        }
-        return count;
-    }
+                                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected) throws IOException;
 
     /**
      * Closes this column reader and releases any resources associated

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
 
@@ -29,7 +30,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.BitSet;
 
 /**
  * The column reader of decimals.
@@ -179,7 +179,7 @@ public class DecimalColumnReader extends ColumnReader
     @Override
     public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                              int offset, int size, int pixelStride, final int vectorIndex,
-                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected)
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected)
     {
         DecimalColumnVector columnVector = (DecimalColumnVector) vector;
         if (type.getPrecision() != columnVector.getPrecision() || type.getScale() != columnVector.getScale())
@@ -257,11 +257,11 @@ public class DecimalColumnReader extends ColumnReader
                 {
                     Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
                 }
-                Arrays.fill(columnVector.isNull, vectorWriteIndex, vectorWriteIndex +
-                        countCandidates(selected, vectorWriteIndex, vectorWriteIndex + numToRead), false);
+                // update columnVector.isNull later to avoid bitmap unnecessary traversal
             }
 
             // read content
+            int originalVectorWriteIndex = vectorWriteIndex;
             if (nullsPadding)
             {
                 for (int j = i; j < i + numToRead; ++j)
@@ -289,6 +289,12 @@ public class DecimalColumnReader extends ColumnReader
                         vectorWriteIndex++;
                     }
                 }
+            }
+
+            // update columnVector.isNull if has no nulls
+            if (!hasNull)
+            {
+                Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
             }
 
             // update variables

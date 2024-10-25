@@ -24,7 +24,6 @@ import io.netty.buffer.ByteBuf;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.BitSet;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -660,7 +659,7 @@ public class BitUtils
      */
     public static int bitWiseDeCompact(boolean[] bits, int bitsOffset, int bitsLength,
                                         ByteBuffer input, int offset, int skipBits, boolean littleEndian,
-                                        BitSet bitmap, int bitmapOffset)
+                                        Bitmap bitmap, int bitmapOffset)
     {
         checkArgument(bitsOffset >= 0 && bitsLength > 0, "invalid bitsOffset or bitsLength");
         checkArgument(offset >= 0, "invalid input offset");
@@ -678,7 +677,7 @@ public class BitUtils
 
     private static int bitWiseDeCompactBE(boolean[] bits, int bitsOffset, int bitsLength,
                                            ByteBuffer input, int offset, int skipBits,
-                                           BitSet bitmap, int bitmapOffset)
+                                           Bitmap bitmap, int bitmapOffset)
     {
         byte bitsLeft = 8, b;
         int bitmapEnd = bitmapOffset + bitsLength, originBitsOffset = bitsOffset;
@@ -712,7 +711,7 @@ public class BitUtils
 
     private static int bitWiseDeCompactLE(boolean[] bits, int bitsOffset, int bitsLength,
                                            ByteBuffer input, int offset, int skipBits,
-                                           BitSet bitmap, int bitmapOffset)
+                                           Bitmap bitmap, int bitmapOffset)
     {
         byte currBit = 0, b;
         int bitmapEnd = bitmapOffset + bitsLength, originBitsOffset = bitsOffset;
@@ -760,7 +759,7 @@ public class BitUtils
      */
     public static int bitWiseDeCompact(byte[] bits, int bitsOffset, int bitsLength,
                                         ByteBuffer input, int offset, int skipBits, boolean littleEndian,
-                                        BitSet bitmap, int bitmapOffset)
+                                        Bitmap bitmap, int bitmapOffset)
     {
         checkArgument(bitsOffset >= 0 && bitsLength > 0, "invalid bitsOffset or bitsLength");
         checkArgument(offset >= 0, "invalid input offset");
@@ -778,7 +777,7 @@ public class BitUtils
 
     private static int bitWiseDeCompactBE(byte[] bits, int bitsOffset, int bitsLength,
                                            ByteBuffer input, int offset, int skipBits,
-                                           BitSet bitmap, int bitmapOffset)
+                                           Bitmap bitmap, int bitmapOffset)
     {
         byte bitsLeft = 8, b;
         int bitmapEnd = bitmapOffset + bitsLength, originBitsOffset = bitsOffset;
@@ -812,7 +811,7 @@ public class BitUtils
 
     private static int bitWiseDeCompactLE(byte[] bits, int bitsOffset, int bitsLength,
                                            ByteBuffer input, int offset, int skipBits,
-                                           BitSet bitmap, int bitmapOffset)
+                                           Bitmap bitmap, int bitmapOffset)
     {
         byte currBit = 0, b;
         int bitmapEnd = bitmapOffset + bitsLength, originBitsOffset = bitsOffset;

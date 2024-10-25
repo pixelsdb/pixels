@@ -99,6 +99,11 @@ public class PixelsReaderOption
         return this.timestamp;
     }
 
+    public boolean hasValidTimestamp()
+    {
+        return this.timestamp >= 0L;
+    }
+
     public PixelsReaderOption rgRange(int rgStart, int rgLen)
     {
         this.rgStart = rgStart;
