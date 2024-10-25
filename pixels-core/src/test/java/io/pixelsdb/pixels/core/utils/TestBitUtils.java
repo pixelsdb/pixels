@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.core.utils;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;
-import java.util.BitSet;
 
 import static io.pixelsdb.pixels.core.utils.BitUtils.bitWiseDeCompact;
 
@@ -99,7 +98,7 @@ public class TestBitUtils
     {
         ByteBuffer buffer = ByteBuffer.allocate(1);
         buffer.put((byte) 0b10101010);
-        BitSet bitSet = new BitSet(8);
+        Bitmap bitSet = new Bitmap(8, false);
         for (int i = 0; i < 8; i += 3)
         {
             bitSet.set(i);

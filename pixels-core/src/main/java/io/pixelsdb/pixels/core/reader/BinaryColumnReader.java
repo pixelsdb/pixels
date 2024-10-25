@@ -21,11 +21,11 @@ package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.BitSet;
 
 /**
  * TODO: unimplemented.
@@ -92,7 +92,7 @@ public class BinaryColumnReader extends ColumnReader
     @Override
     public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                              int offset, int size, int pixelStride, final int vectorIndex,
-                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, BitSet selected)
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected)
     {
         throw new UnsupportedOperationException("Not implemented yet.");
     }
