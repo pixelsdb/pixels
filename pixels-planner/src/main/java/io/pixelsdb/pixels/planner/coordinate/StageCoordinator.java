@@ -53,13 +53,14 @@ public class StageCoordinator
 
     private final int stageId;
     private final boolean isQueued;
+    private int downStreamWorkerNum;
     private final int fixedWorkerNum;
     private final TaskQueue<Task> taskQueue;
     private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers = new ConcurrentHashMap<>();
     // this.workers is used for dependency checking, no concurrent reads and writes
     private final List<Worker<CFWorkerInfo>> workers = new ArrayList<>();
-    private final Map<Long, Integer> workerIdToWorkerIndex = new ConcurrentHashMap<>();
-    private final AtomicInteger workerIndexAssigner = new AtomicInteger(0);
+    private final Map<Long, List<Integer>> workerIdToWorkerIndex = new ConcurrentHashMap<>();
+    private int workerIndexAssigner;
     private final Object lock = new Object();
 
     /**
@@ -78,6 +79,8 @@ public class StageCoordinator
         this.isQueued = false;
         this.fixedWorkerNum = workerNum;
         this.taskQueue = null;
+        this.downStreamWorkerNum = 0;
+        this.workerIndexAssigner = 0;
     }
 
     /**
@@ -94,6 +97,8 @@ public class StageCoordinator
         this.isQueued = true;
         this.fixedWorkerNum = 0;
         this.taskQueue = new TaskQueue<>(pendingTasks);
+        this.downStreamWorkerNum = 0;
+        this.workerIndexAssigner = 0;
     }
 
     /**
@@ -105,7 +110,37 @@ public class StageCoordinator
         synchronized (this.lock)
         {
             this.workerIdToWorkers.put(worker.getWorkerId(), worker);
-            this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndexAssigner.getAndIncrement());
+            if (fixedWorkerNum > 0 && downStreamWorkerNum > 0)
+            {
+                if (downStreamWorkerNum > fixedWorkerNum)
+                {
+                    // one-to-multiple stream
+                    List<Integer> workerIndexs = new ArrayList<>();
+                    int num = downStreamWorkerNum / fixedWorkerNum;
+                    if (downStreamWorkerNum > fixedWorkerNum*num)
+                    {
+                        num++;
+                    }
+                    for (int i = 0; i < num; i++)
+                    {
+                        workerIndexs.add(this.workerIndexAssigner % this.downStreamWorkerNum);
+                        this.workerIndexAssigner++;
+                    }
+                } else
+                {
+                    // multiple-to-one stream
+                    List<Integer> workerIndexes = new ArrayList<>();
+                    workerIndexes.add(this.workerIndexAssigner % this.downStreamWorkerNum);
+                    this.workerIndexAssigner++;
+                    this.workerIdToWorkerIndex.put(worker.getWorkerId(), workerIndexes);
+                }
+            } else
+            {
+                // assume one-to-one stream
+                List<Integer> workerIndexs = new ArrayList<>(this.workerIndexAssigner);
+                this.workerIndexAssigner++;
+                this.workerIdToWorkerIndex.put(worker.getWorkerId(), workerIndexs);
+            }
             this.workers.add(worker);
             if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
             {
@@ -191,14 +226,14 @@ public class StageCoordinator
      * @param workerId the (global) id of the worker
      * @return the index of the worker in this stage, or < 0 if the worker is not found
      */
-    public int getWorkerIndex(long workerId)
+    public List<Integer> getWorkerIndex(long workerId)
     {
-        Integer index = this.workerIdToWorkerIndex.get(workerId);
+        List<Integer> index = this.workerIdToWorkerIndex.get(workerId);
         if (index != null)
         {
             return index;
         }
-        return -1;
+        return null;
     }
 
     /**
@@ -245,5 +280,21 @@ public class StageCoordinator
     public List<Worker<CFWorkerInfo>> getWorkers()
     {
         return this.workers;
+    }
+
+    /**
+     * set down stream workers num
+     */
+    public void setDownStreamWorkerNum(int downStreamWorkerNum)
+    {
+        this.downStreamWorkerNum = downStreamWorkerNum;
+    }
+
+    /**
+     * get worker num of this stage
+     */
+    public int getFixedWorkerNum()
+    {
+        return this.fixedWorkerNum;
     }
 }
