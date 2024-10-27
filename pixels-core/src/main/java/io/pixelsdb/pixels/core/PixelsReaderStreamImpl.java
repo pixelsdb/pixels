@@ -99,7 +99,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
     public PixelsReaderStreamImpl(String endpoint) throws Exception
     {
-        this(endpoint, false, -1);
+        this(endpoint, false, -2);
     }
 
     public PixelsReaderStreamImpl(int port) throws Exception
