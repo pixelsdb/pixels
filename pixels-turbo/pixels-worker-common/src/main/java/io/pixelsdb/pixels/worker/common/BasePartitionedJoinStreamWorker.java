@@ -527,17 +527,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     pixelsReader = StreamWorkerCommon.getReader(rightScheme, "http://localhost:18686/", true, numPartition);
                     readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    Set<Integer> rightHashValues = new HashSet<>(numPartition);
-                    for (int hashValue = 0; hashValue < numPartition; ++hashValue)
-                    {
-                        rightHashValues.add(hashValue);
-                    }
                     for (int hashValue : hashValues)
                     {
-                        if (!rightHashValues.contains(hashValue))
-                        {
-                            continue;
-                        }
                         PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, rightCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rowBatch;
@@ -646,17 +637,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     pixelsReader = StreamWorkerCommon.getReader(rightScheme, "http://localhost:18686/", true, numPartition);
                     readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    Set<Integer> rightHashValues = new HashSet<>(numPartition);
-                    for (int hashValue = 0; hashValue < numPartition; ++hashValue)
-                    {
-                        rightHashValues.add(hashValue);
-                    }
                     for (int hashValue : hashValues)
                     {
-                        if (!rightHashValues.contains(hashValue))
-                        {
-                            continue;
-                        }
                         PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, rightCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rowBatch;
