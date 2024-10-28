@@ -109,6 +109,7 @@ message RegisterWorkerResponse {
   int64 workerId = 2; // the unique id assigned by the coordinator for this worker
   int64 leaseStartTimeMs = 3; // the time since the epoch in milliseconds of the lease
   int64 leasePeriodMs = 4; // the valid period in milliseconds of the lease
+  bool passSchema = 5; // if this worker send schema to down stream worker
 }
 
 message GetDownstreamWorkersRequest {

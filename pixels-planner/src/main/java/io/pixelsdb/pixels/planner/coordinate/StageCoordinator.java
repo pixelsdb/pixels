@@ -129,6 +129,10 @@ public class StageCoordinator
                 } else
                 {
                     // multiple-to-one stream
+                    if (workerIndexAssigner < downStreamWorkerNum)
+                    {
+                        worker.getWorkerInfo().setPassSchema(true);
+                    }
                     List<Integer> workerIndexes = new ArrayList<>();
                     workerIndexes.add(this.workerIndexAssigner % this.downStreamWorkerNum);
                     this.workerIndexAssigner++;
@@ -137,6 +141,7 @@ public class StageCoordinator
             } else
             {
                 // assume one-to-one stream
+                worker.getWorkerInfo().setPassSchema(true);
                 List<Integer> workerIndexs = new ArrayList<>(this.workerIndexAssigner);
                 this.workerIndexAssigner++;
                 this.workerIdToWorkerIndex.put(worker.getWorkerId(), workerIndexs);
