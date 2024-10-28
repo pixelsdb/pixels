@@ -115,6 +115,7 @@ public class StageCoordinator
                 if (downStreamWorkerNum > fixedWorkerNum)
                 {
                     // one-to-multiple stream
+                    // TODO: find a query to test
                     List<Integer> workerIndexs = new ArrayList<>();
                     int num = downStreamWorkerNum / fixedWorkerNum;
                     if (downStreamWorkerNum > fixedWorkerNum*num)
@@ -129,10 +130,11 @@ public class StageCoordinator
                 } else
                 {
                     // multiple-to-one stream
-                    if (workerIndexAssigner < downStreamWorkerNum)
-                    {
-                        worker.getWorkerInfo().setPassSchema(true);
-                    }
+//                    if (workerIndexAssigner < downStreamWorkerNum)
+//                    {
+//                        worker.getWorkerInfo().setPassSchema(true);
+//                    }
+                    worker.setWorkerPortIndex(this.workerIndexAssigner / this.downStreamWorkerNum);
                     List<Integer> workerIndexes = new ArrayList<>();
                     workerIndexes.add(this.workerIndexAssigner % this.downStreamWorkerNum);
                     this.workerIndexAssigner++;
@@ -141,7 +143,7 @@ public class StageCoordinator
             } else
             {
                 // assume one-to-one stream
-                worker.getWorkerInfo().setPassSchema(true);
+                worker.setWorkerPortIndex(0);
                 List<Integer> workerIndexs = new ArrayList<>(this.workerIndexAssigner);
                 this.workerIndexAssigner++;
                 this.workerIdToWorkerIndex.put(worker.getWorkerId(), workerIndexs);

@@ -31,13 +31,15 @@ import static java.util.Objects.requireNonNull;
 public class Worker<WI extends WorkerInfo>
 {
     private final long workerId;
+    private int workerPortIndex;
     private final Lease lease;
     private final WI workerInfo;
     private boolean terminated;
 
-    public Worker(long workerId, Lease lease, WI workerInfo)
+    public Worker(long workerId, Lease lease, int workerPortIndex, WI workerInfo)
     {
         this.workerId = workerId;
+        this.workerPortIndex = workerPortIndex;
         this.lease = requireNonNull(lease, "lease is null");
         this.workerInfo = requireNonNull(workerInfo, "worker info is null");
         this.terminated = false;
@@ -47,6 +49,10 @@ public class Worker<WI extends WorkerInfo>
     {
         return workerId;
     }
+
+    public void setWorkerPortIndex(int index) { this.workerPortIndex = index; }
+
+    public int getWorkerPortIndex() { return workerPortIndex; }
 
     public WI getWorkerInfo()
     {

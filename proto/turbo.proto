@@ -106,10 +106,10 @@ message RegisterWorkerRequest {
 
 message RegisterWorkerResponse {
   int32 errorCode = 1;
-  int64 workerId = 2; // the unique id assigned by the coordinator for this worker
-  int64 leaseStartTimeMs = 3; // the time since the epoch in milliseconds of the lease
-  int64 leasePeriodMs = 4; // the valid period in milliseconds of the lease
-  bool passSchema = 5; // if this worker send schema to down stream worker
+  int32 workerPortIndex = 2; // the index of port this worker will write to down stream worker
+  int64 workerId = 3; // the unique id assigned by the coordinator for this worker
+  int64 leaseStartTimeMs = 4; // the time since the epoch in milliseconds of the lease
+  int64 leasePeriodMs = 5; // the valid period in milliseconds of the lease
 }
 
 message GetDownstreamWorkersRequest {
