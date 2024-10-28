@@ -57,7 +57,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         CFWorkerInfo workerInfo = new CFWorkerInfo(request.getWorkerInfo());
         Lease lease = new Lease(WorkerLeasePeriodMs, System.currentTimeMillis());
         long workerId = CFWorkerManager.Instance().createWorkerId();
-        Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, workerInfo);
+        Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, 0, workerInfo);
         CFWorkerManager.Instance().registerCFWorker(worker);
         log.debug("register worker, local address: " + workerInfo.getIp() + ", transId: " + workerInfo.getTransId()
                 + ", stageId: " + workerInfo.getStageId() + ", workerId: " + workerId);
@@ -67,8 +67,8 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         requireNonNull(stageCoordinator, "stage coordinator is not found");
         stageCoordinator.addWorker(worker);
         TurboProto.RegisterWorkerResponse response = TurboProto.RegisterWorkerResponse.newBuilder()
-                .setErrorCode(SUCCESS).setWorkerId(workerId).setLeasePeriodMs(lease.getPeriodMs())
-                .setLeaseStartTimeMs(lease.getStartTimeMs()).setPassSchema(worker.getWorkerInfo().getPassSchema()).build();
+                .setErrorCode(SUCCESS).setWorkerId(workerId).setWorkerPortIndex(worker.getWorkerPortIndex()).setLeasePeriodMs(lease.getPeriodMs())
+                .setLeaseStartTimeMs(lease.getStartTimeMs()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
