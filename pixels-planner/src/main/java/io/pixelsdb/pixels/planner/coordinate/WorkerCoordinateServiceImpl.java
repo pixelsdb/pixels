@@ -68,7 +68,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         stageCoordinator.addWorker(worker);
         TurboProto.RegisterWorkerResponse response = TurboProto.RegisterWorkerResponse.newBuilder()
                 .setErrorCode(SUCCESS).setWorkerId(workerId).setLeasePeriodMs(lease.getPeriodMs())
-                .setLeaseStartTimeMs(lease.getStartTimeMs()).build();
+                .setLeaseStartTimeMs(lease.getStartTimeMs()).setPassSchema(worker.getWorkerInfo().getPassSchema()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
