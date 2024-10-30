@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntDecoder;
 import io.pixelsdb.pixels.core.exception.PixelsReaderException;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
@@ -354,6 +355,328 @@ public class StringColumnReader extends ColumnReader
                         bufferOffset += len;
                     }
                 }
+                // update variables
+                numLeft -= numToRead;
+                elementIndex += numToRead;
+                i += numToRead;
+            }
+        }
+    }
+
+    /**
+     * Read selected values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
+     * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
+     * @throws IOException
+     */
+    @Override
+    public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
+                             int offset, int size, int pixelStride, final int vectorIndex,
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected) throws IOException
+    {
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+        if (offset == 0)
+        {
+            if (inputBuffer != null)
+            {
+                inputBuffer.release();
+            }
+            // no memory copy
+
+            ByteOrder byteOrder = littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
+            inputBuffer = Unpooled.wrappedBuffer(input).order(byteOrder);
+            readContent(input.remaining(), encoding, byteOrder);
+            isNullOffset = chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
+            bufferOffset = 0;
+            hasNull = true;
+            elementIndex = 0;
+        }
+
+        // if dictionary encoded
+        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
+        {
+            boolean cascadeRLE = false;
+            if (encoding.hasCascadeEncoding() && encoding.getCascadeEncoding().getKind()
+                    .equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
+            {
+                cascadeRLE = true;
+            }
+            if (vector instanceof BinaryColumnVector)
+            {
+                BinaryColumnVector columnVector = (BinaryColumnVector) vector;
+                // read original bytes
+                // we get bytes here to reduce memory copies and avoid creating many small byte arrays
+                byte[] buffer = dictContentBuf.array();
+                int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
+                boolean[] isNull = new boolean[size];
+                for (int i = vectorIndex; numLeft > 0;)
+                {
+                    if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+                    {
+                        // read to the end of the current pixel
+                        numToRead = pixelStride - elementIndex % pixelStride;
+                    } else
+                    {
+                        numToRead = numLeft;
+                    }
+                    bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+
+                    // read isNull
+                    int pixelId = elementIndex / pixelStride;
+                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                    if (hasNull)
+                    {
+                        BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
+                                isNullOffset, isNullSkipBits, littleEndian);
+                        // update columnVector.isNull
+                        int k = vectorWriteIndex;
+                        for (int j = i; j < i + numToRead; ++j)
+                        {
+                            if (selected.get(j - vectorIndex))
+                            {
+                                columnVector.isNull[k++] = isNull[j - vectorIndex];
+                            }
+                        }
+                        isNullOffset += bytesToDeCompact;
+                        isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                        columnVector.noNulls = false;
+                    }
+                    else
+                    {
+                        Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
+                        // update columnVector.isNull later to avoid bitmap unnecessary traversal
+                    }
+
+                    // read content
+                    int originalVectorWriteIndex = vectorWriteIndex;
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (hasNull && isNull[j - vectorIndex])
+                        {
+                            if ((!cascadeRLE) && nullsPadding)
+                            {
+                                contentBuf.skipBytes(Integer.BYTES);
+                            }
+                            if (selected.get(j - vectorIndex))
+                            {
+                                vectorWriteIndex++;
+                            }
+                        }
+                        else
+                        {
+                            int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
+                            int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
+                            if (selected.get(j - vectorIndex))
+                            {
+                                // use setRef instead of setVal to reduce memory copy.
+                                columnVector.setRef(vectorWriteIndex++, buffer, dictStarts[originId], tmpLen);
+                            }
+                        }
+                    }
+
+                    // update columnVector.isNull if has no nulls
+                    if (!hasNull)
+                    {
+                        Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
+                    }
+
+                    // update variables
+                    numLeft -= numToRead;
+                    elementIndex += numToRead;
+                    i += numToRead;
+                }
+            }
+            else if (vector instanceof DictionaryColumnVector)
+            {
+                DictionaryColumnVector columnVector = (DictionaryColumnVector) vector;
+                if (columnVector.dictArray == null)
+                {
+                    columnVector.dictArray = dictContentBuf.array();
+                    columnVector.dictOffsets = dictStarts;
+                }
+                checkArgument(columnVector.dictArray == dictContentBuf.array(),
+                        "dictionaries in the column vector and the input buffer are inconsistent");
+
+                int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
+                boolean[] isNull = new boolean[size];
+                for (int i = vectorIndex; numLeft > 0;)
+                {
+                    if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+                    {
+                        // read to the end of the current pixel
+                        numToRead = pixelStride - elementIndex % pixelStride;
+                    } else
+                    {
+                        numToRead = numLeft;
+                    }
+                    bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+
+                    // read isNull
+                    int pixelId = elementIndex / pixelStride;
+                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                    if (hasNull)
+                    {
+                        BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
+                                isNullOffset, isNullSkipBits, littleEndian);
+                        // update columnVector.isNull
+                        int k = vectorWriteIndex;
+                        for (int j = i; j < i + numToRead; ++j)
+                        {
+                            if (selected.get(j - vectorIndex))
+                            {
+                                columnVector.isNull[k++] = isNull[j - vectorIndex];
+                            }
+                        }
+                        isNullOffset += bytesToDeCompact;
+                        isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                        columnVector.noNulls = false;
+                    }
+                    else
+                    {
+                        Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
+                        // update columnVector.isNull later to avoid bitmap unnecessary traversal
+                    }
+
+                    // read content
+                    int originalVectorWriteIndex = vectorWriteIndex;
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (hasNull && isNull[j - vectorIndex])
+                        {
+                            if ((!cascadeRLE) && nullsPadding)
+                            {
+                                contentBuf.skipBytes(Integer.BYTES);
+                            }
+                            if (selected.get(j - vectorIndex))
+                            {
+                                vectorWriteIndex++;
+                            }
+                        }
+                        else
+                        {
+                            int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
+                            if (selected.get(j - vectorIndex))
+                            {
+                                columnVector.setId(vectorWriteIndex + vectorIndex, originId);
+                                vectorWriteIndex++;
+                            }
+                        }
+                    }
+
+                    // update columnVector.isNull if has no nulls
+                    if (!hasNull)
+                    {
+                        Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
+                    }
+
+                    // update variables
+                    numLeft -= numToRead;
+                    elementIndex += numToRead;
+                    i += numToRead;
+                }
+            }
+            else
+            {
+                throw new IllegalArgumentException("unsupported column vector type: " + vector.getClass().getName());
+            }
+        }
+        // if un-encoded
+        else
+        {
+            BinaryColumnVector columnVector = (BinaryColumnVector) vector;
+            // read values
+            // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
+            byte[] buffer = contentBuf.array();
+            int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
+            boolean[] isNull = new boolean[size];
+            for (int i = vectorIndex; numLeft > 0;)
+            {
+                if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+                {
+                    // read to the end of the current pixel
+                    numToRead = pixelStride - elementIndex % pixelStride;
+                } else
+                {
+                    numToRead = numLeft;
+                }
+                bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+
+                // read isNull
+                int pixelId = elementIndex / pixelStride;
+                hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                if (hasNull)
+                {
+                    BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian);
+                    // update columnVector.isNull
+                    int k = vectorWriteIndex;
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.isNull[k++] = columnVector.isNull[j - vectorIndex];
+                        }
+                    }
+                    isNullOffset += bytesToDeCompact;
+                    isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                    columnVector.noNulls = false;
+                }
+                else
+                {
+                    Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
+                    // update columnVector.isNull later to avoid bitmap unnecessary traversal
+                }
+
+                // read content
+                int originalVectorWriteIndex = vectorWriteIndex;
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (hasNull && isNull[j - vectorIndex])
+                    {
+                        if (nullsPadding)
+                        {
+                            currentStart = nextStart;
+                            nextStart = startsBuf.readInt();
+                            if (currentStart != nextStart)
+                            {
+                                throw new PixelsReaderException("corrupt start offsets detected while nulls padding is enabled");
+                            }
+                        }
+                        if (selected.get(j - vectorIndex))
+                        {
+                            vectorWriteIndex++;
+                        }
+                    }
+                    else
+                    {
+                        currentStart = nextStart;
+                        nextStart = startsBuf.readInt();
+                        int len = nextStart - currentStart;
+                        if (selected.get(j - vectorIndex))
+                        {
+                            // use setRef instead of setVal to reduce memory copy
+                            columnVector.setRef(vectorWriteIndex++, buffer, bufferOffset, len);
+                        }
+                        bufferOffset += len;
+                    }
+                }
+
+                // update columnVector.isNull if has no nulls
+                if (!hasNull)
+                {
+                    Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
+                }
+
                 // update variables
                 numLeft -= numToRead;
                 elementIndex += numToRead;

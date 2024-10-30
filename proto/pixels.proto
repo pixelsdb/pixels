@@ -64,6 +64,8 @@ message PostScript {
     optional bool partitioned = 8;
     // the number of bytes the start offsets of the column chunks are align to
     optional uint32 columnChunkAlignment = 9;
+    // whether the file contains hidden timestamp columns
+    optional bool hasHiddenColumn = 10;
     // it is always "PIXELS", leave this last in the record
     optional string magic = 8000;
 }
@@ -87,6 +89,12 @@ message Footer {
     repeated RowGroupInformation rowGroupInfos = 3;
     // row group statistics
     repeated RowGroupStatistic rowGroupStats = 4;
+    // hidden timestamp column type
+    optional Type hiddenType = 5;
+    // file level hidden timestamp column statistics
+    optional ColumnStatistic hiddenColumnStats = 6;
+    // row group statistics for hidden timestamp columns
+    repeated ColumnStatistic hiddenRowGroupStats = 7;
 }
 
 message Type {
@@ -249,10 +257,12 @@ message ColumnChunkIndex {
 
 message RowGroupIndex {
     repeated ColumnChunkIndex columnChunkIndexEntries = 1;
+    optional ColumnChunkIndex hiddenColumnChunkIndexEntry = 2;
 }
 
 message RowGroupEncoding {
     repeated ColumnEncoding columnChunkEncodings = 1;
+    optional ColumnEncoding hiddenColumnChunkEncoding = 2;
 }
 
 message RowGroupFooter {
