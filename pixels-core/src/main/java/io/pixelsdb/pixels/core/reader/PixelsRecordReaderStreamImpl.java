@@ -449,7 +449,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         {
             acquireNewRowGroup(reuse);
             if (endOfFile) return createEmptyEOFRowBatch(0);
-            logger.debug("In readBatch(), new row group " + curRGIdx);
+            logger.info("In readBatch(), new row group " + curRGIdx);
         }
 
         if (!checkValid || endOfFile)
@@ -580,7 +580,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
 
     private void acquireNewRowGroup(boolean reuse) throws IOException
     {
-        logger.debug("In acquireNewRowGroup(), curRGIdx = " + curRGIdx);
+        logger.info("In acquireNewRowGroup(), curRGIdx = " + curRGIdx);
         if (!endOfFile)
         {
             try

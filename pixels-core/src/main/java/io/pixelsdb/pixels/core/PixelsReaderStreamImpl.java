@@ -114,8 +114,8 @@ public class PixelsReaderStreamImpl implements PixelsReader
         URI uri = new URI(endpoint);
         String IP = uri.getHost();
         int httpPort = uri.getPort();
-        logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort +
-                ", partitioned: " + partitioned + ", numPartitions: " + numPartitions);
+        logger.info("In Pixels stream reader constructor, IP: {}, port: {}, partitioned: {}, numPartitions: {}"
+                , IP, httpPort, partitioned, numPartitions);
         if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost"))
         {
             throw new UnsupportedOperationException("Currently, only localhost is supported as the server address");
@@ -145,7 +145,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     return;
                 }
                 int partitionId = Integer.parseInt(req.headers().get("X-Partition-Id"));
-                logger.debug("Incoming packet on port: " + httpPort +
+                logger.info("Incoming packet on port: " + httpPort +
                         ", content_length header: " + req.headers().get("content-length") +
                         ", connection header: " + req.headers().get("connection") +
                         ", partition ID header: " + req.headers().get("X-Partition-Id") +
@@ -159,10 +159,12 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
                                 req.content().readableBytes() == 0);
                 ByteBuf byteBuf = req.content();
+                logger.info("the content of request {}", byteBuf.toString());
                 try
                 {
                     if (streamHeader == null)
                     {
+                        logger.info("this is stream header");
                         try
                         {
                             streamHeader = parseStreamHeader(byteBuf);
@@ -248,6 +250,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 {
                     f.addListener(future -> {
                         // shutdown the server
+                        logger.info("http server close");
                         ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
                     });
                 }
@@ -301,7 +304,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
         ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
         byteBuf.getBytes(magicLength + Integer.BYTES, metadataBuf);
         PixelsStreamProto.StreamHeader streamHeader = PixelsStreamProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
-
         // check file version
         int fileVersion = streamHeader.getVersion();
         if (!PixelsVersion.matchVersion(fileVersion))
@@ -317,6 +319,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         }
         // At this point, the readerIndex of the byteBuf is past the streamHeader and at the start of
         // the actual rowGroups.
+        logger.info("stream header: {} , the readerIndex is {}", streamHeader.toString(), byteBuf.readerIndex());
 
         this.fileSchema = TypeDescription.createSchema(streamHeader.getTypesList());
         return streamHeader;

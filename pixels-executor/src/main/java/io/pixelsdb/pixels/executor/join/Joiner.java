@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.utils.HashTable;
 import io.pixelsdb.pixels.executor.utils.Tuple;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.*;
@@ -50,6 +52,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class Joiner
 {
+    private static final Logger log = LogManager.getLogger(Joiner.class);
     private final HashTable smallTable = new HashTable();
     private final JoinType joinType;
     private final TypeDescription smallSchema;

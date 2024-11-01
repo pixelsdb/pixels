@@ -142,6 +142,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             Joiner joiner = new Joiner(joinType,
                     WorkerCommon.getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftProjection, leftKeyColumnIds,
                     WorkerCommon.getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightProjection, rightKeyColumnIds);
+            logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>();
             for (InputSplit inputSplit : leftInputs)
@@ -165,6 +166,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
             }
             logger.info("hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
                     (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
+            logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
 
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
             if (partitionOutput)
@@ -215,6 +217,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
                 }
             }
+            logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
 
             String outputPath = outputFolder + outputInfo.getFileNames().get(0);
             try
@@ -242,6 +245,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 }
                 else
                 {
+                    logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
                     pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
                             WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                             encoding, false, null);

@@ -474,6 +474,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     @Override
     public boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException
     {
+        logger.info("writer add row batch size {}", rowBatch.size);
         checkArgument(!partitioned,
                 "this file is hash partitioned, use addRowBatch(rowBatch, hashValue) instead");
         /**
@@ -487,6 +488,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         // If the current row group size has exceeded the row group size, write current row group.
         if (curRowGroupDataLength >= rowGroupSize)
         {
+            logger.info("curRowGroupDataLength {} larger than rowGroupSize {}", curRowGroupDataLength, rowGroupSize);
             writeRowGroup();
             curRowGroupNumOfRows = 0L;
             return false;
@@ -550,25 +552,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     {
         try
         {
-            if (curRowGroupNumOfRows != 0)
+            logger.info("writer close, curRowGroupNumOfRows {}", curRowGroupNumOfRows);
+            writeRowGroup();
+            if (curRowGroupNumOfRows > 0)
             {
-                writeRowGroup();
-            }
-            // If the outgoing stream is empty (addRowBatch() and thus writeRowGroup() never called), we artificially
-            // send an empty row group here before closing,
-            //  so that the HTTP server can properly move on and close.
-            else if (isFirstRowGroup)
-            {
-                writeRowGroup();
-                isFirstRowGroup = false;
-            }
-
-            // In non-partitioned mode and for data servers, we send a close request with empty content to the server.
-            // In partitioned mode, the server closes automatically when it receives all its partitions. No need to send
-            //  a close request.
-            // Schema servers also close automatically and do not need close requests.
-            if (!partitioned && partitionId != PARTITION_ID_SCHEMA_WRITER)
-            {
+                logger.info("send end stream packet to endpoint {}", this.uri);
                 if (!partitioned && uri == null)
                 {
                     uri = URI.create(fileNameToUri(fileName));
@@ -587,19 +575,68 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                     throw new IOException("Failed to send close request to server. Is the server already closed? " +
                             "HTTP status code: " + response.getStatusCode());
                 }
-            }
+                for (ColumnWriter cw : columnWriters)
+                {
+                    cw.close();
+                }
+                columnWriterService.shutdown();
+                columnWriterService.shutdownNow();
 
-            for (ColumnWriter cw : columnWriters)
-            {
-                cw.close();
+                if (byteBuf.refCnt() > 0)
+                {
+                    byteBuf.release();
+                }
             }
-            columnWriterService.shutdown();
-            columnWriterService.shutdownNow();
+//            if (curRowGroupNumOfRows != 0)
+//            {
+//                writeRowGroup();
+//            }
+            // If the outgoing stream is empty (addRowBatch() and thus writeRowGroup() never called), we artificially
+            // send an empty row group here before closing,
+            //  so that the HTTP server can properly move on and close.
+//            else if (isFirstRowGroup)
+//            {
+//                writeRowGroup();
+//                isFirstRowGroup = false;
+//            }
 
-            if (byteBuf.refCnt() > 0)
-            {
-                byteBuf.release();
-            }
+            // In non-partitioned mode and for data servers, we send a close request with empty content to the server.
+            // In partitioned mode, the server closes automatically when it receives all its partitions. No need to send
+            //  a close request.
+            // Schema servers also close automatically and do not need close requests.
+//            if (!partitioned && partitionId != PARTITION_ID_SCHEMA_WRITER)
+//            {
+//                if (!partitioned && uri == null)
+//                {
+//                    uri = URI.create(fileNameToUri(fileName));
+//                }
+//                Request req = httpClient
+//                        .preparePost(partitioned ? uris.get(currHashValue).toString() : uri.toString())
+//                        .addHeader(CONTENT_TYPE, "application/x-protobuf")
+//                        .addHeader(CONTENT_LENGTH, 0)
+//                        .addHeader(CONNECTION, CLOSE)
+//                        .build();
+//
+//                outstandingHTTPRequestSemaphore.acquire();
+//                Response response = httpClient.executeRequest(req).get();
+//                if (response.getStatusCode() != 200)
+//                {
+//                    throw new IOException("Failed to send close request to server. Is the server already closed? " +
+//                            "HTTP status code: " + response.getStatusCode());
+//                }
+//            }
+//
+//            for (ColumnWriter cw : columnWriters)
+//            {
+//                cw.close();
+//            }
+//            columnWriterService.shutdown();
+//            columnWriterService.shutdownNow();
+//
+//            if (byteBuf.refCnt() > 0)
+//            {
+//                byteBuf.release();
+//            }
         }
         catch (Exception e)
         {
@@ -769,7 +806,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             uri = URI.create(fileNameToUri(fileName));
         }
         String reqUri = partitioned ? uris.get(currHashValue).toString() : uri.toString();
-        logger.debug("Sending row group with length: " + byteBuf.writerIndex() + " to endpoint: " + reqUri);
+        logger.info("Sending row group with length: " + byteBuf.writerIndex() + " to endpoint: " + reqUri);
         Request req = httpClient.preparePost(reqUri)
                 .setBody(byteBuf.nioBuffer())
                 .addHeader("X-Partition-Id", String.valueOf(partitionId))
@@ -793,6 +830,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
 
             while (!success)
             {
+                logger.info("try to send row group");
                 try
                 {
                     CompletableFuture<Response> future = new CompletableFuture<>();
@@ -808,6 +846,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                                 throw new IOException("Failed to send row group to server, status code: " + response.getStatusCode());
                             }
                             outstandingHTTPRequestSemaphore.release();
+                            logger.info("succeed to get response");
                             return response;
                         }
 

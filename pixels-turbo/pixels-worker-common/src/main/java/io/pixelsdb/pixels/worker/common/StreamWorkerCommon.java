@@ -31,6 +31,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -45,6 +46,8 @@ public class StreamWorkerCommon extends WorkerCommon
 {
     private static final Logger logger = LogManager.getLogger(StreamWorkerCommon.class);
     private static final Storage http = null;  // placeholder. todo: modularize into a pixels-storage-stream module.
+    private static final HashMap<String, PixelsReader> readerMap = new HashMap<>();
+    private static final HashMap<String, PixelsWriter> writerMap = new HashMap<>();
 
     public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException
     {
@@ -82,6 +85,7 @@ public class StreamWorkerCommon extends WorkerCommon
         {
             throw new IllegalArgumentException("Attempt to call a streaming mode function with a non-HTTP storage");
         }
+        logger.info("pass schema to endpoint {}", endpoint);
         PixelsWriter pixelsWriter = getWriter(schema, null, endpoint, false, false,
                 PARTITION_ID_SCHEMA_WRITER, null, null, true);
         pixelsWriter.close();  // We utilize the sendRowGroup() in PixelsWriterStreamImpl's close() to send the schema.
@@ -159,9 +163,20 @@ public class StreamWorkerCommon extends WorkerCommon
             Future<?> rightFuture = executor.submit(() -> {
                 try
                 {
-                    PixelsReader pixelsReader = new PixelsReaderStreamImpl(rightEndpoints.get(0));
-                    rightSchema.set(pixelsReader.getFileSchema());
-                    pixelsReader.close();
+                    for (String endpoint : rightEndpoints)
+                    {
+                        PixelsReader pixelsReader;
+                        if (!readerMap.containsKey(endpoint))
+                        {
+                            pixelsReader = new PixelsReaderStreamImpl(endpoint);
+                            readerMap.put(endpoint, pixelsReader);
+                        } else
+                        {
+                            pixelsReader = readerMap.get(endpoint);
+                        }
+                        rightSchema.set(pixelsReader.getFileSchema());
+                        logger.info("succeed to get right schema for {}", endpoint);
+                    }
                     // XXX: This `close()` makes the test noticeably slower. Will need to look into it.
                 } catch (Exception e)
                 {
@@ -248,8 +263,18 @@ public class StreamWorkerCommon extends WorkerCommon
         requireNonNull(endpoint, "fileName is null");
         if (storageScheme == Storage.Scheme.httpstream)
         {
-            logger.debug("getReader streaming mode: " + endpoint);
-            return new PixelsReaderStreamImpl(endpoint, partitioned, numPartitions);
+            logger.info("getReader streaming mode: " + endpoint);
+            PixelsReader pixelsReader;
+//            if (readerMap.containsKey(endpoint))
+//            {
+//                pixelsReader = readerMap.get(endpoint);
+//            } else
+//            {
+//                pixelsReader = new PixelsReaderStreamImpl(endpoint, partitioned, numPartitions);
+//            }
+            pixelsReader = new PixelsReaderStreamImpl(endpoint, partitioned, numPartitions);
+
+            return pixelsReader;
         }
         else return WorkerCommon.getReader(endpoint, WorkerCommon.getStorage(storageScheme));
     }
@@ -284,23 +309,34 @@ public class StreamWorkerCommon extends WorkerCommon
         checkArgument(!isPartitioned || outputEndpoints != null,
                 "outputPaths is null whereas isPartitioned is true");
 
-        PixelsWriterStreamImpl.Builder builder = PixelsWriterStreamImpl.newBuilder();
-        builder.setSchema(schema)
-                .setPixelStride(pixelStride)
-                .setRowGroupSize(rowGroupSize)
-                .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
-                .setPartitioned(isPartitioned)
-                .setPartitionId(isSchemaWriter ? PARTITION_ID_SCHEMA_WRITER : (isPartitioned ? partitionId : -1));
-        if (!isPartitioned)
-        {
-            builder.setUri(URI.create(outputPath));
-        }
-        else
-        {
-            builder.setFileNames(outputEndpoints)
-                    .setPartKeyColumnIds(keyColumnIds);
-        }
-        return builder.build();
+        PixelsWriter pixelsWriter;
+//        if (writerMap.containsKey(outputPath))
+//        {
+//            pixelsWriter = writerMap.get(outputPath);
+//            logger.info("get pixels stream writer from old value");
+//        } else
+//        {
+            PixelsWriterStreamImpl.Builder builder = PixelsWriterStreamImpl.newBuilder();
+            builder.setSchema(schema)
+                    .setPixelStride(pixelStride)
+                    .setRowGroupSize(rowGroupSize)
+                    .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
+                    .setPartitioned(isPartitioned)
+                    .setPartitionId(isSchemaWriter ? PARTITION_ID_SCHEMA_WRITER : (isPartitioned ? partitionId : -1));
+            if (!isPartitioned)
+            {
+                builder.setUri(URI.create(outputPath));
+            }
+            else
+            {
+                builder.setFileNames(outputEndpoints)
+                        .setPartKeyColumnIds(keyColumnIds);
+            }
+            writerMap.put(outputPath, builder.build());
+            pixelsWriter = writerMap.get(outputPath);
+            logger.info("get pixels stream writer from new value");
+//        }
+        return pixelsWriter;
     }
 
     public static PixelsReaderOption getReaderOption(long transId, String[] cols, PixelsReader pixelsReader,
@@ -309,6 +345,17 @@ public class StreamWorkerCommon extends WorkerCommon
         // XXX: Currently we assume 1 reader is responsible for only 1 hash value, albeit for all its partitions.
         // Might need to change if we want to support multiple hash values in the future.
 
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.transId(transId);
+        option.includeCols(cols);
+
+        return option;
+    }
+
+    public static PixelsReaderOption getReaderOption(long transId, String[] cols)
+    {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
