@@ -71,6 +71,10 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
         this.workerMetrics = context.getWorkerMetrics();
         this.workerCoordinateService = new WorkerCoordinateService(
                 StreamWorkerCommon.getCoordinatorIp(), StreamWorkerCommon.getCoordinatorPort());
+        // In cloud functions, configuration files "pixels.properties" are not present, and so the pre-packaged
+        //  configuration file "pixels-common/src/main/resources/pixels.properties" will be used during runtime.
+        // Therefore, you need to modify the coordinator host and port in the pre-packaged configuration file on localhost
+        //  where you rebuild the Docker image.
     }
 
     @Override
