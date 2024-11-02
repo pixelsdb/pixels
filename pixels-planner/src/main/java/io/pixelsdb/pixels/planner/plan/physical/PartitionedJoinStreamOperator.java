@@ -63,7 +63,8 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
             {
                 JoinInput joinInput = joinInputs.get(i);
                 joinInput.setSmallPartitionWorkerNum(smallPartitionInputs.size());  // XXX: could be 0
-                joinInput.setLargePartitionWorkerNum(largePartitionInputs.size());
+                joinInput.setLargePartitionWorkerNum(largePartitionInputs.size());  // XXX: Can do this in PixelsPlanner
+                ((PartitionedJoinInput)joinInput).getJoinInfo().setPostPartitionId(i);
                 if (joinAlgo == JoinAlgorithm.PARTITIONED)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
