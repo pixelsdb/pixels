@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinatorFactory;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
+import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -107,7 +108,7 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 for (PartitionInput partitionInput : largePartitionInputs)
                 {
                     largePartitionOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
+                            .getInvoker(WorkerType.PARTITION_STREAMING).invoke(partitionInput);
                 }
 
                 logger.debug("invoke large partition of " + this.getName());

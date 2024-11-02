@@ -53,6 +53,18 @@ public class PartitionedJoinInfo extends JoinInfo
         this.hashValues = hashValues;
     }
 
+    public PartitionedJoinInfo(JoinType joinType, String[] smallColumnAlias, String[] largeColumnAlias,
+                               boolean[] smallProjection, boolean[] largeProjection, boolean postPartition,
+                               PartitionInfo postPartitionInfo, boolean postPartitionIsSmallTable,
+                               int numPartition, List<Integer> hashValues)
+    {
+        super(joinType, smallColumnAlias, largeColumnAlias, smallProjection, largeProjection,
+                postPartition, postPartitionInfo);
+        this.numPartition = numPartition;
+        this.hashValues = hashValues;
+        this.setPostPartitionIsSmallTable(postPartitionIsSmallTable);
+    }
+
     public int getNumPartition()
     {
         return numPartition;
