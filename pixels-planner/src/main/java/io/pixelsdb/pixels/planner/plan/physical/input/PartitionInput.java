@@ -52,7 +52,8 @@ public class PartitionInput extends Input
      */
     private PartitionInfo partitionInfo;
     /**
-     * Whether this table is the small table in a join.
+     * Whether this table is the small table in the next-level join. This is used to determine the HTTP port
+     *  when using streaming.
      */
     private boolean isSmallTable;
 
