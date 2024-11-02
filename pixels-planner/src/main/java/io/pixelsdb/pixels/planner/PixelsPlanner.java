@@ -1345,6 +1345,7 @@ public class PixelsPlanner
     {
         boolean postPartition = false;
         PartitionInfo postPartitionInfo = null;
+        boolean postPartitionIsSmallTable = false;
         if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
         {
             postPartition = true;
@@ -1359,10 +1360,12 @@ public class PixelsPlanner
             if (joinedTable == parent.get().getJoin().getLeftTable())
             {
                 postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPostPartition);
+                postPartitionIsSmallTable = parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT;
             }
             else
             {
                 postPartitionInfo = new PartitionInfo(parent.get().getJoin().getRightKeyColumnIds(), numPostPartition);
+                postPartitionIsSmallTable = parent.get().getJoin().getJoinEndian() != JoinEndian.SMALL_LEFT;
             }
         }
 
@@ -1392,7 +1395,7 @@ public class PixelsPlanner
             {
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
                         joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
-                        leftProjection, rightProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
+                        leftProjection, rightProjection, postPartition, postPartitionInfo, postPartitionIsSmallTable, numPartition, ImmutableList.of(i));
                  joinInput = new PartitionedJoinInput(transId, leftTableInfo, rightTableInfo, joinInfo,
                          false, null, output);
             }
@@ -1400,7 +1403,7 @@ public class PixelsPlanner
             {
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
-                        rightProjection, leftProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
+                        rightProjection, leftProjection, postPartition, postPartitionInfo, postPartitionIsSmallTable, numPartition, ImmutableList.of(i));
                 joinInput = new PartitionedJoinInput(transId, rightTableInfo, leftTableInfo, joinInfo,
                         false, null, output);
             }

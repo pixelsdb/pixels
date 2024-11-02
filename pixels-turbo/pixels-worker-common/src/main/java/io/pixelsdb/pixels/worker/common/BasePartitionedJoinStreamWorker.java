@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.worker.common;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsWriter;
@@ -296,11 +297,20 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 PixelsWriter pixelsWriter;
                 if (partitionOutput)
                 {
+                    List<CFWorkerInfo> downStreamWorkers = workerCoordinateService.getDownstreamWorkers(worker.getWorkerId())
+                            .stream()
+                            .sorted(Comparator.comparing(worker -> worker.getHashValues().get(0)))
+                            .collect(ImmutableList.toImmutableList());
+                    List<String> outputEndpoints = downStreamWorkers.stream()
+                            .map(CFWorkerInfo::getIp)
+                            .map(ip -> "http://" + ip + ":" + (event.getJoinInfo().getPostPartitionIsSmallTable() ? "18688" : "18686") + "/")
+                            // .map(URI::create)
+                            .collect(Collectors.toList());
                     pixelsWriter = StreamWorkerCommon.getWriter(joiner.getJoinedSchema(),
                             StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                            encoding, true, -1, Arrays.stream(
+                            encoding, true, event.getJoinInfo().getPostPartitionId(), Arrays.stream(
                                             outputPartitionInfo.getKeyColumnIds()).boxed().
-                                    collect(Collectors.toList()));
+                                    collect(Collectors.toList()), outputEndpoints, false);
                     for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
                     {
                         ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
@@ -346,9 +356,10 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                         requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
                         pixelsWriter = StreamWorkerCommon.getWriter(joiner.getJoinedSchema(),
                                 StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                                encoding, true, -1, Arrays.stream(
+                                encoding, true, event.getJoinInfo().getPostPartitionId(), Arrays.stream(
                                                 outputPartitionInfo.getKeyColumnIds()).boxed().
-                                        collect(Collectors.toList()));
+                                        collect(Collectors.toList()));  // , outputEndpoints, false);
+                        // TODO: Adapt the left-outer tail to streaming mode.
                         joiner.writeLeftOuterAndPartition(pixelsWriter, StreamWorkerCommon.rowBatchSize,
                                 outputPartitionInfo.getNumPartition(), outputPartitionInfo.getKeyColumnIds());
                     }
