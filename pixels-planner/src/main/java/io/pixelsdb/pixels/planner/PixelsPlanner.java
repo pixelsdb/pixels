@@ -62,6 +62,7 @@ public class PixelsPlanner
     private static final Logger logger = LogManager.getLogger(PixelsPlanner.class);
     private static final StorageInfo InputStorageInfo;
     private static final StorageInfo IntermediateStorageInfo;
+    private static final StorageInfo IntermediateStreamStorageInfo;  // Streaming only used between partition worker -> partitioned join worker
     private static final String IntermediateFolder;
     private static final int IntraWorkerParallelism;
     private static final ExchangeMethod EnabledExchangeMethod;
@@ -91,10 +92,10 @@ public class PixelsPlanner
                 ConfigFactory.Instance().getProperty("executor.input.storage.scheme"));
         InputStorageInfo = StorageInfoBuilder.BuildFromConfig(inputStorageScheme);
 
-        Storage.Scheme interStorageScheme = EnabledExchangeMethod == ExchangeMethod.batch ?
-                Storage.Scheme.from(ConfigFactory.Instance().getProperty("executor.intermediate.storage.scheme")) :
-                Storage.Scheme.valueOf("httpstream");
+        Storage.Scheme interStorageScheme = Storage.Scheme.from(
+                ConfigFactory.Instance().getProperty("executor.intermediate.storage.scheme"));
         IntermediateStorageInfo = StorageInfoBuilder.BuildFromConfig(interStorageScheme);
+        IntermediateStreamStorageInfo = StorageInfoBuilder.BuildFromConfig(Storage.Scheme.valueOf("httpstream"));
         String interStorageFolder = ConfigFactory.Instance().getProperty("executor.intermediate.folder");
         if (!interStorageFolder.endsWith("/"))
         {
@@ -285,7 +286,7 @@ public class PixelsPlanner
                 joinInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = "partial_aggr_" + outputId++;
                 MultiOutputInfo outputInfo = joinInput.getOutput();
-                outputInfo.setStorageInfo(IntermediateStorageInfo);
+                outputInfo.setStorageInfo(IntermediateStorageInfo);  // IntermediateStreamStorageInfo?
                 outputInfo.setPath(intermediateBase);
                 outputInfo.setFileNames(ImmutableList.of(fileName));
                 aggrInputFilesBuilder.add(intermediateBase + fileName);
@@ -527,12 +528,14 @@ public class PixelsPlanner
             boolean leftIsBase = leftTable.getTableType() == Table.TableType.BASE;
             PartitionedTableInfo leftTableInfo = new PartitionedTableInfo(
                     leftTable.getTableName(), leftIsBase, leftTable.getColumnNames(),
-                    leftIsBase ? InputStorageInfo : IntermediateStorageInfo,
+                    leftIsBase ? InputStorageInfo :
+                            (EnabledExchangeMethod == ExchangeMethod.batch ? IntermediateStorageInfo : IntermediateStreamStorageInfo),
                     leftPartitionedFiles, IntraWorkerParallelism, leftKeyColumnIds);
             boolean rightIsBase = rightTable.getTableType() == Table.TableType.BASE;
             PartitionedTableInfo rightTableInfo = new PartitionedTableInfo(
                     rightTable.getTableName(), rightIsBase, rightTable.getColumnNames(),
-                    rightIsBase ? InputStorageInfo : IntermediateStorageInfo,
+                    rightIsBase ? InputStorageInfo :
+                            (EnabledExchangeMethod == ExchangeMethod.batch ? IntermediateStorageInfo : IntermediateStreamStorageInfo),
                     rightPartitionedFiles, IntraWorkerParallelism, rightKeyColumnIds);
 
             int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
@@ -961,7 +964,8 @@ public class PixelsPlanner
                 boolean leftIsBase = leftTable.getTableType() == Table.TableType.BASE;
                 PartitionedTableInfo leftTableInfo = new PartitionedTableInfo(
                         leftTable.getTableName(), leftIsBase, leftTable.getColumnNames(),
-                        leftIsBase ? InputStorageInfo : IntermediateStorageInfo,
+                        leftIsBase ? InputStorageInfo :
+                                (EnabledExchangeMethod == ExchangeMethod.batch ? IntermediateStorageInfo : IntermediateStreamStorageInfo),  // ???
                         leftPartitionedFiles, IntraWorkerParallelism, leftKeyColumnIds);
 
                 boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
@@ -1278,13 +1282,19 @@ public class PixelsPlanner
         if (table.getTableType() == Table.TableType.BASE)
         {
             return new PartitionedTableInfo(table.getTableName(), true,
-                    newColumnsToRead, InputStorageInfo, rightPartitionedFiles.build(),
+                    newColumnsToRead,
+                    EnabledExchangeMethod == ExchangeMethod.batch ? InputStorageInfo : IntermediateStreamStorageInfo,
+                    rightPartitionedFiles.build(),
                     IntraWorkerParallelism, newKeyColumnIds);
         } else
         {
             return new PartitionedTableInfo(table.getTableName(), false,
-                    newColumnsToRead, IntermediateStorageInfo, rightPartitionedFiles.build(),
+                    newColumnsToRead,
+                    EnabledExchangeMethod == ExchangeMethod.batch ? IntermediateStorageInfo : IntermediateStreamStorageInfo,
+                    rightPartitionedFiles.build(),
                     IntraWorkerParallelism, newKeyColumnIds);
+            // XXX: This only applies to joined tables, when the current join reads table from a post partition of a previous join.
+            //  If the table type is AGGREAGATED, we should use IntermediateStorageInfo.
         }
     }
 
@@ -1320,11 +1330,13 @@ public class PixelsPlanner
                 tableInfo.setFilter(JSON.toJSONString(
                         TableScanFilter.empty(inputTable.getSchemaName(), inputTable.getTableName())));
                 tableInfo.setBase(false);
-                tableInfo.setStorageInfo(IntermediateStorageInfo);
+                tableInfo.setStorageInfo(IntermediateStorageInfo);  // IntermediateStreamStorageInfo?
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setProjection(partitionProjection);
-            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part",
+                    EnabledExchangeMethod == ExchangeMethod.batch ? InputStorageInfo : IntermediateStreamStorageInfo,
+                    true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);
@@ -1391,7 +1403,9 @@ public class PixelsPlanner
 
             String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                     joinedTable.getTableName() + "/";
-            MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
+            MultiOutputInfo output = new MultiOutputInfo(path,
+                    postPartition && EnabledExchangeMethod == ExchangeMethod.stream ? IntermediateStreamStorageInfo : IntermediateStorageInfo,
+                true, outputFileNames.build());
 
             boolean[] leftProjection = leftPartitionProjection == null ? joinedTable.getJoin().getLeftProjection() :
                     rewriteProjectionForPartitionedJoin(joinedTable.getJoin().getLeftProjection(), leftPartitionProjection);
