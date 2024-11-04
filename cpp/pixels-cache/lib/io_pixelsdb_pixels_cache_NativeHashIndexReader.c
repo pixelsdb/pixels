@@ -60,5 +60,4 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_NativeHashIndexReader_doNat
   }
   memcpy(retAddr, kv + 12, 8); // offset
   memcpy((char*) retAddr + 8, kv + 20, 4); // length
-
 }

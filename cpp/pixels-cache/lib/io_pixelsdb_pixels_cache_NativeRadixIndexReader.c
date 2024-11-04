@@ -9,7 +9,6 @@
 #define KEY_LEN 12       // long + short + short
 #define CACHE_IDX_LEN 12 // long + int
 
-
 void buildKeyBuf(char *keyBuf, unsigned long blockId, unsigned short rowGroupId, unsigned short columnId)
 {
   // underlying bytes should be big-endian
@@ -86,7 +85,6 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_NativeRadixIndexReader_sear
     int edgeEndOffset = currentNodeChildrenNum * 8 + currentNodeEdgeSize;
     ++bytesMatched;
     ++bytesMatchedInNodeFound;
-
 
     // now we are visiting the edge! rather than children data
     // it seems between children and edge, there is a one byte gap?
