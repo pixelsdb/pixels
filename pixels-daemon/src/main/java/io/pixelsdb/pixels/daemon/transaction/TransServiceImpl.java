@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
 import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.daemon.TransProto;
@@ -109,7 +110,11 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         {
             long id = TransServiceImpl.transId.getAndIncrement();
             long timestamp = request.getReadOnly() ? highWatermark.get() : transTimestamp.getAndIncrement();
-             response = TransProto.BeginTransResponse.newBuilder()
+            boolean enableTimestamp = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("experimental.timestamp.enabled"));
+            if (!enableTimestamp) {
+                timestamp = -1;
+            }
+            response = TransProto.BeginTransResponse.newBuilder()
                     .setErrorCode(ErrorCode.SUCCESS)
                     .setTransId(id).setTimestamp(timestamp).build();
             TransContext context = new TransContext(id, timestamp, request.getReadOnly());
