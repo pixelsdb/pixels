@@ -1,9 +1,9 @@
-#include "stdio.h"
-#include "stdint.h"
-#include "string.h"
-#include "byteswap.h"
-#include "memory_mapped_file.h"
-#include "io_pixelsdb_pixels_cache_HashIndexReader.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <byteswap.h>
+#include "../include/memory_mapped_file.h"
+#include "../include/io_pixelsdb_pixels_cache_NativeHashIndexReader.h"
 
 #define INDEX_HASH_HEAD_OFFSET 24 // 16 + 8
 #define KEY_LEN 12       // long + short + short
@@ -60,5 +60,4 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_NativeHashIndexReader_doNat
   }
   memcpy(retAddr, kv + 12, 8); // offset
   memcpy((char*) retAddr + 8, kv + 20, 4); // length
-
 }

@@ -1,5 +1,5 @@
-#include "stdlib.h"
-#include "jni.h"
+#include <stdlib.h>
+#include <jni.h>
 #include "memory_mapped_file.h"
 
 #ifndef _Included_utils

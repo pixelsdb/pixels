@@ -1,9 +1,9 @@
-#include "stdio.h"
-#include "string.h"
-#include "byteswap.h"
-#include "utils.h"
-#include "memory_mapped_file.h"
-#include "io_pixelsdb_pixels_cache_utils_RadixIndexEndianRewriter.h"
+#include <stdio.h>
+#include <string.h>
+#include <byteswap.h>
+#include "../include/utils.h"
+#include "../include/memory_mapped_file.h"
+#include "../include/io_pixelsdb_pixels_cache_utils_RadixIndexEndianRewriter.h"
 
 #define INDEX_RADIX_OFFSET 16
 #define KEY_LEN 12

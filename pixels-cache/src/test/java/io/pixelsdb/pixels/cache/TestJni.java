@@ -20,15 +20,15 @@
 package io.pixelsdb.pixels.cache;
 
 /**
- * Created at: 19-5-11
- * Author: hank
+ * @create: 2019-05-11
+ * @author: hank
  */
 public class TestJni
 {
     static
     {
-        System.load("/home/hank/dev/idea-projects/pixels/pixels-cache/src/test/c++/test_jni.so");
-
+        String dir = System.getProperty("user.dir");
+        System.load(dir + "/pixels-cache/src/test/java/io/pixelsdb/pixels/cache/jni/test_jni.so");
     }
 
     public static native void sayHello();

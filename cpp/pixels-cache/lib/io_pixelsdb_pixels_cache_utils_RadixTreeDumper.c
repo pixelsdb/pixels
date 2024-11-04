@@ -1,7 +1,7 @@
-#include "stdio.h"
-#include "string.h"
-#include "byteswap.h"
-#include "io_pixelsdb_pixels_cache_utils_RadixTreeDumper.h"
+#include <stdio.h>
+#include <string.h>
+#include <byteswap.h>
+#include "../include/io_pixelsdb_pixels_cache_utils_RadixTreeDumper.h"
 
 #define INDEX_RADIX_OFFSET 16
 #define KEY_LEN 12
