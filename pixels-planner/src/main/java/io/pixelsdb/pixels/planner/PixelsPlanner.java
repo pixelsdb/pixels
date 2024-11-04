@@ -994,7 +994,7 @@ public class PixelsPlanner
                             new PartitionedJoinBatchOperator(joinedTable.getTableName(),
                                     rightPartitionInputs, null, joinInputs, joinAlgo) :
                             new PartitionedJoinStreamOperator(joinedTable.getTableName(),
-                                    null, rightPartitionInputs, joinInputs, joinAlgo);
+                                    rightPartitionInputs, null, joinInputs, joinAlgo);
                     joinOperator.setLargeChild(childOperator);
                 }
             }
