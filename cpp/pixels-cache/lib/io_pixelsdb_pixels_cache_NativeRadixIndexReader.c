@@ -1,9 +1,9 @@
-#include "stdio.h"
-#include "stdint.h"
-#include "string.h"
-#include "byteswap.h"
-#include "memory_mapped_file.h"
-#include "io_pixelsdb_pixels_cache_NativeRadixIndexReader.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <byteswap.h>
+#include "../include/memory_mapped_file.h"
+#include "../include/io_pixelsdb_pixels_cache_NativeRadixIndexReader.h"
 
 #define INDEX_RADIX_OFFSET 16
 #define KEY_LEN 12       // long + short + short
