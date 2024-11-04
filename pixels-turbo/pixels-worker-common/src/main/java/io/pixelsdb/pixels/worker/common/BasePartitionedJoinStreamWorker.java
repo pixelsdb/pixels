@@ -96,7 +96,11 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             List<String> leftPartitioned = event.getSmallTable().getInputFiles();
             requireNonNull(leftPartitioned, "leftPartitioned is null");
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
-            int leftParallelism = event.getSmallTable().getParallelism();
+            int leftParallelism = 1;  // event.getSmallTable().getParallelism();
+            // todo: Intra-worker parallelism support in streaming mode
+            //  Currently, we only support an intra-worker parallelism of 1 (no parallelism) in streaming mode.
+            //  Need to allow each join worker to use multiple ports to read input in parallel, so as to
+            //   build the hash table in parallel, thus achieving intra-worker parallelism.
             checkArgument(leftParallelism > 0, "leftParallelism is not positive");
             String[] leftColumnsToRead = event.getSmallTable().getColumnsToRead();
             int[] leftKeyColumnIds = event.getSmallTable().getKeyColumnIds();
@@ -106,7 +110,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             List<String> rightPartitioned = event.getLargeTable().getInputFiles();
             requireNonNull(rightPartitioned, "rightPartitioned is null");
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
-            int rightParallelism = event.getLargeTable().getParallelism();
+            int rightParallelism = 1;  // event.getLargeTable().getParallelism();
             checkArgument(rightParallelism > 0, "rightParallelism is not positive");
             String[] rightColumnsToRead = event.getLargeTable().getColumnsToRead();
             int[] rightKeyColumnIds = event.getLargeTable().getKeyColumnIds();
@@ -202,8 +206,6 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             for (int i = 0; i < leftPartitioned.size(); i += leftSplitSize)
             {
                 List<String> parts = new LinkedList<>();
-                // XXX: Can allow 1 join worker to use multiple ports to read input in parallel, so as to
-                //  build the hash table in parallel.
                 for (int j = i; j < i + leftSplitSize && j < leftPartitioned.size(); ++j)
                 {
                     parts.add(leftPartitioned.get(j));
@@ -306,6 +308,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                             .map(ip -> "http://" + ip + ":" + (event.getJoinInfo().getPostPartitionIsSmallTable() ? "18688" : "18686") + "/")
                             // .map(URI::create)
                             .collect(Collectors.toList());
+                    StreamWorkerCommon.passSchemaToNextLevel(joiner.getJoinedSchema(), outputStorageInfo, outputEndpoints);
                     pixelsWriter = StreamWorkerCommon.getWriter(joiner.getJoinedSchema(),
                             StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
                             encoding, true, event.getJoinInfo().getPostPartitionId(), Arrays.stream(
@@ -428,73 +431,51 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
         long readBytes = 0L;
         int numReadRequests = 0;
-        while (!leftParts.isEmpty())
-        {
-            for (Iterator<String> it = leftParts.iterator(); it.hasNext(); )
-            {
-                String leftPartitioned = it.next();
-                readCostTimer.start();
-                PixelsReader pixelsReader = null;
-                try
-                {
-                    pixelsReader = StreamWorkerCommon.getReader(leftScheme, "http://localhost:18688/", true, numPartition);
-                    readCostTimer.stop();
-                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    for (int hashValue : hashValues)
-                    {
-                        PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, leftCols, pixelsReader,
-                                hashValue, numPartition);
-                        VectorizedRowBatch rowBatch;
-                        PixelsRecordReader recordReader = pixelsReader.read(option);
-                        // XXX: perhaps do not need to re-initialize the record reader for each hash value.
-                        if (recordReader == null) continue;
-                        checkArgument(recordReader.isValid(), "failed to get record reader");
 
-                        computeCostTimer.start();
-                        do
-                        {
-                            rowBatch = recordReader.readBatch(StreamWorkerCommon.rowBatchSize);
-                            if (rowBatch.size > 0)
-                            {
-                                joiner.populateLeftTable(rowBatch);
-                            }
-                        } while (!rowBatch.endOfFile);
-                        computeCostTimer.stop();
-                        computeCostTimer.minus(recordReader.getReadTimeNanos());
-                        readCostTimer.add(recordReader.getReadTimeNanos());
-                        readBytes += recordReader.getCompletedBytes();
-                        numReadRequests += recordReader.getNumReadRequests();
-                    }
-                    it.remove();
-                }
-                catch (Throwable e)
-                {
-                    if (e instanceof IOException)
-                    {
-                        continue;
-                    }
-                    throw new WorkerException("failed to scan the partitioned file '" +
-                            leftPartitioned + "' and build the hash table", e);
-                }
-                finally
-                {
-                    if (pixelsReader != null)
-                    {
-                        logger.debug("closing pixels reader");
-                        pixelsReader.close();
-                    }
-                }
-            }
-            if (!leftParts.isEmpty())
+        readCostTimer.start();
+        PixelsReader pixelsReader = null;
+        try
+        {
+            pixelsReader = StreamWorkerCommon.getReader(leftScheme, "http://localhost:18688/", true, numPartition);
+            readCostTimer.stop();
+            checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+            for (int hashValue : hashValues)
             {
-                try
+                PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, leftCols, pixelsReader,
+                        hashValue, numPartition);
+                VectorizedRowBatch rowBatch;
+                PixelsRecordReader recordReader = pixelsReader.read(option);
+                // XXX: perhaps do not need to re-initialize the record reader for each hash value.
+                if (recordReader == null) continue;
+                checkArgument(recordReader.isValid(), "failed to get record reader");
+
+                computeCostTimer.start();
+                do
                 {
-                    TimeUnit.MILLISECONDS.sleep(100);
-                }
-                catch (InterruptedException e)
-                {
-                    throw new WorkerException("interrupted while waiting for the partitioned files");
-                }
+                    rowBatch = recordReader.readBatch(StreamWorkerCommon.rowBatchSize);
+                    if (rowBatch.size > 0)
+                    {
+                        joiner.populateLeftTable(rowBatch);
+                    }
+                } while (!rowBatch.endOfFile);
+                computeCostTimer.stop();
+                computeCostTimer.minus(recordReader.getReadTimeNanos());
+                readCostTimer.add(recordReader.getReadTimeNanos());
+                readBytes += recordReader.getCompletedBytes();
+                numReadRequests += recordReader.getNumReadRequests();
+            }
+        }
+        catch (Throwable e)
+        {
+            if (!(e instanceof IOException))
+                throw new WorkerException("failed to scan the partitioned file and build the hash table", e);
+        }
+        finally
+        {
+            if (pixelsReader != null)
+            {
+                logger.debug("closing pixels reader");
+                pixelsReader.close();
             }
         }
         workerMetrics.addReadBytes(readBytes);
@@ -527,79 +508,57 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
         long readBytes = 0L;
         int numReadRequests = 0;
-        while (!rightParts.isEmpty())
-        {
-            for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
-            {
-                String rightPartitioned = it.next();
-                readCostTimer.start();
-                PixelsReader pixelsReader = null;
-                try
-                {
-                    pixelsReader = StreamWorkerCommon.getReader(rightScheme, "http://localhost:18686/", true, numPartition);
-                    readCostTimer.stop();
-                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    for (int hashValue : hashValues)
-                    {
-                        PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, rightCols, pixelsReader,
-                                hashValue, numPartition);
-                        VectorizedRowBatch rowBatch;
-                        PixelsRecordReader recordReader = pixelsReader.read(option);
-                        checkArgument(recordReader.isValid(), "failed to get record reader");
 
-                        computeCostTimer.start();
-                        do
-                        {
-                            rowBatch = recordReader.readBatch(StreamWorkerCommon.rowBatchSize);
-                            if (rowBatch.size > 0)
-                            {
-                                List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
-                                for (VectorizedRowBatch joined : joinedBatches)
-                                {
-                                    if (!joined.isEmpty())
-                                    {
-                                        joinResult.add(joined);
-                                        joinedRows += joined.size;
-                                    }
-                                }
-                            }
-                        } while (!rowBatch.endOfFile);
-                        computeCostTimer.stop();
-                        computeCostTimer.minus(recordReader.getReadTimeNanos());
-                        readCostTimer.add(recordReader.getReadTimeNanos());
-                        readBytes += recordReader.getCompletedBytes();
-                        numReadRequests += recordReader.getNumReadRequests();
-                    }
-                    it.remove();
-                }
-                catch (Throwable e)
-                {
-                    if (e instanceof IOException)
-                    {
-                        continue;
-                    }
-                    throw new WorkerException("failed to scan the partitioned file '" +
-                            rightPartitioned + "' and do the join", e);
-                }
-                finally
-                {
-                    if (pixelsReader != null)
-                    {
-                        logger.debug("closing pixels reader");
-                        pixelsReader.close();
-                    }
-                }
-            }
-            if (!rightParts.isEmpty())
+        readCostTimer.start();
+        PixelsReader pixelsReader = null;
+        try
+        {
+            pixelsReader = StreamWorkerCommon.getReader(rightScheme, "http://localhost:18686/", true, numPartition);
+            readCostTimer.stop();
+            checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+            for (int hashValue : hashValues)
             {
-                try
+                PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, rightCols, pixelsReader,
+                        hashValue, numPartition);
+                VectorizedRowBatch rowBatch;
+                PixelsRecordReader recordReader = pixelsReader.read(option);
+                checkArgument(recordReader.isValid(), "failed to get record reader");
+
+                computeCostTimer.start();
+                do
                 {
-                    TimeUnit.MILLISECONDS.sleep(100);
-                }
-                catch (InterruptedException e)
-                {
-                    throw new WorkerException("interrupted while waiting for the partitioned files");
-                }
+                    rowBatch = recordReader.readBatch(StreamWorkerCommon.rowBatchSize);
+                    if (rowBatch.size > 0)
+                    {
+                        List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
+                        for (VectorizedRowBatch joined : joinedBatches)
+                        {
+                            if (!joined.isEmpty())
+                            {
+                                joinResult.add(joined);
+                                joinedRows += joined.size;
+                            }
+                        }
+                    }
+                } while (!rowBatch.endOfFile);
+                computeCostTimer.stop();
+                computeCostTimer.minus(recordReader.getReadTimeNanos());
+                readCostTimer.add(recordReader.getReadTimeNanos());
+                readBytes += recordReader.getCompletedBytes();
+                numReadRequests += recordReader.getNumReadRequests();
+            }
+        }
+        catch (Throwable e)
+        {
+            if (!(e instanceof IOException))
+                throw new WorkerException("failed to scan the partitioned file and do the join", e);
+        }
+        finally
+        {
+            if (pixelsReader != null)
+            {
+                logger.debug("closing pixels reader");
+                pixelsReader.close();
             }
         }
         workerMetrics.addReadBytes(readBytes);
@@ -637,84 +596,63 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
         long readBytes = 0L;
         int numReadRequests = 0;
-        while (!rightParts.isEmpty())
-        {
-            for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
-            {
-                String rightPartitioned = it.next();
-                readCostTimer.start();
-                PixelsReader pixelsReader = null;
-                try
-                {
-                    pixelsReader = StreamWorkerCommon.getReader(rightScheme, "http://localhost:18686/", true, numPartition);
-                    readCostTimer.stop();
-                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    for (int hashValue : hashValues)
-                    {
-                        PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, rightCols, pixelsReader,
-                                hashValue, numPartition);
-                        VectorizedRowBatch rowBatch;
-                        PixelsRecordReader recordReader = pixelsReader.read(option);
-                        if (recordReader == null) continue;
-                        checkArgument(recordReader.isValid(), "failed to get record reader");
 
-                        computeCostTimer.start();
-                        do
-                        {
-                            rowBatch = recordReader.readBatch(StreamWorkerCommon.rowBatchSize);
-                            if (rowBatch.size > 0)
-                            {
-                                List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
-                                for (VectorizedRowBatch joined : joinedBatches)
-                                {
-                                    if (!joined.isEmpty())
-                                    {
-                                        Map<Integer, VectorizedRowBatch> parts = partitioner.partition(joined);
-                                        for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
-                                        {
-                                            partitionResult.get(entry.getKey()).add(entry.getValue());
-                                        }
-                                        joinedRows += joined.size;
-                                    }
-                                }
-                            }
-                        } while (!rowBatch.endOfFile);
-                        computeCostTimer.stop();
-                        computeCostTimer.minus(recordReader.getReadTimeNanos());
-                        readCostTimer.add(recordReader.getReadTimeNanos());
-                        readBytes += recordReader.getCompletedBytes();
-                        numReadRequests += recordReader.getNumReadRequests();
-                    }
-                    it.remove();
-                }
-                catch (Throwable e)
-                {
-                    if (e instanceof IOException)
-                    {
-                        continue;
-                    }
-                    throw new WorkerException("failed to scan the partitioned file '" +
-                            rightPartitioned + "' and do the join", e);
-                }
-                finally
-                {
-                    if (pixelsReader != null)
-                    {
-                        logger.debug("closing pixels reader");
-                        pixelsReader.close();
-                    }
-                }
-            }
-            if (!rightParts.isEmpty())
+        readCostTimer.start();
+        PixelsReader pixelsReader = null;
+        try
+        {
+            pixelsReader = StreamWorkerCommon.getReader(rightScheme, "http://localhost:18686/", true, numPartition);
+            readCostTimer.stop();
+            checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+            // XXX: check that the hashValue in row group headers match the hashValue assigned to this worker
+            for (int hashValue : hashValues)
             {
-                try
+                PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, rightCols, pixelsReader,
+                        hashValue, numPartition);
+                VectorizedRowBatch rowBatch;
+                PixelsRecordReader recordReader = pixelsReader.read(option);
+                if (recordReader == null) continue;
+                checkArgument(recordReader.isValid(), "failed to get record reader");
+
+                computeCostTimer.start();
+                do
                 {
-                    TimeUnit.MILLISECONDS.sleep(100);
-                }
-                catch (InterruptedException e)
-                {
-                    throw new WorkerException("interrupted while waiting for the partitioned files");
-                }
+                    rowBatch = recordReader.readBatch(StreamWorkerCommon.rowBatchSize);
+                    if (rowBatch.size > 0)
+                    {
+                        List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
+                        for (VectorizedRowBatch joined : joinedBatches)
+                        {
+                            if (!joined.isEmpty())
+                            {
+                                Map<Integer, VectorizedRowBatch> parts = partitioner.partition(joined);
+                                for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+                                {
+                                    partitionResult.get(entry.getKey()).add(entry.getValue());
+                                }
+                                joinedRows += joined.size;
+                            }
+                        }
+                    }
+                } while (!rowBatch.endOfFile);
+                computeCostTimer.stop();
+                computeCostTimer.minus(recordReader.getReadTimeNanos());
+                readCostTimer.add(recordReader.getReadTimeNanos());
+                readBytes += recordReader.getCompletedBytes();
+                numReadRequests += recordReader.getNumReadRequests();
+            }
+        }
+        catch (Throwable e)
+        {
+            if (!(e instanceof IOException))
+                throw new WorkerException("failed to scan the partitioned file and do the join", e);
+        }
+        finally
+        {
+            if (pixelsReader != null)
+            {
+                logger.debug("closing pixels reader");
+                pixelsReader.close();
             }
         }
 

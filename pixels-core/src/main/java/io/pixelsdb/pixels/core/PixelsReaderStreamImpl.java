@@ -216,12 +216,12 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     }
                 }
 
-                // schema packet: only 1 packet expected, so close the connection immediately
+                // schema reader: only 1 packet expected, so close the connection immediately
                 // partitioned mode: close the connection if all partitions received
                 // else (non-partitioned mode, data packet): close connection if empty packet received
-                boolean needCloseParentChannel = partitionId == PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER ||
+                boolean needCloseParentChannel = numPartitions == PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER ||
                         (partitioned && numPartitionsReceived.get() == numPartitions) ||
-                        (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
+                        (numPartitions == -1 && Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
                                 req.content().readableBytes() == 0);
                 sendResponseAndClose(ctx, req, HttpResponseStatus.OK, needCloseParentChannel);
             }
