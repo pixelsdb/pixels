@@ -192,7 +192,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                 }
 
                 // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the
-                //  client is a data writer rather than a schema writer. In the latter case,
+                //  packet is a data packet rather than a schema packet. Because in the latter case,
                 //  the schema packet has been processed when parsing the stream header above.
                 if (partitionId != PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER)
                 {

@@ -308,6 +308,9 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                             .map(ip -> "http://" + ip + ":" + (event.getJoinInfo().getPostPartitionIsSmallTable() ? "18688" : "18686") + "/")
                             // .map(URI::create)
                             .collect(Collectors.toList());
+                    // In partitioned mode, the schema is sent in an over-replicated manner:
+                    //  every previous-stage worker (rather than one of them) sends a schema packet
+                    //  before sending its intermediate data, to prevent errors from possibly out-of-order packet arrivals.
                     StreamWorkerCommon.passSchemaToNextLevel(joiner.getJoinedSchema(), outputStorageInfo, outputEndpoints);
                     pixelsWriter = StreamWorkerCommon.getWriter(joiner.getJoinedSchema(),
                             StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
@@ -476,7 +479,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         {
             if (pixelsReader != null)
             {
-                logger.debug("closing pixels reader");
+                logger.debug("closing pixels reader on port 18688");
                 pixelsReader.close();
             }
         }
@@ -559,7 +562,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         {
             if (pixelsReader != null)
             {
-                logger.debug("closing pixels reader");
+                logger.debug("closing pixels reader on port 18686");
                 pixelsReader.close();
             }
         }
@@ -653,7 +656,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         {
             if (pixelsReader != null)
             {
-                logger.debug("closing pixels reader");
+                logger.debug("closing pixels reader on 18686");
                 pixelsReader.close();
             }
         }
