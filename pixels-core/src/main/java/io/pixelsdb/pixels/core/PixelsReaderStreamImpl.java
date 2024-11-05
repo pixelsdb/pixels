@@ -438,15 +438,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public boolean isPartitioned()
     {
-        try
-        {
-            streamHeaderLatch.await();
-        }
-        catch (InterruptedException e)
-        {
-            logger.error("Interrupted while waiting for stream header", e);
-        }
-        return this.streamHeader.hasPartitioned() && this.streamHeader.getPartitioned();
+        return partitioned;
     }
 
     /**

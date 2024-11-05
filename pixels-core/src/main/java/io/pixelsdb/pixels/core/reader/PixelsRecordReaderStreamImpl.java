@@ -37,6 +37,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * PixelsRecordReaderStreamImpl is the variant of {@link PixelsRecordReaderImpl} for streaming mode.
  * <p>
@@ -153,6 +155,12 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
      */
     public void lateInitialization(PixelsStreamProto.StreamHeader streamHeader) throws IOException
     {
+        if (this.streamHeader != null)
+        {
+            checkArgument(this.streamHeader == streamHeader,
+                    "streamHeader used for lateInitialization() is not the same as the one in the RecordReader.");
+            return;
+        }
         this.streamHeader = streamHeader;
         checkBeforeRead();
     }
