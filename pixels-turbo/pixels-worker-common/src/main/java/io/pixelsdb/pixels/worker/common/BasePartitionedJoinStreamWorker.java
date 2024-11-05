@@ -447,7 +447,9 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 // XXX: perhaps do not need to re-initialize the record reader for each hash value.
                 if (recordReader == null) continue;
-                checkArgument(recordReader.isValid(), "failed to get record reader");
+                // We no longer check the validity of the record reader here, because the record reader
+                //  might not have been initialized yet due to the absence of the stream header.
+                // checkArgument(recordReader.isValid(), "failed to get record reader");
 
                 computeCostTimer.start();
                 do
@@ -522,7 +524,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                         hashValue, numPartition);
                 VectorizedRowBatch rowBatch;
                 PixelsRecordReader recordReader = pixelsReader.read(option);
-                checkArgument(recordReader.isValid(), "failed to get record reader");
+                // checkArgument(recordReader.isValid(), "failed to get record reader");
 
                 computeCostTimer.start();
                 do
@@ -612,7 +614,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 VectorizedRowBatch rowBatch;
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 if (recordReader == null) continue;
-                checkArgument(recordReader.isValid(), "failed to get record reader");
+                // checkArgument(recordReader.isValid(), "failed to get record reader");
 
                 computeCostTimer.start();
                 do
