@@ -243,8 +243,10 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             }
 
             // scan the right table and do the join.
-            if (joiner.getSmallTableSize() > 0)
-            {
+            // We no longer check this condition in streaming mode, because even if the joiner is empty,
+            //  we have to read from the right table to enforce the streaming protocol.
+//            if (joiner.getSmallTableSize() > 0)
+//            {
                 int rightSplitSize = rightPartitioned.size() / rightParallelism;
                 if (rightPartitioned.size() % rightParallelism > 0)
                 {
@@ -290,7 +292,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                 {
                     throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
                 }
-            }
+//            }
 
             String outputPath = outputFolder + outputInfo.getFileNames().get(0);
             try
@@ -326,6 +328,9 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                             {
                                 pixelsWriter.addRowBatch(batch, hash);
                             }
+                        }
+                        else {
+                            pixelsWriter.addRowBatch(null, hash);
                         }
                     }
                 }
