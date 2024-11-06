@@ -179,8 +179,10 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     else if (partitioned)
                     {
                         // In partitioned mode, every packet brings a streamHeader to prevent errors from possibly
-                        // out-of-order packet arrivals, so we need to parse it, but do not need the return value
-                        // (except for the first incoming packet processed above).
+                        //  out-of-order packet arrivals, so we need to parse it, but do not need the return value
+                        //  (except for the first incoming packet processed above).
+                        // XXX: Now we have each worker pass the schema in a separate packet, so this is no longer
+                        //  necessary. We can remove this block of code in PixelsWriterStreamImpl.
                         parseStreamHeader(byteBuf);
                     }
                 }
@@ -516,6 +518,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public void close()
             throws IOException
     {
+        logger.debug("Closing PixelsReaderStreamImpl");
         new Thread(() -> {
             // Conditions for closing:
             // 1. streamHeaderLatch.await() to ensure that the stream header has been received

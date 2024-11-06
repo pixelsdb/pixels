@@ -512,6 +512,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         currHashValue = hashValue;
         hashValueIsSet = true;
         curRowGroupDataLength = 0;
+        if (rowBatch == null) return;
         curRowGroupNumOfRows += rowBatch.size;
         writeColumnVectors(rowBatch.cols, rowBatch.size);
     }
@@ -550,8 +551,9 @@ public class PixelsWriterStreamImpl implements PixelsWriter
     {
         try
         {
-            if (curRowGroupNumOfRows != 0)
+            if (partitioned || curRowGroupNumOfRows != 0)
             {
+                // In partitioned mode, even an empty row group has to be sent to the server.
                 writeRowGroup();
             }
             // If the outgoing stream is empty (addRowBatch() and thus writeRowGroup() never called), we artificially
@@ -609,7 +611,9 @@ public class PixelsWriterStreamImpl implements PixelsWriter
 
     private void writeRowGroup() throws IOException
     {
-        if (isFirstRowGroup || partitioned)
+        // XXX: Now that we have each worker pass the schema in a separate packet in partitioned mode, it is no longer
+        //  necessary to add a stream header to every packet. We can modify this block of code.
+        if (isFirstRowGroup || partitioned)  // if (isFirstRowGroup)
         {
             writeStreamHeader();
             isFirstRowGroup = false;
@@ -769,7 +773,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             uri = URI.create(fileNameToUri(fileName));
         }
         String reqUri = partitioned ? uris.get(currHashValue).toString() : uri.toString();
-        logger.debug("Sending row group with length: " + byteBuf.writerIndex() + " to endpoint: " + reqUri);
+        logger.debug("Sending row group to endpoint: " + reqUri + ", length: " + byteBuf.writerIndex()
+                + ", partitionId: " + partitionId);
         Request req = httpClient.preparePost(reqUri)
                 .setBody(byteBuf.nioBuffer())
                 .addHeader("X-Partition-Id", String.valueOf(partitionId))
