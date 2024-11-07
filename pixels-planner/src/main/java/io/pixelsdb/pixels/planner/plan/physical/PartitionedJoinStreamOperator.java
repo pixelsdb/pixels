@@ -63,6 +63,11 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
             if (!smallPartitionInputs.isEmpty())
             {
                 smallPartitionWorkerNum = smallPartitionInputs.size();
+                for (int i = 0; i < smallPartitionInputs.size(); ++i)
+                {
+                    PartitionInput partitionInput = smallPartitionInputs.get(i);
+                    partitionInput.setPartitionId(i);
+                }
             }
             else if (smallChild != null) {
                 smallPartitionWorkerNum = smallChild.getJoinInputs().size();
@@ -74,6 +79,11 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
             if (!largePartitionInputs.isEmpty())
             {
                 largePartitionWorkerNum = largePartitionInputs.size();
+                for (int i = 0; i < largePartitionInputs.size(); ++i)
+                {
+                    PartitionInput partitionInput = largePartitionInputs.get(i);
+                    partitionInput.setPartitionId(i);
+                }
             }
             else if (largeChild != null) {
                 largePartitionWorkerNum = largeChild.getJoinInputs().size();
@@ -179,7 +189,8 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 logger.debug("invoke large partition of " + this.getName());
             }
 
-            // todo: Finally, wait for the readiness of the partition operators
+            // todo: Finally, wait for the readiness of the partition workers
+            //  (need to modify the partition workers to pull tasks from the worker coordinator server).
 
             return joinOutputs;
         });

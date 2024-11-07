@@ -56,6 +56,10 @@ public class PartitionInput extends Input
      *  when using streaming.
      */
     private boolean isSmallTable;
+    /**
+     * The id of this partition in the current stage.
+     */
+    private int partitionId;
 
     /**
      * Default constructor for Jackson.
@@ -123,5 +127,15 @@ public class PartitionInput extends Input
     public void setSmallTable(boolean isSmallTable)
     {
         this.isSmallTable = isSmallTable;
+    }
+
+    public int getPartitionId()
+    {
+        return partitionId;
+    }
+
+    public void setPartitionId(int partitionId)
+    {
+        this.partitionId = partitionId;
     }
 }
