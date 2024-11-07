@@ -106,4 +106,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject>
     public void setServerCloser(Runnable serverCloser) {
         this.serverCloser = serverCloser;
     }
+
+    public void setServerCloser(Runnable serverCloser) {
+        this.serverCloser = serverCloser;
+    }
 }
