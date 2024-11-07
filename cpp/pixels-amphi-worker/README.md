@@ -1,4 +1,4 @@
-# Pixels-Worker-Amphi
+# Pixels-Amphi-Worker
 
 `pixels-amphi-worker` is the on-premises worker of `pixels-amphi` that aims at submitting queries to 
 `pixels-server` and receiving the coordinator decision. According to the trade-offs in performance and computation costs, 

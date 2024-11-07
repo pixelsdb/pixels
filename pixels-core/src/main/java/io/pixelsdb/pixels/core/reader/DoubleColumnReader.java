@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
 
@@ -145,6 +146,143 @@ public class DoubleColumnReader extends ColumnReader
                     }
                 }
             }
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
+        }
+    }
+
+    /**
+     * Read selected values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
+     * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
+     * @throws IOException
+     */
+    @Override
+    public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
+                             int offset, int size, int pixelStride, final int vectorIndex,
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected)
+    {
+        DoubleColumnVector columnVector = (DoubleColumnVector) vector;
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+        if (offset == 0)
+        {
+            this.inputBuffer = input;
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            inputIndex = inputBuffer.position();
+            // isNull
+            isNullOffset = inputIndex + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
+            // re-init
+            hasNull = true;
+            elementIndex = 0;
+        }
+
+        // read without copying the de-compacted content and isNull
+        int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
+        boolean[] isNull = null;
+        if (!nullsPadding)
+        {
+            isNull = new boolean[size];
+        }
+        for (int i = vectorIndex; numLeft > 0; )
+        {
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+            {
+                // read to the end of the current pixel
+                numToRead = pixelStride - elementIndex % pixelStride;
+            } else
+            {
+                numToRead = numLeft;
+            }
+            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            if (hasNull)
+            {
+                if (nullsPadding)
+                {
+                    // read isNull directly into the vector of the column chunk
+                    BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian, selected, i - vectorIndex);
+                }
+                else
+                {
+                    // need to keep isNull for later use
+                    BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian);
+                    // update columnVector.isNull
+                    int k = vectorWriteIndex;
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.isNull[k++] = isNull[j - vectorIndex];
+                        }
+                    }
+                }
+                isNullOffset += bytesToDeCompact;
+                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                columnVector.noNulls = false;
+            }
+            else
+            {
+                if (!nullsPadding)
+                {
+                    Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
+                }
+                // update columnVector.isNull later to avoid bitmap unnecessary traversal
+            }
+
+            // read content
+            int originalVectorWriteIndex = vectorWriteIndex;
+            if (nullsPadding)
+            {
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (selected.get(j - vectorIndex))
+                    {
+                        columnVector.vector[vectorWriteIndex++] = inputBuffer.getLong(inputIndex);
+                    }
+                    inputIndex += Long.BYTES;
+                }
+            } else
+            {
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (!(hasNull && isNull[j - vectorIndex]))
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.vector[vectorWriteIndex++] = inputBuffer.getLong(inputIndex);
+                        }
+                        inputIndex += Long.BYTES;
+                    }
+                    else if (selected.get(j - vectorIndex))
+                    {
+                        vectorWriteIndex++;
+                    }
+                }
+            }
+
+            // update columnVector.isNull if has no nulls
+            if (!hasNull)
+            {
+                Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
+            }
+
             // update variables
             numLeft -= numToRead;
             elementIndex += numToRead;

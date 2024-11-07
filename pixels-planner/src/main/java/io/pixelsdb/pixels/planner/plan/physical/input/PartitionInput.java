@@ -62,13 +62,13 @@ public class PartitionInput extends Input
      */
     public PartitionInput()
     {
-        super(-1);
+        super(-1, -1);
     }
 
-    public PartitionInput(long transId, ScanTableInfo tableInfo, boolean[] projection,
+    public PartitionInput(long transId, long timestamp, ScanTableInfo tableInfo, boolean[] projection,
                           OutputInfo output, PartitionInfo partitionInfo)
     {
-        super(transId);
+        super(transId, timestamp);
         this.tableInfo = tableInfo;
         this.projection = projection;
         this.output = output;

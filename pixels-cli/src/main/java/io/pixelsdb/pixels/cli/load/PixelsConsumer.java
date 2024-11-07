@@ -90,7 +90,7 @@ public class PixelsConsumer extends Consumer
             short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
             TypeDescription schema = TypeDescription.fromString(schemaStr);
-            VectorizedRowBatch rowBatch = schema.createRowBatch(pixelStride);
+            VectorizedRowBatch rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride);
             ColumnVector[] columnVectors = rowBatch.cols;
 
             BufferedReader reader;
@@ -114,6 +114,8 @@ public class PixelsConsumer extends Consumer
 
                     System.out.println("loading data from: " + originalFilePath);
 
+                    // loaded rows use the same timestamp
+                    long timestamp = parameters.getTimestamp();
                     while ((line = reader.readLine()) != null)
                     {
                         if (initPixelsFile)
@@ -140,6 +142,7 @@ public class PixelsConsumer extends Consumer
 
                             pixelsWriter = PixelsWriterImpl.newBuilder()
                                     .setSchema(schema)
+                                    .setHasHiddenColumn(true)
                                     .setPixelStride(pixelStride)
                                     .setRowGroupSize(rowGroupSize)
                                     .setStorage(targetStorage)
@@ -158,7 +161,7 @@ public class PixelsConsumer extends Consumer
                         rowCounter++;
 
                         String[] colsInLine = line.split(regex);
-                        for (int i = 0; i < columnVectors.length; i++)
+                        for (int i = 0; i < columnVectors.length - 1; i++)
                         {
                             try
                             {
@@ -179,6 +182,8 @@ public class PixelsConsumer extends Consumer
                                 e.printStackTrace();
                             }
                         }
+                        // add hidden timestamp column value
+                        columnVectors[columnVectors.length - 1].add(timestamp);
 
                         if (rowBatch.size >= rowBatch.getMaxSize())
                         {

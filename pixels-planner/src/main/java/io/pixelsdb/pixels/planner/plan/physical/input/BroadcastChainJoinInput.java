@@ -67,13 +67,12 @@ public class BroadcastChainJoinInput extends JoinInput
      */
     public BroadcastChainJoinInput() { }
 
-    public BroadcastChainJoinInput(long transId, List<BroadcastTableInfo> chainTables, List<ChainJoinInfo> chainJoinInfos,
-                                   BroadcastTableInfo largeTable, JoinInfo joinInfo, boolean postChainJoinsPresent,
-                                   List<BroadcastTableInfo> postSmallTables, List<ChainJoinInfo> postChainJoinInfos,
-                                   boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo,
-                                   MultiOutputInfo output)
+    public BroadcastChainJoinInput(long transId, long timestamp, List<BroadcastTableInfo> chainTables,
+                                   List<ChainJoinInfo> chainJoinInfos, BroadcastTableInfo largeTable, JoinInfo joinInfo,
+                                   boolean postChainJoinsPresent, List<BroadcastTableInfo> postSmallTables, List<ChainJoinInfo> postChainJoinInfos,
+                                   boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
     {
-        super(transId, partialAggregationPresent, partialAggregationInfo, output);
+        super(transId, timestamp, partialAggregationPresent, partialAggregationInfo, output);
         this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
         this.largeTable = largeTable;
@@ -164,7 +163,7 @@ public class BroadcastChainJoinInput extends JoinInput
         private Builder(BroadcastChainJoinInput instance)
         {
             this.builderInstance = new BroadcastChainJoinInput(
-                    instance.getTransId(), instance.chainTables, instance.chainJoinInfos, instance.largeTable,
+                    instance.getTransId(), instance.getTimestamp(), instance.chainTables, instance.chainJoinInfos, instance.largeTable,
                     instance.joinInfo, instance.postChainJoinsPresent, instance.postSmallTables, instance.postChainJoinInfos,
                     instance.isPartialAggregationPresent(), instance.getPartialAggregationInfo(), instance.getOutput());
         }

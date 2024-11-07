@@ -149,6 +149,7 @@ public class TestConverter
     {
         return new ScanInput(
                 100,
+                100,
                 genScanTableInfo(),
                 new boolean[]{true, false, true},
                 true,
