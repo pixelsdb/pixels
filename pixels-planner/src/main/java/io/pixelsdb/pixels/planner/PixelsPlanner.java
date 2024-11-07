@@ -1278,7 +1278,9 @@ public class PixelsPlanner
         if (table.getTableType() == Table.TableType.BASE)
         {
             return new PartitionedTableInfo(table.getTableName(), true,
-                    newColumnsToRead, InputStorageInfo, rightPartitionedFiles.build(),
+                    newColumnsToRead,
+                    EnabledExchangeMethod == ExchangeMethod.batch ? InputStorageInfo : IntermediateStorageInfo,
+                    rightPartitionedFiles.build(),
                     IntraWorkerParallelism, newKeyColumnIds);
         } else
         {
@@ -1324,7 +1326,9 @@ public class PixelsPlanner
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setProjection(partitionProjection);
-            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part",
+                    EnabledExchangeMethod == ExchangeMethod.batch ? InputStorageInfo : IntermediateStorageInfo,
+                    true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);
@@ -1391,7 +1395,9 @@ public class PixelsPlanner
 
             String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                     joinedTable.getTableName() + "/";
-            MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
+            MultiOutputInfo output = new MultiOutputInfo(path,
+                    postPartition && EnabledExchangeMethod != ExchangeMethod.batch ? IntermediateStorageInfo : InputStorageInfo,
+                    true, outputFileNames.build());
 
             boolean[] leftProjection = leftPartitionProjection == null ? joinedTable.getJoin().getLeftProjection() :
                     rewriteProjectionForPartitionedJoin(joinedTable.getJoin().getLeftProjection(), leftPartitionProjection);
