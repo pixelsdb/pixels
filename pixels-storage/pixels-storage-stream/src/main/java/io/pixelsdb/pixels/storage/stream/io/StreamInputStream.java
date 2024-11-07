@@ -1,15 +1,12 @@
 package io.pixelsdb.pixels.storage.stream.io;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.pixelsdb.pixels.common.utils.HttpServer;
 import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import sun.rmi.runtime.Log;
 
 import javax.net.ssl.SSLException;
 import java.io.IOException;
@@ -58,6 +55,16 @@ public class StreamInputStream extends InputStream
     private final int bufferCapacity = 1000000000;
 
     /**
+     * The maximum tries to get data.
+     */
+    private final int MAX_TRIES = 10;
+
+    /**
+     * The milliseconds to sleep.
+     */
+    private final int DELAY_MS = 2000;
+
+    /**
      * The http server for receiving input stream.
      */
     private final HttpServer httpServer;
@@ -84,7 +91,6 @@ public class StreamInputStream extends InputStream
             try
             {
                 this.httpServer.serve(this.port);
-                logger.info("http server closed");
             } catch (InterruptedException e)
             {
                 logger.error("http server interrupted", e);
@@ -96,11 +102,22 @@ public class StreamInputStream extends InputStream
     public int read() throws IOException
     {
         assertOpen();
-        if (this.contentQueue.isEmpty())
+        if (!assertData())
         {
             return -1;
         }
-        return this.contentQueue.peek().readableBytes();
+
+        ByteBuf content = this.contentQueue.peek();
+        int b = -1;
+        if (content != null)
+        {
+            b = content.readByte();
+            if (!content.isReadable())
+            {
+                this.contentQueue.poll();
+            }
+        }
+        return b;
     }
 
     @Override
@@ -112,22 +129,56 @@ public class StreamInputStream extends InputStream
     @Override
     public int read(byte[] buf, int off, int len) throws IOException
     {
-        this.assertOpen();
-        if (this.contentQueue.isEmpty())
+        assertOpen();
+        if (!assertData())
         {
             return -1;
         }
 
-        ByteBuf content = this.contentQueue.peek();
-        int offset = content.readerIndex();
-        len = Math.min(len, content.readableBytes());
-        content.readBytes(buf, offset, len);
-        if (!content.isReadable())
+        int readBytes = 0;
+        while (readBytes < len && !this.contentQueue.isEmpty())
         {
-            this.contentQueue.poll();
+            ByteBuf content = this.contentQueue.peek();
+            int offset = content.readerIndex();
+            int readLen = Math.min(len-readBytes, content.readableBytes());
+            content.readBytes(buf, offset, readLen);
+            if (!content.isReadable())
+            {
+                this.contentQueue.poll();
+            }
+            readBytes += readLen;
         }
 
-        return len;
+        return readBytes;
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        if (this.open)
+        {
+            this.open = false;
+            this.httpServerFuture.complete(null);
+            this.httpServer.close();
+        }
+    }
+
+    private boolean assertData() throws IOException
+    {
+        int tries = 0;
+        while (tries < this.MAX_TRIES && this.contentQueue.isEmpty() && !this.httpServerFuture.isDone())
+        {
+            try
+            {
+                tries++;
+                Thread.sleep(this.DELAY_MS);
+            } catch (InterruptedException e)
+            {
+                throw new IOException(e);
+            }
+        }
+
+        return this.contentQueue.isEmpty();
     }
 
     private void assertOpen()
@@ -183,8 +234,8 @@ public class StreamInputStream extends InputStream
             {
                 response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                 response.setStatus(status);
-                ChannelFuture f = ctx.writeAndFlush(response);
-                f.addListener(ChannelFutureListener.CLOSE);
+                ctx.writeAndFlush(response);
+                this.serverCloser.run();
             } else
             {
                 response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
