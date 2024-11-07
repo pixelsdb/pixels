@@ -40,16 +40,20 @@ import java.security.cert.CertificateException;
 public final class HttpServer
 {
     final HttpServerInitializer initializer;
+    private EventLoopGroup bossGroup;
+    private EventLoopGroup workerGroup;
+    private Channel channel;
 
     public HttpServer(HttpServerHandler handler) throws CertificateException, SSLException
     {
         this.initializer = new HttpServerInitializer(HttpServerUtil.buildSslContext(), handler);
+        handler.setServerCloser(this::close);
     }
 
     public void serve(int PORT) throws InterruptedException
     {
-        EventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        bossGroup = new NioEventLoopGroup(1);
+        workerGroup = new NioEventLoopGroup();
         try
         {
             ServerBootstrap b = new ServerBootstrap();
@@ -59,12 +63,27 @@ public final class HttpServer
                     .handler(new LoggingHandler(LogLevel.DEBUG))
                     .childHandler(this.initializer);
 
-            Channel ch = b.bind(PORT).sync().channel();
-
-            ch.closeFuture().sync();
+            channel = b.bind(PORT).sync().channel();
+            channel.closeFuture().sync();
         } finally
         {
             bossGroup.shutdownGracefully();
+            workerGroup.shutdownGracefully();
+        }
+    }
+
+    public void close()
+    {
+        if (channel != null)
+        {
+            channel.close();
+        }
+        if (bossGroup != null)
+        {
+            bossGroup.shutdownGracefully();
+        }
+        if (workerGroup != null)
+        {
             workerGroup.shutdownGracefully();
         }
     }

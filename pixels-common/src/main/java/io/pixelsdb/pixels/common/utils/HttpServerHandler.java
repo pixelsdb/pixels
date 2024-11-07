@@ -43,6 +43,7 @@ import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 @ChannelHandler.Sharable
 public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject>
 {
+    protected Runnable serverCloser;
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx)
@@ -99,5 +100,9 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject>
 
         ChannelFuture f = ctx.writeAndFlush(response);
         f.addListener(ChannelFutureListener.CLOSE);
+    }
+
+    public void setServerCloser(Runnable serverCloser) {
+        this.serverCloser = serverCloser;
     }
 }
