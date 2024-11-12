@@ -127,6 +127,13 @@ public class StreamOutputStream extends OutputStream
     public synchronized void flush()
     {
         assertOpen();
+        try
+        {
+            flushBufferAndRewind();
+        } catch (IOException e)
+        {
+            logger.error(e);
+        }
     }
 
     protected void flushBufferAndRewind() throws IOException
@@ -144,9 +151,8 @@ public class StreamOutputStream extends OutputStream
             StreamHttpClientHandler handler = new StreamHttpClientHandler();
             try
             {
-                httpClient.executeRequest(req, handler)
-                        .toCompletableFuture()
-                        .get();
+                httpClient.executeRequest(req, handler).get();
+                this.bufferPosition = 0;
                 break;
             } catch (Exception e)
             {
@@ -201,9 +207,7 @@ public class StreamOutputStream extends OutputStream
             StreamHttpClientHandler handler = new StreamHttpClientHandler();
             try
             {
-                httpClient.executeRequest(req, handler)
-                        .toCompletableFuture()
-                        .get();
+                httpClient.executeRequest(req, handler).get();
                 break;
             } catch (Exception e)
             {
