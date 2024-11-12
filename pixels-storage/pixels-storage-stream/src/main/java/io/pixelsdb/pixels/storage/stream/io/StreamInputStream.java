@@ -111,7 +111,7 @@ public class StreamInputStream extends InputStream
         int b = -1;
         if (content != null)
         {
-            b = content.readByte();
+            b = content.readUnsignedByte();
             if (!content.isReadable())
             {
                 this.contentQueue.poll();
@@ -126,6 +126,14 @@ public class StreamInputStream extends InputStream
         return read(b, 0, b.length);
     }
 
+    /**
+     * Attempt to read data with a maximum length of len into the position off of buf.
+     * @param buf
+     * @param off
+     * @param len
+     * @return Actual number of bytes read
+     * @throws IOException
+     */
     @Override
     public int read(byte[] buf, int off, int len) throws IOException
     {
@@ -139,11 +147,11 @@ public class StreamInputStream extends InputStream
         while (readBytes < len && !this.contentQueue.isEmpty())
         {
             ByteBuf content = this.contentQueue.peek();
-            int offset = content.readerIndex();
             int readLen = Math.min(len-readBytes, content.readableBytes());
-            content.readBytes(buf, offset, readLen);
+            content.readBytes(buf, readBytes, readLen);
             if (!content.isReadable())
             {
+                content.release();
                 this.contentQueue.poll();
             }
             readBytes += readLen;
@@ -178,7 +186,7 @@ public class StreamInputStream extends InputStream
             }
         }
 
-        return this.contentQueue.isEmpty();
+        return !this.contentQueue.isEmpty();
     }
 
     private void assertOpen()
@@ -218,8 +226,11 @@ public class StreamInputStream extends InputStream
                 return;
             }
             ByteBuf content = req.content();
-            content.retain();
-            this.inputStream.contentQueue.add(content);
+            if (content.isReadable())
+            {
+                content.retain();
+                this.inputStream.contentQueue.add(content);
+            }
             sendResponse(ctx, req, HttpResponseStatus.OK);
         }
 
