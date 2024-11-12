@@ -168,9 +168,9 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             // Bootstrap the readers at once which is up all the time during the worker's lifetime,
             //  to ensure immediate reception of intermediate data and avoid retries on the writer side.
             PixelsReader leftPixelsReader  = StreamWorkerCommon.getReader( leftInputStorageInfo.getScheme(),
-                    "http://localhost:18688/", true, event.getSmallPartitionWorkerNum());
+                    "http://localhost:" + StreamWorkerCommon.STREAM_PORT_SMALL_TABLE, true, event.getSmallPartitionWorkerNum());
             PixelsReader rightPixelsReader = StreamWorkerCommon.getReader(rightInputStorageInfo.getScheme(),
-                    "http://localhost:18686/", true, event.getLargePartitionWorkerNum());
+                    "http://localhost:" + StreamWorkerCommon.STREAM_PORT_LARGE_TABLE, true, event.getLargePartitionWorkerNum());
 
             // `registerWorker()` might awake the dependent workers, so it should be called just before / after
             //  the current worker listens on its HTTP port and is ready to receive streaming packets.
@@ -204,7 +204,9 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     .collect(ImmutableList.toImmutableList());
             List<String> outputEndpoints = downStreamWorkers.stream()
                     .map(CFWorkerInfo::getIp)
-                    .map(ip -> "http://" + ip + ":" + (event.getJoinInfo().getPostPartitionIsSmallTable() ? "18688" : "18686") + "/")
+                    .map(ip -> "http://" + ip + ":" +
+                            (event.getJoinInfo().getPostPartitionIsSmallTable() ?
+                                    StreamWorkerCommon.STREAM_PORT_SMALL_TABLE : StreamWorkerCommon.STREAM_PORT_LARGE_TABLE))
                     // .map(URI::create)
                     .collect(Collectors.toList());
             if (partitionOutput)
@@ -491,7 +493,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         {
             if (pixelsReader != null)
             {
-                logger.debug("closing pixels reader on port 18688");
+                logger.debug("closing pixels reader on port " + StreamWorkerCommon.STREAM_PORT_SMALL_TABLE);
                 pixelsReader.close();
             }
         }
@@ -573,7 +575,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         {
             if (pixelsReader != null)
             {
-                logger.debug("closing pixels reader on port 18686");
+                logger.debug("closing pixels reader on port " + StreamWorkerCommon.STREAM_PORT_LARGE_TABLE);
                 pixelsReader.close();
             }
         }
@@ -666,7 +668,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
         {
             if (pixelsReader != null)
             {
-                logger.debug("closing pixels reader on 18686");
+                logger.debug("closing pixels reader on port " + StreamWorkerCommon.STREAM_PORT_LARGE_TABLE);
                 pixelsReader.close();
             }
         }
