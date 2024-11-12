@@ -208,7 +208,8 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                         pixelsWriter.addRowBatch(batch, hash);
                     }
                 }
-                else {
+                else
+                {
                     pixelsWriter.addRowBatch(null, hash);
                 }
                 hashValues.add(hash);
