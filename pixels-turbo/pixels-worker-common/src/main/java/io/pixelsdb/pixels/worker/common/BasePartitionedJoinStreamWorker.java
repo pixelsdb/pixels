@@ -339,7 +339,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                                 pixelsWriter.addRowBatch(batch, hash);
                             }
                         }
-                        else {
+                        else
+                        {
                             pixelsWriter.addRowBatch(null, hash);
                         }
                     }

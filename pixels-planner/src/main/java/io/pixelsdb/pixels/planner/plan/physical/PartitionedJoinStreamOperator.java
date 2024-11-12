@@ -69,10 +69,12 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                     partitionInput.setPartitionId(i);
                 }
             }
-            else if (smallChild != null) {
+            else if (smallChild != null)
+            {
                 smallPartitionWorkerNum = smallChild.getJoinInputs().size();
             }
-            else {
+            else
+            {
                 throw new IllegalStateException("smallPartitionInputs and smallChild are both null");
             }
             int largePartitionWorkerNum;
@@ -85,10 +87,12 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                     partitionInput.setPartitionId(i);
                 }
             }
-            else if (largeChild != null) {
+            else if (largeChild != null)
+            {
                 largePartitionWorkerNum = largeChild.getJoinInputs().size();
             }
-            else {
+            else
+            {
                 throw new IllegalStateException("largePartitionInputs and largeChild are both null");
             }
             for (int i = 0; i < joinInputs.size(); ++i)
