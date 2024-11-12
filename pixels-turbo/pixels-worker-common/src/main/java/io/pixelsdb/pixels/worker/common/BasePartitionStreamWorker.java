@@ -186,7 +186,8 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                     .collect(ImmutableList.toImmutableList());
             List<String> outputEndpoints = downStreamWorkers.stream()
                     .map(CFWorkerInfo::getIp)
-                    .map(ip -> "http://" + ip + ":" + (event.isSmallTable() ? "18688" : "18686") + "/")
+                    .map(ip -> "http://" + ip + ":" +
+                            (event.isSmallTable() ? StreamWorkerCommon.STREAM_PORT_SMALL_TABLE : StreamWorkerCommon.STREAM_PORT_LARGE_TABLE))
                     // .map(URI::create)
                     .collect(Collectors.toList());
 
