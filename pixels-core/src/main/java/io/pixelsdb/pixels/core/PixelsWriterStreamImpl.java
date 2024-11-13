@@ -791,8 +791,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         try
         {
             outstandingHTTPRequestSemaphore.acquire();
-            int maxAttempts = 30000;
-            long backoffMillis = 10;
+            int maxAttempts = 3000;
+            long backoffMillis = 100;
             int attempt = 0;
             boolean success = false;
 
