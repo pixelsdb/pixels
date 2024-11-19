@@ -36,8 +36,6 @@ void StorageFactory::closeAll() {
     }
 }
 
-
-
 std::shared_ptr<Storage> StorageFactory::getStorage(Storage::Scheme scheme) {
     // TODO: make it synchronized
     if(enabledSchemes.find(scheme) == enabledSchemes.end()) {

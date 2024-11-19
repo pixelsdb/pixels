@@ -1,8 +1,11 @@
 project(pixels-common)
 
+set(CMAKE_CXX_STANDARD 17)
 set(pixels_common_cxx
         lib/physical/storage/LocalFS.cpp
+		lib/physical/Status.cpp
         lib/physical/Storage.cpp
+		lib/physical/FilePath.cpp
         lib/physical/natives/PixelsRandomAccessFile.cpp
         lib/physical/natives/DirectRandomAccessFile.cpp
         lib/physical/natives/ByteBuffer.cpp

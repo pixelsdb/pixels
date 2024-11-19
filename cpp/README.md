@@ -246,3 +246,37 @@ def clean_page_cache():
 
 ### 5. The protobuf version issue
 I use protobuf [v3.21.6](https://github.com/protocolbuffers/protobuf/releases/tag/v3.21.6). The latest protobuf version doesn't work for pixels c++ reader. 
+
+### 6. Install Boost C++ Libraries
+We need the Boost C++ Libraries in pixels-cli, which can be installed with the following command.
+
+```
+sudo apt-get install libboost-all-dev
+```
+
+For every Boost release this information is added by the CMake maintainers and it gets part of the next CMake release. So you have to make sure, that your CMake version was released after the Boost version you try to find.
+
+```
+Boost 1.63 requires CMake 3.7 or newer.
+Boost 1.64 requires CMake 3.8 or newer.
+Boost 1.65 and 1.65.1 require CMake 3.9.3 or newer.
+Boost 1.66 requires CMake 3.11 or newer.
+Boost 1.67 requires CMake 3.12 or newer.
+Boost 1.68, 1.69 require CMake 3.13 or newer.
+Boost 1.70 requires CMake 3.14 or newer.
+Boost 1.71 requires CMake 3.15.3 or newer.
+Boost 1.72 requires CMake 3.16.2 or newer.
+Boost 1.73 requires CMake 3.17.2 or newer.
+Boost 1.74 requires CMake 3.19 or newer.
+Boost 1.75 requires CMake 3.19.5 or newer.
+Boost 1.76 requires CMake 3.20.3 or newer.
+Boost 1.77 requires CMake 3.21.3 or newer.
+Boost 1.78 requires CMake 3.22.2 or newer.
+Boost 1.79 requires CMake 3.23.2 or newer.
+Boost 1.80 requires CMake 3.24.2 or newer.
+Boost 1.81 requires CMake 3.25.2 or newer.
+Boost 1.82 requires CMake 3.27.0 or newer.
+Boost 1.83 requires CMake 3.27.4 or newer.
+Boost 1.84 requires CMake 3.28.2 or newer.
+Boost 1.85 requires CMake 3.29.3 or newer.
+```

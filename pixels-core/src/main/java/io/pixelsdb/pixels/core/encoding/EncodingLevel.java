@@ -90,12 +90,14 @@ public enum EncodingLevel
 
     public boolean equals(int level)
     {
+        checkArgument(isValid(level), "level is invalid");
         return this.level == level;
     }
 
-    public boolean equals(EncodingLevel other)
+    public boolean equals(EncodingLevel encodingLevel)
     {
+        requireNonNull(other, "other is null");
         // enums in Java can be compared using '=='.
-        return this == other;
+        return this == encodingLevel;
     }
 }

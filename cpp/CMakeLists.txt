@@ -20,6 +20,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(pixels-common)
 add_subdirectory(pixels-core)
+add_subdirectory(pixels-cli)
 add_subdirectory(tests)
 
 include_directories(pixels-common/include)
