@@ -50,11 +50,6 @@ public class StreamInputStream extends InputStream
     private final BlockingQueue<ByteBuf> contentQueue;
 
     /**
-     * The capacity of buffer.
-     */
-    private final int bufferCapacity = 1000000000;
-
-    /**
      * The maximum tries to get data.
      */
     private final int MAX_TRIES = 10;
@@ -102,7 +97,7 @@ public class StreamInputStream extends InputStream
     public int read() throws IOException
     {
         assertOpen();
-        if (!assertData())
+        if (emptyData())
         {
             return -1;
         }
@@ -114,6 +109,7 @@ public class StreamInputStream extends InputStream
             b = content.readUnsignedByte();
             if (!content.isReadable())
             {
+                content.release();
                 this.contentQueue.poll();
             }
         }
@@ -138,23 +134,25 @@ public class StreamInputStream extends InputStream
     public int read(byte[] buf, int off, int len) throws IOException
     {
         assertOpen();
-        if (!assertData())
-        {
-            return -1;
-        }
 
+        ByteBuf content;
         int readBytes = 0;
-        while (readBytes < len && !this.contentQueue.isEmpty())
+        while (readBytes < len)
         {
-            ByteBuf content = this.contentQueue.peek();
-            int readLen = Math.min(len-readBytes, content.readableBytes());
-            content.readBytes(buf, readBytes, readLen);
+            if (emptyData())
+            {
+                return readBytes > 0 ? readBytes : -1;
+            }
+            content = this.contentQueue.peek();
+
+            int readLen = Math.min(len - readBytes, content.readableBytes());
+            content.readBytes(buf, off + readBytes, readLen);
+            readBytes += readLen;
             if (!content.isReadable())
             {
                 content.release();
-                this.contentQueue.poll();
+                contentQueue.poll();
             }
-            readBytes += readLen;
         }
 
         return readBytes;
@@ -171,7 +169,7 @@ public class StreamInputStream extends InputStream
         }
     }
 
-    private boolean assertData() throws IOException
+    private boolean emptyData() throws IOException
     {
         int tries = 0;
         while (tries < this.MAX_TRIES && this.contentQueue.isEmpty() && !this.httpServerFuture.isDone())
@@ -186,7 +184,7 @@ public class StreamInputStream extends InputStream
             }
         }
 
-        return !this.contentQueue.isEmpty();
+        return this.contentQueue.isEmpty();
     }
 
     private void assertOpen()

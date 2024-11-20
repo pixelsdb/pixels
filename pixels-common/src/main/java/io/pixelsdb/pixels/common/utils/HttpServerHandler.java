@@ -100,6 +100,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject>
 
         ChannelFuture f = ctx.writeAndFlush(response);
         f.addListener(ChannelFutureListener.CLOSE);
+        ctx.close();
     }
 
     public void setServerCloser(Runnable serverCloser) {
