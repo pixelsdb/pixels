@@ -8,13 +8,13 @@
 
 Status::Status() : path(""), length(0), isDir(false), replication(0) {}
 
-Status::Status(const std::string &path, long long length, bool isDir, int replication)
+Status::Status(const std::string &path, uint64_t length, bool isDir, int replication)
     : path(path), length(length), isDir(isDir), replication(static_cast<short>(replication)) {}
 
 Status::Status(const Status &other)
     : path(other.path), length(other.length), isDir(other.isDir), replication(other.replication) {}
 
-long long Status::getLength() const {
+uint64_t Status::getLength() const {
     return this->length;
 }
 

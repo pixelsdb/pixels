@@ -6,13 +6,14 @@
 #define PIXELS_STATUS_H
 
 #include <string>
+#include <cstdint>
 
 class Status {
 public:
     Status();
-    Status(const std::string &path, long long length, bool isDir, int replication);
+    Status(const std::string &path, uint64_t length, bool isDir, int replication);
     Status(const Status &other);
-    long long getLength() const;
+    uint64_t getLength() const;
     bool isFile() const;
     bool isDirectory() const;
     short getReplication() const;
@@ -24,7 +25,7 @@ public:
 
 private:
     std::string path;
-    long long length;
+    uint64_t length;
     bool isDir;
     short replication;
 };

@@ -58,24 +58,7 @@ public:
 
     virtual std::string ensureSchemePrefix(const std::string &path) const = 0;
 
-//    virtual std::vector<Status> listStatus(const std::string &path);
     virtual std::vector<std::string> listPaths(const std::string &path) = 0;
-
-//    virtual Status getStatus(const std::string &path);
-//
-//    virtual long long getFileId(const std::string &path);
-//
-//    virtual bool mkdirs(const std::string &path);
-//
-//    virtual std::unique_ptr<std::ostream> create(const std::string &path, bool overwrite, int bufferSize);
-//    virtual std::unique_ptr<std::ostream> create(const std::string &path, bool overwrite, int bufferSize, short replication);
-//    virtual std::unique_ptr<std::ostream> create(const std::string &path, bool overwrite, int bufferSize, short replication, long long blockSize);
-//
-//    virtual bool exists(const std::string &path);
-//
-//    virtual bool isFile(const std::string &path);
-//
-//    virtual bool isDirectory(const std::string &path);
 
     virtual void close() = 0;
     // TODO: the remaining function to be implemented

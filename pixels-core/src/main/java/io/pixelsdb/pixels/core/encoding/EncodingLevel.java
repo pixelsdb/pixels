@@ -96,7 +96,7 @@ public enum EncodingLevel
 
     public boolean equals(EncodingLevel encodingLevel)
     {
-        requireNonNull(other, "other is null");
+        requireNonNull(encodingLevel, "other is null");
         // enums in Java can be compared using '=='.
         return this == encodingLevel;
     }

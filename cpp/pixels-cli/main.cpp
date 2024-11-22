@@ -75,7 +75,6 @@ int main () {
                     ("schema,s", bpo::value<std::string>()->required(), "specify the schema of pixels")
                     ("row_num,n", bpo::value<int>()->required(), "specify the max number of rows to write in a file")
                     ("row_regex,r", bpo::value<std::string>()->required(), "specify the split regex of each row in a file")
-                    ("consumer_thread_num,c", bpo::value<int>()->default_value(4), "specify the number of consumer threads used for data generation")
                     ("encoding_level,e", bpo::value<int>()->default_value(2), "specify the encoding level for data loading")
                     ("nulls_padding,p", bpo::value<bool>()->default_value(false), "specify whether nulls padding is enabled");
 
