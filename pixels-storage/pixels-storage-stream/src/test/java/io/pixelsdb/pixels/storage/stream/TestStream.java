@@ -19,15 +19,34 @@
  */
 package io.pixelsdb.pixels.storage.stream;
 
+import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.pixelsdb.pixels.common.physical.*;
+import io.pixelsdb.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.storage.stream.io.StreamInputStream;
+import io.pixelsdb.pixels.storage.stream.io.StreamOutputStream;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 
+import javax.net.ssl.SSLException;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.cert.CertificateException;
+import java.util.Date;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -35,6 +54,8 @@ public class TestStream
 {
     private volatile Exception readerException = null;
     private volatile Exception writerException = null;
+    private final int sendLimit = 8*1024*1024;
+    private final int sendNum = 1600;
 
     @Test
     public void testStorage() throws IOException
@@ -73,18 +94,27 @@ public class TestStream
                     assert(num2 == 815730721);
 
                     ByteBuffer buffer;
-                    for (int len = 1; len < 1000000000; len=len*2)
+
+                    boolean failed = false;
+                    for (int i = 0; i < sendNum; i++)
                     {
-                        buffer = fsReader.readFully(len);
-                        for (int i = 0; i < len; i++)
+                        for (int len = sendLimit; len <= sendLimit; len=len*2)
                         {
-                            byte tmp = buffer.get();
-                            if (tmp != 'a')
+                            buffer = fsReader.readFully(len);
+                            for (int j = 0; j < len; j++)
                             {
-                                System.out.println(len);
-                                throw new IOException("failed: " + len);
+                                byte tmp = buffer.get();
+                                if (tmp != (byte) ('a'+j%10))
+                                {
+                                    System.out.println("failed sendNum " + i + " sendLen " + len + " tmp: " + tmp);
+                                    failed = true;
+                                }
                             }
                         }
+                    }
+                    if (failed)
+                    {
+                        throw new IOException("failed");
                     }
                 }
             } catch (IOException e)
@@ -105,14 +135,18 @@ public class TestStream
                     buffer.putLong(815730721);
                     fsWriter.append(buffer);
                     fsWriter.flush();
-                    for (int len = 1; len < 1000000000; len=len*2)
+                    for (int i = 0; i < sendNum; i++)
                     {
-                        buffer = ByteBuffer.allocate(len);
-                        for (int i = 0; i < len; i++)
+                        for (int len = sendLimit; len <= sendLimit; len=len*2)
                         {
-                            buffer.put((byte) 'a');
+                            buffer = ByteBuffer.allocate(len+1);
+                            for (int j = 0; j < len; j++)
+                            {
+                                buffer.put((byte) ('a'+j%10));
+                            }
+                            fsWriter.append(buffer);
+                            fsWriter.flush();
                         }
-                        fsWriter.append(buffer);
                     }
                 }
             } catch (IOException e)
@@ -133,6 +167,134 @@ public class TestStream
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    public void testStream() throws IOException
+    {
+        Thread inputThread = new Thread(() -> {
+            byte[] buffer = new byte[Constants.STREAM_BUFFER_SIZE];
+            try
+            {
+                try (StreamInputStream inputStream = new StreamInputStream("localhost", 29920))
+                {
+                    for (int i = 0; i < sendNum; i++)
+                    {
+                        inputStream.read(buffer);
+                        for (int j = 0; j < Constants.STREAM_BUFFER_SIZE; j++) {
+                            if (buffer[j] != 'a')
+                            {
+                                System.out.println("failed sendNum " + i + " char " + buffer[j]);
+                                readerException = new IOException();
+                            }
+                        }
+                    }
+                } catch (IOException e)
+                {
+                    throw new RuntimeException(e);
+                }
+            } catch (CertificateException e)
+            {
+                throw new RuntimeException(e);
+            }
+        });
+        Thread outputThread = new Thread(() -> {
+            byte[] buffer = new byte[Constants.STREAM_BUFFER_SIZE];
+            for (int i = 0; i < Constants.STREAM_BUFFER_SIZE; i++)
+            {
+                buffer[i] = 'a';
+            }
+
+            try (StreamOutputStream outputStream = new StreamOutputStream("localhost", 29920, Constants.STREAM_BUFFER_SIZE))
+            {
+                for (int i = 0; i < sendNum; i++)
+                {
+                    outputStream.write(buffer);
+                }
+            } catch (IOException e)
+            {
+                throw new RuntimeException(e);
+            }
+        });
+        inputThread.start();
+        outputThread.start();
+
+        try
+        {
+            inputThread.join();
+            outputThread.join();
+        } catch (InterruptedException e)
+        {
+            throw new RuntimeException(e);
+        }
+        if (readerException != null)
+        {
+            throw new IOException();
+        }
+    }
+
+    @Test
+    public void testDataStream() throws IOException
+    {
+        Storage stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+        Thread inputThread = new Thread(() -> {
+            byte[] buffer = new byte[Constants.STREAM_BUFFER_SIZE];
+            try (DataInputStream inputStream = stream.open("stream:///localhost:29920"))
+            {
+                for (int i = 0; i < sendNum; i++)
+                {
+                    inputStream.read(buffer);
+                    for (int j = 0; j < Constants.STREAM_BUFFER_SIZE; j++) {
+                        if (buffer[j] != 'a')
+                        {
+                            System.out.println("failed sendNum " + i + " sendLen " + buffer[j] + " tmp " + buffer[j]);
+                            readerException = new IOException();
+                        }
+                    }
+                }
+            } catch (IOException e)
+            {
+                throw new RuntimeException(e);
+            }
+        });
+        Thread outputThread = new Thread(() -> {
+            byte[] buffer = new byte[Constants.STREAM_BUFFER_SIZE];
+            for (int i = 0; i < Constants.STREAM_BUFFER_SIZE; i++)
+            {
+                buffer[i] = 'a';
+            }
+
+            try (DataOutputStream outputStream = stream.create("stream:///localhost:29920", false, Constants.STREAM_BUFFER_SIZE))
+            {
+                for (int i = 0; i < sendNum; i++)
+                {
+                    outputStream.write(buffer);
+                }
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            } catch (IOException e)
+            {
+                throw new RuntimeException(e);
+            }
+        });
+        inputThread.start();
+        outputThread.start();
+
+        try
+        {
+            inputThread.join();
+            outputThread.join();
+        } catch (InterruptedException e)
+        {
+            throw new RuntimeException(e);
+        }
+        if (readerException != null)
+        {
+            throw new IOException();
         }
     }
 }
