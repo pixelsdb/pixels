@@ -44,6 +44,11 @@ public abstract class Input
     private int stageId;
 
     private String operatorName;
+    /*
+    * The requirement for resources
+    * */
+    private int requiredCpu; // Every 1024 represents a vCPU
+    private int requiredMemory; // in MB
 
     public Input(long transId, long timestamp)
     {
@@ -52,6 +57,8 @@ public abstract class Input
         // Issue #468: operatorName is optional, it is to be set by the setter.
         this.operatorName = null;
         this.stageId = -1;
+        this.requiredCpu = 0;
+        this.requiredMemory = 0;
     }
 
     public long getTransId()
@@ -96,5 +103,25 @@ public abstract class Input
     public void setOperatorName(String operatorName)
     {
         this.operatorName = requireNonNull(operatorName, "operatorName is null");
+    }
+
+    public int getRequiredCpu()
+    {
+        return requiredCpu;
+    }
+
+    public void setRequiredCpu(int requiredCpu)
+    {
+        this.requiredCpu = requiredCpu;
+    }
+
+    public int getRequiredMemory()
+    {
+        return requiredMemory;
+    }
+
+    public void setRequiredMemory(int requiredMemory)
+    {
+        this.requiredMemory = requiredMemory;
     }
 }
