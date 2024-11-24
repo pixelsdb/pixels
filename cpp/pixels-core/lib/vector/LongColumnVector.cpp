@@ -3,9 +3,10 @@
 //
 
 #include "vector/LongColumnVector.h"
+#include <algorithm>
 
 LongColumnVector::LongColumnVector(uint64_t len, bool encoding, bool isLong): ColumnVector(len, encoding) {
-	if(encoding) {
+    if(encoding) {
 		if(isLong) {
             posix_memalign(reinterpret_cast<void **>(&longVector), 32,
                            len * sizeof(int64_t));
@@ -67,3 +68,50 @@ void * LongColumnVector::current() {
         }
     }
 }
+
+void LongColumnVector::add(std::string &value) {
+    std::transform(value.begin(), value.end(), value.begin(), ::tolower);
+    if (value == "true") {
+        add(1);
+    } else if (value == "false") {
+        add(0);
+    } else {
+        add(std::stol(value));
+    }
+}
+
+void LongColumnVector::add(bool value) {
+    add(value ? 1 : 0);
+}
+
+void LongColumnVector::add(int64_t value) {
+    if (writeIndex >= length) {
+        ensureSize(writeIndex * 2, true);
+    }
+    if (encoding) {
+        int index = writeIndex++;
+        if(isLong) {
+            longVector[index] = value;
+        } else {
+            intVector[index] = value;
+        }
+        isNull[index] = false;
+    }
+}
+
+void LongColumnVector::add(int value) {
+    if (writeIndex >= length) {
+        ensureSize(writeIndex * 2, true);
+    }
+    if (encoding) {
+        int index = writeIndex++;
+        if(isLong) {
+            longVector[index] = value;
+        } else {
+            intVector[index] = value;
+        }
+        isNull[index] = false;
+    }
+}
+
+

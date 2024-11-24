@@ -452,7 +452,6 @@ TypeDescription::Category TypeDescription::parseCategory(TypeDescription::String
         for (const auto &entry : categoryMap) {
             for (const auto &name : entry.second.names) {
                 if (word == name) {
-                    std::cout << "Category: " << entry.first << std::endl;
                     return entry.first;
                 }
             }

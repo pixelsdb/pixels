@@ -11,7 +11,8 @@ ColumnVector::ColumnVector(uint64_t len, bool encoding) {
 	this->encoding = encoding;
     memoryUsage = len + sizeof(int) * 3 + 4;
 	closed = false;
-    isNull = nullptr;
+    isNull = new uint8_t[length]();
+    noNulls = true;
     posix_memalign(reinterpret_cast<void **>(&isValid), 64, ceil(1.0 * len / 64) * sizeof(uint64_t));
 }
 
@@ -68,7 +69,41 @@ uint64_t * ColumnVector::currentValid() {
     return isValid + readIndex / 64;
 }
 
+void ColumnVector::addNull() {
+    if (writeIndex >= length) {
+        ensureSize(writeIndex * 2, true);
+    }
+    this->isNull[writeIndex++] = true;
+    this->noNulls = false;
+}
 
+void ColumnVector::ensureSize(uint64_t size, bool preserveData) {
+    if (this->length < size) {
+        uint8_t *oldArray = this->isNull;
+        this->isNull = new uint8_t[size]();
+        if (preserveData && !this->noNulls) {
+            std::copy(oldArray, oldArray + this->length, this->isNull);
+        }
+        delete[] oldArray;
+        resize(size);
+    }
+}
+
+void ColumnVector::add(std::string &value) {
+    throw new std::runtime_error("Adding string is not supported");
+}
+
+void ColumnVector::add(bool value) {
+    throw new std::runtime_error("Adding boolean is not supported");
+}
+
+void ColumnVector::add(int64_t value) {
+    throw new std::runtime_error("Adding long is not supported");
+}
+
+void ColumnVector::add(int value) {
+    throw new std::runtime_error("Adding int is not supported");
+}
 
 
 
