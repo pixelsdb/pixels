@@ -1,0 +1,10 @@
+io.pixelsdb.pixels.invoker.spike.AggregationInvokerProvider
+io.pixelsdb.pixels.invoker.spike.BroadcastChainJoinInvokerProvider
+io.pixelsdb.pixels.invoker.spike.BroadcastJoinInvokerProvider
+io.pixelsdb.pixels.invoker.spike.PartitionedChainJoinInvokerProvider
+io.pixelsdb.pixels.invoker.spike.PartitionedJoinInvokerProvider
+io.pixelsdb.pixels.invoker.spike.PartitionedJoinStreamInvokerProvider
+io.pixelsdb.pixels.invoker.spike.PartitionInvokerProvider
+io.pixelsdb.pixels.invoker.spike.PartitionStreamInvokerProvider
+io.pixelsdb.pixels.invoker.spike.ScanInvokerProvider
+io.pixelsdb.pixels.invoker.spike.ScanStreamInvokerProvider

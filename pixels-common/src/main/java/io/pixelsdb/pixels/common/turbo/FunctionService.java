@@ -30,6 +30,7 @@ public enum FunctionService
 {
     lambda,  // AWS Lambda
     vhive,   // vhive
+    spike,    // Spike
     ;
 
     /**
