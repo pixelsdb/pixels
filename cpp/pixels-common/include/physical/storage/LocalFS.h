@@ -26,7 +26,8 @@ public:
     Scheme getScheme() override;
     std::string ensureSchemePrefix(const std::string &path) const override;
 	std::shared_ptr<PixelsRandomAccessFile> openRaf(const std::string& path);
-    std::vector<std::string> listPaths(const std::string &path);
+    std::vector<std::string> listPaths(const std::string &path) override;
+    std::ifstream open(const std::string &path) override;
     void close() override;
 private:
     // TODO: read the configuration from pixels.properties for the following to values.

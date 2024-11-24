@@ -12,6 +12,8 @@
 #include <cctype>
 #include <vector>
 #include <memory>
+#include <fstream>
+#include <filesystem>
 #include <physical/Status.h>
 
 
@@ -59,6 +61,8 @@ public:
     virtual std::string ensureSchemePrefix(const std::string &path) const = 0;
 
     virtual std::vector<std::string> listPaths(const std::string &path) = 0;
+
+    virtual std::ifstream open(const std::string &path) = 0;
 
     virtual void close() = 0;
     // TODO: the remaining function to be implemented
