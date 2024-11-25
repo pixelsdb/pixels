@@ -13,7 +13,7 @@ std::int64_t PhysicalWriterOption::getBlockSize() const {
 
 std::shared_ptr<PhysicalWriterOption> PhysicalWriterOption::setBlockSize(std::int64_t blockSize) {
     this->blockSize = blockSize;
-    return std::shared_ptr<PhysicalWriterOption>(this);
+    return shared_from_this();
 }
 
 bool PhysicalWriterOption::isAddBlockPadding() const {
@@ -22,7 +22,7 @@ bool PhysicalWriterOption::isAddBlockPadding() const {
 
 std::shared_ptr<PhysicalWriterOption> PhysicalWriterOption::setAddBlockPadding(bool addBlockPadding) {
     this->addBlockPadding = addBlockPadding;
-    return std::shared_ptr<PhysicalWriterOption>(this);
+    return shared_from_this();
 }
 
 bool PhysicalWriterOption::isOverwrite() const {
@@ -31,5 +31,5 @@ bool PhysicalWriterOption::isOverwrite() const {
 
 std::shared_ptr<PhysicalWriterOption> PhysicalWriterOption::setOverwrite(bool overwrite) {
     this->overwrite = overwrite;
-    return std::shared_ptr<PhysicalWriterOption>(this);
+    return shared_from_this();
 }

@@ -9,6 +9,7 @@
 #include "vector/ColumnVector.h"
 #include "vector/VectorizedRowBatch.h"
 #include "physical/storage/LocalFS.h"
+#include "PixelsWriterImpl.h"
 #include <boost/regex.hpp>
 #include <iostream>
 #include <fstream>
@@ -51,6 +52,7 @@ void PixelsConsumer::run() {
     bool initPixelsFile = true;
     std::string targetFileName = "";
     std::string targetFilePath;
+    std::shared_ptr<PixelsWriter> pixelsWriter(nullptr);
     int rowCounter = 0;
 
     int count = 0;
@@ -74,6 +76,8 @@ void PixelsConsumer::run() {
                     LocalFS targetStorage;
                     targetFileName = std::to_string(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())) + ".pxl";
                     targetFilePath = targetPath + targetFileName;
+                    pixelsWriter = std::make_shared<PixelsWriterImpl>(schema, pixelsStride, rowGroupSize, targetFilePath, blockSize,
+                                                                      true, encodingLevel, nullPadding, 1);
                 }
                 initPixelsFile = false;
 
@@ -87,23 +91,21 @@ void PixelsConsumer::run() {
                 }
                 for(int i = 0; i < columnVectors.size(); ++i) {
                     if (i > colsInLine.size() || colsInLine[i].empty() || colsInLine[i] == "\\N") {
-                        std::cout << "adding null to column: " << i << std::endl;
                         columnVectors[i]->addNull();
                     } else {
-                        std::cout << "adding value " << colsInLine[i] << " to column: " << i << std::endl;
                         columnVectors[i]->add(colsInLine[i]);
                     }
                 }
 
                 if (rowBatch->rowCount >= rowBatch->getMaxSize()) {
                     std::cout << "writing row group to file: " << targetFilePath << std::endl;
-                    // pixelsWriter->addRowBatch(rowBatch);
+                    pixelsWriter->addRowBatch(rowBatch);
                     rowBatch->reset();
                 }
 
                 if (rowCounter >= maxRowNum) {
                     if (rowBatch->rowCount != 0) {
-                        // pixelsWriter->addRowBatch(rowBatch);
+                        pixelsWriter->addRowBatch(rowBatch);
                         rowBatch->reset();
                     }
                     this->loadedFiles.push_back(targetFilePath);
@@ -115,7 +117,7 @@ void PixelsConsumer::run() {
     }
     if (rowCounter > 0) {
         if (rowBatch->rowCount != 0) {
-            // pixelsWriter->addRowBatch(rowBatch);
+            pixelsWriter->addRowBatch(rowBatch);
             rowBatch->reset();
         }
         this->loadedFiles.push_back(targetFilePath);

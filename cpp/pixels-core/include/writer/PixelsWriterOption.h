@@ -8,7 +8,7 @@
 #include "encoding/EncodingLevel.h"
 #include <memory>
 
-class PixelsWriterOption {
+class PixelsWriterOption : public std::enable_shared_from_this<PixelsWriterOption> {
 public:
     PixelsWriterOption();
     int getPixelsStride() const;

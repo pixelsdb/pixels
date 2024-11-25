@@ -8,7 +8,7 @@
 #include <memory>
 #include <cstdint>
 
-class PhysicalWriterOption {
+class PhysicalWriterOption : public std::enable_shared_from_this<PhysicalWriterOption> {
 public:
     PhysicalWriterOption(std::int64_t blockSize, bool addBlockPadding, bool overwrite);
     std::int64_t getBlockSize() const;

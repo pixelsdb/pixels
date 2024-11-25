@@ -3,6 +3,7 @@
 //
 
 #include "writer/PixelsWriterOption.h"
+#include <iostream>
 
 PixelsWriterOption::PixelsWriterOption() {}
 
@@ -12,7 +13,7 @@ int PixelsWriterOption::getPixelsStride() const {
 
 std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setPixelsStride(int pixelsStride) {
     this->pixelsStride = pixelsStride;
-    return std::shared_ptr<PixelsWriterOption>(this);
+    return shared_from_this();
 }
 
 EncodingLevel PixelsWriterOption::getEncodingLevel() {
@@ -21,7 +22,7 @@ EncodingLevel PixelsWriterOption::getEncodingLevel() {
 
 std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setEncodingLevel(EncodingLevel encodingLevel) {
     this->encodingLevel = encodingLevel;
-    return std::shared_ptr<PixelsWriterOption>(this);
+    return shared_from_this();
 }
 
 bool PixelsWriterOption::isNullsPadding() {
@@ -30,5 +31,5 @@ bool PixelsWriterOption::isNullsPadding() {
 
 std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setNullsPadding(bool nullsPadding) {
     this->nullsPadding = nullsPadding;
-    return std::shared_ptr<PixelsWriterOption>(this);
+    return shared_from_this();
 }
