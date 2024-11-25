@@ -1,0 +1,58 @@
+//
+// Created by gengdy on 24-11-25.
+//
+
+#ifndef PIXELS_PIXELSWRITERIMPL_H
+#define PIXELS_PIXELSWRITERIMPL_H
+
+#include "PixelsWriter.h"
+#include "physical/PhysicalWriter.h"
+#include "writer/PixelsWriterOption.h"
+#include "writer/ColumnWriter.h"
+#include "utils/ConfigFactory.h"
+#include "stats/StatsRecorder.h"
+#include "pixels-common/pixels.pb.h"
+#include "vector/VectorizedRowBatch.h"
+#include <unicode/timezone.h>
+#include <unicode/unistr.h>
+#include <unicode/locid.h>
+
+class PixelsWriterImpl : public PixelsWriter {
+public:
+    PixelsWriterImpl(std::shared_ptr<TypeDescription> schema, int pixelsStride, int rowGroupSize,
+                     const std::string &targetFilePath, int blockSize, bool blockPadding,
+                     EncodingLevel encodingLevel, bool nullsPadding, int compressionBlockSize);
+    bool addRowBatch(std::shared_ptr<VectorizedRowBatch> rowBatch) override;
+private:
+    /**
+     * The number of bytes that the start offset of each column chunk is aligned to.
+     */
+    static const int CHUNK_ALIGNMENT;
+    /**
+     * The byte buffer padded to each column chunk for alignment.
+     */
+    static const std::vector<uint8_t> CHUNK_PADDING_BUFFER;
+
+    std::shared_ptr<TypeDescription> schema;
+    int rowGroupSize;
+    pixels::proto::CompressionKind compressionKind;
+    int compressionBlockSize;
+    std::unique_ptr<icu::TimeZone> timeZone;
+    std::shared_ptr<PixelsWriterOption> columnWriterOption;
+    std::vector<std::shared_ptr<ColumnWriter>> columnWriters;
+    std::vector<StatsRecorder> fileColStatRecorders;
+    std::int64_t fileContentLength;
+    int fileRowNum;
+    std::int64_t writtenBytes = 0;
+    std::int64_t curRowGroupOffset = 0;
+    std::int64_t curRowGroupFooterOffset = 0;
+    std::int64_t curRowGroupNumOfRows = 0;
+    int curRowGroupDataLength = 0;
+    bool haseValueIsSet = false;
+    int currHashValue = 0;
+    std::vector<pixels::proto::RowGroupInformation> rowGroupInfoList;
+    std::vector<pixels::proto::RowGroupStatistic> rowGroupStatisticList;
+    std::shared_ptr<PhysicalWriter> physicalWriter;
+    std::vector<std::shared_ptr<TypeDescription>> children;
+};
+#endif //PIXELS_PIXELSWRITERIMPL_H

@@ -6,20 +6,15 @@
 #include <algorithm>
 
 LongColumnVector::LongColumnVector(uint64_t len, bool encoding, bool isLong): ColumnVector(len, encoding) {
-    if(encoding) {
-		if(isLong) {
-            posix_memalign(reinterpret_cast<void **>(&longVector), 32,
-                           len * sizeof(int64_t));
-			intVector = nullptr;
-		} else {
-			longVector = nullptr;
-            posix_memalign(reinterpret_cast<void **>(&intVector), 32,
-                           len * sizeof(int32_t));
-		}
-	} else {
-		longVector = nullptr;
-		intVector = nullptr;
-	}
+    if(isLong) {
+        posix_memalign(reinterpret_cast<void **>(&longVector), 32,
+                       len * sizeof(int64_t));
+        intVector = nullptr;
+    } else {
+        longVector = nullptr;
+        posix_memalign(reinterpret_cast<void **>(&intVector), 32,
+                       len * sizeof(int32_t));
+    }
 
     this->isLong = isLong;
     memoryUsage += (long) sizeof(long) * len;
@@ -88,30 +83,51 @@ void LongColumnVector::add(int64_t value) {
     if (writeIndex >= length) {
         ensureSize(writeIndex * 2, true);
     }
-    if (encoding) {
-        int index = writeIndex++;
-        if(isLong) {
-            longVector[index] = value;
-        } else {
-            intVector[index] = value;
-        }
-        isNull[index] = false;
+    int index = writeIndex++;
+    if(isLong) {
+        longVector[index] = value;
+    } else {
+        intVector[index] = value;
     }
+    isNull[index] = false;
 }
 
 void LongColumnVector::add(int value) {
     if (writeIndex >= length) {
         ensureSize(writeIndex * 2, true);
     }
-    if (encoding) {
-        int index = writeIndex++;
-        if(isLong) {
-            longVector[index] = value;
-        } else {
-            intVector[index] = value;
-        }
-        isNull[index] = false;
+    int index = writeIndex++;
+    if(isLong) {
+        longVector[index] = value;
+    } else {
+        intVector[index] = value;
     }
+    isNull[index] = false;
 }
 
-
+void LongColumnVector::ensureSize(uint64_t size, bool preserveData) {
+    ColumnVector::ensureSize(size, preserveData);
+    if (length < size) {
+        if (isLong) {
+            long *oldVector = longVector;
+            posix_memalign(reinterpret_cast<void **>(&longVector), 32,
+                           size * sizeof(int64_t));
+            if (preserveData) {
+                std::copy(oldVector, oldVector + length, longVector);
+            }
+            delete[] oldVector;
+            memoryUsage += (long) sizeof(long) * (size - length);
+            resize(size);
+        } else {
+            int *oldVector = intVector;
+            posix_memalign(reinterpret_cast<void **>(&intVector), 32,
+                           size * sizeof(int32_t));
+            if (preserveData) {
+                std::copy(oldVector, oldVector + length, intVector);
+            }
+            delete[] oldVector;
+            memoryUsage += (long) sizeof(int) * (size - length);
+            resize(size);
+        }
+    }
+}

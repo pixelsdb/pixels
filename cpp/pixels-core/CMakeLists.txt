@@ -45,7 +45,11 @@ set(pixels_core_cxx
         include/vector/TimestampColumnVector.h
         lib/vector/TimestampColumnVector.cpp
         include/reader/TimestampColumnReader.h
-        lib/reader/TimestampColumnReader.cpp)
+        lib/reader/TimestampColumnReader.cpp
+        lib/writer/ColumnWriter.cpp
+        lib/writer/PixelsWriterOption.cpp
+        lib/PixelsWriterImpl.cpp
+        lib/stats/StatsRecorder.cpp)
 
 add_library(pixels-core ${pixels_core_cxx})
 

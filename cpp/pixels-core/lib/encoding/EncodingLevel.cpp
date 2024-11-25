@@ -5,6 +5,8 @@
 #include <encoding/EncodingLevel.h>
 #include <stdexcept>
 
+EncodingLevel::EncodingLevel() {}
+
 EncodingLevel::EncodingLevel(Level level) {
     this->level = level;
 }

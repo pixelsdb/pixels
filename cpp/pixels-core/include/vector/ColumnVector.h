@@ -72,7 +72,7 @@ public:
     virtual void print(int rowCount);      // this is only used for debug
     bool checkValid(int index);
     void addNull();
-    void ensureSize(uint64_t size, bool preserveData);
+    virtual void ensureSize(uint64_t size, bool preserveData);
     virtual void add(std::string &value);
     virtual void add(bool value);
     virtual void add(int64_t value);

@@ -3,6 +3,9 @@ project(pixels-common)
 set(CMAKE_CXX_STANDARD 17)
 set(pixels_common_cxx
         lib/physical/storage/LocalFS.cpp
+		lib/physical/storage/LocalFSProvider.cpp
+		lib/physical/storage/PhysicalLocalWriter.cpp
+		lib/physical/PhysicalWriterOption.cpp
 		lib/physical/Status.cpp
         lib/physical/Storage.cpp
 		lib/physical/FilePath.cpp

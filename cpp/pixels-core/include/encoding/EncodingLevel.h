@@ -15,6 +15,7 @@ public:
         EL2 = 2
     };
 
+    EncodingLevel();
     explicit EncodingLevel(Level level);
     explicit EncodingLevel(int level);
     explicit EncodingLevel(const std::string &level);
