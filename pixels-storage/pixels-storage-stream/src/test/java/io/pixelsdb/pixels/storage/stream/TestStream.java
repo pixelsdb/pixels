@@ -81,7 +81,7 @@ public class TestStream
         Thread readerThread = new Thread(() -> {
             try
             {
-                try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(stream, "stream:///localhost:29920"))
+                try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(stream, "stream://localhost:29920"))
                 {
                     int num1 = fsReader.readInt(ByteOrder.BIG_ENDIAN);
                     assert(num1 == 13);
@@ -126,7 +126,7 @@ public class TestStream
         Thread writerThread = new Thread(() -> {
             try
             {
-                try (PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalWriter(stream, "stream:///localhost:29920", null))
+                try (PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalWriter(stream, "stream://localhost:29920", null))
                 {
                     ByteBuffer buffer = ByteBuffer.allocate(24);
                     buffer.putInt(13);
@@ -240,7 +240,7 @@ public class TestStream
         Storage stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
         Thread inputThread = new Thread(() -> {
             byte[] buffer = new byte[Constants.STREAM_BUFFER_SIZE];
-            try (DataInputStream inputStream = stream.open("stream:///localhost:29920"))
+            try (DataInputStream inputStream = stream.open("stream://localhost:29920"))
             {
                 for (int i = 0; i < sendNum; i++)
                 {
@@ -265,7 +265,7 @@ public class TestStream
                 buffer[i] = 'a';
             }
 
-            try (DataOutputStream outputStream = stream.create("stream:///localhost:29920", false, Constants.STREAM_BUFFER_SIZE))
+            try (DataOutputStream outputStream = stream.create("stream://localhost:29920", false, Constants.STREAM_BUFFER_SIZE))
             {
                 for (int i = 0; i < sendNum; i++)
                 {
