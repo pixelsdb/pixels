@@ -132,7 +132,7 @@ unique_ptr<FunctionData> PixelsScanFunction::PixelsScanBind(
 	}
     auto multi_file_reader= MultiFileReader::CreateDefault("PixelsScan");
 
-    auto file_list=multi_file_reader->CreateFileList(context,input.inputs[0]);
+    auto file_list=multi_file_reader->CreateFileList(context,input.inputs[0],duckdb::FileGlobOptions::ALLOW_EMPTY);
 
     auto files=file_list->GetPaths();
     // parse *
