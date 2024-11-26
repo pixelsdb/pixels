@@ -23,6 +23,9 @@ public:
                      const std::string &targetFilePath, int blockSize, bool blockPadding,
                      EncodingLevel encodingLevel, bool nullsPadding, int compressionBlockSize);
     bool addRowBatch(std::shared_ptr<VectorizedRowBatch> rowBatch) override;
+    void writeColumnVectors(std::vector<std::shared_ptr<ColumnVector>> &columnVectors, int rowBatchSize);
+    void writeRowGroup();
+    void writeFileTail();
 private:
     /**
      * The number of bytes that the start offset of each column chunk is aligned to.
