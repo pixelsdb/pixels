@@ -25,9 +25,9 @@ Install a JDK compatible with both Pixels and the query engine in the EC2 instan
 
 In ubuntu 22.04, JDK 21 or below can be installed using `apt`:
 ```bash
-sudo apt install openjdk-17-jdk openjdk-17-jre
+sudo apt install openjdk-21-jdk openjdk-21-jre
 ```
-Replace `17` with another valid JDK version if needed.
+Replace `21` with another valid JDK version if needed.
 A higher version JDK can be installed using a downloaded `deb` package 
 ([Zulu JDK](https://www.azul.com/downloads/?package=jdk#zulu) is recommended):
 ```bash
