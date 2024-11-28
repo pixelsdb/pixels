@@ -14,31 +14,41 @@ To use the following optional components, follow the instructions in the corresp
 * [Pixels Turbo](../pixels-turbo/README.md): The hybrid query engine that invokes serverless resources to help process unpredictable workload spikes.
 * [Pixels Amphi](../pixels-amphi/README.md): The adaptive query scheduler that enables cost-efficient query processing in both on-perm and in-cloud environments.
 
-In AWS EC2, create an Ubuntu-20.04 or 22.04 instance with x86 arch and at least 4GB memory and 20GB root volume. 
+In AWS EC2, create an Ubuntu 22.04 instance with x86 arch and at least 4GB memory and 20GB root volume. 
 8GB or larger memory is recommended for performance evaluations on datasets larger than 10GB. 
 Login the instance as `ubuntu` user, and install the following components.
 
 > Installation steps marked with `*` are optional.
 
 ## Install JDK
-Install JDK 17.0 in the EC2 instance:
+Install a JDK compatible with both Pixels and the query engine in the EC2 instance:
+
+In ubuntu 22.04, JDK 21 or below can be installed using `apt`:
 ```bash
 sudo apt install openjdk-17-jdk openjdk-17-jre
 ```
+Replace `17` with another valid JDK version if needed.
+A higher version JDK can be installed using a downloaded `deb` package 
+([Zulu JDK](https://www.azul.com/downloads/?package=jdk#zulu) is recommended):
+```bash
+sudo dpkg -i zulu23.30.13-ca-jdk23.0.1-linux_amd64.deb
+```
+
 Check the java version:
 ```bash
 java -version
 ```
-If the other version of JDK is in use, switch to JDK 17:
+If the other version of JDK is in use, switch to the required JDK:
 ```bash
 update-java-alternatives --list
-sudo update-java-alternatives --set /path/to/jdk-17.0
+sudo update-java-alternatives --set /path/to/the/jdk
 ```
-Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
+In this document, we are installing Pixels with Trino 465. The required JDK version is 23.0.1+.
 
 ## Install Maven
 
-Pixels requires maven 3.8 or later to build the source code (some early maven versions may work, but we haven't test them yet). On some operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
+Pixels requires maven 3.8 or later to build the source code (some early maven versions may work, 
+but we haven't test them yet). On some operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17+. 
 In this case, manually install a newer maven compatible with your JDK.
 
 ## Setup AWS Credentials*

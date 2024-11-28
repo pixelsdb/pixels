@@ -6,7 +6,7 @@ It is optimized for analytical tables stored in on-premises and cloud-native sto
 including S3, GCS, HDFS, Redis, and local file systems.
 Pixels outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to two orders of magnitude.
 
-We have integrated Pixels with popular query engines including DuckDB, Trino (405), Presto (0.279), and Hive (2.3+).
+We have integrated Pixels with popular query engines including DuckDB (1.1.0), Trino (405 and 465), Presto (0.279), and Hive (2.3+).
 
 The DuckDB integration and the C++ implementation of Pixels Reader are in the [cpp](cpp) folder.
 The other integrations are opensourced in separate repositories:
@@ -31,13 +31,12 @@ will result in different monetary costs on resources.
 Pixels is mainly implemented in Java (with some JNI hooks of system calls and C/C++ libs), while there is a C++ implementation of the Pixels Reader.
 The [C++ document](cpp/README.md) gives the instructions of using the C++ reader. Here we explain how to build and use the Java components.
 
-Install JDK 17.0.3 or above, and clone the Pixels codebase into any `SRC_BASE` directory:
+JDK 8 (or above) and Maven 3.8 (or above) are required to build Pixels.
+After installing these requirements, clone the Pixels codebase into any `SRC_BASE` directory:
 ```bash
 git clone https://github.com/pixelsdb/pixels.git
 ```
 Enter `SRC_BASE/pixels`, use `mvn install` to build and install it to the local Maven repository.
-> JDK 17.0.3+ is required by Trino. To run Pixels in Presto or other query engines, please build Pixels and the corresponding connector
-> using the Java version required by the query engine. Pixels by itself is compatible with Java 8 or above.
 
 It may take a couple of minutes to complete. After that, find jar files:
 * `pixels-daemon-*-full.jar` in `pixels-daemon/target`,this is the jar to run Pixels daemons.
@@ -49,6 +48,9 @@ Pixels is compatible with different query engines, such as Trino, Presto, and Hi
 The query engine integrations can be easily built using maven.
 For example, to build the Trino integration for Pixels, just git clone [pixels-trino](https://github.com/pixelsdb/pixels-trino), 
 and build it using `mvn package` in the local git repository.
+
+> Pixels by itself is compatible with Java 8 or above. However, third-party query engines such as Trino may require a later JDK (e.g., Trino 405/465 requires JDK17.0.3+/23.0.1+).
+> It is fine build Pixels and the query engine connector (e.g., pixels-trino) with the same or different versions of JDK.
 
 After building `pixels-trino`, find the following zip files in the build target directories:
 * `pixels-trino-listener-*.zip`, this is the event listener plugin for Trino.
