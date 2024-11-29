@@ -14,31 +14,41 @@ To use the following optional components, follow the instructions in the corresp
 * [Pixels Turbo](../pixels-turbo/README.md): The hybrid query engine that invokes serverless resources to help process unpredictable workload spikes.
 * [Pixels Amphi](../pixels-amphi/README.md): The adaptive query scheduler that enables cost-efficient query processing in both on-perm and in-cloud environments.
 
-In AWS EC2, create an Ubuntu-20.04 or 22.04 instance with x86 arch and at least 4GB memory and 20GB root volume. 
+In AWS EC2, create an Ubuntu 22.04 instance with x86 arch and at least 4GB memory and 20GB root volume. 
 8GB or larger memory is recommended for performance evaluations on datasets larger than 10GB. 
 Login the instance as `ubuntu` user, and install the following components.
 
 > Installation steps marked with `*` are optional.
 
 ## Install JDK
-Install JDK 17.0 in the EC2 instance:
+Install a JDK compatible with both Pixels and the query engine in the EC2 instance:
+
+In ubuntu 22.04, JDK 21 or below can be installed using `apt`:
 ```bash
-sudo apt install openjdk-17-jdk openjdk-17-jre
+sudo apt install openjdk-21-jdk openjdk-21-jre
 ```
+Replace `21` with other valid JDK version if needed.
+A higher version JDK can be installed using a downloaded `deb` package 
+([Zulu JDK](https://www.azul.com/downloads/?package=jdk#zulu) is recommended):
+```bash
+sudo dpkg -i zulu23.30.13-ca-jdk23.0.1-linux_amd64.deb
+```
+
 Check the java version:
 ```bash
 java -version
 ```
-If the other version of JDK is in use, switch to JDK 17:
+If other version of JDK is in use, switch to the required JDK:
 ```bash
 update-java-alternatives --list
-sudo update-java-alternatives --set /path/to/jdk-17.0
+sudo update-java-alternatives --set /path/to/the/required/jdk
 ```
-Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
+In this document, we are installing Pixels and Trino 465. The required JDK version is 23.0.1+.
 
 ## Install Maven
 
-Pixels requires maven 3.8 or later to build the source code (some early maven versions may work, but we haven't test them yet). On some operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17. 
+Pixels requires maven 3.8 or later to build the source code (some early maven versions may work, 
+but we haven't test them yet). On some operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17+. 
 In this case, manually install a newer maven compatible with your JDK.
 
 ## Setup AWS Credentials*
@@ -188,10 +198,10 @@ If you are using your own OS installation or a different user, please modify the
 especially for the `data-dir` and `*-urls`.
 
 ## Install Hadoop*
-Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
+Hadoop is optional. It is only needed if you want to use HDFS as the underlying storage.
 
-Pixels has been tested to be compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
-Follow the official docs to install Hadoop.
+Pixels has been tested on Hadoop-2.7.3 and Hadoop-3.3.1.
+Follow the official documents to install Hadoop.
 
 Modify `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`
 and point it to the `etc/hadoop` directory under the home of Hadoop.
@@ -199,68 +209,15 @@ Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.x
 
 > Note:
 > (1) Some default ports used by Hadoop
-> may conflict with the default ports used by Trino. In this case, modify the default port configuration
+> may conflict with the default ports of Trino. In this case, modify the default port configuration
 > of either system.
 > (2) Hadoop 2.7.x and 3.3.x are not compatible with high-version JDKs such as JDK 17. Please configure
 > Hadoop to use JDK 8.
 
 ## Install Trino
-Trino is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Trino-405.
-Download and install Trino-405 following the instructions [here](https://trino.io/docs/405/installation/deployment.html).
-
-Here, we install Trino to `~/opt/trino-server-405` and create a link for it:
-```bash
-ln -s trino-server-405 trino-server
-```
-Then download [trino-cli](https://trinodb.github.io/docs.trino.io/405/client/cli.html) into `~/opt/trino-server/bin/`
-and give executable permission to it.
-
-There are two important directories in the home of trino-server: `etc` and `plugin`.
-Decompress `pixels-trino-listener-*.zip` and `pixels-trino-connector-*.zip` into the `plugin` directory.
-The `etc` directory contains the configuration files of Trino.
-In addition to the configurations mentioned in the official docs, add the following configurations
-for Pixels:
-
-* Create the listener config file named `event-listener.properties` in the `etc` directory, with the following content:
-```properties
-event-listener.name=pixels-event-listener
-enabled=true
-listened.user.prefix=none
-listened.schema=pixels
-listened.query.type=SELECT
-log.dir=/home/ubuntu/opt/pixels/listener/
-```
-`log-dir` should point to
-an existing directory where the listener logs will appear.
-
-* Create the catalog config file named `pixels.properties` for Pixels in the `etc/catalog` directory,
-  with the following content:
-```properties
-connector.name=pixels
-
-# serverless config
-# it can be on, off, auto, or session
-cloud.function.switch=off
-clean.intermediate.result=true
-```
-**Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
-In Trino, Pixels can push projections, filters, joins, and aggregations into serverless computing services (e.g., AWS Lambda).
-This feature is named `Pixels-Turbo` and can be turned on by setting `cloud.function.switch` to `auto` (adaptively enabled) or `on` (always enabled).
-Turn it `off` to only use Trino workers for query processing.
-We can also set it to `session` so that this switch can be dynamically turned on or off by the session properties `pixels.cloud_function_enabled`.
-This allows `pixels-server` choosing whether to execute the query with cloud functions enabled.
-
-Append the following two lines into `etc/jvm.config`:
-```config
---add-opens=java.base/sun.nio.ch=ALL-UNNAMED
---add-opens=java.base/java.nio=ALL-UNNAMED
-```
-Thus, pixels can reflect internal or low-level classes to improve performance. This is only needed for Java 9+.
-
-Some scripts in Trino may require python:
-```bash
-sudo apt-get install python
-```
+Trino is the recommended query engine that works with Pixels.
+Follow the instructions in [Use Pixels in Trino](https://github.com/pixelsdb/pixels-trino?tab=readme-ov-file#use-pixels-in-trino) to install Trino with the Pixels plugins.
+If you want to use an early Trino version (e.g., 405) other than the latest version that is compatible with Pixels, switch to the corresponding branch of [Pixels-Trino](https://github.com/pixelsdb/pixels-trino) to see the instructions. 
 
 ## Install Prometheus and Grafana*
 Prometheus and Grafana are optional. We can install them to monitor the
