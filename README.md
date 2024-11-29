@@ -32,7 +32,7 @@ Pixels is mainly implemented in Java (with some JNI hooks of system calls and C/
 The [C++ document](cpp/README.md) gives the instructions of using the C++ reader. Here we explain how to build and use the Java components.
 
 JDK 8 (or above) and Maven 3.8 (or above) are required to build Pixels.
-After installing these requirements, clone the Pixels codebase into any `SRC_BASE` directory:
+After installing these prerequisites, clone the Pixels codebase into any `SRC_BASE` directory:
 ```bash
 git clone https://github.com/pixelsdb/pixels.git
 ```
