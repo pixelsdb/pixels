@@ -61,7 +61,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private final PixelsReaderOption option;
     private final long transId;
     private final long timestamp;
-    private final boolean hasValidTimestamp;
+    private final boolean shouldReadTimestamp;
     private final int RGStart;
     private int RGLen;
     private final boolean enableMetrics;
@@ -149,9 +149,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.option = option;
         this.transId = option.getTransId();
         this.timestamp = option.getTimestamp();
-        this.hasValidTimestamp = option.hasValidTimestamp();
-        checkArgument(!this.hasValidTimestamp || postScript.getHasHiddenColumn(),
-                "The hidden timestamp column must be present in the file if the timestamp is set.");
+        this.shouldReadTimestamp = option.hasValidTimestamp() && postScript.getHasHiddenColumn();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
@@ -210,7 +208,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         includedColumnNum = 0;
         String[] optionIncludedCols = option.getIncludedCols();
         // if size of cols is 0, create an empty row batch
-        if (!hasValidTimestamp && optionIncludedCols.length == 0)
+        if (!shouldReadTimestamp && optionIncludedCols.length == 0)
         {
             checkValid = true;
             // Issue #103: init the following members as null.
@@ -267,13 +265,13 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
 
         // create column readers
         List<TypeDescription> columnSchemas = fileSchema.getChildren();
-        readers = new ColumnReader[targetColumnNum + (hasValidTimestamp ? 1 : 0)];
+        readers = new ColumnReader[targetColumnNum + (shouldReadTimestamp ? 1 : 0)];
         for (int i = 0; i < resultColumns.length; i++)
         {
             int index = resultColumns[i];
             readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
         }
-        if (this.hasValidTimestamp)
+        if (this.shouldReadTimestamp)
         {
             // create reader for the hidden timestamp column
             readers[readers.length - 1] = ColumnReader.newColumnReader(new TypeDescription(TypeDescription.Category.LONG));
@@ -308,7 +306,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 = footer.getRowGroupStatsList();
         List<PixelsProto.ColumnStatistic> hiddenRowGroupStatistics
                 = footer.getHiddenRowGroupStatsList();
-        checkArgument(!hasValidTimestamp || !hiddenRowGroupStatistics.isEmpty(),
+        checkArgument(!shouldReadTimestamp || !hiddenRowGroupStatistics.isEmpty(),
                 "The hidden timestamp column statistics must be present in the file if the timestamp is set.");
         boolean[] includedRGs = new boolean[RGLen];
         if (includedRGs.length == 0)
@@ -337,7 +335,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 {
                     for (int i = 0; i < RGLen; i++)
                     {
-                        if (hasValidTimestamp)
+                        if (shouldReadTimestamp)
                         {
                             // get the hidden timestamp column statistics
                             PixelsProto.ColumnStatistic hiddenRowGroupStatistic = hiddenRowGroupStatistics.get(RGStart + i);
@@ -404,7 +402,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     // second, get row group statistics, if not matches, skip the row group
                     for (int i = 0; i < RGLen; i++)
                     {
-                        if (hasValidTimestamp)
+                        if (shouldReadTimestamp)
                         {
                             // get the hidden timestamp column statistics
                             PixelsProto.ColumnStatistic hiddenRowGroupStatistic = hiddenRowGroupStatistics.get(RGStart + i);
@@ -457,7 +455,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
         }
 
-        if (!this.hasValidTimestamp && includedColumnNum == 0)
+        if (!this.shouldReadTimestamp && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -604,7 +602,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
          * project nothing, must be count(*).
          * qualifiedRowNum and endOfFile have been set in prepareRead();
          */
-        if (!this.hasValidTimestamp && includedColumnNum == 0)
+        if (!this.shouldReadTimestamp && includedColumnNum == 0)
         {
             if (!endOfFile)
             {
@@ -625,8 +623,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         }
 
         // read chunk offset and length of each target column chunks
-        int includedColumnNum = includedColumns.length + (hasValidTimestamp ? 1 : 0); // included hidden column if set
-        int targetColumnNum = targetColumns.length + (hasValidTimestamp ? 1 : 0); // included hidden column if set
+        int includedColumnNum = includedColumns.length + (shouldReadTimestamp ? 1 : 0); // included hidden column if set
+        int targetColumnNum = targetColumns.length + (shouldReadTimestamp ? 1 : 0); // included hidden column if set
         this.chunkBuffers = new ByteBuffer[targetRGNum * includedColumnNum];
         List<ChunkId> diskChunks = new ArrayList<>(targetRGNum * targetColumnNum);
         // read cached data which are in need
@@ -685,7 +683,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     }
                 }
             }
-            if (hasValidTimestamp)
+            if (shouldReadTimestamp)
             {
                 // search for hidden column chunk
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
@@ -736,7 +734,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     PixelsProto.RowGroupIndex rowGroupIndex =
                             rowGroupFooters[rgIdx].getRowGroupIndexEntry();
                     PixelsProto.ColumnChunkIndex chunkIndex =
-                            (this.hasValidTimestamp && colId == includedColumns.length) ?
+                            (this.shouldReadTimestamp && colId == includedColumns.length) ?
                                     rowGroupIndex.getHiddenColumnChunkIndexEntry() :
                                     rowGroupIndex.getColumnChunkIndexEntries(colId);
                     ChunkId diskChunk = new ChunkId(rgIdx, colId, chunkIndex.getChunkOffset(),
@@ -764,7 +762,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                             chunkIndex.getChunkLength());
                     diskChunks.add(chunk);
                 }
-                if (hasValidTimestamp)
+                if (shouldReadTimestamp)
                 {
                     PixelsProto.ColumnChunkIndex chunkIndex =
                             rowGroupIndex.getHiddenColumnChunkIndexEntry();
@@ -896,7 +894,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
         }
 
-        if (!this.hasValidTimestamp && includedColumnNum == 0)
+        if (!this.shouldReadTimestamp && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -1010,7 +1008,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         }
 
         // project nothing, must be count(*)
-        if (!this.hasValidTimestamp && includedColumnNum == 0)
+        if (!this.shouldReadTimestamp && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -1052,7 +1050,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
-        if (this.hasValidTimestamp)
+        if (this.shouldReadTimestamp)
         {
             while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
             {
