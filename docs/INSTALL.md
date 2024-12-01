@@ -216,7 +216,7 @@ Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.x
 
 ## Install Trino
 Trino is the recommended query engine that works with Pixels.
-Follow the instructions in [pixels-trino](https://github.com/pixelsdb/pixels-trino?tab=readme-ov-file#pixels-trino) to install Trino with the Pixels plugins.
+Follow the instructions in [pixels-trino document](https://github.com/pixelsdb/pixels-trino?tab=readme-ov-file#pixels-trino) to install Trino with the Pixels plugins.
 If you want to use an early Pixels-compatible Trino version (e.g., 405), see the installation instructions in the corresponding branch of [pixels-trino](https://github.com/pixelsdb/pixels-trino). 
 
 ## Install Prometheus and Grafana*
