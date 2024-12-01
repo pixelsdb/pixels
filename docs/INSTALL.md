@@ -56,7 +56,7 @@ Ensure Maven is using the required JDK:
 mvn -v
 ```
 The printed Java version should be consistent to the Java version printed by `java --version`.
-Otherwise, ensure the `JAVA_HOME` environment variable is pointing to `/path/to/the/required/jdk`.
+Otherwise, ensure `JAVA_HOME` is pointing to the `/path/to/the/required/jdk`.
 
 ## Setup AWS Credentials*
 
