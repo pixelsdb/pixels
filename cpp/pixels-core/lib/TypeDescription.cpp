@@ -337,7 +337,7 @@ std::shared_ptr<ColumnVector> TypeDescription::createColumn(int maxSize, std::ve
     }
 }
 
-TypeDescription::Category TypeDescription::getCategory() {
+TypeDescription::Category TypeDescription::getCategory() const {
     return category;
 }
 
@@ -351,6 +351,9 @@ int TypeDescription::getPrecision() {
 
 int TypeDescription::getScale() {
 	return scale;
+}
+int TypeDescription::getMaxLength() {
+    return maxLength;
 }
 
 void TypeDescription::requireChar(TypeDescription::StringPosition &source, char required) {
@@ -587,4 +590,88 @@ TypeDescription TypeDescription::withMaxLength(int maxLength) {
     }
     this->maxLength = maxLength;
     return *this;
+}
+
+void TypeDescription::writeTypes(std::shared_ptr<pixels::proto::Footer> footer) {
+    std::vector<std::shared_ptr<TypeDescription>> children= this->getChildren();
+    std::vector<std::string> names=this->getFieldNames();
+    if(children.empty()){
+        return;
+    }
+    for(int i=0;i<children.size();i++){
+        std::shared_ptr<TypeDescription> child=children.at(i);
+        std::shared_ptr<pixels::proto::Type> tmpType=std::make_shared<pixels::proto::Type>();
+        tmpType->set_name(names.at(i));
+        switch (child->getCategory()) {
+            case TypeDescription::Category::BOOLEAN:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BOOLEAN);
+                break;
+            case TypeDescription::Category::BYTE:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BYTE);
+                break;
+            case TypeDescription::Category::SHORT:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_SHORT);
+                break;
+            case TypeDescription::Category::INT:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_INT);
+                break;
+            case TypeDescription::Category::LONG:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_LONG);
+                break;
+            case TypeDescription::Category::FLOAT:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_FLOAT);
+                break;
+            case TypeDescription::Category::DOUBLE:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DOUBLE);
+                break;
+            case TypeDescription::Category::DECIMAL:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DECIMAL);
+                tmpType->set_precision(child->getPrecision());
+                tmpType->set_scale(child->getScale());
+                break;
+            case TypeDescription::Category::STRING:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_STRING);
+                break;
+            case TypeDescription::Category::CHAR:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_CHAR);
+                tmpType->set_maximumlength(child->getMaxLength());
+                break;
+            case TypeDescription::Category::VARCHAR:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VARCHAR);
+                tmpType->set_maximumlength(child->getMaxLength());
+                break;
+            case TypeDescription::Category::BINARY:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BINARY);
+                tmpType->set_maximumlength(child->getMaxLength());
+                break;
+            case TypeDescription::Category::VARBINARY:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VARBINARY);
+                tmpType->set_maximumlength(child->getMaxLength());
+                break;
+            case TypeDescription::Category::TIMESTAMP:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_TIMESTAMP);
+                tmpType->set_precision(child->getPrecision());
+                break;
+            case TypeDescription::Category::DATE:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DATE);
+                break;
+            case TypeDescription::Category::TIME:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_TIME);
+                tmpType->set_precision(child->getPrecision());
+                break;
+//            case TypeDescription::Category::VECTOR:
+//                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VECTOR);
+//                tmpType->set_dimension(child->getDimension());
+//                break;
+            default: {
+                std::string errorMsg = "Unknown category: ";
+                errorMsg += static_cast<std::underlying_type_t<Category>>(this->getCategory());
+                throw std::runtime_error(errorMsg);
+            }
+
+
+        }
+        footer->add_types();
+//        footer->add_types(tmpType.get());
+    }
 }

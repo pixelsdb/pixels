@@ -7,6 +7,8 @@
 
 #include <cstdint>
 #include <string>
+#include "physical/natives/ByteBuffer.h"
+
 
 class PhysicalWriter {
 public:

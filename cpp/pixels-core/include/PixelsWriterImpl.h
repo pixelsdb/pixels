@@ -21,11 +21,13 @@ class PixelsWriterImpl : public PixelsWriter {
 public:
     PixelsWriterImpl(std::shared_ptr<TypeDescription> schema, int pixelsStride, int rowGroupSize,
                      const std::string &targetFilePath, int blockSize, bool blockPadding,
-                     EncodingLevel encodingLevel, bool nullsPadding, int compressionBlockSize);
+                     EncodingLevel encodingLevel, bool nullsPadding,bool partitioned, int compressionBlockSize);
     bool addRowBatch(std::shared_ptr<VectorizedRowBatch> rowBatch) override;
     void writeColumnVectors(std::vector<std::shared_ptr<ColumnVector>> &columnVectors, int rowBatchSize);
     void writeRowGroup();
     void writeFileTail();
+    void close() override;
+
 private:
     /**
      * The number of bytes that the start offset of each column chunk is aligned to.
@@ -53,9 +55,11 @@ private:
     int curRowGroupDataLength = 0;
     bool haseValueIsSet = false;
     int currHashValue = 0;
+    bool partitioned;
     std::vector<pixels::proto::RowGroupInformation> rowGroupInfoList;
     std::vector<pixels::proto::RowGroupStatistic> rowGroupStatisticList;
     std::shared_ptr<PhysicalWriter> physicalWriter;
     std::vector<std::shared_ptr<TypeDescription>> children;
+
 };
 #endif //PIXELS_PIXELSWRITERIMPL_H

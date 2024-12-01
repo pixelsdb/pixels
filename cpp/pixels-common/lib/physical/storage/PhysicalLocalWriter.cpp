@@ -24,6 +24,8 @@ std::int64_t PhysicalLocalWriter::append(const uint8_t *buffer, int offset, int 
     return start;
 }
 
+
+
 void PhysicalLocalWriter::close() {
     rawWriter.close();
 }

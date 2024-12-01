@@ -16,7 +16,7 @@ std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setPixelsStride(int pixe
     return shared_from_this();
 }
 
-EncodingLevel PixelsWriterOption::getEncodingLevel() {
+EncodingLevel PixelsWriterOption::getEncodingLevel() const {
     return this->encodingLevel;
 }
 
@@ -25,7 +25,7 @@ std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setEncodingLevel(Encodin
     return shared_from_this();
 }
 
-bool PixelsWriterOption::isNullsPadding() {
+bool PixelsWriterOption::isNullsPadding() const {
     return this->nullsPadding;
 }
 
@@ -33,3 +33,8 @@ std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setNullsPadding(bool nul
     this->nullsPadding = nullsPadding;
     return shared_from_this();
 }
+
+ByteOrder PixelsWriterOption::getByteOrder() const {
+    return byteOrder;
+}
+
