@@ -6,7 +6,7 @@ It is optimized for analytical tables stored in on-premises and cloud-native sto
 including S3, GCS, HDFS, Redis, and local file systems.
 Pixels outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to two orders of magnitude.
 
-We have integrated Pixels with popular query engines including DuckDB (1.1.0), Trino (405 and 465), Presto (0.279), and Hive (2.3+).
+We have integrated Pixels with popular query engines including DuckDB (1.1.0), Trino (405 and 466), Presto (0.279), and Hive (2.3+).
 
 The DuckDB integration and the C++ implementation of Pixels Reader are in the [cpp](cpp) folder.
 The other integrations are opensourced in separate repositories:
@@ -45,18 +45,13 @@ It may take a couple of minutes to complete. After that, find jar files:
 They will be used in the installation of Pixels.
 
 Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
-The query engine integrations can be easily built using maven.
+The query engine integrations also can be built using maven.
 For example, to build the Trino integration for Pixels, just git clone [pixels-trino](https://github.com/pixelsdb/pixels-trino), 
 and build it using `mvn package` in the local git repository.
 
-> Pixels by itself is compatible with Java 8 or above. However, third-party query engines such as Trino may require a later JDK (e.g., Trino 405/465 requires JDK17.0.3+/23.0.1+).
-> It is fine build Pixels and the query engine connector (e.g., pixels-trino) with the same or different versions of JDK.
-
-After building `pixels-trino`, find the following zip files in the build target directories:
-* `pixels-trino-listener-*.zip`, this is the event listener plugin for Trino.
-* `pixels-trino-connector-*.zip`, this is the connector for Trino.
-
-They will be used in the installation of the integration.
+> Pixels by itself is compatible with Java 8+ and Maven 3.8+. However, third-party query engines such as Trino may require
+> a later JDK (e.g., Trino 405/466 requires JDK17.0.3+/23.0.0+) and Maven (e.g., Trino 466 requires Maven 3.9.9).
+> It is fine to build the query engine integration (e.g., `pixels-trino`) with the same or higher versions of JDK and Maven than Pixels.
 
 
 ## Develop Pixels in IntelliJ
