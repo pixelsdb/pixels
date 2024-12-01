@@ -43,13 +43,13 @@ If other version of JDK is in use, switch to the required JDK:
 update-java-alternatives --list
 sudo update-java-alternatives --set /path/to/the/required/jdk
 ```
-In this document, we are installing Pixels and Trino 465. The required JDK version is 23.0.1+.
+In this document, we are installing Pixels and Trino 466. The required JDK version is 23.0.0+.
 
 ## Install Maven
 
-Pixels requires maven 3.8 or later to build the source code (some early maven versions may work, 
-but we haven't test them yet). On some operating systems, the maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17+. 
-In this case, manually install a newer maven compatible with your JDK.
+Pixels requires Maven 3.8 or later to build the source code (early Maven versions may work, 
+but they are not tested). On some operating systems, the Maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17+. 
+In this case, manually install a newer Maven compatible with your JDK.
 
 ## Setup AWS Credentials*
 
@@ -217,7 +217,7 @@ Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.x
 ## Install Trino
 Trino is the recommended query engine that works with Pixels.
 Follow the instructions in [Use Pixels in Trino](https://github.com/pixelsdb/pixels-trino?tab=readme-ov-file#use-pixels-in-trino) to install Trino with the Pixels plugins.
-If you want to use an early Trino version (e.g., 405) other than the latest version that is compatible with Pixels, switch to the corresponding branch of [Pixels-Trino](https://github.com/pixelsdb/pixels-trino) to see the instructions. 
+If you want to use an early Pixels-compatible Trino version (e.g., 405), see the installation instructions in the corresponding branch of [Pixels-Trino](https://github.com/pixelsdb/pixels-trino). 
 
 ## Install Prometheus and Grafana*
 Prometheus and Grafana are optional. We can install them to monitor the
