@@ -89,9 +89,9 @@ public class PixelsReaderOption
         return this.transId;
     }
 
-    public PixelsReaderOption timestamp(long timestamp)
+    public PixelsReaderOption transTimestamp(long transTimestamp)
     {
-        this.transTimestamp = timestamp;
+        this.transTimestamp = transTimestamp;
         return this;
     }
 
