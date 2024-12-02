@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.core.reader;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsWriterStreamImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -32,10 +34,17 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.annotation.concurrent.NotThreadSafe;
+import java.io.EOFException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * PixelsRecordReaderStreamImpl is the variant of {@link PixelsRecordReaderImpl} for streaming mode.
@@ -49,12 +58,14 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
 {
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderStreamImpl.class);
     PixelsStreamProto.StreamHeader streamHeader;
+    private static final ByteOrder READER_ENDIAN;
+
     private final PixelsReaderOption option;
-    private final long transId;
-    private int RGLen;  // In streaming mode, RGLen means max number of row groups to read. But currently unused.
+    private final long transId = 0;
+    private int RGLen = 0;  // In streaming mode, RGLen means max number of row groups to read. But currently unused.
     private final List<PixelsProto.Type> includedColumnTypes;
 
-    private final boolean partitioned;
+    private final boolean partitioned = false;
 
     /**
      * If the curRowGroupByteBuf is no longer readable, we take the next ByteBuf from the byteBufSharedQueue or
@@ -64,8 +75,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
      * {@link io.pixelsdb.pixels.core.PixelsReaderStreamImpl#byteBufSharedQueue}, and only its reference is passed here.
      */
     private ByteBuf curRowGroupByteBuf;
-    private final BlockingQueue<ByteBuf> byteBufSharedQueue;
-    private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;  // hash value -> ByteBuf
+//    private final BlockingQueue<ByteBuf> byteBufSharedQueue;
+//    private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;  // hash value -> ByteBuf
 
     PixelsStreamProto.StreamRowGroupFooter curRowGroupStreamFooter;
     private TypeDescription fileSchema = null;
@@ -104,13 +115,15 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private boolean endOfFile = false;
 
     private int targetRGNum = 0;         // number of target row groups. Unused in streaming mode.
-    private int curRGIdx = 0;            // index of current reading row group in targetRGs
-    private int curRowInRG = 0;          // starting index of values to read by reader in current row group
+    private int curRGIdx = -1;            // index of current reading row group in targetRGs
+    private int curRowInRG = -1;          // starting index of values to read by reader in current row group
+    private int curRGCount = -1;            // number of rows in current row group
 
+    private ByteBuffer curRGBuffer;
+    private ByteBuffer curRGFooterBuffer;
     private ByteBuffer[] chunkBuffers;   // buffers of each chunk in current row group, arranged by chunk's column id
     private ColumnReader[] readers;      // column readers for each target columns
-    private final boolean enableEncodedVector;
-    private final int typeMode;
+    private final boolean enableEncodedVector = false;
 
     // The following members for performance metrics are not well maintained in the current implementation due to
     //  disuse in the streaming mode. They are kept for compatibility and future use.
@@ -118,22 +131,54 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;
 
+    private final PhysicalReader physicalReader;
+
+    static
+    {
+        boolean littleEndian = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("column.chunk.little.endian"));
+        if (littleEndian)
+        {
+            READER_ENDIAN = ByteOrder.LITTLE_ENDIAN;
+        }
+        else
+        {
+            READER_ENDIAN = ByteOrder.BIG_ENDIAN;
+        }
+    }
+
+    public PixelsRecordReaderStreamImpl(PhysicalReader physicalReader,
+                                        PixelsStreamProto.StreamHeader streamHeader,
+                                        PixelsReaderOption option) throws IOException
+    {
+        requireNonNull(physicalReader, "physicalReader must not be null");
+        requireNonNull(streamHeader, "streamHeader must not be null");
+        requireNonNull(option, "option must not be null");
+        this.physicalReader = physicalReader;
+        this.curRGBuffer = ByteBuffer.allocate(1048576);
+        this.curRGFooterBuffer = ByteBuffer.allocate(1024);
+        this.streamHeader = streamHeader;
+        this.option = option;
+        this.includedColumnTypes = new ArrayList<>();
+//        this.transId = option.getTransId();
+        checkBeforeRead();
+    }
+
     public PixelsRecordReaderStreamImpl(boolean partitioned,
                                         BlockingQueue<ByteBuf> byteBufSharedQueue,
                                         BlockingMap<Integer, ByteBuf> byteBufBlockingMap,
                                         PixelsStreamProto.StreamHeader streamHeader,
                                         PixelsReaderOption option) throws IOException
     {
-        this.partitioned = partitioned;
-        this.byteBufSharedQueue = byteBufSharedQueue;
-        this.byteBufBlockingMap = byteBufBlockingMap;
+        this.physicalReader = null;
+
+//        this.partitioned = partitioned;
+//        this.byteBufSharedQueue = byteBufSharedQueue;
+//        this.byteBufBlockingMap = byteBufBlockingMap;
         this.streamHeader = streamHeader;
         this.option = option;
-        this.transId = option.getTransId();
+//        this.transId = option.getTransId();
         this.RGLen = 1;
-        this.enableEncodedVector = option.isEnableEncodedColumnVector();
-        this.typeMode = option.isReadIntColumnAsIntVector() ?
-                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT : TypeDescription.Mode.NONE;
+//        this.enableEncodedVector = option.isEnableEncodedColumnVector();
         this.includedColumnTypes = new ArrayList<>();
         this.curRowGroupByteBuf = Unpooled.buffer();
         // Issue #175: this check is currently not necessary.
@@ -247,7 +292,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         for (int i = 0; i < resultColumns.length; i++)
         {
             int index = resultColumns[i];
-            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index), option);
+            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
         }
 
         // create result vectorized row batch
@@ -257,6 +302,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         }
 
         resultSchema = TypeDescription.createSchema(includedColumnTypes);
+        resultColumnsEncoded = new boolean[includedColumns.length];
         checkValid = true;
     }
 
@@ -430,11 +476,226 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private VectorizedRowBatch createEmptyEOFRowBatch(int size)
     {
         TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0, typeMode);
+        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0);
         resultRowBatch.projectionSize = 0;
         resultRowBatch.endOfFile = true;
         resultRowBatch.size = size;
         return resultRowBatch;
+    }
+
+    public VectorizedRowBatch myReadBatch(int batchSize, boolean reuse) throws IOException
+    {
+        readRowGroup();
+        if (curRGCount == 0)
+        {
+            return createEmptyEOFRowBatch(0);
+        }
+
+        VectorizedRowBatch resultRowBatch;
+        if (reuse)
+        {
+            if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
+            {
+                this.resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
+                this.resultRowBatch.projectionSize = includedColumnNum;
+            }
+            this.resultRowBatch.reset();
+            this.resultRowBatch.ensureSize(batchSize, false);
+            resultRowBatch = this.resultRowBatch;
+        }
+        else
+        {
+            resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
+            resultRowBatch.projectionSize = includedColumnNum;
+        }
+
+        ColumnVector[] columnVectors = resultRowBatch.cols;
+        int curBatchSize = 0;
+        while (resultRowBatch.size < batchSize)
+        {
+            // the number of rows read from this row group
+            curBatchSize = Math.min(curRGCount - curRowInRG, batchSize - resultRowBatch.size);
+
+            // read from row group to result row batch
+            for (int i = 0; i < resultColumns.length; i++)
+            {
+                if (!columnVectors[i].duplicated)
+                {
+                    PixelsProto.ColumnEncoding encoding = curRowGroupStreamFooter.getRowGroupEncoding()
+                            .getColumnChunkEncodings(resultColumns[i]);
+                    PixelsProto.ColumnChunkIndex chunkIndex = curRowGroupStreamFooter.getRowGroupIndexEntry()
+                            .getColumnChunkIndexEntries(resultColumns[i]);
+                    readers[i].read(chunkBuffers[resultColumns[i]], encoding, curRowInRG, curBatchSize,
+                            streamHeader.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                    // don't update statistics in whenComplete as it may be executed in other threads.
+                    diskReadBytes += chunkIndex.getChunkLength();
+                    memoryUsage += chunkIndex.getChunkLength();
+                }
+            }
+
+            // update current row index in the row group
+            curRowInRG += curBatchSize;
+            //preRowInRG = curRowInRG; // keep in sync with curRowInRG.
+            completedRows += curBatchSize;
+            resultRowBatch.size += curBatchSize;
+
+            if (curRowInRG >= curRGCount)
+            {
+                readRowGroup();
+                if (curRGCount == 0)
+                {
+                    resultRowBatch.endOfFile = true;
+                    break;
+                }
+            }
+            if (this.enableEncodedVector)
+            {
+                /**
+                 * Issue #374:
+                 * Dictionary column vector can not contain data from multiple column chunks,
+                 * hence we do not pad the row batch with rows from the next row group.
+                 */
+                break;
+            }
+        }
+
+        for (ColumnVector cv : columnVectors)
+        {
+            if (cv.duplicated)
+            {
+                // copyFrom() is actually a shallow copy
+                // rename copyFrom() to duplicate(), so it is more readable
+                cv.duplicate(columnVectors[cv.originVecId]);
+            }
+        }
+
+        return resultRowBatch;
+    }
+
+    private void readRowGroup() throws IOException {
+        curRGIdx++;
+        if (curRowInRG < curRGCount)
+        {
+            return;
+        }
+
+        int rowGroupDataLen = 0;
+        try
+        {
+            rowGroupDataLen = physicalReader.readInt(READER_ENDIAN);
+        } catch (IOException e)
+        {
+            if (e instanceof EOFException)
+            {
+                curRGCount = 0;
+                curRowInRG = 0;
+                curRGIdx--;
+                return;
+            } else
+            {
+                throw e;
+            }
+        }
+
+        if (rowGroupDataLen > 1024*1024)
+        {
+            curRGBuffer = ByteBuffer.allocate(rowGroupDataLen);
+        }
+        physicalReader.readFully(curRGBuffer.array(), 0, rowGroupDataLen);
+        curRGBuffer.limit(rowGroupDataLen);
+
+        // write to file
+        try (FileOutputStream fos = new FileOutputStream("/tmp/test");
+             FileChannel fileChannel = fos.getChannel()) {
+
+            // 将 ByteBuffer 写入文件
+            fileChannel.write(curRGBuffer);
+            System.out.println("数据已写入文件 output.txt");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        int rowGroupFooterLen = physicalReader.readInt(READER_ENDIAN);
+        if (rowGroupFooterLen > 1024)
+        {
+            curRGFooterBuffer = ByteBuffer.allocate(rowGroupFooterLen);
+        }
+        physicalReader.readFully(curRGFooterBuffer.array(), 0, rowGroupFooterLen);
+        curRGFooterBuffer.limit(rowGroupFooterLen);
+
+        curRowGroupStreamFooter = PixelsStreamProto.StreamRowGroupFooter.parseFrom(curRGFooterBuffer);
+        PixelsProto.RowGroupEncoding rgEncoding = curRowGroupStreamFooter.getRowGroupEncoding();
+
+        // update curRowInRG and curRGCount
+        curRowInRG = 0;
+        curRGCount = (int) curRowGroupStreamFooter.getNumberOfRows();
+
+        // refresh resultColumnsEncoded for reading the column vectors in the next row group.
+        for (int i = 0; i < includedColumnNum; i++)
+        {
+            this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
+                    PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
+        }
+
+        // divide the row group data into chunks
+        if (this.chunkBuffers != null)
+        {
+            Arrays.fill(this.chunkBuffers, null);
+        }
+        this.chunkBuffers = new ByteBuffer[includedColumns.length];
+        List<ChunkId> diskChunks = new ArrayList<>(targetColumns.length);
+        PixelsProto.RowGroupIndex rowGroupIndex =
+                curRowGroupStreamFooter.getRowGroupIndexEntry();
+        for (int colId : targetColumns)
+        {
+            PixelsProto.ColumnChunkIndex chunkIndex =
+                    rowGroupIndex.getColumnChunkIndexEntries(colId);
+            ChunkId chunk = new ChunkId(0, colId,
+                    chunkIndex.getChunkOffset(),
+                    chunkIndex.getChunkLength());
+            diskChunks.add(chunk);
+        }
+
+        if (!diskChunks.isEmpty())
+        {
+            for (ChunkId chunk : diskChunks)
+            {
+                /**
+                 * Comments added in Issue #103:
+                 * chunk.rowGroupId does not mean the row group id in the Pixels file,
+                 * it is the index of group that is to be read (some row groups in the file
+                 * may be filtered out by the predicate and will not be read) and it is
+                 * used to calculate the index of chunkBuffers.
+                 */
+                int rgIdx = chunk.rowGroupId;
+                int numCols = includedColumns.length;
+                int colId = chunk.columnId;
+                /**
+                 * Issue #114:
+                 * The old code segment of chunk reading is remove in this issue.
+                 * Now, if enableMetrics == true, we can add the read performance metrics here.
+                 *
+                 * Examples of how to add performance metrics:
+                 *
+                 * BytesMsCost seekCost = new BytesMsCost();
+                 * seekCost.setBytes(seekDistanceInBytes);
+                 * seekCost.setMs(seekTimeMs);
+                 * readPerfMetrics.addSeek(seekCost);
+                 *
+                 * BytesMsCost readCost = new BytesMsCost();
+                 * readCost.setBytes(bytesRead);
+                 * readCost.setMs(readTimeMs);
+                 * readPerfMetrics.addSeqRead(readCost);
+                 */
+                ByteBuffer temp = ByteBuffer.allocate(chunk.length);
+                curRGBuffer.position((int) chunk.offset);
+                curRGBuffer.get(temp.array(), 0, chunk.length);
+                chunkBuffers[rgIdx * numCols + colId] = temp;
+                // don't update statistics in whenComplete as it may be executed in other threads.
+                diskReadBytes += chunk.length;
+                memoryUsage += chunk.length;
+            }
+        }
     }
 
     /**
@@ -483,7 +744,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         {
             if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
             {
-                this.resultRowBatch = resultSchema.createRowBatch(batchSize, typeMode, resultColumnsEncoded);
+                this.resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
                 this.resultRowBatch.projectionSize = includedColumnNum;
             }
             this.resultRowBatch.reset();
@@ -492,7 +753,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         }
         else
         {
-            resultRowBatch = resultSchema.createRowBatch(batchSize, typeMode, resultColumnsEncoded);
+            resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
         }
 
@@ -586,15 +847,15 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         logger.debug("In acquireNewRowGroup(), curRGIdx = " + curRGIdx);
         if (!endOfFile)
         {
-            try
-            {
-                curRowGroupByteBuf.release();
-                curRowGroupByteBuf = partitioned ? byteBufBlockingMap.get(curRGIdx) : byteBufSharedQueue.take();
-            }
-            catch (InterruptedException e)
-            {
-                e.printStackTrace();
-            }
+//            try
+//            {
+//                curRowGroupByteBuf.release();
+//                curRowGroupByteBuf = partitioned ? byteBufBlockingMap.get(curRGIdx) : byteBufSharedQueue.take();
+//            }
+//            catch (InterruptedException e)
+//            {
+//                e.printStackTrace();
+//            }
         }
 
         //preRGIdx = curRGIdx;
@@ -730,7 +991,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     @Override
     public VectorizedRowBatch readBatch() throws IOException
     {
-        return readBatch(VectorizedRowBatch.DEFAULT_SIZE, false);
+//        return readBatch(VectorizedRowBatch.DEFAULT_SIZE, false);
+        return myReadBatch(VectorizedRowBatch.DEFAULT_SIZE, false);
     }
 
     @Override
