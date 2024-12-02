@@ -155,7 +155,7 @@ message RowGroupStatistic {
     // statistic for each column chunk that can be used to filter row groups
     repeated ColumnStatistic columnChunkStats = 1;
     // statistics for the column chunk of hidden timestamp column that can be used to filter row groups
-    optional ColumnStatistic hiddenColumnChunkStats = 7;
+    optional ColumnStatistic hiddenColumnChunkStats = 2;
 }
 
 message IntegerStatistic  {
