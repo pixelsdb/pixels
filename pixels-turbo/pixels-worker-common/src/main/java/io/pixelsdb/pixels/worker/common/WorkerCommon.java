@@ -420,7 +420,7 @@ public class WorkerCommon
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
-        option.timestamp(timestamp);
+        option.transTimestamp(timestamp);
         option.includeCols(cols);
         option.rgRange(input.getRgStart(), input.getRgLength());
         return option;
@@ -444,7 +444,7 @@ public class WorkerCommon
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
-        option.timestamp(timestamp);
+        option.transTimestamp(timestamp);
         option.includeCols(cols);
         if (pixelsReader.getRowGroupNum() == numPartition)
         {

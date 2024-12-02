@@ -269,7 +269,7 @@ public class BaseAggregationWorker extends Worker<AggregationInput, AggregationO
                     {
                         PixelsReaderOption option = new PixelsReaderOption();
                         option.transId(transId);
-                        option.timestamp(timestamp);
+                        option.transTimestamp(timestamp);
                         option.includeCols(columnsToRead);
                         option.rgRange(0, -1);
                         option.skipCorruptRecords(true);

@@ -45,8 +45,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 /**
  * @author guodong
  * @author hank
@@ -60,8 +58,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
     private final long transId;
-    private final long timestamp;
-    private final boolean shouldReadTimestamp;
+    private final long transTimestamp;
+    private final boolean shouldReadHiddenColumn;
     private final int RGStart;
     private int RGLen;
     private final boolean enableMetrics;
@@ -111,8 +109,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private boolean[] resultColumnsEncoded;
     private int includedColumnNum = 0; // the number of columns to read, not include the hidden timestamp column if set.
     /**
-     * the number of qualified rows in this split.
-     * If the timestamp is set, the final value is set after filtering by timestamp in {@link #readBatch(int, boolean)}.
+     * The number of qualified rows in this split. If the transaction timestamp is set,
+     * the final value is set after filtering by the transaction timestamp in {@link #readBatch(int, boolean)}.
      */
     private int qualifiedRowNum = 0;
     private boolean endOfFile = false;
@@ -149,8 +147,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.footer = footer;
         this.option = option;
         this.transId = option.getTransId();
-        this.timestamp = option.getTimestamp();
-        this.shouldReadTimestamp = option.hasValidTimestamp() && postScript.getHasHiddenColumn();
+        this.transTimestamp = option.getTransTimestamp();
+        this.shouldReadHiddenColumn = option.hasValidTransTimestamp() && postScript.getHasHiddenColumn();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
@@ -211,7 +209,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         includedColumnNum = 0;
         String[] optionIncludedCols = option.getIncludedCols();
         // if size of cols is 0, create an empty row batch
-        if (!shouldReadTimestamp && optionIncludedCols.length == 0)
+        if (!shouldReadHiddenColumn && optionIncludedCols.length == 0)
         {
             checkValid = true;
             // Issue #103: init the following members as null.
@@ -268,17 +266,16 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
 
         // create column readers
         List<TypeDescription> columnSchemas = fileSchema.getChildren();
-        readers = new ColumnReader[targetColumnNum + (shouldReadTimestamp ? 1 : 0)];
+        readers = new ColumnReader[targetColumnNum + (shouldReadHiddenColumn ? 1 : 0)];
         for (int i = 0; i < resultColumns.length; i++)
         {
             int index = resultColumns[i];
             readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index), option);
         }
-        if (this.shouldReadTimestamp)
+        if (this.shouldReadHiddenColumn)
         {
             // create reader for the hidden timestamp column
-            readers[readers.length - 1] = ColumnReader.newColumnReader(
-                    new TypeDescription(TypeDescription.Category.LONG), option);
+            readers[readers.length - 1] = ColumnReader.newColumnReader(TypeDescription.HIDDEN_COLUMN_TYPE, option);
         }
 
         // create result vectorized row batch
@@ -306,12 +303,11 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             return false;
         }
 
-        List<PixelsProto.RowGroupStatistic> rowGroupStatistics
-                = footer.getRowGroupStatsList();
-        List<PixelsProto.ColumnStatistic> hiddenRowGroupStatistics
-                = footer.getHiddenRowGroupStatsList();
-        checkArgument(!shouldReadTimestamp || !hiddenRowGroupStatistics.isEmpty(),
-                "The hidden timestamp column statistics must be present in the file if the timestamp is set.");
+        List<PixelsProto.RowGroupStatistic> rowGroupStatistics = footer.getRowGroupStatsList();
+        //List<PixelsProto.ColumnStatistic> hiddenRowGroupStatistics
+        //        = footer.getHiddenRowGroupStatsList();
+        //checkArgument(!shouldReadHiddenTimestamp || !hiddenRowGroupStatistics.isEmpty(),
+        //        "Row group level hidden timestamp column statistics is not present.");
         boolean[] includedRGs = new boolean[RGLen];
         if (includedRGs.length == 0)
         {
@@ -339,14 +335,16 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 {
                     for (int i = 0; i < RGLen; i++)
                     {
-                        if (shouldReadTimestamp)
+                        if (shouldReadHiddenColumn)
                         {
-                            // get the hidden timestamp column statistics
-                            PixelsProto.ColumnStatistic hiddenRowGroupStatistic = hiddenRowGroupStatistics.get(RGStart + i);
-                            IntegerStatsRecorder timestampStats = (IntegerStatsRecorder) StatsRecorder.create(
-                                    new TypeDescription(TypeDescription.Category.LONG), hiddenRowGroupStatistic);
+                            // get the row group level hidden timestamp column statistics
+                            PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
+                            PixelsProto.ColumnStatistic hiddenRowGroupStatistic =
+                                    rowGroupStatistic.getHiddenColumnChunkStats();
+                            IntegerStatsRecorder hiddenTimestampStats = (IntegerStatsRecorder) StatsRecorder.create(
+                                    TypeDescription.HIDDEN_COLUMN_TYPE, hiddenRowGroupStatistic);
                             // check if the row group is qualified
-                            if (timestampStats.getMinimum() > this.timestamp)
+                            if (hiddenTimestampStats.getMinimum() > this.transTimestamp)
                             {
                                 includedRGs[i] = false;
                                 continue;
@@ -365,9 +363,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 }
                 else
                 {
-                    throw new IOException(
-                            "predicate does not match none or all while included columns is empty, predicate=" +
-                            predicate.toString());
+                    throw new IOException("predicate does not match none or all " +
+                            "while included columns is empty, predicate=" + predicate);
                 }
             }
             else
@@ -406,14 +403,16 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     // second, get row group statistics, if not matches, skip the row group
                     for (int i = 0; i < RGLen; i++)
                     {
-                        if (shouldReadTimestamp)
+                        PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
+                        if (shouldReadHiddenColumn)
                         {
-                            // get the hidden timestamp column statistics
-                            PixelsProto.ColumnStatistic hiddenRowGroupStatistic = hiddenRowGroupStatistics.get(RGStart + i);
-                            IntegerStatsRecorder timestampStats = (IntegerStatsRecorder) StatsRecorder.create(
-                                    new TypeDescription(TypeDescription.Category.LONG), hiddenRowGroupStatistic);
+                            // get the row group level hidden timestamp column statistics
+                            PixelsProto.ColumnStatistic hiddenRowGroupStatistic =
+                                    rowGroupStatistic.getHiddenColumnChunkStats();
+                            IntegerStatsRecorder hiddenTimestampStats = (IntegerStatsRecorder) StatsRecorder.create(
+                                    TypeDescription.HIDDEN_COLUMN_TYPE, hiddenRowGroupStatistic);
                             // check if the row group is qualified
-                            if (timestampStats.getMinimum() > this.timestamp)
+                            if (hiddenTimestampStats.getMinimum() > this.transTimestamp)
                             {
                                 includedRGs[i] = false;
                                 continue;
@@ -421,7 +420,6 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                         }
                         // Issue #103: columnStatsMap should be cleared for each row group.
                         columnStatsMap.clear();
-                        PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
                         List<PixelsProto.ColumnStatistic> rgColumnStatistics =
                                 rowGroupStatistic.getColumnChunkStatsList();
                         for (int id : targetColumns)
@@ -442,13 +440,14 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         {
             for (int i = 0; i < RGLen; i++)
             {
-                if (this.timestamp != -1L)
+                if (shouldReadHiddenColumn)
                 {
-                    PixelsProto.ColumnStatistic hiddenRowGroupStatistic = hiddenRowGroupStatistics.get(RGStart + i);
-                    IntegerStatsRecorder timestampStats = (IntegerStatsRecorder) StatsRecorder.create(
-                            new TypeDescription(TypeDescription.Category.LONG), hiddenRowGroupStatistic);
+                    PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
+                    PixelsProto.ColumnStatistic hiddenRowGroupStatistic = rowGroupStatistic.getHiddenColumnChunkStats();
+                    IntegerStatsRecorder hiddenTimestampStats = (IntegerStatsRecorder) StatsRecorder.create(
+                            TypeDescription.HIDDEN_COLUMN_TYPE, hiddenRowGroupStatistic);
                     // check if the row group is qualified
-                    if (timestampStats.getMinimum() > this.timestamp)
+                    if (hiddenTimestampStats.getMinimum() > this.transTimestamp)
                     {
                         includedRGs[i] = false;
                         continue;
@@ -459,7 +458,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
         }
 
-        if (!this.shouldReadTimestamp && includedColumnNum == 0)
+        if (!this.shouldReadHiddenColumn && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -606,7 +605,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
          * project nothing, must be count(*).
          * qualifiedRowNum and endOfFile have been set in prepareRead();
          */
-        if (!this.shouldReadTimestamp && includedColumnNum == 0)
+        if (!this.shouldReadHiddenColumn && includedColumnNum == 0)
         {
             if (!endOfFile)
             {
@@ -627,8 +626,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         }
 
         // read chunk offset and length of each target column chunks
-        int includedColumnNum = includedColumns.length + (shouldReadTimestamp ? 1 : 0); // included hidden column if set
-        int targetColumnNum = targetColumns.length + (shouldReadTimestamp ? 1 : 0); // included hidden column if set
+        // include hidden column if shouldReadHiddenTimestamp is set
+        int includedColumnNum = includedColumns.length + (shouldReadHiddenColumn ? 1 : 0);
+        // include hidden column if shouldReadHiddenTimestamp is set
+        int targetColumnNum = targetColumns.length + (shouldReadHiddenColumn ? 1 : 0);
         this.chunkBuffers = new ByteBuffer[targetRGNum * includedColumnNum];
         List<ChunkId> diskChunks = new ArrayList<>(targetRGNum * targetColumnNum);
         // read cached data which are in need
@@ -687,9 +688,9 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     }
                 }
             }
-            if (shouldReadTimestamp)
+            if (shouldReadHiddenColumn)
             {
-                // search for hidden column chunk
+                // search for column chunk of the hidden timestamp column
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
                 {
                     int rgId = targetRGs[rgIdx];
@@ -738,7 +739,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     PixelsProto.RowGroupIndex rowGroupIndex =
                             rowGroupFooters[rgIdx].getRowGroupIndexEntry();
                     PixelsProto.ColumnChunkIndex chunkIndex =
-                            (this.shouldReadTimestamp && colId == includedColumns.length) ?
+                            (this.shouldReadHiddenColumn && colId == includedColumns.length) ?
                                     rowGroupIndex.getHiddenColumnChunkIndexEntry() :
                                     rowGroupIndex.getColumnChunkIndexEntries(colId);
                     ChunkId diskChunk = new ChunkId(rgIdx, colId, chunkIndex.getChunkOffset(),
@@ -766,7 +767,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                             chunkIndex.getChunkLength());
                     diskChunks.add(chunk);
                 }
-                if (shouldReadTimestamp)
+                if (shouldReadHiddenColumn)
                 {
                     PixelsProto.ColumnChunkIndex chunkIndex =
                             rowGroupIndex.getHiddenColumnChunkIndexEntry();
@@ -898,7 +899,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
         }
 
-        if (!this.shouldReadTimestamp && includedColumnNum == 0)
+        if (!this.shouldReadHiddenColumn && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -928,7 +929,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         int curBatchSize = -preRowInRG;
         for (int rgIdx = preRGIdx; rgIdx < targetRGNum; ++rgIdx)
         {
-            int rgRowCount = (int) footer.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
+            int rgRowCount = footer.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
             curBatchSize += rgRowCount;
             if (curBatchSize <= 0)
             {
@@ -1012,7 +1013,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         }
 
         // project nothing, must be count(*)
-        if (!this.shouldReadTimestamp && includedColumnNum == 0)
+        if (!this.shouldReadHiddenColumn && includedColumnNum == 0)
         {
             /**
              * Issue #105:
@@ -1051,10 +1052,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
 
         if (curRGIdx < targetRGNum)
         {
-            rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+            rgRowCount = footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
-        if (this.shouldReadTimestamp)
+        if (this.shouldReadHiddenColumn)
         {
             while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
             {
@@ -1065,17 +1066,18 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     curBatchSize = batchSize - resultRowBatch.size;
                 }
 
-                // read timestamp into timestamp vector
-                LongColumnVector timestampVector = new LongColumnVector(curBatchSize);
+                // read the hidden timestamp column
+                LongColumnVector hiddenTimestampVector = new LongColumnVector(curBatchSize);
                 PixelsProto.RowGroupFooter rowGroupFooter = rowGroupFooters[curRGIdx];
-                int timestampColId = includedColumns.length;
-                PixelsProto.ColumnEncoding timestampEncoding = rowGroupFooter.getRowGroupEncoding()
+                int hiddenTimestampColId = includedColumns.length;
+                PixelsProto.ColumnEncoding hiddenTimestampEncoding = rowGroupFooter.getRowGroupEncoding()
                         .getHiddenColumnChunkEncoding();
-                int timestampIndex = curRGIdx * (includedColumns.length + 1) + timestampColId;
-                PixelsProto.ColumnChunkIndex timestampChunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                int hiddenTimestampIndex = curRGIdx * (includedColumns.length + 1) + hiddenTimestampColId;
+                PixelsProto.ColumnChunkIndex hiddenTimestampChunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                         .getHiddenColumnChunkIndexEntry();
-                readers[readers.length - 1].read(chunkBuffers[timestampIndex], timestampEncoding, curRowInRG, curBatchSize,
-                        postScript.getPixelStride(), 0, timestampVector, timestampChunkIndex);
+                readers[readers.length - 1].read(chunkBuffers[hiddenTimestampIndex], hiddenTimestampEncoding,
+                        curRowInRG, curBatchSize, postScript.getPixelStride(), 0,
+                        hiddenTimestampVector, hiddenTimestampChunkIndex);
 
                 /**
                  * construct the selected rows bitmap, size is curBatchSize
@@ -1085,7 +1087,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 int addedRows = 0;
                 for (int i = 0; i < curBatchSize; i++)
                 {
-                    if (timestampVector.vector[i] <= this.timestamp)
+                    if (hiddenTimestampVector.vector[i] <= this.transTimestamp)
                     {
                         selectedRows.set(i);
                         addedRows++;
@@ -1115,21 +1117,25 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 this.qualifiedRowNum += addedRows;
 
                 // update row group index if current row index exceeds max row count in the row group
-                if (curRowInRG >= rgRowCount) {
+                if (curRowInRG >= rgRowCount)
+                {
                     curRGIdx++;
                     //preRGIdx = curRGIdx; // keep in sync with curRGIdx
                     // if not end of file, update row count
-                    if (curRGIdx < targetRGNum) {
-                        rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                    if (curRGIdx < targetRGNum)
+                    {
+                        rgRowCount = footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
                         // refresh resultColumnsEncoded for reading the column vectors in the next row group.
                         PixelsProto.RowGroupEncoding rgEncoding = rowGroupFooters[curRGIdx].getRowGroupEncoding();
-                        for (int i = 0; i < includedColumnNum; i++) {
+                        for (int i = 0; i < includedColumnNum; i++)
+                        {
                             this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
                                     PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
                         }
                     }
                     // if end of file, set result vectorized row batch endOfFile
-                    else {
+                    else
+                    {
                         checkValid = false; // Issue #105: to reject continuous read.
                         resultRowBatch.endOfFile = true;
                         this.endOfFile = true;
@@ -1149,8 +1155,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 }
             }
 
-            for (ColumnVector cv : columnVectors) {
-                if (cv.duplicated) {
+            for (ColumnVector cv : columnVectors)
+            {
+                if (cv.duplicated)
+                {
                     // copyFrom() is actually a shallow copy
                     // rename copyFrom() to duplicate(), so it is more readable
                     cv.duplicate(columnVectors[cv.originVecId]);
@@ -1190,21 +1198,25 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 rowIndex += curBatchSize;
                 resultRowBatch.size += curBatchSize;
                 // update row group index if current row index exceeds max row count in the row group
-                if (curRowInRG >= rgRowCount) {
+                if (curRowInRG >= rgRowCount)
+                {
                     curRGIdx++;
                     //preRGIdx = curRGIdx; // keep in sync with curRGIdx
                     // if not end of file, update row count
-                    if (curRGIdx < targetRGNum) {
-                        rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                    if (curRGIdx < targetRGNum)
+                    {
+                        rgRowCount = footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
                         // refresh resultColumnsEncoded for reading the column vectors in the next row group.
                         PixelsProto.RowGroupEncoding rgEncoding = rowGroupFooters[curRGIdx].getRowGroupEncoding();
-                        for (int i = 0; i < includedColumnNum; i++) {
+                        for (int i = 0; i < includedColumnNum; i++)
+                        {
                             this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
                                     PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
                         }
                     }
                     // if end of file, set result vectorized row batch endOfFile
-                    else {
+                    else
+                    {
                         checkValid = false; // Issue #105: to reject continuous read.
                         resultRowBatch.endOfFile = true;
                         this.endOfFile = true;
@@ -1213,7 +1225,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
                     curRowInRG = 0;
                 }
-                if (this.enableEncodedVector) {
+                if (this.enableEncodedVector)
+                {
                     /**
                      * Issue #374:
                      * Dictionary column vector can not contain data from multiple column chunks,
@@ -1223,8 +1236,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 }
             }
 
-            for (ColumnVector cv : columnVectors) {
-                if (cv.duplicated) {
+            for (ColumnVector cv : columnVectors)
+            {
+                if (cv.duplicated)
+                {
                     // copyFrom() is actually a shallow copy
                     // rename copyFrom() to duplicate(), so it is more readable
                     cv.duplicate(columnVectors[cv.originVecId]);

@@ -35,7 +35,7 @@ public class PixelsReaderOption
     private boolean enableEncodedColumnVector = false; // whether read encoded column vectors directly when possible
     private boolean readIntColumnAsIntVector = false; // whether read int32 columns as int32 column vectors
     private long transId = -1L;
-    private long timestamp = -1L; // -1 means no need to consider the timestamp when reading data
+    private long transTimestamp = -1L; // -1 means no need to consider the timestamp when reading data
     private int rgStart = 0;
     private int rgLen = -1;     // -1 means reading to the end of the file
 
@@ -89,20 +89,20 @@ public class PixelsReaderOption
         return this.transId;
     }
 
-    public PixelsReaderOption timestamp(long timestamp)
+    public PixelsReaderOption transTimestamp(long transTimestamp)
     {
-        this.timestamp = timestamp;
+        this.transTimestamp = transTimestamp;
         return this;
     }
 
-    public long getTimestamp()
+    public long getTransTimestamp()
     {
-        return this.timestamp;
+        return this.transTimestamp;
     }
 
-    public boolean hasValidTimestamp()
+    public boolean hasValidTransTimestamp()
     {
-        return this.timestamp >= 0L;
+        return this.transTimestamp >= 0L;
     }
 
     public PixelsReaderOption rgRange(int rgStart, int rgLen)

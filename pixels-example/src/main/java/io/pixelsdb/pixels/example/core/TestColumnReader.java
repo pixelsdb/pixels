@@ -24,8 +24,6 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
-import io.pixelsdb.pixels.core.reader.DecimalColumnReader;
-import io.pixelsdb.pixels.core.reader.FloatColumnReader;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.*;
@@ -186,7 +184,7 @@ public class TestColumnReader
             cols[10] = reader.getFileSchema().getFieldNames().get(10);
             PixelsReaderOption option = new PixelsReaderOption();
             option.transId(0);
-            option.timestamp(85);
+            option.transTimestamp(85);
             option.skipCorruptRecords(true);
             option.tolerantSchemaEvolution(true);
             option.includeCols(cols);

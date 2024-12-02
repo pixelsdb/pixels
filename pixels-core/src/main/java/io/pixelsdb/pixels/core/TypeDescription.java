@@ -108,6 +108,16 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
      */
     public static final int MAX_TIME_PRECISION = 3;
 
+    /**
+     * The type of the hidden commit timestamp column.
+     */
+    public static final TypeDescription HIDDEN_COLUMN_TYPE = new TypeDescription(TypeDescription.Category.LONG);
+    /**
+     * The name of the hidden commit timestamp column.
+     */
+    public static final String HIDDEN_COLUMN_NAME = "hidden_commit_timestamp";
+
+
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
 
     private static final Logger logger = LogManager.getLogger(TypeDescription.class);
