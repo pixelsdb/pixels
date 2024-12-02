@@ -32,6 +32,7 @@ Pixels is mainly implemented in Java (with some JNI hooks of system calls and C/
 The [C++ document](cpp/README.md) gives the instructions of using the C++ reader. Here we explain how to build and use the Java components.
 
 JDK 8 (or above) and Maven 3.8 (or above) are required to build Pixels.
+Earlier Maven versions may work but are not tested.
 After installing these prerequisites, clone the Pixels codebase into any `SRC_BASE` directory:
 ```bash
 git clone https://github.com/pixelsdb/pixels.git
@@ -50,7 +51,7 @@ For example, to build the Trino integration for Pixels, just git clone [pixels-t
 and build it using `mvn package` in the local git repository.
 
 > Pixels by itself is compatible with Java 8+ and Maven 3.8+. However, third-party query engines such as Trino may require
-> a later JDK (e.g., Trino 405/466 requires JDK17.0.3+/23.0.0+) and Maven (e.g., Trino 466 requires Maven 3.9.9).
+> a later JDK (e.g., Trino 405/466 requires JDK17.0.3+/23.0.0+) and Maven.
 > It is fine to build the query engine integration (e.g., `pixels-trino`) with the same or higher versions of JDK and Maven than Pixels.
 
 

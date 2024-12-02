@@ -47,9 +47,16 @@ In this document, we are installing Pixels and Trino 466. The required JDK versi
 
 ## Install Maven
 
-Pixels requires Maven 3.8 or later to build the source code (early Maven versions may work, 
-but they are not tested). On some operating systems, the Maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17+. 
-In this case, manually install a newer Maven compatible with your JDK.
+Pixels requires Maven 3.8+ to build the source code.
+On some operating systems, the Maven installed by `apt` or `yum` might be incompatible with new JDKs such as 17+. 
+In this case, manually install a later Maven compatible with your JDK.
+
+Ensure Maven is using the required JDK:
+```bash
+mvn -v
+```
+The printed Java version should be consistent to the Java version printed by `java --version`.
+Otherwise, ensure `JAVA_HOME` is pointing to the `/path/to/the/required/jdk`.
 
 ## Setup AWS Credentials*
 
