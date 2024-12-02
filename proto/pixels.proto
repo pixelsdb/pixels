@@ -93,8 +93,6 @@ message Footer {
     optional Type hiddenType = 5;
     // file level hidden timestamp column statistics
     optional ColumnStatistic hiddenColumnStats = 6;
-    // row group statistics for hidden timestamp columns
-    repeated ColumnStatistic hiddenRowGroupStats = 7;
 }
 
 message Type {
@@ -156,6 +154,8 @@ message RowGroupInformation {
 message RowGroupStatistic {
     // statistic for each column chunk that can be used to filter row groups
     repeated ColumnStatistic columnChunkStats = 1;
+    // statistics for the column chunk of hidden timestamp column that can be used to filter row groups
+    optional ColumnStatistic hiddenColumnChunkStats = 7;
 }
 
 message IntegerStatistic  {

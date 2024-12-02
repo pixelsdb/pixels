@@ -45,8 +45,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 /**
  * @author guodong
  * @author hank
@@ -306,12 +304,11 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             return false;
         }
 
-        List<PixelsProto.RowGroupStatistic> rowGroupStatistics
-                = footer.getRowGroupStatsList();
-        List<PixelsProto.ColumnStatistic> hiddenRowGroupStatistics
-                = footer.getHiddenRowGroupStatsList();
-        checkArgument(!shouldReadHiddenTimestamp || !hiddenRowGroupStatistics.isEmpty(),
-                "Row group level hidden timestamp column statistics is not present.");
+        List<PixelsProto.RowGroupStatistic> rowGroupStatistics = footer.getRowGroupStatsList();
+        //List<PixelsProto.ColumnStatistic> hiddenRowGroupStatistics
+        //        = footer.getHiddenRowGroupStatsList();
+        //checkArgument(!shouldReadHiddenTimestamp || !hiddenRowGroupStatistics.isEmpty(),
+        //        "Row group level hidden timestamp column statistics is not present.");
         boolean[] includedRGs = new boolean[RGLen];
         if (includedRGs.length == 0)
         {
@@ -342,7 +339,9 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                         if (shouldReadHiddenTimestamp)
                         {
                             // get the row group level hidden timestamp column statistics
-                            PixelsProto.ColumnStatistic hiddenRowGroupStatistic = hiddenRowGroupStatistics.get(RGStart + i);
+                            PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
+                            PixelsProto.ColumnStatistic hiddenRowGroupStatistic =
+                                    rowGroupStatistic.getHiddenColumnChunkStats();
                             IntegerStatsRecorder hiddenTimestampStats = (IntegerStatsRecorder) StatsRecorder.create(
                                     new TypeDescription(TypeDescription.Category.LONG), hiddenRowGroupStatistic);
                             // check if the row group is qualified
@@ -365,9 +364,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 }
                 else
                 {
-                    throw new IOException(
-                            "predicate does not match none or all while included columns is empty, predicate=" +
-                            predicate.toString());
+                    throw new IOException("predicate does not match none or all " +
+                            "while included columns is empty, predicate=" + predicate);
                 }
             }
             else
@@ -406,10 +404,12 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     // second, get row group statistics, if not matches, skip the row group
                     for (int i = 0; i < RGLen; i++)
                     {
+                        PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
                         if (shouldReadHiddenTimestamp)
                         {
                             // get the row group level hidden timestamp column statistics
-                            PixelsProto.ColumnStatistic hiddenRowGroupStatistic = hiddenRowGroupStatistics.get(RGStart + i);
+                            PixelsProto.ColumnStatistic hiddenRowGroupStatistic =
+                                    rowGroupStatistic.getHiddenColumnChunkStats();
                             IntegerStatsRecorder hiddenTimestampStats = (IntegerStatsRecorder) StatsRecorder.create(
                                     new TypeDescription(TypeDescription.Category.LONG), hiddenRowGroupStatistic);
                             // check if the row group is qualified
@@ -421,7 +421,6 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                         }
                         // Issue #103: columnStatsMap should be cleared for each row group.
                         columnStatsMap.clear();
-                        PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
                         List<PixelsProto.ColumnStatistic> rgColumnStatistics =
                                 rowGroupStatistic.getColumnChunkStatsList();
                         for (int id : targetColumns)
@@ -442,9 +441,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         {
             for (int i = 0; i < RGLen; i++)
             {
-                if (this.transTimestamp != -1L)
+                if (shouldReadHiddenTimestamp)
                 {
-                    PixelsProto.ColumnStatistic hiddenRowGroupStatistic = hiddenRowGroupStatistics.get(RGStart + i);
+                    PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
+                    PixelsProto.ColumnStatistic hiddenRowGroupStatistic = rowGroupStatistic.getHiddenColumnChunkStats();
                     IntegerStatsRecorder hiddenTimestampStats = (IntegerStatsRecorder) StatsRecorder.create(
                             new TypeDescription(TypeDescription.Category.LONG), hiddenRowGroupStatistic);
                     // check if the row group is qualified
