@@ -269,12 +269,13 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         for (int i = 0; i < resultColumns.length; i++)
         {
             int index = resultColumns[i];
-            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
+            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index), option);
         }
         if (this.shouldReadTimestamp)
         {
             // create reader for the hidden timestamp column
-            readers[readers.length - 1] = ColumnReader.newColumnReader(new TypeDescription(TypeDescription.Category.LONG));
+            readers[readers.length - 1] = ColumnReader.newColumnReader(
+                    new TypeDescription(TypeDescription.Category.LONG), option);
         }
 
         // create result vectorized row batch

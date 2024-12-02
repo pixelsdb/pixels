@@ -244,7 +244,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         for (int i = 0; i < resultColumns.length; i++)
         {
             int index = resultColumns[i];
-            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
+            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index), option);
         }
 
         // create result vectorized row batch

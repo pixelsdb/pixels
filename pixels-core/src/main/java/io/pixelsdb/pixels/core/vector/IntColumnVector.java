@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -27,27 +27,26 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * LongColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
- * <p>
- * This class represents a nullable long column vector.
- * This class can be used for operations on all integer types (tinyint, smallint, int, bigint)
- * and as such uses a 64-bit long value to hold the biggest possible value.
- * During copy-in/copy-out, smaller int types will be converted as needed. This will
- * reduce the amount of code that needs to be generated and also will run fast since the
- * machine operates with 64-bit words.
+ * This class represents a nullable int column vector.
+ * This class uses a 32-bit long value to hold the values.
+ * In high Java versions such as Java 23, 32-bit integer has comparable operation performance as 64-bit integer.
+ * Therefore, using 32-bit column vector for int32 columns saves memory without performance degradation.
  * <p>
  * The vector[] field is public by design for high-performance access in the inner
  * loop of query execution.
+ *
+ * @author hank
+ * @create 2024-12-02
  */
-public class LongColumnVector extends ColumnVector
+public class IntColumnVector extends ColumnVector
 {
-    public long[] vector;
+    public int[] vector;
 
     /**
      * Use this constructor by default. All column vectors
      * should normally be the default size.
      */
-    public LongColumnVector()
+    public IntColumnVector()
     {
         this(VectorizedRowBatch.DEFAULT_SIZE);
     }
@@ -57,11 +56,11 @@ public class LongColumnVector extends ColumnVector
      *
      * @param len the number of rows
      */
-    public LongColumnVector(int len)
+    public IntColumnVector(int len)
     {
         super(len);
-        vector = new long[len];
-        memoryUsage += Long.BYTES * len;
+        vector = new int[len];
+        memoryUsage += Integer.BYTES * len;
     }
 
     @Override
@@ -76,7 +75,7 @@ public class LongColumnVector extends ColumnVector
                 add(0);
                 break;
             default:
-                add(Long.parseLong(value));
+                add(Integer.parseInt(value));
                 break;
         }
     }
@@ -85,18 +84,6 @@ public class LongColumnVector extends ColumnVector
     public void add(boolean value)
     {
         add(value ? 1 : 0);
-    }
-
-    @Override
-    public void add(long v)
-    {
-        if (writeIndex >= getLength())
-        {
-            ensureSize(writeIndex * 2, true);
-        }
-        int index = writeIndex++;
-        vector[index] = v;
-        isNull[index] = false;
     }
 
     @Override
@@ -123,7 +110,7 @@ public class LongColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 16));
+            hashCode[i] = 31 * hashCode[i] + (this.vector[i] ^ (this.vector[i] >>> 16));
         }
         return hashCode;
     }
@@ -131,7 +118,7 @@ public class LongColumnVector extends ColumnVector
     @Override
     public boolean elementEquals(int index, int otherIndex, ColumnVector other)
     {
-        LongColumnVector otherVector = (LongColumnVector) other;
+        IntColumnVector otherVector = (IntColumnVector) other;
         if (!this.isNull[index] && !otherVector.isNull[otherIndex])
         {
             return this.vector[index] == otherVector.vector[otherIndex];
@@ -142,7 +129,7 @@ public class LongColumnVector extends ColumnVector
     @Override
     public int compareElement(int index, int otherIndex, ColumnVector other)
     {
-        LongColumnVector otherVector = (LongColumnVector) other;
+        IntColumnVector otherVector = (IntColumnVector) other;
         if (!this.isNull[index] && !otherVector.isNull[otherIndex])
         {
             return this.vector[index] < otherVector.vector[otherIndex] ? -1 :
@@ -152,7 +139,7 @@ public class LongColumnVector extends ColumnVector
     }
 
     // Fill the column vector with the provided value
-    public void fill(long value)
+    public void fill(int value)
     {
         noNulls = true;
         isRepeating = true;
@@ -168,7 +155,7 @@ public class LongColumnVector extends ColumnVector
         if (isRepeating)
         {
             isRepeating = false;
-            long repeatVal = vector[0];
+            int repeatVal = vector[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
@@ -194,7 +181,7 @@ public class LongColumnVector extends ColumnVector
         if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
             isNull[index] = false;
-            vector[index] = ((LongColumnVector) inputVector).vector[inputIndex];
+            vector[index] = ((IntColumnVector) inputVector).vector[inputIndex];
         }
         else
         {
@@ -208,7 +195,7 @@ public class LongColumnVector extends ColumnVector
     {
         // isRepeating should be false and src should be an instance of LongColumnVector.
         // However, we do not check these for performance considerations.
-        LongColumnVector source = (LongColumnVector) src;
+        IntColumnVector source = (IntColumnVector) src;
 
         for (int i = offset; i < offset + length; i++)
         {
@@ -229,9 +216,9 @@ public class LongColumnVector extends ColumnVector
     @Override
     public void duplicate(ColumnVector inputVector)
     {
-        if (inputVector instanceof LongColumnVector)
+        if (inputVector instanceof IntColumnVector)
         {
-            LongColumnVector srcVector = (LongColumnVector) inputVector;
+            IntColumnVector srcVector = (IntColumnVector) inputVector;
             this.vector = srcVector.vector;
             this.isNull = srcVector.isNull;
             this.writeIndex = srcVector.writeIndex;
@@ -292,9 +279,9 @@ public class LongColumnVector extends ColumnVector
         super.ensureSize(size, preserveData);
         if (size > vector.length)
         {
-            long[] oldArray = vector;
-            vector = new long[size];
-            memoryUsage += Long.BYTES * size;
+            int[] oldArray = vector;
+            vector = new int[size];
+            memoryUsage += Integer.BYTES * size;
             length = size;
             if (preserveData)
             {
