@@ -90,7 +90,7 @@ public class PixelsConsumer extends Consumer
             short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
             TypeDescription schema = TypeDescription.fromString(schemaStr);
-            VectorizedRowBatch rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride);
+            VectorizedRowBatch rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
             ColumnVector[] columnVectors = rowBatch.cols;
 
             BufferedReader reader;

@@ -107,6 +107,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
      * For simplicity and compatibility to {@link java.sql.Time}, we further limit the precision to 3.</p>
      */
     public static final int MAX_TIME_PRECISION = 3;
+
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
 
     private static final Logger logger = LogManager.getLogger(TypeDescription.class);
@@ -1166,7 +1167,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         return maxId;
     }
 
-    private ColumnVector createColumn(int maxSize, boolean... useEncodedVector)
+    private ColumnVector createColumn(int maxSize, int mode, boolean... useEncodedVector)
     {
         requireNonNull(useEncodedVector, "columnsEncoded should not be null");
         // the length of useEncodedVector is already checked, not need to check again.
@@ -1177,6 +1178,14 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                 return new ByteColumnVector(maxSize);
             case SHORT:
             case INT:
+                if (Mode.match(mode, Mode.CREATE_INT_VECTOR_FOR_INT))
+                {
+                    return new IntColumnVector(maxSize);
+                }
+                else
+                {
+                    return new LongColumnVector(maxSize);
+                }
             case LONG:
                 return new LongColumnVector(maxSize);
             case DATE:
@@ -1212,7 +1221,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                 ColumnVector[] fieldVector = new ColumnVector[children.size()];
                 for (int i = 0; i < fieldVector.length; ++i)
                 {
-                    fieldVector[i] = children.get(i).createColumn(maxSize, useEncodedVector[i]);
+                    fieldVector[i] = children.get(i).createColumn(maxSize, mode, useEncodedVector[i]);
                 }
                 return new StructColumnVector(maxSize, fieldVector);
             }
@@ -1223,7 +1232,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         }
     }
 
-    public VectorizedRowBatch createRowBatch(int maxSize, boolean... useEncodedVector)
+    public VectorizedRowBatch createRowBatch(int maxSize, int mode, boolean... useEncodedVector)
     {
         VectorizedRowBatch result;
         if (category == Category.STRUCT)
@@ -1235,7 +1244,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             for (int i = 0; i < result.cols.length; ++i)
             {
                 String fieldName = fieldNames.get(i);
-                ColumnVector cv = children.get(i).createColumn(maxSize,
+                ColumnVector cv = children.get(i).createColumn(maxSize, mode,
                         useEncodedVector.length != 0 && useEncodedVector[i]);
                 int originId = columnNames.indexOf(fieldName);
                 if (originId >= 0)
@@ -1255,7 +1264,8 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             checkArgument(useEncodedVector.length == 0 || useEncodedVector.length == 1,
                     "for null structure type, there can be only 0 or 1 elements in useEncodedVector");
             result = new VectorizedRowBatch(1, maxSize);
-            result.cols[0] = createColumn(maxSize, useEncodedVector.length == 1 && useEncodedVector[0]);
+            result.cols[0] = createColumn(maxSize, mode,
+                    useEncodedVector.length == 1 && useEncodedVector[0]);
         }
         result.reset();
         return result;
@@ -1263,10 +1273,10 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
 
     public VectorizedRowBatch createRowBatch()
     {
-        return createRowBatch(VectorizedRowBatch.DEFAULT_SIZE);
+        return createRowBatch(VectorizedRowBatch.DEFAULT_SIZE, Mode.NONE);
     }
 
-    public VectorizedRowBatch createRowBatchWithHiddenColumn(int maxSize, boolean... useEncodedVector)
+    public VectorizedRowBatch createRowBatchWithHiddenColumn(int maxSize, int mode, boolean... useEncodedVector)
     {
         VectorizedRowBatch result;
         if (category == Category.STRUCT)
@@ -1279,7 +1289,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             for (int i = 0; i < result.cols.length - 1; ++i)
             {
                 String fieldName = fieldNames.get(i);
-                ColumnVector cv = children.get(i).createColumn(maxSize,
+                ColumnVector cv = children.get(i).createColumn(maxSize, mode,
                         useEncodedVector.length != 0 && useEncodedVector[i]);
                 int originId = columnNames.indexOf(fieldName);
                 if (originId >= 0)
@@ -1301,7 +1311,8 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             checkArgument(useEncodedVector.length == 0 || useEncodedVector.length == 1,
                     "for null structure type, there can be only 0 or 1 elements in useEncodedVector");
             result = new VectorizedRowBatch(2, maxSize);
-            result.cols[0] = createColumn(maxSize, useEncodedVector.length == 1 && useEncodedVector[0]);
+            result.cols[0] = createColumn(maxSize, mode,
+                    useEncodedVector.length == 1 && useEncodedVector[0]);
             result.cols[1] = new LongColumnVector(maxSize);
         }
         result.reset();
@@ -1310,7 +1321,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
 
     public VectorizedRowBatch createRowBatchWithHiddenColumn()
     {
-        return createRowBatchWithHiddenColumn(VectorizedRowBatch.DEFAULT_SIZE);
+        return createRowBatchWithHiddenColumn(VectorizedRowBatch.DEFAULT_SIZE, Mode.NONE);
     }
 
     /**
@@ -1600,6 +1611,23 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                 prev = next;
             }
             return prev.findSubtype(goal);
+        }
+    }
+
+    /**
+     * The type related modes used when creating column vectors and row batches.
+     */
+    public static final class Mode
+    {
+        public static final int NONE = 0;
+        /**
+         * Create {@link IntColumnVector} for INT type.
+         */
+        public static final int CREATE_INT_VECTOR_FOR_INT = 0x01;
+
+        public static boolean match(int mode1, int mode2)
+        {
+            return (mode1 & mode2) != 0;
         }
     }
 }
