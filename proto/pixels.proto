@@ -147,7 +147,7 @@ message RowGroupInformation {
     // serialized RowGroupFooter length
     optional uint32 footerLength = 3;
     // number of rows in this row group
-    optional uint64 numberOfRows = 4;
+    optional uint32 numberOfRows = 4;
     // the information of the hash partition, if Footer.partitioned is true
     optional PartitionInformation partitionInfo = 5;
 }

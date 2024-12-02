@@ -115,14 +115,14 @@ public class PixelsWriterImpl implements PixelsWriter
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
     private ColumnWriter hiddenColumnWriter;
-    private StatsRecorder hiddenFileColStatRecorder;
+    private final StatsRecorder hiddenFileColStatRecorder;
     private long fileContentLength;
     private int fileRowNum;
 
     private long writtenBytes = 0L;
     private long curRowGroupOffset = 0L;
     private long curRowGroupFooterOffset = 0L;
-    private long curRowGroupNumOfRows = 0L;
+    private int curRowGroupNumOfRows = 0;
     private int curRowGroupDataLength = 0;
     /**
      * Whether any current hash value has been set.
@@ -464,7 +464,7 @@ public class PixelsWriterImpl implements PixelsWriter
         if (curRowGroupDataLength >= rowGroupSize)
         {
             writeRowGroup();
-            curRowGroupNumOfRows = 0L;
+            curRowGroupNumOfRows = 0;
             return false;
         }
         return true;
@@ -482,7 +482,7 @@ public class PixelsWriterImpl implements PixelsWriter
             {
                 // Write the current partition (row group) and add the row batch to a new partition.
                 writeRowGroup();
-                curRowGroupNumOfRows = 0L;
+                curRowGroupNumOfRows = 0;
             }
         }
         currHashValue = hashValue;
