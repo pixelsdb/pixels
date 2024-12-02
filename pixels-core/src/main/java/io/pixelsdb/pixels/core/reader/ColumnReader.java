@@ -66,7 +66,7 @@ public abstract class ColumnReader implements Closeable
             case SHORT:
             case INT:
             case LONG:
-                return new IntegerColumnReader(type);
+                return new LongColumnReader(type);
             case DOUBLE:
                 return new DoubleColumnReader(type);
             case DECIMAL: // Issue #196: precision and scale are passed through type.

@@ -39,7 +39,7 @@ import java.util.Arrays;
  * @create 2017-12-06
  * @update 2023-08-21: support nulls padding
  */
-public class IntegerColumnReader extends ColumnReader
+public class LongColumnReader extends ColumnReader
 {
     private RunLenIntDecoder decoder;
     private ByteBuffer inputBuffer;
@@ -50,7 +50,7 @@ public class IntegerColumnReader extends ColumnReader
      */
     private boolean isLong = false;
 
-    IntegerColumnReader(TypeDescription type)
+    LongColumnReader(TypeDescription type)
     {
         super(type);
     }

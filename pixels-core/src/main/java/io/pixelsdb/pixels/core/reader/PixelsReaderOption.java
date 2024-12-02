@@ -33,6 +33,7 @@ public class PixelsReaderOption
     private boolean skipCorruptRecords = false;
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
     private boolean enableEncodedColumnVector = false; // whether read encoded column vectors directly when possible
+    private boolean readIntColumnAsIntVector = false; // whether read int32 columns as int32 column vectors
     private long transId = -1L;
     private long timestamp = -1L; // -1 means no need to consider the timestamp when reading data
     private int rgStart = 0;
@@ -141,5 +142,15 @@ public class PixelsReaderOption
     public boolean isEnableEncodedColumnVector()
     {
         return enableEncodedColumnVector;
+    }
+
+    public void readIntColumnAsIntVector(boolean readIntColumnAsIntVector)
+    {
+        this.readIntColumnAsIntVector = readIntColumnAsIntVector;
+    }
+
+    public boolean isReadIntColumnAsIntVector()
+    {
+        return readIntColumnAsIntVector;
     }
 }

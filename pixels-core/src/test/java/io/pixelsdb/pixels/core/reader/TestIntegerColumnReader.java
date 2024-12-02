@@ -73,7 +73,7 @@ public class TestIntegerColumnReader
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        IntegerColumnReader columnReader = new IntegerColumnReader(TypeDescription.createInt());
+        LongColumnReader columnReader = new LongColumnReader(TypeDescription.createInt());
         LongColumnVector longColumnVector1 = new LongColumnVector(22);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
                 10, 0, longColumnVector1, chunkIndex);
@@ -126,7 +126,7 @@ public class TestIntegerColumnReader
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        IntegerColumnReader columnReader = new IntegerColumnReader(TypeDescription.createLong());
+        LongColumnReader columnReader = new LongColumnReader(TypeDescription.createLong());
         LongColumnVector longColumnVector1 = new LongColumnVector(22);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
                 10, 0, longColumnVector1, chunkIndex);
