@@ -149,8 +149,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.footer = footer;
         this.option = option;
         this.transId = option.getTransId();
-        this.transTimestamp = option.getTimestamp();
-        this.shouldReadHiddenTimestamp = option.hasValidTimestamp() && postScript.getHasHiddenColumn();
+        this.transTimestamp = option.getTransTimestamp();
+        this.shouldReadHiddenTimestamp = option.hasValidTransTimestamp() && postScript.getHasHiddenColumn();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
