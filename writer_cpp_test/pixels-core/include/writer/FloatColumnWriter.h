@@ -1,0 +1,8 @@
+//
+// Created by whz on 11/19/24.
+//
+
+#ifndef DUCKDB_FLOATCOLUMNWRITER_H
+#define DUCKDB_FLOATCOLUMNWRITER_H
+
+#endif // DUCKDB_FLOATCOLUMNWRITER_H

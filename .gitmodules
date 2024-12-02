@@ -4,3 +4,6 @@
 [submodule "cpp/pixels-duckdb"]
 	path = cpp/pixels-duckdb
 	url = git@github.com:pixelsdb/duckdb.git
+[submodule "writer_cpp_test/third-party/protobuf"]
+	path = writer_cpp_test/third-party/protobuf
+	url = https://github.com/protocolbuffers/protobuf
