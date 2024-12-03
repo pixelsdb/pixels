@@ -574,11 +574,11 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     }
 
     private void readRowGroup() throws IOException {
-        curRGIdx++;
         if (curRowInRG < curRGCount)
         {
             return;
         }
+        curRGIdx++;
 
         int rowGroupDataLen = 0;
         try
@@ -603,6 +603,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             curRGBuffer = ByteBuffer.allocate(rowGroupDataLen);
         }
         physicalReader.readFully(curRGBuffer.array(), 0, rowGroupDataLen);
+        curRGBuffer.position(0);
         curRGBuffer.limit(rowGroupDataLen);
 
         // write to file
@@ -622,6 +623,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
             curRGFooterBuffer = ByteBuffer.allocate(rowGroupFooterLen);
         }
         physicalReader.readFully(curRGFooterBuffer.array(), 0, rowGroupFooterLen);
+        curRGFooterBuffer.position(0);
         curRGFooterBuffer.limit(rowGroupFooterLen);
 
         curRowGroupStreamFooter = PixelsStreamProto.StreamRowGroupFooter.parseFrom(curRGFooterBuffer);
