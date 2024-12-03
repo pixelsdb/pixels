@@ -94,13 +94,15 @@ public:
     static std::shared_ptr<TypeDescription> parseType(StringPosition &source);
     static std::shared_ptr<TypeDescription> fromString(const std::string &typeName);
     std::vector<std::shared_ptr<TypeDescription>> getChildren();
-    Category getCategory();
+    Category getCategory() const;
 	std::vector<std::string> getFieldNames();
 	int getPrecision();
 	int getScale();
     TypeDescription withPrecision(int precision);
     TypeDescription withScale(int scale);
     TypeDescription withMaxLength(int maxLength);
+
+    int getMaxLength();
     static std::map<Category, CategoryProperty> categoryMap;
 
     static int SHORT_DECIMAL_MAX_PRECISION;
@@ -127,6 +129,9 @@ public:
     static int MAX_TIMESTAMP_PRECISION;
 
     static int MAX_TIME_PRECISION;
+
+    void writeTypes(std::shared_ptr<pixels::proto::Footer> footer);
+
 
 
 private:

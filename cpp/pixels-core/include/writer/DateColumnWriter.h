@@ -1,0 +1,8 @@
+//
+// Created by whz on 11/19/24.
+//
+
+#ifndef DUCKDB_DATECOLUMNWRITER_H
+#define DUCKDB_DATECOLUMNWRITER_H
+
+#endif // DUCKDB_DATECOLUMNWRITER_H
