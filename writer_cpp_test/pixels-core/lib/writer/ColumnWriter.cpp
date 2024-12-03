@@ -85,6 +85,9 @@ ColumnWriter::ColumnWriter(std::shared_ptr<TypeDescription> type,
           isNull(pixelStride, false)
 
 {
+    outputStream=std::make_shared<ByteBuffer>();
+    isNullStream=std::make_shared<ByteBuffer>();
+    columnChunkIndex=std::make_shared<pixels::proto::ColumnChunkIndex>();
     columnChunkIndex->set_littleendian(byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN);
     columnChunkIndex->set_nullspadding(nullsPadding);
     columnChunkIndex->set_isnullalignment(ISNULL_ALIGNMENT);

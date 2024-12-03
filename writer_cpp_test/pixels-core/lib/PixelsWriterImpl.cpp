@@ -9,6 +9,7 @@
 #include <future>
 #include "writer/ColumnWriterBuilder.h"
 #include "pixels-common/pixels.pb.h"
+#include "ColumnWriterBuilder.h"
 
 const int PixelsWriterImpl::CHUNK_ALIGNMENT = std::stoi(ConfigFactory::Instance().getProperty("column.chunk.alignment"));
 
@@ -24,6 +25,10 @@ PixelsWriterImpl::PixelsWriterImpl(std::shared_ptr<TypeDescription> schema, int 
     // this->timeZone = std::unique_ptr<icu::TimeZone>(icu::TimeZone::createDefault());
     this->children = schema->getChildren();
     this->partitioned=partitioned;
+
+    for(int i=0;i<children.size();i++){
+        columnWriters.push_back(ColumnWriterBuilder::newColumnWriter(children.at(i),columnWriterOption));
+    }
 }
 
 bool PixelsWriterImpl::addRowBatch(std::shared_ptr<VectorizedRowBatch> rowBatch) {
@@ -48,13 +53,14 @@ void PixelsWriterImpl::writeColumnVectors(std::vector<std::shared_ptr<ColumnVect
 
     // Writing regular columns
     for (int i = 0; i < commonColumnLength; ++i) {
-        futures.push_back(std::async(std::launch::async, [&]() {
-            try {
-                dataLength += columnWriters[i]->write(columnVectors[i], rowBatchSize);
-            } catch (const std::exception& e) {
-                throw std::runtime_error("failed to write column vector: " + std::string(e.what()));
-            }
-        }));
+        dataLength += columnWriters[i]->write(columnVectors[i], rowBatchSize);
+//        futures.push_back(std::async(std::launch::async, [&]() {
+//            try {
+//                dataLength += columnWriters[i]->write(columnVectors[i], rowBatchSize);
+//            } catch (const std::exception& e) {
+//                throw std::runtime_error("failed to write column vector: " + std::string(e.what()));
+//            }
+//        }));
     }
 
 

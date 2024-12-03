@@ -1,5 +1,6 @@
 #include "writer/IntegerColumnWriter.h"
 #include "utils/BitUtils.h"
+//#include <variant>
 
 IntegerColumnWriter::IntegerColumnWriter(std::shared_ptr<TypeDescription> type, std::shared_ptr<PixelsWriterOption> writerOption) :
 ColumnWriter(type, writerOption), curPixelVector(pixelStride)
@@ -14,12 +15,19 @@ ColumnWriter(type, writerOption), curPixelVector(pixelStride)
 
 int IntegerColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
 {
+    std::cout<<"In IntegerColumnWriter"<<std::endl;
     auto columnVector = std::static_pointer_cast<LongColumnVector>(vector);
     if (!columnVector)
     {
         throw std::invalid_argument("Invalid vector type");
     }
-    auto values = columnVector->longVector;
+    long* values;
+    if(columnVector->isLongVectore()){
+      values=columnVector->longVector;
+
+    }else {
+        values = columnVector->intVector;
+    }
 
     int curPartLength;         // size of the partition which belongs to current pixel
     int curPartOffset = 0;     // starting offset of the partition which belongs to current pixel
