@@ -292,7 +292,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         for (int i = 0; i < resultColumns.length; i++)
         {
             int index = resultColumns[i];
-            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
+            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index), option);
         }
 
         // create result vectorized row batch
@@ -476,7 +476,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private VectorizedRowBatch createEmptyEOFRowBatch(int size)
     {
         TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0);
+        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0, TypeDescription.Mode.NONE);
         resultRowBatch.projectionSize = 0;
         resultRowBatch.endOfFile = true;
         resultRowBatch.size = size;
@@ -496,7 +496,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         {
             if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
             {
-                this.resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
+                this.resultRowBatch = resultSchema.createRowBatch(batchSize,
+                        TypeDescription.Mode.NONE, resultColumnsEncoded);
                 this.resultRowBatch.projectionSize = includedColumnNum;
             }
             this.resultRowBatch.reset();
@@ -505,7 +506,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         }
         else
         {
-            resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
+            resultRowBatch = resultSchema.createRowBatch(batchSize, TypeDescription.Mode.NONE, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
         }
 
@@ -744,7 +745,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         {
             if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
             {
-                this.resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
+                this.resultRowBatch = resultSchema.createRowBatch(batchSize,
+                        TypeDescription.Mode.NONE, resultColumnsEncoded);
                 this.resultRowBatch.projectionSize = includedColumnNum;
             }
             this.resultRowBatch.reset();
@@ -753,7 +755,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         }
         else
         {
-            resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
+            resultRowBatch = resultSchema.createRowBatch(batchSize, TypeDescription.Mode.NONE, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
         }
 
