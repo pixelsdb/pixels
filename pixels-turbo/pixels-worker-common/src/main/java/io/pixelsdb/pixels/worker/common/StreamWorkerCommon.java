@@ -46,6 +46,9 @@ public class StreamWorkerCommon extends WorkerCommon
     private static final Logger logger = LogManager.getLogger(StreamWorkerCommon.class);
     private static final Storage http = null;  // placeholder. todo: modularize into a pixels-storage-stream module.
 
+    public static final int STREAM_PORT_SMALL_TABLE = 18688;
+    public static final int STREAM_PORT_LARGE_TABLE = 18686;
+
     public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException
     {
         if (storageInfo.getScheme() == Storage.Scheme.httpstream)

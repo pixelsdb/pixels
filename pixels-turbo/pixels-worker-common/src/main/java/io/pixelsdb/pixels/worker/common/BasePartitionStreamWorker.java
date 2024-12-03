@@ -69,10 +69,12 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
         super(context);
         this.logger = context.getLogger();
         this.workerMetrics = context.getWorkerMetrics();
-        this.workerCoordinateService = new WorkerCoordinateService("128.110.218.225", 18894);
-        // Hardcoded for Cloudlab. todo: Need to figure out how to get the daemon IP dynamically.
-        //  Perhaps add a field in the WorkerContext class to store the daemon IP,
-        //  or to have the Pixels planner pass the daemon IP in the Input.
+        this.workerCoordinateService = new WorkerCoordinateService(
+                StreamWorkerCommon.getCoordinatorIp(), StreamWorkerCommon.getCoordinatorPort());
+        // In cloud functions, configuration files "pixels.properties" are not present, and so the pre-packaged
+        //  configuration file "pixels-common/src/main/resources/pixels.properties" will be used during runtime.
+        // Therefore, you need to modify the coordinator host and port in the pre-packaged configuration file on localhost
+        //  where you rebuild the Docker image.
     }
 
     @Override
@@ -184,19 +186,15 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                     .collect(ImmutableList.toImmutableList());
             List<String> outputEndpoints = downStreamWorkers.stream()
                     .map(CFWorkerInfo::getIp)
-                    .map(ip -> "http://" + ip + ":"
-                            + (Objects.equals(event.getTableInfo().getTableName(), "part") ? "18688" : "18686") + "/")
+                    .map(ip -> "http://" + ip + ":" +
+                            (event.isSmallTable() ? StreamWorkerCommon.STREAM_PORT_SMALL_TABLE : StreamWorkerCommon.STREAM_PORT_LARGE_TABLE))
                     // .map(URI::create)
                     .collect(Collectors.toList());
-            // todo: Need to pass whether the table is the large table or the small table here into the partition worker.
-            //  Perhaps add a boolean field in the PartitionInput class.
-            //  Currently, we hardcode the table name for TPC-H Q14 - the large table (rightTable for join) uses port 18686
-            //  while the small table (leftTable for join) uses port 18688.
 
             StreamWorkerCommon.passSchemaToNextLevel(writerSchema.get(), outputStorageInfo, outputEndpoints);
             PixelsWriter pixelsWriter = StreamWorkerCommon.getWriter(writerSchema.get(),
                     StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                    true, 0,  // todo: hardcoded for only 1 partition worker scenario; need to pass the actual value
+                    true, event.getPartitionId(),
                     Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()),
                     outputEndpoints, false);
             Set<Integer> hashValues = new HashSet<>(numPartition);
@@ -209,8 +207,12 @@ public class BasePartitionStreamWorker extends Worker<PartitionInput, PartitionO
                     {
                         pixelsWriter.addRowBatch(batch, hash);
                     }
-                    hashValues.add(hash);
                 }
+                else
+                {
+                    pixelsWriter.addRowBatch(null, hash);
+                }
+                hashValues.add(hash);
             }
             partitionOutput.addOutput(outputPath);
             partitionOutput.setHashValues(hashValues);

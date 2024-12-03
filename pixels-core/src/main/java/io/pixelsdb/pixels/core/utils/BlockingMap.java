@@ -51,7 +51,7 @@ public class BlockingMap<K, V>
 
     public V get(K key) throws InterruptedException
     {
-        V ret = getQueue(key).poll(60, TimeUnit.SECONDS);
+        V ret = getQueue(key).poll(300, TimeUnit.SECONDS);
         if (ret == null)
         {
             throw new RuntimeException("BlockingMap.get() timed out");

@@ -970,6 +970,10 @@ public class PixelsPlanner
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
                         getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
+                for (PartitionInput rightPartitionInput : rightPartitionInputs)
+                {
+                    rightPartitionInput.setSmallTable(join.getJoinEndian() != JoinEndian.SMALL_LEFT);
+                }
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
@@ -993,7 +997,7 @@ public class PixelsPlanner
                             new PartitionedJoinBatchOperator(joinedTable.getTableName(),
                                     rightPartitionInputs, null, joinInputs, joinAlgo) :
                             new PartitionedJoinStreamOperator(joinedTable.getTableName(),
-                                    null, rightPartitionInputs, joinInputs, joinAlgo);
+                                    rightPartitionInputs, null, joinInputs, joinAlgo);
                     joinOperator.setLargeChild(childOperator);
                 }
             }
@@ -1005,6 +1009,11 @@ public class PixelsPlanner
                         leftTable, leftInputSplits, leftKeyColumnIds, leftPartitionProjection, numPartition,
                         getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
+                for (PartitionInput leftPartitionInput : leftPartitionInputs)
+                {
+                    leftPartitionInput.setSmallTable(join.getJoinEndian() == JoinEndian.SMALL_LEFT);
+                }
+
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs, leftPartitionProjection);
 
@@ -1013,6 +1022,11 @@ public class PixelsPlanner
                         rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
                         getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
+                for (PartitionInput rightPartitionInput : rightPartitionInputs)
+                {
+                    rightPartitionInput.setSmallTable(join.getJoinEndian() != JoinEndian.SMALL_LEFT);
+                }
+
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
 
@@ -1264,7 +1278,9 @@ public class PixelsPlanner
         if (table.getTableType() == Table.TableType.BASE)
         {
             return new PartitionedTableInfo(table.getTableName(), true,
-                    newColumnsToRead, InputStorageInfo, rightPartitionedFiles.build(),
+                    newColumnsToRead,
+                    EnabledExchangeMethod == ExchangeMethod.batch ? InputStorageInfo : IntermediateStorageInfo,
+                    rightPartitionedFiles.build(),
                     IntraWorkerParallelism, newKeyColumnIds);
         } else
         {
@@ -1310,7 +1326,9 @@ public class PixelsPlanner
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setProjection(partitionProjection);
-            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part",
+                    EnabledExchangeMethod == ExchangeMethod.batch ? InputStorageInfo : IntermediateStorageInfo,
+                    true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);
@@ -1339,6 +1357,7 @@ public class PixelsPlanner
     {
         boolean postPartition = false;
         PartitionInfo postPartitionInfo = null;
+        boolean postPartitionIsSmallTable = false;
         if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
         {
             postPartition = true;
@@ -1353,10 +1372,12 @@ public class PixelsPlanner
             if (joinedTable == parent.get().getJoin().getLeftTable())
             {
                 postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPostPartition);
+                postPartitionIsSmallTable = parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT;
             }
             else
             {
                 postPartitionInfo = new PartitionInfo(parent.get().getJoin().getRightKeyColumnIds(), numPostPartition);
+                postPartitionIsSmallTable = parent.get().getJoin().getJoinEndian() != JoinEndian.SMALL_LEFT;
             }
         }
 
@@ -1374,7 +1395,9 @@ public class PixelsPlanner
 
             String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
                     joinedTable.getTableName() + "/";
-            MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
+            MultiOutputInfo output = new MultiOutputInfo(path,
+                    postPartition && EnabledExchangeMethod != ExchangeMethod.batch ? IntermediateStorageInfo : InputStorageInfo,
+                    true, outputFileNames.build());
 
             boolean[] leftProjection = leftPartitionProjection == null ? joinedTable.getJoin().getLeftProjection() :
                     rewriteProjectionForPartitionedJoin(joinedTable.getJoin().getLeftProjection(), leftPartitionProjection);
@@ -1386,15 +1409,15 @@ public class PixelsPlanner
             {
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
                         joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
-                        leftProjection, rightProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
-                 joinInput = new PartitionedJoinInput(transId, timestamp, leftTableInfo, rightTableInfo, joinInfo,
+                        leftProjection, rightProjection, postPartition, postPartitionInfo, postPartitionIsSmallTable, numPartition, ImmutableList.of(i));
+                joinInput = new PartitionedJoinInput(transId, timestamp, leftTableInfo, rightTableInfo, joinInfo,
                          false, null, output);
             }
             else
             {
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
-                        rightProjection, leftProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
+                        rightProjection, leftProjection, postPartition, postPartitionInfo, postPartitionIsSmallTable, numPartition, ImmutableList.of(i));
                 joinInput = new PartitionedJoinInput(transId, timestamp, rightTableInfo, leftTableInfo, joinInfo,
                         false, null, output);
             }

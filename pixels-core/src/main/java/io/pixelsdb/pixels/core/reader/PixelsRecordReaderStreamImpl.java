@@ -37,6 +37,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * PixelsRecordReaderStreamImpl is the variant of {@link PixelsRecordReaderImpl} for streaming mode.
  * <p>
@@ -156,6 +158,12 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
      */
     public void lateInitialization(PixelsStreamProto.StreamHeader streamHeader) throws IOException
     {
+        if (this.streamHeader != null)
+        {
+            checkArgument(this.streamHeader == streamHeader,
+                    "streamHeader used for lateInitialization() is not the same as the one in the RecordReader.");
+            return;
+        }
         this.streamHeader = streamHeader;
         checkBeforeRead();
     }
@@ -429,6 +437,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
      */
     private VectorizedRowBatch createEmptyEOFRowBatch(int size)
     {
+        logger.debug("In createEmptyEOFRowBatch(), size = " + size);
         TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
         VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0, typeMode);
         resultRowBatch.projectionSize = 0;
@@ -497,6 +506,14 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         }
 
         int rgRowCount = (int) curRowGroupStreamFooter.getNumberOfRows();
+        if (rgRowCount == 0)
+        {
+            // Empty row group, mark the current row group as unreadable.
+            curRowGroupByteBuf.readerIndex(curRowGroupByteBuf.readerIndex() + curRowGroupByteBuf.readableBytes());
+            curRGIdx++;
+            return resultSchema.createRowBatch(0, resultColumnsEncoded);
+        }
+
         int curBatchSize;
         ColumnVector[] columnVectors = resultRowBatch.cols;
 
@@ -705,6 +722,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         else
         // incoming byteBuf unreadable, must be end of stream
         {
+            logger.debug("In acquireNewRowGroup(), end of file");
             // checkValid = false; // Issue #105: to reject continuous read.
             if (reuse && resultRowBatch != null)
                 // XXX: Before we implement necessary checks, the close() below might be called before our readBatch()

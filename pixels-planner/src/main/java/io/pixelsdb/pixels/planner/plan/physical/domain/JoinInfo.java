@@ -59,6 +59,15 @@ public class JoinInfo
      * The partition information of the output if outputPartitioned is true.
      */
     private PartitionInfo postPartitionInfo;
+    /**
+     * The partition id of this worker in post partition if outputPartitioned is true.
+     */
+    private int postPartitionId;
+    /**
+     * Whether this table is the small table in the next-level join. This is used to determine the HTTP port
+     *  when using streaming.
+     */
+    private boolean postPartitionIsSmallTable;
 
     /**
      * Default constructor for Jackson.
@@ -146,5 +155,25 @@ public class JoinInfo
     public void setPostPartitionInfo(PartitionInfo postPartitionInfo)
     {
         this.postPartitionInfo = postPartitionInfo;
+    }
+
+    public int getPostPartitionId()
+    {
+        return postPartitionId;
+    }
+
+    public void setPostPartitionId(int postPartitionId)
+    {
+        this.postPartitionId = postPartitionId;
+    }
+
+    public boolean getPostPartitionIsSmallTable()
+    {
+        return postPartitionIsSmallTable;
+    }
+
+    public void setPostPartitionIsSmallTable(boolean postPartitionIsSmallTable)
+    {
+        this.postPartitionIsSmallTable = postPartitionIsSmallTable;
     }
 }

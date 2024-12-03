@@ -33,21 +33,23 @@ public abstract class VhiveInvoker implements Invoker
 {
     private static final Logger logger = LogManager.getLogger(VhiveInvoker.class);
     private final String functionName;
-    private final int memoryMB;
+    private int memoryMB;
 
     protected VhiveInvoker(String functionName)
     {
         this.functionName = functionName;
-        int memoryMB = 0;
-        try
-        {
-            TurboProto.GetMemoryResponse response = Vhive.Instance().getAsyncClient().getMemory().get();
-            memoryMB = (int) response.getMemoryMB();
-        } catch (Exception e)
-        {
-            logger.error("failed to get memory: " + e);
-        }
-        this.memoryMB = memoryMB;
+        new Thread(() -> {
+            int memoryMB = 0;
+            try
+            {
+                TurboProto.GetMemoryResponse response = Vhive.Instance().getAsyncClient().getMemory().get();
+                memoryMB = (int) response.getMemoryMB();
+            } catch (Exception e)
+            {
+                logger.error("failed to get memory: " + e);
+            }
+            this.memoryMB = memoryMB;
+        }).start();
     }
 
     @Override

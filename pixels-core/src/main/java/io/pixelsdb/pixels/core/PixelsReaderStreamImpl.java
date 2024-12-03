@@ -84,6 +84,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     // In partitioned mode, we use byteBufBlockingMap to map hash value to corresponding ByteBuf
     private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;
     private final boolean partitioned;
+    private final int httpPort;
     private final AtomicReference<Integer> numPartitionsReceived = new AtomicReference<>(0);
     private final List<PixelsRecordReaderStreamImpl> recordReaders;
 
@@ -98,7 +99,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
     public PixelsReaderStreamImpl(String endpoint) throws Exception
     {
-        this(endpoint, false, -1);
+        this(endpoint, false, -2);
     }
 
     public PixelsReaderStreamImpl(int port) throws Exception
@@ -113,7 +114,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
         this.streamHeader = null;
         URI uri = new URI(endpoint);
         String IP = uri.getHost();
-        int httpPort = uri.getPort();
+        this.httpPort = uri.getPort();
         logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort +
                 ", partitioned: " + partitioned + ", numPartitions: " + numPartitions);
         if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost"))
@@ -151,13 +152,6 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         ", partition ID header: " + req.headers().get("X-Partition-Id") +
                         ", HTTP request object body total length: " + req.content().readableBytes());
 
-                // schema packet: only 1 packet expected, so close the connection immediately
-                // partitioned mode: close the connection if all partitions received
-                // else (non-partitioned mode, data packet): close connection if empty packet received
-                boolean needCloseParentChannel = partitionId == PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER ||
-                        (partitioned && numPartitionsReceived.get() == numPartitions) ||
-                        (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
-                                req.content().readableBytes() == 0);
                 ByteBuf byteBuf = req.content();
                 try
                 {
@@ -178,27 +172,29 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         catch (IOException e)
                         {
                             logger.error("Invalid stream header values: ", e);
-                            sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
+                            sendResponseAndClose(ctx, req, BAD_REQUEST, false);
                             return;
                         }
                     }
                     else if (partitioned)
                     {
                         // In partitioned mode, every packet brings a streamHeader to prevent errors from possibly
-                        // out-of-order packet arrivals, so we need to parse it, but do not need the return value
-                        // (except for the first incoming packet processed above).
+                        //  out-of-order packet arrivals, so we need to parse it, but do not need the return value
+                        //  (except for the first incoming packet processed above).
+                        // XXX: Now we have each worker pass the schema in a separate packet, so this is no longer
+                        //  necessary. We can remove this block of code in PixelsWriterStreamImpl.
                         parseStreamHeader(byteBuf);
                     }
                 }
                 catch (InvalidProtocolBufferException | IndexOutOfBoundsException e)
                 {
                     logger.error("Malformed or corrupted stream header", e);
-                    sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
+                    sendResponseAndClose(ctx, req, BAD_REQUEST, false);
                     return;
                 }
 
                 // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the
-                //  client is a data writer rather than a schema writer. In the latter case,
+                //  packet is a data packet rather than a schema packet. Because in the latter case,
                 //  the schema packet has been processed when parsing the stream header above.
                 if (partitionId != PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER)
                 {
@@ -209,7 +205,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
                         if (partitionId < 0 || partitionId >= numPartitions)
                         {
                             logger.warn("Client sent invalid partitionId value: " + partitionId);
-                            sendResponseAndClose(ctx, req, BAD_REQUEST, needCloseParentChannel);
+                            sendResponseAndClose(ctx, req, BAD_REQUEST, false);
                             return;
                         }
                         byteBufBlockingMap.put(partitionId, byteBuf);
@@ -222,6 +218,13 @@ public class PixelsReaderStreamImpl implements PixelsReader
                     }
                 }
 
+                // schema reader: only 1 packet expected, so close the connection immediately
+                // partitioned mode: close the connection if all partitions received
+                // else (non-partitioned mode, data packet): close connection if empty packet received
+                boolean needCloseParentChannel = numPartitions == PixelsWriterStreamImpl.PARTITION_ID_SCHEMA_WRITER ||
+                        (partitioned && numPartitionsReceived.get() == numPartitions) ||
+                        (numPartitions == -1 && Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
+                                req.content().readableBytes() == 0);
                 sendResponseAndClose(ctx, req, HttpResponseStatus.OK, needCloseParentChannel);
             }
 
@@ -437,15 +440,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public boolean isPartitioned()
     {
-        try
-        {
-            streamHeaderLatch.await();
-        }
-        catch (InterruptedException e)
-        {
-            logger.error("Interrupted while waiting for stream header", e);
-        }
-        return this.streamHeader.hasPartitioned() && this.streamHeader.getPartitioned();
+        return partitioned;
     }
 
     /**
@@ -523,6 +518,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public void close()
             throws IOException
     {
+        logger.debug("Closing PixelsReaderStreamImpl");
         new Thread(() -> {
             // Conditions for closing:
             // 1. streamHeaderLatch.await() to ensure that the stream header has been received
@@ -539,11 +535,11 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
             try
             {
-                if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(5, TimeUnit.SECONDS);
+                if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(300, TimeUnit.SECONDS);
             }
             catch (TimeoutException e)
             {
-                logger.warn("In close(), HTTP server did not shut down in 5 seconds, doing forceful shutdown");
+                logger.warn("In close(), HTTP server on port " + httpPort + " did not shut down in 300 seconds, doing forceful shutdown");
                 this.httpServerFuture.cancel(true);
             }
             catch (InterruptedException | ExecutionException e)

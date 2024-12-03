@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinatorFactory;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
+import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -58,11 +59,48 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
         {
             // First, bootstrap the join workers.
             joinOutputs = new CompletableFuture[joinInputs.size()];
+            int smallPartitionWorkerNum;
+            if (!smallPartitionInputs.isEmpty())
+            {
+                smallPartitionWorkerNum = smallPartitionInputs.size();
+                for (int i = 0; i < smallPartitionInputs.size(); ++i)
+                {
+                    PartitionInput partitionInput = smallPartitionInputs.get(i);
+                    partitionInput.setPartitionId(i);
+                }
+            }
+            else if (smallChild != null)
+            {
+                smallPartitionWorkerNum = smallChild.getJoinInputs().size();
+            }
+            else
+            {
+                throw new IllegalStateException("smallPartitionInputs and smallChild are both null");
+            }
+            int largePartitionWorkerNum;
+            if (!largePartitionInputs.isEmpty())
+            {
+                largePartitionWorkerNum = largePartitionInputs.size();
+                for (int i = 0; i < largePartitionInputs.size(); ++i)
+                {
+                    PartitionInput partitionInput = largePartitionInputs.get(i);
+                    partitionInput.setPartitionId(i);
+                }
+            }
+            else if (largeChild != null)
+            {
+                largePartitionWorkerNum = largeChild.getJoinInputs().size();
+            }
+            else
+            {
+                throw new IllegalStateException("largePartitionInputs and largeChild are both null");
+            }
             for (int i = 0; i < joinInputs.size(); ++i)
             {
                 JoinInput joinInput = joinInputs.get(i);
-                joinInput.setSmallPartitionWorkerNum(smallPartitionInputs.size());  // XXX: could be 0
-                joinInput.setLargePartitionWorkerNum(largePartitionInputs.size());
+                joinInput.setSmallPartitionWorkerNum(smallPartitionWorkerNum);
+                joinInput.setLargePartitionWorkerNum(largePartitionWorkerNum);  // XXX: Can do this in PixelsPlanner
+                ((PartitionedJoinInput)joinInput).getJoinInfo().setPostPartitionId(i);
                 if (joinAlgo == JoinAlgorithm.PARTITIONED)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
@@ -107,7 +145,7 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 for (PartitionInput partitionInput : largePartitionInputs)
                 {
                     largePartitionOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
+                            .getInvoker(WorkerType.PARTITION_STREAMING).invoke(partitionInput);
                 }
 
                 logger.debug("invoke large partition of " + this.getName());
@@ -155,7 +193,8 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 logger.debug("invoke large partition of " + this.getName());
             }
 
-            // todo: Finally, wait for the readiness of the partition operators
+            // todo: Finally, wait for the readiness of the partition workers
+            //  (need to modify the partition workers to pull tasks from the worker coordinator server).
 
             return joinOutputs;
         });
