@@ -7,3 +7,6 @@
 [submodule "writer_cpp_test/third-party/protobuf"]
 	path = writer_cpp_test/third-party/protobuf
 	url = https://github.com/protocolbuffers/protobuf
+[submodule "cpp/third-party/googletest"]
+	path = cpp/third-party/googletest
+	url = git@github.com:google/googletest.git

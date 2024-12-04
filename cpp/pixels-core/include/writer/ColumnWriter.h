@@ -14,7 +14,7 @@
 #include "duckdb/common/types/vector.hpp"
 #include "PixelsFilter.h"
 #include "writer/PixelsWriterOption.h"
-
+#include "stats/StatsRecorder.h"
 
 
 class ColumnWriter{
@@ -30,7 +30,8 @@ public:
     virtual std::vector<uint8_t> getColumnChunkContent() const;
     virtual int getColumnChunkSize() const;
     virtual bool decideNullsPadding(std::shared_ptr<PixelsWriterOption> writerOption) =0;
-    virtual pixels::proto::ColumnChunkIndex getColumnChunkIndex();
+    virtual pixels::proto::ColumnChunkIndex getNewColumnChunkIndex();
+    virtual std::shared_ptr<pixels::proto::ColumnChunkIndex> getColumnChunkIndex();
     virtual pixels::proto::ColumnEncoding getColumnChunkEncoding();
     virtual void reset();
     virtual void flush() ;
@@ -56,6 +57,8 @@ protected:
     std::shared_ptr<ByteBuffer> outputStream;
     int curPixelEleIndex = 0;
 //std::unique_ptr<Encoder> encoder;
+    StatsRecorder pixelStatRecorder;
+    StatsRecorder columnChunkStatRecorder;
 bool hasNull = false;
     const bool nullsPadding;
     int curPixelVectorIndex = 0;

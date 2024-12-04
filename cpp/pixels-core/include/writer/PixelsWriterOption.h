@@ -25,9 +25,9 @@ private:
      * Whether nulls positions in column are padded by arbitrary values and occupy storage and memory space.
      */
     bool nullsPadding;
-    ByteOrder byteOrder;
+    ByteOrder byteOrder{ByteOrder::PIXELS_LITTLE_ENDIAN};
 public:
     ByteOrder getByteOrder() const;
-
+    void setByteOrder(ByteOrder byte_order);
 };
 #endif //PIXELS_PIXELSWRITEROPTION_H

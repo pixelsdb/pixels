@@ -49,7 +49,7 @@ set(pixels_core_cxx
         lib/writer/ColumnWriter.cpp
         lib/writer/PixelsWriterOption.cpp
         lib/encoding/EncodingLevel.cpp
-        lib/PixelsWriterImpl.cpp
+        # lib/PixelsWriterImpl.cpp
         lib/stats/StatsRecorder.cpp
         include/utils/BitUtils.h
         lib/utils/BitUtils.cpp
