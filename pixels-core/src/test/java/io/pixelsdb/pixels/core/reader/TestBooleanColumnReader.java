@@ -41,7 +41,7 @@ public class TestBooleanColumnReader
     public void test() throws IOException
     {
         PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .pixelStride(8).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         BooleanColumnWriter columnWriter = new BooleanColumnWriter(
                 TypeDescription.createBoolean(), writerOption);
@@ -62,7 +62,7 @@ public class TestBooleanColumnReader
         byteColumnVector.add(true);
         byteColumnVector.add(false);
         byteColumnVector.add(false);
-        byteColumnVector.add(false);
+        byteColumnVector.addNull();
         byteColumnVector.add(false);
         byteColumnVector.add(true);
         byteColumnVector.add(false);
@@ -76,7 +76,60 @@ public class TestBooleanColumnReader
         BooleanColumnReader columnReader = new BooleanColumnReader(TypeDescription.createBoolean());
         ByteColumnVector byteColumnVector1 = new ByteColumnVector(22);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
-                10, 0, byteColumnVector1, chunkIndex);
+                8, 0, byteColumnVector1, chunkIndex);
+        for (int i = 0; i < 22; ++i)
+        {
+            if (!byteColumnVector1.noNulls && byteColumnVector1.isNull[i])
+            {
+                assert !byteColumnVector.noNulls && byteColumnVector.isNull[i];
+            }
+            else
+            {
+                assert byteColumnVector1.vector[i] == byteColumnVector.vector[i];
+            }
+        }
+    }
+
+    @Test
+    public void testWithoutNullsPadding() throws IOException
+    {
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(8).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
+        BooleanColumnWriter columnWriter = new BooleanColumnWriter(
+                TypeDescription.createBoolean(), writerOption);
+        ByteColumnVector byteColumnVector = new ByteColumnVector(22);
+        byteColumnVector.add(false);
+        byteColumnVector.add(false);
+        byteColumnVector.add(false);
+        byteColumnVector.add(true);
+        byteColumnVector.addNull();
+        byteColumnVector.add(false);
+        byteColumnVector.add(true);
+        byteColumnVector.add(true);
+        byteColumnVector.addNull();
+        byteColumnVector.add(false);
+        byteColumnVector.add(false);
+        byteColumnVector.add(false);
+        byteColumnVector.add(false);
+        byteColumnVector.add(true);
+        byteColumnVector.add(false);
+        byteColumnVector.add(false);
+        byteColumnVector.addNull();
+        byteColumnVector.add(false);
+        byteColumnVector.add(true);
+        byteColumnVector.add(false);
+        byteColumnVector.add(false);
+        byteColumnVector.add(true);
+        columnWriter.write(byteColumnVector, 22);
+        columnWriter.flush();
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        BooleanColumnReader columnReader = new BooleanColumnReader(TypeDescription.createBoolean());
+        ByteColumnVector byteColumnVector1 = new ByteColumnVector(22);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
+                8, 0, byteColumnVector1, chunkIndex);
         for (int i = 0; i < 22; ++i)
         {
             if (!byteColumnVector1.noNulls && byteColumnVector1.isNull[i])
