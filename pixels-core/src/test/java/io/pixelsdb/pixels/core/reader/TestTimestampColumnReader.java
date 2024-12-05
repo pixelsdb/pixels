@@ -89,4 +89,56 @@ public class TestTimestampColumnReader
             }
         }
     }
+
+    @Test
+    public void test2() throws IOException
+    {
+        int batchNum = 15;
+        int rowNum = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        TimestampColumnWriter columnWriter = new TimestampColumnWriter(
+                TypeDescription.createTimestamp(6), writerOption);
+        for (int i = 0; i < batchNum; i++)
+        {
+            TimestampColumnVector vector = new TimestampColumnVector(rowNum, 6);
+            for (int j = 0; j < rowNum; j++)
+            {
+                if (j % 100 == 0)
+                {
+                    vector.addNull();
+                } else
+                {
+                    vector.add(1000L);
+                }
+            }
+            columnWriter.write(vector, rowNum);
+        }
+        columnWriter.flush();
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        TimestampColumnReader columnReader = new TimestampColumnReader(TypeDescription.createTimestamp(6));
+        TimestampColumnVector timestampColumnVector1 = new TimestampColumnVector(batchNum*rowNum, 6);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+                10000, 0, timestampColumnVector1, chunkIndex);
+
+        TimestampColumnVector vector = new TimestampColumnVector(rowNum, 6);
+        for (int j = 0; j < rowNum; j++)
+        {
+            if (j % 100 == 0)
+            {
+                vector.addNull();
+            } else
+            {
+                vector.add(1000L);
+            }
+        }
+
+        for (int i = 0; i < batchNum*rowNum; i++)
+        {
+            assert timestampColumnVector1.times[i] == vector.times[i%rowNum] && timestampColumnVector1.isNull[i] == vector.isNull[i%rowNum];
+        }
+    }
 }
