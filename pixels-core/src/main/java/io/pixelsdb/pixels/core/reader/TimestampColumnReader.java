@@ -159,7 +159,11 @@ public class TimestampColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        columnVector.set(j, inputBuffer.getLong());
+                        long time = inputBuffer.getLong();
+                        if (!(hasNull && columnVector.isNull[j]))
+                        {
+                            columnVector.set(j, time);
+                        }
                     }
                 } else
                 {

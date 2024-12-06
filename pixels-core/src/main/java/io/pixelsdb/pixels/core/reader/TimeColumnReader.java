@@ -159,7 +159,11 @@ public class TimeColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        columnVector.set(j, inputBuffer.getInt());
+                        int millis = inputBuffer.getInt();
+                        if (!(hasNull && columnVector.isNull[j]))
+                        {
+                            columnVector.set(j, millis);
+                        }
                     }
                 } else
                 {
