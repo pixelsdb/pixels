@@ -159,7 +159,8 @@ public class TimestampColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        columnVector.set(j, inputBuffer.getLong());
+                        // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                        columnVector.times[j] = inputBuffer.getLong();
                     }
                 } else
                 {
@@ -306,10 +307,12 @@ public class TimestampColumnReader extends ColumnReader
                         long value = inputBuffer.getLong();
                         if (selected.get(j - vectorIndex))
                         {
-                            columnVector.set(vectorWriteIndex++, value);
+                            // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                            columnVector.times[vectorWriteIndex++] = value;
                         }
                     }
-                } else
+                }
+                else
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {

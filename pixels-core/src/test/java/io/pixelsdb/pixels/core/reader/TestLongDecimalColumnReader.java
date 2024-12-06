@@ -73,7 +73,8 @@ public class TestLongDecimalColumnReader
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(TypeDescription.createDecimal(38, 2));
+        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(
+                TypeDescription.createDecimal(38, 2));
         LongDecimalColumnVector decimalColumnVector1 = new LongDecimalColumnVector(22, 38, 2);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
                 10, 0, decimalColumnVector1, chunkIndex);
@@ -87,6 +88,58 @@ public class TestLongDecimalColumnReader
             {
                 assert decimalColumnVector1.vector[i * 2] == decimalColumnVector.vector[i * 2];
                 assert decimalColumnVector1.vector[i * 2 + 1] == decimalColumnVector.vector[i * 2 + 1];
+            }
+        }
+    }
+
+    @Test
+    public void testLarge() throws IOException
+    {
+        int batchNum = 15;
+        int rowNum = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        LongDecimalColumnWriter columnWriter = new LongDecimalColumnWriter(
+                TypeDescription.createDecimal(38, 2), writerOption);
+
+        LongDecimalColumnVector originVector = new LongDecimalColumnVector(rowNum, 38, 2);
+        for (int j = 0; j < rowNum; j++)
+        {
+            if (j % 100 == 0)
+            {
+                originVector.addNull();
+            }
+            else
+            {
+                originVector.add(1000.00d);
+            }
+        }
+
+        for (int i = 0; i < batchNum; i++)
+        {
+            columnWriter.write(originVector, rowNum);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(
+                TypeDescription.createDecimal(38, 2));
+        LongDecimalColumnVector targetVector = new LongDecimalColumnVector(batchNum*rowNum, 38, 2);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+                10000, 0, targetVector, chunkIndex);
+
+        for (int i = 0; i < batchNum*rowNum; i++)
+        {
+            int j = i % rowNum;
+            assert targetVector.isNull[i] == originVector.isNull[j];
+            if (!targetVector.isNull[i])
+            {
+                assert originVector.vector[j * 2] == targetVector.vector[i * 2];
+                assert originVector.vector[j * 2 + 1] == targetVector.vector[i * 2 + 1];
             }
         }
     }

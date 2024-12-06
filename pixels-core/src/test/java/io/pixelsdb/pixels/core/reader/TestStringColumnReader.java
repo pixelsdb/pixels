@@ -91,4 +91,56 @@ public class TestStringColumnReader
             }
         }
     }
+
+    @Test
+    public void testLarge() throws IOException
+    {
+        int batchNum = 15;
+        int rowNum = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        StringColumnWriter columnWriter = new StringColumnWriter(
+                TypeDescription.createString(), writerOption);
+
+        BinaryColumnVector originVector = new BinaryColumnVector(rowNum);
+        for (int j = 0; j < rowNum; j++)
+        {
+            if (j % 100 == 0)
+            {
+                originVector.addNull();
+            } else
+            {
+                originVector.add("1000");
+            }
+        }
+
+        for (int i = 0; i < batchNum; i++)
+        {
+            columnWriter.write(originVector, rowNum);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        StringColumnReader columnReader = new StringColumnReader(TypeDescription.createString());
+        BinaryColumnVector targetVector = new BinaryColumnVector(batchNum*rowNum);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+                10000, 0, targetVector, chunkIndex);
+
+        for (int i = 0; i < batchNum*rowNum; i++)
+        {
+            int j = i % rowNum;
+            assert targetVector.isNull[i] == originVector.isNull[j];
+            if (!targetVector.isNull[i])
+            {
+                String s1 = new String(targetVector.vector[i], targetVector.start[i], targetVector.lens[i]);
+
+                String s = new String(originVector.vector[j], originVector.start[j], originVector.lens[j]);
+                assert s1.equals(s);
+            }
+        }
+    }
 }

@@ -115,7 +115,8 @@ public class LongDecimalColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-            } else
+            }
+            else
             {
                 numToRead = numLeft;
             }
@@ -130,7 +131,8 @@ public class LongDecimalColumnReader extends ColumnReader
                 isNullOffset += bytesToDeCompact;
                 isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
-            } else
+            }
+            else
             {
                 Arrays.fill(columnVector.isNull, i, i + numToRead, false);
             }
@@ -145,7 +147,8 @@ public class LongDecimalColumnReader extends ColumnReader
                     columnVector.vector[index + 1] = inputBuffer.getLong(inputIndex);
                     inputIndex += Long.BYTES;
                 }
-            } else
+            }
+            else
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {

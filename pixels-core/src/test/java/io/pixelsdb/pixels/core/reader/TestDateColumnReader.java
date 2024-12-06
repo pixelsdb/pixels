@@ -89,4 +89,53 @@ public class TestDateColumnReader
             }
         }
     }
+
+    @Test
+    public void testLarge() throws IOException
+    {
+        int batchNum = 15;
+        int rowNum = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        DateColumnWriter columnWriter = new DateColumnWriter(
+                TypeDescription.createDate(), writerOption);
+
+        DateColumnVector originVector = new DateColumnVector(rowNum);
+        for (int j = 0; j < rowNum; j++)
+        {
+            if (j % 100 == 0)
+            {
+                originVector.addNull();
+            }
+            else
+            {
+                originVector.add(1000);
+            }
+        }
+
+        for (int i = 0; i < batchNum; i++)
+        {
+            columnWriter.write(originVector, rowNum);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        DateColumnReader columnReader = new DateColumnReader(TypeDescription.createDate());
+        DateColumnVector targetVector = new DateColumnVector(batchNum*rowNum);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+                10000, 0, targetVector, chunkIndex);
+
+        for (int i = 0; i < batchNum*rowNum; i++)
+        {
+            assert targetVector.isNull[i] == originVector.isNull[i%rowNum];
+            if (!targetVector.isNull[i])
+            {
+                assert targetVector.dates[i] == originVector.dates[i % rowNum];
+            }
+        }
+    }
 }

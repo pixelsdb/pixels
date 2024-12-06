@@ -89,4 +89,54 @@ public class TestDecimalColumnReader
             }
         }
     }
+
+    @Test
+    public void testLarge() throws IOException
+    {
+        int batchNum = 15;
+        int rowNum = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        DecimalColumnWriter columnWriter = new DecimalColumnWriter(
+                TypeDescription.createDecimal(15, 2), writerOption);
+
+        DecimalColumnVector originVector = new DecimalColumnVector(rowNum, 15, 2);
+        for (int j = 0; j < rowNum; j++)
+        {
+            if (j % 100 == 0)
+            {
+                originVector.addNull();
+            }
+            else
+            {
+                originVector.add(1000.00d);
+            }
+        }
+
+        for (int i = 0; i < batchNum; i++)
+        {
+            columnWriter.write(originVector, rowNum);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        DecimalColumnReader columnReader = new DecimalColumnReader(TypeDescription.createDecimal(15, 2));
+        DecimalColumnVector targetVector = new DecimalColumnVector(batchNum*rowNum, 15, 2);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+                10000, 0, targetVector, chunkIndex);
+
+        for (int i = 0; i < batchNum*rowNum; i++)
+        {
+            int j = i % rowNum;
+            assert targetVector.isNull[i] == originVector.isNull[j];
+            if (!targetVector.isNull[i])
+            {
+                assert originVector.vector[j] == targetVector.vector[i];
+            }
+        }
+    }
 }
