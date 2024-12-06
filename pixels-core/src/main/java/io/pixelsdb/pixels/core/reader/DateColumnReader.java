@@ -159,7 +159,8 @@ public class DateColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        columnVector.set(j, inputBuffer.getInt());
+                        // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                        columnVector.dates[j] = inputBuffer.getInt();
                     }
                 } else
                 {
@@ -307,7 +308,8 @@ public class DateColumnReader extends ColumnReader
                         int value = inputBuffer.getInt();
                         if (selected.get(j - vectorIndex))
                         {
-                            columnVector.set(vectorWriteIndex++, value);
+                            // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                            columnVector.dates[vectorWriteIndex++] = value;
                         }
                     }
                 } else

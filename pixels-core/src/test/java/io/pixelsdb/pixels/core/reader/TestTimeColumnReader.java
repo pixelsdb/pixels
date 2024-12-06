@@ -100,46 +100,42 @@ public class TestTimeColumnReader
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         TimeColumnWriter columnWriter = new TimeColumnWriter(
                 TypeDescription.createTime(3), writerOption);
-        for (int i = 0; i < batchNum; i++)
-        {
-            TimeColumnVector vector = new TimeColumnVector(rowNum, 3);
-            for (int j = 0; j < rowNum; j++)
-            {
-                if (j % 100 == 0)
-                {
-                    vector.addNull();
-                } else
-                {
-                    vector.add(1000);
-                }
-            }
-            columnWriter.write(vector, rowNum);
-        }
-        columnWriter.flush();
-        byte[] content = columnWriter.getColumnChunkContent();
-        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
-        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        TimeColumnReader columnReader = new TimeColumnReader(TypeDescription.createTimestamp(3));
-        TimeColumnVector timeColumnVector1 = new TimeColumnVector(batchNum*rowNum, 3);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
-                10000, 0, timeColumnVector1, chunkIndex);
 
-        TimeColumnVector vector = new TimeColumnVector(rowNum, 3);
+        TimeColumnVector originVector = new TimeColumnVector(rowNum, 3);
         for (int j = 0; j < rowNum; j++)
         {
             if (j % 100 == 0)
             {
-                vector.addNull();
-            } else
+                originVector.addNull();
+            }
+            else
             {
-                vector.add(1000);
+                originVector.add(1000);
             }
         }
 
+        for (int i = 0; i < batchNum; i++)
+        {
+            columnWriter.write(originVector, rowNum);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        TimeColumnReader columnReader = new TimeColumnReader(TypeDescription.createTime(3));
+        TimeColumnVector targetVector = new TimeColumnVector(batchNum*rowNum, 3);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+                10000, 0, targetVector, chunkIndex);
+
         for (int i = 0; i < batchNum*rowNum; i++)
         {
-            assert timeColumnVector1.isNull[i] == vector.isNull[i%rowNum];
-            assert !timeColumnVector1.isNull[i] || timeColumnVector1.times[i] == vector.times[i % rowNum];
+            assert targetVector.isNull[i] == originVector.isNull[i%rowNum];
+            if (!targetVector.isNull[i])
+            {
+                assert targetVector.times[i] == originVector.times[i % rowNum];
+            }
         }
     }
 }

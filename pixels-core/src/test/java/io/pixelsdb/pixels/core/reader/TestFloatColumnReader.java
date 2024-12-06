@@ -89,4 +89,53 @@ public class TestFloatColumnReader
             }
         }
     }
+
+    @Test
+    public void testLarge() throws IOException
+    {
+        int batchNum = 15;
+        int rowNum = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
+        FloatColumnWriter columnWriter = new FloatColumnWriter(
+                TypeDescription.createFloat(), writerOption);
+
+        FloatColumnVector originVector = new FloatColumnVector(rowNum);
+        for (int j = 0; j < rowNum; j++)
+        {
+            if (j % 100 == 0)
+            {
+                originVector.addNull();
+            }
+            else
+            {
+                originVector.add(1000.0f);
+            }
+        }
+
+        for (int i = 0; i < batchNum; i++)
+        {
+            columnWriter.write(originVector, rowNum);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        FloatColumnReader columnReader = new FloatColumnReader(TypeDescription.createFloat());
+        FloatColumnVector targetVector = new FloatColumnVector(batchNum*rowNum);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+                10000, 0, targetVector, chunkIndex);
+
+        for (int i = 0; i < batchNum*rowNum; i++)
+        {
+            assert targetVector.isNull[i] == originVector.isNull[i%rowNum];
+            if (!targetVector.isNull[i])
+            {
+                assert targetVector.vector[i] == originVector.vector[i % rowNum];
+            }
+        }
+    }
 }

@@ -118,6 +118,10 @@ public class VectorColumnReader extends ColumnReader
                             inputIndex += Double.BYTES;
                         }
                     }
+                    else
+                    {
+                        inputIndex += dimension * Double.BYTES;
+                    }
                 }
             } else
             {
@@ -225,25 +229,22 @@ public class VectorColumnReader extends ColumnReader
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    if (!(hasNull && isNull[j - vectorIndex]))
+                    if (!(hasNull && isNull[j - vectorIndex]) && selected.get(j - vectorIndex))
                     {
+                        for (int d = 0; d < dimension; d++)
+                        {
+                            vectorColumnVector.vector[vectorWriteIndex][d] = inputBuffer.getDouble(inputIndex);
+                            inputIndex += Double.BYTES;
+                        }
+                        vectorWriteIndex++;
+                    }
+                    else
+                    {
+                        inputIndex += dimension * Double.BYTES;
                         if (selected.get(j - vectorIndex))
                         {
-                            for (int d = 0; d < dimension; d++)
-                            {
-                                vectorColumnVector.vector[vectorWriteIndex][d] = inputBuffer.getDouble(inputIndex);
-                                inputIndex += Double.BYTES;
-                            }
                             vectorWriteIndex++;
                         }
-                        else
-                        {
-                            inputIndex += dimension * Double.BYTES;
-                        }
-                    }
-                    else if (selected.get(j - vectorIndex))
-                    {
-                        vectorWriteIndex++;
                     }
                 }
             }

@@ -159,13 +159,11 @@ public class TimeColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        int millis = inputBuffer.getInt();
-                        if (!(hasNull && columnVector.isNull[j]))
-                        {
-                            columnVector.set(j, millis);
-                        }
+                        // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                        columnVector.times[j] = inputBuffer.getInt();
                     }
-                } else
+                }
+                else
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
@@ -311,7 +309,8 @@ public class TimeColumnReader extends ColumnReader
                         int value = inputBuffer.getInt();
                         if (selected.get(j - vectorIndex))
                         {
-                            columnVector.set(vectorWriteIndex++, value);
+                            // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                            columnVector.times[vectorWriteIndex++] = value;
                         }
                     }
                 }

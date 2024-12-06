@@ -132,7 +132,8 @@ public class LongColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-            } else
+            }
+            else
             {
                 numToRead = numLeft;
             }
@@ -147,7 +148,8 @@ public class LongColumnReader extends ColumnReader
                 isNullOffset += bytesToDeCompact;
                 isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
-            } else
+            }
+            else
             {
                 Arrays.fill(columnVector.isNull, i, i + numToRead, false);
             }
@@ -161,7 +163,8 @@ public class LongColumnReader extends ColumnReader
                         columnVector.vector[j] = decoder.next();
                     }
                 }
-            } else
+            }
+            else
             {
                 if (isLong)
                 {
@@ -171,7 +174,8 @@ public class LongColumnReader extends ColumnReader
                         {
                             columnVector.vector[j] = inputBuffer.getLong();
                         }
-                    } else
+                    }
+                    else
                     {
                         for (int j = i; j < i + numToRead; ++j)
                         {
@@ -181,7 +185,8 @@ public class LongColumnReader extends ColumnReader
                             }
                         }
                     }
-                } else
+                }
+                else
                 {
                     if (nullsPadding)
                     {
@@ -189,7 +194,8 @@ public class LongColumnReader extends ColumnReader
                         {
                             columnVector.vector[j] = inputBuffer.getInt();
                         }
-                    } else
+                    }
+                    else
                     {
                         for (int j = i; j < i + numToRead; ++j)
                         {
@@ -267,7 +273,8 @@ public class LongColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-            } else
+            }
+            else
             {
                 numToRead = numLeft;
             }

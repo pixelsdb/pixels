@@ -130,7 +130,8 @@ public class IntColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-            } else
+            }
+            else
             {
                 numToRead = numLeft;
             }
@@ -145,7 +146,8 @@ public class IntColumnReader extends ColumnReader
                 isNullOffset += bytesToDeCompact;
                 isNullSkipBits = (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
-            } else
+            }
+            else
             {
                 Arrays.fill(columnVector.isNull, i, i + numToRead, false);
             }
@@ -159,7 +161,8 @@ public class IntColumnReader extends ColumnReader
                         columnVector.vector[j] = (int) decoder.next();
                     }
                 }
-            } else
+            }
+            else
             {
                 if (nullsPadding)
                 {
@@ -167,7 +170,8 @@ public class IntColumnReader extends ColumnReader
                     {
                         columnVector.vector[j] = inputBuffer.getInt();
                     }
-                } else
+                }
+                else
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
@@ -240,7 +244,8 @@ public class IntColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-            } else
+            }
+            else
             {
                 numToRead = numLeft;
             }
