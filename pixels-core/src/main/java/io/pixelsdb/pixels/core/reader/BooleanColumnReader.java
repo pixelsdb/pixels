@@ -122,16 +122,19 @@ public class BooleanColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead;
+        boolean endOfPixel;
         for (int i = vectorIndex; numLeft > 0;)
         {
             if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
             }
             else
             {
                 numToRead = numLeft;
+                endOfPixel = false;
             }
 
             // read isNull
@@ -139,11 +142,11 @@ public class BooleanColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
                 BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                         inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
@@ -153,22 +156,26 @@ public class BooleanColumnReader extends ColumnReader
             // read content
             if (nullsPadding)
             {
-                bytesToDeCompact = (numToRead + inputSkipBits) / 8;
+                bytesToDeCompact = (numToRead + inputSkipBits + (endOfPixel ? 7 : 0)) / 8;
                 BitUtils.bitWiseDeCompact(columnVector.vector, i, numToRead,
                         inputBuffer, bitsOrInputIndex, inputSkipBits, littleEndian);
                 bitsOrInputIndex += bytesToDeCompact;
-                inputSkipBits = (numToRead + inputSkipBits) % 8;
+                inputSkipBits = endOfPixel ? 0 : (numToRead + inputSkipBits) % 8;
             }
             else
             {
-                // Issue #615: no need to align bitsOrInputIndex to 8.
-                // bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
+                // Issue #615: no need to align bitsOrInputIndex to 8 before reading into the column vector.
                 for (int j = i; j < i + numToRead; ++j)
                 {
                     if (!(hasNull && columnVector.isNull[j]))
                     {
                         columnVector.vector[j] = bits[bitsOrInputIndex++];
                     }
+                }
+                if (endOfPixel)
+                {
+                    // Issue #789: align bitsOrInputIndex to 8 for the next read if end of pixel.
+                    bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
                 }
             }
             // update variables
@@ -230,6 +237,7 @@ public class BooleanColumnReader extends ColumnReader
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, vectorWriteIndex = vectorIndex;
         boolean[] isNull = null;
+        boolean endOfPixel;
         if (!nullsPadding)
         {
             isNull = new boolean[size];
@@ -240,10 +248,12 @@ public class BooleanColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
             }
             else
             {
                 numToRead = numLeft;
+                endOfPixel = false;
             }
 
             // read isNull
@@ -251,7 +261,7 @@ public class BooleanColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
                 if (nullsPadding)
                 {
                     // read isNull directly into the vector of the column chunk
@@ -274,7 +284,7 @@ public class BooleanColumnReader extends ColumnReader
                     }
                 }
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
@@ -290,17 +300,16 @@ public class BooleanColumnReader extends ColumnReader
             int originalVectorWriteIndex = vectorWriteIndex;
             if (nullsPadding)
             {
-                bytesToDeCompact = (numToRead + inputSkipBits) / 8;
+                bytesToDeCompact = (numToRead + inputSkipBits  + (endOfPixel ? 7 : 0)) / 8;
                 // update vectorWriteIndex at the same time
                 vectorWriteIndex += BitUtils.bitWiseDeCompact(columnVector.vector, vectorWriteIndex, numToRead,
                         inputBuffer, bitsOrInputIndex, inputSkipBits, littleEndian, selected, i - vectorIndex);
                 bitsOrInputIndex += bytesToDeCompact;
-                inputSkipBits = (numToRead + inputSkipBits) % 8;
+                inputSkipBits = endOfPixel ? 0 : (numToRead + inputSkipBits) % 8;
             }
             else
             {
-                // Issue #615: no need to align bitsOrInputIndex to 8.
-                // bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
+                // Issue #615: no need to align bitsOrInputIndex to 8 before reading into the column vector.
                 for (int j = i; j < i + numToRead; ++j)
                 {
                     if (!(hasNull && isNull[j - vectorIndex]))
@@ -317,6 +326,11 @@ public class BooleanColumnReader extends ColumnReader
                         // represent reading a null value
                         vectorWriteIndex++;
                     }
+                }
+                if (endOfPixel)
+                {
+                    // Issue #789: align bitsOrInputIndex to 8 for the next read if end of pixel.
+                    bitsOrInputIndex = (bitsOrInputIndex + 7) / 8 * 8;
                 }
             }
 
