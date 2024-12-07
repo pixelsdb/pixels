@@ -214,16 +214,16 @@ public class TestBooleanColumnReader
     @Test
     public void testLarge() throws IOException
     {
-        int batchNum = 15;
-        int rowNum = 1024;
+        int numBatches = 15;
+        int numRows = 1024;
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         BooleanColumnWriter columnWriter = new BooleanColumnWriter(
                 TypeDescription.createBoolean(), writerOption);
 
-        ByteColumnVector originVector = new ByteColumnVector(rowNum);
-        for (int j = 0; j < rowNum; j++)
+        ByteColumnVector originVector = new ByteColumnVector(numRows);
+        for (int j = 0; j < numRows; j++)
         {
             if (j % 100 == 0)
             {
@@ -235,9 +235,9 @@ public class TestBooleanColumnReader
             }
         }
 
-        for (int i = 0; i < batchNum; i++)
+        for (int i = 0; i < numBatches; i++)
         {
-            columnWriter.write(originVector, rowNum);
+            columnWriter.write(originVector, numRows);
         }
         columnWriter.flush();
         columnWriter.close();
@@ -246,16 +246,16 @@ public class TestBooleanColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         BooleanColumnReader columnReader = new BooleanColumnReader(TypeDescription.createBoolean());
-        ByteColumnVector targetVector = new ByteColumnVector(batchNum*rowNum);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+        ByteColumnVector targetVector = new ByteColumnVector(numBatches*numRows);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numBatches*numRows,
                 10000, 0, targetVector, chunkIndex);
 
-        for (int i = 0; i < batchNum*rowNum; i++)
+        for (int i = 0; i < numBatches*numRows; i++)
         {
-            assert targetVector.isNull[i] == originVector.isNull[i%rowNum];
+            assert targetVector.isNull[i] == originVector.isNull[i%numRows];
             if (!targetVector.isNull[i])
             {
-                assert targetVector.vector[i] == originVector.vector[i % rowNum];
+                assert targetVector.vector[i] == originVector.vector[i % numRows];
             }
         }
     }
@@ -266,16 +266,16 @@ public class TestBooleanColumnReader
     @Test
     public void testLargeFragmented() throws IOException
     {
-        int batchNum = 15;
-        int rowNum = 1024;
+        int numBatches = 15;
+        int numRows = 1024;
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         BooleanColumnWriter columnWriter = new BooleanColumnWriter(
                 TypeDescription.createBoolean(), writerOption);
 
-        ByteColumnVector originVector = new ByteColumnVector(rowNum);
-        for (int j = 0; j < rowNum; j++)
+        ByteColumnVector originVector = new ByteColumnVector(numRows);
+        for (int j = 0; j < numRows; j++)
         {
             if (j % 100 == 0)
             {
@@ -287,9 +287,9 @@ public class TestBooleanColumnReader
             }
         }
 
-        for (int i = 0; i < batchNum; i++)
+        for (int i = 0; i < numBatches; i++)
         {
-            columnWriter.write(originVector, rowNum);
+            columnWriter.write(originVector, numRows);
         }
         columnWriter.flush();
         columnWriter.close();
@@ -298,20 +298,20 @@ public class TestBooleanColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         BooleanColumnReader columnReader = new BooleanColumnReader(TypeDescription.createBoolean());
-        ByteColumnVector targetVector = new ByteColumnVector(batchNum*rowNum);
+        ByteColumnVector targetVector = new ByteColumnVector(numBatches*numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, 123,
                 10000, 0, targetVector, chunkIndex);
         columnReader.read(ByteBuffer.wrap(content), encoding, 123, 456,
                 10000, 123, targetVector, chunkIndex);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 123+456, batchNum*rowNum-123-456,
+        columnReader.read(ByteBuffer.wrap(content), encoding, 123+456, numBatches*numRows-123-456,
                 10000, 123+456, targetVector, chunkIndex);
 
-        for (int i = 0; i < batchNum*rowNum; i++)
+        for (int i = 0; i < numBatches*numRows; i++)
         {
-            assert targetVector.isNull[i] == originVector.isNull[i%rowNum];
+            assert targetVector.isNull[i] == originVector.isNull[i%numRows];
             if (!targetVector.isNull[i])
             {
-                assert targetVector.vector[i] == originVector.vector[i % rowNum];
+                assert targetVector.vector[i] == originVector.vector[i % numRows];
             }
         }
     }
