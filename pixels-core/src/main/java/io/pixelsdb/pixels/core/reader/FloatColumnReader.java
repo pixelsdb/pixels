@@ -99,18 +99,21 @@ public class FloatColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
+        boolean endOfPixel;
         for (int i = vectorIndex; numLeft > 0; )
         {
             if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
             }
             else
             {
                 numToRead = numLeft;
+                endOfPixel = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -119,7 +122,7 @@ public class FloatColumnReader extends ColumnReader
                 BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                         inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits =  endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
@@ -189,6 +192,7 @@ public class FloatColumnReader extends ColumnReader
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
         boolean[] isNull = null;
+        boolean endOfPixel;
         if (!nullsPadding)
         {
             isNull = new boolean[size];
@@ -199,12 +203,14 @@ public class FloatColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
             }
             else
             {
                 numToRead = numLeft;
+                endOfPixel = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
 
             // read isNull
             int pixelId = elementIndex / pixelStride;
@@ -233,7 +239,7 @@ public class FloatColumnReader extends ColumnReader
                     }
                 }
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
