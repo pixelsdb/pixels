@@ -84,9 +84,9 @@ public class TestDecimalColumnReader
                 pixelsStride, 0, decimalColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!decimalColumnVector1.noNulls && decimalColumnVector1.isNull[i])
+            if (!decimalColumnVector.noNulls && decimalColumnVector.isNull[i])
             {
-                assert !decimalColumnVector.noNulls && decimalColumnVector.isNull[i];
+                assert !decimalColumnVector1.noNulls && decimalColumnVector1.isNull[i];
             }
             else
             {
@@ -141,9 +141,9 @@ public class TestDecimalColumnReader
                 pixelsStride, 0, decimalColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!decimalColumnVector1.noNulls && decimalColumnVector1.isNull[i])
+            if (!decimalColumnVector.noNulls && decimalColumnVector.isNull[i])
             {
-                assert !decimalColumnVector.noNulls && decimalColumnVector.isNull[i];
+                assert !decimalColumnVector1.noNulls && decimalColumnVector1.isNull[i];
             }
             else
             {
@@ -198,15 +198,15 @@ public class TestDecimalColumnReader
         selected.clear(0);
         selected.clear(10);
         selected.clear(20);
-        columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
+        columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, 22,
                 pixelsStride, 0, decimalColumnVector1, chunkIndex, selected);
         for (int i = 0, j = 0; i < numRows; ++i)
         {
             if (i % 10 != 0)
             {
-                if (!decimalColumnVector1.noNulls && decimalColumnVector1.isNull[j])
+                if (!decimalColumnVector.noNulls && decimalColumnVector.isNull[i])
                 {
-                    assert !decimalColumnVector.noNulls && decimalColumnVector.isNull[i];
+                    assert !decimalColumnVector1.noNulls && decimalColumnVector1.isNull[j];
                 }
                 else
                 {

@@ -84,11 +84,9 @@ public class TestDateColumnReader
                 pixelsStride, 0, dateColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!dateColumnVector1.noNulls && dateColumnVector1.isNull[i])
-            {
-                assert !dateColumnVector.noNulls && dateColumnVector.isNull[i];
-            }
-            else
+            assert dateColumnVector1.noNulls == dateColumnVector.noNulls;
+            assert dateColumnVector1.isNull[i] == dateColumnVector.isNull[i];
+            if (dateColumnVector.noNulls || !dateColumnVector.isNull[i])
             {
                 assert dateColumnVector1.dates[i] == dateColumnVector.dates[i];
             }
@@ -141,11 +139,9 @@ public class TestDateColumnReader
                 pixelsStride, 0, dateColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!dateColumnVector1.noNulls && dateColumnVector1.isNull[i])
-            {
-                assert !dateColumnVector.noNulls && dateColumnVector.isNull[i];
-            }
-            else
+            assert dateColumnVector1.noNulls == dateColumnVector.noNulls;
+            assert dateColumnVector1.isNull[i] == dateColumnVector.isNull[i];
+            if (dateColumnVector.noNulls || !dateColumnVector.isNull[i])
             {
                 assert dateColumnVector1.dates[i] == dateColumnVector.dates[i];
             }
@@ -204,11 +200,9 @@ public class TestDateColumnReader
         {
             if (i % 10 != 0)
             {
-                if (!dateColumnVector1.noNulls && dateColumnVector1.isNull[j])
-                {
-                    assert !dateColumnVector.noNulls && dateColumnVector.isNull[i];
-                }
-                else
+                assert dateColumnVector1.noNulls == dateColumnVector.noNulls;
+                assert dateColumnVector1.isNull[j] == dateColumnVector.isNull[i];
+                if (dateColumnVector.noNulls || !dateColumnVector.isNull[i])
                 {
                     assert dateColumnVector1.dates[j] == dateColumnVector.dates[i];
                 }
@@ -259,7 +253,7 @@ public class TestDateColumnReader
         for (int i = 0; i < numBatches*numRows; i++)
         {
             assert targetVector.isNull[i] == originVector.isNull[i%numRows];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert targetVector.dates[i] == originVector.dates[i % numRows];
             }
@@ -315,7 +309,7 @@ public class TestDateColumnReader
         for (int i = 0; i < numBatches*numRows; i++)
         {
             assert targetVector.isNull[i] == originVector.isNull[i%numRows];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert targetVector.dates[i] == originVector.dates[i % numRows];
             }

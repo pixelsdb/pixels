@@ -84,9 +84,9 @@ public class TestDoubleColumnReader
                 pixelsStride, 0, doubleColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!doubleColumnVector1.noNulls && doubleColumnVector1.isNull[i])
+            if (!doubleColumnVector.noNulls && doubleColumnVector.isNull[i])
             {
-                assert !doubleColumnVector.noNulls && doubleColumnVector.isNull[i];
+                assert !doubleColumnVector1.noNulls && doubleColumnVector1.isNull[i];
             }
             else
             {
@@ -141,11 +141,9 @@ public class TestDoubleColumnReader
                 pixelsStride, 0, doubleColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!doubleColumnVector1.noNulls && doubleColumnVector1.isNull[i])
-            {
-                assert !doubleColumnVector.noNulls && doubleColumnVector.isNull[i];
-            }
-            else
+            assert doubleColumnVector1.noNulls == doubleColumnVector.noNulls;
+            assert doubleColumnVector1.isNull[i] == doubleColumnVector.isNull[i];
+            if (doubleColumnVector.noNulls || !doubleColumnVector.isNull[i])
             {
                 assert doubleColumnVector1.vector[i] == doubleColumnVector.vector[i];
             }

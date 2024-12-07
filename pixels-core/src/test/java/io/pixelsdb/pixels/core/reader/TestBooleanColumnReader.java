@@ -82,11 +82,9 @@ public class TestBooleanColumnReader
                 pixelsStride, 0, byteColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!byteColumnVector1.noNulls && byteColumnVector1.isNull[i])
-            {
-                assert !byteColumnVector.noNulls && byteColumnVector.isNull[i];
-            }
-            else
+            assert byteColumnVector1.noNulls == byteColumnVector.noNulls;
+            assert byteColumnVector1.isNull[i] == byteColumnVector.isNull[i];
+            if (byteColumnVector.noNulls || !byteColumnVector.isNull[i])
             {
                 assert byteColumnVector1.vector[i] == byteColumnVector.vector[i];
             }
@@ -137,11 +135,9 @@ public class TestBooleanColumnReader
                 pixelsStride, 0, byteColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!byteColumnVector1.noNulls && byteColumnVector1.isNull[i])
-            {
-                assert !byteColumnVector.noNulls && byteColumnVector.isNull[i];
-            }
-            else
+            assert byteColumnVector1.noNulls == byteColumnVector.noNulls;
+            assert byteColumnVector1.isNull[i] == byteColumnVector.isNull[i];
+            if (byteColumnVector.noNulls || !byteColumnVector.isNull[i])
             {
                 assert byteColumnVector1.vector[i] == byteColumnVector.vector[i];
             }
@@ -198,11 +194,9 @@ public class TestBooleanColumnReader
         {
             if (i % 10 != 0)
             {
-                if (!byteColumnVector1.noNulls && byteColumnVector1.isNull[j])
-                {
-                    assert !byteColumnVector.noNulls && byteColumnVector.isNull[i];
-                }
-                else
+                assert byteColumnVector1.noNulls == byteColumnVector.noNulls;
+                assert byteColumnVector1.isNull[j] == byteColumnVector.isNull[i];
+                if (byteColumnVector.noNulls || !byteColumnVector.isNull[i])
                 {
                     assert byteColumnVector1.vector[j] == byteColumnVector.vector[i];
                 }
@@ -253,7 +247,7 @@ public class TestBooleanColumnReader
         for (int i = 0; i < numBatches*numRows; i++)
         {
             assert targetVector.isNull[i] == originVector.isNull[i%numRows];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert targetVector.vector[i] == originVector.vector[i % numRows];
             }
@@ -309,7 +303,7 @@ public class TestBooleanColumnReader
         for (int i = 0; i < numBatches*numRows; i++)
         {
             assert targetVector.isNull[i] == originVector.isNull[i%numRows];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert targetVector.vector[i] == originVector.vector[i % numRows];
             }
