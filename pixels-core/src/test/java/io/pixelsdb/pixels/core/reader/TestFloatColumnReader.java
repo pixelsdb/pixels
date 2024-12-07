@@ -65,7 +65,7 @@ public class TestFloatColumnReader
         floatColumnVector.add(675.34F);
         floatColumnVector.add(235.58F);
         floatColumnVector.add(32434.68F);
-        floatColumnVector.add(3.58F);
+        floatColumnVector.addNull();
         floatColumnVector.add(6.66F);
         floatColumnVector.add(7.77F);
         floatColumnVector.add(65656565.20F);
@@ -84,11 +84,9 @@ public class TestFloatColumnReader
                 pixelsStride, 0, floatColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!floatColumnVector1.noNulls && floatColumnVector1.isNull[i])
-            {
-                assert !floatColumnVector.noNulls && floatColumnVector.isNull[i];
-            }
-            else
+            assert floatColumnVector1.noNulls == floatColumnVector.noNulls;
+            assert floatColumnVector1.isNull[i] == floatColumnVector.isNull[i];
+            if (floatColumnVector.noNulls || !floatColumnVector.isNull[i])
             {
                 assert floatColumnVector1.vector[i] == floatColumnVector.vector[i];
             }
@@ -141,11 +139,9 @@ public class TestFloatColumnReader
                 pixelsStride, 0, floatColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!floatColumnVector1.noNulls && floatColumnVector1.isNull[i])
-            {
-                assert !floatColumnVector.noNulls && floatColumnVector.isNull[i];
-            }
-            else
+            assert floatColumnVector1.noNulls == floatColumnVector.noNulls;
+            assert floatColumnVector1.isNull[i] == floatColumnVector.isNull[i];
+            if (floatColumnVector.noNulls || !floatColumnVector.isNull[i])
             {
                 assert floatColumnVector1.vector[i] == floatColumnVector.vector[i];
             }
@@ -204,11 +200,9 @@ public class TestFloatColumnReader
         {
             if (i % 10 != 0)
             {
-                if (!floatColumnVector1.noNulls && floatColumnVector1.isNull[j])
-                {
-                    assert !floatColumnVector.noNulls && floatColumnVector.isNull[i];
-                }
-                else
+                assert floatColumnVector1.noNulls == floatColumnVector.noNulls;
+                assert floatColumnVector1.isNull[j] == floatColumnVector.isNull[i];
+                if (floatColumnVector.noNulls || !floatColumnVector.isNull[i])
                 {
                     assert floatColumnVector1.vector[j] == floatColumnVector.vector[i];
                 }
@@ -259,7 +253,7 @@ public class TestFloatColumnReader
         for (int i = 0; i < numBatches*numRows; i++)
         {
             assert targetVector.isNull[i] == originVector.isNull[i%numRows];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert targetVector.vector[i] == originVector.vector[i % numRows];
             }
@@ -312,7 +306,7 @@ public class TestFloatColumnReader
         for (int i = 0; i < numBatches*numRows; i++)
         {
             assert targetVector.isNull[i] == originVector.isNull[i%numRows];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert targetVector.vector[i] == originVector.vector[i % numRows];
             }

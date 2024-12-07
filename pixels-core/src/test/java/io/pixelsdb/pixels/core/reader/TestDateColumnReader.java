@@ -65,7 +65,7 @@ public class TestDateColumnReader
         dateColumnVector.add(675);
         dateColumnVector.add(235);
         dateColumnVector.add(32434);
-        dateColumnVector.add(3);
+        dateColumnVector.addNull();
         dateColumnVector.add(6);
         dateColumnVector.add(7);
         dateColumnVector.add(65656565);

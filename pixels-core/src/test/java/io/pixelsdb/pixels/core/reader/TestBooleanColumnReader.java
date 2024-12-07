@@ -65,7 +65,7 @@ public class TestBooleanColumnReader
         byteColumnVector.add(true);
         byteColumnVector.add(false);
         byteColumnVector.add(false);
-        byteColumnVector.add(false);
+        byteColumnVector.addNull();
         byteColumnVector.add(false);
         byteColumnVector.add(true);
         byteColumnVector.add(false);

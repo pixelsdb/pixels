@@ -84,11 +84,9 @@ public class TestDecimalColumnReader
                 pixelsStride, 0, decimalColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!decimalColumnVector.noNulls && decimalColumnVector.isNull[i])
-            {
-                assert !decimalColumnVector1.noNulls && decimalColumnVector1.isNull[i];
-            }
-            else
+            assert decimalColumnVector1.noNulls == decimalColumnVector.noNulls;
+            assert decimalColumnVector1.isNull[i] == decimalColumnVector.isNull[i];
+            if (decimalColumnVector.noNulls || !decimalColumnVector.isNull[i])
             {
                 assert decimalColumnVector1.vector[i] == decimalColumnVector.vector[i];
             }
@@ -141,11 +139,9 @@ public class TestDecimalColumnReader
                 pixelsStride, 0, decimalColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!decimalColumnVector.noNulls && decimalColumnVector.isNull[i])
-            {
-                assert !decimalColumnVector1.noNulls && decimalColumnVector1.isNull[i];
-            }
-            else
+            assert decimalColumnVector1.noNulls == decimalColumnVector.noNulls;
+            assert decimalColumnVector1.isNull[i] == decimalColumnVector.isNull[i];
+            if (decimalColumnVector.noNulls || !decimalColumnVector.isNull[i])
             {
                 assert decimalColumnVector1.vector[i] == decimalColumnVector.vector[i];
             }
@@ -204,11 +200,9 @@ public class TestDecimalColumnReader
         {
             if (i % 10 != 0)
             {
-                if (!decimalColumnVector.noNulls && decimalColumnVector.isNull[i])
-                {
-                    assert !decimalColumnVector1.noNulls && decimalColumnVector1.isNull[j];
-                }
-                else
+                assert decimalColumnVector1.noNulls == decimalColumnVector.noNulls;
+                assert decimalColumnVector1.isNull[j] == decimalColumnVector.isNull[i];
+                if (decimalColumnVector.noNulls || !decimalColumnVector.isNull[i])
                 {
                     assert decimalColumnVector1.vector[j] == decimalColumnVector.vector[i];
                 }
@@ -260,7 +254,7 @@ public class TestDecimalColumnReader
         {
             int j = i % numRows;
             assert targetVector.isNull[i] == originVector.isNull[j];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert originVector.vector[j] == targetVector.vector[i];
             }
@@ -317,7 +311,7 @@ public class TestDecimalColumnReader
         {
             int j = i % numRows;
             assert targetVector.isNull[i] == originVector.isNull[j];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert originVector.vector[j] == targetVector.vector[i];
             }

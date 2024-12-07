@@ -65,7 +65,7 @@ public class TestDoubleColumnReader
         doubleColumnVector.add(675.34);
         doubleColumnVector.add(235.58);
         doubleColumnVector.add(32434.68);
-        doubleColumnVector.add(3.58);
+        doubleColumnVector.addNull(); // or add(3.58);
         doubleColumnVector.add(6.66);
         doubleColumnVector.add(7.77);
         doubleColumnVector.add(65656565.20);
@@ -84,11 +84,9 @@ public class TestDoubleColumnReader
                 pixelsStride, 0, doubleColumnVector1, chunkIndex);
         for (int i = 0; i < numRows; ++i)
         {
-            if (!doubleColumnVector.noNulls && doubleColumnVector.isNull[i])
-            {
-                assert !doubleColumnVector1.noNulls && doubleColumnVector1.isNull[i];
-            }
-            else
+            assert doubleColumnVector1.noNulls == doubleColumnVector.noNulls;
+            assert doubleColumnVector1.isNull[i] == doubleColumnVector.isNull[i];
+            if (doubleColumnVector.noNulls || !doubleColumnVector.isNull[i])
             {
                 assert doubleColumnVector1.vector[i] == doubleColumnVector.vector[i];
             }
@@ -202,10 +200,9 @@ public class TestDoubleColumnReader
         {
             if (i % 10 != 0)
             {
-                if (!doubleColumnVector1.noNulls && doubleColumnVector1.isNull[j])
-                {
-                    assert !doubleColumnVector.noNulls && doubleColumnVector.isNull[i];
-                } else
+                assert doubleColumnVector1.noNulls == doubleColumnVector.noNulls;
+                assert doubleColumnVector1.isNull[j] == doubleColumnVector.isNull[i];
+                if (doubleColumnVector.noNulls || !doubleColumnVector.isNull[i])
                 {
                     assert doubleColumnVector1.vector[j] == doubleColumnVector.vector[i];
                 }
@@ -256,7 +253,7 @@ public class TestDoubleColumnReader
         for (int i = 0; i < numBatches*numRows; i++)
         {
             assert targetVector.isNull[i] == originVector.isNull[i%numRows];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert targetVector.vector[i] == originVector.vector[i % numRows];
             }
@@ -309,7 +306,7 @@ public class TestDoubleColumnReader
         for (int i = 0; i < numBatches*numRows; i++)
         {
             assert targetVector.isNull[i] == originVector.isNull[i%numRows];
-            if (!targetVector.isNull[i])
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
                 assert targetVector.vector[i] == originVector.vector[i % numRows];
             }
