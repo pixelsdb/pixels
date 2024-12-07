@@ -38,7 +38,7 @@ import java.nio.ByteOrder;
 public class TestDoubleColumnReader
 {
     @Test
-    public void test() throws IOException
+    public void testNullsPadding() throws IOException
     {
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
@@ -70,6 +70,8 @@ public class TestDoubleColumnReader
         doubleColumnVector.add(54578.22);
         columnWriter.write(doubleColumnVector, 22);
         columnWriter.flush();
+        columnWriter.close();
+
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();

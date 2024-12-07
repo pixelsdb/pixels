@@ -39,7 +39,7 @@ import java.nio.ByteOrder;
 public class TestBooleanColumnReader
 {
     @Test
-    public void test() throws IOException
+    public void testNullsPadding() throws IOException
     {
         int pixelsStride = 10;
         int numRows = 22;
@@ -65,7 +65,7 @@ public class TestBooleanColumnReader
         byteColumnVector.add(true);
         byteColumnVector.add(false);
         byteColumnVector.add(false);
-        byteColumnVector.addNull();
+        byteColumnVector.add(false);
         byteColumnVector.add(false);
         byteColumnVector.add(true);
         byteColumnVector.add(false);
@@ -149,7 +149,7 @@ public class TestBooleanColumnReader
     }
 
     @Test
-    public void testNullsPaddingSelected() throws IOException
+    public void testSelected() throws IOException
     {
         int pixelsStride = 10;
         int numRows = 22;
@@ -188,76 +188,15 @@ public class TestBooleanColumnReader
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         BooleanColumnReader columnReader = new BooleanColumnReader(TypeDescription.createBoolean());
         ByteColumnVector byteColumnVector1 = new ByteColumnVector(numRows);
-        Bitmap selected = new Bitmap(22, true);
+        Bitmap selected = new Bitmap(numRows, true);
+        selected.clear(0);
         selected.clear(10);
         selected.clear(20);
         columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, byteColumnVector1, chunkIndex, selected);
         for (int i = 0, j = 0; i < numRows; ++i)
         {
-            if (i % 10 == 0)
-            {
-                if (!byteColumnVector1.noNulls && byteColumnVector1.isNull[j])
-                {
-                    assert !byteColumnVector.noNulls && byteColumnVector.isNull[i];
-                }
-                else
-                {
-                    assert byteColumnVector1.vector[j] == byteColumnVector.vector[i];
-                }
-                j++;
-            }
-        }
-    }
-
-    @Test
-    public void testWithoutNullsPaddingSelected() throws IOException
-    {
-        int pixelsStride = 10;
-        int numRows = 22;
-        PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
-                .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
-        BooleanColumnWriter columnWriter = new BooleanColumnWriter(
-                TypeDescription.createBoolean(), writerOption);
-        ByteColumnVector byteColumnVector = new ByteColumnVector(numRows);
-        byteColumnVector.add(false);
-        byteColumnVector.add(false);
-        byteColumnVector.add(false);
-        byteColumnVector.add(true);
-        byteColumnVector.addNull();
-        byteColumnVector.add(false);
-        byteColumnVector.add(true);
-        byteColumnVector.add(true);
-        byteColumnVector.addNull();
-        byteColumnVector.add(false);
-        byteColumnVector.add(false);
-        byteColumnVector.add(false);
-        byteColumnVector.add(false);
-        byteColumnVector.add(true);
-        byteColumnVector.add(false);
-        byteColumnVector.add(false);
-        byteColumnVector.addNull();
-        byteColumnVector.add(false);
-        byteColumnVector.add(true);
-        byteColumnVector.add(false);
-        byteColumnVector.add(false);
-        byteColumnVector.add(true);
-        columnWriter.write(byteColumnVector, numRows);
-        columnWriter.flush();
-        byte[] content = columnWriter.getColumnChunkContent();
-        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
-        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        BooleanColumnReader columnReader = new BooleanColumnReader(TypeDescription.createBoolean());
-        ByteColumnVector byteColumnVector1 = new ByteColumnVector(numRows);
-        Bitmap selected = new Bitmap(22, true);
-        selected.clear(10);
-        selected.clear(20);
-        columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
-                pixelsStride, 0, byteColumnVector1, chunkIndex, selected);
-        for (int i = 0, j = 0; i < numRows; ++i)
-        {
-            if (i % 10 == 0)
+            if (i % 10 != 0)
             {
                 if (!byteColumnVector1.noNulls && byteColumnVector1.isNull[j])
                 {
@@ -321,6 +260,9 @@ public class TestBooleanColumnReader
         }
     }
 
+    /**
+     * Test reading into column vectors with a run-length smaller than pixels stride.
+     */
     @Test
     public void testLargeFragmented() throws IOException
     {
