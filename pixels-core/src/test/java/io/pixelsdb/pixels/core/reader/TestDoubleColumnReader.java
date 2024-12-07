@@ -40,12 +40,14 @@ public class TestDoubleColumnReader
     @Test
     public void testNullsPadding() throws IOException
     {
+        int pixelsStride = 10;
+        int numRows = 22;
         PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         DoubleColumnWriter columnWriter = new DoubleColumnWriter(
                 TypeDescription.createDouble(), writerOption);
-        DoubleColumnVector doubleColumnVector = new DoubleColumnVector(22);
+        DoubleColumnVector doubleColumnVector = new DoubleColumnVector(numRows);
         doubleColumnVector.add(100.22);
         doubleColumnVector.add(103.32);
         doubleColumnVector.add(106.43);
@@ -68,7 +70,7 @@ public class TestDoubleColumnReader
         doubleColumnVector.add(65656565.20);
         doubleColumnVector.add(3434.11);
         doubleColumnVector.add(54578.22);
-        columnWriter.write(doubleColumnVector, 22);
+        columnWriter.write(doubleColumnVector, numRows);
         columnWriter.flush();
         columnWriter.close();
 
@@ -76,10 +78,67 @@ public class TestDoubleColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         DoubleColumnReader columnReader = new DoubleColumnReader(TypeDescription.createDouble());
-        DoubleColumnVector doubleColumnVector1 = new DoubleColumnVector(22);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
-                10, 0, doubleColumnVector1, chunkIndex);
-        for (int i = 0; i < 22; ++i)
+        DoubleColumnVector doubleColumnVector1 = new DoubleColumnVector(numRows);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
+                pixelsStride, 0, doubleColumnVector1, chunkIndex);
+        for (int i = 0; i < numRows; ++i)
+        {
+            if (!doubleColumnVector1.noNulls && doubleColumnVector1.isNull[i])
+            {
+                assert !doubleColumnVector.noNulls && doubleColumnVector.isNull[i];
+            }
+            else
+            {
+                assert doubleColumnVector1.vector[i] == doubleColumnVector.vector[i];
+            }
+        }
+    }
+
+    @Test
+    public void testWithoutNullsPadding() throws IOException
+    {
+        int pixelsStride = 10;
+        int numRows = 22;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
+        DoubleColumnWriter columnWriter = new DoubleColumnWriter(
+                TypeDescription.createDouble(), writerOption);
+        DoubleColumnVector doubleColumnVector = new DoubleColumnVector(numRows);
+        doubleColumnVector.add(100.22);
+        doubleColumnVector.add(103.32);
+        doubleColumnVector.add(106.43);
+        doubleColumnVector.add(34.10);
+        doubleColumnVector.addNull();
+        doubleColumnVector.add(54.09);
+        doubleColumnVector.add(55.00);
+        doubleColumnVector.add(67.23);
+        doubleColumnVector.addNull();
+        doubleColumnVector.add(34.58);
+        doubleColumnVector.add(555.98);
+        doubleColumnVector.add(565.76);
+        doubleColumnVector.add(234.11);
+        doubleColumnVector.add(675.34);
+        doubleColumnVector.add(235.58);
+        doubleColumnVector.add(32434.68);
+        doubleColumnVector.addNull();
+        doubleColumnVector.add(6.66);
+        doubleColumnVector.add(7.77);
+        doubleColumnVector.add(65656565.20);
+        doubleColumnVector.add(3434.11);
+        doubleColumnVector.add(54578.22);
+        columnWriter.write(doubleColumnVector, numRows);
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        DoubleColumnReader columnReader = new DoubleColumnReader(TypeDescription.createDouble());
+        DoubleColumnVector doubleColumnVector1 = new DoubleColumnVector(numRows);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
+                pixelsStride, 0, doubleColumnVector1, chunkIndex);
+        for (int i = 0; i < numRows; ++i)
         {
             if (!doubleColumnVector1.noNulls && doubleColumnVector1.isNull[i])
             {

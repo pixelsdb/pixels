@@ -42,7 +42,7 @@ public class TestDecimalColumnReader
     public void testNullsPadding() throws IOException
     {
         int pixelsStride = 10;
-        int numRows = 10;
+        int numRows = 22;
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
@@ -65,7 +65,7 @@ public class TestDecimalColumnReader
         decimalColumnVector.add(675.34);
         decimalColumnVector.add(235.58);
         decimalColumnVector.add(32434.68);
-        decimalColumnVector.add(3.58);
+        decimalColumnVector.addNull();
         decimalColumnVector.add(6.66);
         decimalColumnVector.add(7.77);
         decimalColumnVector.add(65656565.20);
@@ -99,7 +99,7 @@ public class TestDecimalColumnReader
     public void testWithoutNullsPadding() throws IOException
     {
         int pixelsStride = 10;
-        int numRows = 10;
+        int numRows = 22;
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
@@ -122,7 +122,7 @@ public class TestDecimalColumnReader
         decimalColumnVector.add(675.34);
         decimalColumnVector.add(235.58);
         decimalColumnVector.add(32434.68);
-        decimalColumnVector.add(3.58);
+        decimalColumnVector.addNull();
         decimalColumnVector.add(6.66);
         decimalColumnVector.add(7.77);
         decimalColumnVector.add(65656565.20);
@@ -156,7 +156,7 @@ public class TestDecimalColumnReader
     public void testSelected() throws IOException
     {
         int pixelsStride = 10;
-        int numRows = 10;
+        int numRows = 22;
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
@@ -179,7 +179,7 @@ public class TestDecimalColumnReader
         decimalColumnVector.add(675.34);
         decimalColumnVector.add(235.58);
         decimalColumnVector.add(32434.68);
-        decimalColumnVector.add(3.58);
+        decimalColumnVector.addNull();
         decimalColumnVector.add(6.66);
         decimalColumnVector.add(7.77);
         decimalColumnVector.add(65656565.20);
