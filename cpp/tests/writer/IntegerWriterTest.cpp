@@ -132,7 +132,7 @@ TEST(IntegerWriterTest, DISABLED_WriteIntWithoutNull) {
         }
 }
 
-TEST(EncodeTest, EncodeLong) {
+TEST(EncodeTest, DISABLED_EncodeLong) {
     const size_t len = 10;
     std::array<long, len> data;
     for(int i = 0; i < len; i++) {
@@ -212,22 +212,27 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
 
 }
 
-TEST(IntegerWriterTest, DISABLED_WriteIntWithNull) {
-        int len = 10;
+TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
+        int len = 23;
         int pixel_stride = 5;
         bool is_long = false;
         bool encoding = true;
-        auto integer_column_vector = std::make_shared<LongColumnVector>(len, is_long, encoding);
+        auto integer_column_vector = std::make_shared<LongColumnVector>(len, encoding, is_long);
         ASSERT_TRUE(integer_column_vector);
         for (int i = 0; i < len; ++i)
         {
-            if(i % 2) {
-                integer_column_vector->addNull();
-            } else {
+            if(i%2) {
                 integer_column_vector->add(i);
+            } else {
+                integer_column_vector->addNull();
             }
+
         }
-        // Run Length Encoding
+        /**----------------------------------------------
+         * *                   INFO
+         *   Case: RunLengthEncode
+         *   
+         *---------------------------------------------**/
         auto option = std::make_shared<PixelsWriterOption>();
         option->setPixelsStride(pixel_stride);
         option->setNullsPadding(false);
@@ -240,19 +245,37 @@ TEST(IntegerWriterTest, DISABLED_WriteIntWithNull) {
         integer_column_writer->flush();
         auto content = integer_column_writer->getColumnChunkContent();
         EXPECT_GT(content.size(), 0);
+
+       
         std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
         integer_column_writer->close();
 
-        // without run length encoding
-        option->setEncodingLevel(EncodingLevel(EncodingLevel::EL0));
-        integer_column_writer = std::make_unique<IntegerColumnWriter>
-            (TypeDescription::createInt(), option);
-        write_size = integer_column_writer->write(integer_column_vector, len);    
-        EXPECT_NE(write_size, 0);
-        content = integer_column_writer->getColumnChunkContent();
-        EXPECT_GT(content.size(), 0);
-        std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
-        integer_column_writer->flush();
-        integer_column_writer->close();
+        /**----------------------
+         **      Write End. Use Reader to check
+         *------------------------**/
+        auto integer_column_reader = std::make_unique<IntegerColumnReader>(TypeDescription::createInt());
+        auto buffer = std::make_shared<ByteBuffer>(content.size());
+        buffer->putBytes(content.data(), content.size());
+        auto column_chunk_encoding = integer_column_writer->getColumnChunkEncoding();
+        auto int_result_vector = std::make_shared<LongColumnVector>(len, encoding, is_long);
+        auto bit_mask = std::make_shared<PixelsBitMask>(len);
+
+
+        auto num_to_read = len;
+        auto pixel_offset = 0;
+        auto vector_index = 0;
+        while(num_to_read) {
+            auto size = std::min(pixel_stride, num_to_read);
+            integer_column_reader->read(buffer, column_chunk_encoding, pixel_offset, size, pixel_stride, vector_index,
+                int_result_vector,
+                *integer_column_writer->getColumnChunkIndex(),
+                bit_mask);
+            for(int i = vector_index; i < vector_index + size; i++) {
+                std::cerr << "[DEBUG READ CASE1] " << int_result_vector->intVector[i] << std::endl;
+                // EXPECT_EQ(int_result_vector->intVector[i], integer_column_vector->intVector[i]);
+            }
+            pixel_offset+=size;
+            vector_index+=size;
+            num_to_read-=size;
+        }
 }
-

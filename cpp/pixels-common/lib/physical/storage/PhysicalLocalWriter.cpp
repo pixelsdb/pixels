@@ -6,6 +6,7 @@
 #include "utils/Constants.h"
 
 PhysicalLocalWriter::PhysicalLocalWriter(const std::string &path, bool overwrite) {
+    this->position = 0;
     this->path = path;
     this->rawWriter.open(this->path, overwrite ? std::ios::trunc : std::ios::app);
     if (!this->rawWriter.is_open()) {

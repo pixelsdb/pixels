@@ -1,6 +1,11 @@
 add_executable(IntegerWriterTest
     IntegerWriterTest.cpp                
 )
+
+add_executable(PixelsWriterTest
+    PixelsWriterTest.cpp                
+)
+
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
   set(
     CMAKE_CPP_FLAGS
@@ -9,9 +14,21 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
   target_link_options(IntegerWriterTest
     BEFORE PUBLIC -fsanitize=undefined PUBLIC -fsanitize=address
   )
+
+  target_link_options(PixelsWriterTest
+    BEFORE PUBLIC -fsanitize=undefined PUBLIC -fsanitize=address
+  )
 endif()
 target_link_libraries(
        IntegerWriterTest
+       gtest_main
+       pixels-common
+       pixels-core
+       duckdb
+)
+
+target_link_libraries(
+       PixelsWriterTest
        gtest_main
        pixels-common
        pixels-core
