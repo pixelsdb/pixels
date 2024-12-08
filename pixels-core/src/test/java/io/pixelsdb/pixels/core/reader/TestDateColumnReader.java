@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.DateColumnVector;
 import io.pixelsdb.pixels.core.writer.DateColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
@@ -38,14 +39,16 @@ import java.nio.ByteOrder;
 public class TestDateColumnReader
 {
     @Test
-    public void test() throws IOException
+    public void testNullsPadding() throws IOException
     {
+        int pixelsStride = 10;
+        int numRows = 22;
         PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         DateColumnWriter columnWriter = new DateColumnWriter(
                 TypeDescription.createDate(), writerOption);
-        DateColumnVector dateColumnVector = new DateColumnVector(22);
+        DateColumnVector dateColumnVector = new DateColumnVector(numRows);
         dateColumnVector.add(100);
         dateColumnVector.add(103);
         dateColumnVector.add(106);
@@ -62,28 +65,30 @@ public class TestDateColumnReader
         dateColumnVector.add(675);
         dateColumnVector.add(235);
         dateColumnVector.add(32434);
-        dateColumnVector.add(3);
+        dateColumnVector.addNull();
         dateColumnVector.add(6);
         dateColumnVector.add(7);
         dateColumnVector.add(65656565);
         dateColumnVector.add(3434);
         dateColumnVector.add(54578);
-        columnWriter.write(dateColumnVector, 22);
+        columnWriter.write(dateColumnVector, numRows);
         columnWriter.flush();
+        columnWriter.close();
+
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         DateColumnReader columnReader = new DateColumnReader(TypeDescription.createDate());
-        DateColumnVector dateColumnVector1 = new DateColumnVector(22);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
-                10, 0, dateColumnVector1, chunkIndex);
-        for (int i = 0; i < 22; ++i)
+        DateColumnVector dateColumnVector1 = new DateColumnVector(numRows);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
+                pixelsStride, 0, dateColumnVector1, chunkIndex);
+        columnReader.close();
+
+        for (int i = 0; i < numRows; ++i)
         {
-            if (!dateColumnVector1.noNulls && dateColumnVector1.isNull[i])
-            {
-                assert !dateColumnVector.noNulls && dateColumnVector.isNull[i];
-            }
-            else
+            assert dateColumnVector1.noNulls == dateColumnVector.noNulls;
+            assert dateColumnVector1.isNull[i] == dateColumnVector.isNull[i];
+            if (dateColumnVector.noNulls || !dateColumnVector.isNull[i])
             {
                 assert dateColumnVector1.dates[i] == dateColumnVector.dates[i];
             }
@@ -91,18 +96,140 @@ public class TestDateColumnReader
     }
 
     @Test
+    public void testWithoutNullsPadding() throws IOException
+    {
+        int pixelsStride = 10;
+        int numRows = 22;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
+        DateColumnWriter columnWriter = new DateColumnWriter(
+                TypeDescription.createDate(), writerOption);
+        DateColumnVector dateColumnVector = new DateColumnVector(numRows);
+        dateColumnVector.add(100);
+        dateColumnVector.add(103);
+        dateColumnVector.add(106);
+        dateColumnVector.add(34);
+        dateColumnVector.addNull();
+        dateColumnVector.add(54);
+        dateColumnVector.add(55);
+        dateColumnVector.add(67);
+        dateColumnVector.addNull();
+        dateColumnVector.add(34);
+        dateColumnVector.add(555);
+        dateColumnVector.add(565);
+        dateColumnVector.add(234);
+        dateColumnVector.add(675);
+        dateColumnVector.add(235);
+        dateColumnVector.add(32434);
+        dateColumnVector.addNull();
+        dateColumnVector.add(6);
+        dateColumnVector.add(7);
+        dateColumnVector.add(65656565);
+        dateColumnVector.add(3434);
+        dateColumnVector.add(54578);
+        columnWriter.write(dateColumnVector, numRows);
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        DateColumnReader columnReader = new DateColumnReader(TypeDescription.createDate());
+        DateColumnVector dateColumnVector1 = new DateColumnVector(numRows);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
+                pixelsStride, 0, dateColumnVector1, chunkIndex);
+        columnReader.close();
+
+        for (int i = 0; i < numRows; ++i)
+        {
+            assert dateColumnVector1.noNulls == dateColumnVector.noNulls;
+            assert dateColumnVector1.isNull[i] == dateColumnVector.isNull[i];
+            if (dateColumnVector.noNulls || !dateColumnVector.isNull[i])
+            {
+                assert dateColumnVector1.dates[i] == dateColumnVector.dates[i];
+            }
+        }
+    }
+
+    @Test
+    public void testSelected() throws IOException
+    {
+        int pixelsStride = 10;
+        int numRows = 22;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        DateColumnWriter columnWriter = new DateColumnWriter(
+                TypeDescription.createDate(), writerOption);
+        DateColumnVector dateColumnVector = new DateColumnVector(numRows);
+        dateColumnVector.add(100);
+        dateColumnVector.add(103);
+        dateColumnVector.add(106);
+        dateColumnVector.add(34);
+        dateColumnVector.addNull();
+        dateColumnVector.add(54);
+        dateColumnVector.add(55);
+        dateColumnVector.add(67);
+        dateColumnVector.addNull();
+        dateColumnVector.add(34);
+        dateColumnVector.add(555);
+        dateColumnVector.add(565);
+        dateColumnVector.add(234);
+        dateColumnVector.add(675);
+        dateColumnVector.add(235);
+        dateColumnVector.add(32434);
+        dateColumnVector.addNull();
+        dateColumnVector.add(6);
+        dateColumnVector.add(7);
+        dateColumnVector.add(65656565);
+        dateColumnVector.add(3434);
+        dateColumnVector.add(54578);
+        columnWriter.write(dateColumnVector, 22);
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        DateColumnReader columnReader = new DateColumnReader(TypeDescription.createDate());
+        DateColumnVector dateColumnVector1 = new DateColumnVector(numRows);
+        Bitmap selected = new Bitmap(numRows, true);
+        selected.clear(0);
+        selected.clear(10);
+        selected.clear(20);
+        columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
+                pixelsStride, 0, dateColumnVector1, chunkIndex, selected);
+        columnReader.close();
+
+        for (int i = 0, j = 0; i < numRows; ++i)
+        {
+            if (i % 10 != 0)
+            {
+                assert dateColumnVector1.noNulls == dateColumnVector.noNulls;
+                assert dateColumnVector1.isNull[j] == dateColumnVector.isNull[i];
+                if (dateColumnVector.noNulls || !dateColumnVector.isNull[i])
+                {
+                    assert dateColumnVector1.dates[j] == dateColumnVector.dates[i];
+                }
+                j++;
+            }
+        }
+    }
+
+    @Test
     public void testLarge() throws IOException
     {
-        int batchNum = 15;
-        int rowNum = 1024;
+        int numBatches = 15;
+        int numRows = 1024;
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         DateColumnWriter columnWriter = new DateColumnWriter(
                 TypeDescription.createDate(), writerOption);
 
-        DateColumnVector originVector = new DateColumnVector(rowNum);
-        for (int j = 0; j < rowNum; j++)
+        DateColumnVector originVector = new DateColumnVector(numRows);
+        for (int j = 0; j < numRows; j++)
         {
             if (j % 100 == 0)
             {
@@ -114,9 +241,9 @@ public class TestDateColumnReader
             }
         }
 
-        for (int i = 0; i < batchNum; i++)
+        for (int i = 0; i < numBatches; i++)
         {
-            columnWriter.write(originVector, rowNum);
+            columnWriter.write(originVector, numRows);
         }
         columnWriter.flush();
         columnWriter.close();
@@ -125,16 +252,75 @@ public class TestDateColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         DateColumnReader columnReader = new DateColumnReader(TypeDescription.createDate());
-        DateColumnVector targetVector = new DateColumnVector(batchNum*rowNum);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, batchNum*rowNum,
+        DateColumnVector targetVector = new DateColumnVector(numBatches*numRows);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numBatches*numRows,
                 10000, 0, targetVector, chunkIndex);
+        columnReader.close();
 
-        for (int i = 0; i < batchNum*rowNum; i++)
+        for (int i = 0; i < numBatches*numRows; i++)
         {
-            assert targetVector.isNull[i] == originVector.isNull[i%rowNum];
-            if (!targetVector.isNull[i])
+            assert targetVector.isNull[i] == originVector.isNull[i%numRows];
+            if (targetVector.noNulls || !targetVector.isNull[i])
             {
-                assert targetVector.dates[i] == originVector.dates[i % rowNum];
+                assert targetVector.dates[i] == originVector.dates[i % numRows];
+            }
+        }
+    }
+
+    /**
+     * Test reading into column vectors with a run-length smaller than pixels stride.
+     */
+    @Test
+    public void testLargeFragmented() throws IOException
+    {
+        int numBatches = 15;
+        int numRows = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        DateColumnWriter columnWriter = new DateColumnWriter(
+                TypeDescription.createDate(), writerOption);
+
+        DateColumnVector originVector = new DateColumnVector(numRows);
+        for (int j = 0; j < numRows; j++)
+        {
+            if (j % 100 == 0)
+            {
+                originVector.addNull();
+            }
+            else
+            {
+                originVector.add(1000);
+            }
+        }
+
+        for (int i = 0; i < numBatches; i++)
+        {
+            columnWriter.write(originVector, numRows);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        DateColumnReader columnReader = new DateColumnReader(TypeDescription.createDate());
+        DateColumnVector targetVector = new DateColumnVector(numBatches*numRows);
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        columnReader.read(buffer, encoding, 0, 123,
+                10000, 0, targetVector, chunkIndex);
+        columnReader.read(buffer, encoding, 123, 456,
+                10000, 123, targetVector, chunkIndex);
+        columnReader.read(buffer, encoding, 123+456, numBatches*numRows-123-456,
+                10000, 123+456, targetVector, chunkIndex);
+        columnReader.close();
+
+        for (int i = 0; i < numBatches*numRows; i++)
+        {
+            assert targetVector.isNull[i] == originVector.isNull[i%numRows];
+            if (targetVector.noNulls || !targetVector.isNull[i])
+            {
+                assert targetVector.dates[i] == originVector.dates[i % numRows];
             }
         }
     }

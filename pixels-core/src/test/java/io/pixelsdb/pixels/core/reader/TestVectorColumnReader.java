@@ -3,9 +3,7 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorColumnVector;
-import io.pixelsdb.pixels.core.writer.DoubleColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import io.pixelsdb.pixels.core.writer.VectorColumnWriter;
 import org.junit.Test;
@@ -66,7 +64,8 @@ public class TestVectorColumnReader
         int length = 1000;
         int dimension = 1024;
         VectorColumnVector vectorColumnVector = new VectorColumnVector(length, dimension);
-        for (int i=0; i<length; i++) {
+        for (int i=0; i<length; i++)
+        {
             vectorColumnVector.add(getRandomVector(dimension));
         }
 
@@ -104,7 +103,8 @@ public class TestVectorColumnReader
     {
         Random random = new Random();
         double[] randomVec = new double[dimension];
-        for (int i=0; i<dimension; i++) {
+        for (int i=0; i<dimension; i++)
+        {
             randomVec[i] = random.nextDouble();
         }
         return randomVec;
