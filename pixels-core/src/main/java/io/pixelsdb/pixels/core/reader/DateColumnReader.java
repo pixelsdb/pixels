@@ -138,7 +138,7 @@ public class DateColumnReader extends ColumnReader
                 BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                         inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits =  endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else

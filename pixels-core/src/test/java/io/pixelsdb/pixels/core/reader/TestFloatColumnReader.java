@@ -267,6 +267,9 @@ public class TestFloatColumnReader
         }
     }
 
+    /**
+     * Test reading into column vectors with a run-length smaller than pixels stride.
+     */
     @Test
     public void testLargeFragmented() throws IOException
     {

@@ -187,17 +187,21 @@ public class StringColumnReader extends ColumnReader
                 // we get bytes here to reduce memory copies and avoid creating many small byte arrays
                 byte[] buffer = dictContentBuf.array();
                 int numLeft = size, numToRead, bytesToDeCompact;
+                boolean endOfPixel;
                 for (int i = vectorIndex; numLeft > 0;)
                 {
                     if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
                     {
                         // read to the end of the current pixel
                         numToRead = pixelStride - elementIndex % pixelStride;
-                    } else
+                        endOfPixel = true;
+                    }
+                    else
                     {
                         numToRead = numLeft;
+                        endOfPixel = false;
                     }
-                    bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                    bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
                     // read isNull
                     int pixelId = elementIndex / pixelStride;
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -206,12 +210,14 @@ public class StringColumnReader extends ColumnReader
                         BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                                 inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                         isNullOffset += bytesToDeCompact;
-                        isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                        isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                         columnVector.noNulls = false;
-                    } else
+                    }
+                    else
                     {
                         Arrays.fill(columnVector.isNull, i, i + numToRead, false);
                     }
+                    // read content
                     for (int j = i; j < i + numToRead; ++j)
                     {
                         if (hasNull && columnVector.isNull[j])
@@ -247,17 +253,21 @@ public class StringColumnReader extends ColumnReader
                         "dictionaries in the column vector and the input buffer are inconsistent");
 
                 int numLeft = size, numToRead, bytesToDeCompact;
+                boolean endOfPixel;
                 for (int i = vectorIndex; numLeft > 0;)
                 {
                     if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
                     {
                         // read to the end of the current pixel
                         numToRead = pixelStride - elementIndex % pixelStride;
-                    } else
+                        endOfPixel = true;
+                    }
+                    else
                     {
                         numToRead = numLeft;
+                        endOfPixel = false;
                     }
-                    bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                    bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
                     // read isNull
                     int pixelId = elementIndex / pixelStride;
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -266,12 +276,14 @@ public class StringColumnReader extends ColumnReader
                         BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                                 inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                         isNullOffset += bytesToDeCompact;
-                        isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                        isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                         columnVector.noNulls = false;
-                    } else
+                    }
+                    else
                     {
                         Arrays.fill(columnVector.isNull, i, i + numToRead, false);
                     }
+                    // read content
                     for (int j = i; j < i + numToRead; ++j)
                     {
                         if (hasNull && columnVector.isNull[j])
@@ -306,17 +318,21 @@ public class StringColumnReader extends ColumnReader
             // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
             byte[] buffer = contentBuf.array();
             int numLeft = size, numToRead, bytesToDeCompact;
+            boolean endOfPixel;
             for (int i = vectorIndex; numLeft > 0;)
             {
                 if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
                 {
                     // read to the end of the current pixel
                     numToRead = pixelStride - elementIndex % pixelStride;
-                } else
+                    endOfPixel = true;
+                }
+                else
                 {
                     numToRead = numLeft;
+                    endOfPixel = false;
                 }
-                bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
                 // read isNull
                 int pixelId = elementIndex / pixelStride;
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -325,12 +341,14 @@ public class StringColumnReader extends ColumnReader
                     BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                             inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                     isNullOffset += bytesToDeCompact;
-                    isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                    isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                     columnVector.noNulls = false;
-                } else
+                }
+                else
                 {
                     Arrays.fill(columnVector.isNull, i, i + numToRead, false);
                 }
+                // read content
                 for (int j = i; j < i + numToRead; ++j)
                 {
                     if (hasNull && columnVector.isNull[j])
@@ -419,17 +437,21 @@ public class StringColumnReader extends ColumnReader
                 byte[] buffer = dictContentBuf.array();
                 int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
                 boolean[] isNull = new boolean[size];
+                boolean endOfPixel;
                 for (int i = vectorIndex; numLeft > 0;)
                 {
                     if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
                     {
                         // read to the end of the current pixel
                         numToRead = pixelStride - elementIndex % pixelStride;
-                    } else
+                        endOfPixel = true;
+                    }
+                    else
                     {
                         numToRead = numLeft;
+                        endOfPixel = false;
                     }
-                    bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                    bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
 
                     // read isNull
                     int pixelId = elementIndex / pixelStride;
@@ -448,7 +470,7 @@ public class StringColumnReader extends ColumnReader
                             }
                         }
                         isNullOffset += bytesToDeCompact;
-                        isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                        isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                         columnVector.noNulls = false;
                     }
                     else
@@ -509,17 +531,21 @@ public class StringColumnReader extends ColumnReader
 
                 int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
                 boolean[] isNull = new boolean[size];
+                boolean endOfPixel;
                 for (int i = vectorIndex; numLeft > 0;)
                 {
                     if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
                     {
                         // read to the end of the current pixel
                         numToRead = pixelStride - elementIndex % pixelStride;
-                    } else
+                        endOfPixel = true;
+                    }
+                    else
                     {
                         numToRead = numLeft;
+                        endOfPixel = false;
                     }
-                    bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                    bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
 
                     // read isNull
                     int pixelId = elementIndex / pixelStride;
@@ -538,7 +564,7 @@ public class StringColumnReader extends ColumnReader
                             }
                         }
                         isNullOffset += bytesToDeCompact;
-                        isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                        isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                         columnVector.noNulls = false;
                     }
                     else
@@ -599,24 +625,28 @@ public class StringColumnReader extends ColumnReader
             byte[] buffer = contentBuf.array();
             int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
             boolean[] isNull = new boolean[size];
+            boolean endOfPixel;
             for (int i = vectorIndex; numLeft > 0;)
             {
                 if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
                 {
                     // read to the end of the current pixel
                     numToRead = pixelStride - elementIndex % pixelStride;
-                } else
+                    endOfPixel = true;
+                }
+                else
                 {
                     numToRead = numLeft;
+                    endOfPixel = false;
                 }
-                bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+                bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
 
                 // read isNull
                 int pixelId = elementIndex / pixelStride;
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                 if (hasNull)
                 {
-                    BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
+                    BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
                             isNullOffset, isNullSkipBits, littleEndian);
                     // update columnVector.isNull
                     int k = vectorWriteIndex;
@@ -624,11 +654,11 @@ public class StringColumnReader extends ColumnReader
                     {
                         if (selected.get(j - vectorIndex))
                         {
-                            columnVector.isNull[k++] = columnVector.isNull[j - vectorIndex];
+                            columnVector.isNull[k++] = isNull[j - vectorIndex];
                         }
                     }
                     isNullOffset += bytesToDeCompact;
-                    isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                    isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                     columnVector.noNulls = false;
                 }
                 else
