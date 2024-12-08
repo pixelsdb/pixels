@@ -82,6 +82,8 @@ public class TestDoubleColumnReader
         DoubleColumnVector doubleColumnVector1 = new DoubleColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, doubleColumnVector1, chunkIndex);
+        columnReader.close();
+
         for (int i = 0; i < numRows; ++i)
         {
             assert doubleColumnVector1.noNulls == doubleColumnVector.noNulls;
@@ -137,6 +139,8 @@ public class TestDoubleColumnReader
         DoubleColumnVector doubleColumnVector1 = new DoubleColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, doubleColumnVector1, chunkIndex);
+        columnReader.close();
+
         for (int i = 0; i < numRows; ++i)
         {
             assert doubleColumnVector1.noNulls == doubleColumnVector.noNulls;
@@ -196,6 +200,8 @@ public class TestDoubleColumnReader
         selected.clear(20);
         columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, doubleColumnVector1, chunkIndex, selected);
+        columnReader.close();
+
         for (int i = 0, j = 0; i < numRows; ++i)
         {
             if (i % 10 != 0)
@@ -249,6 +255,7 @@ public class TestDoubleColumnReader
         DoubleColumnVector targetVector = new DoubleColumnVector(numBatches*numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numBatches*numRows,
                 10000, 0, targetVector, chunkIndex);
+        columnReader.close();
 
         for (int i = 0; i < numBatches*numRows; i++)
         {
@@ -296,12 +303,14 @@ public class TestDoubleColumnReader
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         DoubleColumnReader columnReader = new DoubleColumnReader(TypeDescription.createDouble());
         DoubleColumnVector targetVector = new DoubleColumnVector(numBatches*numRows);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 123,
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        columnReader.read(buffer, encoding, 0, 123,
                 10000, 0, targetVector, chunkIndex);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 123, 456,
+        columnReader.read(buffer, encoding, 123, 456,
                 10000, 123, targetVector, chunkIndex);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 123+456, numBatches*numRows-123-456,
+        columnReader.read(buffer, encoding, 123+456, numBatches*numRows-123-456,
                 10000, 123+456, targetVector, chunkIndex);
+        columnReader.close();
 
         for (int i = 0; i < numBatches*numRows; i++)
         {

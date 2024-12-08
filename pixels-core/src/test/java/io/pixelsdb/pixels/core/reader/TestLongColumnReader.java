@@ -82,6 +82,8 @@ public class TestLongColumnReader
         LongColumnVector longColumnVector1 = new LongColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, longColumnVector1, chunkIndex);
+        columnReader.close();
+
         for (int i = 0; i < numRows; ++i)
         {
             assert longColumnVector1.noNulls == longColumnVector.noNulls;
@@ -137,6 +139,8 @@ public class TestLongColumnReader
         LongColumnVector longColumnVector1 = new LongColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, longColumnVector1, chunkIndex);
+        columnReader.close();
+
         for (int i = 0; i < numRows; ++i)
         {
             assert longColumnVector1.noNulls == longColumnVector.noNulls;
@@ -192,6 +196,8 @@ public class TestLongColumnReader
         LongColumnVector longColumnVector1 = new LongColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, longColumnVector1, chunkIndex);
+        columnReader.close();
+
         for (int i = 0; i < numRows; ++i)
         {
             assert longColumnVector1.noNulls == longColumnVector.noNulls;
@@ -251,6 +257,8 @@ public class TestLongColumnReader
         selected.clear(20);
         columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, longColumnVector1, chunkIndex, selected);
+        columnReader.close();
+
         for (int i = 0, j = 0; i < numRows; ++i)
         {
             if (i % 10 != 0)
@@ -304,6 +312,7 @@ public class TestLongColumnReader
         LongColumnVector targetVector = new LongColumnVector(numBatches*numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numBatches*numRows,
                 10000, 0, targetVector, chunkIndex);
+        columnReader.close();
 
         for (int i = 0; i < numBatches*numRows; i++)
         {
@@ -351,12 +360,14 @@ public class TestLongColumnReader
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         LongColumnReader columnReader = new LongColumnReader(TypeDescription.createLong());
         LongColumnVector targetVector = new LongColumnVector(numBatches*numRows);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 123,
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        columnReader.read(buffer, encoding, 0, 123,
                 10000, 0, targetVector, chunkIndex);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 123, 456,
+        columnReader.read(buffer, encoding, 123, 456,
                 10000, 123, targetVector, chunkIndex);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 123+456, numBatches*numRows-123-456,
+        columnReader.read(buffer, encoding, 123+456, numBatches*numRows-123-456,
                 10000, 123+456, targetVector, chunkIndex);
+        columnReader.close();
 
         for (int i = 0; i < numBatches*numRows; i++)
         {

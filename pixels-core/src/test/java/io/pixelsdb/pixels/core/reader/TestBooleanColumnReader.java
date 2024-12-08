@@ -73,6 +73,8 @@ public class TestBooleanColumnReader
         byteColumnVector.add(true);
         columnWriter.write(byteColumnVector, numRows);
         columnWriter.flush();
+        columnWriter.close();
+
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
@@ -80,6 +82,8 @@ public class TestBooleanColumnReader
         ByteColumnVector byteColumnVector1 = new ByteColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, byteColumnVector1, chunkIndex);
+        columnReader.close();
+
         for (int i = 0; i < numRows; ++i)
         {
             assert byteColumnVector1.noNulls == byteColumnVector.noNulls;
@@ -126,6 +130,8 @@ public class TestBooleanColumnReader
         byteColumnVector.add(true);
         columnWriter.write(byteColumnVector, numRows);
         columnWriter.flush();
+        columnWriter.close();
+
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
@@ -133,6 +139,8 @@ public class TestBooleanColumnReader
         ByteColumnVector byteColumnVector1 = new ByteColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, byteColumnVector1, chunkIndex);
+        columnReader.close();
+
         for (int i = 0; i < numRows; ++i)
         {
             assert byteColumnVector1.noNulls == byteColumnVector.noNulls;
@@ -179,6 +187,8 @@ public class TestBooleanColumnReader
         byteColumnVector.add(true);
         columnWriter.write(byteColumnVector, numRows);
         columnWriter.flush();
+        columnWriter.close();
+
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
@@ -190,6 +200,8 @@ public class TestBooleanColumnReader
         selected.clear(20);
         columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, byteColumnVector1, chunkIndex, selected);
+        columnReader.close();
+
         for (int i = 0, j = 0; i < numRows; ++i)
         {
             if (i % 10 != 0)
@@ -243,6 +255,7 @@ public class TestBooleanColumnReader
         ByteColumnVector targetVector = new ByteColumnVector(numBatches*numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numBatches*numRows,
                 10000, 0, targetVector, chunkIndex);
+        columnReader.close();
 
         for (int i = 0; i < numBatches*numRows; i++)
         {
@@ -293,12 +306,14 @@ public class TestBooleanColumnReader
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         BooleanColumnReader columnReader = new BooleanColumnReader(TypeDescription.createBoolean());
         ByteColumnVector targetVector = new ByteColumnVector(numBatches*numRows);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 123,
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        columnReader.read(buffer, encoding, 0, 123,
                 10000, 0, targetVector, chunkIndex);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 123, 456,
+        columnReader.read(buffer, encoding, 123, 456,
                 10000, 123, targetVector, chunkIndex);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 123+456, numBatches*numRows-123-456,
+        columnReader.read(buffer, encoding, 123+456, numBatches*numRows-123-456,
                 10000, 123+456, targetVector, chunkIndex);
+        columnReader.close();
 
         for (int i = 0; i < numBatches*numRows; i++)
         {
