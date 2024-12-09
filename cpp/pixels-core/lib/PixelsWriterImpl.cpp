@@ -155,7 +155,7 @@ void PixelsWriterImpl::writeRowGroup() {
     rowGroupDataLength=0;
     for(int i=0;i<columnWriters.size();i++){
         std::shared_ptr<ColumnWriter> writer=columnWriters[i];
-        auto chunkIndex=writer->getNewColumnChunkIndex();
+        auto chunkIndex=writer->getColumnChunkIndex();
         chunkIndex.set_chunkoffset(curRowGroupOffset+rowGroupDataLength);
         chunkIndex.set_chunklength(writer->getColumnChunkSize());
         rowGroupDataLength+=writer->getColumnChunkSize();

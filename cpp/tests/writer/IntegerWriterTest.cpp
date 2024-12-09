@@ -5,7 +5,7 @@
 #include "gtest/gtest.h"
 
 
-TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithoutNull) {
+TEST(IntegerWriterTest, WriteRunLengthEncodeIntWithoutNull) {
         int len = 10;
         int pixel_stride = 5;
         bool is_long = false;
@@ -56,7 +56,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithoutNull) {
             auto size = std::min(pixel_stride, num_to_read);
             integer_column_reader->read(buffer, column_chunk_encoding, pixel_offset, size, pixel_stride, vector_index,
                 int_result_vector,
-                *integer_column_writer->getColumnChunkIndex(),
+                *integer_column_writer->getColumnChunkIndexPtr(),
                 bit_mask);
             for(int i = vector_index; i < vector_index + size; i++) {
                 std::cerr << "[DEBUG READ CASE1] " << int_result_vector->intVector[i] << std::endl;
@@ -120,7 +120,7 @@ TEST(IntegerWriterTest, DISABLED_WriteIntWithoutNull) {
             auto size = std::min(pixel_stride, num_to_read);
             integer_column_reader->read(buffer, column_chunk_encoding, pixel_offset, size, pixel_stride, vector_index,
                 int_result_vector,
-                *integer_column_writer->getColumnChunkIndex(),
+                *integer_column_writer->getColumnChunkIndexPtr(),
                 bit_mask);
             for(int i = vector_index; i < vector_index + size; i++) {
                 std::cerr << "[DEBUG READ CASE1] " << reinterpret_cast<int*>(int_result_vector->intVector)[i] << std::endl;
@@ -197,7 +197,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
             auto size = std::min(pixel_stride, num_to_read);
             long_column_reader->read(buffer, column_chunk_encoding, pixel_offset, size, pixel_stride, vector_index,
                 long_result_vector,
-                *long_column_writer->getColumnChunkIndex(),
+                *(long_column_writer->getColumnChunkIndexPtr()),
                 bit_mask);
             for(int i = vector_index; i < vector_index + size; i++) {
                 std::cerr << "[DEBUG READ CASE1] " << long_result_vector->longVector[i] << std::endl;
@@ -268,7 +268,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
             auto size = std::min(pixel_stride, num_to_read);
             integer_column_reader->read(buffer, column_chunk_encoding, pixel_offset, size, pixel_stride, vector_index,
                 int_result_vector,
-                *integer_column_writer->getColumnChunkIndex(),
+                *integer_column_writer->getColumnChunkIndexPtr(),
                 bit_mask);
             for(int i = vector_index; i < vector_index + size; i++) {
                 std::cerr << "[DEBUG READ CASE1] " << int_result_vector->intVector[i] << std::endl;

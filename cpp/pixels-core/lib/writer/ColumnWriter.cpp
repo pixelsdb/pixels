@@ -19,11 +19,11 @@ std::vector<uint8_t> ColumnWriter::getColumnChunkContent() const {
 int ColumnWriter::getColumnChunkSize() const {
     return static_cast<int>(outputStream->getWritePos() - outputStream->getReadPos());
 }
-pixels::proto::ColumnChunkIndex ColumnWriter::getNewColumnChunkIndex() {
+
+pixels::proto::ColumnChunkIndex ColumnWriter::getColumnChunkIndex() {
     return pixels::proto::ColumnChunkIndex();
 }
-
-std::shared_ptr<pixels::proto::ColumnChunkIndex> ColumnWriter::getColumnChunkIndex() {
+std::shared_ptr<pixels::proto::ColumnChunkIndex> ColumnWriter::getColumnChunkIndexPtr() {
     return columnChunkIndex;
 }
 
