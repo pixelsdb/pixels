@@ -11,7 +11,7 @@
 class LongColumnVector: public ColumnVector {
 public:
     long * longVector;
-	int * intVector;
+	long * intVector;
     /**
     * Use this constructor by default. All column vectors
     * should normally be the default size.
@@ -26,6 +26,7 @@ public:
     void add(int64_t value) override;
     void add(int value) override;
     void ensureSize(uint64_t size, bool preserveData) override;
+    bool isLongVectore();
 private:
     bool isLong;
 };

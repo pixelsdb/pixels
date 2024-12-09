@@ -38,3 +38,6 @@ ByteOrder PixelsWriterOption::getByteOrder() const {
     return byteOrder;
 }
 
+void PixelsWriterOption::setByteOrder(ByteOrder byte_order) {
+    byteOrder = byte_order;
+}

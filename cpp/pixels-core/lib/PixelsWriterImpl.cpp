@@ -9,6 +9,7 @@
 #include <future>
 #include "writer/ColumnWriterBuilder.h"
 #include "pixels-common/pixels.pb.h"
+#include "ColumnWriterBuilder.h"
 
 const int PixelsWriterImpl::CHUNK_ALIGNMENT = std::stoi(ConfigFactory::Instance().getProperty("column.chunk.alignment"));
 
@@ -24,6 +25,10 @@ PixelsWriterImpl::PixelsWriterImpl(std::shared_ptr<TypeDescription> schema, int 
     // this->timeZone = std::unique_ptr<icu::TimeZone>(icu::TimeZone::createDefault());
     this->children = schema->getChildren();
     this->partitioned=partitioned;
+
+    for(int i=0;i<children.size();i++){
+        columnWriters.push_back(ColumnWriterBuilder::newColumnWriter(children.at(i),columnWriterOption));
+    }
 }
 
 bool PixelsWriterImpl::addRowBatch(std::shared_ptr<VectorizedRowBatch> rowBatch) {
@@ -48,13 +53,14 @@ void PixelsWriterImpl::writeColumnVectors(std::vector<std::shared_ptr<ColumnVect
 
     // Writing regular columns
     for (int i = 0; i < commonColumnLength; ++i) {
-        futures.push_back(std::async(std::launch::async, [&]() {
-            try {
-                dataLength += columnWriters[i]->write(columnVectors[i], rowBatchSize);
-            } catch (const std::exception& e) {
-                throw std::runtime_error("failed to write column vector: " + std::string(e.what()));
-            }
-        }));
+       // dataLength += columnWriters[i]->write(columnVectors[i], rowBatchSize);
+       futures.emplace_back(std::async(std::launch::async, [this, columnVectors, rowBatchSize, i, &dataLength]() {
+           try {
+               dataLength += columnWriters[i]->write(columnVectors[i], rowBatchSize);
+           } catch (const std::exception& e) {
+               throw std::runtime_error("failed to write column vector: " + std::string(e.what()));
+           }
+       }));
     }
 
 
@@ -64,7 +70,7 @@ void PixelsWriterImpl::writeColumnVectors(std::vector<std::shared_ptr<ColumnVect
     }
 
     // Simulate curRowGroupDataLength accumulation
-    int curRowGroupDataLength = dataLength.load();
+    curRowGroupDataLength += dataLength.load();
     std::cout << "Data length written: " << curRowGroupDataLength << std::endl;
 }
 
@@ -90,8 +96,8 @@ void PixelsWriterImpl::writeRowGroup() {
     int rowGroupDataLength = 0;
 //    pixels::proto::RowGroupStatistic curRowGroupStatistic;
     pixels::proto::RowGroupInformation curRowGroupInfo;
-    std::shared_ptr<pixels::proto::RowGroupIndex> curRowGroupIndex=std::make_shared<pixels::proto::RowGroupIndex>();
-    std::shared_ptr<pixels::proto::RowGroupEncoding> curRowGroupEncoding=std::make_shared<pixels::proto::RowGroupEncoding>();
+    pixels::proto::RowGroupIndex curRowGroupIndex;
+    pixels::proto::RowGroupEncoding curRowGroupEncoding;
     // reset each column writer and get current row group content size in bytes
     for(auto writer:columnWriters){
         // flush writes the isNull bit map into the internal output stream.
@@ -149,26 +155,26 @@ void PixelsWriterImpl::writeRowGroup() {
     rowGroupDataLength=0;
     for(int i=0;i<columnWriters.size();i++){
         std::shared_ptr<ColumnWriter> writer=columnWriters[i];
-        pixels::proto::ColumnChunkIndex chunkIndex=writer->getColumnChunkIndex();
+        auto chunkIndex=writer->getColumnChunkIndex();
         chunkIndex.set_chunkoffset(curRowGroupOffset+rowGroupDataLength);
         chunkIndex.set_chunklength(writer->getColumnChunkSize());
         rowGroupDataLength+=writer->getColumnChunkSize();
         if(CHUNK_ALIGNMENT!=0&&rowGroupDataLength%CHUNK_ALIGNMENT!=0){
             rowGroupDataLength += CHUNK_ALIGNMENT - rowGroupDataLength % CHUNK_ALIGNMENT;
         }
-        curRowGroupIndex->add_columnchunkindexentries();
-//        curRowGroupStatistic.add_columnchunkstats(writer->getColumnChunkStat());
-        curRowGroupEncoding->add_columnchunkencodings();
+        *(curRowGroupIndex.add_columnchunkindexentries()) = chunkIndex;
+        // *curRowGroupStatistic->add_columnchunkstats() = writer->getColumnChunkStat();
+        *(curRowGroupEncoding.add_columnchunkencodings()) = writer->getColumnChunkEncoding();
 
         columnWriters[i]=ColumnWriterBuilder::newColumnWriter(children.at(i),columnWriterOption);
     }
 
     std::shared_ptr<pixels::proto::RowGroupFooter> rowGroupFooter=std::make_shared<pixels::proto::RowGroupFooter>();
-    rowGroupFooter->set_allocated_rowgroupindexentry(curRowGroupIndex.get());
-    rowGroupFooter->set_allocated_rowgroupencoding(curRowGroupEncoding.get());
 
+    rowGroupFooter->set_allocated_rowgroupindexentry(new pixels::proto::RowGroupIndex(curRowGroupIndex));
+    rowGroupFooter->set_allocated_rowgroupencoding(new pixels::proto::RowGroupEncoding(curRowGroupEncoding));
     try {
-        std::vector<uint8_t> footerBuffer;
+        std::vector<uint8_t> footerBuffer(rowGroupFooter->ByteSizeLong());
         rowGroupFooter->SerializeToArray(footerBuffer.data(), rowGroupFooter->ByteSizeLong());
         physicalWriter->prepare(footerBuffer.size());
         curRowGroupFooterOffset = physicalWriter->append(footerBuffer.data(), 0, footerBuffer.size());
@@ -198,8 +204,7 @@ void PixelsWriterImpl::writeFileTail() {
     std::shared_ptr<pixels::proto::PostScript> postScript=std::make_shared<pixels::proto::PostScript>();
     schema->writeTypes(footer);
     for(auto rowGroupInformation: rowGroupInfoList){
-        footer->add_rowgroupinfos();
-//        footer->add_rowgroupinfos(rowGroupInformation);
+        *(footer->add_rowgroupinfos()) = rowGroupInformation;
     }
 //    postScript.set_version();
     std::string FILE_MAGIC="PIXELS";
@@ -215,21 +220,21 @@ void PixelsWriterImpl::writeFileTail() {
 
     // build fileTail
     pixels::proto::FileTail fileTail;
-    fileTail.set_allocated_footer(footer.get());
-    fileTail.set_allocated_postscript(postScript.get());
+    *fileTail.mutable_footer() = *footer;
+    *fileTail.mutable_postscript() = *postScript;
     fileTail.set_footerlength(footer->ByteSizeLong());
     fileTail.set_postscriptlength(postScript->ByteSizeLong());
 
     int fileTailLen=fileTail.ByteSizeLong();
     physicalWriter->prepare(fileTailLen);
-    std::vector<uint8_t> fileTailBuffer;
+    std::vector<uint8_t> fileTailBuffer(fileTailLen);
     fileTail.SerializeToArray(fileTailBuffer.data(),fileTail.ByteSizeLong());
     long tailOffset =physicalWriter->append(fileTailBuffer.data(),0,fileTailBuffer.size());
     ByteBuffer tailOffsetBuffer=ByteBuffer(8);
     tailOffsetBuffer.putLong(tailOffset);
-    uint8_t * tailOffsetBufferBytes;
-    tailOffsetBuffer.getBytes(tailOffsetBufferBytes,tailOffsetBuffer.size());
-    physicalWriter->append(tailOffsetBufferBytes,0,tailOffsetBuffer.size());
+    uint8_t tailOffsetBufferBytes;
+    tailOffsetBuffer.getBytes(&tailOffsetBufferBytes,tailOffsetBuffer.getWritePos());
+    physicalWriter->append(&tailOffsetBufferBytes,0,tailOffsetBuffer.getWritePos());
     physicalWriter->flush();
     std::cout << "PixelsWriterImpl::writeFileTail" << std::endl;
 }

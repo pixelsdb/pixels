@@ -12,15 +12,19 @@ const std::vector<uint8_t> ColumnWriter::ISNULL_PADDING_BUFFER(ColumnWriter::ISN
 
 std::vector<uint8_t> ColumnWriter::getColumnChunkContent() const {
     auto begin = outputStream->getPointer() + outputStream->getReadPos();
-    auto end = outputStream->getPointer() + outputStream->getReadPos();
+    auto end = outputStream->getPointer() + outputStream->getWritePos();
     return std::vector<uint8_t>(begin, end);
 }
 
 int ColumnWriter::getColumnChunkSize() const {
     return static_cast<int>(outputStream->getWritePos() - outputStream->getReadPos());
 }
+
 pixels::proto::ColumnChunkIndex ColumnWriter::getColumnChunkIndex() {
     return pixels::proto::ColumnChunkIndex();
+}
+std::shared_ptr<pixels::proto::ColumnChunkIndex> ColumnWriter::getColumnChunkIndexPtr() {
+    return columnChunkIndex;
 }
 
 pixels::proto::ColumnEncoding ColumnWriter::getColumnChunkEncoding() {
@@ -48,15 +52,23 @@ void ColumnWriter::newPixel() {
     if (hasNull) {
         auto compacted = BitUtils::bitWiseCompact(isNull, curPixelIsNullIndex, byteOrder);
         isNullStream->putBytes(const_cast<uint8_t*>(compacted.data()), compacted.size());
+        pixelStatRecorder.setHasNull();
     }
     curPixelPosition = static_cast<int>(outputStream->getWritePos());
     curPixelEleIndex = 0;
     curPixelVectorIndex = 0;
     curPixelIsNullIndex = 0;
 
+    columnChunkStatRecorder.merge(pixelStatRecorder);
+
+    pixels::proto::PixelStatistic pixelStat;
+    *pixelStat.mutable_statistic() = pixelStatRecorder.serialize();
     columnChunkIndex->add_pixelpositions(lastPixelPosition);
+    auto new_pixelstatistic = columnChunkIndex->add_pixelstatistics();
+    *new_pixelstatistic = pixelStat;
 
     lastPixelPosition = curPixelPosition;
+    pixelStatRecorder.reset();
     hasNull = false;
 }
 
@@ -65,6 +77,8 @@ void ColumnWriter::reset() {
     curPixelPosition = 0;
     columnChunkIndex->Clear();
     columnChunkStat->Clear();
+    pixelStatRecorder.reset();
+    columnChunkStatRecorder.reset();
     outputStream->resetPosition();
     isNullStream->resetPosition();
 }
@@ -85,6 +99,9 @@ ColumnWriter::ColumnWriter(std::shared_ptr<TypeDescription> type,
           isNull(pixelStride, false)
 
 {
+    outputStream=std::make_shared<ByteBuffer>();
+    isNullStream=std::make_shared<ByteBuffer>();
+    columnChunkIndex=std::make_shared<pixels::proto::ColumnChunkIndex>();
     columnChunkIndex->set_littleendian(byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN);
     columnChunkIndex->set_nullspadding(nullsPadding);
     columnChunkIndex->set_isnullalignment(ISNULL_ALIGNMENT);

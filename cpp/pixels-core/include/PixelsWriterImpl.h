@@ -42,7 +42,7 @@ private:
     int rowGroupSize;
     pixels::proto::CompressionKind compressionKind;
     int compressionBlockSize;
-    std::unique_ptr<icu::TimeZone> timeZone;
+    // std::unique_ptr<icu::TimeZone> timeZone;
     std::shared_ptr<PixelsWriterOption> columnWriterOption;
     std::vector<std::shared_ptr<ColumnWriter>> columnWriters;
     std::vector<StatsRecorder> fileColStatRecorders;

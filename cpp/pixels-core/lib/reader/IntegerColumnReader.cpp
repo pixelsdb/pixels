@@ -46,11 +46,11 @@ void IntegerColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto:
     } else {
         if(isLong) {
             // if long
-            std::memcpy(columnVector->longVector, input->getPointer() + input->getReadPos(), size * sizeof(int64_t));
+            std::memcpy((void*)columnVector->longVector + vectorIndex * sizeof(int64_t), input->getPointer() + input->getReadPos(), size * sizeof(int64_t));
 			input->setReadPos(input->getReadPos() + size * sizeof(int64_t));
         } else {
             // if int
-            std::memcpy(columnVector->intVector, input->getPointer() + input->getReadPos(), size * sizeof(int));
+            std::memcpy((void*)columnVector->intVector + vectorIndex * sizeof(int), input->getPointer() + input->getReadPos(), size * sizeof(int));
 			input->setReadPos(input->getReadPos() + size * sizeof(int));
         }
     }

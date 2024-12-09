@@ -27,3 +27,5 @@
 #include_directories(../pixels-core/include)
 #include_directories(../pixels-common/include)
 #gtest_discover_tests(unit_tests)
+
+add_subdirectory(writer)
