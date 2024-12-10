@@ -1,4 +1,4 @@
-package io.pixelsdb.pixels.core;/*
+/*
  * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
@@ -17,7 +17,7 @@ package io.pixelsdb.pixels.core;/*
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-
+package io.pixelsdb.pixels.core;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
@@ -28,347 +28,93 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.sql.Date;
-import java.sql.Time;
-import java.sql.Timestamp;
 import java.util.List;
 
 public class TestStreamReaderAndWriter
 {
-    private IOException readerException = null;
-    private final long rowBatchNum = 8L*1024*1024*1024;
+    static ByteColumnVector byteColumnVector = new ByteColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
+    static IOException readerException = null;
+    static long batchNum = 1024*15;
+    static int varCharMaxSize = 199;
+    static int charMaxSize = 55;
+    static boolean nullsPadding = true;
+    static TypeDescription schema;
+    static LongColumnVector intColumnVector = new LongColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
+    static LongColumnVector longColumnVector = new LongColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
+    static DecimalColumnVector decimalColumnVector = new DecimalColumnVector(VectorizedRowBatch.DEFAULT_SIZE, 15, 2);
+    static BinaryColumnVector varCharColumnVector = new BinaryColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
+    static BinaryColumnVector charColumnVector = new BinaryColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
+    static DateColumnVector dateColumnVector = new DateColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
 
+    static
+    {
+        // create schema
+        schema = TypeDescription.createStruct();
+        schema.addField("a", TypeDescription.createInt());
+        schema.addField("b", TypeDescription.createLong());
+        schema.addField("c", TypeDescription.createDecimal(15, 2));
+        schema.addField("d", TypeDescription.createVarchar(varCharMaxSize));
+        schema.addField("e", TypeDescription.createVarchar(varCharMaxSize));
+        schema.addField("f", TypeDescription.createChar(charMaxSize));
+        schema.addField("g", TypeDescription.createChar(charMaxSize));
+        schema.addField("h", TypeDescription.createVarchar(varCharMaxSize));
+        schema.addField("i", TypeDescription.createLong());
+        schema.addField("j", TypeDescription.createDate());
+
+        // create some columns
+        for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
+        {
+            if (i % 100 == 0)
+            {
+                intColumnVector.addNull();
+                longColumnVector.addNull();
+                decimalColumnVector.addNull();
+                dateColumnVector.addNull();
+            } else
+            {
+                intColumnVector.add(i%100 > 25 ? 111 : -111);
+                longColumnVector.add(i%100 > 25 ? 8L*1024*1024*1024 : -8L*1024*1024*1024);
+                decimalColumnVector.add(11111.22);
+                dateColumnVector.add(new Date(1000));
+            }
+        }
+
+
+        // create char columns
+        for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
+        {
+            if (i % 100 == 0)
+            {
+                varCharColumnVector.addNull();
+                charColumnVector.addNull();
+            } else
+            {
+                int len = i%varCharMaxSize + 1;
+                char[] charArray = new char[len];
+                for (int k = 0; k < len; k++)
+                {
+                    charArray[k] = (char) k;
+                }
+                String str = new String(charArray);
+                varCharColumnVector.add(str);
+
+                len = i%charMaxSize + 1;
+                charArray = new char[len];
+                for (int k = 0; k < len; k++)
+                {
+                    charArray[k] = (char) k;
+                }
+                str = new String(charArray);
+                charColumnVector.add(str);
+            }
+        }
+    }
     @Test
     public void testStreamReaderAndWriter() throws IOException
     {
-        Thread thread1 = new Thread(() -> {
-            String path = "stream://localhost:29920";
-            PixelsReader reader;
+        Thread thread1 = new Thread(runReader());
 
-            try
-            {
-                Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
-                reader = PixelsReaderStreamImpl.newBuilder()
-                        .setStorage(storage)
-                        .setPath(path)
-                        .build();
-                TypeDescription fileSchema = reader.getFileSchema();
-                List<TypeDescription> types = fileSchema.getChildren();
-                if (!types.get(0).toString().equals("integer")
-                    || !types.get(1).toString().equals("float")
-                    || !types.get(2).toString().equals("double")
-                    || !types.get(3).toString().equals("timestamp(3)")
-                    || !types.get(4).toString().equals("boolean")
-                    || !types.get(5).toString().equals("date")
-                    || !types.get(6).toString().equals("time(3)")
-                    || !types.get(7).toString().equals("string")
-                    || !types.get(8).toString().equals("decimal(6,3)")
-                    || !types.get(9).toString().equals("decimal(37,6)"))
-                {
-                    readerException = new IOException("wrong header");
-                }
-//                for (TypeDescription type: types)
-//                {
-//                    System.out.println(type.toString());
-//                }
-
-
-                // read row group
-                PixelsReaderOption option = new PixelsReaderOption();
-                option.skipCorruptRecords(true);
-                option.tolerantSchemaEvolution(true);
-                option.includeCols(new String[]{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"});
-                PixelsRecordReader recordReader = reader.read(option);
-
-                VectorizedRowBatch rowBatch = null;
-                try
-                {
-                    rowBatch = recordReader.readBatch();
-                } catch (IOException e)
-                {
-                    readerException = new IOException("wrong row batch");
-                }
-
-                int curRow = 0;
-                while (rowBatch != null && rowBatch.size > 0)
-                {
-                    LongColumnVector va = (LongColumnVector) rowBatch.cols[0];              // int
-                    FloatColumnVector vb = (FloatColumnVector) rowBatch.cols[1];            // float
-                    DoubleColumnVector vc = (DoubleColumnVector) rowBatch.cols[2];          // double
-                    TimestampColumnVector vd = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
-                    ByteColumnVector ve = (ByteColumnVector) rowBatch.cols[4];              // boolean
-                    DateColumnVector vf = (DateColumnVector) rowBatch.cols[5];              // date
-                    TimeColumnVector vg = (TimeColumnVector) rowBatch.cols[6];              // time
-                    BinaryColumnVector vh = (BinaryColumnVector) rowBatch.cols[7];          // string
-                    DecimalColumnVector vi = (DecimalColumnVector) rowBatch.cols[8];        // decimal
-                    LongDecimalColumnVector vj = (LongDecimalColumnVector) rowBatch.cols[9];// long decimal
-
-                    for (int i = 0; i < rowBatch.size; curRow++, i++)
-                    {
-                        if (curRow % 100 == 0)
-                        {
-                            if (!va.isNull[i] || !vb.isNull[i] || !vc.isNull[i] || !vd.isNull[i] || !ve.isNull[i]
-                                || !vf.isNull[i] || !vg.isNull[i] || !vh.isNull[i] || !vi.isNull[i] || !vj.isNull[i])
-                            {
-                                System.out.println("is null not right");
-                                readerException = new IOException();
-//                                break;
-                            }
-                        } else
-                        {
-                            if (va.vector[i] != curRow || va.isNull[i])
-                            {
-                                readerException = new IOException("va not right: " + va.vector[i] + " != " + curRow);
-                                System.out.println("va not right: " + va.vector[i] + " != " + curRow);
-//                                break;
-                            }
-                            if (vb.vector[i] != Float.floatToIntBits(curRow * 3.1415f) || vb.isNull[i])
-                            {
-                                readerException = new IOException("vb not right: " + vb.vector[i] + " != "
-                                        + Float.floatToIntBits(curRow * 3.1415f));
-                                System.out.println("vb not right: " + vb.vector[i] + " != "
-                                        + Float.floatToIntBits(curRow * 3.1415f));
-//                                break;
-                            }
-                            if (vc.vector[i] != Double.doubleToLongBits(curRow * 3.14159d) || vc.isNull[i])
-                            {
-                                readerException = new IOException("vc not right: " + vc.vector[i] + " != "
-                                        + Double.doubleToLongBits(curRow * 3.14159d));
-                                System.out.println("vc not right: " + vc.vector[i] + " != "
-                                        + Double.doubleToLongBits(curRow * 3.14159d));
-//                                break;
-                            }
-                            if (vd.compareTo(i, new Timestamp(1000000)) != 0 || vd.isNull[i])
-                            {
-                                readerException = new IOException("vd not right: " + vd.getMicros(i) + " != "
-                                        + "1000000");
-                                System.out.println("vd not right: " + vd.getMicros(i) + " != "
-                                        + "1000000");
-                                break;
-                            }
-                            if (ve.vector[i] != (byte) (curRow % 100 > 25 ? 1 : 0) || ve.isNull[i])
-                            {
-                                System.out.println("ve " + curRow + " not right: " + ve.vector[i] + " != "
-                                        + (byte) (curRow % 100 > 25 ? 1 : 0));
-                                readerException = new IOException("ve not right: " + ve.vector[i] + " != "
-                                + (byte) (curRow % 100 > 25 ? 1 : 0));
-//                                break;
-                            }
-                            if (vf.compareTo(i, new Date(1000)) != 0 || vf.isNull[i])
-                            {
-                                readerException = new IOException("vf not right: " + vf.getDate(i) + " != "
-                                + 1000);
-                                System.out.println("vf not right: " + vf.getDate(i) + " != "
-                                        + 1000);
-//                                break;
-                            }
-                            if (vg.compareTo(i, new Time(1000)) != 0 || vg.isNull[i])
-                            {
-                                readerException = new IOException("vg not right: " + vg.getTime(i) + " != "
-                                + 1000);
-                                System.out.println("vg not right: " + vg.getTime(i) + " != "
-                                        + 1000);
-//                                break;
-                            }
-                            if (!(vh.toString(i).equals(String.valueOf(curRow))) || vh.isNull[i])
-                            {
-                                readerException = new IOException("vh not right: " + vh.toString(i) + " != "
-                                + String.valueOf(curRow));
-                                System.out.println("vh not right: " + vh.toString(i) + " != "
-                                        + String.valueOf(curRow));
-//                                break;
-                            }
-                            if (vi.vector[i] != curRow || vi.isNull[i])
-                            {
-                                readerException = new IOException("vi not right: " + vi.vector[i] + " != "
-                                + curRow);
-                                System.out.println("vi not right: " + vi.vector[i] + " != "
-                                        + curRow);
-//                                break;
-                            }
-                            if (vj.vector[i*2] != curRow || vj.vector[i*2+1] != curRow || vj.isNull[i])
-                            {
-                                readerException = new IOException("vj not right: " + vj.vector[i*2] + " != "
-                                + curRow + ", " + vj.vector[i*2+1] + " != " + curRow);
-                                System.out.println("vj not right: " + vj.vector[i*2] + " != "
-                                        + curRow + ", " + vj.vector[i*2+1] + " != " + curRow);
-//                                break;
-                            }
-//                            if (va.vector[i] != curRow || va.isNull[i]
-//                                || vb.vector[i] != Float.floatToIntBits(curRow * 3.1415f) || vb.isNull[i]
-//                                || vc.vector[i] != Double.doubleToLongBits(curRow * 3.14159d) || vc.isNull[i]
-//                                || vd.compareTo(i, new Timestamp(1000000)) != 0 || vd.isNull[i]
-//                                || ve.vector[i] != (byte) (curRow % 100 > 25 ? 1 : 0) || ve.isNull[i]
-//                                || vf.compareTo(i, new Date(1000)) != 0 || vf.isNull[i]
-//                                || vg.compareTo(i, new Time(1000)) != 0 || vg.isNull[i]
-//                                || !(vh.toString(i).equals(String.valueOf(curRow))) || vh.isNull[i]
-//                                || vi.vector[i] != curRow || vi.isNull[i]
-//                                || vj.vector[i*2] != curRow || vj.vector[i*2+1] != curRow || vj.isNull[i])
-//                            {
-////                                String a = vh.toString(i);
-////                                String b = String.valueOf(curRow);
-////                                System.out.println("len of a: " + a.length());
-////                                System.out.println("len of b: " + b.length());
-////                                System.out.println(a.equals("1"));
-////                                System.out.println(b.equals("1"));
-////                                System.out.println(a.equals(b));
-////                                System.out.println(vh.toString(i).equals(String.valueOf(curRow)));
-//                                readerException = new IOException();
-//                                break;
-//                            }
-                        }
-                    }
-
-
-                    rowBatch = recordReader.readBatch();
-                }
-
-                reader.close();
-            } catch (IOException e)
-            {
-                e.printStackTrace();
-            }
-        });
-
-        Thread thread2 = new Thread(() -> {
-            // Read from file
-            String path = "file:///home/hsy/Downloads/nation.pxl";
-            PixelsWriter writer;
-
-            try
-            {
-                Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.file);
-                PixelsReader reader;
-                reader = PixelsReaderImpl.newBuilder()
-                        .setStorage(storage)
-                        .setPath(path)
-                        .setEnableCache(false)
-                        .setPixelsFooterCache(new PixelsFooterCache())
-                        .build();
-                PixelsReaderOption option = new PixelsReaderOption();
-                option.skipCorruptRecords(true);
-                option.tolerantSchemaEvolution(true);
-                option.enableEncodedColumnVector(false);
-                String[] colNames = new String[]{"n_nationkey", "n_name", "n_regionkey", "n_comment"};
-                option.includeCols(colNames);
-                PixelsRecordReader recordReader = reader.read(option);
-
-
-                storage = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
-                path = "stream://localhost:29920";
-
-
-                // create row batch and send
-                TypeDescription schema = TypeDescription.createStruct();
-                schema.addField("a", TypeDescription.createInt());
-                schema.addField("b", TypeDescription.createFloat());
-                schema.addField("c", TypeDescription.createDouble());
-                schema.addField("d", TypeDescription.createTimestamp(3));
-                schema.addField("e", TypeDescription.createBoolean());
-                schema.addField("f", TypeDescription.createDate());
-                schema.addField("g", TypeDescription.createTime(3));
-                schema.addField("h", TypeDescription.createString());
-                schema.addField("i", TypeDescription.createDecimal(6, 3));
-                schema.addField("j", TypeDescription.createDecimal(37, 6));
-                writer = PixelsWriterStreamImpl.newBuilder()
-                        .setStorage(storage)
-                        .setPath(path)
-                        .setSchema(schema)
-                        .setPixelStride(10000)
-                        .setRowGroupSize(1024*512)
-                        .setEncodingLevel(EncodingLevel.EL2)
-                        .setPartitioned(false)
-                        .build();
-
-                VectorizedRowBatch rowBatch = schema.createRowBatch();
-                LongColumnVector va = (LongColumnVector) rowBatch.cols[0];              // int
-                FloatColumnVector vb = (FloatColumnVector) rowBatch.cols[1];            // float
-                DoubleColumnVector vc = (DoubleColumnVector) rowBatch.cols[2];          // double
-                TimestampColumnVector vd = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
-                ByteColumnVector ve = (ByteColumnVector) rowBatch.cols[4];              // boolean
-                DateColumnVector vf = (DateColumnVector) rowBatch.cols[5];              // date
-                TimeColumnVector vg = (TimeColumnVector) rowBatch.cols[6];              // time
-                BinaryColumnVector vh = (BinaryColumnVector) rowBatch.cols[7];          // string
-                DecimalColumnVector vi = (DecimalColumnVector) rowBatch.cols[8];        // decimal
-                LongDecimalColumnVector vj = (LongDecimalColumnVector) rowBatch.cols[9];// long decimal
-
-                long curT = 1000000;
-                Timestamp timestamp = new Timestamp(curT);
-
-                for (int i = 0; i < TestParams.rowNum; i++)
-                {
-                    int row = rowBatch.size++;
-                    if (i % 100 == 0)
-                    {
-                        va.isNull[row] = true;
-                        va.vector[row] = 0;
-                        vb.isNull[row] = true;
-                        vb.vector[row] = 0;
-                        vc.isNull[row] = true;
-                        vc.vector[row] = 0;
-                        vd.isNull[row] = true;
-                        vd.times[row] = 0;
-                        ve.isNull[row] = true;
-                        ve.vector[row] = 0;
-                        vf.isNull[row] = true;
-                        vf.dates[row] = 0;
-                        vg.isNull[row] = true;
-                        vg.times[row] = 0;
-                        vh.isNull[row] = true;
-                        vh.vector[row] = new byte[0];
-                        vi.isNull[row] = true;
-                        vi.vector[row] = 0;
-                        vj.isNull[row] = true;
-                        vj.vector[row*2] = 0;
-                        vj.vector[row*2+1] = 0;
-                    }
-                    else
-                    {
-                        va.vector[row] = i;
-                        va.isNull[row] = false;
-                        vb.vector[row] = Float.floatToIntBits(i * 3.1415f);
-                        vb.isNull[row] = false;
-                        vc.vector[row] = Double.doubleToLongBits(i * 3.14159d);
-                        vc.isNull[row] = false;
-                        vd.set(row, timestamp);
-                        vd.isNull[row] = false;
-                        ve.vector[row] = (byte) (i % 100 > 25 ? 1 : 0);
-                        ve.isNull[row] = false;
-                        vf.set(row, new Date(1000));
-                        vf.isNull[row] = false;
-                        vg.set(row, new Time(1000));
-                        vg.isNull[row] = false;
-                        vh.setVal(row, String.valueOf(i).getBytes());
-                        vh.isNull[row] = false;
-                        vi.vector[row] = i;
-                        vi.isNull[row] = false;
-                        vj.vector[row*2] = i;
-                        vj.vector[row*2+1] = i;
-                        vj.isNull[row] = false;
-                    }
-                    if (rowBatch.size == rowBatch.getMaxSize())
-                    {
-                        writer.addRowBatch(rowBatch);
-                        rowBatch.reset();
-                    }
-                }
-                if (rowBatch.size != 0)
-                {
-                    writer.addRowBatch(rowBatch);
-                    rowBatch.reset();
-                }
-
-//                System.out.println(vi.getPrecision());
-//                System.out.println(vi.getScale());
-//                System.out.println(vj.getPrecision());
-//                System.out.println(vj.getScale());
-//                System.out.println("writer succeed to build");
-                writer.close();
-//                System.out.println("writer succeed to close");
-            } catch (IOException e)
-            {
-                e.printStackTrace();
-            }
-        });
+        Thread thread2 = new Thread(runWriter());
         thread1.start();
         thread2.start();
 
@@ -382,6 +128,268 @@ public class TestStreamReaderAndWriter
         {
             System.out.println(readerException.getMessage());
             throw new IOException();
+        }
+    }
+
+    private static Runnable runWriter()
+    {
+        return () -> {
+            PixelsWriter writer;
+            try
+            {
+                Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+                String path = "stream://localhost:29920";
+
+                writer = PixelsWriterStreamImpl.newBuilder()
+                        .setStorage(storage)
+                        .setPath(path)
+                        .setSchema(schema)
+                        .setPixelStride(10000)
+                        .setRowGroupSize(1024*512)
+                        .setEncodingLevel(EncodingLevel.EL0)
+                        .setPartitioned(false)
+                        .setNullsPadding(nullsPadding)
+                        .build();
+
+                VectorizedRowBatch rowBatch = schema.createRowBatch();
+                for (int i = 0; i < batchNum; i++)
+                {
+                    fillColumns(rowBatch, writer.getSchema().getChildren());
+                    if (rowBatch.size != 0)
+                    {
+                        writer.addRowBatch(rowBatch);
+                        rowBatch.reset();
+                    }
+                }
+
+                writer.close();
+            } catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+        };
+    }
+
+    private static Runnable runReader()
+    {
+        return () -> {
+            String path = "stream://localhost:29920";
+            PixelsReader reader;
+
+            try
+            {
+                Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+                reader = PixelsReaderStreamImpl.newBuilder()
+                        .setStorage(storage)
+                        .setPath(path)
+                        .build();
+                TypeDescription fileSchema = reader.getFileSchema();
+                PixelsReaderOption option = isHeaderRight(fileSchema);
+                PixelsRecordReader recordReader = reader.read(option);
+
+                // read row group
+                VectorizedRowBatch rowBatch = null;
+                try
+                {
+                    rowBatch = recordReader.readBatch();
+                } catch (IOException e)
+                {
+                    readerException = new IOException("wrong row batch");
+                }
+
+                while (rowBatch != null && rowBatch.size > 0)
+                {
+                    for (int i = 0; i < rowBatch.cols.length; i++)
+                    {
+                        compareColumn(i, rowBatch);
+                    }
+
+                    rowBatch = recordReader.readBatch();
+                }
+
+                reader.close();
+            } catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+        };
+    }
+
+    private static PixelsReaderOption isHeaderRight(TypeDescription fileSchema)
+    {
+        assert fileSchema.getCategory() == schema.getCategory();
+        assert fileSchema.getChildren().size() == schema.getChildren().size();
+        List<TypeDescription> types = fileSchema.getChildren();
+        for (int i = 0; i < types.size(); i++)
+        {
+            assert types.get(i).equals(schema.getChildren().get(i));
+        }
+
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        String[] includeColumns = new String[types.size()];
+        for (int i = 0; i < types.size(); i++)
+        {
+            includeColumns[i] = fileSchema.getFieldNames().get(i);
+        }
+        option.includeCols(includeColumns);
+
+        return option;
+    }
+
+    private static void compareColumn(int colIdx, VectorizedRowBatch rowBatch)
+    {
+        ColumnVector column = rowBatch.cols[colIdx];
+        if (column instanceof LongColumnVector &&
+                schema.getChildren().get(colIdx).getCategory() == TypeDescription.Category.INT)
+        {
+            for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
+            {
+                assert column.noNulls == intColumnVector.noNulls;
+                assert column.isNull[i] == intColumnVector.isNull[i];
+                assert !intColumnVector.noNulls && column.isNull[i] ||
+                        ((LongColumnVector) column).vector[i] == intColumnVector.vector[i];
+            }
+        } else if (column instanceof LongColumnVector )
+        {
+            for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
+            {
+                assert column.noNulls == longColumnVector.noNulls;
+                assert column.isNull[i] == longColumnVector.isNull[i];
+                assert !longColumnVector.noNulls && column.isNull[i] ||
+                        ((LongColumnVector) column).vector[i] == longColumnVector.vector[i];
+            }
+        } else if (column instanceof DecimalColumnVector)
+        {
+            for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
+            {
+                assert column.noNulls == decimalColumnVector.noNulls;
+                assert column.isNull[i] == decimalColumnVector.isNull[i];
+                assert !decimalColumnVector.noNulls && column.isNull[i] ||
+                        ((DecimalColumnVector) column).vector[i] == decimalColumnVector.vector[i];
+            }
+        } else if (column instanceof BinaryColumnVector &&
+                schema.getChildren().get(colIdx).getCategory() == TypeDescription.Category.VARCHAR)
+        {
+            for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
+            {
+                assert column.noNulls == varCharColumnVector.noNulls;
+                assert column.isNull[i] == varCharColumnVector.isNull[i];
+                if (varCharColumnVector.noNulls || !column.isNull[i])
+                {
+                    String s1 = new String(varCharColumnVector.vector[i], varCharColumnVector.start[i], varCharColumnVector.lens[i]);
+                    String s2 = new String(((BinaryColumnVector) column).vector[i],
+                            ((BinaryColumnVector) column).start[i], ((BinaryColumnVector) column).lens[i]);
+                    if (!s1.equals(s2))
+                    {
+                        System.out.println(s1 + " != " + s2);
+                    }
+                    assert s1.equals(s2);
+                }
+            }
+        } else if (column instanceof BinaryColumnVector &&
+                schema.getChildren().get(colIdx).getCategory() == TypeDescription.Category.CHAR)
+        {
+            for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
+            {
+                assert column.noNulls == charColumnVector.noNulls;
+                assert column.isNull[i] == charColumnVector.isNull[i];
+                if (charColumnVector.noNulls || !column.isNull[i])
+                {
+                    String s1 = new String(charColumnVector.vector[i], charColumnVector.start[i], charColumnVector.lens[i]);
+                    String s = new String(((BinaryColumnVector) column).vector[i],
+                            ((BinaryColumnVector) column).start[i], ((BinaryColumnVector) column).lens[i]);
+                    assert s1.equals(s);
+                }
+            }
+        } else if (column instanceof DateColumnVector &&
+                schema.getChildren().get(colIdx).getCategory() == TypeDescription.Category.DATE)
+        {
+            for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
+            {
+                assert column.noNulls == dateColumnVector.noNulls;
+                assert column.isNull[i] == dateColumnVector.isNull[i];
+                assert !dateColumnVector.noNulls && column.isNull[i] ||
+                        ((DateColumnVector) column).dates[i] == dateColumnVector.dates[i];
+            }
+        }
+    }
+
+    private static void fillColumns(VectorizedRowBatch rowBatch, List<TypeDescription> types)
+    {
+        for (int colIdx = 0; colIdx < rowBatch.cols.length; colIdx++)
+        {
+            ColumnVector column = rowBatch.cols[colIdx];
+            if (types.get(colIdx).getCategory().equals(TypeDescription.Category.INT))
+            {
+                duplicate(column, intColumnVector);
+            } else if (types.get(colIdx).getCategory().equals(TypeDescription.Category.LONG))
+            {
+                duplicate(column, longColumnVector);
+            } else if (column instanceof DecimalColumnVector)
+            {
+                duplicate(column, decimalColumnVector);
+            } else if (column instanceof BinaryColumnVector &&
+                    schema.getChildren().get(colIdx).getCategory() == TypeDescription.Category.VARCHAR)
+            {
+//                column.duplicate(varCharColumnVector);
+                duplicate(column, varCharColumnVector);
+            } else if (column instanceof BinaryColumnVector &&
+                    schema.getChildren().get(colIdx).getCategory() == TypeDescription.Category.CHAR)
+            {
+//                column.duplicate(charColumnVector);
+                duplicate(column, charColumnVector);
+            } else if (column instanceof DateColumnVector &&
+                    schema.getChildren().get(colIdx).getCategory() == TypeDescription.Category.DATE)
+            {
+                duplicate(column, dateColumnVector);
+            }
+        }
+        rowBatch.size += VectorizedRowBatch.DEFAULT_SIZE;
+    }
+    
+    private static void duplicate(ColumnVector dst, ColumnVector src)
+    {
+        assert dst.getClass() == src.getClass();
+        if (dst instanceof IntColumnVector)
+        {
+            dst.setWriteIndex(src.getWriteIndex());
+            dst.noNulls = src.noNulls;
+
+            System.arraycopy(((IntColumnVector) src).vector, 0,
+                    ((IntColumnVector) dst).vector, 0, ((IntColumnVector) src).vector.length);
+            System.arraycopy(src.isNull, 0,
+                    dst.isNull, 0, src.isNull.length);
+        } else if (dst instanceof LongColumnVector)
+        {
+            dst.setWriteIndex(src.getWriteIndex());
+            dst.noNulls = src.noNulls;
+            System.arraycopy(((LongColumnVector) src).vector, 0,
+                    ((LongColumnVector) dst).vector, 0, ((LongColumnVector) src).vector.length);
+            System.arraycopy(src.isNull, 0,
+                    dst.isNull, 0, src.isNull.length);
+        } else if (dst instanceof DecimalColumnVector)
+        {
+            dst.setWriteIndex(src.getWriteIndex());
+            dst.noNulls = src.noNulls;
+            System.arraycopy(((DecimalColumnVector) src).vector, 0,
+                    ((DecimalColumnVector) dst).vector, 0, ((DecimalColumnVector) src).vector.length);
+            System.arraycopy(src.isNull, 0,
+                    dst.isNull, 0, src.isNull.length);
+        } else if (dst instanceof BinaryColumnVector)
+        {
+            dst.duplicate(src);
+            boolean[] isNull = new boolean[src.isNull.length];
+            dst.isNull = isNull;
+            System.arraycopy(src.isNull, 0, dst.isNull, 0, src.isNull.length);
+        } else if (dst instanceof DateColumnVector)
+        {
+            dst.setWriteIndex(src.getWriteIndex());
+            dst.noNulls = src.noNulls;
+            System.arraycopy(((DateColumnVector) src).dates, 0,
+                    ((DateColumnVector) dst).dates, 0, ((DateColumnVector) src).dates.length);
+            System.arraycopy(src.isNull, 0, dst.isNull, 0, src.isNull.length);
         }
     }
 }

@@ -606,17 +606,6 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         curRGBuffer.position(0);
         curRGBuffer.limit(rowGroupDataLen);
 
-        // write to file
-        try (FileOutputStream fos = new FileOutputStream("/tmp/test");
-             FileChannel fileChannel = fos.getChannel()) {
-
-            // 将 ByteBuffer 写入文件
-            fileChannel.write(curRGBuffer);
-            System.out.println("数据已写入文件 output.txt");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
         int rowGroupFooterLen = physicalReader.readInt(READER_ENDIAN);
         if (rowGroupFooterLen > 1024)
         {

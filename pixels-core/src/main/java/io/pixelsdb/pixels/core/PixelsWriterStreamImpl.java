@@ -255,6 +255,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         this.schema = requireNonNull(schema, "schema is null");
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
         checkArgument(rowGroupSize > 0, "row group size is not positive");
+        checkArgument(encodingLevel != null, "encoding level is null");
         this.rowGroupSize = rowGroupSize;
         this.compressionKind = requireNonNull(compressionKind, "compressionKind is null");
         checkArgument(compressionBlockSize > 0, "compression block size is not positive");
@@ -268,7 +269,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
 //        this.fileColStatRecorders = new StatsRecorder[children.size()];
         this.columnWriterOption = new PixelsWriterOption()
                 .pixelStride(pixelStride)
-                .encodingLevel(requireNonNull(encodingLevel, "encodingLevel is null"))
+                .encodingLevel(encodingLevel)
                 .byteOrder(WRITER_ENDIAN)
                 .nullsPadding(nullsPadding);
         for (int i = 0; i < children.size(); ++i)
@@ -482,10 +483,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         PixelsStreamProto.StreamHeader streamHeader = streamHeaderBuilder.build();
 
         int streamHeaderLength = streamHeader.getSerializedSize();
-
-        // write and flush streamHeader
-//        this.byteBuf.writeInt(streamHeaderLength);
-//        this.byteBuf.writeBytes(streamHeader.toByteArray());
         writtenBytes += streamHeaderLength + Integer.BYTES;
 
         // ensure the next member (row group data length) is aligned to CHUNK_ALIGNMENT
@@ -778,20 +775,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         ByteBuffer buf = ByteBuffer.allocate(4);
         buf.order(WRITER_ENDIAN).putInt(rowGroupDataLength);
         physicalWriter.append(buf);
-        tmpFileBuf.put(buf);
         writtenBytes += 4;
-
-        int tryAlign = 0;
-//        while (CHUNK_ALIGNMENT != 0 && writtenBytes % CHUNK_ALIGNMENT != 0 && tryAlign++ < 2)
-//        {
-//            int alignBytes = (int) (CHUNK_ALIGNMENT - writtenBytes % CHUNK_ALIGNMENT);
-//            physicalWriter.append(CHUNK_PADDING_BUFFER, 0, alignBytes);
-//            writtenBytes += alignBytes;
-//        }
-//        if (tryAlign > 2)
-//        {
-//            throw new IOException("failed to align the start offset of the column chunks in the row group");
-//        }
 
         // write and flush row group content
         int chunkOffset = 0;
@@ -833,17 +817,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             throw e;
         }
 
-        // write writer to output file
-        try (FileOutputStream fos = new FileOutputStream("/tmp/test2");
-             FileChannel fileChannel = fos.getChannel()) {
-            // 将 ByteBuffer 写入文件
-            fileChannel.write(tmpFileBuf);
-            System.out.println("数据已写入文件 output.txt");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        tmpFileBuf.clear();
-
         if (partitioned)
         {
             // partitionColumnIds has been checked to be present in the builder.
@@ -868,23 +841,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         buf.clear();
         buf.order(WRITER_ENDIAN).putInt(footerBuffer.length);
         physicalWriter.append(buf);
-//        tmpFileBuf.put(buf.array());
         writtenBytes += 4;
 
-//        tryAlign = 0;
-//        while (CHUNK_ALIGNMENT != 0 && writtenBytes % CHUNK_ALIGNMENT != 0 && tryAlign++ < 2)
-//        {
-//            int alignBytes = (int) (CHUNK_ALIGNMENT - writtenBytes % CHUNK_ALIGNMENT);
-//            physicalWriter.append(CHUNK_PADDING_BUFFER, 0, alignBytes);
-//            writtenBytes += alignBytes;
-//        }
-//        if (tryAlign > 2)
-//        {
-//            throw new IOException("failed to align the start offset of the column chunks in the row group");
-//        }
         physicalWriter.append(footerBuffer, 0, footerBuffer.length);
         physicalWriter.flush();
-//        tmpFileBuf.put(footerBuffer, 0, footerBuffer.length);
         writtenBytes += footerBuffer.length;
         rowGroupNum++;
     }
