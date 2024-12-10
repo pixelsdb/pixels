@@ -42,3 +42,11 @@ std::string PhysicalLocalWriter::getPath() const {
 int PhysicalLocalWriter::getBufferSize() const {
     return Constants::LOCAL_BUFFER_SIZE;
 }
+
+std::int64_t PhysicalLocalWriter::append(std::shared_ptr<ByteBuffer> byteBuffer) {
+    byteBuffer->filp();
+    int length=byteBuffer->bytesRemaining();
+
+
+    return append(byteBuffer->getBuffer(),byteBuffer->getBufferOffset(),length);
+}

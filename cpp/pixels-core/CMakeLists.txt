@@ -60,6 +60,11 @@ set(pixels_core_cxx
         include/writer/testColumnWriter.h
         lib/writer/testColumnWriter.cpp
         lib/writer/testColumnWriter.cpp
+        lib/writer/DecimalColumnWriter.cpp
+        include/writer/TimestampColumnWriter.h
+        lib/writer/TimestampColumnWriter.cpp
+        lib/writer/DateColumnWriter.cpp
+        include/writer/DateColumnWriter.h
 )
 
 add_library(pixels-core ${pixels_core_cxx})

@@ -65,6 +65,16 @@ ByteBuffer::ByteBuffer(ByteBuffer & bb, uint32_t startId, uint32_t length) {
     fromOtherBB = true;
 	allocated_by_new = true;
 }
+
+/**
+ * Buffer flip
+ * set the readPosition to the beginning
+ */
+void ByteBuffer::filp() {
+    if(size()>0){
+        rpos=0;
+    }
+}
 /**
  * Bytes Remaining
  * Returns the number of bytes from the current read position till the end of the buffer
@@ -348,6 +358,25 @@ void ByteBuffer::markReaderIndex() {
 // Then the rpos is reset to rmark.
 void ByteBuffer::resetReaderIndex() {
     rpos = rmark;
+}
+
+
+
+/**
+ *
+ * @return internal buffers
+ */
+uint8_t *ByteBuffer::getBuffer() {
+    return buf+rpos;
+}
+
+/**
+ *
+ * @return internal buffers first element's offset
+ */
+int ByteBuffer::getBufferOffset() {
+    return rpos;
+//    return 0;
 }
 
 

@@ -230,11 +230,10 @@ void PixelsWriterImpl::writeFileTail() {
     std::vector<uint8_t> fileTailBuffer(fileTailLen);
     fileTail.SerializeToArray(fileTailBuffer.data(),fileTail.ByteSizeLong());
     long tailOffset =physicalWriter->append(fileTailBuffer.data(),0,fileTailBuffer.size());
-    ByteBuffer tailOffsetBuffer=ByteBuffer(8);
-    tailOffsetBuffer.putLong(tailOffset);
-    uint8_t tailOffsetBufferBytes;
-    tailOffsetBuffer.getBytes(&tailOffsetBufferBytes,tailOffsetBuffer.getWritePos());
-    physicalWriter->append(&tailOffsetBufferBytes,0,tailOffsetBuffer.getWritePos());
+    std::shared_ptr<ByteBuffer> tailOffsetBuffer=std::make_shared<ByteBuffer>(8);
+//    ByteBuffer tailOffsetBuffer=ByteBuffer(8);
+    tailOffsetBuffer->putLong(tailOffset);
+    physicalWriter->append(tailOffsetBuffer);
     physicalWriter->flush();
     std::cout << "PixelsWriterImpl::writeFileTail" << std::endl;
 }

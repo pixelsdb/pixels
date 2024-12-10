@@ -7,6 +7,7 @@
 
 #include "physical/PhysicalWriter.h"
 #include "physical/storage/LocalFS.h"
+#include "physical/natives/ByteBuffer.h"
 #include <fstream>
 
 class PhysicalLocalWriter : public PhysicalWriter {
@@ -14,6 +15,7 @@ public:
     PhysicalLocalWriter(const std::string &path, bool overwrite);
     std::int64_t prepare(int length) override;
     std::int64_t append(const uint8_t *buffer, int offset, int length) override;
+    std::int64_t append(std::shared_ptr<ByteBuffer> byteBuffer) override;
     void close() override;
     void flush() override;
     std::string getPath() const override;

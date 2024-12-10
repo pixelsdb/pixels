@@ -31,6 +31,12 @@ public:
      */
     virtual std::int64_t append(const uint8_t *buffer, int offset, int length) = 0;
     /**
+     * Append content to the file.
+     * @param buffer content buffer
+     * @return start offset of content in the file
+     */
+     virtual std::int64_t append(std::shared_ptr<ByteBuffer> byteBuffer) =0 ;
+    /**
      * Close writer.
      */
     virtual void close() = 0;
