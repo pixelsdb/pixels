@@ -75,7 +75,7 @@ public class WorkerCoordinateService
             throw new WorkerCoordinateException("failed to register worker, error code=" + response.getErrorCode());
         }
         return new Worker<>(response.getWorkerId(),
-                new Lease(response.getLeasePeriodMs(), response.getLeaseStartTimeMs()), workerInfo);
+                new Lease(response.getLeasePeriodMs(), response.getLeaseStartTimeMs()), response.getWorkerPortIndex(), workerInfo);
     }
 
     /**
