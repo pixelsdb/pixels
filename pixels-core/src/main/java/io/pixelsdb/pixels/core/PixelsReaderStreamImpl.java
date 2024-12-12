@@ -22,19 +22,18 @@ package io.pixelsdb.pixels.core;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReaderStreamImpl;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static io.pixelsdb.pixels.common.utils.Constants.FILE_MAGIC;
@@ -52,14 +51,25 @@ public class PixelsReaderStreamImpl implements PixelsReader
     /**
      * The number of bytes that the start offset of each column chunk is aligned to.
      */
-    private static final int CHUNK_ALIGNMENT = Integer.parseInt(ConfigFactory.Instance()
-            .getProperty("column.chunk.alignment"));
-    private static final Logger logger = LogManager.getLogger(PixelsReaderStreamImpl.class);
-
     private TypeDescription fileSchema;
     private final PhysicalReader physicalReader;
     private final PixelsStreamProto.StreamHeader streamHeader;
     private PixelsRecordReader recordReader = null;
+
+    public PixelsReaderStreamImpl(String endpoint) throws Exception
+    {
+        throw new NotImplementedException();
+    }
+
+    public PixelsReaderStreamImpl(int port) throws Exception
+    {
+        throw new NotImplementedException();
+    }
+
+    public PixelsReaderStreamImpl(String endpoint, boolean partitioned, int numPartitions)
+    {
+        throw new NotImplementedException();
+    }
 
     private PixelsReaderStreamImpl(TypeDescription fileSchema,
                                    PhysicalReader physicalReader,
@@ -102,6 +112,13 @@ public class PixelsReaderStreamImpl implements PixelsReader
             }
             PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderStorage, builderPath);
             // get stream header
+            byte[] magic = new byte[FILE_MAGIC.length()];
+            fsReader.readFully(magic);
+            String fileMagic = new String(magic, StandardCharsets.US_ASCII);
+            if (!fileMagic.contentEquals(FILE_MAGIC))
+            {
+                throw new PixelsFileMagicInvalidException(fileMagic);
+            }
             int headerLength = 0;
             headerLength = fsReader.readInt(ByteOrder.BIG_ENDIAN);
             ByteBuffer streamHeaderBuffer = fsReader.readFully(headerLength);
@@ -109,7 +126,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
 
             // check file MAGIC and file version
             int fileVersion = header.getVersion();
-            String fileMagic = header.getMagic();
+            fileMagic = header.getMagic();
             if (!PixelsVersion.matchVersion(fileVersion))
             {
                 throw new PixelsFileVersionInvalidException(fileVersion);

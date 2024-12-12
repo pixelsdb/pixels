@@ -32,7 +32,7 @@ option java_outer_classname = "PixelsStreamProto";
  * DESIGN: In streaming mode, we cannot determine all these footer fields until the end of the stream. So:
  * In streaming mode, the whole message flow is like:
  * ------------------------------------------------------------------
- * | streamHeaderLen | streamHeader | rowGroup | rowGroup | ... |
+ * | magic | streamHeaderLen | streamHeader | rowGroup | rowGroup | ... |
  * ------------------------------------------------------------------
  * where each rowGroup is sent like:
  * -----------------------------------------------------------------------

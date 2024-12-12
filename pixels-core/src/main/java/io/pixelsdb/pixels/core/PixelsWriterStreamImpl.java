@@ -34,11 +34,14 @@ import io.pixelsdb.pixels.core.writer.ColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.TimeZone;
@@ -67,6 +70,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter
      * The byte buffer padded to each column chunk for alignment.
      */
     private static final byte[] CHUNK_PADDING_BUFFER;
+    /**
+     *  Useless symbol, delete in the future.
+     */
+    public static final int PARTITION_ID_SCHEMA_WRITER = -2;
 
     static
     {
@@ -82,6 +89,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         CHUNK_ALIGNMENT = Integer.parseInt(ConfigFactory.Instance().getProperty("column.chunk.alignment"));
         checkArgument(CHUNK_ALIGNMENT >= 0, "column.chunk.alignment must >= 0");
         CHUNK_PADDING_BUFFER = new byte[CHUNK_ALIGNMENT];
+    }
+
+    public static int getSchemaPort(String path)
+    {
+        throw new NotImplementedException();
     }
 
     private final TypeDescription schema;
@@ -153,7 +165,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         try
         {
             writeHeader();
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             throw new PixelsWriterException(
                     "Failed to create PixelsWriter due to error when sending header");
         }
@@ -267,6 +280,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             return this;
         }
 
+        public Builder setUri(URI uri)
+        {
+            throw new NotImplementedException();
+        }
+
         public PixelsWriter build() throws PixelsWriterException
         {
             requireNonNull(this.builderStorage, "storage is not set");
@@ -336,7 +354,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         PixelsStreamProto.StreamHeader streamHeader = streamHeaderBuilder.build();
 
         int streamHeaderLength = streamHeader.getSerializedSize();
-        writtenBytes += streamHeaderLength + Integer.BYTES;
+        writtenBytes += Constants.FILE_MAGIC.length() + Integer.BYTES + streamHeaderLength;
 
         // ensure the next member (row group data length) is aligned to CHUNK_ALIGNMENT
         int alignBytes = 0;
@@ -348,6 +366,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
 
         checkArgument(this.writtenBytes >= Integer.MIN_VALUE && this.writtenBytes <= Integer.MAX_VALUE);
         ByteBuffer buf = ByteBuffer.allocate((int) this.writtenBytes);
+        buf.put(Constants.FILE_MAGIC.getBytes(StandardCharsets.US_ASCII));
         buf.putInt(streamHeaderLength);
         buf.put(streamHeader.toByteArray());
         buf.put(CHUNK_PADDING_BUFFER, 0, alignBytes);

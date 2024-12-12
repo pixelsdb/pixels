@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
-import com.google.errorprone.annotations.Var;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
