@@ -21,7 +21,8 @@ int ColumnWriter::getColumnChunkSize() const {
 }
 
 pixels::proto::ColumnChunkIndex ColumnWriter::getColumnChunkIndex() {
-    return pixels::proto::ColumnChunkIndex();
+    return *columnChunkIndex;
+//    return columnChunkIndex.get();
 }
 std::shared_ptr<pixels::proto::ColumnChunkIndex> ColumnWriter::getColumnChunkIndexPtr() {
     return columnChunkIndex;

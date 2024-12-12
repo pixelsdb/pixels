@@ -40,6 +40,7 @@ public:
     ByteBuffer(uint8_t* arr, uint32_t size, bool allocated_by_new = true);
     ByteBuffer(ByteBuffer & bb, uint32_t startId, uint32_t length);
     ~ByteBuffer();
+    void filp();// reset the readPosition
     uint32_t bytesRemaining(); // Number of uint8_ts from the current read position till the end of the buffer
     void clear(); // Clear our the vector and reset read and write positions
     uint32_t size(); // Size of internal vector
@@ -50,6 +51,8 @@ public:
     uint8_t get(); // Relative get method. Reads the uint8_t at the buffers current position then increments the position
     uint8_t get(uint32_t index); // Absolute get method. Read uint8_t at index
     // this is the same as read(byte b[], int off, int len) in InputStream.java
+    int getBufferOffset();
+    uint8_t * getBuffer();
     int read(uint8_t * buffer, uint32_t off, uint32_t len);
     void getBytes(uint8_t* buffer, uint32_t len); // Absolute read into array buf of length len
     char getChar(); // Relative

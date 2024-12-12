@@ -31,6 +31,7 @@ void IntegerColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto:
     }
 
     int pixelId = elementIndex / pixelStride;
+    // still need to add pixelsStatistics in the writer
     bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
     setValid(input, pixelStride, vector, pixelId, hasNull);
 
