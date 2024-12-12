@@ -10,6 +10,11 @@
 #include "writer/ColumnWriterBuilder.h"
 #include "pixels-common/pixels.pb.h"
 #include "ColumnWriterBuilder.h"
+#include "reader/PixelsRecordReaderImpl.h"
+#include "reader/PixelsRecordReader.h"
+#include "physical/PhysicalReader.h"
+#include "physical/PhysicalReaderUtil.h"
+#include "PixelsVersion.h"
 
 const int PixelsWriterImpl::CHUNK_ALIGNMENT = std::stoi(ConfigFactory::Instance().getProperty("column.chunk.alignment"));
 
@@ -93,6 +98,7 @@ void PixelsWriterImpl::close(){
 
 void PixelsWriterImpl::writeRowGroup() {
     // TODO
+    std::cout<<"Try to write rowGroup"<<std::endl;
     int rowGroupDataLength = 0;
 //    pixels::proto::RowGroupStatistic curRowGroupStatistic;
     pixels::proto::RowGroupInformation curRowGroupInfo;
@@ -158,6 +164,7 @@ void PixelsWriterImpl::writeRowGroup() {
         auto chunkIndex=writer->getColumnChunkIndex();
         chunkIndex.set_chunkoffset(curRowGroupOffset+rowGroupDataLength);
         chunkIndex.set_chunklength(writer->getColumnChunkSize());
+        chunkIndex.set_littleendian(true);
         rowGroupDataLength+=writer->getColumnChunkSize();
         if(CHUNK_ALIGNMENT!=0&&rowGroupDataLength%CHUNK_ALIGNMENT!=0){
             rowGroupDataLength += CHUNK_ALIGNMENT - rowGroupDataLength % CHUNK_ALIGNMENT;
@@ -165,19 +172,24 @@ void PixelsWriterImpl::writeRowGroup() {
         *(curRowGroupIndex.add_columnchunkindexentries()) = chunkIndex;
         // *curRowGroupStatistic->add_columnchunkstats() = writer->getColumnChunkStat();
         *(curRowGroupEncoding.add_columnchunkencodings()) = writer->getColumnChunkEncoding();
+//        std::cout<<"chunkIndex:endian:"<<chunkIndex.littleendian();
+
 
         columnWriters[i]=ColumnWriterBuilder::newColumnWriter(children.at(i),columnWriterOption);
     }
 
+    // put curRowGroupIndex into rowGroupFooter
     std::shared_ptr<pixels::proto::RowGroupFooter> rowGroupFooter=std::make_shared<pixels::proto::RowGroupFooter>();
 
-    rowGroupFooter->set_allocated_rowgroupindexentry(new pixels::proto::RowGroupIndex(curRowGroupIndex));
-    rowGroupFooter->set_allocated_rowgroupencoding(new pixels::proto::RowGroupEncoding(curRowGroupEncoding));
+    rowGroupFooter->mutable_rowgroupindexentry()->CopyFrom(curRowGroupIndex);
+    rowGroupFooter->mutable_rowgroupencoding()->CopyFrom(curRowGroupEncoding);
+    std::cout<<"curRowGroupEncoding: "<<curRowGroupEncoding.ByteSizeLong()<<std::endl;
+    std::cout<<"curRowGroupEncoding: "<<curRowGroupEncoding.ByteSizeLong()<<std::endl;
     try {
-        std::vector<uint8_t> footerBuffer(rowGroupFooter->ByteSizeLong());
-        rowGroupFooter->SerializeToArray(footerBuffer.data(), rowGroupFooter->ByteSizeLong());
+        ByteBuffer footerBuffer(rowGroupFooter->ByteSizeLong());
+        rowGroupFooter->SerializeToArray(footerBuffer.getPointer(), rowGroupFooter->ByteSizeLong());
         physicalWriter->prepare(footerBuffer.size());
-        curRowGroupFooterOffset = physicalWriter->append(footerBuffer.data(), 0, footerBuffer.size());
+        curRowGroupFooterOffset = physicalWriter->append(footerBuffer.getPointer(), 0, footerBuffer.size());
         writtenBytes += footerBuffer.size();
         physicalWriter->flush();
     } catch (const std::exception& e) {
@@ -207,6 +219,7 @@ void PixelsWriterImpl::writeFileTail() {
         *(footer->add_rowgroupinfos()) = rowGroupInformation;
     }
 //    postScript.set_version();
+    postScript->set_version(PixelsVersion::V1);
     std::string FILE_MAGIC="PIXELS";
     postScript->set_contentlength(fileContentLength);
     postScript->set_numberofrows(fileRowNum);
@@ -225,15 +238,52 @@ void PixelsWriterImpl::writeFileTail() {
     fileTail.set_footerlength(footer->ByteSizeLong());
     fileTail.set_postscriptlength(postScript->ByteSizeLong());
 
-    int fileTailLen=fileTail.ByteSizeLong();
+    int fileTailLen=fileTail.ByteSizeLong()+8;
+    std::cout<<"fileTailLen:"<<fileTailLen<<std::endl;
     physicalWriter->prepare(fileTailLen);
-    std::vector<uint8_t> fileTailBuffer(fileTailLen);
-    fileTail.SerializeToArray(fileTailBuffer.data(),fileTail.ByteSizeLong());
-    long tailOffset =physicalWriter->append(fileTailBuffer.data(),0,fileTailBuffer.size());
+    std::shared_ptr<ByteBuffer> fileTailBuffer=std::make_shared<ByteBuffer>(fileTail.ByteSizeLong());
+
+    fileTail.SerializeToArray(fileTailBuffer->getPointer(),fileTail.ByteSizeLong());
+    long tailOffset =physicalWriter->append(fileTailBuffer->getPointer(),0,fileTail.ByteSizeLong());
+    std::cout<<"fileTailOffset:"<<tailOffset<<std::endl;
     std::shared_ptr<ByteBuffer> tailOffsetBuffer=std::make_shared<ByteBuffer>(8);
 //    ByteBuffer tailOffsetBuffer=ByteBuffer(8);
     tailOffsetBuffer->putLong(tailOffset);
     physicalWriter->append(tailOffsetBuffer);
+    writtenBytes+=fileTailLen;
     physicalWriter->flush();
+
+
     std::cout << "PixelsWriterImpl::writeFileTail" << std::endl;
+    std::cout<< "test reader immediately"<<std::endl;
+
+
+    std::shared_ptr<::Storage> storage = StorageFactory::getInstance()->getStorage(::Storage::file);
+    std::string builderPath=physicalWriter->getPath();
+
+    std::shared_ptr<PhysicalReader> fsReader =
+            PhysicalReaderUtil::newPhysicalReader(storage, builderPath);
+    std::string fileName = fsReader->getName();
+    std::shared_ptr<pixels::proto::FileTail> fileTail2;
+    // get FileTail
+    long fileLen = fsReader->getFileLength();
+    std::cout<<"filelen: "<<fsReader->getFileLength()<<std::endl;
+    fsReader->seek(fileLen - (long)sizeof(long));
+//    long fileTailOffset = (long)__builtin_bswap64(fsReader->readLong());
+    long fileTailOffset = fsReader->readLong();
+    long bigendinfileTailOffset=(long)__builtin_bswap64(fileTailOffset);
+    std::cout<<"bigendinfileTailOffset: "<<bigendinfileTailOffset<<std::endl;
+
+    int fileTailLength = (int) (fileLen - fileTailOffset - sizeof(long));
+    std::cout<<"fileTailOffset to read"<<fileTailOffset<<std::endl;
+    std::cout<<"fileTailLength to read"<<fileTailLen<<std::endl;
+    fsReader->seek(fileTailOffset);
+    std::shared_ptr<ByteBuffer> fileTailBuffer2 = fsReader->readFully(fileTailLength);
+    fileTail2 = std::make_shared<pixels::proto::FileTail>();
+    if(!fileTail2->ParseFromArray(fileTailBuffer2->getPointer(),
+                                 fileTailLength)) {
+        throw InvalidArgumentException("PixelsReaderBuilder::build: paring FileTail error!");
+    }
+
+    // 读取rowGroupFooter 并且解析 查看是否正确解析
 }

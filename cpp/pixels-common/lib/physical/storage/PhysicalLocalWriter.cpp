@@ -48,5 +48,5 @@ std::int64_t PhysicalLocalWriter::append(std::shared_ptr<ByteBuffer> byteBuffer)
     int length=byteBuffer->bytesRemaining();
 
 
-    return append(byteBuffer->getBuffer(),byteBuffer->getBufferOffset(),length);
+    return append(byteBuffer->getPointer(),byteBuffer->getBufferOffset(),length);
 }

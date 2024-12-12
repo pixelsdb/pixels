@@ -671,7 +671,6 @@ void TypeDescription::writeTypes(std::shared_ptr<pixels::proto::Footer> footer) 
 
 
         }
-        footer->add_types();
-//        footer->add_types(tmpType.get());
+        *(footer->add_types())=*tmpType;
     }
 }
