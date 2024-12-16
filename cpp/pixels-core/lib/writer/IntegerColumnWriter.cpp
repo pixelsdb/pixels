@@ -146,7 +146,7 @@ void IntegerColumnWriter::newPixel()
     ColumnWriter::newPixel();
 }
 
-pixels::proto::ColumnEncoding IntegerColumnWriter::getColumnChunkEncoding() const
+pixels::proto::ColumnEncoding IntegerColumnWriter::getColumnChunkEncoding()
 {
     pixels::proto::ColumnEncoding columnEncoding;
     if (runlengthEncoding)

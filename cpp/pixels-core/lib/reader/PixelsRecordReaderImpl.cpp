@@ -42,7 +42,7 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr<PhysicalReader> r
     includedColumnNum = 0;
 	endOfFile = false;
     resultRowBatch = nullptr;
-
+    ::DirectUringRandomAccessFile::Initialize();
     checkBeforeRead();
 }
 
