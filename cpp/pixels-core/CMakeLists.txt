@@ -57,9 +57,6 @@ set(pixels_core_cxx
         lib/writer/ColumnWriterBuilder.cpp
         include/writer/IntegerColumnWriter.h
         lib/writer/IntegerColumnWriter.cpp
-        include/writer/testColumnWriter.h
-        lib/writer/testColumnWriter.cpp
-        lib/writer/testColumnWriter.cpp
         lib/writer/DecimalColumnWriter.cpp
         include/writer/TimestampColumnWriter.h
         lib/writer/TimestampColumnWriter.cpp

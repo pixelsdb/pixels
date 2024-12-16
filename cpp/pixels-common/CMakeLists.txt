@@ -45,7 +45,7 @@ set(pixels_common_cxx
 		include/utils/ColumnSizeCSVReader.h lib/utils/ColumnSizeCSVReader.cpp
         include/physical/StorageArrayScheduler.h lib/physical/StorageArrayScheduler.cpp
 		include/physical/natives/ByteOrder.h
-		lib/physical/natives/ByteOrder.cpp)
+)
 
 include_directories(include)
 

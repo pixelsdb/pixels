@@ -1,8 +1,0 @@
-//
-// Created by whz on 11/19/24.
-//
-
-#ifndef DUCKDB_DOUBLECOLUMNWRITER_H
-#define DUCKDB_DOUBLECOLUMNWRITER_H
-
-#endif // DUCKDB_DOUBLECOLUMNWRITER_H
