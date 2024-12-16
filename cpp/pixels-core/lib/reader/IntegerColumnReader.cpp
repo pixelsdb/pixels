@@ -40,7 +40,7 @@ void IntegerColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto:
 			if(isLong) {
 				columnVector->longVector[i + vectorIndex] = decoder->next();
 			} else {
-				columnVector->intVector[i + vectorIndex] = decoder->next();
+				*(reinterpret_cast<int*>(columnVector->intVector) + i + vectorIndex)  = decoder->next();
 			}
             elementIndex++;
         }
