@@ -17,7 +17,7 @@
 // -----------------------------------------------------------
 // Construtors 
 
-RunLenIntEncoder::RunLenIntEncoder() : isSigned(true), isAlignedBitPacking(true) {}
+RunLenIntEncoder::RunLenIntEncoder() : RunLenIntEncoder(true, true) {}
 
 
 /**
@@ -76,7 +76,7 @@ void RunLenIntEncoder::encode(long* values, int offset, int length, byte* result
     // std::cout << "buffer end: " << outputStream->getWritePos() << std::endl;
     resLen = outputStream->getWritePos();
     outputStream->getBytes(results, resLen);
-    outputStream->clear();
+    outputStream->resetPosition();
 }
 
 void RunLenIntEncoder::encode(int* values, int offset, int length, byte* results, int& resLen) {
@@ -977,5 +977,5 @@ void RunLenIntEncoder::writeVulong(std::shared_ptr<ByteBuffer> output, long valu
 }
 
 void RunLenIntEncoder::writeVslong(std::shared_ptr<ByteBuffer> output, long value) {
-    writeVulong(output, (value << 1) ^ (value >> 63));
+    writeVulong(output, (static_cast<unsigned long>(value) << 1) ^ (value >> 63));
 }

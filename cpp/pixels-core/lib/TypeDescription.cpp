@@ -1,3 +1,23 @@
+/*
+ * Copyright 2024 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
 //
 // Created by liyu on 3/16/23.
 //
@@ -6,7 +26,8 @@
 
 #include <utility>
 #include "exception/InvalidArgumentException.h"
-
+#include <sstream>
+#include <regex>
 
 long TypeDescription::serialVersionUID = 4270695889340023552L;
 
@@ -35,6 +56,7 @@ int TypeDescription::LONG_DECIMAL_DEFAULT_PRECISION = 38;
 /**
  * It is a standard that the default scale of decimal is 0.
  */
+int TypeDescription::DEFAULT_DECIMAL_SCALE = 0;
 int TypeDescription::SHORT_DECIMAL_DEFAULT_SCALE = 0;
 int TypeDescription::LONG_DECIMAL_DEFAULT_SCALE = 0;
 /**
@@ -58,7 +80,30 @@ int TypeDescription::DEFAULT_TIMESTAMP_PRECISION = 3;
  * Therefore, we also set the max precision of long encoded timestamp to 6 in Pixels.</p>
  */
 int TypeDescription::MAX_TIMESTAMP_PRECISION = 6;
+/**
+ * In SQL standard, the default precision of time is 6 (i.e., microseconds), however,
+ * in Pixels, we use the default precision 3 (i.e., milliseconds), which is consistent with Trino.
+ */
+ int TypeDescription::DEFAULT_TIME_PRECISION = 3;
+/**
+ * 9 = nanosecond, 6 = microsecond, 3 = millisecond, 0 = second.
+ * <p>In Pixels, we use 32-bit integer to store time, thus we can support time precision up to 4.
+ * For simplicity and compatibility to {@link java.sql.Time}, we further limit the precision to 3.</p>
+ */
+ int TypeDescription::MAX_TIME_PRECISION = 3;
 
+TypeDescription::StringPosition::StringPosition(const std::string &value)
+    : value(value), position(0), length(value.size()) {}
+
+std::string TypeDescription::StringPosition::toString() const {
+    std::ostringstream buffer;
+    buffer << '\'';
+    buffer << value.substr(0, position);
+    buffer << '^';
+    buffer << value.substr(position);
+    buffer << '\'';
+    return buffer.str();
+}
 
 std::map<TypeDescription::Category, CategoryProperty> TypeDescription::categoryMap = {
         {BOOLEAN, {true, {"boolean"}}},
@@ -312,7 +357,7 @@ std::shared_ptr<ColumnVector> TypeDescription::createColumn(int maxSize, std::ve
     }
 }
 
-TypeDescription::Category TypeDescription::getCategory() {
+TypeDescription::Category TypeDescription::getCategory() const {
     return category;
 }
 
@@ -327,4 +372,325 @@ int TypeDescription::getPrecision() {
 int TypeDescription::getScale() {
 	return scale;
 }
+int TypeDescription::getMaxLength() {
+    return maxLength;
+}
 
+void TypeDescription::requireChar(TypeDescription::StringPosition &source, char required) {
+    if (source.position >= source.length || source.value[source.position] != required) {
+        throw new InvalidArgumentException("Missing required char " + std::string(1, required) + " at " + source.toString());
+    }
+    source.position += 1;
+}
+
+bool TypeDescription::consumeChar(TypeDescription::StringPosition &source, char ch) {
+    bool result = (source.position < source.length) && (source.value[source.position] == ch);
+    if (result) {
+        source.position += 1;
+    }
+    return result;
+}
+
+int TypeDescription::parseInt(TypeDescription::StringPosition &source) {
+    int start = source.position;
+    int result = 0;
+    while (source.position < source.length) {
+        char ch = source.value[source.position];
+        if (!std::isdigit(ch)) {
+            break;
+        }
+        result = result * 10 + (ch - '0');
+        source.position += 1;
+    }
+    if (source.position == start) {
+        throw new InvalidArgumentException("Missing integer at " + source.toString());
+    }
+    return result;
+}
+
+std::string TypeDescription::parseName(TypeDescription::StringPosition &source) {
+    if (source.position == source.length) {
+        throw new InvalidArgumentException("Missing name at " + source.toString());
+    }
+    int start = source.position;
+    if (source.value[source.position] == '`') {
+        source.position += 1;
+        std::string buffer;
+        bool closed = false;
+        while (source.position < source.length) {
+            char ch = source.value[source.position];
+            source.position += 1;
+            if (ch == '`') {
+                if (source.position < source.length && source.value[source.position] == '`') {
+                    source.position += 1;
+                    buffer += '`';
+                } else {
+                    closed = true;
+                    break;
+                }
+            } else {
+                buffer += ch;
+            }
+        }
+        if (!closed) {
+            source.position = start;
+            throw std::invalid_argument("Unmatched quote at " + source.toString());
+        } else if (buffer.empty()) {
+            throw new InvalidArgumentException("Empty quoted field name at " + source.toString());
+        }
+        return buffer;
+    } else {
+        while (source.position < source.length) {
+            char ch = source.value[source.position];
+            if (!std::isalnum(ch) && ch != '.' && ch != '_') {
+                break;
+            }
+            source.position += 1;
+        }
+        if (source.position == start) {
+            throw new InvalidArgumentException("Missing name at " + source.toString());
+        }
+        return source.value.substr(start, source.position - start);
+    }
+}
+
+void TypeDescription::parseStruct(std::shared_ptr<TypeDescription> type, TypeDescription::StringPosition &source) {
+    requireChar(source, '<');
+    do {
+        std::string fieldName = parseName(source);
+        requireChar(source, ':');
+        type->addField(fieldName, parseType(source));
+    } while (consumeChar(source, ','));
+    requireChar(source, '>');
+}
+
+TypeDescription::Category TypeDescription::parseCategory(TypeDescription::StringPosition &source) {
+    int start = source.position;
+    while (source.position < source.length && std::isalpha(source.value[source.position])) {
+        ++source.position;
+    }
+    if (source.position != start) {
+        std::string word = source.value.substr(start, source.position - start);
+        std::transform(word.begin(), word.end(), word.begin(), ::tolower);
+        for (const auto &entry : categoryMap) {
+            for (const auto &name : entry.second.names) {
+                if (word == name) {
+                    return entry.first;
+                }
+            }
+        }
+    }
+    throw std::invalid_argument("Can't parse type category at " + source.toString());
+}
+
+std::shared_ptr<TypeDescription> TypeDescription::parseType(TypeDescription::StringPosition &source) {
+    auto result = std::make_shared<TypeDescription>(parseCategory(source));
+    switch (result->getCategory()) {
+        case BOOLEAN:
+        case BYTE:
+        case DATE:
+        case DOUBLE:
+        case FLOAT:
+        case INT:
+        case LONG:
+        case SHORT:
+        case STRING:
+            break;
+        case TIME:
+            if (consumeChar(source, '(')) {
+                result->withPrecision(parseInt(source));
+                requireChar(source, ')');
+            } else {
+                result->withPrecision(DEFAULT_TIME_PRECISION);
+            }
+            break;
+        case TIMESTAMP:
+            if (consumeChar(source, '(')) {
+                result->withPrecision(parseInt(source));
+                requireChar(source, ')');
+            } else {
+                result->withPrecision(DEFAULT_TIMESTAMP_PRECISION);
+            }
+            break;
+        case BINARY:
+        case VARBINARY:
+        case CHAR:
+        case VARCHAR:
+            if (consumeChar(source, '(')) {
+                result->withMaxLength(parseInt(source));
+                requireChar(source, ')');
+            } else if (result->getCategory() == Category::CHAR) {
+                result->withMaxLength(DEFAULT_CHAR_LENGTH);
+            } else {
+                result->withMaxLength(DEFAULT_LENGTH);
+            }
+            break;
+        case DECIMAL:
+            if (consumeChar(source, '(')) {
+                int precision = parseInt(source);
+                int scale = 0;
+                if (consumeChar(source, ',')) {
+                    scale = parseInt(source);
+                }
+                requireChar(source, ')');
+                if (scale > precision) {
+                    throw new InvalidArgumentException(std::string("Decimal's scale ") + std::to_string(scale) + " is greater than precision " + std::to_string(precision));
+                }
+                result->withPrecision(precision);
+                result->withScale(scale);
+            } else {
+                result->withPrecision(LONG_DECIMAL_DEFAULT_PRECISION);
+                result->withScale(DEFAULT_DECIMAL_SCALE);
+            }
+            break;
+        case STRUCT:
+            parseStruct(result, source);
+            break;
+        default:
+            throw new InvalidArgumentException("Unknown type at " + source.toString());
+    }
+    return result;
+}
+
+std::shared_ptr<TypeDescription> TypeDescription::fromString(const std::string &typeName) {
+    if (typeName == "") {
+        return nullptr;
+    }
+    StringPosition source(std::regex_replace(typeName, std::regex("\\s+"), ""));
+    auto result = parseType(source);
+    if (source.position != source.length) {
+        throw InvalidArgumentException(std::string("Extra characters at ") + source.toString());
+    }
+    return result;
+}
+
+TypeDescription TypeDescription::withPrecision(int precision) {
+    if (this->category == Category::DECIMAL) {
+        if (precision < 1 || precision > LONG_DECIMAL_MAX_PRECISION) {
+            throw new InvalidArgumentException(std::string("precision ") + std::to_string(precision) + " is out of the valid range 1 .. " + std::to_string(LONG_DECIMAL_DEFAULT_PRECISION));
+        } else if (scale > precision) {
+            throw new InvalidArgumentException(std::string("precision ") + std::to_string(precision) + " is smaller that scale " + std::to_string(scale));
+        }
+    } else if (this->category == Category::TIMESTAMP) {
+        if (precision < 0 || precision > MAX_TIMESTAMP_PRECISION) {
+            throw new InvalidArgumentException(std::string("precision ") + std::to_string(precision) + " is out of the valid range 0 .. " + std::to_string(MAX_TIMESTAMP_PRECISION));
+        }
+    } else if (this->category == Category::TIME) {
+        if (precision < 0 || precision > MAX_TIME_PRECISION) {
+            throw new InvalidArgumentException(std::string("precision ") + std::to_string(precision) + " is out of the valid range 0 .. " + std::to_string(MAX_TIME_PRECISION));
+        }
+    } else {
+        throw new InvalidArgumentException("precision is not valid on decimal, time, and timestamp.");
+    }
+    this->precision = precision;
+    return *this;
+}
+
+TypeDescription TypeDescription::withScale(int scale) {
+    if (this->category == Category::DECIMAL) {
+        if (scale < 0 || scale > LONG_DECIMAL_MAX_SCALE) {
+            throw new InvalidArgumentException(std::string("scale ") + std::to_string(scale) + " is out of the valid range 0 .. " + std::to_string(LONG_DECIMAL_MAX_SCALE));
+        } else if (scale > precision) {
+            throw new InvalidArgumentException(std::string("scale ") + std::to_string(scale) + " is out of the valid range 0 .. " + std::to_string(precision));
+        }
+    } else {
+        throw new InvalidArgumentException("scale is only valid on decimal.");
+    }
+    this->scale = scale;
+    return *this;
+}
+
+TypeDescription TypeDescription::withMaxLength(int maxLength) {
+    if (this->category != Category::VARCHAR && this->category != Category::CHAR &&
+        this->category != Category::BINARY && this->category != Category::VARBINARY) {
+        throw new InvalidArgumentException(std::string("maxLength is only allowed on char, varchar, binary, and varbinary."));
+    }
+    if (maxLength < 1) {
+        throw new InvalidArgumentException(std::string("maxLength ") + std::to_string(maxLength) + " is not positive");
+    }
+    this->maxLength = maxLength;
+    return *this;
+}
+
+void TypeDescription::writeTypes(std::shared_ptr<pixels::proto::Footer> footer) {
+    std::vector<std::shared_ptr<TypeDescription>> children= this->getChildren();
+    std::vector<std::string> names=this->getFieldNames();
+    if(children.empty()){
+        return;
+    }
+    for(int i=0;i<children.size();i++){
+        std::shared_ptr<TypeDescription> child=children.at(i);
+        std::shared_ptr<pixels::proto::Type> tmpType=std::make_shared<pixels::proto::Type>();
+        tmpType->set_name(names.at(i));
+        switch (child->getCategory()) {
+            case TypeDescription::Category::BOOLEAN:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BOOLEAN);
+                break;
+            case TypeDescription::Category::BYTE:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BYTE);
+                break;
+            case TypeDescription::Category::SHORT:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_SHORT);
+                break;
+            case TypeDescription::Category::INT:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_INT);
+                break;
+            case TypeDescription::Category::LONG:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_LONG);
+                break;
+            case TypeDescription::Category::FLOAT:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_FLOAT);
+                break;
+            case TypeDescription::Category::DOUBLE:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DOUBLE);
+                break;
+            case TypeDescription::Category::DECIMAL:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DECIMAL);
+                tmpType->set_precision(child->getPrecision());
+                tmpType->set_scale(child->getScale());
+                break;
+            case TypeDescription::Category::STRING:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_STRING);
+                break;
+            case TypeDescription::Category::CHAR:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_CHAR);
+                tmpType->set_maximumlength(child->getMaxLength());
+                break;
+            case TypeDescription::Category::VARCHAR:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VARCHAR);
+                tmpType->set_maximumlength(child->getMaxLength());
+                break;
+            case TypeDescription::Category::BINARY:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BINARY);
+                tmpType->set_maximumlength(child->getMaxLength());
+                break;
+            case TypeDescription::Category::VARBINARY:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VARBINARY);
+                tmpType->set_maximumlength(child->getMaxLength());
+                break;
+            case TypeDescription::Category::TIMESTAMP:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_TIMESTAMP);
+                tmpType->set_precision(child->getPrecision());
+                break;
+            case TypeDescription::Category::DATE:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DATE);
+                break;
+            case TypeDescription::Category::TIME:
+                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_TIME);
+                tmpType->set_precision(child->getPrecision());
+                break;
+//            case TypeDescription::Category::VECTOR:
+//                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VECTOR);
+//                tmpType->set_dimension(child->getDimension());
+//                break;
+            default: {
+                std::string errorMsg = "Unknown category: ";
+                errorMsg += static_cast<std::underlying_type_t<Category>>(this->getCategory());
+                throw std::runtime_error(errorMsg);
+            }
+
+
+        }
+        *(footer->add_types())=*tmpType;
+    }
+}

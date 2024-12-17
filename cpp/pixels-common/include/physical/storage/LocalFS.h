@@ -7,6 +7,9 @@
 
 #include "physical/Storage.h"
 #include "physical/natives/PixelsRandomAccessFile.h"
+#include <string>
+#include <vector>
+#include <iostream>
 /**
  * This implementation is used to access all kinds of POSIX file systems that are mounted
  * on a local directory. The file system does not need to be local physically. For example,
@@ -21,8 +24,10 @@ public:
     LocalFS();
     ~LocalFS();
     Scheme getScheme() override;
-    std::string ensureSchemePrefix(std::string path) override;
+    std::string ensureSchemePrefix(const std::string &path) const override;
 	std::shared_ptr<PixelsRandomAccessFile> openRaf(const std::string& path);
+    std::vector<std::string> listPaths(const std::string &path) override;
+    std::ifstream open(const std::string &path) override;
     void close() override;
 private:
     // TODO: read the configuration from pixels.properties for the following to values.

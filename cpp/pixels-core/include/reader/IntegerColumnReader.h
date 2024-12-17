@@ -8,7 +8,7 @@
 #include "reader/ColumnReader.h"
 #include "encoding/RunLenIntDecoder.h"
 
-class IntegerColumnReader: public ColumnReader {
+class IntegerColumnReader: public ColumnReader{
 public:
     explicit IntegerColumnReader(std::shared_ptr<TypeDescription> type);
     void close() override;

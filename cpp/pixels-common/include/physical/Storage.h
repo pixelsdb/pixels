@@ -10,6 +10,11 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <vector>
+#include <memory>
+#include <fstream>
+#include <filesystem>
+#include <physical/Status.h>
 
 
 class Storage {
@@ -53,10 +58,11 @@ public:
 
     virtual Scheme getScheme() = 0;
 
-    virtual std::string ensureSchemePrefix(std::string path) = 0;
+    virtual std::string ensureSchemePrefix(const std::string &path) const = 0;
 
+    virtual std::vector<std::string> listPaths(const std::string &path) = 0;
 
-    // TODO: virtual List<Status> listStatus(std::string path)
+    virtual std::ifstream open(const std::string &path) = 0;
 
     virtual void close() = 0;
     // TODO: the remaining function to be implemented

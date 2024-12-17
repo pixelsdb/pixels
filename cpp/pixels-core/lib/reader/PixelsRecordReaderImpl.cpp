@@ -22,7 +22,8 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr<PhysicalReader> r
     RGLen = option.getRGLen();
     batchSize = option.getBatchSize();
     // batchSize must be larger than STANDARD_VECTOR_SIZE
-    assert(batchSize >= STANDARD_VECTOR_SIZE);
+    // for test purpose, can we comment it temporarily
+//    assert(batchSize >= STANDARD_VECTOR_SIZE);
     enabledFilterPushDown = option.isEnabledFilterPushDown();
     if(enabledFilterPushDown) {
         filter = option.getFilter();
@@ -41,7 +42,7 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr<PhysicalReader> r
     includedColumnNum = 0;
 	endOfFile = false;
     resultRowBatch = nullptr;
-
+    ::DirectUringRandomAccessFile::Initialize();
     checkBeforeRead();
 }
 

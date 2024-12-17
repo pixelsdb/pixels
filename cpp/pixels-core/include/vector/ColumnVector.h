@@ -55,6 +55,9 @@ public:
      */
     uint8_t * isNull;
 
+    // If the whole column vector has no nulls, this is true, otherwise false.
+    bool noNulls;
+
     // DuckDB requires that the type of the valid mask should be uint64
     uint64_t * isValid;
     explicit ColumnVector(uint64_t len, bool encoding);
@@ -68,6 +71,12 @@ public:
     uint64_t * currentValid();
     virtual void print(int rowCount);      // this is only used for debug
     bool checkValid(int index);
+    void addNull();
+    virtual void ensureSize(uint64_t size, bool preserveData);
+    virtual void add(std::string &value);
+    virtual void add(bool value);
+    virtual void add(int64_t value);
+    virtual void add(int value);
 };
 
 #endif //PIXELS_COLUMNVECTOR_H
