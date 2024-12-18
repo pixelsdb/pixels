@@ -8,7 +8,7 @@ project(${TARGET_NAME})
 include_directories(include)
 
 set(EXTENSION_SOURCES
-        pixels_extension.cpp
+        PixelsExtension.cpp
         PixelsScanFunction.cpp
 )
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})

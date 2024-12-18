@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <byteswap.h>
-#include "../include/utils.h"
-#include "../include/memory_mapped_file.h"
+#include "../include/Utils.h"
+#include "../include/MemoryMappedFile.h"
 #include "../include/io_pixelsdb_pixels_cache_utils_RadixIndexEndianRewriter.h"
 
 #define INDEX_RADIX_OFFSET 16

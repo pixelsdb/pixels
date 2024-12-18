@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <jni.h>
-#include "memory_mapped_file.h"
+#include "MemoryMappedFile.h"
 
 #ifndef _Included_utils
 #define _Included_utils

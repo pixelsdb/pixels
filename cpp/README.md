@@ -80,49 +80,49 @@ The benchmark script is `run_benchmark.py` in `duckdb/scripts` directory.
 Check the usage:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --help
 ```
 
 Run TPC-H 1 benchmarks:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" --parquet "benchmark/tpch/parquet/tpch_1/" -v --repeat-time-disk 1
 ```
 
 or enabling the encoding of pixels:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1_encoding/" --parquet "benchmark/tpch/parquet/tpch_1/" -v --repeat-time-disk 1
 ```
 
 Run TPCH 300 benchmark:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_300/" --parquet "benchmark/tpch/parquet/tpch_300/" -v --repeat-time-disk 1
 ```
 
 or enabling the encoding of pixels:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_300_encoding/" --parquet "benchmark/tpch/parquet/tpch_300/" -v --repeat-time-disk 1
 ```
 
 We also support to just run pixels or parquet:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" -v --repeat-time-disk 1
 ```
 
 We also offer self-defined queries:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/micro-benchmark/tpch_1/" -v  --repeat-time-disk 1
 ```
 
@@ -138,7 +138,7 @@ SSD array needs pixels data to be in multiple directories. The following instruc
 We offer a convenient python script to distribute the pixels data in a single directory to multiple directories. For example:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/pixels-multidir-generator.py -i /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian \
 -o /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1 \
 /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2 \
@@ -171,7 +171,7 @@ CREATE VIEW region AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data
 We replace these `CREATE` queries in `pixels_tpch_template.benchmark.in`, and run the benchmark:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" -v --repeat-time-disk 1
 ```
 

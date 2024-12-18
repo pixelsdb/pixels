@@ -3,7 +3,7 @@
 //
 #define DUCKDB_EXTENSION_MAIN
 
-#include "pixels_extension.hpp"
+#include "PixelsExtension.hpp"
 #include "PixelsScanFunction.hpp"
 #include "PixelsReadBindData.hpp"
 #include "duckdb.hpp"
