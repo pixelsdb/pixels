@@ -69,6 +69,23 @@ if [ -z "$(ls -A $PIXELS_HOME/lib)" ]; then
 fi
 
 echo "Installing config files..."
+# copy the jvm and worker nodes config files
+CP_ETC=0
+
+if [ -z "$(ls -A $PIXELS_HOME/etc)" ]; then
+  CP_ETC=1
+else
+  read -p "'$PIXELS_HOME/etc' not empty, override?[y/n]" -n 1 -r
+  echo # move to a new line
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    CP_ETC=1
+  fi
+fi
+
+if [ $CP_ETC -eq 1 ]; then
+  cp -v ./scripts/etc/* $PIXELS_HOME/etc
+fi
+
 # find and copy pixels.properties
 if [ -z "$(find $PIXELS_HOME/etc -name "pixels.properties")" ]; then
   cp -v ./pixels-common/src/main/resources/pixels.properties $PIXELS_HOME/etc
@@ -99,24 +116,7 @@ else
   fi
 fi
 
-# copy the jvm and worker nodes config files
-CP_ETC=0
-
-if [ -z "$(ls -A $PIXELS_HOME/etc)" ]; then
-  CP_ETC=1
-else
-  read -p "'$PIXELS_HOME/etc' not empty, override?[y/n]" -n 1 -r
-  echo # move to a new line
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    CP_ETC=1
-  fi
-fi
-
-if [ $CP_ETC -eq 1 ]; then
-  cp -v ./scripts/etc/* $PIXELS_HOME/etc
-fi
-
-# prompt the post-install tasks
+# prompt the post-install steps
 echo "$(
   tput setaf 1
   tput setab 7
