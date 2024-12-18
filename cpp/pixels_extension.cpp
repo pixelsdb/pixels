@@ -15,7 +15,7 @@
 
 namespace duckdb {
 
-    // Pixels Scan Replacemet for duckdb 1.0
+    // Pixels Scan Replacement for duckdb 1.1
 unique_ptr<TableRef> PixelsScanReplacement(ClientContext &context,ReplacementScanInput &input,
                                                optional_ptr<ReplacementScanData> data){
     auto table_name=ReplacementScan::GetFullPath(input);

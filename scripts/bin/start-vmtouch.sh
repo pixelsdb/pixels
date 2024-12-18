@@ -6,7 +6,7 @@ if type numactl >/dev/null 2>&1; then
 fi
 
 # keep CACHE_PATH same as the directory of
-# cache.location and index.location of pixels.properties
+# cache.location and index.location in PIXELS_HOME/etc/pixels.properties
 CACHE_PATH="/mnt/ramfs"
 
 ${NUMA_INTERLEAVE} vmtouch -vt ${CACHE_PATH}/pixels.*

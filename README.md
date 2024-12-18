@@ -69,7 +69,7 @@ To solve this problem, set this property to at least `3600` (i.e., 3.6MB) in `He
 > To run or debug the unit tests or the main classes of Pixels in Intellij, set the `PIXELS_HOME` environment
 > variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
 > Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](docs/INSTALL.md#install-pixels) to put
-> the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
+> the `pixels.properties` into `PIXELS_HOME/etc` and create the `logs` directory where the log files will be
 > written into.
 
 

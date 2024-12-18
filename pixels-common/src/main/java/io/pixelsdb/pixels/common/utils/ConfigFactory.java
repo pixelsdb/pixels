@@ -83,7 +83,7 @@ public class ConfigFactory
             {
                 pixelsHome += "/";
             }
-            pixelsConfig = pixelsHome + "pixels.properties";
+            pixelsConfig = pixelsHome + "etc/pixels.properties";
         }
 
         InputStream in = null;

@@ -31,7 +31,7 @@ If the command outputs the following information, it means your system supports 
 0000000000000000 d _eil_addr___x64_sys_io_uring_setup
 ```
 
-Then set the `PIXELS_SRC` and `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels). `PIXELS_SRC` is the source directory of pixels (e.g. `/home/liyu/pixels`). It is used to locate proto files. `PIXELS_HOME` is the path where `pixels-cxx.properties` locates. `PIXELS_HOME` is usually the same as the installation path of pixels.
+Then set the `PIXELS_SRC` and `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels). `PIXELS_SRC` is the source directory of pixels (e.g. `/home/liyu/pixels`). It is used to locate proto files. `PIXELS_HOME/etc` is the path where `pixels-cpp.properties` locates. `PIXELS_HOME` is usually the same as the installation path of pixels.
 
 Pull the dependency code:
 
@@ -177,7 +177,7 @@ python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" -v --re
 
 ## Parameters
 
-Here are two important parameters in `pixels-cxx.properties`:
+Here are two important parameters in `pixels-cpp.properties`:
 
 * `localfs.enable.direct.io`: use DIRECT IO or buffer IO
 

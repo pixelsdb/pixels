@@ -32,20 +32,20 @@ sed -i "s/coordinator-ip-dummy/$coordinator_ip/g" /home/ubuntu/opt/trino-server/
 instance_id=$(get_instance_id)
 sed -i "s/instance-id-dummy/$instance_id/g" /home/ubuntu/opt/trino-server/etc/node.properties
 
-# ~/opt/pixels/pixels.properties set executor.output.storage.scheme
-sed -i "s/output-storage-scheme-dummy/$executor_output_storage_scheme/g" /home/ubuntu/opt/pixels/pixels.properties
+# ~/opt/pixels/etc/pixels.properties set executor.output.storage.scheme
+sed -i "s/output-storage-scheme-dummy/$executor_output_storage_scheme/g" /home/ubuntu/opt/pixels/etc/pixels.properties
 
-# ~/opt/pixels/pixels.properties set executor.output.folder
-sed -i "s+output-folder-dummy+$executor_output_folder+" /home/ubuntu/opt/pixels/pixels.properties
+# ~/opt/pixels/etc/pixels.properties set executor.output.folder
+sed -i "s+output-folder-dummy+$executor_output_folder+" /home/ubuntu/opt/pixels/etc/pixels.properties
 
 ### set these minio settings if minio is used as the output storage scheme ###
-# ~/opt/pixels/pixels.properties replace output-endpoint-dummy with the local minio endpoint
+# ~/opt/pixels/etc/pixels.properties replace output-endpoint-dummy with the local minio endpoint
 private_ip=$(get_private_ip)
-sed -i "s/minio-host-dummy/$private_ip/g" /home/ubuntu/opt/pixels/pixels.properties
+sed -i "s/minio-host-dummy/$private_ip/g" /home/ubuntu/opt/pixels/etc/pixels.properties
 
-sed -i "s/minio-access-key-dummy/$minio_access_key/g" /home/ubuntu/opt/pixels/pixels.properties
+sed -i "s/minio-access-key-dummy/$minio_access_key/g" /home/ubuntu/opt/pixels/etc/pixels.properties
 
-sed -i "s/minio-secret-key-dummy/$minio_secret_key/g" /home/ubuntu/opt/pixels/pixels.properties
+sed -i "s/minio-secret-key-dummy/$minio_secret_key/g" /home/ubuntu/opt/pixels/etc/pixels.properties
 
 echo "start minio_server"
 su ubuntu -c "screen -d -S minio_server -m /home/ubuntu/opt/minio-server/minio server --console-address :9090 /home/ubuntu/opt/minio-server/data/"

@@ -108,7 +108,7 @@ The last parameter `-c` of `COMPACT` command is the maximum number of threads us
 For large tables such as `lineitem`, you can increase `-c` to improve the compaction performance.
 Compaction does not re-encode data, hence it should be much faster than loading.
 
-> `compact.factor` in `$PIXELS_HOME/pixels.properties` determines how many row groups are compacted into a single
+> `compact.factor` in `PIXELS_HOME/etc/pixels.properties` determines how many row groups are compacted into a single
 > file. The default value is 32, which is appropriate in most conditions. An experimental evaluation of the effects
 > of compact factor on AWS S3 can be found in our [ICDE'22](https://ieeexplore.ieee.org/document/9835615) paper.
 
@@ -117,7 +117,7 @@ To avoid scanning the small files in the ordered path during query execution, di
 ## Statistics Collection*
 This is optional. Data statistics enable cost-based query optimization for the queries.
 Start Pixels and Trino, make sure that Trino can execute queries on `tpch` schema and `presto.jdbc.url`
-in `$PIXELS_HOME/properties` points to the JDBC endpoint of your Trino instance.
+in `PIXELS_HOME/etc/pixels.properties` points to the JDBC endpoint of your Trino instance.
 
 In pixels-cli, use the `STAT` command to collect the data statistics for each table.
 ```bash
@@ -130,7 +130,7 @@ STAT -s tpch -t partsupp
 STAT -s tpch -t orders
 STAT -s tpch -t lineitem
 ```
-Note that `STAT` command issues queries to Trino to collect some statistics. Set the following two properties in `$PIXELS_HOME/pixels.properties` as needed before executing this command:
+Note that `STAT` command issues queries to Trino to collect some statistics. Set the following two properties in `PIXELS_HOME/etc/pixels.properties` as needed before executing this command:
 ```properties
 executor.ordered.layout.enabled=false
 executor.compact.layout.enabled=true

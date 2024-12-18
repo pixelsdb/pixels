@@ -73,7 +73,7 @@ public class TransService
 
     /**
      * Get the default trans service instance connecting to the trans host:port configured in
-     * PIXELS_HOME/pixels.properties. This default instance will be automatically shut down when the process
+     * PIXELS_HOME/etc/pixels.properties. This default instance will be automatically shut down when the process
      * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
      * @return
      */
@@ -84,7 +84,7 @@ public class TransService
 
     /**
      * This method should only be used to connect to a trans server that is not configured through
-     * PIXELS_HOME/pixels.properties. <b>No need</b> to manually shut down the returned trans service.
+     * PIXELS_HOME/etc/pixels.properties. <b>No need</b> to manually shut down the returned trans service.
      * @param host the host name of the trans server
      * @param port the port of the trans server
      * @return the created trans service instance
