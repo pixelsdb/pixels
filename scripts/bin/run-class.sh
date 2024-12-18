@@ -16,7 +16,7 @@ else
 fi
 
 # add local jars into classpath
-for file in "$base_dir"/pixels-daemon-*.jar;
+for file in "$base_dir"/bin/pixels-daemon-*.jar;
 do
   CLASSPATH="$CLASSPATH":"$file"
 done

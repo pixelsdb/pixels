@@ -14,6 +14,12 @@ else
   echo "PIXELS_HOME is '$PIXELS_HOME'"
 fi
 
+# remove the last '/', this is optional, but makes the output look better
+if [[ "$PIXELS_HOME" == *"/" ]]
+then
+    PIXELS_HOME=${PIXELS_HOME::-1}
+fi
+
 mkdir -p $PIXELS_HOME/bin
 mkdir -p $PIXELS_HOME/sbin
 mkdir -p $PIXELS_HOME/etc
@@ -57,7 +63,7 @@ if [ $CP_BIN -eq 1 ]; then
 fi
 
 echo "Installing pixels-daemons..."
-cp -v ./pixels-daemon/target/pixels-daemon-*-full.jar $PIXELS_HOME
+cp -v ./pixels-daemon/target/pixels-daemon-*-full.jar $PIXELS_HOME/bin
 echo "Installing pixels-cli..."
 cp -v ./pixels-cli/target/pixels-cli-*-full.jar $PIXELS_HOME/sbin
 

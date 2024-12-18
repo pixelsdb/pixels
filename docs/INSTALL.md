@@ -135,7 +135,7 @@ mkdir sbin
 mkdir var
 ```
 Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` and `PIXELS_HOME/sbin`, respectively.
-Put `pixels-daemon-*-full.jar` into `PIXELS_HOME`.
+Put `pixels-daemon-*-full.jar` into `PIXELS_HOME/bin`.
 Put `pixels-cli-*-full.jar` into `PIXELS_HOME/sbin`
 Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
 Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME/etc`.
