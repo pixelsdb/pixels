@@ -138,6 +138,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             Optional<List<Integer>> partKeyColumnIds)
     {
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
+        if (pixelStride % 8 != 0)
+        {
+            LOGGER.warn("Pixel stride is not a multiple of 8, this may lead to sub-optimal performance");
+        }
         checkArgument(rowGroupSize > 0, "row group size is not positive");
         checkArgument(encodingLevel != null, "encoding level is null");
         checkArgument(compressionBlockSize > 0, "compression block size is not positive");
@@ -216,6 +220,10 @@ public class PixelsWriterStreamImpl implements PixelsWriter
 
         public Builder setPixelStride(int stride)
         {
+            if (stride % 8 != 0)
+            {
+                LOGGER.warn("Pixel stride is recommended to be multiple of 8 for better performance");
+            }
             this.builderPixelStride = stride;
             return this;
         }

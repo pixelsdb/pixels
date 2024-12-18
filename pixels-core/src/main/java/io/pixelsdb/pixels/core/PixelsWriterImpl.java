@@ -155,6 +155,10 @@ public class PixelsWriterImpl implements PixelsWriter
         this.schema = requireNonNull(schema, "schema is null");
         this.hasHiddenColumn = hasHiddenColumn;
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
+        if (pixelStride % 8 != 0)
+        {
+            LOGGER.warn("Pixel stride is not a multiple of 8, this may lead to sub-optimal performance");
+        }
         checkArgument(rowGroupSize > 0, "row group size is not positive");
         this.rowGroupSize = rowGroupSize;
         this.compressionKind = requireNonNull(compressionKind, "compressionKind is null");
@@ -233,6 +237,10 @@ public class PixelsWriterImpl implements PixelsWriter
 
         public Builder setPixelStride(int stride)
         {
+            if (stride % 8 != 0)
+            {
+                LOGGER.warn("Pixel stride is recommended to be multiple of 8 for better performance");
+            }
             this.builderPixelStride = stride;
             return this;
         }
