@@ -30,7 +30,7 @@ consumed by the scaling manager (e.g., AWS EC2 Autoscaling Group) in the cloud p
 
 Install `Pixels-Trino` following the instructions [HERE](../docs/INSTALL.md).
 
-To use Pixels-Turbo, we need to set the following properties in `PIXELS_HOME/pixels.properties`:
+To use Pixels-Turbo, we need to set the following properties in `PIXELS_HOME/etc/pixels.properties`:
 ```properties
 executor.input.storage.scheme=s3
 executor.intermediate.storage.scheme=s3
@@ -67,7 +67,7 @@ It can be used as an example to implement the auto-scaling manager for other clo
 
 ## Start Pixels (with Turbo)
 
-In `etc/catalogpixels.properties` under the installation directory of Trino, set `cloud.function.switch` to `auto` if you have installed the auto-scaling manager and 
+In `etc/catalog/pixels.properties` under the installation directory of Trino, set `cloud.function.switch` to `auto` if you have installed the auto-scaling manager and 
 want to enable auto-scaling of MPP cluster and adaptive invocation of serverless workers; or set it to `on` if you want to always push the queries into serverless workers.
 ```properties
 # serverless config

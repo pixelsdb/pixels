@@ -66,7 +66,7 @@ COMPACT -s clickbench -t hits -n no -c 40
 The last parameter `-c` of `COMPACT` command is the maximum number of threads used for data compaction.
 This may take a few seconds to a minute, depending on the write bandwidth of S3 on your EC2 VM.
 
-> `compact.factor` in `$PIXELS_HOME/pixels.properties` determines how many row groups are compacted into a single
+> `compact.factor` in `PIXELS_HOME/etc/pixels.properties` determines how many row groups are compacted into a single
 > file. The default value is 32, which is appropriate in most conditions. An experimental evaluation of the effects
 > of compact factor on AWS S3 can be found in our [ICDE'22](https://ieeexplore.ieee.org/document/9835615) paper.
 
@@ -75,13 +75,13 @@ To avoid scanning the small files in the ordered path during query execution, di
 ## Statistics Collection*
 This is optional. Data statistics enable cost-based query optimization for the queries.
 Start Pixels and Trino, make sure that Trino can execute queries on `clickbench` schema and `presto.jdbc.url`
-in `$PIXELS_HOME/properties` points to the JDBC endpoint of your Trino instance.
+in `PIXELS_HOME/etc/pixels.properties` points to the JDBC endpoint of your Trino instance.
 
 In pixels-cli, use the following commands to collect the data statistics for the columns in the table.
 ```bash
 STAT -s clickbench -t hits
 ```
-Note that `STAT` command issues queries to Trino to collect some statistics. Set the following two properties in `$PIXELS_HOME/pixels.properties` as needed before executing this command:
+Note that `STAT` command issues queries to Trino to collect some statistics. Set the following two properties in `PIXELS_HOME/etc/pixels.properties` as needed before executing this command:
 ```properties
 executor.ordered.layout.enabled=false
 executor.compact.layout.enabled=true

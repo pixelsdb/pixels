@@ -78,7 +78,7 @@ public class MetadataService
 
     /**
      * Get the default metadata service instance connecting to the metadata host:port configured in
-     * PIXELS_HOME/pixels.properties. This default instance will be automatically shut down when the process
+     * PIXELS_HOME/etc/pixels.properties. This default instance will be automatically shut down when the process
      * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
      * @return
      */
@@ -89,7 +89,7 @@ public class MetadataService
 
     /**
      * This method should only be used to connect to a metadata server that is not configured through
-     * PIXELS_HOME/pixels.properties. <b>No need</b> to manually shut down the returned metadata service.
+     * PIXELS_HOME/etc/pixels.properties. <b>No need</b> to manually shut down the returned metadata service.
      * @param host the host name of the metadata server
      * @param port the port of the metadata server
      * @return the created metadata service instance

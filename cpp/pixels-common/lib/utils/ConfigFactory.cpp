@@ -27,8 +27,8 @@ ConfigFactory::ConfigFactory() {
 	if(pixelsHome.back() != '/') {
 		pixelsHome += "/";
 	}
-	std::ifstream infile(pixelsHome + "cpp/pixels-cxx.properties");
-	std::cout<<"pixels properties file is "<<pixelsHome + "cpp/pixels-cxx.properties"<<std::endl;
+	std::ifstream infile(pixelsHome + "etc/pixels-cpp.properties");
+	std::cout<<"pixels properties file is "<<pixelsHome + "etc/pixels-cpp.properties"<<std::endl;
 	std::string line;
 	while (std::getline(infile, line)) {
 		if (line.find('=') != std::string::npos && line.at(0) != '#') {

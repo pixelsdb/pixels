@@ -79,7 +79,7 @@ source ~/.bashrc
 
 But you still need to:
 - Put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib`.
-- Modify `pixels.properties` to ensure the following properties are valid:
+- Modify `PIXELS_HOME/etc/pixels.properties` to ensure the following properties are valid:
 ```properties
 pixels.var.dir=/home/pixels/opt/pixels/var/
 metadata.db.driver=com.mysql.jdbc.Driver
@@ -138,11 +138,11 @@ Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` an
 Put `pixels-daemon-*-full.jar` into `PIXELS_HOME`.
 Put `pixels-cli-*-full.jar` into `PIXELS_HOME/sbin`
 Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
-Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
+Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME/etc`.
 Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
 Leave the other config parameters as default.
 
-Set `cache.enabled` to `false` in `$PIXELS_HOME/pixels.properties` if you don't use pixels-cache.
+Set `cache.enabled` to `false` in `PIXELS_HOME/etc/pixels.properties` if you don't use pixels-cache.
 
 ## Install MySQL
 MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later has been tested. Other forks or variants may also work.
@@ -210,7 +210,7 @@ Hadoop is optional. It is only needed if you want to use HDFS as the underlying 
 Pixels has been tested on Hadoop-2.7.3 and Hadoop-3.3.1.
 Follow the official documents to install Hadoop.
 
-Modify `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`
+Modify `hdfs.config.dir` in `PIXELS_HOME/etc/pixels.properties`
 and point it to the `etc/hadoop` directory under the home of Hadoop.
 Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from this directory.
 
