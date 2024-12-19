@@ -60,7 +60,7 @@ add_library(pixels-common ${pixels_common_cxx} ${PROTO_SRCS} ${PROTO_HDRS})
 # liburing
 include(ExternalProject)
 ExternalProject_Add(liburing
-		GIT_REPOSITORY https://gitee.com/wszdc/liburing.git
+		GIT_REPOSITORY git@github.com:axboe/liburing.git
 		GIT_TAG liburing-2.2
 		PREFIX ${CMAKE_CURRENT_BINARY_DIR}
 		SOURCE_DIR "liburing"

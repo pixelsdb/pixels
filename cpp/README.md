@@ -2,11 +2,11 @@
 
 ## Usage
 
-### Compilation
+### Build Source Code
 
-Pixels C++ relies on protobuf and liburing. And it builds the pixels extension of duckdb by default,
+Pixels C++ relies on protobuf, liburing, and googletest. And it builds the pixels extension of duckdb by default,
 which relies on [duckdb](https://github.com/pixelsdb/duckdb).
-We don't need to manually install these prerequisites, since the Makefile would automatically download them.
+We don't need to manually install these prerequisites, since the build scripts would automatically download them.
 
 Pixels C++ reader uses `iouring` system calls. You can use the following command to check if iouring is supported in your system:
 
@@ -51,7 +51,7 @@ Finally, compile the code:
 make -j
 ```
 
-### Example
+### Run Basic Example
 
 Here is a pixels reader example in the directory `duckdb/examples/pixels-example`.
 This example validates the correctness of compilation and gives you an idea how to load the Pixels data. 
@@ -71,7 +71,7 @@ set `CMake options` as:
 -DDUCKDB_EXTENSION_NAMES="pixels" -DDUCKDB_EXTENSION_PIXELS_PATH=${PIXELS_SRC}/cpp -DDUCKDB_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_SRC}/cpp/include -DCMAKE_PREFIX_PATH=${PIXELS_SRC}/cpp/third-party/protobuf/cmake/build
 ```
 
-### Benchmark
+### Run Benchmarks
 
 Note: the benchmark runs on diascld31 server. If you run the benchmark on your machine, please refer to [Common issue](#4-i-fail-to-run-the-pixels-and-parquet-benchmark)
 

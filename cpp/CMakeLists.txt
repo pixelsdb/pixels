@@ -29,14 +29,11 @@ include_directories(pixels-core/include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/pixels-common/liburing/src/include)
 
-
-
 target_link_libraries(
         ${EXTENSION_NAME}
         pixels-common
         pixels-core
 )
-
 
 # Add the subdirectory that contains the build_loadable_extension definition
 
