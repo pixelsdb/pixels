@@ -4,7 +4,8 @@
 
 ### Compilation
 
-The repository relies on [duckdb](https://github.com/pixelsdb/duckdb), protobuf, and liburing.
+Pixels C++ relies on protobuf and liburing. And it builds the pixels extension of duckdb by default,
+which relies on [duckdb](https://github.com/pixelsdb/duckdb).
 We don't need to manually install these prerequisites, since the Makefile would automatically download them.
 
 Pixels C++ reader uses `iouring` system calls. You can use the following command to check if iouring is supported in your system:
