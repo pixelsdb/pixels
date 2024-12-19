@@ -79,6 +79,11 @@
             <artifactId>pixels-storage-localfs</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-stream</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <!-- google -->
         <dependency>

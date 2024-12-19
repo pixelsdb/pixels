@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.worker.vhive;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import com.sun.corba.se.spi.orbutil.threadpool.Work;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.core.PixelsReader;
@@ -35,6 +36,7 @@ import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.join.Partitioner;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
+import io.pixelsdb.pixels.planner.coordinate.TaskBatch;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 import io.pixelsdb.pixels.planner.plan.logical.Join;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
@@ -60,6 +62,7 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
     protected WorkerCoordinateService workerCoordinatorService;
     private final WorkerMetrics workerMetrics;
     private io.pixelsdb.pixels.common.task.Worker<CFWorkerInfo> worker;
+    private List<CFWorkerInfo> downStreamWorkers;
 
     public BroadcastJoinStreamWorker(WorkerContext context) {
         super(context);
@@ -81,6 +84,9 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             CFWorkerInfo workerInfo = new CFWorkerInfo(ip, port, transId, stageId, "broadcast_join", Collections.emptyList());
             workerCoordinatorService = new WorkerCoordinateService(coordinatorIp, coordinatorPort);
             worker = workerCoordinatorService.registerWorker(workerInfo);
+            downStreamWorkers = workerCoordinatorService.getDownstreamWorkers(worker.getWorkerId());
+            checkArgument( downStreamWorkers.isEmpty() || downStreamWorkers.size() == 1,
+                    "most one downstream worker is allowed");
             JoinOutput output = process(input);
             workerCoordinatorService.terminateWorker(worker.getWorkerId());
             return output;
@@ -121,6 +127,7 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                     new WorkerThreadFactory(exceptionHandler));
 
             long transId = input.getTransId();
+            long timestamp = input.getTimestamp();
             BroadcastTableInfo leftTable = requireNonNull(input.getSmallTable(), "leftTable is null");
             StorageInfo leftInputStorageInfo = requireNonNull(leftTable.getStorageInfo(), "leftStorageInfo is null");
             List<InputSplit> leftInputs = requireNonNull(leftTable.getInputSplits(), "leftInputs is null");
@@ -137,6 +144,32 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
             TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
 
+            if (leftInputStorageInfo.getScheme() == Storage.Scheme.httpstream ||
+                    rightInputStorageInfo.getScheme() == Storage.Scheme.httpstream)
+            {
+                int port = WorkerCommon.getPort();
+                if (leftInputStorageInfo.getScheme() == Storage.Scheme.httpstream)
+                {
+                    for (InputSplit inputSplit : leftInputs)
+                    {
+                        checkArgument(inputSplit.getInputInfos().size() == 1,
+                                "inputSplit has more than one input");
+                        inputSplit.getInputInfos().get(0).setPath("localhost:" + port);
+                        port++;
+                    }
+                }
+                if (rightInputStorageInfo.getScheme() == Storage.Scheme.httpstream)
+                {
+                    for (InputSplit inputSplit : rightInputs)
+                    {
+                        checkArgument(inputSplit.getInputInfos().size() == 1,
+                                "inputSplit has more than one input");
+                        inputSplit.getInputInfos().get(0).setPath("localhost:" + port);
+                        port++;
+                    }
+                }
+            }
+
             String[] leftColAlias = input.getJoinInfo().getSmallColumnAlias();
             String[] rightColAlias = input.getJoinInfo().getLargeColumnAlias();
             boolean[] leftProjection = input.getJoinInfo().getSmallProjection();
@@ -150,16 +183,16 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             checkArgument(outputInfo.getFileNames().size() == 1,
                     "it is incorrect to have more than one output files");
             String outputFolder = outputInfo.getPath();
-            if (!outputFolder.endsWith("/")) {
+            if (!outputFolder.endsWith("/"))
+            {
                 outputFolder += "/";
             }
             boolean encoding = outputInfo.isEncoding();
 
-            StreamWorkerCommon.initStorage(leftInputStorageInfo);
-            StreamWorkerCommon.initStorage(rightInputStorageInfo);
-            StreamWorkerCommon.initStorage(outputStorageInfo);
+            WorkerCommon.initStorage(leftInputStorageInfo);
+            WorkerCommon.initStorage(rightInputStorageInfo);
+            WorkerCommon.initStorage(outputStorageInfo);
 
-            List<String> rightEndpoints = Arrays.asList("http://localhost:18686/", "http://localhost:18687/", "http://localhost:18688/", "http://localhost:18689/");
             boolean partitionOutput = input.getJoinInfo().isPostPartition();
             PartitionInfo outputPartitionInfo = input.getJoinInfo().getPostPartitionInfo();
             if (partitionOutput) {
@@ -169,101 +202,64 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             // build the joiner
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            if (leftInputStorageInfo.getScheme() == Storage.Scheme.httpstream && rightInputStorageInfo.getScheme() == Storage.Scheme.httpstream) {
-                StreamWorkerCommon.getSchemaFromPaths(threadPool,
-                        StreamWorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
-                        StreamWorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
-                        leftSchema, rightSchema,
-                        Collections.singletonList("http://localhost:18688/"),
-                        Collections.singletonList("http://localhost:18686/"));
-            } else if (leftInputStorageInfo.getScheme() != Storage.Scheme.httpstream && rightInputStorageInfo.getScheme() == Storage.Scheme.httpstream) {
-                StreamWorkerCommon.getSchemaFromTwoPaths(threadPool,
-                        StreamWorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
-                        StreamWorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
-                        leftSchema, rightSchema,
-                        leftInputs,
-                        rightEndpoints);
-            } else if (leftInputStorageInfo.getScheme() != Storage.Scheme.httpstream && rightInputStorageInfo.getScheme() != Storage.Scheme.httpstream) {
-                WorkerCommon.getFileSchemaFromSplits(threadPool,
-                        StreamWorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
-                        StreamWorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
-                        leftSchema, rightSchema, leftInputs, rightInputs);
-            }
+            WorkerCommon.getFileSchemaFromSplits(threadPool,
+                    WorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
+                    WorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
+                    leftSchema, rightSchema, leftInputs, rightInputs);
             Joiner joiner = new Joiner(joinType,
-                    StreamWorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead),
+                    WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead),
                     leftColAlias, leftProjection, leftKeyColumnIds,
-                    StreamWorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead),
+                    WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead),
                     rightColAlias, rightProjection, rightKeyColumnIds);
             logger.info("succeed to get left and right schema");
+            logger.info("left schema: " + leftSchema.get());
+            logger.info("right schema: " + rightSchema.get());
 
             // build the hash table for the left table.
-            List<Future> leftFutures = new ArrayList<>();
-            for (InputSplit inputSplit : leftInputs) {
-                List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
-                leftFutures.add(threadPool.submit(() -> {
-                    try {
-                        buildHashTable(transId, joiner, inputs, leftInputStorageInfo.getScheme(),
-                                !leftTable.isBase(), leftColumnsToRead, leftFilter, workerMetrics);
-                    } catch (Throwable e) {
-                        throw new WorkerException("error during hash table construction", e);
-                    }
-                }));
-            }
-            for (Future future : leftFutures) {
-                future.get();
-            }
-            logger.info("succeed to build hash table");
-
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
-            if (partitionOutput) {
-                for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i) {
+            if (leftInputStorageInfo.getScheme() != Storage.Scheme.httpstream &&
+                    rightInputStorageInfo.getScheme() != Storage.Scheme.httpstream)
+            {
+                // build the hash table for the left table.
+                List<Future> leftFutures = new ArrayList<>();
+                for (InputSplit inputSplit : leftInputs)
+                {
+                    List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
+                    leftFutures.add(threadPool.submit(() -> {
+                        try
+                        {
+                            buildHashTable(transId, timestamp, joiner, inputs, leftInputStorageInfo.getScheme(),
+                                    !leftTable.isBase(), leftColumnsToRead, leftFilter, workerMetrics);
+                        }
+                        catch (Throwable e)
+                        {
+                            throw new WorkerException("error during hash table construction", e);
+                        }
+                    }));
+                }
+                for (Future future : leftFutures)
+                {
+                    future.get();
+                }
+                logger.info("hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
+                        (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
+                logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
+
+                if (partitionOutput)
+                {
+                    for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
+                    {
+                        result.add(new ConcurrentLinkedQueue<>());
+                    }
+                }
+                else
+                {
                     result.add(new ConcurrentLinkedQueue<>());
                 }
-            } else {
-                result.add(new ConcurrentLinkedQueue<>());
-            }
 
-            // scan the right table and do the join.
-            if (joiner.getSmallTableSize() > 0)
-            {
-                if (rightInputStorageInfo.getScheme() == Storage.Scheme.httpstream)
+                // scan the right table and do the join.
+                if (joiner.getSmallTableSize() > 0)
                 {
-                    logger.info("scan right input from http");
-                    for (String endpoint : rightEndpoints)
-                    {
-                        threadPool.execute(() -> {
-                            try
-                            {
-                                if (partitionOutput)
-                                {
-                                    throw new UnsupportedOperationException("don't support partitioning operation");
-                                } else
-                                {
-                                    joinWithRightTable(transId, joiner, endpoint, rightInputStorageInfo.getScheme(), rightColumnsToRead,
-                                            rightFilter, result.get(0), workerMetrics, logger);
-                                }
-                            } catch (Throwable e)
-                            {
-                                throw new WorkerException("error during broadcast join", e);
-                            }
-                        });
-                    }
-                    threadPool.shutdown();
-                    try
-                    {
-                        while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
-                    } catch (InterruptedException e)
-                    {
-                        throw new WorkerException("interrupted while waiting for the termination of join", e);
-                    }
-
-                    if (exceptionHandler.hasException())
-                    {
-                        throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
-                    }
-                } else
-                {
-                    logger.info("scan right input from non http");
                     for (InputSplit inputSplit : rightInputs)
                     {
                         List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
@@ -272,10 +268,10 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                             {
                                 int numJoinedRows = partitionOutput ?
                                         joinWithRightTableAndPartition(
-                                                transId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                                transId, timestamp, joiner, inputs, rightInputStorageInfo.getScheme(),
                                                 !rightTable.isBase(), rightColumnsToRead, rightFilter,
                                                 outputPartitionInfo, result, workerMetrics) :
-                                        joinWithRightTable(transId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                        joinWithRightTable(transId, timestamp, joiner, inputs, rightInputStorageInfo.getScheme(),
                                                 !rightTable.isBase(), rightColumnsToRead, rightFilter, result.get(0), workerMetrics);
                             } catch (Throwable e)
                             {
@@ -297,113 +293,70 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                         throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
                     }
                 }
+                logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
             }
-            logger.info("succeed to join with right table");
-
-            String outputPath = outputFolder + outputInfo.getFileNames().get(0);
-            List<CFWorkerInfo> downStreamWorkers = workerCoordinatorService.getDownstreamWorkers(worker.getWorkerId())
-                    .stream()
-                    .sorted(Comparator.comparing(worker -> worker.getHashValues().get(0)))
-                    .collect(ImmutableList.toImmutableList());
-            List<String> outputEndpoints = downStreamWorkers.stream()
-                    .map(CFWorkerInfo::getIp)
-                    .map(ip -> "http://" + ip + ":"
-                            + (18686 + worker.getWorkerPortIndex()) + "/")
-                    // .map(URI::create)
-                    .collect(Collectors.toList());
-
-            logger.info("down stream workers are {}", downStreamWorkers);
-            if (!downStreamWorkers.isEmpty()) {
-                StreamWorkerCommon.passSchemaToNextLevel(joiner.getJoinedSchema(), outputStorageInfo,
-                        outputEndpoints);
-                logger.info("succeed to pass schema to next level");
-                try {
-                    WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
-                    PixelsWriter pixelsWriter;
-                    if (partitionOutput) {
-                        pixelsWriter = StreamWorkerCommon.getWriter(joiner.getJoinedSchema(),
-                                StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                                true, 0,
-                                Arrays.stream(leftKeyColumnIds).boxed().collect(Collectors.toList()),
-                                outputEndpoints, false);
-                        for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash) {
-                            ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
-                            if (!batches.isEmpty()) {
-                                for (VectorizedRowBatch batch : batches) {
-                                    pixelsWriter.addRowBatch(batch, hash);
-                                }
+            String outputPath;
+            if (outputStorageInfo.getScheme() == Storage.Scheme.httpstream)
+            {
+                outputPath = downStreamWorkers.get(0).getIp() + ":" + (downStreamWorkers.get(0).getPort() + worker.getWorkerPortIndex());
+            } else
+            {
+                outputPath = outputFolder + outputInfo.getFileNames().get(0);
+            }
+            try
+            {
+                PixelsWriter pixelsWriter;
+                WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
+                if (partitionOutput)
+                {
+                    pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
+                            encoding, true, Arrays.stream(
+                                            outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    collect(Collectors.toList()));
+                    for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+                    {
+                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
+                        if (!batches.isEmpty())
+                        {
+                            for (VectorizedRowBatch batch : batches)
+                            {
+                                pixelsWriter.addRowBatch(batch, hash);
                             }
                         }
-                    } else {
-                        pixelsWriter = StreamWorkerCommon.getWriter(joiner.getJoinedSchema(),
-                                StreamWorkerCommon.getStorage(outputStorageInfo.getScheme()),
-                                outputEndpoints.get(0), encoding,
-                                false, 0,
-                                null, null, false);
-                        ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
-                        for (VectorizedRowBatch rowBatch : rowBatches) {
-                            pixelsWriter.addRowBatch(rowBatch);
-                        }
                     }
-                    pixelsWriter.close();
-                    logger.info("succeed to write results");
-                    joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
-                    if (outputStorageInfo.getScheme() == Storage.Scheme.minio) {
-                        while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath)) {
-                            // Wait for 10ms and see if the output file is visible.
-                            TimeUnit.MILLISECONDS.sleep(10);
-                        }
-                    }
-                    workerMetrics.addOutputCostNs(writeCostTimer.stop());
-                    workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-                    workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-                } catch (Throwable e) {
-                    throw new WorkerException(
-                            "failed to finish writing and close the join result file '" + outputPath + "'", e);
                 }
-            } else {
-                try {
-                    PixelsWriter pixelsWriter;
-                    WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
-                    if (partitionOutput) {
-                        pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                                encoding, true, Arrays.stream(
-                                                outputPartitionInfo.getKeyColumnIds()).boxed().
-                                        collect(Collectors.toList()));
-                        for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash) {
-                            ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
-                            if (!batches.isEmpty()) {
-                                for (VectorizedRowBatch batch : batches) {
-                                    pixelsWriter.addRowBatch(batch, hash);
-                                }
-                            }
-                        }
-                    } else {
-                        pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                                encoding, false, null);
-                        ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
-                        for (VectorizedRowBatch rowBatch : rowBatches) {
-                            pixelsWriter.addRowBatch(rowBatch);
-                        }
+                else
+                {
+                    logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
+                    pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
+                            encoding, false, null);
+                    ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
+                    for (VectorizedRowBatch rowBatch : rowBatches)
+                    {
+                        pixelsWriter.addRowBatch(rowBatch);
                     }
-                    pixelsWriter.close();
-                    joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
-                    if (outputStorageInfo.getScheme() == Storage.Scheme.minio) {
-                        while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath)) {
-                            // Wait for 10ms and see if the output file is visible.
-                            TimeUnit.MILLISECONDS.sleep(10);
-                        }
-                    }
-                    workerMetrics.addOutputCostNs(writeCostTimer.stop());
-                    workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-                    workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-                } catch (Throwable e) {
-                    throw new WorkerException(
-                            "failed to finish writing and close the join result file '" + outputPath + "'", e);
                 }
+                pixelsWriter.close();
+                joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
+                if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
+                {
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
+                }
+                workerMetrics.addOutputCostNs(writeCostTimer.stop());
+                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+            } catch (Throwable e)
+            {
+                throw new WorkerException(
+                        "failed to finish writing and close the join result file '" + outputPath + "'", e);
             }
+
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(joinOutput, workerMetrics);
             return joinOutput;

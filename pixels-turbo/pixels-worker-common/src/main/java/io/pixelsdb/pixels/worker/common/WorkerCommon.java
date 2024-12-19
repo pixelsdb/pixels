@@ -65,12 +65,14 @@ public class WorkerCommon
     private static Storage s3;
     protected static Storage minio;
     private static Storage redis;
+    private static Storage stream;
     public static final int rowBatchSize;
     protected static final int pixelStride;
     protected static final int rowGroupSize;
     protected static int port;
     protected static String coordinatorIp;
     protected static int coordinatorPort;
+    private static HashMap<String, PixelsReader> streamReaders;
 
     static
     {
@@ -80,6 +82,7 @@ public class WorkerCommon
         port = Integer.parseInt(configFactory.getProperty("executor.worker.exchange.port"));
         coordinatorIp = configFactory.getProperty("worker.coordinate.server.host");
         coordinatorPort = Integer.parseInt(configFactory.getProperty("worker.coordinate.server.port"));
+        streamReaders = new HashMap<>();
     }
 
     public static void initStorage(StorageInfo storageInfo)
@@ -101,6 +104,10 @@ public class WorkerCommon
                 ConfigRedis(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                 WorkerCommon.redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
             }
+            else if (WorkerCommon.stream == null && storageInfo.getScheme() == Storage.Scheme.httpstream)
+            {
+                WorkerCommon.stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+            }
         } catch (Throwable e)
         {
             throw new WorkerException("failed to initialize the storage of scheme " + storageInfo.getScheme(), e);
@@ -117,6 +124,8 @@ public class WorkerCommon
                 return minio;
             case redis:
                 return redis;
+            case httpstream:
+                return stream;
         }
         throw new UnsupportedOperationException("scheme " + scheme + " is not supported");
     }
@@ -255,7 +264,10 @@ public class WorkerCommon
                         checkedPath = inputInfo.getPath();
                         PixelsReader reader = getReader(checkedPath, storage);
                         TypeDescription fileSchema = reader.getFileSchema();
-                        reader.close();
+                        if (!storage.getScheme().equals(Storage.Scheme.httpstream))
+                        {
+                            reader.close();
+                        }
                         return fileSchema;
                     } catch (Throwable e)
                     {
@@ -357,14 +369,30 @@ public class WorkerCommon
     {
         requireNonNull(filePath, "fileName is null");
         requireNonNull(storage, "storage is null");
-        PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
-                .setStorage(storage)
-                .setPath(filePath)
-                .setEnableCache(false)
-                .setCacheOrder(ImmutableList.of())
-                .setPixelsCacheReader(null)
-                .setPixelsFooterCache(footerCache);
-        PixelsReader pixelsReader = builder.build();
+        PixelsReaderImpl.Builder builder;
+        PixelsReader pixelsReader;
+        if (storage.getScheme().equals(Storage.Scheme.httpstream))
+        {
+            if (!streamReaders.containsKey(filePath))
+            {
+                pixelsReader = PixelsReaderStreamImpl.newBuilder()
+                        .setStorage(storage)
+                        .setPath(filePath)
+                        .build();
+                streamReaders.put(filePath, pixelsReader);
+            }
+            pixelsReader = streamReaders.get(filePath);
+        } else
+        {
+            pixelsReader = PixelsReaderImpl.newBuilder()
+                    .setStorage(storage)
+                    .setPath(filePath)
+                    .setEnableCache(false)
+                    .setCacheOrder(ImmutableList.of())
+                    .setPixelsCacheReader(null)
+                    .setPixelsFooterCache(footerCache)
+                    .build();
+        }
         return pixelsReader;
     }
 
@@ -389,20 +417,36 @@ public class WorkerCommon
         requireNonNull(storage, "storage is null");
         checkArgument(!isPartitioned || keyColumnIds != null,
                 "keyColumnIds is null whereas isPartitioned is true");
-        PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder()
-                .setSchema(schema)
-                .setPixelStride(pixelStride)
-                .setRowGroupSize(rowGroupSize)
-                .setStorage(storage)
-                .setPath(filePath)
-                .setOverwrite(true) // set overwrite to true to avoid existence checking.
-                .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
-                .setPartitioned(isPartitioned);
-        if (isPartitioned)
+        PixelsWriter writer;
+        if (storage.getScheme() == Storage.Scheme.httpstream)
         {
-            builder.setPartKeyColumnIds(keyColumnIds);
+            writer = PixelsWriterStreamImpl.newBuilder()
+                    .setSchema(schema)
+                    .setPixelStride(pixelStride)
+                    .setRowGroupSize(rowGroupSize)
+                    .setStorage(storage)
+                    .setPath(filePath)
+                    .setEncodingLevel(EncodingLevel.EL0)
+                    .setPartitioned(isPartitioned)
+                    .build();
+        } else
+        {
+            PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder()
+                    .setSchema(schema)
+                    .setPixelStride(pixelStride)
+                    .setRowGroupSize(rowGroupSize)
+                    .setStorage(storage)
+                    .setPath(filePath)
+                    .setOverwrite(true) // set overwrite to true to avoid existence checking.
+                    .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
+                    .setPartitioned(isPartitioned);
+            if (isPartitioned)
+            {
+                builder.setPartKeyColumnIds(keyColumnIds);
+            }
+            writer = builder.build();
         }
-        return builder.build();
+        return writer;
     }
 
     /**
