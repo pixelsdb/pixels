@@ -1,12 +1,9 @@
 [submodule "cpp/third_party/protobuf"]
 	path = cpp/third-party/protobuf
 	url = https://github.com/protocolbuffers/protobuf
-[submodule "cpp/pixels-duckdb"]
-	path = cpp/pixels-duckdb
+[submodule "cpp/pixels-duckdb/duckdb"]
+	path = cpp/pixels-duckdb/duckdb
 	url = git@github.com:pixelsdb/duckdb.git
-[submodule "writer_cpp_test/third-party/protobuf"]
-	path = writer_cpp_test/third-party/protobuf
-	url = https://github.com/protocolbuffers/protobuf
 [submodule "cpp/third-party/googletest"]
 	path = cpp/third-party/googletest
 	url = git@github.com:google/googletest.git

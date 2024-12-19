@@ -8,8 +8,8 @@ project(${TARGET_NAME})
 include_directories(include)
 
 set(EXTENSION_SOURCES
-        pixels_extension.cpp
-        PixelsScanFunction.cpp
+        pixels-duckdb/pixels_extension.cpp
+        pixels-duckdb/PixelsScanFunction.cpp
 )
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 

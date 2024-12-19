@@ -35,7 +35,9 @@ pull:
 	git submodule update --recursive --init
 
 update:
-	git submodule update --remote --merge
+	git submodule update --remote --merge pixels-duckdb/duckdb
+	git -C third-party/googletest checkout v1.15.2
+	git -C third-party/protobuf checkout v3.21.6
 
 deps:
 	mkdir -p "${PROTOBUF_DIR}/cmake/build" && cd "third-party/protobuf/cmake/build" && \
@@ -45,13 +47,13 @@ deps:
 
 clean:
 	rm -rf build
-	cd pixels-duckdb && make clean
+	cd pixels-duckdb/duckdb && make clean
 
 # Main build
 debug: deps
-	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Debug ${BUILD_FLAGS} -S pixels-duckdb/ -B build/debug && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Debug ${BUILD_FLAGS} -S pixels-duckdb/duckdb -B build/debug && \
 	cmake --build build/debug --config Debug
 
 release: deps
-	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S pixels-duckdb/ -B build/release && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S pixels-duckdb/duckdb -B build/release && \
 	cmake --build build/release --config Release
