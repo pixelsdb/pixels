@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.19)
 set(CMAKE_CXX_STANDARD 14)
 # Set extension name here
 set(TARGET_NAME pixels)
@@ -20,7 +20,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(pixels-common)
 add_subdirectory(pixels-core)
- add_subdirectory(pixels-cli)
+add_subdirectory(pixels-cli)
 add_subdirectory(third-party/googletest)
 add_subdirectory(tests)
 
