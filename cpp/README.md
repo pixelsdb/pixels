@@ -2,11 +2,11 @@
 
 ## Usage
 
-### Compilation
+### Build Source Code
 
-Pixels C++ relies on protobuf and liburing. And it builds the pixels extension of duckdb by default,
+Pixels C++ relies on protobuf, liburing, boost, and googletest. Furthermore, it builds the pixels extension of duckdb by default,
 which relies on [duckdb](https://github.com/pixelsdb/duckdb).
-We don't need to manually install these prerequisites, since the Makefile would automatically download them.
+We don't need to manually install these prerequisites, since the build scripts would automatically download them.
 
 Pixels C++ reader uses `iouring` system calls. You can use the following command to check if iouring is supported in your system:
 
@@ -51,7 +51,7 @@ Finally, compile the code:
 make -j
 ```
 
-### Example
+### Run Basic Example
 
 Here is a pixels reader example in the directory `duckdb/examples/pixels-example`.
 This example validates the correctness of compilation and gives you an idea how to load the Pixels data. 
@@ -71,7 +71,7 @@ set `CMake options` as:
 -DDUCKDB_EXTENSION_NAMES="pixels" -DDUCKDB_EXTENSION_PIXELS_PATH=${PIXELS_SRC}/cpp -DDUCKDB_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_SRC}/cpp/include -DCMAKE_PREFIX_PATH=${PIXELS_SRC}/cpp/third-party/protobuf/cmake/build
 ```
 
-### Benchmark
+### Run Benchmarks
 
 Note: the benchmark runs on diascld31 server. If you run the benchmark on your machine, please refer to [Common issue](#4-i-fail-to-run-the-pixels-and-parquet-benchmark)
 
@@ -248,36 +248,6 @@ def clean_page_cache():
 ### 4. The protobuf version issue
 We use protobuf [v3.21.6](https://github.com/protocolbuffers/protobuf/releases/tag/v3.21.6). It is pulled as a submodule. The latest protobuf version doesn't work for pixels c++ reader. 
 
-### 5. Install Boost C++ Libraries
-We need the Boost C++ Libraries in pixels-cli, which can be installed with the following command.
-
-```
-sudo apt-get install libboost-all-dev
-```
-
-For every Boost release this information is added by the CMake maintainers and it gets part of the next CMake release. So you have to make sure, that your CMake version was released after the Boost version you try to find.
-
-```
-Boost 1.63 requires CMake 3.7 or newer.
-Boost 1.64 requires CMake 3.8 or newer.
-Boost 1.65 and 1.65.1 require CMake 3.9.3 or newer.
-Boost 1.66 requires CMake 3.11 or newer.
-Boost 1.67 requires CMake 3.12 or newer.
-Boost 1.68, 1.69 require CMake 3.13 or newer.
-Boost 1.70 requires CMake 3.14 or newer.
-Boost 1.71 requires CMake 3.15.3 or newer.
-Boost 1.72 requires CMake 3.16.2 or newer.
-Boost 1.73 requires CMake 3.17.2 or newer.
-Boost 1.74 requires CMake 3.19 or newer.
-Boost 1.75 requires CMake 3.19.5 or newer.
-Boost 1.76 requires CMake 3.20.3 or newer.
-Boost 1.77 requires CMake 3.21.3 or newer.
-Boost 1.78 requires CMake 3.22.2 or newer.
-Boost 1.79 requires CMake 3.23.2 or newer.
-Boost 1.80 requires CMake 3.24.2 or newer.
-Boost 1.81 requires CMake 3.25.2 or newer.
-Boost 1.82 requires CMake 3.27.0 or newer.
-Boost 1.83 requires CMake 3.27.4 or newer.
-Boost 1.84 requires CMake 3.28.2 or newer.
-Boost 1.85 requires CMake 3.29.3 or newer.
-```
+### 5. Boost C++ Libraries
+We use boost [1.74.0](https://github.com/boostorg/boost/tree/boost-1.74.0) that requires CMake 3.19 or later.
+Boost is downloaded automatically in the CMakeLists of pixels-cli.
