@@ -20,8 +20,6 @@
 package io.pixelsdb.pixels.worker.vhive;
 
 import com.alibaba.fastjson.JSON;
-import com.google.common.collect.ImmutableList;
-import com.sun.corba.se.spi.orbutil.threadpool.Work;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.core.PixelsReader;
@@ -33,22 +31,16 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
-import io.pixelsdb.pixels.executor.join.Partitioner;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
-import io.pixelsdb.pixels.planner.coordinate.TaskBatch;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
-import io.pixelsdb.pixels.planner.plan.logical.Join;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.BroadcastJoinInput;
-import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.worker.common.*;
 import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
 import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
-import java.sql.Time;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -216,85 +208,79 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             logger.info("right schema: " + rightSchema.get());
 
             // build the hash table for the left table.
-            List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
-            if (leftInputStorageInfo.getScheme() != Storage.Scheme.httpstream &&
-                    rightInputStorageInfo.getScheme() != Storage.Scheme.httpstream)
+            List<Future> leftFutures = new ArrayList<>();
+            for (InputSplit inputSplit : leftInputs)
             {
-                // build the hash table for the left table.
-                List<Future> leftFutures = new ArrayList<>();
-                for (InputSplit inputSplit : leftInputs)
-                {
-                    List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
-                    leftFutures.add(threadPool.submit(() -> {
-                        try
-                        {
-                            buildHashTable(transId, timestamp, joiner, inputs, leftInputStorageInfo.getScheme(),
-                                    !leftTable.isBase(), leftColumnsToRead, leftFilter, workerMetrics);
-                        }
-                        catch (Throwable e)
-                        {
-                            throw new WorkerException("error during hash table construction", e);
-                        }
-                    }));
-                }
-                for (Future future : leftFutures)
-                {
-                    future.get();
-                }
-                logger.info("hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
-                        (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
-                logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
-
-                if (partitionOutput)
-                {
-                    for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
+                List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
+                leftFutures.add(threadPool.submit(() -> {
+                    try
                     {
-                        result.add(new ConcurrentLinkedQueue<>());
+                        buildHashTable(transId, timestamp, joiner, inputs, leftInputStorageInfo.getScheme(),
+                                !leftTable.isBase(), leftColumnsToRead, leftFilter, workerMetrics);
                     }
-                }
-                else
+                    catch (Throwable e)
+                    {
+                        throw new WorkerException("error during hash table construction", e);
+                    }
+                }));
+            }
+            for (Future future : leftFutures)
+            {
+                future.get();
+            }
+            logger.info("hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
+                    (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
+
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
+            if (partitionOutput)
+            {
+                for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
                 {
                     result.add(new ConcurrentLinkedQueue<>());
                 }
-
-                // scan the right table and do the join.
-                if (joiner.getSmallTableSize() > 0)
-                {
-                    for (InputSplit inputSplit : rightInputs)
-                    {
-                        List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
-                        threadPool.execute(() -> {
-                            try
-                            {
-                                int numJoinedRows = partitionOutput ?
-                                        joinWithRightTableAndPartition(
-                                                transId, timestamp, joiner, inputs, rightInputStorageInfo.getScheme(),
-                                                !rightTable.isBase(), rightColumnsToRead, rightFilter,
-                                                outputPartitionInfo, result, workerMetrics) :
-                                        joinWithRightTable(transId, timestamp, joiner, inputs, rightInputStorageInfo.getScheme(),
-                                                !rightTable.isBase(), rightColumnsToRead, rightFilter, result.get(0), workerMetrics);
-                            } catch (Throwable e)
-                            {
-                                throw new WorkerException("error during broadcast join", e);
-                            }
-                        });
-                    }
-                    threadPool.shutdown();
-                    try
-                    {
-                        while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
-                    } catch (InterruptedException e)
-                    {
-                        throw new WorkerException("interrupted while waiting for the termination of join", e);
-                    }
-
-                    if (exceptionHandler.hasException())
-                    {
-                        throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
-                    }
-                }
-                logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
             }
+            else
+            {
+                result.add(new ConcurrentLinkedQueue<>());
+            }
+
+            if (joiner.getSmallTableSize() > 0)
+            {
+                for (InputSplit inputSplit : rightInputs)
+                {
+                    List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
+                    threadPool.execute(() -> {
+                        try
+                        {
+                            int numJoinedRows = partitionOutput ?
+                                    joinWithRightTableAndPartition(
+                                            transId, timestamp, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            !rightTable.isBase(), rightColumnsToRead, rightFilter,
+                                            outputPartitionInfo, result, workerMetrics) :
+                                    joinWithRightTable(transId, timestamp, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            !rightTable.isBase(), rightColumnsToRead, rightFilter, result.get(0), workerMetrics);
+                        } catch (Throwable e)
+                        {
+                            throw new WorkerException("error during broadcast join", e);
+                        }
+                    });
+                }
+                threadPool.shutdown();
+                try
+                {
+                    while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                } catch (InterruptedException e)
+                {
+                    throw new WorkerException("interrupted while waiting for the termination of join", e);
+                }
+
+                if (exceptionHandler.hasException())
+                {
+                    throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+                }
+            }
+            logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
+
             String outputPath;
             if (outputStorageInfo.getScheme() == Storage.Scheme.httpstream)
             {

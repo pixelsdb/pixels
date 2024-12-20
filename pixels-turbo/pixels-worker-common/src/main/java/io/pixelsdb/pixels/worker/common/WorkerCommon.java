@@ -248,6 +248,7 @@ public class WorkerCommon
     {
         requireNonNull(storage, "storage is null");
         requireNonNull(inputSplits, "inputSplits is null");
+        TypeDescription fileSchema = null;
         while (true)
         {
             for (InputSplit inputSplit : inputSplits)
@@ -263,12 +264,12 @@ public class WorkerCommon
                     {
                         checkedPath = inputInfo.getPath();
                         PixelsReader reader = getReader(checkedPath, storage);
-                        TypeDescription fileSchema = reader.getFileSchema();
+                        fileSchema = reader.getFileSchema();
                         if (!storage.getScheme().equals(Storage.Scheme.httpstream))
                         {
                             reader.close();
+                            return fileSchema;
                         }
-                        return fileSchema;
                     } catch (Throwable e)
                     {
                         if (e instanceof IOException)
@@ -278,6 +279,10 @@ public class WorkerCommon
                         throw new IOException("failed to read file schema", e);
                     }
                 }
+            }
+            if (storage.getScheme().equals(Storage.Scheme.httpstream))
+            {
+                return fileSchema;
             }
             TimeUnit.MILLISECONDS.sleep(200);
         }
@@ -558,7 +563,7 @@ public class WorkerCommon
 
     public static int getPort()
     {
-        return port++;
+        return port;
     }
 
     public static String getCoordinatorIp()

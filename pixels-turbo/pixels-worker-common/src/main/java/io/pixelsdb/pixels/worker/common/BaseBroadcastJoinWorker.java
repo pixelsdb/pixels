@@ -415,14 +415,17 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                         input.getPath(), WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
-                    if (input.getRgStart() >= pixelsReader.getRowGroupNum())
+                    if (rightScheme != Storage.Scheme.httpstream)
                     {
-                        it.remove();
-                        continue;
-                    }
-                    if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
-                    {
-                        input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
+                        if (input.getRgStart() >= pixelsReader.getRowGroupNum())
+                        {
+                            it.remove();
+                            continue;
+                        }
+                        if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
+                        {
+                            input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
+                        }
                     }
                     PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, rightCols, input);
                     VectorizedRowBatch rowBatch;
