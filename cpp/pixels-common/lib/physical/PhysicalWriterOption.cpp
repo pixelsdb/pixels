@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-25.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-25
+ */
 #include "physical/PhysicalWriterOption.h"
 
 PhysicalWriterOption::PhysicalWriterOption(std::int64_t blockSize, bool addBlockPadding, bool overwrite)

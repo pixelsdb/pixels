@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gegndy on 24-11-25.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-25
+ */
 #ifndef PIXELS_PHYSICALWRITEROPTION_H
 #define PIXELS_PHYSICALWRITEROPTION_H
 
