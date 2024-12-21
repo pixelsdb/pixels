@@ -29,14 +29,18 @@
 #include <string>
 #include <load/Parameters.h>
 
-class PixelsConsumer {
+class PixelsConsumer
+{
 public:
-    PixelsConsumer(const std::vector<std::string> &queue, const Parameters &parameters, const std::vector<std::string> &loadedFiles);
+    PixelsConsumer(const std::vector <std::string> &queue, const Parameters &parameters,
+                   const std::vector <std::string> &loadedFiles);
+
     void run();
+
 private:
     static int GlobalTargetPathId;
-    std::vector<std::string> queue;
+    std::vector <std::string> queue;
     Parameters parameters;
-    std::vector<std::string> loadedFiles;
+    std::vector <std::string> loadedFiles;
 };
 #endif //PIXELS_PIXELSCONSUMER_H

@@ -24,7 +24,8 @@
  */
 #include "reader/CharColumnReader.h"
 
-CharColumnReader::CharColumnReader(std::shared_ptr<TypeDescription> type)
-    :StringColumnReader(type) {
+CharColumnReader::CharColumnReader(std::shared_ptr <TypeDescription> type)
+        : StringColumnReader(type)
+{
     // TODO: implement
 }

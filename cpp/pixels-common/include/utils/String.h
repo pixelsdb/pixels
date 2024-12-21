@@ -27,8 +27,9 @@
 
 #include <iostream>
 #include <string>
+
 bool icompare_pred(unsigned char a, unsigned char b);
 
-bool icompare(std::string const& a, std::string const& b);
+bool icompare(std::string const &a, std::string const &b);
 
 #endif //PIXELS_STRING_H

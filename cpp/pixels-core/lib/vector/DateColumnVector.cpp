@@ -24,36 +24,47 @@
  */
 #include "vector/DateColumnVector.h"
 
-DateColumnVector::DateColumnVector(uint64_t len, bool encoding): ColumnVector(len, encoding) {
-	if(encoding) {
+DateColumnVector::DateColumnVector(uint64_t len, bool encoding) : ColumnVector(len, encoding)
+{
+    if (encoding)
+    {
         posix_memalign(reinterpret_cast<void **>(&dates), 32,
                        len * sizeof(int32_t));
-	} else {
-		this->dates = nullptr;
-	}
-	memoryUsage += (long) sizeof(int) * len;
+    }
+    else
+    {
+        this->dates = nullptr;
+    }
+    memoryUsage += (long) sizeof(int) * len;
 }
 
-void DateColumnVector::close() {
-	if(!closed) {
-		if(encoding && dates != nullptr) {
-			free(dates);
-		}
-		dates = nullptr;
-		ColumnVector::close();
-	}
+void DateColumnVector::close()
+{
+    if (!closed)
+    {
+        if (encoding && dates != nullptr)
+        {
+            free(dates);
+        }
+        dates = nullptr;
+        ColumnVector::close();
+    }
 }
 
-void DateColumnVector::print(int rowCount) {
-	for(int i = 0; i < rowCount; i++) {
-		std::cout<<dates[i]<<std::endl;
-	}
+void DateColumnVector::print(int rowCount)
+{
+    for (int i = 0; i < rowCount; i++)
+    {
+        std::cout << dates[i] << std::endl;
+    }
 }
 
-DateColumnVector::~DateColumnVector() {
-	if(!closed) {
-		DateColumnVector::close();
-	}
+DateColumnVector::~DateColumnVector()
+{
+    if (!closed)
+    {
+        DateColumnVector::close();
+    }
 }
 
 /**
@@ -63,18 +74,24 @@ DateColumnVector::~DateColumnVector() {
      * @param elementNum
      * @param days
  */
-void DateColumnVector::set(int elementNum, int days) {
-	if(elementNum >= writeIndex) {
-		writeIndex = elementNum + 1;
-	}
-	dates[elementNum] = days;
-	// TODO: isNull
+void DateColumnVector::set(int elementNum, int days)
+{
+    if (elementNum >= writeIndex)
+    {
+        writeIndex = elementNum + 1;
+    }
+    dates[elementNum] = days;
+    // TODO: isNull
 }
 
-void * DateColumnVector::current() {
-    if(dates == nullptr) {
+void *DateColumnVector::current()
+{
+    if (dates == nullptr)
+    {
         return nullptr;
-    } else {
+    }
+    else
+    {
         return dates + readIndex;
     }
 }

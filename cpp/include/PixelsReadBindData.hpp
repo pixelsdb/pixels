@@ -34,14 +34,16 @@
 #include "PixelsReader.h"
 
 
-namespace duckdb {
+namespace duckdb
+{
 
-struct PixelsReadBindData : public TableFunctionData {
-	std::shared_ptr<PixelsReader> initialPixelsReader;
-	std::shared_ptr<TypeDescription> fileSchema;
-	vector<string> files;
-	atomic<idx_t> curFileId;
-};
+    struct PixelsReadBindData : public TableFunctionData
+    {
+        std::shared_ptr <PixelsReader> initialPixelsReader;
+        std::shared_ptr <TypeDescription> fileSchema;
+        vector <string> files;
+        atomic <idx_t> curFileId;
+    };
 
 }
 #endif // EXAMPLE_C_PIXELSREADBINDDATA_HPP

@@ -40,23 +40,24 @@
 
 #define ENABLE_SIMD_FILTER
 
-class PixelsFilter {
+class PixelsFilter
+{
 public:
-    static void ApplyFilter(std::shared_ptr<ColumnVector> vector, duckdb::TableFilter &filter,
-                            PixelsBitMask& filterMask,
-                            std::shared_ptr<TypeDescription> type);
+    static void ApplyFilter(std::shared_ptr <ColumnVector> vector, duckdb::TableFilter &filter,
+                            PixelsBitMask &filterMask,
+                            std::shared_ptr <TypeDescription> type);
 
-    template <class T, class OP>
-    static int CompareAvx2(void * data, T constant);
+    template<class T, class OP>
+    static int CompareAvx2(void *data, T constant);
 
-    template <class T, class OP>
-    static void TemplatedFilterOperation(std::shared_ptr<ColumnVector> vector,
-                            const duckdb::Value &constant, PixelsBitMask &filter_mask,
-                            std::shared_ptr<TypeDescription> type);
+    template<class T, class OP>
+    static void TemplatedFilterOperation(std::shared_ptr <ColumnVector> vector,
+                                         const duckdb::Value &constant, PixelsBitMask &filter_mask,
+                                         std::shared_ptr <TypeDescription> type);
 
-    template <class OP>
-    static void FilterOperationSwitch(std::shared_ptr<ColumnVector> vector, duckdb::Value &constant,
-                                      PixelsBitMask &filter_mask, std::shared_ptr<TypeDescription> type);
+    template<class OP>
+    static void FilterOperationSwitch(std::shared_ptr <ColumnVector> vector, duckdb::Value &constant,
+                                      PixelsBitMask &filter_mask, std::shared_ptr <TypeDescription> type);
 
 };
 #endif //DUCKDB_PIXELSFILTER_H

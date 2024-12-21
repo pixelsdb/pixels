@@ -24,8 +24,9 @@
  */
 #include "exception/PixelsReaderException.h"
 
-PixelsReaderException::PixelsReaderException(const std::string & msg) {
-    std::cout<<msg<<std::endl;
+PixelsReaderException::PixelsReaderException(const std::string &msg)
+{
+    std::cout << msg << std::endl;
 }
 
 

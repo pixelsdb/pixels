@@ -44,7 +44,7 @@ add_custom_command(
         --grpc_out "${PROTO_OUTPUT_DIR}"
         --cpp_out "${PROTO_OUTPUT_DIR}"
         -I "${amphi_proto_path}"
-        --plugin=protoc-gen-grpc="${grpc_cpp_plugin_location}"
+        --plugin=protoc-gen-grpc= "${grpc_cpp_plugin_location}"
         "${amphi_proto}"
         DEPENDS "${amphi_proto}"
 )
@@ -56,7 +56,7 @@ add_custom_command(
         --grpc_out "${PROTO_OUTPUT_DIR}"
         --cpp_out "${PROTO_OUTPUT_DIR}"
         -I "${metadata_proto_path}"
-        --plugin=protoc-gen-grpc="${grpc_cpp_plugin_location}"
+        --plugin=protoc-gen-grpc= "${grpc_cpp_plugin_location}"
         "${metadata_proto}"
         DEPENDS "${metadata_proto}"
 )

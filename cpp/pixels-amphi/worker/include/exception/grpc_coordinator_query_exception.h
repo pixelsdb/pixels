@@ -24,13 +24,16 @@
 #include <iostream>
 #include <string>
 
-class GrpcCoordinatorQueryException: public std::exception {
+class GrpcCoordinatorQueryException : public std::exception
+{
 private:
     std::string message_;
 public:
-    GrpcCoordinatorQueryException(const std::string& message);
+    GrpcCoordinatorQueryException(const std::string &message);
 
-    const char* what() const noexcept override;
+    const char *what() const
+
+    noexcept override;
 };
 
 #endif //PIXELS_AMPHI_WORKER_GRPC_COORDINATOR_QUERY_EXCEPTION_H

@@ -26,13 +26,16 @@
 
 #include "duckdb.hpp"
 
-namespace duckdb {
+namespace duckdb
+{
 
-class PixelsExtension : public Extension {
-public:
-	void Load(DuckDB &db) override;
-	std::string Name() override;
+    class PixelsExtension : public Extension
+    {
+    public:
+        void Load(DuckDB &db) override;
 
-};
+        std::string Name() override;
+
+    };
 
 } // namespace duckdb

@@ -28,9 +28,10 @@
 #include "vector/ColumnVector.h"
 #include "vector/VectorizedRowBatch.h"
 
-class ByteColumnVector: public ColumnVector {
+class ByteColumnVector : public ColumnVector
+{
 public:
-    uint8_t * vector;
+    uint8_t *vector;
 
     /**
     * Use this constructor by default. All column vectors

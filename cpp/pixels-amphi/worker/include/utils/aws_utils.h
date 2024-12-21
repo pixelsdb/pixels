@@ -30,10 +30,13 @@
 #include "aws/s3/model/ListObjectsRequest.h"
 #include "aws/s3/model/GetObjectRequest.h"
 
-namespace awsutils {
+namespace awsutils
+{
     bool ListBuckets(const Aws::Client::ClientConfiguration &clientConfig);
+
     bool ListObjects(const Aws::String &bucketName,
                      const Aws::Client::ClientConfiguration &clientConfig);
+
     bool GetObject(const Aws::String &objectKey,
                    const Aws::String &fromBucket,
                    const std::string &store_fp,

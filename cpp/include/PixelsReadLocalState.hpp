@@ -33,38 +33,42 @@
 #include "PixelsReader.h"
 #include "reader/PixelsRecordReader.h"
 
-namespace duckdb {
+namespace duckdb
+{
 
-struct PixelsReadLocalState : public LocalTableFunctionState {
-    PixelsReadLocalState() {
-        curr_file_index = 0;
-        next_file_index = 0;
-        curr_batch_index = 0;
-        next_batch_index = 0;
-        rowOffset = 0;
-        currPixelsRecordReader = nullptr;
-        nextPixelsRecordReader = nullptr;
-        vectorizedRowBatch = nullptr;
-        currReader = nullptr;
-        nextReader = nullptr;
-    }
-	std::shared_ptr<PixelsRecordReader> currPixelsRecordReader;
-    std::shared_ptr<PixelsRecordReader> nextPixelsRecordReader;
-	// this is used for storing row batch results.
-	std::shared_ptr<VectorizedRowBatch> vectorizedRowBatch;
-    int deviceID;
-	int rowOffset;
-	vector<column_t> column_ids;
-	vector<string> column_names;
-	std::shared_ptr<PixelsReader> currReader;
-    std::shared_ptr<PixelsReader> nextReader;
-	idx_t curr_file_index;
-    idx_t next_file_index;
-    idx_t curr_batch_index;
-    idx_t next_batch_index;
-    std::string next_file_name;
-    std::string curr_file_name;
-};
+    struct PixelsReadLocalState : public LocalTableFunctionState
+    {
+        PixelsReadLocalState()
+        {
+            curr_file_index = 0;
+            next_file_index = 0;
+            curr_batch_index = 0;
+            next_batch_index = 0;
+            rowOffset = 0;
+            currPixelsRecordReader = nullptr;
+            nextPixelsRecordReader = nullptr;
+            vectorizedRowBatch = nullptr;
+            currReader = nullptr;
+            nextReader = nullptr;
+        }
+
+        std::shared_ptr <PixelsRecordReader> currPixelsRecordReader;
+        std::shared_ptr <PixelsRecordReader> nextPixelsRecordReader;
+        // this is used for storing row batch results.
+        std::shared_ptr <VectorizedRowBatch> vectorizedRowBatch;
+        int deviceID;
+        int rowOffset;
+        vector <column_t> column_ids;
+        vector <string> column_names;
+        std::shared_ptr <PixelsReader> currReader;
+        std::shared_ptr <PixelsReader> nextReader;
+        idx_t curr_file_index;
+        idx_t next_file_index;
+        idx_t curr_batch_index;
+        idx_t next_batch_index;
+        std::string next_file_name;
+        std::string curr_file_name;
+    };
 
 }
 

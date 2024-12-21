@@ -34,15 +34,23 @@
 #include <limits>
 #include <vector>
 
-class MergedRequest: public std::enable_shared_from_this<MergedRequest> {
+class MergedRequest : public std::enable_shared_from_this<MergedRequest>
+{
 public:
     MergedRequest(Request first);
-    std::shared_ptr<MergedRequest> merge(Request curr);
-    std::vector<std::shared_ptr<ByteBuffer>> complete(std::shared_ptr<ByteBuffer> buffer);
+
+    std::shared_ptr <MergedRequest> merge(Request curr);
+
+    std::vector <std::shared_ptr<ByteBuffer>> complete(std::shared_ptr <ByteBuffer> buffer);
+
     long getStart();
+
     int getLength();
+
     int getSize();
+
     long getQueryId();
+
 private:
     long queryId;
     long start;

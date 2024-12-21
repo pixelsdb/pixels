@@ -38,20 +38,32 @@
 #define PROFILE_START(X) ::TimeProfiler::Instance().Start(X)
 #define PROFILE_END(X) ::TimeProfiler::Instance().End(X)
 
-class TimeProfiler: public AbstractProfiler {
+class TimeProfiler : public AbstractProfiler
+{
 public:
-    static TimeProfiler & Instance();
-    void Start(const std::string& label);
-    void End(const std::string& label);
+    static TimeProfiler &Instance();
+
+    void Start(const std::string &label);
+
+    void End(const std::string &label);
+
     long Get(const std::string &label);
+
     void Reset() override;
+
     void Print() override;
+
     void Collect();
+
     int GetResultSize();
+
 private:
     TimeProfiler();
-    static thread_local std::map<std::string,std::chrono::steady_clock::time_point> profiling;
-    static thread_local std::map<std::string, long> localResult;
+
+    static thread_local std::map<std::string, std::chrono::steady_clock::time_point>
+    profiling;
+    static thread_local std::map<std::string, long>
+    localResult;
     std::mutex lock;
     std::map<std::string, long> globalResult;
 };

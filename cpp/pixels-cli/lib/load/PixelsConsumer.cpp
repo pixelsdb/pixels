@@ -40,12 +40,15 @@ int PixelsConsumer::GlobalTargetPathId = 0;
 
 PixelsConsumer::PixelsConsumer(const std::vector <std::string> &queue, const Parameters &parameters,
                                const std::vector <std::string> &loadedFiles)
-                               : queue(queue), parameters(parameters), loadedFiles(loadedFiles) {}
+        : queue(queue), parameters(parameters), loadedFiles(loadedFiles)
+{}
 
-void PixelsConsumer::run() {
+void PixelsConsumer::run()
+{
     std::cout << "Start PixelsConsumer" << std::endl;
     std::string targetPath = parameters.getLoadingPath();
-    if (targetPath.back() != '/') {
+    if (targetPath.back() != '/')
+    {
         targetPath += '/';
     }
     std::string schemaStr = parameters.getSchema();
@@ -53,7 +56,8 @@ void PixelsConsumer::run() {
     std::string regex = parameters.getRegex();
     EncodingLevel encodingLevel = parameters.getEncodingLevel();
     bool nullPadding = parameters.isNullsPadding();
-    if (regex == "\\s") {
+    if (regex == "\\s")
+    {
         regex = " ";
     }
 
@@ -66,9 +70,9 @@ void PixelsConsumer::run() {
 
     short replication = static_cast<short>(std::stoi(ConfigFactory::Instance().getProperty("block.replication")));
 
-    std::shared_ptr<TypeDescription> schema = TypeDescription::fromString(schemaStr);
-    std::shared_ptr<VectorizedRowBatch> rowBatch = schema->createRowBatch(pixelsStride);
-    std::vector<std::shared_ptr<ColumnVector>> columnVectors = rowBatch->cols;
+    std::shared_ptr <TypeDescription> schema = TypeDescription::fromString(schemaStr);
+    std::shared_ptr <VectorizedRowBatch> rowBatch = schema->createRowBatch(pixelsStride);
+    std::vector <std::shared_ptr<ColumnVector>> columnVectors = rowBatch->cols;
 
     std::ifstream reader;
     std::string line;
@@ -76,61 +80,79 @@ void PixelsConsumer::run() {
     bool initPixelsFile = true;
     std::string targetFileName = "";
     std::string targetFilePath;
-    std::shared_ptr<PixelsWriter> pixelsWriter(nullptr);
+    std::shared_ptr <PixelsWriter> pixelsWriter(nullptr);
     int rowCounter = 0;
 
     int count = 0;
-    for (std::string originalFilePath : queue) {
-        if (!originalFilePath.empty()) {
+    for (std::string originalFilePath: queue)
+    {
+        if (!originalFilePath.empty())
+        {
             ++count;
             LocalFS originStorage;
             reader = originStorage.open(originalFilePath);
-            if (!reader.is_open()) {
+            if (!reader.is_open())
+            {
                 std::cerr << "Error opening file: " << originalFilePath << std::endl;
                 continue;
             }
             std::cout << "loading data from: " << originalFilePath << std::endl;
 
-            while (std::getline(reader, line)) {
-                if (initPixelsFile) {
-                    if (line.empty()) {
+            while (std::getline(reader, line))
+            {
+                if (initPixelsFile)
+                {
+                    if (line.empty())
+                    {
                         std::cout << "got empty line" << std::endl;
                         continue;
                     }
                     LocalFS targetStorage;
-                    targetFileName = std::to_string(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())) + ".pxl";
+                    targetFileName =
+                            std::to_string(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())) +
+                            ".pxl";
                     targetFilePath = targetPath + targetFileName;
-                    pixelsWriter = std::make_shared<PixelsWriterImpl>(schema, pixelsStride, rowGroupSize, targetFilePath, blockSize,
-                                                                      true, encodingLevel, nullPadding,false, 1);
+                    pixelsWriter = std::make_shared<PixelsWriterImpl>(schema, pixelsStride, rowGroupSize,
+                                                                      targetFilePath, blockSize,
+                                                                      true, encodingLevel, nullPadding, false, 1);
                 }
                 initPixelsFile = false;
 
                 ++rowBatch->rowCount;
                 ++rowCounter;
 
-                std::vector<std::string> colsInLine;
+                std::vector <std::string> colsInLine;
                 boost::sregex_token_iterator it(line.begin(), line.end(), boost::regex(regex), -1);
-                for (; it != boost::sregex_token_iterator(); ++it) {
+                for (; it != boost::sregex_token_iterator(); ++it)
+                {
                     colsInLine.push_back(*it);
                 }
-                for(int i = 0; i < columnVectors.size(); ++i) {
-                    if (i > colsInLine.size() || colsInLine[i].empty() || colsInLine[i] == "\\N") {
+                for (int i = 0; i < columnVectors.size(); ++i)
+                {
+                    if (i > colsInLine.size() || colsInLine[i].empty() || colsInLine[i] == "\\N")
+                    {
                         columnVectors[i]->addNull();
-                    } else {
+                    }
+                    else
+                    {
                         columnVectors[i]->add(colsInLine[i]);
                     }
                 }
 
-                if (rowBatch->rowCount == rowBatch->getMaxSize()) {
-                    std::cout << "writing row group to file: " << targetFilePath << " rowCount:"<<rowBatch->rowCount<<std::endl;
+                if (rowBatch->rowCount == rowBatch->getMaxSize())
+                {
+                    std::cout << "writing row group to file: " << targetFilePath << " rowCount:" << rowBatch->rowCount
+                              << std::endl;
                     pixelsWriter->addRowBatch(rowBatch);
 
                     rowBatch->reset();
                 }
 
                 // 创建一个新的文件
-                if (rowCounter >= maxRowNum) {
-                    if (rowBatch->rowCount != 0) {
+                if (rowCounter >= maxRowNum)
+                {
+                    if (rowBatch->rowCount != 0)
+                    {
                         pixelsWriter->addRowBatch(rowBatch);
                         rowBatch->reset();
                     }
@@ -143,8 +165,10 @@ void PixelsConsumer::run() {
         }
     }
     // 剩余line写入文件
-    if (rowCounter > 0) {
-        if (rowBatch->rowCount != 0) {
+    if (rowCounter > 0)
+    {
+        if (rowBatch->rowCount != 0)
+        {
             pixelsWriter->addRowBatch(rowBatch);
             rowBatch->reset();
         }

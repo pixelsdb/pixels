@@ -44,7 +44,7 @@ def get_columns(schema: Dict[str, List[str]], query: str) -> List[str]:
 
 # Match a list of columns to the schema and return the corresponding partial schema
 def collist_to_partial_schema(
-    schema: Dict[str, List[str]], collist: List[str]
+        schema: Dict[str, List[str]], collist: List[str]
 ) -> Dict[str, List[str]]:
     partial_schema = {}
     for table, columns in schema.items():
@@ -57,12 +57,12 @@ def collist_to_partial_schema(
 
 # Entry point to call different strategies
 def plan_cache_columns(
-    strategy: str,
-    schema: Dict[str, List[str]],
-    stat: Dict[str, int],
-    workload: List[str],
-    workload_cost: List[int],
-    storage_restriction: int,
+        strategy: str,
+        schema: Dict[str, List[str]],
+        stat: Dict[str, int],
+        workload: List[str],
+        workload_cost: List[int],
+        storage_restriction: int,
 ) -> Dict[str, List[str]]:
     # two baseline methods: most number / most frequent
     if strategy == "most_number_columns":
@@ -81,10 +81,10 @@ def plan_cache_columns(
 
 # Cache as much columns as possible based on the column statistics
 def cache_most_columns(
-    schema: Dict[str, List[str]],
-    stat: Dict[str, int],
-    workload: List[str],
-    storage_restriction: int,
+        schema: Dict[str, List[str]],
+        stat: Dict[str, int],
+        workload: List[str],
+        storage_restriction: int,
 ) -> Dict[str, List[str]]:
     # Sort the columns based on the column size
     sorted_stat = sorted(stat.items(), key=lambda x: x[1])
@@ -103,10 +103,10 @@ def cache_most_columns(
 
 # Cache the columns that are most frequently used in the workload
 def cache_most_frequent_columns(
-    schema: Dict[str, List[str]],
-    stat: Dict[str, int],
-    workload: List[str],
-    storage_restriction: int,
+        schema: Dict[str, List[str]],
+        stat: Dict[str, int],
+        workload: List[str],
+        storage_restriction: int,
 ) -> Dict[str, List[str]]:
     # Get the columns frequency in the workload
     col_freq = {}
@@ -135,10 +135,10 @@ def cache_most_frequent_columns(
 
 # Cache the columns greedy based on the rate of size to frequency
 def cache_rate_greedy_columns(
-    schema: Dict[str, List[str]],
-    stat: Dict[str, int],
-    workload: List[str],
-    storage_restriction: int,
+        schema: Dict[str, List[str]],
+        stat: Dict[str, int],
+        workload: List[str],
+        storage_restriction: int,
 ) -> Dict[str, List[str]]:
     # Get the columns frequency in the workload
     col_freq = {}
@@ -172,10 +172,10 @@ def cache_rate_greedy_columns(
 # Cache to make the most coverage of the workload (assumed all queries are equally costly)
 # The problem can be formed as a linear programming problem
 def cache_most_coverage_columns(
-    schema: Dict[str, List[str]],
-    stat: Dict[str, int],
-    workload: List[str],
-    storage_restriction: int,
+        schema: Dict[str, List[str]],
+        stat: Dict[str, int],
+        workload: List[str],
+        storage_restriction: int,
 ) -> Dict[str, List[str]]:
     col_name = list(stat.keys())
     col_index_dict = dict(zip(col_name, range(1, len(col_name) + 1)))
@@ -212,19 +212,19 @@ def cache_most_coverage_columns(
         for yi, col_ids in mapping.items():
             if col in col_ids:
                 prob += (
-                    x[index_col_dict[col]]
-                    >= a["q" + str(yi) + "_" + str(index_col_dict[col])]
+                        x[index_col_dict[col]]
+                        >= a["q" + str(yi) + "_" + str(index_col_dict[col])]
                 )
 
     # Storage restriction
     prob += (
-        lpSum(
-            [
-                stat[index_col_dict[i]] * x[index_col_dict[i]]
-                for i in range(1, len(col_name) + 1)
-            ]
-        )
-        <= storage_restriction
+            lpSum(
+                [
+                    stat[index_col_dict[i]] * x[index_col_dict[i]]
+                    for i in range(1, len(col_name) + 1)
+                ]
+            )
+            <= storage_restriction
     )
     prob.solve()
 
@@ -239,11 +239,11 @@ def cache_most_coverage_columns(
 
 # Cache to make the optimal cost of the workload
 def cache_cost_optimal_columns(
-    schema: Dict[str, List[str]],
-    stat: Dict[str, int],
-    workload: List[str],
-    workload_cost: List[int],
-    storage_restriction: int,
+        schema: Dict[str, List[str]],
+        stat: Dict[str, int],
+        workload: List[str],
+        workload_cost: List[int],
+        storage_restriction: int,
 ) -> Dict[str, List[str]]:
     col_name = list(stat.keys())
     col_index_dict = dict(zip(col_name, range(1, len(col_name) + 1)))
@@ -282,19 +282,19 @@ def cache_cost_optimal_columns(
         for yi, col_ids in mapping.items():
             if col in col_ids:
                 prob += (
-                    x[index_col_dict[col]]
-                    >= a["q" + str(yi) + "_" + str(index_col_dict[col])]
+                        x[index_col_dict[col]]
+                        >= a["q" + str(yi) + "_" + str(index_col_dict[col])]
                 )
 
     # Storage restriction
     prob += (
-        lpSum(
-            [
-                stat[index_col_dict[i]] * x[index_col_dict[i]]
-                for i in range(1, len(col_name) + 1)
-            ]
-        )
-        <= storage_restriction
+            lpSum(
+                [
+                    stat[index_col_dict[i]] * x[index_col_dict[i]]
+                    for i in range(1, len(col_name) + 1)
+                ]
+            )
+            <= storage_restriction
     )
     prob.solve()
 

@@ -38,25 +38,30 @@ int VectorizedRowBatch::DEFAULT_SIZE = 1024;
  * @param numCols the number of columns to include in the batch
  * @param size    the number of rows to include in the batch
  */
-VectorizedRowBatch::VectorizedRowBatch(int nCols, int size) {
+VectorizedRowBatch::VectorizedRowBatch(int nCols, int size)
+{
     numCols = nCols;
     rowCount = 0;
     current = 0;
     maxSize = size;
     cols.clear();
     cols.resize(numCols);
-	closed = false;
+    closed = false;
 }
 
-VectorizedRowBatch::~VectorizedRowBatch() {
-	if(!closed) {
-		close();
-	}
+VectorizedRowBatch::~VectorizedRowBatch()
+{
+    if (!closed)
+    {
+        close();
+    }
 }
+
 /**
  * Returns the maximum size of the batch (number of rows it can hold)
  */
-int VectorizedRowBatch::getMaxSize() {
+int VectorizedRowBatch::getMaxSize()
+{
     return maxSize;
 }
 
@@ -65,7 +70,8 @@ int VectorizedRowBatch::getMaxSize() {
  *
  * @return number of rows that have not been filtered out
  */
-int VectorizedRowBatch::count() {
+int VectorizedRowBatch::count()
+{
     return rowCount;
 }
 
@@ -74,7 +80,8 @@ int VectorizedRowBatch::count() {
  *
  * @return true if this row batch is empty
  */
-bool VectorizedRowBatch::isEmpty() {
+bool VectorizedRowBatch::isEmpty()
+{
     return rowCount == 0;
 }
 
@@ -83,58 +90,72 @@ bool VectorizedRowBatch::isEmpty() {
  *
  * @return true if this row batch is full
  */
-bool VectorizedRowBatch::isFull() {
+bool VectorizedRowBatch::isFull()
+{
     return rowCount >= maxSize;
 }
 
 /**
  * @return the number of remaining slots in this row batch.
  */
-int VectorizedRowBatch::freeSlots() {
+int VectorizedRowBatch::freeSlots()
+{
     return maxSize - rowCount;
 }
 
-void VectorizedRowBatch::close() {
-	if(!closed) {
-		maxSize = 0;
-		for(const auto& col : cols) {
-			col->close();
-		}
-		cols.clear();
-		closed = true;
-	}
+void VectorizedRowBatch::close()
+{
+    if (!closed)
+    {
+        maxSize = 0;
+        for (const auto &col: cols)
+        {
+            col->close();
+        }
+        cols.clear();
+        closed = true;
+    }
 }
 
-bool VectorizedRowBatch::isEndOfFile() {
+bool VectorizedRowBatch::isEndOfFile()
+{
     return closed || current >= rowCount;
 }
 
-uint64_t VectorizedRowBatch::position() {
+uint64_t VectorizedRowBatch::position()
+{
     return current;
 }
 
-void VectorizedRowBatch::reset() {
-    for(auto col: cols) {
+void VectorizedRowBatch::reset()
+{
+    for (auto col: cols)
+    {
         col->reset();
     }
     rowCount = 0;
     current = 0;
 }
 
-void VectorizedRowBatch::resize(int size) {
-    for(auto col: cols) {
+void VectorizedRowBatch::resize(int size)
+{
+    for (auto col: cols)
+    {
         col->resize(size);
     }
     maxSize = size;
 }
 
-void VectorizedRowBatch::increment(int size) {
+void VectorizedRowBatch::increment(int size)
+{
     current += size;
-    for (const auto& col: cols) {
+    for (const auto &col: cols)
+    {
         col->increment(size);
     }
 }
 
-uint64_t VectorizedRowBatch::remaining() {
+uint64_t VectorizedRowBatch::remaining()
+{
     return rowCount - current;
 }

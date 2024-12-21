@@ -29,10 +29,13 @@
 #include <iostream>
 #include "physical/natives/ByteBuffer.h"
 
-class Decoder {
+class Decoder
+{
 public:
     virtual void close() = 0;
+
     virtual long next() = 0;
-	virtual bool hasNext() = 0;
+
+    virtual bool hasNext() = 0;
 };
 #endif //PIXELS_DECODER_H

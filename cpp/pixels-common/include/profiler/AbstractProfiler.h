@@ -27,9 +27,11 @@
 
 constexpr bool enableProfile = true;
 
-class AbstractProfiler {
+class AbstractProfiler
+{
 public:
     virtual void Print() = 0;
+
     virtual void Reset() = 0;
 
 };

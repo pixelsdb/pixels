@@ -29,7 +29,9 @@
 #include "physical/PhysicalWriterOption.h"
 #include <memory>
 
-class StorageProvider {
-    virtual std::shared_ptr<PhysicalWriter> createWriter(const std::string &path, std::shared_ptr<PhysicalWriterOption> option) = 0;
+class StorageProvider
+{
+    virtual std::shared_ptr <PhysicalWriter>
+    createWriter(const std::string &path, std::shared_ptr <PhysicalWriterOption> option) = 0;
 };
 #endif //PIXELS_STORAGEPROVIDER_H

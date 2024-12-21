@@ -29,9 +29,11 @@
 #include <memory>
 #include <physical/natives/ByteBuffer.h>
 
-class Allocator {
+class Allocator
+{
 public:
-	virtual void reset() = 0;
-	virtual std::shared_ptr<ByteBuffer> allocate(int size) = 0;
+    virtual void reset() = 0;
+
+    virtual std::shared_ptr <ByteBuffer> allocate(int size) = 0;
 };
 #endif // DUCKDB_ALLOCATOR_H

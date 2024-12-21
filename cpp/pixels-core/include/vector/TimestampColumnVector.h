@@ -28,21 +28,30 @@
 #include "vector/ColumnVector.h"
 #include "vector/VectorizedRowBatch.h"
 
-class TimestampColumnVector: public ColumnVector {
+class TimestampColumnVector : public ColumnVector
+{
 public:
     int precision;
-    long * times;
+    long *times;
+
     /**
     * Use this constructor by default. All column vectors
     * should normally be the default size.
     */
     explicit TimestampColumnVector(int precision, bool encoding = false);
+
     explicit TimestampColumnVector(uint64_t len, int precision, bool encoding = false);
-    void * current() override;
+
+    void *current() override;
+
     void set(int elementNum, long ts);
+
     ~TimestampColumnVector();
+
     void print(int rowCount) override;
+
     void close() override;
+
 private:
     bool isLong;
 };

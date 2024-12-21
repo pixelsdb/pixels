@@ -25,27 +25,35 @@
 #include "PixelsVersion.h"
 #include "exception/InvalidArgumentException.h"
 
-int PixelsVersion::getVersion() {
+int PixelsVersion::getVersion()
+{
     return version;
 }
 
-PixelsVersion::PixelsVersion(int v) {
+PixelsVersion::PixelsVersion(int v)
+{
     version = v;
 }
 
-PixelsVersion::Version PixelsVersion::from(int v) {
-    if (v == 1) {
+PixelsVersion::Version PixelsVersion::from(int v)
+{
+    if (v == 1)
+    {
         return V1;
-    } else {
+    }
+    else
+    {
         throw InvalidArgumentException("Wrong pixels version. ");
     }
 }
 
-bool PixelsVersion::matchVersion(PixelsVersion::Version otherVersion) {
+bool PixelsVersion::matchVersion(PixelsVersion::Version otherVersion)
+{
     return otherVersion == V1;
 }
 
-PixelsVersion::Version PixelsVersion::currentVersion() {
+PixelsVersion::Version PixelsVersion::currentVersion()
+{
     return V1;
 }
 

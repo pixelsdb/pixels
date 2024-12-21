@@ -24,11 +24,14 @@
  */
 #ifndef PIXELS_PIXELSREADEREXCEPTION_H
 #define PIXELS_PIXELSREADEREXCEPTION_H
+
 #include <exception>
 #include <string>
 #include <iostream>
-class PixelsReaderException: public std::exception {
+
+class PixelsReaderException : public std::exception
+{
 public:
-    explicit PixelsReaderException(const std::string & msg);
+    explicit PixelsReaderException(const std::string &msg);
 };
 #endif //PIXELS_PIXELSREADEREXCEPTION_H

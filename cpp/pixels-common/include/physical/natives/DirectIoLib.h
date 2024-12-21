@@ -44,25 +44,32 @@
 #include "liburing/io_uring.h"
 
 
-struct uringData {
-	int idx;
-	ByteBuffer * bb;
+struct uringData
+{
+    int idx;
+    ByteBuffer *bb;
 };
 
 
-class DirectIoLib {
+class DirectIoLib
+{
 public:
-	/**
+    /**
      * the start address/size of direct buffer is the multiple of block Size
-	 */
-	DirectIoLib(int fsBlockSize);
-	std::shared_ptr<ByteBuffer> allocateDirectBuffer(long size);
-	std::shared_ptr<ByteBuffer> read(int fd, long fileOffset, std::shared_ptr<ByteBuffer> directBuffer, long length);
-	long blockStart(long value);
-	long blockEnd(long value);
+     */
+    DirectIoLib(int fsBlockSize);
+
+    std::shared_ptr <ByteBuffer> allocateDirectBuffer(long size);
+
+    std::shared_ptr <ByteBuffer> read(int fd, long fileOffset, std::shared_ptr <ByteBuffer> directBuffer, long length);
+
+    long blockStart(long value);
+
+    long blockEnd(long value);
+
 private:
-	int fsBlockSize;
-	long fsBlockNotMask;
+    int fsBlockSize;
+    long fsBlockNotMask;
 };
 
 #endif // DUCKDB_DIRECTIOLIB_H

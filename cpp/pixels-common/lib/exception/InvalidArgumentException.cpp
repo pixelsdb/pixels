@@ -24,6 +24,7 @@
  */
 #include "exception/InvalidArgumentException.h"
 
-InvalidArgumentException::InvalidArgumentException(std::string message) {
-    std::cout<<message<<std::endl;
+InvalidArgumentException::InvalidArgumentException(std::string message)
+{
+    std::cout << message << std::endl;
 }

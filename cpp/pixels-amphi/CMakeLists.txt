@@ -26,7 +26,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         ${DuckDB_INCLUDE_DIRS}
         ${gRPC_INCLUDE_DIRS}
         worker/include
-)
+        )
 
 target_link_libraries(${PROJECT_NAME}
         worker
@@ -36,4 +36,4 @@ target_link_libraries(${PROJECT_NAME}
         yaml-cpp
         spdlog::spdlog
         cli::cli
-)
+        )

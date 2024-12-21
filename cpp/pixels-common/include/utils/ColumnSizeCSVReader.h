@@ -31,13 +31,16 @@
 #include <unordered_map>
 #include "exception/InvalidArgumentException.h"
 
-class ColumnSizeCSVReader {
+class ColumnSizeCSVReader
+{
 public:
-    ColumnSizeCSVReader(std::string csvPath) {
+    ColumnSizeCSVReader(std::string csvPath)
+    {
         std::ifstream file;
         file.open(csvPath);
         std::string line;
-        while (getline(file, line)) {
+        while (getline(file, line))
+        {
             std::string delimiter = " ";
             std::string columnName = line.substr(0, line.find(delimiter));
             int maxSize = std::stoi(line.substr(line.find(delimiter) + 1));
@@ -45,7 +48,9 @@ public:
         }
         file.close();
     }
-    int get(const std::string & columnName);
+
+    int get(const std::string &columnName);
+
 private:
     std::unordered_map<std::string, int> colSize;
 };

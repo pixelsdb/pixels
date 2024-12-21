@@ -28,9 +28,11 @@
 #include<iostream>
 #include<exception>
 
-class InvalidArgumentException: public std::exception {
+class InvalidArgumentException : public std::exception
+{
 public:
     InvalidArgumentException() = default;
+
     explicit InvalidArgumentException(std::string message);
 };
 #endif //PIXELS_INVALIDARGUMENTEXCEPTION_H
