@@ -18,6 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+/*
+ * @author whz
+ * @create 2024-11-19
+ */
 #include "writer/IntegerColumnWriter.h"
 #include "utils/BitUtils.h"
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by liyu on 3/16/23.
-//
-
+/*
+ * @author liyu
+ * @create 2023-03-16
+ */
 #include "TypeDescription.h"
 
 #include <utility>

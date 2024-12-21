@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by whz on 12/9/24.
-//
-
+/*
+ * @author whz
+ * @create 2024-12-09
+ */
 #ifndef DUCKDB_DECIMALCOLUMNWRITER_H
 #define DUCKDB_DECIMALCOLUMNWRITER_H
 #include "encoding/RunLenIntEncoder.h"

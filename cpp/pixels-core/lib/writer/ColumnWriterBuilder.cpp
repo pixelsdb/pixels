@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by whz on 24-11-29.
-//
-//#include "writer/ColumnWriterBuilder.h"
+/*
+ * @author whz
+ * @create 2024-11-29
+ */
 #include "writer/ColumnWriterBuilder.h"
 #include "writer/IntegerColumnWriter.h"
 

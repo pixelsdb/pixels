@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by whz on 24-11-29.
-//
-
+/*
+ * @author whz
+ * @create 2024-11-29
+ */
 #ifndef PIXELS_COLUMNWRITERBUILDER_H
 #define PIXELS_COLUMNWRITERBUILDER_H
 #include "writer/ColumnWriter.h"

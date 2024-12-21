@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by whz on 11/19/24.
-//
-
+/*
+ * @author whz
+ * @create 2024-11-19
+ */
 #ifndef DUCKDB_STRINGCOLUMNWRITER_H
 #define DUCKDB_STRINGCOLUMNWRITER_H
 

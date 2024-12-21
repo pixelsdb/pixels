@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-9.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-9
+ */
 #ifndef PIXELS_COLUMNWRITER_H
 #define PIXELS_COLUMNWRITER_H
 
