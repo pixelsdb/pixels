@@ -300,6 +300,8 @@ public class WorkerCommon
     {
         requireNonNull(storage, "storage is null");
         requireNonNull(paths, "paths is null");
+
+        TypeDescription fileSchema = null;
         while (true)
         {
             for (String path : paths)
@@ -307,9 +309,12 @@ public class WorkerCommon
                 try
                 {
                     PixelsReader reader = getReader(path, storage);
-                    TypeDescription fileSchema = reader.getFileSchema();
-                    reader.close();
-                    return fileSchema;
+                    fileSchema = reader.getFileSchema();
+                    if (!storage.getScheme().equals(Storage.Scheme.httpstream))
+                    {
+                        reader.close();
+                        return fileSchema;
+                    }
                 } catch (Throwable e)
                 {
                     if (e instanceof IOException)
@@ -318,6 +323,10 @@ public class WorkerCommon
                     }
                     throw new IOException("failed to read file schema", e);
                 }
+            }
+            if (storage.getScheme().equals(Storage.Scheme.httpstream))
+            {
+                return fileSchema;
             }
             TimeUnit.MILLISECONDS.sleep(200);
         }
@@ -506,19 +515,22 @@ public class WorkerCommon
         option.transId(transId);
         option.transTimestamp(timestamp);
         option.includeCols(cols);
-        if (pixelsReader.getRowGroupNum() == numPartition)
+        if (pixelsReader instanceof PixelsReaderImpl)
         {
-            option.rgRange(hashValue, 1);
-        } else
-        {
-            for (int i = 0; i < pixelsReader.getRowGroupNum(); ++i)
+            if (pixelsReader.getRowGroupNum() == numPartition)
             {
-                PixelsProto.RowGroupInformation info = pixelsReader.getRowGroupInfo(i);
-                if (info.getPartitionInfo().getHashValue() == hashValue)
+                option.rgRange(hashValue, 1);
+            } else
+            {
+                for (int i = 0; i < pixelsReader.getRowGroupNum(); ++i)
                 {
-                    // Note: DO NOT use hashValue as the row group start index.
-                    option.rgRange(i, 1);
-                    break;
+                    PixelsProto.RowGroupInformation info = pixelsReader.getRowGroupInfo(i);
+                    if (info.getPartitionInfo().getHashValue() == hashValue)
+                    {
+                        // Note: DO NOT use hashValue as the row group start index.
+                        option.rgRange(i, 1);
+                        break;
+                    }
                 }
             }
         }
