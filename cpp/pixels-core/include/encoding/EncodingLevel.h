@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-18.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-18
+ */
 #ifndef PIXELS_ENCODINGLEVEL_H
 #define PIXELS_ENCODINGLEVEL_H
 

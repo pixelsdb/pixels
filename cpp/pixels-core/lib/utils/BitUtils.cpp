@@ -18,9 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by whz on 11/27/24.
-//
+/*
+ * @author whz
+ * @create 2024-11-27
+ */
 #include <stdexcept>
 #include "utils/BitUtils.h"
 

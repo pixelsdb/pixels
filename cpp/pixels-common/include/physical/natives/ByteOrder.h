@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by whz on 11/27/24.
-//
-
+/*
+ * @author whz
+ * @create 2024-11-27
+ */
 #ifndef DUCKDB_BYTEORDER_H
 #define DUCKDB_BYTEORDER_H
 enum class ByteOrder {

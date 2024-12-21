@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-19.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-19
+ */
 #include <load/Parameters.h>
 
 Parameters::Parameters(const std::string &schema, int maxRowNum, const std::string &regex,

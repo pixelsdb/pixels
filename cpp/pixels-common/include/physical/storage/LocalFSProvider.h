@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-25.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-25
+ */
 #ifndef PIXELS_LOCALFSPROVIDER_H
 #define PIXELS_LOCALFSPROVIDER_H
 

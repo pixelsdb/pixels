@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-22.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-22
+ */
 #include "load/PixelsConsumer.h"
 #include "encoding/EncodingLevel.h"
 #include "utils/ConfigFactory.h"

@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-17.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-17
+ */
 #include <executor/LoadExecutor.h>
 #include <iostream>
 #include <encoding/EncodingLevel.h>

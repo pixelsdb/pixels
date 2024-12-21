@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by whz on 11/27/24.
-//
-
+/*
+ * @author whz
+ * @create 2024-11-27
+ */
 #ifndef PIXELS_BITUTILS_H
 #define PIXELS_BITUTILS_H
 #include <vector>

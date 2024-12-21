@@ -18,9 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-9.
-//
+/*
+ * @author gengdy
+ * @create 2024-11-09
+ */
 #include <utils/ConfigFactory.h>
 #include "utils/BitUtils.h"
 #include "writer/ColumnWriter.h"

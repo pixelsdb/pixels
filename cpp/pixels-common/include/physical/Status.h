@@ -18,11 +18,11 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-19.
-//
-
-#ifndef PIXELS_STATUS_H
+/*
+ * @author gengdy
+ * @create 2024-11-19
+ */
+ #ifndef PIXELS_STATUS_H
 #define PIXELS_STATUS_H
 
 #include <string>
