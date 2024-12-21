@@ -24,7 +24,8 @@
  */
 #include "physical/MergedRequest.h"
 
-std::shared_ptr<MergedRequest> MergedRequest::merge(Request curr) {
+std::shared_ptr <MergedRequest> MergedRequest::merge(Request curr)
+{
     if (curr.start < this->end)
     {
         throw InvalidArgumentException("MergedRequest: Can not merge backward request.");
@@ -34,7 +35,8 @@ std::shared_ptr<MergedRequest> MergedRequest::merge(Request curr) {
         throw InvalidArgumentException("MergedRequest: Can not merge requests from different queries (transactions).");
     }
     long gap = curr.start - this->end;
-    if(gap <= maxGap && this->length + gap + curr.length <= std::numeric_limits<int>::max()) {
+    if (gap <= maxGap && this->length + gap + curr.length <= std::numeric_limits<int>::max())
+    {
         this->offsets.emplace_back(this->length + (int) gap);
         this->lengths.emplace_back(curr.length);
         this->length += gap + curr.length;
@@ -45,7 +47,8 @@ std::shared_ptr<MergedRequest> MergedRequest::merge(Request curr) {
     return std::make_shared<MergedRequest>(curr);
 }
 
-MergedRequest::MergedRequest(Request first) {
+MergedRequest::MergedRequest(Request first)
+{
     this->queryId = first.queryId;
     this->start = first.start;
     this->end = first.start + first.length;
@@ -57,9 +60,11 @@ MergedRequest::MergedRequest(Request first) {
 }
 
 // when the data has been read, split the merged buffer to original buffer
-std::vector<std::shared_ptr<ByteBuffer>> MergedRequest::complete(std::shared_ptr<ByteBuffer> buffer) {
-    std::vector<std::shared_ptr<ByteBuffer>> bbs;
-    for(int i = 0; i < this->size; i++) {
+std::vector <std::shared_ptr<ByteBuffer>> MergedRequest::complete(std::shared_ptr <ByteBuffer> buffer)
+{
+    std::vector <std::shared_ptr<ByteBuffer>> bbs;
+    for (int i = 0; i < this->size; i++)
+    {
         auto bb = std::make_shared<ByteBuffer>(*buffer,
                                                offsets.at(i),
                                                lengths.at(i));
@@ -68,19 +73,23 @@ std::vector<std::shared_ptr<ByteBuffer>> MergedRequest::complete(std::shared_ptr
     return bbs;
 }
 
-long MergedRequest::getStart() {
+long MergedRequest::getStart()
+{
     return start;
 }
 
-int MergedRequest::getLength() {
+int MergedRequest::getLength()
+{
     return length;
 }
 
-int MergedRequest::getSize() {
+int MergedRequest::getSize()
+{
     return size;
 }
 
-long MergedRequest::getQueryId() {
+long MergedRequest::getQueryId()
+{
     return queryId;
 }
 

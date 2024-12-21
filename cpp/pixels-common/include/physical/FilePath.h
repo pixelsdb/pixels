@@ -28,15 +28,19 @@
 #include <string>
 #include <physical/Storage.h>
 
-class FilePath {
+class FilePath
+{
 public:
     std::string realPath;
     bool valid;
     bool isDir;
 
     FilePath();
+
     FilePath(const std::string &path);
+
     std::string toString() const;
+
     std::string toStringWithPrefix(const Storage &storage) const;
 };
 #endif //PIXELS_FILEPATH_H

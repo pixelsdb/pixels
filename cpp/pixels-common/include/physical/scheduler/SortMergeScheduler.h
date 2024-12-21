@@ -30,20 +30,26 @@
 #include<algorithm>
 #include "exception/InvalidArgumentException.h"
 
-class SortMergeScheduler : public Scheduler {
+class SortMergeScheduler : public Scheduler
+{
     // TODO: logger
 public:
-    static Scheduler * Instance();
-	std::vector<std::shared_ptr<MergedRequest>> sortMerge(RequestBatch batch, long queryId);
-	std::vector<std::shared_ptr<ByteBuffer>> executeBatch(std::shared_ptr<PhysicalReader> reader,
-	                                                                          RequestBatch batch, long queryId) override;
-	std::vector<std::shared_ptr<ByteBuffer>> executeBatch(std::shared_ptr<PhysicalReader> reader, RequestBatch batch,
-	                                                      std::vector<std::shared_ptr<ByteBuffer>> reuseBuffers, long queryId) override;
+    static Scheduler *Instance();
+
+    std::vector <std::shared_ptr<MergedRequest>> sortMerge(RequestBatch batch, long queryId);
+
+    std::vector <std::shared_ptr<ByteBuffer>> executeBatch(std::shared_ptr <PhysicalReader> reader,
+                                                           RequestBatch batch, long queryId) override;
+
+    std::vector <std::shared_ptr<ByteBuffer>> executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatch batch,
+                                                           std::vector <std::shared_ptr<ByteBuffer>> reuseBuffers,
+                                                           long queryId) override;
 
 
 private:
     SortMergeScheduler();
-    static Scheduler * instance;
+
+    static Scheduler *instance;
 
 
 };

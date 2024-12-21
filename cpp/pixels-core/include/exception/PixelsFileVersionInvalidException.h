@@ -30,7 +30,8 @@
 #include <iostream>
 #include "PixelsVersion.h"
 
-class PixelsFileVersionInvalidException: public std::exception {
+class PixelsFileVersionInvalidException : public std::exception
+{
 public:
     explicit PixelsFileVersionInvalidException(uint32_t version);
 };

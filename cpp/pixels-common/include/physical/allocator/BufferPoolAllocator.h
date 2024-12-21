@@ -27,14 +27,19 @@
 
 #include "Allocator.h"
 
-class BufferPoolAllocator: public Allocator {
+class BufferPoolAllocator : public Allocator
+{
 public:
-	BufferPoolAllocator();
-	~BufferPoolAllocator();
-	std::shared_ptr<ByteBuffer> allocate(int size) override;
-	void reset() override;
+    BufferPoolAllocator();
+
+    ~BufferPoolAllocator();
+
+    std::shared_ptr <ByteBuffer> allocate(int size) override;
+
+    void reset() override;
+
 private:
-	long maxSize;
-	std::shared_ptr<ByteBuffer> buffer;
+    long maxSize;
+    std::shared_ptr <ByteBuffer> buffer;
 };
 #endif // DUCKDB_BUFFERPOOLALLOCATOR_H

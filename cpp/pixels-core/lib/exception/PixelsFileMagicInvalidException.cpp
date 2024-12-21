@@ -24,9 +24,10 @@
  */
 #include "exception/PixelsFileMagicInvalidException.h"
 
-PixelsFileMagicInvalidException::PixelsFileMagicInvalidException(const std::string &magic) {
-    std::cout<<"The file magic "
-        << magic
-        <<" is not valid."
-        <<std::endl;
+PixelsFileMagicInvalidException::PixelsFileMagicInvalidException(const std::string &magic)
+{
+    std::cout << "The file magic "
+              << magic
+              << " is not valid."
+              << std::endl;
 }

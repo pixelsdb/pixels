@@ -37,18 +37,23 @@
 #include "utils/Constants.h"
 #include "TypeDescription.h"
 
-class PixelsReaderBuilder {
+class PixelsReaderBuilder
+{
 public:
     PixelsReaderBuilder();
-	PixelsReaderBuilder * setStorage(std::shared_ptr<Storage> storage);
-	PixelsReaderBuilder * setPath(const std::string & path);
-	PixelsReaderBuilder * setPixelsFooterCache(std::shared_ptr<PixelsFooterCache> pixelsFooterCache);
-	std::shared_ptr<PixelsReader> build();
+
+    PixelsReaderBuilder *setStorage(std::shared_ptr <Storage> storage);
+
+    PixelsReaderBuilder *setPath(const std::string &path);
+
+    PixelsReaderBuilder *setPixelsFooterCache(std::shared_ptr <PixelsFooterCache> pixelsFooterCache);
+
+    std::shared_ptr <PixelsReader> build();
 
 private:
-    std::shared_ptr<Storage> builderStorage;
+    std::shared_ptr <Storage> builderStorage;
     std::string builderPath;
-	std::shared_ptr<PixelsFooterCache> builderPixelsFooterCache;
-	std::shared_ptr<TypeDescription> builderSchema;
+    std::shared_ptr <PixelsFooterCache> builderPixelsFooterCache;
+    std::shared_ptr <TypeDescription> builderSchema;
 };
 #endif //PIXELS_PIXELSREADERBUILDER_H

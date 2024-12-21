@@ -26,7 +26,9 @@
 #define PIXELS_CONSTANTS_H
 
 #include <string>
-class Constants {
+
+class Constants
+{
 public:
     static int VERSION;
     static std::string MAGIC;

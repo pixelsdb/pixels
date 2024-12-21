@@ -34,21 +34,28 @@
 #include <mutex>
 #include <unordered_map>
 
-class StorageArrayScheduler {
+class StorageArrayScheduler
+{
 public:
-    StorageArrayScheduler(std::vector<std::string>& files, int threadNum);
+    StorageArrayScheduler(std::vector <std::string> &files, int threadNum);
+
     int acquireDeviceId();
+
     int getDeviceSum();
 
     std::string getFileName(int deviceID, int fileID);
+
     uint64_t getFileSum(int deviceID);
+
     int getMaxFileSum();
+
     int getBatchID(int deviceID, int fileID);
+
 private:
     std::mutex m;
     int currentDeviceID;
     int devicesNum;
-    std::vector<std::vector<std::string>> filesVector;
+    std::vector <std::vector<std::string>> filesVector;
 };
 
 #endif //DUCKDB_STORAGEARRAYSCHEDULER_H

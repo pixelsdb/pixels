@@ -24,13 +24,16 @@
  */
 #include "reader/ColumnReader.h"
 
-ColumnReader::ColumnReader(std::shared_ptr<TypeDescription> type) {
+ColumnReader::ColumnReader(std::shared_ptr <TypeDescription> type)
+{
     this->type = type;
     this->elementIndex = 0;
 }
 
-std::shared_ptr<ColumnReader> ColumnReader::newColumnReader(std::shared_ptr<TypeDescription> type) {
-    switch(type->getCategory()) {
+std::shared_ptr <ColumnReader> ColumnReader::newColumnReader(std::shared_ptr <TypeDescription> type)
+{
+    switch (type->getCategory())
+    {
         case TypeDescription::BOOLEAN:
             break;
         case TypeDescription::BYTE:
@@ -66,29 +69,36 @@ std::shared_ptr<ColumnReader> ColumnReader::newColumnReader(std::shared_ptr<Type
         case TypeDescription::STRUCT:
             break;
     }
-	throw InvalidArgumentException("This function is not supported yet. ");
+    throw InvalidArgumentException("This function is not supported yet. ");
 }
 
 void
-ColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset, int size,
-                   int pixelStride, int vectorIndex, std::shared_ptr<ColumnVector> vector,
-                   pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr<PixelsBitMask> filterMask) {
+ColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset, int size,
+                   int pixelStride, int vectorIndex, std::shared_ptr <ColumnVector> vector,
+                   pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
+{
 }
 
 
-void ColumnReader::setValid(const std::shared_ptr<ByteBuffer>& input, int pixelStride, const std::shared_ptr<ColumnVector>& columnVector, int pixelId, bool hasNull) {
-    int elementSizeInCurrPixels = std::min(pixelStride, (int)columnVector->length);
+void ColumnReader::setValid(const std::shared_ptr <ByteBuffer> &input, int pixelStride,
+                            const std::shared_ptr <ColumnVector> &columnVector, int pixelId, bool hasNull)
+{
+    int elementSizeInCurrPixels = std::min(pixelStride, (int) columnVector->length);
     columnVector->isNull = input->getPointer() + isNullOffset;
 
     int byteSize = ceil(1.0 * elementSizeInCurrPixels / 8);
 
-    if (hasNull) {
-        for(int byteOffset = 0; byteOffset < byteSize; byteOffset++) {
+    if (hasNull)
+    {
+        for (int byteOffset = 0; byteOffset < byteSize; byteOffset++)
+        {
             ((uint8_t *) columnVector->isValid)[byteOffset] = ~(columnVector->isNull[byteOffset]);
         }
         isNullOffset += byteSize;
-    } else {
-        memset(((uint8_t *)columnVector->isValid), 0xFF, byteSize);
+    }
+    else
+    {
+        memset(((uint8_t *) columnVector->isValid), 0xFF, byteSize);
     }
 //    while (currentElementIndex < initElementIndex + columnVector->length) {
 //        int elementSizeInCurrPixels = std::min(pixelStride, (int)(initElementIndex + columnVector->length) - pixelId * pixelStride);

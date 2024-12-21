@@ -28,29 +28,38 @@
 #include <string>
 #include <iostream>
 #include "physical/natives/ByteBuffer.h"
-class PhysicalReader {
+
+class PhysicalReader
+{
 public:
     virtual long getFileLength() = 0;
+
     virtual void seek(long desired) = 0;
-    virtual std::shared_ptr<ByteBuffer> readFully(int length) = 0;
-	virtual std::shared_ptr<ByteBuffer> readFully(int length, std::shared_ptr<ByteBuffer> bb) = 0;
+
+    virtual std::shared_ptr <ByteBuffer> readFully(int length) = 0;
+
+    virtual std::shared_ptr <ByteBuffer> readFully(int length, std::shared_ptr <ByteBuffer> bb) = 0;
+
 //    virtual void readFully(char * buffer) = 0;
 //    virtual void readFully(char * buffer, int offset, int length) = 0;
     virtual std::string getName() = 0;
+
     /**
      * If direct I/O is supported, {@link #readFully(int)} will directly read from the file
      * without going through the OS cache. This is currently supported on LocalFS.
      *
      * @return true if direct read is supported.
      */
-    virtual bool supportsDirect() {
+    virtual bool supportsDirect()
+    {
         return false;
     }
 
     /**
      * @return true if readAsync is supported.
      */
-    virtual bool supportsAsync() {
+    virtual bool supportsAsync()
+    {
         return false;
     }
 
@@ -61,11 +70,14 @@ public:
      * @return
      * @throws IOException
      */
-     // TODO: default CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
+    // TODO: default CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
 
     virtual long readLong() = 0;
+
     virtual int readInt() = 0;
+
     virtual char readChar() = 0;
+
 //    virtual int readInt() = 0;
     virtual void close() = 0;
 

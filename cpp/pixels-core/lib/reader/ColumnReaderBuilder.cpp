@@ -25,8 +25,10 @@
 #include "reader/ColumnReaderBuilder.h"
 #include "exception/InvalidArgumentException.h"
 
-std::shared_ptr<ColumnReader> ColumnReaderBuilder::newColumnReader(std::shared_ptr<TypeDescription> type) {
-    switch (type->getCategory()) {
+std::shared_ptr <ColumnReader> ColumnReaderBuilder::newColumnReader(std::shared_ptr <TypeDescription> type)
+{
+    switch (type->getCategory())
+    {
 //        case TypeDescription::BOOLEAN:
 //            break;
 //        case TypeDescription::BYTE:
@@ -39,17 +41,21 @@ std::shared_ptr<ColumnReader> ColumnReaderBuilder::newColumnReader(std::shared_p
 //            break;
 //        case TypeDescription::DOUBLE:
 //            break;
-	    case TypeDescription::DECIMAL: {
-		    if (type->getPrecision() <= TypeDescription::SHORT_DECIMAL_MAX_PRECISION) {
-			    return std::make_shared<DecimalColumnReader>(type);
-		    } else {
-			    throw InvalidArgumentException("Currently we didn't implement LongDecimalColumnVector.");
-		    }
-	    }
+        case TypeDescription::DECIMAL:
+        {
+            if (type->getPrecision() <= TypeDescription::SHORT_DECIMAL_MAX_PRECISION)
+            {
+                return std::make_shared<DecimalColumnReader>(type);
+            }
+            else
+            {
+                throw InvalidArgumentException("Currently we didn't implement LongDecimalColumnVector.");
+            }
+        }
 //        case TypeDescription::STRING:
 //            break;
         case TypeDescription::DATE:
-		    return std::make_shared<DateColumnReader>(type);
+            return std::make_shared<DateColumnReader>(type);
 //        case TypeDescription::TIME:
 //            break;
         case TypeDescription::TIMESTAMP:
@@ -65,6 +71,7 @@ std::shared_ptr<ColumnReader> ColumnReaderBuilder::newColumnReader(std::shared_p
 //        case TypeDescription::STRUCT:
 //            break;
         default:
-            throw InvalidArgumentException("bad column type in ColumnReaderBuilder: " + std::to_string(type->getCategory()));
+            throw InvalidArgumentException(
+                    "bad column type in ColumnReaderBuilder: " + std::to_string(type->getCategory()));
     }
 }

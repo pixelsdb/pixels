@@ -25,14 +25,24 @@
 #ifndef PIXELS_PIXELSVERSION_H
 #define PIXELS_PIXELSVERSION_H
 
-class PixelsVersion {
+class PixelsVersion
+{
 public:
-    enum Version {V1 = 1};
+    enum Version
+    {
+        V1 = 1
+    };
+
     explicit PixelsVersion(int v);
+
     int getVersion();
+
     static PixelsVersion::Version from(int v);
+
     static bool matchVersion(PixelsVersion::Version otherVersion);
+
     static PixelsVersion::Version currentVersion();
+
 private:
     int version;
 };

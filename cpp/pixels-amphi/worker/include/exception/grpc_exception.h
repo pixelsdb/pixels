@@ -24,13 +24,16 @@
 #include <iostream>
 #include <string>
 
-class GrpcException: public std::exception {
+class GrpcException : public std::exception
+{
 private:
     std::string message_;
 public:
-    GrpcException(const std::string& message);
+    GrpcException(const std::string &message);
 
-    const char* what() const noexcept override;
+    const char *what() const
+
+    noexcept override;
 };
 
 #endif //PIXELS_WORKER_AMPHI_GRPC_EXCEPTION_H

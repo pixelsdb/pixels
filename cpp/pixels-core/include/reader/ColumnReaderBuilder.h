@@ -33,9 +33,10 @@
 #include "reader/DateColumnReader.h"
 #include "reader/TimestampColumnReader.h"
 
-class ColumnReaderBuilder {
+class ColumnReaderBuilder
+{
 public:
-    static std::shared_ptr<ColumnReader> newColumnReader(
-            std::shared_ptr<TypeDescription> type);
+    static std::shared_ptr <ColumnReader> newColumnReader(
+            std::shared_ptr <TypeDescription> type);
 };
 #endif //PIXELS_COLUMNREADERBUILDER_H

@@ -48,9 +48,10 @@
  * though that use is probably not typical.
  */
 
-class BinaryColumnVector: public ColumnVector {
+class BinaryColumnVector : public ColumnVector
+{
 public:
-    duckdb::string_t * vector;
+    duckdb::string_t *vector;
 
     /**
     * Use this constructor by default. All column vectors
@@ -58,7 +59,8 @@ public:
     */
     explicit BinaryColumnVector(uint64_t len = VectorizedRowBatch::DEFAULT_SIZE, bool encoding = false);
 
-	~BinaryColumnVector();
+    ~BinaryColumnVector();
+
     /**
      * Set a field by reference.
      *
@@ -67,9 +69,12 @@ public:
      * @param start      start byte position within source
      * @param length     length of source byte sequence
      */
-    void setRef(int elementNum, uint8_t * const & sourceBuf, int start, int length);
-    void * current() override;
+    void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
+
+    void *current() override;
+
     void close() override;
+
     void print(int rowCount) override;
 };
 #endif //PIXELS_BINARYCOLUMNVECTOR_H

@@ -24,7 +24,8 @@
  */
 #include "reader/VarcharColumnReader.h"
 
-VarcharColumnReader::VarcharColumnReader(std::shared_ptr<TypeDescription> type) : StringColumnReader(type) {
+VarcharColumnReader::VarcharColumnReader(std::shared_ptr <TypeDescription> type) : StringColumnReader(type)
+{
     // TODO: implement
 }
 

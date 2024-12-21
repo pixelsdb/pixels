@@ -34,18 +34,26 @@
 #include <fstream>
 #include <sstream>
 
-class ConfigFactory {
+class ConfigFactory
+{
 public:
-	static ConfigFactory & Instance();
-	void Print();
-	std::string getProperty(std::string key);
+    static ConfigFactory &Instance();
+
+    void Print();
+
+    std::string getProperty(std::string key);
+
     bool boolCheckProperty(std::string key);
-	std::string getPixelsDirectory();
+
+    std::string getPixelsDirectory();
+
     std::string getPixelsSourceDirectory();
+
 private:
-	ConfigFactory();
-	std::map<std::string, std::string> prop;
-	std::string pixelsHome;
+    ConfigFactory();
+
+    std::map <std::string, std::string> prop;
+    std::string pixelsHome;
     std::string pixelsSrc;
 };
 #endif // DUCKDB_CONFIGFACTORY_H

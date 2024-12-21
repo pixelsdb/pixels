@@ -30,9 +30,11 @@
 
 namespace bpo = boost::program_options;
 
-class CommandExecutor {
+class CommandExecutor
+{
 public:
     virtual ~CommandExecutor() = default;
-    virtual void execute(const bpo::variables_map& ns, const std::string& command) = 0;
+
+    virtual void execute(const bpo::variables_map &ns, const std::string &command) = 0;
 };
 #endif //PIXELS_COMMANDEXECUTOR_H

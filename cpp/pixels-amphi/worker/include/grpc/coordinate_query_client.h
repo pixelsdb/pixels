@@ -28,18 +28,19 @@
 #include "amphi.pb.h"
 #include "amphi.grpc.pb.h"
 
-class CoordinateQueryClient {
+class CoordinateQueryClient
+{
 public:
-    CoordinateQueryClient(std::shared_ptr<grpc::Channel> channel);
+    CoordinateQueryClient(std::shared_ptr <grpc::Channel> channel);
 
     amphi::proto::CoordinateQueryResponse CoordinateQuery(
-            const std::string& token,
-            const std::string& peer_name,
-            const std::string& schema,
-            const std::string& sql_statement);
+            const std::string &token,
+            const std::string &peer_name,
+            const std::string &schema,
+            const std::string &sql_statement);
 
 private:
-    std::unique_ptr<amphi::proto::AmphiService::Stub> stub_;
+    std::unique_ptr <amphi::proto::AmphiService::Stub> stub_;
 };
 
 #endif //PIXELS_AMPHI_WORKER_COORDINATOR_QUERY_CLIENT_H

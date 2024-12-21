@@ -25,8 +25,10 @@
 #ifndef PIXELS_CATEGORY_H
 #define PIXELS_CATEGORY_H
 
-class Category {
-    enum TYPE {
+class Category
+{
+    enum TYPE
+    {
         BOOLEAN,
         BYTE,
         SHORT,

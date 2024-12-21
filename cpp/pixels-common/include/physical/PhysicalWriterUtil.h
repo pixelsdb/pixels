@@ -29,11 +29,14 @@
 #include "physical/PhysicalWriterOption.h"
 #include "physical/storage/LocalFSProvider.h"
 
-class PhysicalWriterUtil {
+class PhysicalWriterUtil
+{
 public:
-    static std::shared_ptr<PhysicalWriter> newPhysicalWriter(std::string path, int blockSize,
-                                                             bool blockPadding, bool overwrite) {
-        std::shared_ptr<PhysicalWriterOption> option = std::make_shared<PhysicalWriterOption>(blockSize, blockPadding, overwrite);
+    static std::shared_ptr <PhysicalWriter> newPhysicalWriter(std::string path, int blockSize,
+                                                              bool blockPadding, bool overwrite)
+    {
+        std::shared_ptr <PhysicalWriterOption> option = std::make_shared<PhysicalWriterOption>(blockSize, blockPadding,
+                                                                                               overwrite);
         LocalFSProvider provider;
         return provider.createWriter(path, option);
     }

@@ -28,15 +28,22 @@
 #include <string>
 #include <encoding/EncodingLevel.h>
 
-class Parameters {
+class Parameters
+{
 public:
     Parameters(const std::string &schema, int maxRowNum, const std::string &regex,
                const std::string &loadingPath, EncodingLevel encodingLevel, bool nullsPadding);
+
     std::string getLoadingPath() const;
+
     std::string getSchema() const;
+
     int getMaxRowNum() const;
+
     std::string getRegex() const;
+
     EncodingLevel getEncodingLevel() const;
+
     bool isNullsPadding() const;
 
 private:

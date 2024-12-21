@@ -27,15 +27,22 @@
 
 #include "physical/Scheduler.h"
 
-class NoopScheduler : public Scheduler {
+class NoopScheduler : public Scheduler
+{
     // TODO: logger
 public:
-    static Scheduler * Instance();
-	std::vector<std::shared_ptr<ByteBuffer>> executeBatch(std::shared_ptr<PhysicalReader> reader, RequestBatch batch, long queryId) override;
-	std::vector<std::shared_ptr<ByteBuffer>> executeBatch(std::shared_ptr<PhysicalReader> reader, RequestBatch batch,
-	                                                      std::vector<std::shared_ptr<ByteBuffer>> reuseBuffers, long queryId) override;
-	~NoopScheduler();
+    static Scheduler *Instance();
+
+    std::vector <std::shared_ptr<ByteBuffer>>
+    executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatch batch, long queryId) override;
+
+    std::vector <std::shared_ptr<ByteBuffer>> executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatch batch,
+                                                           std::vector <std::shared_ptr<ByteBuffer>> reuseBuffers,
+                                                           long queryId) override;
+
+    ~NoopScheduler();
+
 private:
-    static Scheduler * instance;
+    static Scheduler *instance;
 };
 #endif //PIXELS_NOOPSCHEDULER_H

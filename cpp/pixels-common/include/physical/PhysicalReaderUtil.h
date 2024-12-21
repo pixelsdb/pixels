@@ -30,17 +30,22 @@
 #include "StorageFactory.h"
 #include <memory>
 
-class PhysicalReaderUtil {
+class PhysicalReaderUtil
+{
 public:
-    static std::shared_ptr<PhysicalReader> newPhysicalReader(std::shared_ptr<Storage> storage, std::string path) {
-        if(storage == nullptr) {
+    static std::shared_ptr <PhysicalReader> newPhysicalReader(std::shared_ptr <Storage> storage, std::string path)
+    {
+        if (storage == nullptr)
+        {
             throw std::runtime_error("storage should not be nullptr");
         }
-        if(path.size() == 0) {
+        if (path.size() == 0)
+        {
             throw std::runtime_error("path should not be empty");
         }
-        std::shared_ptr<PhysicalReader> reader;
-        switch (storage->getScheme()) {
+        std::shared_ptr <PhysicalReader> reader;
+        switch (storage->getScheme())
+        {
             case Storage::hdfs:
                 throw std::runtime_error("hdfs not support");
                 break;
@@ -68,8 +73,10 @@ public:
         return reader;
     }
 
-    static std::shared_ptr<PhysicalReader> newPhysicalReader(Storage::Scheme scheme, std::string path) {
-        if(path.size() == 0) {
+    static std::shared_ptr <PhysicalReader> newPhysicalReader(Storage::Scheme scheme, std::string path)
+    {
+        if (path.size() == 0)
+        {
             throw std::runtime_error("path should not be empty");
         }
         return newPhysicalReader(StorageFactory::getInstance()->getStorage(scheme), path);

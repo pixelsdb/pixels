@@ -24,13 +24,16 @@
 #include <iostream>
 #include <string>
 
-class GrpcMetadataException: public std::exception {
+class GrpcMetadataException : public std::exception
+{
 private:
     std::string message_;
 public:
-    GrpcMetadataException(const std::string& message);
+    GrpcMetadataException(const std::string &message);
 
-    const char* what() const noexcept override;
+    const char *what() const
+
+    noexcept override;
 };
 
 #endif //PIXELS_AMPHI_WORKER_GRPC_METADATA_EXCEPTION_H

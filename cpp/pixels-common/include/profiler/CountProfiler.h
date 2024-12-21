@@ -24,6 +24,7 @@
  */
 #ifndef DUCKDB_COUNTPROFILER_H
 #define DUCKDB_COUNTPROFILER_H
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -36,20 +37,25 @@
 
 // This class is used for showing how many times a function is invoked.
 
-class CountProfiler: public AbstractProfiler {
+class CountProfiler : public AbstractProfiler
+{
 public:
-    static CountProfiler & Instance();
-    void Count(const std::string& label);
-	void Count(const std::string& label, int num);
+    static CountProfiler &Instance();
+
+    void Count(const std::string &label);
+
+    void Count(const std::string &label, int num);
+
     void Print() override;
+
     void Reset() override;
-    long Get(const std::string& label);
+
+    long Get(const std::string &label);
+
 private:
     std::mutex lock;
     std::map<std::string, long> result;
 };
-
-
 
 
 #endif //DUCKDB_COUNTPROFILER_H

@@ -24,13 +24,16 @@
 #include <iostream>
 #include <string>
 
-class GrpcUnavailableException: public std::exception {
+class GrpcUnavailableException : public std::exception
+{
 private:
     std::string message_;
 public:
-    GrpcUnavailableException(const std::string& message);
+    GrpcUnavailableException(const std::string &message);
 
-    const char* what() const noexcept override;
+    const char *what() const
+
+    noexcept override;
 };
 
 #endif //PIXELS_WORKER_AMPHI_GRPC_UNAVAILABLE_EXCEPTION_H

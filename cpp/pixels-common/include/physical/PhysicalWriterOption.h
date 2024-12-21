@@ -28,15 +28,23 @@
 #include <memory>
 #include <cstdint>
 
-class PhysicalWriterOption : public std::enable_shared_from_this<PhysicalWriterOption> {
+class PhysicalWriterOption : public std::enable_shared_from_this<PhysicalWriterOption>
+{
 public:
     PhysicalWriterOption(std::int64_t blockSize, bool addBlockPadding, bool overwrite);
+
     std::int64_t getBlockSize() const;
-    std::shared_ptr<PhysicalWriterOption> setBlockSize(std::int64_t blockSize);
+
+    std::shared_ptr <PhysicalWriterOption> setBlockSize(std::int64_t blockSize);
+
     bool isAddBlockPadding() const;
-    std::shared_ptr<PhysicalWriterOption> setAddBlockPadding(bool addBlockPadding);
+
+    std::shared_ptr <PhysicalWriterOption> setAddBlockPadding(bool addBlockPadding);
+
     bool isOverwrite() const;
-    std::shared_ptr<PhysicalWriterOption> setOverwrite(bool overwrite);
+
+    std::shared_ptr <PhysicalWriterOption> setOverwrite(bool overwrite);
+
 private:
     std::int64_t blockSize;
     bool addBlockPadding;

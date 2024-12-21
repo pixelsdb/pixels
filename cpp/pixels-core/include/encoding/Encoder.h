@@ -25,7 +25,8 @@
 #ifndef PIXELS_ENCODER_H
 #define PIXELS_ENCODER_H
 
-class Encoder {
+class Encoder
+{
 
 };
 #endif //PIXELS_ENCODER_H

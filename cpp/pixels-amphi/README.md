@@ -1,20 +1,21 @@
 # Pixels-Amphi-Worker
 
-`pixels-amphi-worker` is the on-premises worker of `pixels-amphi` that aims at submitting queries to 
-`pixels-server` and receiving the coordinator decision. According to the trade-offs in performance and computation costs, 
-the coordinator either decide to execute the query in the cloud and send back the results, or execute the query 
+`pixels-amphi-worker` is the on-premises worker of `pixels-amphi` that aims at submitting queries to
+`pixels-server` and receiving the coordinator decision. According to the trade-offs in performance and computation
+costs,
+the coordinator either decide to execute the query in the cloud and send back the results, or execute the query
 locally with cached columnar data.
 
 ## Basic Functionalities
 
 - Communicate with `pixels-server` in the cloud with gRPC. This project shares proto files with Pixels project.
-See the protocol buffer files in the `proto` directory of this project for the definitions.
+  See the protocol buffer files in the `proto` directory of this project for the definitions.
 - Send SQL queries to the dialect transpilation service, and transpile the corresponding queries for both
-in-cloud query engine (Trino) and on-premise query engine (DuckDB).
-- Submit the transpiled query to the coordinator service, to receive either the 
-exact query result from cloud compute, or instructed to perform on-premises execution.
+  in-cloud query engine (Trino) and on-premise query engine (DuckDB).
+- Submit the transpiled query to the coordinator service, to receive either the
+  exact query result from cloud compute, or instructed to perform on-premises execution.
 - With the Columnar Cache Planner implemented in `benchmark/scripts/cache_algorithm.py`
-and `pixels-amphi/downloader`, the worker can produce a cache plan and download Pixels data as parquet files.
+  and `pixels-amphi/downloader`, the worker can produce a cache plan and download Pixels data as parquet files.
 - The worker runs DuckDB engine to create views on parquet files and perform the corresponding query.
 
 ## Dependencies
@@ -28,6 +29,7 @@ and `pixels-amphi/downloader`, the worker can produce a cache plan and download 
 - `nlohmann_json-3.11.2` for parsing json files
 
 ## Quick start
+
 ```
 >> make clean
 >> make
@@ -45,6 +47,7 @@ and `pixels-amphi/downloader`, the worker can produce a cache plan and download 
 ## Build with Docker
 
 `Dockerfile` includes the configuration to run the worker in a docker container:
+
 ```
 >> docker build -t worker .
 ... (Installing dependencies and creating docker image)

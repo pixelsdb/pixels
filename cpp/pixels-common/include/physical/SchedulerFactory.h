@@ -33,14 +33,19 @@
 #include <cctype>
 #include <string>
 
-class SchedulerFactory {
+class SchedulerFactory
+{
 public:
-    static SchedulerFactory * Instance();
-    Scheduler * getScheduler();
-	~SchedulerFactory();
+    static SchedulerFactory *Instance();
+
+    Scheduler *getScheduler();
+
+    ~SchedulerFactory();
+
 private:
-    static SchedulerFactory * instance;
-    Scheduler * scheduler;
+    static SchedulerFactory *instance;
+    Scheduler *scheduler;
+
     SchedulerFactory();
 };
 #endif //PIXELS_SCHEDULERFACTORY_H

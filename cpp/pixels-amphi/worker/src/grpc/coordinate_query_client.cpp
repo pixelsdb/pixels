@@ -31,34 +31,44 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 
-CoordinateQueryClient::CoordinateQueryClient(std::shared_ptr<Channel> channel)
-    : stub_(AmphiService::NewStub(channel)){};
+CoordinateQueryClient::CoordinateQueryClient(std::shared_ptr <Channel> channel)
+        : stub_(AmphiService::NewStub(channel))
+{};
 
 CoordinateQueryResponse CoordinateQueryClient::CoordinateQuery(
-    const std::string& token, const std::string& peer_name,
-    const std::string& schema, const std::string& sql_statement) {
-  // Prepare the request
-  CoordinateQueryRequest request;
-  request.mutable_header()->set_token(token);
-  request.set_peername(peer_name);
-  request.set_schema(schema);
-  request.set_sqlstatement(sql_statement);
+        const std::string &token, const std::string &peer_name,
+        const std::string &schema, const std::string &sql_statement)
+{
+    // Prepare the request
+    CoordinateQueryRequest request;
+    request.mutable_header()->set_token(token);
+    request.set_peername(peer_name);
+    request.set_schema(schema);
+    request.set_sqlstatement(sql_statement);
 
-  // Send the request and get the response
-  CoordinateQueryResponse response;
-  ClientContext context;
+    // Send the request and get the response
+    CoordinateQueryResponse response;
+    ClientContext context;
 
-  Status status = stub_->CoordinateQuery(&context, request, &response);
+    Status status = stub_->CoordinateQuery(&context, request, &response);
 
-  if (status.ok()) {
-    if (response.header().errorcode() == 0) {
-      return response;
-    } else {
-      throw GrpcCoordinatorQueryException(response.header().errormsg());
+    if (status.ok())
+    {
+        if (response.header().errorcode() == 0)
+        {
+            return response;
+        }
+        else
+        {
+            throw GrpcCoordinatorQueryException(response.header().errormsg());
+        }
     }
-  } else if (status.error_code() == grpc::StatusCode::UNAVAILABLE) {
-    throw GrpcUnavailableException(status.error_message());
-  } else {
-    throw GrpcException(status.error_message());
-  }
+    else if (status.error_code() == grpc::StatusCode::UNAVAILABLE)
+    {
+        throw GrpcUnavailableException(status.error_message());
+    }
+    else
+    {
+        throw GrpcException(status.error_message());
+    }
 }
