@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 24-11-17.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-17
+ */
 #ifndef PIXELS_COMMANDEXECUTOR_H
 #define PIXELS_COMMANDEXECUTOR_H
 
