@@ -174,6 +174,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                 checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
             }
 
+            int smallWorkerNum = 0;
             if (!smallPartitionInputs.isEmpty())
             {
                 this.smallPartitionStageId = planCoordinator.assignStageId();
@@ -193,7 +194,8 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                         tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                     }
                 }
-                StageCoordinator partitionStageCoordinator = new StageCoordinator(smallPartitionStageId, tasks);
+                smallWorkerNum = this.smallPartitionInputs.size();
+                StageCoordinator partitionStageCoordinator = new StageCoordinator(smallPartitionStageId, tasks, 0);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
             }
 
@@ -216,7 +218,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                         tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                     }
                 }
-                StageCoordinator partitionStageCoordinator = new StageCoordinator(largePartitionStageId, tasks);
+                StageCoordinator partitionStageCoordinator = new StageCoordinator(largePartitionStageId, tasks, smallWorkerNum);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
             }
         }

@@ -91,14 +91,14 @@ public class StageCoordinator
      * @param stageId
      * @param pendingTasks
      */
-    public StageCoordinator(int stageId, List<Task> pendingTasks)
+    public StageCoordinator(int stageId, List<Task> pendingTasks, int workerIndex)
     {
         this.stageId = stageId;
         this.isQueued = true;
         this.fixedWorkerNum = 0;
         this.taskQueue = new TaskQueue<>(pendingTasks);
         this.downStreamWorkerNum = 0;
-        this.workerIndexAssigner = 0;
+        this.workerIndexAssigner = workerIndex;
     }
 
     /**
