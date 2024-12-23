@@ -184,16 +184,6 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                 }
                 StageDependency partitionStageDependency = new StageDependency(smallPartitionStageId, joinStageId, true);
                 List<Task> tasks = new ArrayList<>();
-                int taskId = 0;
-                for (PartitionInput partitionInput : this.smallPartitionInputs)
-                {
-                    List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
-                    for (InputSplit inputSplit : inputSplits)
-                    {
-                        partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
-                        tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
-                    }
-                }
                 smallWorkerNum = this.smallPartitionInputs.size();
                 StageCoordinator partitionStageCoordinator = new StageCoordinator(smallPartitionStageId, tasks, 0);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
@@ -208,16 +198,6 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                 }
                 StageDependency partitionStageDependency = new StageDependency(largePartitionStageId, joinStageId, true);
                 List<Task> tasks = new ArrayList<>();
-                int taskId = 0;
-                for (PartitionInput partitionInput : this.largePartitionInputs)
-                {
-                    List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
-                    for (InputSplit inputSplit : inputSplits)
-                    {
-                        partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
-                        tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
-                    }
-                }
                 StageCoordinator partitionStageCoordinator = new StageCoordinator(largePartitionStageId, tasks, smallWorkerNum);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
             }
