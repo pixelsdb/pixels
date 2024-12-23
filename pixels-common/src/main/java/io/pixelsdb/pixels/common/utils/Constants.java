@@ -49,6 +49,8 @@ public final class Constants
     public static final String HEARTBEAT_COORDINATOR_LITERAL = "heartbeat_coordinator_";
     public static final String HEARTBEAT_WORKER_LITERAL = "heartbeat_worker_";
 
+    public static final String PARTITION_OPERATOR_NAME = "partition";
+    public static final String PARTITION_JOIN_OPERATOR_NAME = "partition_join";
     /*
      * Issue #649:
      * Breakdown costs into vmCost and cfCost
