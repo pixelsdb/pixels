@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by gengdy on 11/16/24.
-//
-
+/*
+ * @author gengdy
+ * @create 2024-11-16
+ */
 #include <iostream>
 #include <sstream>
 #include <string>
