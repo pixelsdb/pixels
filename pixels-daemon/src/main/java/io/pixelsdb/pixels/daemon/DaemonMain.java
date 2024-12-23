@@ -3,6 +3,7 @@ package io.pixelsdb.pixels.daemon;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
 import io.pixelsdb.pixels.daemon.cache.CacheWorker;
+import io.pixelsdb.pixels.daemon.retina.RetinaServer;
 import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatCoordinator;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
@@ -113,6 +114,8 @@ public class DaemonMain
             {
                 boolean metricsServerEnabled = Boolean.parseBoolean(
                         ConfigFactory.Instance().getProperty("metrics.server.enabled"));
+                int deleterServerPort = Integer.parseInt(config.getProperty("deleter.server.port"));
+
                 try
                 {
                     // start heartbeat worker
@@ -129,6 +132,9 @@ public class DaemonMain
                         CacheWorker cacheWorker = new CacheWorker();
                         container.addServer("cache_worker", cacheWorker);
                     }
+                    // start deleter server on worker node
+                    RetinaServer retinaServer = new RetinaServer(deleterServerPort);
+                    container.addServer("retina", retinaServer);
                 } catch (Throwable e)
                 {
                     log.error("failed to start worker", e);
