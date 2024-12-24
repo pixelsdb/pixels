@@ -209,7 +209,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                 StageDependency partitionStageDependency = new StageDependency(largePartitionStageId, joinStageId, true);
                 List<Task> tasks = new ArrayList<>();
                 int taskId = 0;
-                for (PartitionInput partitionInput : this.smallPartitionInputs)
+                for (PartitionInput partitionInput : this.largePartitionInputs)
                 {
                     List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
                     for (InputSplit inputSplit : inputSplits)
