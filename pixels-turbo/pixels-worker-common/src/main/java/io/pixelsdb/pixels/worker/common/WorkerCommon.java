@@ -434,15 +434,19 @@ public class WorkerCommon
         PixelsWriter writer;
         if (storage.getScheme() == Storage.Scheme.httpstream)
         {
-            writer = PixelsWriterStreamImpl.newBuilder()
+            PixelsWriterStreamImpl.Builder builder =  PixelsWriterStreamImpl.newBuilder()
                     .setSchema(schema)
                     .setPixelStride(pixelStride)
                     .setRowGroupSize(rowGroupSize)
                     .setStorage(storage)
                     .setPath(filePath)
                     .setEncodingLevel(EncodingLevel.EL0)
-                    .setPartitioned(isPartitioned)
-                    .build();
+                    .setPartitioned(isPartitioned);
+            if (isPartitioned)
+            {
+                builder.setPartKeyColumnIds(keyColumnIds);
+            }
+            writer = builder.build();
         } else
         {
             PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder()

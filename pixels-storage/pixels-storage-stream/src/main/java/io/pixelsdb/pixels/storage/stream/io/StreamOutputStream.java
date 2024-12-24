@@ -62,7 +62,7 @@ public class StreamOutputStream extends OutputStream
     /**
      * The maximum retry count.
      */
-    private static final int MAX_RETRIES = 10;
+    private static final int MAX_RETRIES = 30;
 
     /**
      * The delay between two tries.
