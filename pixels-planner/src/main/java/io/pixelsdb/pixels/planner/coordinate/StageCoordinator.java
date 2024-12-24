@@ -111,51 +111,11 @@ public class StageCoordinator
         synchronized (this.lock)
         {
             this.workerIdToWorkers.put(worker.getWorkerId(), worker);
-            if (worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_OPERATOR_NAME))
+            if (worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_OPERATOR_NAME) ||
+                    worker.getWorkerInfo().getOperatorName().equals(Constants.BROADCAST_OPERATOR_NAME))
             {
                 worker.setWorkerPortIndex(workerIndexAssigner);
                 this.workerIndexAssigner++;
-            } else
-            {
-                // TODO: Delete later
-                if (fixedWorkerNum > 0 && downStreamWorkerNum > 0)
-                {
-                    if (downStreamWorkerNum > fixedWorkerNum)
-                    {
-                        // one-to-multiple stream
-                        // TODO: find a query to test
-                        List<Integer> workerIndexs = new ArrayList<>();
-                        int num = downStreamWorkerNum / fixedWorkerNum;
-                        if (downStreamWorkerNum > fixedWorkerNum*num)
-                        {
-                            num++;
-                        }
-                        for (int i = 0; i < num; i++)
-                        {
-                            workerIndexs.add(this.workerIndexAssigner % this.downStreamWorkerNum);
-                            this.workerIndexAssigner++;
-                        }
-                    } else
-                    {
-                        // multiple-to-one stream
-//                    if (workerIndexAssigner < downStreamWorkerNum)
-//                    {
-//                        worker.getWorkerInfo().setPassSchema(true);
-//                    }
-                        worker.setWorkerPortIndex(this.workerIndexAssigner / this.downStreamWorkerNum);
-                        List<Integer> workerIndexes = new ArrayList<>();
-                        workerIndexes.add(this.workerIndexAssigner % this.downStreamWorkerNum);
-                        this.workerIndexAssigner++;
-                        this.workerIdToWorkerIndex.put(worker.getWorkerId(), workerIndexes);
-                    }
-                } else
-                {
-                    // assume one-to-one stream
-                    worker.setWorkerPortIndex(0);
-                    List<Integer> workerIndexs = new ArrayList<>(this.workerIndexAssigner);
-                    this.workerIndexAssigner++;
-                    this.workerIdToWorkerIndex.put(worker.getWorkerId(), workerIndexs);
-                }
             }
             this.workers.add(worker);
             if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
