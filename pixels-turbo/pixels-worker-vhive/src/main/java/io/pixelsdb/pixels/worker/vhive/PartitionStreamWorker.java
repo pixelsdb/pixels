@@ -28,6 +28,8 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
+import io.pixelsdb.pixels.planner.coordinate.TaskBatch;
+import io.pixelsdb.pixels.planner.coordinate.TaskInfo;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
@@ -129,7 +131,6 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
             long timestamp = event.getTimestamp();
             requireNonNull(event.getTableInfo(), "event.tableInfo is null");
             StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
-            List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
             requireNonNull(event.getPartitionInfo(), "event.partitionInfo is null");
             int numPartition = event.getPartitionInfo().getNumPartition();
             logger.info("table '" + event.getTableInfo().getTableName() +
@@ -160,36 +161,53 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
             {
                 partitioned.add(new ConcurrentLinkedQueue<>());
             }
-            for (InputSplit inputSplit : inputSplits)
-            {
-                List<InputInfo> scanInputs = inputSplit.getInputInfos();
 
-                partitionFutures.add(threadPool.submit(() -> {
-                        try
-                        {
-                            partitionFile(transId, timestamp, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
-                                    filter, keyColumnIds, projection, partitioned, writerSchema);
-                        }
-                        catch (Throwable e)
-                        {
-                            throw new WorkerException("error during partitioning", e);
-                        }
-                    }
-                ));
-            }
-            for (Future future : partitionFutures)
+            // get tasks from worker coordinator
+            TaskBatch taskBatch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
+            while (!taskBatch.isEndOfTasks())
             {
-                future.get();
+                List<TaskInfo> taskInfos = taskBatch.getTasks();
+                List<InputSplit> inputSplits = new ArrayList<>();
+                for (TaskInfo taskInfo : taskInfos)
+                {
+                    PartitionInput input = JSON.parseObject(taskInfo.getPayload(), PartitionInput.class);
+                    requireNonNull(input.getTableInfo(), "task.tableInfo is null");
+                    inputSplits.addAll(input.getTableInfo().getInputSplits());
+                }
+                if (writerSchema.get() == null)
+                {
+                    TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(
+                            WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
+                    TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
+                    writerSchema.set(resultSchema);
+                }
+                for (InputSplit inputSplit : inputSplits)
+                {
+                    List<InputInfo> scanInputs = inputSplit.getInputInfos();
+
+                    partitionFutures.add(threadPool.submit(() -> {
+                                try
+                                {
+                                    partitionFile(transId, timestamp, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
+                                            filter, keyColumnIds, projection, partitioned, writerSchema);
+                                }
+                                catch (Throwable e)
+                                {
+                                    throw new WorkerException("error during partitioning", e);
+                                }
+                            }
+                    ));
+                }
+                for (Future future : partitionFutures)
+                {
+                    future.get();
+                }
+                workerCoordinatorService.completeTasks(worker.getWorkerId(), taskInfos);
+                taskBatch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
             }
 
+            // write to down stream workers
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
-            if (writerSchema.get() == null)
-            {
-                TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(
-                        WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
-                TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
-                writerSchema.set(resultSchema);
-            }
             Set<Integer> hashValues = new HashSet<>(numPartition);
             for (int hash = 0; hash < numPartition; hash++)
             {
@@ -237,7 +255,6 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
             {
                 throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
             }
-
             outputPaths.forEach(partitionOutput::addOutput);
             partitionOutput.setHashValues(hashValues);
 
