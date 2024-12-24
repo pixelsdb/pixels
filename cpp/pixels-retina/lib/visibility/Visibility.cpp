@@ -33,7 +33,7 @@ Visibility::~Visibility() {
     std::cout << "call destroy function\n";
 }
 
-std::vector<uint64_t> Visibility::getReadableBitmap(int timestamp) {
+std::vector<uint64_t> Visibility::getVisibilityBitmap(int timestamp) {
     std::cout << "call getReadableBitmap\n";
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<uint64_t> readableBitmap(4, 0xFFFFFFFFFFFFFFFF);
@@ -50,24 +50,8 @@ std::vector<uint64_t> Visibility::getReadableBitmap(int timestamp) {
     return readableBitmap;
 }
 
-//void DeleteTrackerNative::markRowPreparedDelete(int timestamp, int rowId) {
-//    std::lock_guard<std::mutex> lock(mutex_);
-//    if (GET_BITMAP_BIT(deleteBitmap1, rowId) && GET_BITMAP_BIT(deleteBitmap2, rowId)) {
-//        throw std::runtime_error("this row is already marked for delete");
-//    }
-//    SET_BITMAP_BIT(deleteBitmap1, rowId);
-//    allValue = -1;
-//}
-//
-//void DeleteTrackerNative::markRowDeleted(int rowId) {
-//    std::lock_guard<std::mutex> lock(mutex_);
-//    SET_BITMAP_BIT(deleteBitmap1, rowId);
-//    SET_BITMAP_BIT(deleteBitmap2, rowId);
-//    allValue = -1;
-//}
-
-void Visibility::deleteRow(int rowId, int timestamp) {
-    std::cout << "call deleteRow\n";
+void Visibility::deleteRecord(int rowId, int timestamp) {
+    std::cout << "call deleteRecord\n";
     std::lock_guard<std::mutex> lock(mutex_);
 
     // set delete status to 10

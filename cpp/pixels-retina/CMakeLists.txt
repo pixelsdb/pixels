@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
-project(DeleteTrackerNative)
+project(pixels-retina)
+
+cmake_policy(SET CMP0177 NEW)
 
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 11)
@@ -20,9 +22,13 @@ set(SOURCES
     lib/visibility/Visibility.cpp)
 
 # Create shared library
-add_library(VisibilityNative SHARED ${SOURCES})
+add_library(pixels-retina SHARED ${SOURCES})
 
 # Set the target properties
-set_target_properties(VisibilityNative PROPERTIES
-    OUTPUT_NAME "VisibilityNative"
-    LIBRARY_OUTPUT_DIRECTORY "$ENV{PIXELS_HOME}/lib")
+set_target_properties(pixels-retina PROPERTIES
+    OUTPUT_NAME "pixels-retina"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+
+# Ensure the library is placed in the PIXELS_HOME directory
+install(TARGETS pixels-retina
+        LIBRARY DESTINATION $ENV{PIXELS_HOME}/lib)

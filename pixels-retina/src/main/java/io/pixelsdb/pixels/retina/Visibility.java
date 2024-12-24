@@ -18,26 +18,31 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-package io.pixelsdb.pixels.core.retina;
+package io.pixelsdb.pixels.retina;
 
 public class Visibility implements AutoCloseable
 {
     static
     {
         String pixelsHome = System.getenv("PIXELS_HOME");
-        if (pixelsHome == null || pixelsHome.isEmpty()) {
+        if (pixelsHome == null || pixelsHome.isEmpty())
+        {
             throw new IllegalStateException("Environment variable PIXELS_HOME is not set");
         }
 
         String osName = System.getProperty("os.name").toLowerCase();
         String libName;
-        if (osName.contains("win")) {
-            libName = "VisibilityNative.dll";
-        } else if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix")) {
-            libName = "libVisibilityNative.so";
-        } else if (osName.contains("mac")) {
-            libName = "libVisibilityNative.dylib";
-        } else {
+        if (osName.contains("win"))
+        {
+            libName = "pixels-retina.dll";
+        } else if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix"))
+        {
+            libName = "libpixels-retina.so";
+        } else if (osName.contains("mac"))
+        {
+            libName = "libpixels-retina.dylib";
+        } else
+        {
             throw new IllegalStateException("Unsupported OS: " + osName);
         }
 
@@ -69,16 +74,16 @@ public class Visibility implements AutoCloseable
     // native methods
     private native void destroyNativeObject(long nativeHandle);
     private native long createNativeObject();
-    public native long[] getReadableBitmap(int timestamp, long nativeHandle);
-    public native void deleteRow(int timestamp, int rowId, long nativeHandle);
+    public native long[] getVisibilityBitmap(int timestamp, long nativeHandle);
+    public native void deleteRecord(int timestamp, int rowId, long nativeHandle);
 
-    public long[] getReadableBitmap(int timestamp)
+    public long[] getVisibilityBitmap(int timestamp)
     {
-        return getReadableBitmap(timestamp, this.nativeHandle);
+        return getVisibilityBitmap(timestamp, this.nativeHandle);
     }
 
-    public void deleteRow(int timestamp, int rowId)
+    public void deleteRecord(int timestamp, int rowId)
     {
-        deleteRow(timestamp, rowId, this.nativeHandle);
+        deleteRecord(timestamp, rowId, this.nativeHandle);
     }
 }

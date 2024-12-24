@@ -17,16 +17,23 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.retina;
+package io.pixelsdb.pixels.retina;
 
-import org.junit.Test;
-
-public class TestRetinaServer
+public class TestVisibility
 {
-    @Test
-    public void testRetinaServer() throws Exception
+    public static void main(String[] args)
     {
-        RetinaServer retinaServer = new RetinaServer(18890);
-        retinaServer.run();
+        try (Visibility tracker = new Visibility()) {
+            // Test getReadableBitmap method
+            long[] bitmap = tracker.getVisibilityBitmap(12345);
+            System.out.println("Readable Bitmap: " + java.util.Arrays.toString(bitmap));
+
+            // Test deleteRow method
+            tracker.deleteRecord(12345, 1);
+            System.out.println("Row 1 deleted at timestamp 12345");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.println("Hello, World!");
     }
 }

@@ -23,36 +23,36 @@
 #include <cstdlib>
 
 /*
- * Class:     io_pixelsdb_pixels_core_deleter_DeleteTracker
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    destroyNativeObject
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeObject
+        (JNIEnv *env, jobject obj, jlong nativeHandle) {
+    Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
+    delete nativeObj;
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_Visibility
  * Method:    createNativeObject
  * Signature: ()J
  */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_core_deleter_DeleteTracker_createNativeObject
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject
         (JNIEnv *env, jobject obj) {
     Visibility* nativeObj = new Visibility();
     return reinterpret_cast<jlong>(nativeObj);
 }
 
 /*
- * Class:     io_pixelsdb_pixels_core_deleter_DeleteTracker
- * Method:    destroyNativeObject
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_core_deleter_DeleteTracker_destroyNativeObject
-(JNIEnv *env, jobject obj, jlong nativeHandle) {
-    Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
-    delete nativeObj;
-}
-
-/*
- * Class:     io_pixelsdb_pixels_core_deleter_DeleteTracker
- * Method:    getReadableBitmap
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    getVisibilityBitmap
  * Signature: (IJ)[J
  */
-JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_core_deleter_DeleteTracker_getReadableBitmap
+JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap
         (JNIEnv *env, jobject obj, jint timestamp, jlong nativeHandle) {
     Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
-    std::vector<uint64_t> bitmap = nativeObj->getReadableBitmap(static_cast<int>(timestamp));
+    std::vector<uint64_t> bitmap = nativeObj->getVisibilityBitmap(static_cast<int>(timestamp));
 
     jlongArray result = env->NewLongArray(bitmap.size());
     if (result == NULL) {
@@ -63,12 +63,12 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_core_deleter_DeleteTracker_
 }
 
 /*
- * Class:     io_pixelsdb_pixels_core_deleter_DeleteTracker
- * Method:    deleteRow
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    deleteRecord
  * Signature: (IIJ)V
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_core_deleter_DeleteTracker_deleteRow
-(JNIEnv *env, jobject obj, jint timestamp, jint rowId, jlong nativeHandle) {
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_deleteRecord
+        (JNIEnv *env, jobject obj, jint timestamp, jint rowId, jlong nativeHandle) {
     Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
-    nativeObj->deleteRow(static_cast<int>(timestamp), static_cast<int>(rowId));
+    nativeObj->deleteRecord(static_cast<int>(timestamp), static_cast<int>(rowId));
 }

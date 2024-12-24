@@ -17,9 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-
-#ifndef PIXELS_VISIBILITY_H
-#define PIXELS_VISIBILITY_H
+#ifndef PIXELS_RETINA_VISIBILITY_H
+#define PIXELS_RETINA_VISIBILITY_H
 
 #define GET_BITMAP_BIT(bitmap, rowId) (((bitmap)[(rowId) / 64] >> ((rowId) % 64)) & 1ULL)
 #define SET_BITMAP_BIT(bitmap, rowId) ((bitmap)[(rowId) / 64] |= (1ULL << ((rowId) % 64)))
@@ -39,8 +38,8 @@ public:
     Visibility();
     ~Visibility();
 
-    std::vector<uint64_t> getReadableBitmap(int timestamp);
-    void deleteRow(int rowId, int timestamp);
+    std::vector<uint64_t> getVisibilityBitmap(int timestamp);
+    void deleteRecord(int rowId, int timestamp);
 
 private:
     int8_t allValue;
@@ -51,4 +50,4 @@ private:
     std::mutex mutex_;
 };
 
-#endif //PIXELS_VISIBILITY_H
+#endif //PIXELS_RETINA_VISIBILITY_H
