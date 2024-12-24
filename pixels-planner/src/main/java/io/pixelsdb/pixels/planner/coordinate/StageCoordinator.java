@@ -29,10 +29,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -110,12 +110,20 @@ public class StageCoordinator
     {
         synchronized (this.lock)
         {
-            this.workerIdToWorkers.put(worker.getWorkerId(), worker);
-            if (worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_OPERATOR_NAME) ||
-                    worker.getWorkerInfo().getOperatorName().equals(Constants.BROADCAST_OPERATOR_NAME))
+            workerIdToWorkers.put(worker.getWorkerId(), worker);
+            if (worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_OPERATOR_NAME))
             {
                 worker.setWorkerPortIndex(workerIndexAssigner);
-                this.workerIndexAssigner++;
+                workerIndexAssigner++;
+            } else if (worker.getWorkerInfo().getOperatorName().equals(Constants.BROADCAST_OPERATOR_NAME))
+            {
+                if (downStreamWorkerNum != 0)
+                {
+                    workerIdToWorkerIndex.put(worker.getWorkerId(),
+                            Collections.singletonList(workerIndexAssigner % downStreamWorkerNum) );
+                    worker.setWorkerPortIndex(workerIndexAssigner / downStreamWorkerNum);
+                    workerIndexAssigner++;
+                }
             }
             this.workers.add(worker);
             if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
