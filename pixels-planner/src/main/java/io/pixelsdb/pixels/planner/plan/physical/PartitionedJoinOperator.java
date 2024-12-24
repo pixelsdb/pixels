@@ -191,8 +191,8 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                     for (InputSplit inputSplit : inputSplits)
                     {
                         partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
+                        tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                     }
-                    tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                 }
                 smallWorkerNum = this.smallPartitionInputs.size();
                 StageCoordinator partitionStageCoordinator = new StageCoordinator(smallPartitionStageId, tasks, 0);
@@ -215,8 +215,8 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                     for (InputSplit inputSplit : inputSplits)
                     {
                         partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
+                        tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                     }
-                    tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                 }
                 StageCoordinator partitionStageCoordinator = new StageCoordinator(largePartitionStageId, tasks, smallWorkerNum);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
