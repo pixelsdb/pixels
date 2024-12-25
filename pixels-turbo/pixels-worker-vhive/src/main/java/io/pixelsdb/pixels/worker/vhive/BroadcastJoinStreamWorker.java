@@ -46,14 +46,16 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
-public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, JoinOutput> {
+public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, JoinOutput>
+{
     private final Logger logger;
     protected WorkerCoordinateService workerCoordinatorService;
     private final WorkerMetrics workerMetrics;
     private io.pixelsdb.pixels.common.task.Worker<CFWorkerInfo> worker;
     private List<CFWorkerInfo> downStreamWorkers;
 
-    public BroadcastJoinStreamWorker(WorkerContext context) {
+    public BroadcastJoinStreamWorker(WorkerContext context)
+    {
         super(context);
         this.logger = context.getLogger();
         this.workerMetrics = context.getWorkerMetrics();
@@ -61,7 +63,8 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
     }
 
     @Override
-    public JoinOutput handleRequest(BroadcastJoinInput input) {
+    public JoinOutput handleRequest(BroadcastJoinInput input)
+    {
         long startTime = System.currentTimeMillis();
         try {
             int stageId = input.getStageId();
@@ -101,7 +104,8 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
     }
 
     @Override
-    public JoinOutput process(BroadcastJoinInput input) {
+    public JoinOutput process(BroadcastJoinInput input)
+    {
         JoinOutput joinOutput = new JoinOutput();
         long startTime = System.currentTimeMillis();
         joinOutput.setStartTimeMs(startTime);

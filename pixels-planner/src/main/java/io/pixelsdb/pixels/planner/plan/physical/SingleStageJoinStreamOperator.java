@@ -73,9 +73,8 @@ public class SingleStageJoinStreamOperator extends SingleStageJoinOperator
                 }
                 else if (joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
                 {
-//                    joinOutputs[i] = InvokerFactory.Instance()
-//                            .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(joinInput);
-                    throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+                    joinOutputs[i] = InvokerFactory.Instance()
+                            .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN_STREAMING).invoke(joinInput);
                 }
                 else
                 {
