@@ -36,7 +36,6 @@ public class CFWorkerInfo implements WorkerInfo
     private final int stageId;
     private final String operatorName;
     private final List<Integer> hashValues;
-    private boolean passSchema;
 
     public CFWorkerInfo(String ip, int port, long transId, int stageId,
                         String operatorName, List<Integer> hashValues)
@@ -47,7 +46,6 @@ public class CFWorkerInfo implements WorkerInfo
         this.stageId = stageId;
         this.operatorName = operatorName;
         this.hashValues = hashValues;
-        this.passSchema = false;
     }
 
     public CFWorkerInfo(TurboProto.WorkerInfo workerInfo)
@@ -58,12 +56,7 @@ public class CFWorkerInfo implements WorkerInfo
         this.stageId = workerInfo.getStageId();
         this.operatorName = workerInfo.getOperatorName();
         this.hashValues = workerInfo.getHashValuesList();
-        this.passSchema = false;
     }
-
-    public void setPassSchema(boolean passSchema) { this.passSchema = passSchema; }
-
-    public boolean getPassSchema() { return passSchema; }
 
     public String getIp()
     {

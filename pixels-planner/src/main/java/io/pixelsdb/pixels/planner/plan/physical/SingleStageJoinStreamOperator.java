@@ -34,7 +34,7 @@ import java.util.concurrent.CompletionException;
 import static io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.waitForCompletion;
 
 /**
- * @author hank
+ * @author hank, huasiy
  * @create 2023-09-19
  */
 public class SingleStageJoinStreamOperator extends SingleStageJoinOperator
@@ -104,17 +104,7 @@ public class SingleStageJoinStreamOperator extends SingleStageJoinOperator
                 CompletableFuture<CompletableFuture<? extends Output>[]> largeChildFuture = null;
                 if (largeChild != null)
                 {
-                    largeChildFuture = largeChild.execute();
-                }
-                if (smallChildFuture != null)
-                {
-                    CompletableFuture<? extends Output>[] smallChildOutputs = smallChildFuture.join();
-                    waitForCompletion(smallChildOutputs);
-                }
-                if (largeChildFuture != null)
-                {
-                    CompletableFuture<? extends Output>[] largeChildOutputs = largeChildFuture.join();
-//                    waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
+                    largeChild.execute();
                 }
                 prevStagesFuture.complete(null);
             }

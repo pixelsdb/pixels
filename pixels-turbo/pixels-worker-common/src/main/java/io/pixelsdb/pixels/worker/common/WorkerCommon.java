@@ -440,7 +440,7 @@ public class WorkerCommon
                     .setRowGroupSize(rowGroupSize)
                     .setStorage(storage)
                     .setPath(filePath)
-                    .setEncodingLevel(EncodingLevel.EL0)
+                    .setEncodingLevel(EncodingLevel.EL2)
                     .setPartitioned(isPartitioned);
             if (isPartitioned)
             {

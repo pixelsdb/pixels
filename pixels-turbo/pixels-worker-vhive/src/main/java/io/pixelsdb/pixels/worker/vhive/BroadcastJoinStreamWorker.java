@@ -22,12 +22,9 @@ package io.pixelsdb.pixels.worker.vhive;
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
-import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
-import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
@@ -73,7 +70,8 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             int port = WorkerCommon.getPort();
             String coordinatorIp = WorkerCommon.getCoordinatorIp();
             int coordinatorPort = WorkerCommon.getCoordinatorPort();
-            CFWorkerInfo workerInfo = new CFWorkerInfo(ip, port, transId, stageId, "broadcast_join", Collections.emptyList());
+            CFWorkerInfo workerInfo = new CFWorkerInfo(ip, port, transId, stageId,
+                    Constants.BROADCAST_OPERATOR_NAME, Collections.emptyList());
             workerCoordinatorService = new WorkerCoordinateService(coordinatorIp, coordinatorPort);
             worker = workerCoordinatorService.registerWorker(workerInfo);
             downStreamWorkers = workerCoordinatorService.getDownstreamWorkers(worker.getWorkerId());
@@ -204,8 +202,6 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                     WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead),
                     rightColAlias, rightProjection, rightKeyColumnIds);
             logger.info("succeed to get left and right schema");
-            logger.info("left schema: " + leftSchema.get());
-            logger.info("right schema: " + rightSchema.get());
 
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>();
@@ -353,77 +349,5 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return joinOutput;
         }
-    }
-
-    /**
-     * Scan the input files of the right table and do the join.
-     *
-     * @param transId        the transaction id used by I/O scheduler
-     * @param joiner         the joiner for the broadcast join
-     * @param rightScheme    the storage scheme of the right table
-     * @param rightCols      the column names of the right table
-     * @param rightFilter    the table scan filter on the right table
-     * @param joinResult     the container of the join result
-     * @param workerMetrics  the collector of the performance metrics
-     * @return the number of joined rows produced in this split
-     */
-    public static int joinWithRightTable(
-            long transId, Joiner joiner, String rightEndpoint,
-            Storage.Scheme rightScheme, String[] rightCols, TableScanFilter rightFilter,
-            ConcurrentLinkedQueue<VectorizedRowBatch> joinResult, WorkerMetrics workerMetrics, Logger logger) {
-        logger.info("join with right table endpoint {}", rightEndpoint);
-        int joinedRows = 0;
-        WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
-        WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
-        long readBytes = 0L;
-        int numReadRequests = 0;
-
-        readCostTimer.start();
-        PixelsReader pixelsReader;
-        try
-        {
-            pixelsReader = StreamWorkerCommon.getReader(rightScheme, rightEndpoint);
-            readCostTimer.stop();
-            PixelsReaderOption option = StreamWorkerCommon.getReaderOption(transId, rightCols);
-            PixelsRecordReader recordReader = pixelsReader.read(option);
-            VectorizedRowBatch rowBatch;
-
-            Bitmap filtered = new Bitmap(StreamWorkerCommon.rowBatchSize, true);
-            Bitmap tmp = new Bitmap(StreamWorkerCommon.rowBatchSize, false);
-            computeCostTimer.start();
-            do
-            {
-                rowBatch = recordReader.readBatch(StreamWorkerCommon.rowBatchSize);
-//                logger.info("record reader read row batch size before filter {}", rowBatch.size);
-                rightFilter.doFilter(rowBatch, filtered, tmp);
-                rowBatch.applyFilter(filtered);
-//                logger.info("record reader read row batch size after filter {}", rowBatch.size);
-                if (rowBatch.size > 0) {
-                    logger.info("row batch size > 0");
-                    List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
-                    for (VectorizedRowBatch joined : joinedBatches) {
-                        if (!joined.isEmpty()) {
-                            logger.info("joined result add {}", joined.size);
-                            joinResult.add(joined);
-                            joinedRows += joined.size;
-                        }
-                    }
-                }
-            } while (!rowBatch.endOfFile);
-            pixelsReader.close();
-            computeCostTimer.stop();
-            computeCostTimer.minus(recordReader.getReadTimeNanos());
-            readCostTimer.add(recordReader.getReadTimeNanos());
-            readBytes += recordReader.getCompletedBytes();
-            numReadRequests += recordReader.getNumReadRequests();
-        } catch (Throwable e) {
-            throw new WorkerException("failed to scan the right table input file '" +
-                    rightEndpoint + "' and do the join", e);
-        }
-        workerMetrics.addReadBytes(readBytes);
-        workerMetrics.addNumReadRequests(numReadRequests);
-        workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
-        workerMetrics.addComputeCostNs(computeCostTimer.getElapsedNs());
-        return joinedRows;
     }
 }
