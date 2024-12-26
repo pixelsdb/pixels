@@ -26,18 +26,34 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeOb
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
  * Method:    getVisibilityBitmap
- * Signature: (IJ)[J
+ * Signature: (J[JJ)V
  */
-JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap
-  (JNIEnv *, jobject, jint, jlong);
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap
+  (JNIEnv *, jobject, jlong, jlongArray, jlong);
 
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
  * Method:    deleteRecord
- * Signature: (IIJ)V
+ * Signature: (IJJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_deleteRecord
-  (JNIEnv *, jobject, jint, jint, jlong);
+  (JNIEnv *, jobject, jint, jlong, jlong);
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    createNewEpoch
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNewEpoch
+  (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    cleanEpochArrAndPatchArr
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_cleanEpochArrAndPatchArr
+  (JNIEnv *, jobject, jlong, jlong);
 
 #ifdef __cplusplus
 }

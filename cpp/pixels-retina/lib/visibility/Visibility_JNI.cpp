@@ -47,28 +47,45 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeOb
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
  * Method:    getVisibilityBitmap
- * Signature: (IJ)[J
+ * Signature: (J[JJ)V
  */
-JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap
-        (JNIEnv *env, jobject obj, jint timestamp, jlong nativeHandle) {
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap
+        (JNIEnv *env, jobject obj, jlong epochTs, jlongArray bitmapArray, jlong nativeHandle) {
     Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
-    std::vector<uint64_t> bitmap = nativeObj->getVisibilityBitmap(static_cast<int>(timestamp));
-
-    jlongArray result = env->NewLongArray(bitmap.size());
-    if (result == NULL) {
-        return NULL;
-    }
-    env->SetLongArrayRegion(result, 0, bitmap.size(), reinterpret_cast<jlong*>(bitmap.data()));
-    return result;
+    std::uint64_t bitmap[BITMAP_ARRAY_SIZE];
+    nativeObj->getVisibilityBitmap(static_cast<std::uint64_t>(epochTs), bitmap);
+    env->SetLongArrayRegion(bitmapArray, 0, BITMAP_ARRAY_SIZE, reinterpret_cast<jlong*>(bitmap));
 }
 
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
  * Method:    deleteRecord
- * Signature: (IIJ)V
+ * Signature: (IJJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_deleteRecord
-        (JNIEnv *env, jobject obj, jint timestamp, jint rowId, jlong nativeHandle) {
+        (JNIEnv * env, jobject obj, jint rowId, jlong epochTs, jlong nativeHandle) {
     Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
-    nativeObj->deleteRecord(static_cast<int>(timestamp), static_cast<int>(rowId));
+    nativeObj->deleteRecord(static_cast<int>(rowId), static_cast<std::uint64_t>(epochTs));
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    createNewEpoch
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNewEpoch
+        (JNIEnv *env, jobject obj, jlong epochTs, jlong nativeHandle) {
+    Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
+    nativeObj->createNewEpoch(static_cast<std::uint64_t>(epochTs));
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    cleanEpochArrAndPatchArr
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_cleanEpochArrAndPatchArr
+        (JNIEnv *env, jobject obj, jlong cleanUpToEpochTs, jlong nativeHandle) {
+    Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
+    nativeObj->cleanEpochArrAndPatchArr(static_cast<std::uint64_t>(cleanUpToEpochTs));
 }

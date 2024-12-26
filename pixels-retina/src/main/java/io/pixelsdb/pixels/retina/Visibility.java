@@ -74,16 +74,29 @@ public class Visibility implements AutoCloseable
     // native methods
     private native void destroyNativeObject(long nativeHandle);
     private native long createNativeObject();
-    public native long[] getVisibilityBitmap(int timestamp, long nativeHandle);
-    public native void deleteRecord(int timestamp, int rowId, long nativeHandle);
+    public native void getVisibilityBitmap(long epochTs, long[] visibilityBitmap, long nativeHandle);
+    public native void deleteRecord(int rowId, long epochTs, long nativeHandle);
+    public native void createNewEpoch(long epochTs, long nativeHandle);
+    public native void cleanEpochArrAndPatchArr(long epochTs, long nativeHandle);
 
-    public long[] getVisibilityBitmap(int timestamp)
+    public long[] getVisibilityBitmap(long epochTs, long[] visibilityBitmap)
     {
-        return getVisibilityBitmap(timestamp, this.nativeHandle);
+        getVisibilityBitmap(epochTs, visibilityBitmap, this.nativeHandle);
+        return visibilityBitmap;
     }
 
-    public void deleteRecord(int timestamp, int rowId)
+    public void deleteRecord(int rowId, long epochTs)
     {
-        deleteRecord(timestamp, rowId, this.nativeHandle);
+        deleteRecord(rowId, epochTs, this.nativeHandle);
+    }
+
+    public void createNewEpoch(long epochTs)
+    {
+        createNewEpoch(epochTs, this.nativeHandle);
+    }
+
+    public void cleanEpochArrAndPatchArr(long epochTs)
+    {
+        cleanEpochArrAndPatchArr(epochTs, this.nativeHandle);
     }
 }

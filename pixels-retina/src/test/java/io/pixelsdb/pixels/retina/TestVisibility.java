@@ -25,7 +25,8 @@ public class TestVisibility
     {
         try (Visibility tracker = new Visibility()) {
             // Test getReadableBitmap method
-            long[] bitmap = tracker.getVisibilityBitmap(12345);
+            long[] bitmap = new long[4];
+            tracker.getVisibilityBitmap(12345, bitmap);
             System.out.println("Readable Bitmap: " + java.util.Arrays.toString(bitmap));
 
             // Test deleteRow method
