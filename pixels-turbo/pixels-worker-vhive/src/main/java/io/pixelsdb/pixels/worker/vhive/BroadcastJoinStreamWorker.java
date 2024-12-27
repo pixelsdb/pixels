@@ -82,6 +82,7 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                     "most one downstream worker is allowed");
             JoinOutput output = process(input);
             workerCoordinatorService.terminateWorker(worker.getWorkerId());
+            workerCoordinatorService.shutdown();
             return output;
         } catch (Throwable e) {
             JoinOutput joinOutput = new JoinOutput();

@@ -79,6 +79,7 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
             downStreamWorkers = workerCoordinatorService.getDownstreamWorkers(worker.getWorkerId());
             JoinOutput output = process(input);
             workerCoordinatorService.terminateWorker(worker.getWorkerId());
+            workerCoordinatorService.shutdown();
             return output;
         } catch (Throwable e) {
             JoinOutput output = new JoinOutput();

@@ -85,6 +85,7 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
                     "at least one downstream worker is allowed");
             PartitionOutput output = process(input);
             workerCoordinatorService.terminateWorker(worker.getWorkerId());
+            workerCoordinatorService.shutdown();
             return output;
         } catch (Throwable e) {
             PartitionOutput partitionOutput = new PartitionOutput();
