@@ -111,7 +111,8 @@ public class StageCoordinator
         synchronized (this.lock)
         {
             workerIdToWorkers.put(worker.getWorkerId(), worker);
-            if (worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_OPERATOR_NAME))
+            if (worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_OPERATOR_NAME) ||
+                    worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_JOIN_OPERATOR_NAME))
             {
                 worker.setWorkerPortIndex(workerIndexAssigner);
                 workerIndexAssigner++;
