@@ -702,7 +702,7 @@ public class PixelsPlanner
                     // The parent is not present or is not a small-left broadcast join, complete chain join construction.
                     boolean postPartition = false;
                     PartitionInfo postPartitionInfo = null;
-                    if (parent.isPresent() && (parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED || parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.SORTED))
+                    if (parent.isPresent() && (parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED))
                     {
                         // Note: we must use the parent to calculate the number of partitions for post partitioning.
                         postPartition = true;
