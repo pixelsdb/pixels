@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.planner.plan.physical.output;
 import java.util.List;
 import io.pixelsdb.pixels.common.turbo.Output;
 
-public class SortOutput extends Output {
+public class SortOutput extends NonPartitionOutput {
     /**
      * Default constructor for Jackson.
      */

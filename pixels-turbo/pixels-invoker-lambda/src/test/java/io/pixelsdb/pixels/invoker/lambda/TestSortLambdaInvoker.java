@@ -69,7 +69,6 @@ public class TestSortLambdaInvoker
             tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
             input.setTableInfo(tableInfo);
             input.setProjection(new boolean[]{true, true, true, true});
-            input.setNumPartition(4);
             input.setKeyColumnIds(new int[]{0});
             input.setOutput(new OutputInfo("pixels-turbo-intermediate/zhujiaxuan/test/result/orders_" + i,
                     new StorageInfo(Storage.Scheme.s3, null, null, null, null), true));
@@ -111,7 +110,6 @@ public class TestSortLambdaInvoker
             tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.s3, null, null, null, null));
             input.setTableInfo(tableInfo);
             input.setProjection(new boolean[]{true, true, true, true});
-            input.setNumPartition(40);
             input.setKeyColumnIds(new int[]{0});
             input.setOutput(new OutputInfo("pixels-turbo-intermediate/zhujiaxuan/test/result/lineitem_" + i,
                     new StorageInfo(Storage.Scheme.s3, null, null, null, null), true));

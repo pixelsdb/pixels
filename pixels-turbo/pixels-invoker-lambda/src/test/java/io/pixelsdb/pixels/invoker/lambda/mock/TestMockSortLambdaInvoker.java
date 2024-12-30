@@ -48,7 +48,6 @@ public class TestMockSortLambdaInvoker
             tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.file, null, null, null, null));
             input.setTableInfo(tableInfo);
             input.setProjection(new boolean[]{true, true, true, true});
-            input.setNumPartition(4);
             input.setKeyColumnIds(new int[]{0});
             input.setOutput(new OutputInfo("/home/ubuntu/test/pixels-lambda-test/orders_" + i,
                     new StorageInfo(Storage.Scheme.file, null, null, null, null), true));
@@ -90,7 +89,6 @@ public class TestMockSortLambdaInvoker
             tableInfo.setStorageInfo(new StorageInfo(Storage.Scheme.file, null, null, null, null));
             input.setTableInfo(tableInfo);
             input.setProjection(new boolean[]{true, true, true, true});
-            input.setNumPartition(4);
             input.setKeyColumnIds(new int[]{0});
             input.setOutput(new OutputInfo("/home/ubuntu/test/pixels-lambda-test/lineitem_" + i,
                     new StorageInfo(Storage.Scheme.file, null, null, null, null), true));

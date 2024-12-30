@@ -1468,7 +1468,6 @@ public class PixelsPlanner
             sortInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection); // 这么命名也没毛病，同一个方法一样用，但是有歧义
             sortInput.setKeyColumnIds(newKeyColumnIds);
-            sortInput.setNumPartition(numPartition);
             sortInput.setIsSorted(false);
             sortInputsBuilder.add(sortInput);
         }

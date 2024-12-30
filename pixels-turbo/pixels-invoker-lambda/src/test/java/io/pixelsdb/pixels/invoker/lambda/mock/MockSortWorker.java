@@ -75,9 +75,6 @@ public class MockSortWorker
             requireNonNull(event.getTableInfo(), "event.tableInfo is null");
             StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
-            int numPartition = event.getNumPartition();
-            logger.info("table '" + event.getTableInfo().getTableName() +
-                    "', number of partitions (" + numPartition + ")");
             int[] keyColumnIds = event.getKeyColumnIds();
             boolean[] projection = event.getProjection();
             requireNonNull(event.getOutput(), "event.output is null");

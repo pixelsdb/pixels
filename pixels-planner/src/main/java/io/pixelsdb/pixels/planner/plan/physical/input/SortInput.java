@@ -36,8 +36,6 @@ public class SortInput extends Input
     private boolean[] projection;
     private OutputInfo output;
     private int[] keyColumnIds;
-    private int numPartition;
-
     private boolean isSorted;
 
     /**
@@ -107,15 +105,5 @@ public class SortInput extends Input
     public void setIsSorted(boolean sorted)
     {
         isSorted = sorted;
-    }
-
-    public int getNumPartition()
-    {
-        return numPartition;
-    }
-
-    public void setNumPartition(int numPartition)
-    {
-        this.numPartition = numPartition;
     }
 }
