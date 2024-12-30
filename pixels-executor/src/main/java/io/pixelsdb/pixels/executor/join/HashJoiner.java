@@ -37,29 +37,6 @@ import static java.util.Objects.requireNonNull;
 public class HashJoiner extends Joiner
 {
     private final HashTable smallTable = new HashTable();
-
-    /**
-     * The joiner to join two tables. Currently, only NATURE/INNER/LEFT/RIGHT equi-joins
-     * are supported. The first numKeyColumns columns in the two tables are considered as
-     * the join key. The small table, a.k.a., the left table, is hash probed in the join.
-     * <p/>
-     * In the join result, first comes with the columns from the small table, followed by
-     * the columns from the large (a.k.a., right) table.
-     *
-     * @param joinType the join type
-     * @param smallSchema the schema of the small table
-     * @param smallColumnAlias the alias of the columns from the small table. These alias
-     *                         are used as the column name in {@link #joinedSchema}
-     * @param smallProjection denotes whether the columns from {@link #smallSchema}
-     *                        are included in {@link #joinedSchema}
-     * @param smallKeyColumnIds the ids of the key columns of the small table
-     * @param largeSchema the schema of the large table
-     * @param largeColumnAlias the alias of the columns from the large table. These alias
-     *                         are used as the column name in {@link #joinedSchema}
-     * @param largeProjection denotes whether the columns from {@link #largeSchema}
-     *                        are included in {@link #joinedSchema}
-     * @param largeKeyColumnIds the ids of the key columns of the large table
-     */
     public HashJoiner(JoinType joinType,
                   TypeDescription smallSchema, String[] smallColumnAlias,
                   boolean[] smallProjection, int[] smallKeyColumnIds,
@@ -69,14 +46,7 @@ public class HashJoiner extends Joiner
         super(joinType, smallSchema, smallColumnAlias, smallProjection, smallKeyColumnIds, largeSchema, largeColumnAlias, largeProjection, largeKeyColumnIds);
     }
 
-    /**
-     * Populate the hash table for the left (a.k.a., small) table in the join. The
-     * hash table will be used for probing in the join.
-     * <b>Note</b> this method is thread safe, but it should only be called before
-     * {@link Joiner#join(VectorizedRowBatch) join}.
-     *
-     * @param smallBatch a row batch from the left (a.k.a., small) table
-     */
+    @Override
     public void populateLeftTable(VectorizedRowBatch smallBatch)
     {
         requireNonNull(smallBatch, "smallBatch is null");
@@ -92,14 +62,7 @@ public class HashJoiner extends Joiner
         }
     }
 
-    /**
-     * Perform the join for a row batch from the right (a.k.a., large) table.
-     * This method is thread-safe, but should not be called before the small table is populated.
-     *
-     * @param largeBatch a row batch from the large table
-     * @return the row batches of the join result, could be empty. <b>Note: </b> the returned
-     * list is backed by {@link LinkedList}, thus it is not performant to access it randomly.
-     */
+    @Override
     public List<VectorizedRowBatch> join(VectorizedRowBatch largeBatch)
     {
         requireNonNull(largeBatch, "largeBatch is null");
@@ -162,11 +125,7 @@ public class HashJoiner extends Joiner
         return result;
     }
 
-    /**
-     * Get the left outer join results for the tuples from the unmatched small (a.k.a., left) table.
-     * This method should be called after {@link Joiner#join(VectorizedRowBatch) join} is done, if
-     * the join is left outer join.
-     */
+    @Override
     public boolean writeLeftOuter(PixelsWriter pixelsWriter, int batchSize) throws IOException
     {
         checkArgument(this.joinType == JoinType.EQUI_LEFT || this.joinType == JoinType.EQUI_FULL,
@@ -275,11 +234,6 @@ public class HashJoiner extends Joiner
         }
         partitioned.clear();
         return true;
-    }
-
-    public TypeDescription getJoinedSchema()
-    {
-        return this.joinedSchema;
     }
 
     public int getSmallTableSize()

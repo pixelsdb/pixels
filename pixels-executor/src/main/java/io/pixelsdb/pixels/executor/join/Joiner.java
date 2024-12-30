@@ -177,10 +177,31 @@ public abstract class Joiner
         return this.joinedSchema;
     }
 
+    /**
+     * Perform the join for a row batch from the right (a.k.a., large) table.
+     * This method is thread-safe, but should not be called before the small table is populated.
+     *
+     * @param largeBatch a row batch from the large table
+     * @return the row batches of the join result, could be empty. <b>Note: </b> the returned
+     * list is backed by {@link LinkedList}, thus it is not performant to access it randomly.
+     */
     public abstract List<VectorizedRowBatch> join(VectorizedRowBatch largeBatch);
 
+    /**
+     * Populate the hash table for the left (a.k.a., small) table in the join. The
+     * hash table will be used for probing in the join.
+     * <b>Note</b> this method is thread safe, but it should only be called before
+     * {@link Joiner#join(VectorizedRowBatch) join}.
+     *
+     * @param smallBatch a row batch from the left (a.k.a., small) table
+     */
     public abstract void populateLeftTable(VectorizedRowBatch smallBatch);
 
+    /**
+     * Get the left outer join results for the tuples from the unmatched small (a.k.a., left) table.
+     * This method should be called after {@link Joiner#join(VectorizedRowBatch) join} is done, if
+     * the join is left outer join.
+     */
     public abstract boolean writeLeftOuter(PixelsWriter pixelsWriter, int batchSize) throws IOException;
 
     public abstract int getSmallTableSize();

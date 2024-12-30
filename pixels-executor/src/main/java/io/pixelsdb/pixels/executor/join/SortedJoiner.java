@@ -33,7 +33,7 @@ import static java.util.Objects.requireNonNull;
 public class SortedJoiner extends Joiner
 {
     public final List<Tuple> sortedSmallTable = new ArrayList<>();
-    public final List<List<Tuple>> tempTable = new ArrayList<>();
+    public final List<List<Tuple>> tempTable = Collections.synchronizedList(new ArrayList<>());
 
     /**
      * The joiner to join two tables. Currently, only NATURE/INNER/LEFT/RIGHT equi-joins
@@ -66,11 +66,15 @@ public class SortedJoiner extends Joiner
     {
         requireNonNull(smallBatch, "smallBatch is null");
         checkArgument(smallBatch.size > 0, "smallBatch is empty");
-        if (tempTable.size() <= partIndex)
+        List<Tuple> table;
+        synchronized (tempTable)
         {
-            tempTable.add(new ArrayList<>());
+            if (tempTable.size() <= partIndex)
+            {
+                tempTable.add(new ArrayList<>());
+            }
+            table = tempTable.get(partIndex);
         }
-        List<Tuple> table = tempTable.get(partIndex);
 
         Tuple.Builder builder = new Tuple.Builder(smallBatch, this.smallKeyColumnIds, this.smallProjection);
         synchronized (table)
@@ -81,7 +85,6 @@ public class SortedJoiner extends Joiner
                 table.add(tuple);
             }
         }
-
     }
 
     public void mergeLeftTable()
