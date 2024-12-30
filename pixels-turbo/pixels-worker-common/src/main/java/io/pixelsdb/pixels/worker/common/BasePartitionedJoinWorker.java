@@ -608,11 +608,18 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                         rightPartitioned, WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
-                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                    Set<Integer> rightHashValues;
+                    if (rightScheme.equals(Storage.Scheme.httpstream))
                     {
-                        rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                        rightHashValues = new HashSet<>(hashValues);
+                    } else
+                    {
+                        checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+                        rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
+                        for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                        {
+                            rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                        }
                     }
                     for (int hashValue : hashValues)
                     {

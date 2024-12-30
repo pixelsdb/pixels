@@ -55,7 +55,16 @@ public class WorkerCoordinateService
 
     public void shutdown() throws InterruptedException
     {
-        this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        try
+        {
+            if (!channel.shutdown().awaitTermination(5, TimeUnit.SECONDS))
+            {
+                channel.shutdownNow();
+            }
+        } catch (InterruptedException e)
+        {
+            channel.shutdownNow();
+        }
     }
 
     /**
