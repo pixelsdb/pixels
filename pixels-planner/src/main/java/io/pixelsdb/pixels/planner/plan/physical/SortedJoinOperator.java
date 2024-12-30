@@ -439,7 +439,7 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
             return inputCostMs;
         }
 
-        public long getLargesortComputeCostMs()
+        public long getLargeSortComputeCostMs()
         {
             long computeCostMs = 0;
             if (this.largeSortedOutputs != null)
