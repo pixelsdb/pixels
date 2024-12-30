@@ -36,7 +36,7 @@ public class SortInput extends Input
     private boolean[] projection;
     private OutputInfo output;
     private int[] keyColumnIds;
-    private boolean isSorted;
+    private boolean sorted;
 
     /**
      * Default constructor for Jackson.
@@ -47,14 +47,14 @@ public class SortInput extends Input
     }
 
     public SortInput(long transId, long timestamp, ScanTableInfo tableInfo, boolean[] projection,
-                     OutputInfo output, int[] keyColumnIds, boolean isSorted)
+                     OutputInfo output, int[] keyColumnIds, boolean sorted)
     {
         super(transId, timestamp);
         this.tableInfo = tableInfo;
         this.projection = projection;
         this.output = output;
         this.keyColumnIds = keyColumnIds;
-        this.isSorted = isSorted;
+        this.sorted = sorted;
     }
 
     public ScanTableInfo getTableInfo()
@@ -97,13 +97,13 @@ public class SortInput extends Input
         this.keyColumnIds = keyColumnIds;
     }
 
-    public boolean isSorted()
+    public boolean sorted()
     {
-        return isSorted;
+        return this.sorted;
     }
 
-    public void setIsSorted(boolean sorted)
+    public void setSorted(boolean sorted)
     {
-        isSorted = sorted;
+        this.sorted = sorted;
     }
 }

@@ -39,7 +39,7 @@ import static io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.waitForC
 
 public class SortedJoinBatchOperator extends SortedJoinOperator
 {
-    private static final Logger logger = LogManager.getLogger(PartitionedJoinBatchOperator.class);
+    private static final Logger logger = LogManager.getLogger(SortedJoinBatchOperator.class);
 
     public SortedJoinBatchOperator(String name, List<SortInput> smallSortedInputs,
                                    List<SortInput> largeSortedInputs,
@@ -141,7 +141,7 @@ public class SortedJoinBatchOperator extends SortedJoinOperator
                     prevStagesFuture.complete(null);
                 } else
                 {
-                    // no children exist, partition both tables and wait for the small table partitioning.
+                    // no children exist, sort both tables and wait for the small table sorting.
                     checkArgument(!smallSortedInputs.isEmpty(), "smallSortedInputs is empty");
                     checkArgument(!largeSortedInputs.isEmpty(), "largeSortedInputs is empty");
                     smallSortedOutputs = new CompletableFuture[smallSortedInputs.size()];

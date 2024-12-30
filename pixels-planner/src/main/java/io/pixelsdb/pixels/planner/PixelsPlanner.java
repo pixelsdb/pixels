@@ -702,7 +702,7 @@ public class PixelsPlanner
                     // The parent is not present or is not a small-left broadcast join, complete chain join construction.
                     boolean postPartition = false;
                     PartitionInfo postPartitionInfo = null;
-                    if (parent.isPresent() && (parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED))
+                    if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
                     {
                         // Note: we must use the parent to calculate the number of partitions for post partitioning.
                         postPartition = true;
@@ -1047,7 +1047,6 @@ public class PixelsPlanner
                     this.transId, leftTable, rightTable, join.getJoinEndian());
             if (childOperator != null)
             {
-                // left side is post partitioned, thus we only partition the right table.
                 boolean leftIsBase = leftTable.getTableType() == Table.TableType.BASE;
                 SortedTableInfo leftTableInfo = new SortedTableInfo(
                         leftTable.getTableName(), leftIsBase, leftTable.getColumnNames(),
@@ -1468,7 +1467,7 @@ public class PixelsPlanner
             sortInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection); // todo: Rename this function
             sortInput.setKeyColumnIds(newKeyColumnIds);
-            sortInput.setIsSorted(false);
+            sortInput.setSorted(true);
             sortInputsBuilder.add(sortInput);
         }
         return sortInputsBuilder.build();

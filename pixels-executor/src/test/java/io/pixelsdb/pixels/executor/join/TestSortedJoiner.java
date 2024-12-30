@@ -76,7 +76,7 @@ public class TestSortedJoiner
             rowBatch = recordReaderNation.readBatch(1000);
             if (rowBatch.size > 0)
             {
-                joiner.populateLeftTable(rowBatch, 0); // 把rowbatch 插入到sorted left table。 怎么插入的时候转为Tuple
+                joiner.populateLeftTable(rowBatch);
             }
         } while (!rowBatch.endOfFile);
 

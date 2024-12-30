@@ -123,10 +123,10 @@ public class MockSortWorker
                 TypeDescription resultSchema = MockWorkerCommon.getResultSchema(fileSchema, columnsToRead);
                 writerSchema.set(resultSchema);
             }
-            mergeSortedList(resultToMerge, result, writerSchema); //换了位置
+            mergeSortedList(resultToMerge, result, writerSchema);
             PixelsWriter pixelsWriter = MockWorkerCommon.getWriter(writerSchema.get(),
                     MockWorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                    false, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList())); // 改为false
+                    false, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
 
             for (VectorizedRowBatch batch : result)
             {

@@ -140,14 +140,14 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
 
             } else if (smallChild != null)
             {
-                // only small child exists, we should invoke the large table partitioning and wait for the small child.
+                // only small child exists, we should invoke the large table sorting and wait for the small child.
                 checkArgument(smallSortedInputs.isEmpty(), "smallSortedInputs is not empty");
                 checkArgument(!largeSortedInputs.isEmpty(), "largeSortedInputs is empty");
                 this.smallChild.initPlanCoordinator(planCoordinator, joinStageId, true);
 
             } else if (largeChild != null)
             {
-                // only large child exists, we should invoke and wait for the small table partitioning.
+                // only large child exists, we should invoke and wait for the small table sorting.
                 checkArgument(!smallSortedInputs.isEmpty(), "smallSortedInputs is empty");
                 checkArgument(largeSortedInputs.isEmpty(), "largeSortedInputs is not empty");
                 this.largeChild.initPlanCoordinator(planCoordinator, joinStageId, true);
@@ -159,8 +159,8 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
 
             if (!smallSortedInputs.isEmpty())
             {
-                int partitionStageId = planCoordinator.assignStageId();
-                StageDependency partitionStageDependency = new StageDependency(partitionStageId, joinStageId, true);
+                int sortStageId = planCoordinator.assignStageId();
+                StageDependency sortStageDependency = new StageDependency(sortStageId, joinStageId, true);
                 List<Task> tasks = new ArrayList<>();
                 int taskId = 0;
                 for (SortInput SortedInput : this.smallSortedInputs)
@@ -172,14 +172,14 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
                         tasks.add(new Task(taskId++, JSON.toJSONString(SortedInput)));
                     }
                 }
-                StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks);
-                planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
+                StageCoordinator sortStageCoordinator = new StageCoordinator(sortStageId, tasks);
+                planCoordinator.addStageCoordinator(sortStageCoordinator, sortStageDependency);
             }
 
             if (!largeSortedInputs.isEmpty())
             {
-                int partitionStageId = planCoordinator.assignStageId();
-                StageDependency partitionStageDependency = new StageDependency(partitionStageId, joinStageId, true);
+                int sortStageId = planCoordinator.assignStageId();
+                StageDependency sortStageDependency = new StageDependency(sortStageId, joinStageId, true);
                 List<Task> tasks = new ArrayList<>();
                 int taskId = 0;
                 for (SortInput SortedInput : this.largeSortedInputs)
@@ -191,8 +191,8 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
                         tasks.add(new Task(taskId++, JSON.toJSONString(SortedInput)));
                     }
                 }
-                StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks);
-                planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
+                StageCoordinator sortStageCoordinator = new StageCoordinator(sortStageId, tasks);
+                planCoordinator.addStageCoordinator(sortStageCoordinator, sortStageDependency);
             }
         } else
         {
@@ -400,7 +400,7 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
             return inputCostMs;
         }
 
-        public long getSmallPartitionComputeCostMs()
+        public long getSmallSortComputeCostMs()
         {
             long computeCostMs = 0;
             if (this.smallSortedOutputs != null)
@@ -413,7 +413,7 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
             return computeCostMs;
         }
 
-        public long getSmallPartitionOutputCostMs()
+        public long getSmallSortOutputCostMs()
         {
             long outputCostMs = 0;
             if (this.smallSortedOutputs != null)
@@ -439,7 +439,7 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
             return inputCostMs;
         }
 
-        public long getLargePartitionComputeCostMs()
+        public long getLargesortComputeCostMs()
         {
             long computeCostMs = 0;
             if (this.largeSortedOutputs != null)
@@ -452,7 +452,7 @@ public abstract class SortedJoinOperator extends SingleStageJoinOperator
             return computeCostMs;
         }
 
-        public long getLargePartitionOutputCostMs()
+        public long getLargeSortOutputCostMs()
         {
             long outputCostMs = 0;
             if (this.largeSortedOutputs != null)
