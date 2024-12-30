@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,38 +17,28 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.turbo;
+package io.pixelsdb.pixels.invoker.lambda;
+
+import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 
 /**
- * @author hank
- * @create 2022-06-28
+ * The lambda invoker for sorted join operator.
+ *
+ * @author zhujiaxuan
+ * @date 11/12/2024
  */
-public enum WorkerType
+public class SortedJoinInvoker extends LambdaInvoker
 {
-    UNKNOWN, // The first enum value is the default value.
-    SCAN, SCAN_STREAM,
-    PARTITION,
-    BROADCAST_JOIN,
-    BROADCAST_CHAIN_JOIN,
-    PARTITIONED_JOIN,
-    PARTITIONED_CHAIN_JOIN,
-    SORT,
-    SORTED_JOIN,
-    AGGREGATION;
-
-    public static WorkerType from(String value)
+    protected SortedJoinInvoker(String functionName)
     {
-        return valueOf(value.toUpperCase());
+        super(functionName);
     }
 
-    public boolean equals(String other)
+    @Override
+    public Output parseOutput(String outputJson)
     {
-        return this.toString().equalsIgnoreCase(other);
-    }
-
-    public boolean equals(WorkerType other)
-    {
-        // enums in Java can be compared using '=='.
-        return this == other;
+        return JSON.parseObject(outputJson, JoinOutput.class);
     }
 }

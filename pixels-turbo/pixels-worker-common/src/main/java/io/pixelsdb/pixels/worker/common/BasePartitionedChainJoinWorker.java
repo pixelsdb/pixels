@@ -27,9 +27,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.executor.join.JoinType;
-import io.pixelsdb.pixels.executor.join.Joiner;
-import io.pixelsdb.pixels.executor.join.Partitioner;
+import io.pixelsdb.pixels.executor.join.*;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
@@ -169,7 +167,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
              * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
              * However, it is safer to turn file schema into result schema here.
              */
-            Joiner partitionJoiner = new Joiner(joinType,
+            Joiner partitionJoiner = new HashJoiner(joinType,
                     WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead), leftColAlias, leftProjection, leftKeyColumnIds,
                     WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead), rightColAlias, rightProjection, rightKeyColumnIds);
             // build the chain joiner.
@@ -210,7 +208,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     leftFutures.add(threadPool.submit(() -> {
                         try
                         {
-                            BasePartitionedJoinWorker.buildHashTable(transId, partitionJoiner, parts, leftColumnsToRead,
+                            BasePartitionedJoinWorker.buildHashTable(transId, (HashJoiner) partitionJoiner, parts, leftColumnsToRead,
                                     leftInputStorageInfo.getScheme(), hashValues, numPartition, workerMetrics);
                         } catch (Throwable e)
                         {
@@ -363,7 +361,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                 readCostTimer.stop();
 
                 ChainJoinInfo nextChainJoin = chainJoinInfos.get(i);
-                Joiner nextJoiner = new Joiner(nextChainJoin.getJoinType(),
+                Joiner nextJoiner = new HashJoiner(nextChainJoin.getJoinType(),
                         currJoiner.getJoinedSchema(), nextChainJoin.getSmallColumnAlias(),
                         nextChainJoin.getSmallProjection(), currChainJoin.getKeyColumnIds(),
                         nextResultSchema, nextChainJoin.getLargeColumnAlias(),
@@ -375,7 +373,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             }
             BroadcastTableInfo lastChainTable = chainTables.get(chainTables.size()-1);
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
-            Joiner finalJoiner = new Joiner(lastChainJoin.getJoinType(),
+            Joiner finalJoiner = new HashJoiner(lastChainJoin.getJoinType(),
                     currJoiner.getJoinedSchema(), lastChainJoin.getSmallColumnAlias(),
                     lastChainJoin.getSmallProjection(), currChainJoin.getKeyColumnIds(),
                     lastResultSchema, lastChainJoin.getLargeColumnAlias(),

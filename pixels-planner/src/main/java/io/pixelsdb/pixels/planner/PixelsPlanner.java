@@ -693,7 +693,7 @@ public class PixelsPlanner
                     // The parent is not present or is not a small-left broadcast join, complete chain join construction.
                     boolean postPartition = false;
                     PartitionInfo postPartitionInfo = null;
-                    if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
+                    if (parent.isPresent() && (parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED || parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.SORTED))
                     {
                         // Note: we must use the parent to calculate the number of partitions for post partitioning.
                         postPartition = true;
@@ -776,7 +776,7 @@ public class PixelsPlanner
             {
                 leftInputSplits = getBroadcastInputSplits(childJoinInputs);
             }
-            else if (joinAlgo == JoinAlgorithm.PARTITIONED)
+            else if (joinAlgo == JoinAlgorithm.PARTITIONED || joinAlgo == JoinAlgorithm.SORTED)
             {
                 leftPartitionedFiles = getPartitionedFiles(childJoinInputs);
             }
@@ -1030,6 +1030,91 @@ public class PixelsPlanner
             }
             return joinOperator;
         }
+        else if (joinAlgo == JoinAlgorithm.SORTED)
+        {
+            // process sorted join.
+            SortedJoinOperator joinOperator;
+            int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
+                    this.transId, leftTable, rightTable, join.getJoinEndian());
+            if (childOperator != null)
+            {
+                // left side is post partitioned, thus we only partition the right table.
+                boolean leftIsBase = leftTable.getTableType() == Table.TableType.BASE;
+                SortedTableInfo leftTableInfo = new SortedTableInfo(
+                        leftTable.getTableName(), leftIsBase, leftTable.getColumnNames(),
+                        leftIsBase ? InputStorageInfo : IntermediateStorageInfo,
+                        leftPartitionedFiles, IntraWorkerParallelism, leftKeyColumnIds);
+
+                boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
+
+                List<SortInput> rightSortInputs = getSortInputs(
+                        rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
+                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
+                SortedTableInfo rightTableInfo = getSortedTableInfo(
+                        rightTable, rightKeyColumnIds, rightSortInputs, rightPartitionProjection);
+
+                List<JoinInput> joinInputs = getSortedJoinInputs(
+                        joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
+                        null, rightPartitionProjection);
+
+                if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+                {
+                    joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new SortedJoinBatchOperator(joinedTable.getTableName(),
+                                    null, rightSortInputs, joinInputs, joinAlgo) :
+                            null;
+                    joinOperator.setSmallChild(childOperator);
+                }
+                else
+                {
+                    joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new SortedJoinBatchOperator(joinedTable.getTableName(),
+                                    rightSortInputs, null, joinInputs, joinAlgo) :
+                            null;
+                    joinOperator.setLargeChild(childOperator);
+                }
+            }
+            else
+            {
+                // sort both tables. in this case, the operator's child must be null.
+                boolean[] leftPartitionProjection = getPartitionProjection(leftTable, join.getLeftProjection());
+                List<SortInput> leftSortedInputs = getSortInputs(
+                        leftTable, leftInputSplits, leftKeyColumnIds, leftPartitionProjection, numPartition,
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
+                                joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
+                SortedTableInfo leftTableInfo = getSortedTableInfo(
+                        leftTable, leftKeyColumnIds, leftSortedInputs, leftPartitionProjection);
+
+                boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
+                List<SortInput> rightSortedInputs = getSortInputs(
+                        rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
+                        getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
+                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
+                SortedTableInfo rightTableInfo = getSortedTableInfo(
+                        rightTable, rightKeyColumnIds, rightSortedInputs, rightPartitionProjection);
+
+                List<JoinInput> joinInputs = getSortedJoinInputs(
+                        joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
+                        leftPartitionProjection, rightPartitionProjection);
+
+                if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+                {
+                    joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new SortedJoinBatchOperator(joinedTable.getTableName(),
+                                    leftSortedInputs, rightSortedInputs, joinInputs, joinAlgo) :
+                            null; // todo
+                }
+                else
+                {
+                    joinOperator = EnabledExchangeMethod == ExchangeMethod.batch ?
+                            new SortedJoinBatchOperator(joinedTable.getTableName(),
+                                    rightSortedInputs, leftSortedInputs, joinInputs, joinAlgo) :
+                            null;
+                }
+            }
+            return joinOperator;
+        }
         else
         {
             throw new UnsupportedOperationException("unsupported join algorithm '" + joinAlgo +
@@ -1265,6 +1350,31 @@ public class PixelsPlanner
         }
     }
 
+    private SortedTableInfo getSortedTableInfo(
+            Table table, int[] keyColumnIds, List<SortInput> partitionInputs, boolean[] partitionProjection)
+    {
+        ImmutableList.Builder<String> rightPartitionedFiles = ImmutableList.builder();
+        for (SortInput sortInput : partitionInputs)
+        {
+            rightPartitionedFiles.add(sortInput.getOutput().getPath());
+        }
+
+        int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
+        String[] newColumnsToRead = rewriteColumnsToReadForPartitionedJoin(table.getColumnNames(), partitionProjection);
+
+        if (table.getTableType() == Table.TableType.BASE)
+        {
+            return new SortedTableInfo(table.getTableName(), true,
+                    newColumnsToRead, InputStorageInfo, rightPartitionedFiles.build(),
+                    IntraWorkerParallelism, newKeyColumnIds);
+        } else
+        {
+            return new SortedTableInfo(table.getTableName(), false,
+                    newColumnsToRead, IntermediateStorageInfo, rightPartitionedFiles.build(),
+                    IntraWorkerParallelism, newKeyColumnIds);
+        }
+    }
+
     private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits, int[] keyColumnIds,
                                                     boolean[] partitionProjection, int numPartition, String outputBase)
     {
@@ -1307,6 +1417,51 @@ public class PixelsPlanner
         }
 
         return partitionInputsBuilder.build();
+    }
+
+    private List<SortInput> getSortInputs(Table inputTable, List<InputSplit> inputSplits, int[] keyColumnIds,
+                                                   boolean[] partitionProjection, int numPartition, String outputBase)
+    {
+        ImmutableList.Builder<SortInput> sortInputsBuilder = ImmutableList.builder();
+        int outputId = 0;
+        for (int i = 0; i < inputSplits.size();)
+        {
+            SortInput sortInput = new SortInput();
+            sortInput.setTransId(transId);
+            ScanTableInfo tableInfo = new ScanTableInfo();
+            ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
+                    .builderWithExpectedSize(IntraWorkerParallelism);
+            for (int j = 0; j < IntraWorkerParallelism && i < inputSplits.size(); ++j, ++i)
+            {
+                // We assign a number of IntraWorkerParallelism input-splits to each partition worker.
+                inputsBuilder.add(inputSplits.get(i));
+            }
+            tableInfo.setInputSplits(inputsBuilder.build());
+            tableInfo.setColumnsToRead(inputTable.getColumnNames());
+            tableInfo.setTableName(inputTable.getTableName());
+            if (inputTable.getTableType() == Table.TableType.BASE)
+            {
+                tableInfo.setFilter(JSON.toJSONString(((BaseTable) inputTable).getFilter()));
+                tableInfo.setBase(true);
+                tableInfo.setStorageInfo(InputStorageInfo);
+            }
+            else
+            {
+                tableInfo.setFilter(JSON.toJSONString(
+                        TableScanFilter.empty(inputTable.getSchemaName(), inputTable.getTableName())));
+                tableInfo.setBase(false);
+                tableInfo.setStorageInfo(IntermediateStorageInfo);
+            }
+            sortInput.setTableInfo(tableInfo);
+            sortInput.setProjection(partitionProjection);
+            sortInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
+            int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection); // 这么命名也没毛病，同一个方法一样用，但是有歧义
+            sortInput.setKeyColumnIds(newKeyColumnIds);
+            sortInput.setNumPartition(numPartition);
+            sortInput.setIsSorted(false);
+            sortInputsBuilder.add(sortInput);
+        }
+        return sortInputsBuilder.build();
     }
 
     /**
@@ -1389,6 +1544,78 @@ public class PixelsPlanner
                         false, null, output);
             }
 
+            joinInputs.add(joinInput);
+        }
+        return joinInputs.build();
+    }
+
+    private List<JoinInput> getSortedJoinInputs(
+            JoinedTable joinedTable, Optional<JoinedTable> parent, int numPartition,
+            SortedTableInfo leftTableInfo, SortedTableInfo rightTableInfo,
+            boolean[] leftPartitionProjection, boolean[] rightPartitionProjection)
+            throws MetadataException, InvalidProtocolBufferException
+    {
+        boolean postPartition = false;
+        PartitionInfo postPartitionInfo = null;
+        if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
+        {
+            postPartition = true;
+            // Note: DO NOT use numPartition as the number of partitions for post partitioning.
+            int numPostPartition = PlanOptimizer.Instance().getJoinNumPartition(
+                    this.transId,
+                    parent.get().getJoin().getLeftTable(),
+                    parent.get().getJoin().getRightTable(),
+                    parent.get().getJoin().getJoinEndian());
+
+            // Check if the current table if the left child or the right child of parent.
+            if (joinedTable == parent.get().getJoin().getLeftTable())
+            {
+                postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPostPartition);
+            }
+            else
+            {
+                postPartitionInfo = new PartitionInfo(parent.get().getJoin().getRightKeyColumnIds(), numPostPartition);
+            }
+        }
+
+        ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
+        for (int i = 0; i < numPartition; ++i)
+        {
+            ImmutableList.Builder<String> outputFileNames = ImmutableList
+                    .builderWithExpectedSize(IntraWorkerParallelism);
+            outputFileNames.add(i + "/join");
+            if (joinedTable.getJoin().getJoinType() == JoinType.EQUI_LEFT ||
+                    joinedTable.getJoin().getJoinType() == JoinType.EQUI_FULL)
+            {
+                outputFileNames.add(i + "/join_left");
+            }
+
+            String path = getIntermediateFolderForTrans(transId) + joinedTable.getSchemaName() + "/" +
+                    joinedTable.getTableName() + "/";
+            MultiOutputInfo output = new MultiOutputInfo(path, IntermediateStorageInfo, true, outputFileNames.build());
+
+            boolean[] leftProjection = leftPartitionProjection == null ? joinedTable.getJoin().getLeftProjection() :
+                    rewriteProjectionForPartitionedJoin(joinedTable.getJoin().getLeftProjection(), leftPartitionProjection);
+            boolean[] rightProjection = rightPartitionProjection == null ? joinedTable.getJoin().getRightProjection() :
+                    rewriteProjectionForPartitionedJoin(joinedTable.getJoin().getRightProjection(), rightPartitionProjection);
+
+            SortedJoinInput joinInput;
+            if (joinedTable.getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
+            {
+                SortedJoinInfo joinInfo = new SortedJoinInfo(joinedTable.getJoin().getJoinType(),
+                        joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
+                        leftProjection, rightProjection, postPartition, postPartitionInfo,numPartition);
+                joinInput = new SortedJoinInput(transId, leftTableInfo, rightTableInfo, joinInfo,
+                        false, null, output);
+            }
+            else
+            {
+                SortedJoinInfo joinInfo = new SortedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
+                        joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
+                        rightProjection, leftProjection, postPartition, postPartitionInfo, numPartition);
+                joinInput = new SortedJoinInput(transId, rightTableInfo, leftTableInfo, joinInfo,
+                        false, null, output);
+            }
             joinInputs.add(joinInput);
         }
         return joinInputs.build();
