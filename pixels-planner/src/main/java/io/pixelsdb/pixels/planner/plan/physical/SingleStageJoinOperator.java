@@ -114,6 +114,8 @@ public abstract class SingleStageJoinOperator extends JoinOperator
         }
         StageDependency joinStageDependency = new StageDependency(joinStageId, parentStageId, wideDependOnParent);
         StageCoordinator joinStageCoordinator = new StageCoordinator(joinStageId, this.joinInputs.size());
+        StageCoordinator parentStageCoordinator = planCoordinator.getStageCoordinator(parentStageId);
+        joinStageCoordinator.setDownStreamWorkerNum(parentStageCoordinator.getFixedWorkerNum());
         planCoordinator.addStageCoordinator(joinStageCoordinator, joinStageDependency);
         if (this.joinAlgo == JoinAlgorithm.BROADCAST || this.joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
         {

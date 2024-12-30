@@ -122,7 +122,9 @@ public class StageCoordinator
                 {
                     workerIdToWorkerIndex.put(worker.getWorkerId(),
                             Collections.singletonList(workerIndexAssigner % downStreamWorkerNum) );
-                    worker.setWorkerPortIndex(workerIndexAssigner / downStreamWorkerNum);
+                    // down stage is partitioned join
+                    // so one worker writes to one port of worker in next stage
+                    worker.setWorkerPortIndex(workerIndexAssigner);
                     workerIndexAssigner++;
                 }
             }
