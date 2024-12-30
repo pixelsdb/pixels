@@ -46,17 +46,23 @@ public abstract class JoinInput extends Input
     private MultiOutputInfo output;
 
     /**
+     * The number of small and large table partition workers. This is required by Pixels stream reader.
+     */
+    private int smallPartitionWorkerNum;
+    private int largePartitionWorkerNum;
+
+    /**
      * Default constructor for Jackson.
      */
     public JoinInput()
     {
-        super(-1);
+        super(-1, -1);
     }
 
-    public JoinInput(long transId, boolean partialAggregationPresent,
+    public JoinInput(long transId, long timestamp, boolean partialAggregationPresent,
                      PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
     {
-        super(transId);
+        super(transId, timestamp);
         this.partialAggregationPresent = partialAggregationPresent;
         this.partialAggregationInfo = partialAggregationInfo;
         this.output = output;
@@ -98,5 +104,25 @@ public abstract class JoinInput extends Input
     public void setOutput(MultiOutputInfo output)
     {
         this.output = output;
+    }
+
+    public int getSmallPartitionWorkerNum()
+    {
+        return smallPartitionWorkerNum;
+    }
+
+    public void setSmallPartitionWorkerNum(int smallPartitionWorkerNum)
+    {
+        this.smallPartitionWorkerNum = smallPartitionWorkerNum;
+    }
+
+    public int getLargePartitionWorkerNum()
+    {
+        return largePartitionWorkerNum;
+    }
+
+    public void setLargePartitionWorkerNum(int largePartitionWorkerNum)
+    {
+        this.largePartitionWorkerNum = largePartitionWorkerNum;
     }
 }

@@ -1,14 +1,14 @@
-# Pixels Reader C++ Implementation
+# Pixels C++ Implementation
 
 ## Usage
 
-### Compilation
+### Build Source Code
 
-The repository relies on [duckdb](https://github.com/yuly16/duckdb), It is refered from [pixels reader](https://github.com/yuly16/pixels-reader-cxx). 
-It also relies on protobuf and liburing. We don't need to manually install these prerequisites, since our compilation code would
-automatically download them.
+Pixels C++ relies on protobuf, liburing, boost, and googletest. Furthermore, it builds the pixels extension of duckdb by default,
+which relies on [duckdb](https://github.com/pixelsdb/duckdb).
+We don't need to manually install these prerequisites, since the build scripts would automatically download them.
 
-Pixels C++ reader uses `iouring` system call. You can use the following command to check if iouring is supported in your system:
+Pixels C++ reader uses `iouring` system calls. You can use the following command to check if iouring is supported in your system:
 
 ```shell
 grep io_uring_setup /proc/kallsyms
@@ -31,23 +31,30 @@ If the command outputs the following information, it means your system supports 
 0000000000000000 d _eil_addr___x64_sys_io_uring_setup
 ```
 
-Then set the `PIXELS_SRC` and `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels). `PIXELS_SRC` is the source directory of pixels (e.g. `/home/liyu/pixels`). It is used to locate proto files. `PIXELS_HOME` is the path where `pixels-cxx.properties` locates. `PIXELS_HOME` is usually the same as the installation path of pixels.
+Then set the `PIXELS_SRC` and `PIXELS_HOME` environment variable (Ignore it if you have already set it when installing Pixels). `PIXELS_SRC` is the source directory of pixels (e.g. `/home/liyu/pixels`). It is used to locate proto files. `PIXELS_HOME/etc` is the path where `pixels-cpp.properties` locates. `PIXELS_HOME` is usually the same as the installation path of pixels.
 
 Pull the dependency code:
 
-```
+```shell
 make pull
+```
+
+If it is not the first time to execute `make pull`, you can check out the latest submodules:
+
+```shell
+make update
 ```
 
 Finally, compile the code:
 
-```
+```shell
 make -j
 ```
 
-### Example
+### Run Basic Example
 
-Here is a pixels reader example in the directory `duckdb/examples/pixels-example`. This example validates the correctness of compilation and gives you an idea how to load the pixels data. 
+Here is a pixels reader example in the directory `duckdb/examples/pixels-example`.
+This example validates the correctness of compilation and gives you an idea how to load the Pixels data. 
 
 To run this binary:
 
@@ -55,7 +62,7 @@ To run this binary:
 ./build/release/examples/pixels-example/pixels-example
 ```
 
-### Run pixels reader in CLion
+### Run pixels C++ in CLion
 In order to run the code in CLion, we should set the cmake configuration in CLion. 
 
 In `"setting"`->`"Build,Execution,Deployment"`->`"CMake"`, set `"Generator"` as `"Let CMake decide"`, and
@@ -64,7 +71,7 @@ set `CMake options` as:
 -DDUCKDB_EXTENSION_NAMES="pixels" -DDUCKDB_EXTENSION_PIXELS_PATH=${PIXELS_SRC}/cpp -DDUCKDB_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_EXTENSION_PIXELS_INCLUDE_PATH=${PIXELS_SRC}/cpp/include -DCMAKE_PREFIX_PATH=${PIXELS_SRC}/cpp/third-party/protobuf/cmake/build
 ```
 
-### Benchmark
+### Run Benchmarks
 
 Note: the benchmark runs on diascld31 server. If you run the benchmark on your machine, please refer to [Common issue](#4-i-fail-to-run-the-pixels-and-parquet-benchmark)
 
@@ -74,55 +81,55 @@ We run one simple query by the following command:
 ```
 build/release/benchmark/benchmark_runner "benchmark/tpch/pixels/tpch_1/q01.benchmark"
 ```
-#### 2. TPCH benchmark
+#### 2. TPC-H benchmark
 The benchmark script is `run_benchmark.py` in `duckdb/scripts` directory.
 
 Check the usage:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --help
 ```
 
 Run TPC-H 1 benchmarks:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" --parquet "benchmark/tpch/parquet/tpch_1/" -v --repeat-time-disk 1
 ```
 
 or enabling the encoding of pixels:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1_encoding/" --parquet "benchmark/tpch/parquet/tpch_1/" -v --repeat-time-disk 1
 ```
 
 Run TPCH 300 benchmark:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_300/" --parquet "benchmark/tpch/parquet/tpch_300/" -v --repeat-time-disk 1
 ```
 
 or enabling the encoding of pixels:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_300_encoding/" --parquet "benchmark/tpch/parquet/tpch_300/" -v --repeat-time-disk 1
 ```
 
 We also support to just run pixels or parquet:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" -v --repeat-time-disk 1
 ```
 
 We also offer self-defined queries:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/micro-benchmark/tpch_1/" -v  --repeat-time-disk 1
 ```
 
@@ -138,7 +145,7 @@ SSD array needs pixels data to be in multiple directories. The following instruc
 We offer a convenient python script to distribute the pixels data in a single directory to multiple directories. For example:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/pixels-multidir-generator.py -i /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian \
 -o /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition1 \
 /data/s1725-1/liyu/pixels_data/pixels-tpch-1-small-endian-partition2 \
@@ -152,7 +159,7 @@ The python script copies files from the input directory to all output paths. The
 (e.g. the file index of `20230809035030_4630.pxl` is 4630) and then copied to the output paths in the round-rubin fashion. Pixels C++ reader reads 
 the pixels data sorted by the file index, so all SSDs can be utilized simultaneously.
 
-#### 2. Modity the benchmark
+#### 2. Modify the benchmark
 
 The above python script outputs the following queries:
 
@@ -171,13 +178,13 @@ CREATE VIEW region AS SELECT * FROM pixels_scan(["/data/s1725-1/liyu/pixels_data
 We replace these `CREATE` queries in `pixels_tpch_template.benchmark.in`, and run the benchmark:
 
 ```
-cd pixels-duckdb
+cd pixels-duckdb/duckdb
 python scripts/run_benchmark.py --pixels "benchmark/tpch/pixels/tpch_1/" -v --repeat-time-disk 1
 ```
 
 ## Parameters
 
-Here are two important parameters in `pixels-cxx.properties`:
+Here are two important parameters in `pixels-cpp.properties`:
 
 * `localfs.enable.direct.io`: use DIRECT IO or buffer IO
 
@@ -208,15 +215,9 @@ make update
 
 ### 2. The compilation fails in duckdb
 
-Please make sure you don't use the official `duckdb` repository. The official `duckdb` has some name conflicts with `iouring` (which is a linux async IO library), which would lead to the compilation failure. 
+Please make sure you don't use the official `duckdb` repository. The official `duckdb` has some name conflicts with `iouring` (which is a linux async IO library), which would lead to the compilation failure.
 
-
-### 3. I can't load the pixels data via pixels C++ reader
-
-Currently, the pixels Java writer and reader uses big endian to write/read pixels data. We find that small endian is more efficient for pixels c++ reader. Therefore, in order to generate the pixels data with small endian, please use Pixels in [little-endian branch](https://github.com/pixelsdb/pixels/tree/little-endian). We will merge the small endian to pixels java reader in the future. 
-
-
-### 4. I fail to run the pixels and parquet benchmark
+### 3. I fail to run the pixels and parquet benchmark
 
 This code is tested in diascld31 server. I hardcode the pixels data directory and parquet data directory in `parquet_tpch_template.benchmark.in`, `parquet_tpch_template_no_verification.benchmark.in`, `pixels_tpch_template.benchmark.in` and `pixels_tpch_template_no_verification.benchmark.in`. If you want to run this benchmark in another machine, make sure to modify the pixels and parquet directory to the correct location. `TODO`: In the future I will rewrite this to a more user-friendly benchmark.
 
@@ -244,5 +245,9 @@ def clean_page_cache():
     os.system(cmd)
 ```
 
-### 5. The protobuf version issue
-I use protobuf [v3.21.6](https://github.com/protocolbuffers/protobuf/releases/tag/v3.21.6). The latest protobuf version doesn't work for pixels c++ reader. 
+### 4. The protobuf version issue
+We use protobuf [v3.21.6](https://github.com/protocolbuffers/protobuf/releases/tag/v3.21.6). It is pulled as a submodule. The latest protobuf version doesn't work for pixels c++ reader. 
+
+### 5. Boost C++ Libraries
+We use boost [1.74.0](https://github.com/boostorg/boost/tree/boost-1.74.0) that requires CMake 3.19 or later.
+Boost is downloaded automatically in the CMakeLists of pixels-cli.

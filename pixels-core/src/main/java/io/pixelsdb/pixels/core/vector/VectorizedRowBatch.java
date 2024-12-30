@@ -285,7 +285,7 @@ public class VectorizedRowBatch implements AutoCloseable
     }
 
     /**
-     * Get the approximate (may be slightly lower than actual)
+     * Get the approximate (maybe slightly lower than actual)
      * cumulative memory usage, which is more meaningful for GC
      * performance tuning.
      *

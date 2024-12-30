@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntDecoder;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.ByteBufferInputStream;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
@@ -114,18 +115,21 @@ public class TimestampColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
+        boolean endOfPixel;
         for (int i = vectorIndex; numLeft > 0;)
         {
             if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
             }
             else
             {
                 numToRead = numLeft;
+                endOfPixel = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -134,7 +138,7 @@ public class TimestampColumnReader extends ColumnReader
                 BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                         inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
@@ -158,7 +162,8 @@ public class TimestampColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        columnVector.set(j, inputBuffer.getLong());
+                        // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                        columnVector.times[j] = inputBuffer.getLong();
                     }
                 } else
                 {
@@ -171,6 +176,173 @@ public class TimestampColumnReader extends ColumnReader
                     }
                 }
             }
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
+        }
+    }
+
+    /**
+     * Read selected values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
+     * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
+     * @throws IOException
+     */
+    @Override
+    public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
+                             int offset, int size, int pixelStride, final int vectorIndex,
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected) throws IOException
+    {
+        TimestampColumnVector columnVector = (TimestampColumnVector) vector;
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+        if (offset == 0)
+        {
+            if (inputStream != null)
+            {
+                inputStream.close();
+            }
+            this.inputBuffer = input;
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
+            decoder = new RunLenIntDecoder(inputStream, true);
+            isNullOffset = inputBuffer.position() + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
+            hasNull = true;
+            elementIndex = 0;
+        }
+
+        // read without copying the de-compacted content and isNull
+        int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
+        boolean[] isNull = null;
+        boolean endOfPixel;
+        if (decoding || !nullsPadding)
+        {
+            isNull = new boolean[size];
+        }
+        for (int i = vectorIndex; numLeft > 0;)
+        {
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+            {
+                // read to the end of the current pixel
+                numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
+            }
+            else
+            {
+                numToRead = numLeft;
+                endOfPixel = false;
+            }
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            if (hasNull)
+            {
+                if (!decoding && nullsPadding)
+                {
+                    // read isNull directly into the vector of the column chunk
+                    BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian, selected, i - vectorIndex);
+                }
+                else
+                {
+                    // need to keep isNull for later use
+                    BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian);
+                    // update columnVector.isNull
+                    int k = vectorWriteIndex;
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.isNull[k++] = isNull[j - vectorIndex];
+                        }
+                    }
+                }
+                isNullOffset += bytesToDeCompact;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
+                columnVector.noNulls = false;
+            }
+            else
+            {
+                if (decoding || !nullsPadding)
+                {
+                    Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
+                }
+                // update columnVector.isNull later to avoid bitmap unnecessary traversal
+            }
+
+            // read content
+            int originalVectorWriteIndex = vectorWriteIndex;
+            if (decoding)
+            {
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (!(hasNull && isNull[j - vectorIndex]))
+                    {
+                        long value = decoder.next();
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.set(vectorWriteIndex++, value);
+                        }
+                    }
+                    else if (selected.get(j - vectorIndex))
+                    {
+                        vectorWriteIndex++;
+                    }
+                }
+            }
+            else
+            {
+                if (nullsPadding)
+                {
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        long value = inputBuffer.getLong();
+                        if (selected.get(j - vectorIndex))
+                        {
+                            // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                            columnVector.times[vectorWriteIndex++] = value;
+                        }
+                    }
+                }
+                else
+                {
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (!(hasNull && isNull[j - vectorIndex]))
+                        {
+                            long value = inputBuffer.getLong();
+                            if (selected.get(j - vectorIndex))
+                            {
+                                columnVector.set(vectorWriteIndex++, value);
+                            }
+                        }
+                        else if (selected.get(j - vectorIndex))
+                        {
+                            vectorWriteIndex++;
+                        }
+                    }
+                }
+            }
+
+            // update columnVector.isNull if has no nulls
+            if (!hasNull)
+            {
+                Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
+            }
+
             // update variables
             numLeft -= numToRead;
             elementIndex += numToRead;

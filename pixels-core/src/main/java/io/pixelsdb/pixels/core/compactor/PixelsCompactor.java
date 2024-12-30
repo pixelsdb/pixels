@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.core.PixelsVersion;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
+import io.pixelsdb.pixels.core.exception.PixelsReaderException;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -72,14 +73,18 @@ public class PixelsCompactor
     private final Storage inputStorage;
     private final PhysicalWriter fsWriter;
     private final StatsRecorder[] fileColStatRecorders;
+    private final StatsRecorder hiddenFileColStatRecorder; // hidden column stats recorder
 
-    private final List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList; // row group information in footer
-    private final List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList; // row group statistic in footer
-    private final List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList; // row group footers
+    private final List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList;   // row group information in footer
+    private final List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList;     // row group statistic in footer
+    private final List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList;      // row group footers
     private final List<String> rowGroupPaths;
+
+    private final boolean hasHiddenColumn;
 
     private PixelsCompactor(
             TypeDescription schema,
+            boolean hasHiddenColumn,
             CompactLayout compactLayout,
             int pixelStride,
             PixelsProto.CompressionKind compressionKind,
@@ -90,12 +95,14 @@ public class PixelsCompactor
             Storage inputStorage,
             PhysicalWriter fsWriter,
             StatsRecorder[] fileColStatRecorders,
+            StatsRecorder hiddenFileColStatRecorder,
             List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList,
             List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList,
             List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList,
             List<String> rowGroupPaths)
     {
         this.schema = requireNonNull(schema, "schema is null");
+        this.hasHiddenColumn = hasHiddenColumn;
         this.compactLayout = requireNonNull(compactLayout, "compactLayout is null");
         checkArgument(pixelStride > 0, "pixelStride is not positive");
         this.pixelStride = pixelStride;
@@ -130,6 +137,15 @@ public class PixelsCompactor
                 "lengths of the row group lists are not consistent");
         this.rowGroupInfoBuilderList = ImmutableList.copyOf(rowGroupInfoBuilderList);
         this.rowGroupStatBuilderList = ImmutableList.copyOf(rowGroupStatBuilderList);
+        if (hasHiddenColumn)
+        {
+            this.hiddenFileColStatRecorder = requireNonNull(hiddenFileColStatRecorder,
+                    "no file level hidden timestamp column statistics");
+        }
+        else
+        {
+            this.hiddenFileColStatRecorder = null;
+        }
         this.rowGroupFooterBuilderList = ImmutableList.copyOf(rowGroupFooterBuilderList);
         this.rowGroupPaths = ImmutableList.copyOf(rowGroupPaths);
     }
@@ -145,6 +161,7 @@ public class PixelsCompactor
     public static class Builder
     {
         private TypeDescription builderSchema = null;
+        private boolean builderHasHiddenColumn = false; // whether the compact file should have hidden timestamp column
         private List<String> builderSourcePaths = null;
         private CompactLayout builderCompactLayout = null;
         private TimeZone builderTimeZone = TimeZone.getDefault();
@@ -152,6 +169,7 @@ public class PixelsCompactor
         private Storage builderOutputStorage = null;
         private String builderFilePath = null;
         private StatsRecorder[] builderFileColStatRecorders;
+        private StatsRecorder builderHiddenFileColStatRecorder = null; // hidden column stats recorder
         private long builderBlockSize = DEFAULT_HDFS_BLOCK_SIZE;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
@@ -164,12 +182,11 @@ public class PixelsCompactor
         private PhysicalWriter builderFsWriter = null;
         private final List<PixelsProto.RowGroupInformation.Builder> builderRowGroupInfoBuilderList = new LinkedList<>();
         private final List<PixelsProto.RowGroupStatistic.Builder> builderRowGroupStatBuilderList = new LinkedList<>();
+        //private List<PixelsProto.ColumnStatistic.Builder> builderHiddenRowGroupStatBuilderList = null; // hidden column statistic if hasHiddenColumn
         private final List<PixelsProto.RowGroupFooter.Builder> builderRowGroupFooterBuilderList = new LinkedList<>();
         private final List<String> builderRowGroupPaths = new LinkedList<>();
 
-        private Builder()
-        {
-        }
+        private Builder() { }
 
         /**
          * set schema is optional, if schema is not set, the schema read from the first source file will be used as this.schema.
@@ -180,6 +197,12 @@ public class PixelsCompactor
         public PixelsCompactor.Builder setSchema(TypeDescription schema)
         {
             this.builderSchema = schema;
+            return this;
+        }
+
+        public PixelsCompactor.Builder setHasHiddenColumn(boolean hasHiddenColumn)
+        {
+            this.builderHasHiddenColumn = hasHiddenColumn;
             return this;
         }
 
@@ -259,7 +282,7 @@ public class PixelsCompactor
                 PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderInputStorage, path);
                 if (fsReader == null)
                 {
-                    throw new IOException("Read file failed.");
+                    throw new IOException("Read file failed");
                 }
 
                 // get FileTail
@@ -275,13 +298,14 @@ public class PixelsCompactor
                 if (fileTail == null)
                 {
                     fsReader.close();
-                    throw new IOException("read file tail failed.");
+                    throw new IOException("Read file tail failed");
                 }
 
                 // check file MAGIC and file version
                 PixelsProto.PostScript postScript = fileTail.getPostscript();
                 int fileVersion = postScript.getVersion();
                 String fileMagic = postScript.getMagic();
+                boolean hasHiddenColumn = postScript.getHasHiddenColumn();
                 if (!PixelsVersion.matchVersion(fileVersion))
                 {
                     fsReader.close();
@@ -291,6 +315,11 @@ public class PixelsCompactor
                 {
                     fsReader.close();
                     throw new PixelsFileMagicInvalidException(fileMagic);
+                }
+                if (builderHasHiddenColumn && !hasHiddenColumn)
+                {
+                    fsReader.close();
+                    throw new PixelsReaderException("File has no readable hidden timestamp columns to compact");
                 }
 
                 if (i == 0)
@@ -305,12 +334,17 @@ public class PixelsCompactor
                     }
 
                     List<TypeDescription> childrenSchema = builderSchema.getChildren();
-                    checkArgument(!requireNonNull(childrenSchema).isEmpty());
+                    checkArgument(!requireNonNull(childrenSchema).isEmpty(), "schema is empty");
                     builderFileColStatRecorders = new StatsRecorder[childrenSchema.size()];
                     for (int j = 0; j < childrenSchema.size(); ++j)
                     {
                         this.builderFileColStatRecorders[j] = StatsRecorder
                                 .create(childrenSchema.get(j)); // to be updated when compacting
+                    }
+
+                    if (builderHasHiddenColumn)
+                    {
+                        builderHiddenFileColStatRecorder = StatsRecorder.create(TypeDescription.HIDDEN_COLUMN_TYPE);
                     }
                 }
 
@@ -321,8 +355,20 @@ public class PixelsCompactor
                 // init rowGroupStatisticList
                 for (PixelsProto.RowGroupStatistic stat : footer.getRowGroupStatsList())
                 {
-                    builderRowGroupStatBuilderList.add(stat.toBuilder());
+
+                    PixelsProto.RowGroupStatistic.Builder statBuilder = stat.toBuilder();
+                    if (builderHasHiddenColumn)
+                    {
+                        checkArgument(statBuilder.hasHiddenColumnChunkStats(),
+                                "row group does not have statistics for hidden column chunk");
+                    }
+                    else if (statBuilder.hasHiddenColumnChunkStats())
+                    {
+                        statBuilder.clearHiddenColumnChunkStats();
+                    }
+                    builderRowGroupStatBuilderList.add(statBuilder);
                 }
+
                 for (PixelsProto.RowGroupInformation info : footer.getRowGroupInfosList())
                 {
                     builderRowGroupInfoBuilderList.add(info.toBuilder()); // footerOffset to be updated when compacting
@@ -345,6 +391,7 @@ public class PixelsCompactor
 
             return new PixelsCompactor(
                     builderSchema,
+                    builderHasHiddenColumn,
                     builderCompactLayout,
                     builderPixelStride,
                     builderCompressionKind,
@@ -355,6 +402,7 @@ public class PixelsCompactor
                     builderInputStorage,
                     builderFsWriter,
                     builderFileColStatRecorders,
+                    builderHiddenFileColStatRecorder,
                     builderRowGroupInfoBuilderList,
                     builderRowGroupStatBuilderList,
                     builderRowGroupFooterBuilderList,
@@ -376,6 +424,7 @@ public class PixelsCompactor
 
     private void writeColumnChunks()
     {
+        // write common column chunks
         for (int i = 0; i < this.compactLayout.size(); ++i)
         {
             ColumnChunkIndex index = this.compactLayout.get(i);
@@ -431,6 +480,55 @@ public class PixelsCompactor
                 e.printStackTrace();
             }
         }
+        // write hidden column chunks
+        if (hasHiddenColumn)
+        {
+            /**
+             * Warning: It's hard-coded here.
+             * The chunks of the hidden column from different row groups are appended to the end of other column chunks.
+             */
+            for (int rowGroupId = 0; rowGroupId < this.rowGroupFooterBuilderList.size(); ++rowGroupId)
+            {
+                PixelsProto.ColumnChunkIndex.Builder hiddenColumnChunkIndexBuilder =
+                        this.rowGroupFooterBuilderList.get(rowGroupId).getRowGroupIndexEntryBuilder()
+                                .getHiddenColumnChunkIndexEntryBuilder();
+                long hiddenColumnChunkOffset = hiddenColumnChunkIndexBuilder.getChunkOffset();
+                int hiddenColumnChunkLength = hiddenColumnChunkIndexBuilder.getChunkLength();
+                String path = this.rowGroupPaths.get(rowGroupId);
+                try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(inputStorage, path))
+                {
+                    if (fsReader == null)
+                    {
+                        throw new IOException("read file failed.");
+                    }
+                    fsReader.seek(hiddenColumnChunkOffset);
+                    byte[] hiddenChunkBuffer = new byte[hiddenColumnChunkLength];
+                    fsReader.readFully(hiddenChunkBuffer);
+
+                    long hiddenChunkStartOffset = fsWriter.prepare(hiddenColumnChunkLength);
+                    int tryAlign = 0;
+                    while (chunkAlignment != 0 && hiddenChunkStartOffset % chunkAlignment != 0 && tryAlign++ < 2)
+                    {
+                        int alignBytes = (int) (chunkAlignment - hiddenChunkStartOffset % chunkAlignment);
+                        this.fsWriter.append(chunkPaddingBuffer, 0, alignBytes);
+                        hiddenChunkStartOffset = this.fsWriter.prepare(hiddenColumnChunkLength);
+                    }
+                    if (tryAlign > 2)
+                    {
+                        LOGGER.warn("failed to align the start offset of the hidden column chunk");
+                        throw new IOException("failed to align the start offset of the hidden column chunk");
+                    }
+
+                    this.fsWriter.append(hiddenChunkBuffer, 0, hiddenColumnChunkLength);
+                    hiddenColumnChunkIndexBuilder.setChunkOffset(hiddenChunkStartOffset);
+                }
+                catch (IOException e)
+                {
+                    LOGGER.error(e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     private void writeRowGroupFooters()
@@ -462,6 +560,13 @@ public class PixelsCompactor
             for (int j = 0; j < children.size(); ++j)
             {
                 fileColStatRecorders[j].merge(StatsRecorder.create(children.get(j), columnChunkStats.get(j)));
+            }
+            if (this.hasHiddenColumn)
+            {
+                PixelsProto.ColumnStatistic hiddenColumnChunkStat =
+                        this.rowGroupStatBuilderList.get(i).getHiddenColumnChunkStats();
+                hiddenFileColStatRecorder.merge(StatsRecorder.create(
+                        TypeDescription.HIDDEN_COLUMN_TYPE, hiddenColumnChunkStat));
             }
         }
     }
@@ -515,6 +620,13 @@ public class PixelsCompactor
         {
             footerBuilder.addRowGroupStats(rowGroupStatisticBuilder.build());
         }
+        if (hasHiddenColumn)
+        {
+            footerBuilder.setHiddenType(PixelsProto.Type.newBuilder()
+                    .setName(TypeDescription.HIDDEN_COLUMN_NAME)
+                    .setKind(PixelsProto.Type.Kind.LONG));
+            footerBuilder.setHiddenColumnStats(hiddenFileColStatRecorder.serialize().build());
+        }
 
         return footerBuilder.build();
     }
@@ -531,6 +643,7 @@ public class PixelsCompactor
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(false) // Issue #521: we do not compact partitioned files.
                 .setColumnChunkAlignment(chunkAlignment)
+                .setHasHiddenColumn(hasHiddenColumn)
                 .setMagic(Constants.FILE_MAGIC)
                 .build();
     }

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.LongDecimalColumnVector;
 import io.pixelsdb.pixels.core.writer.LongDecimalColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
@@ -38,14 +39,16 @@ import java.nio.ByteOrder;
 public class TestLongDecimalColumnReader
 {
     @Test
-    public void test() throws IOException
+    public void testNullsPadding() throws IOException
     {
+        int pixelsStride = 10;
+        int numRows = 22;
         PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(10).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
         LongDecimalColumnWriter columnWriter = new LongDecimalColumnWriter(
                 TypeDescription.createDecimal(38, 2), writerOption);
-        LongDecimalColumnVector decimalColumnVector = new LongDecimalColumnVector(22, 38, 2);
+        LongDecimalColumnVector decimalColumnVector = new LongDecimalColumnVector(numRows, 38, 2);
         decimalColumnVector.add(100.22);
         decimalColumnVector.add(103.32);
         decimalColumnVector.add(106.43);
@@ -62,31 +65,274 @@ public class TestLongDecimalColumnReader
         decimalColumnVector.add(675.34);
         decimalColumnVector.add(235.58);
         decimalColumnVector.add(32434.68);
-        decimalColumnVector.add(3.58);
+        decimalColumnVector.addNull();
         decimalColumnVector.add(6.66);
         decimalColumnVector.add(7.77);
         decimalColumnVector.add(65656565.20);
         decimalColumnVector.add(3434.11);
         decimalColumnVector.add(54578.22);
-        columnWriter.write(decimalColumnVector, 22);
+        columnWriter.write(decimalColumnVector, numRows);
         columnWriter.flush();
+        columnWriter.close();
+
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(TypeDescription.createDecimal(38, 2));
-        LongDecimalColumnVector decimalColumnVector1 = new LongDecimalColumnVector(22, 38, 2);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, 22,
-                10, 0, decimalColumnVector1, chunkIndex);
-        for (int i = 0; i < 22; ++i)
+        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(
+                TypeDescription.createDecimal(38, 2));
+        LongDecimalColumnVector decimalColumnVector1 = new LongDecimalColumnVector(numRows, 38, 2);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
+                pixelsStride, 0, decimalColumnVector1, chunkIndex);
+        columnReader.close();
+
+        for (int i = 0; i < numRows; ++i)
         {
-            if (!decimalColumnVector1.noNulls && decimalColumnVector1.isNull[i])
-            {
-                assert !decimalColumnVector.noNulls && decimalColumnVector.isNull[i];
-            }
-            else
+            assert decimalColumnVector1.noNulls == decimalColumnVector.noNulls;
+            assert decimalColumnVector1.isNull[i] == decimalColumnVector.isNull[i];
+            if (decimalColumnVector.noNulls || !decimalColumnVector.isNull[i])
             {
                 assert decimalColumnVector1.vector[i * 2] == decimalColumnVector.vector[i * 2];
                 assert decimalColumnVector1.vector[i * 2 + 1] == decimalColumnVector.vector[i * 2 + 1];
+            }
+        }
+    }
+
+    @Test
+    public void testWithoutNullsPadding() throws IOException
+    {
+        int pixelsStride = 10;
+        int numRows = 22;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
+        LongDecimalColumnWriter columnWriter = new LongDecimalColumnWriter(
+                TypeDescription.createDecimal(38, 2), writerOption);
+        LongDecimalColumnVector decimalColumnVector = new LongDecimalColumnVector(numRows, 38, 2);
+        decimalColumnVector.add(100.22);
+        decimalColumnVector.add(103.32);
+        decimalColumnVector.add(106.43);
+        decimalColumnVector.add(34.10);
+        decimalColumnVector.addNull();
+        decimalColumnVector.add(54.09);
+        decimalColumnVector.add(55.00);
+        decimalColumnVector.add(67.23);
+        decimalColumnVector.addNull();
+        decimalColumnVector.add(34.58);
+        decimalColumnVector.add(555.98);
+        decimalColumnVector.add(565.76);
+        decimalColumnVector.add(234.11);
+        decimalColumnVector.add(675.34);
+        decimalColumnVector.add(235.58);
+        decimalColumnVector.add(32434.68);
+        decimalColumnVector.addNull();
+        decimalColumnVector.add(6.66);
+        decimalColumnVector.add(7.77);
+        decimalColumnVector.add(65656565.20);
+        decimalColumnVector.add(3434.11);
+        decimalColumnVector.add(54578.22);
+        columnWriter.write(decimalColumnVector, numRows);
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(
+                TypeDescription.createDecimal(38, 2));
+        LongDecimalColumnVector decimalColumnVector1 = new LongDecimalColumnVector(numRows, 38, 2);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
+                pixelsStride, 0, decimalColumnVector1, chunkIndex);
+        columnReader.close();
+
+        for (int i = 0; i < numRows; ++i)
+        {
+            assert decimalColumnVector1.noNulls == decimalColumnVector.noNulls;
+            assert decimalColumnVector1.isNull[i] == decimalColumnVector.isNull[i];
+            if (decimalColumnVector.noNulls || !decimalColumnVector.isNull[i])
+            {
+                assert decimalColumnVector1.vector[i * 2] == decimalColumnVector.vector[i * 2];
+                assert decimalColumnVector1.vector[i * 2 + 1] == decimalColumnVector.vector[i * 2 + 1];
+            }
+        }
+    }
+
+    /**
+     * Test reading into column vectors with a run-length smaller than pixels stride.
+     */
+    @Test
+    public void testSelected() throws IOException
+    {
+        int pixelsStride = 10;
+        int numRows = 22;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        LongDecimalColumnWriter columnWriter = new LongDecimalColumnWriter(
+                TypeDescription.createDecimal(38, 2), writerOption);
+        LongDecimalColumnVector decimalColumnVector = new LongDecimalColumnVector(numRows, 38, 2);
+        decimalColumnVector.add(100.22);
+        decimalColumnVector.add(103.32);
+        decimalColumnVector.add(106.43);
+        decimalColumnVector.add(34.10);
+        decimalColumnVector.addNull();
+        decimalColumnVector.add(54.09);
+        decimalColumnVector.add(55.00);
+        decimalColumnVector.add(67.23);
+        decimalColumnVector.addNull();
+        decimalColumnVector.add(34.58);
+        decimalColumnVector.add(555.98);
+        decimalColumnVector.add(565.76);
+        decimalColumnVector.add(234.11);
+        decimalColumnVector.add(675.34);
+        decimalColumnVector.add(235.58);
+        decimalColumnVector.add(32434.68);
+        decimalColumnVector.addNull();
+        decimalColumnVector.add(6.66);
+        decimalColumnVector.add(7.77);
+        decimalColumnVector.add(65656565.20);
+        decimalColumnVector.add(3434.11);
+        decimalColumnVector.add(54578.22);
+        columnWriter.write(decimalColumnVector, numRows);
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(
+                TypeDescription.createDecimal(38, 2));
+        Bitmap selected = new Bitmap(numRows, true);
+        selected.clear(0);
+        selected.clear(10);
+        selected.clear(20);
+        LongDecimalColumnVector decimalColumnVector1 = new LongDecimalColumnVector(numRows, 38, 2);
+        columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
+                pixelsStride, 0, decimalColumnVector1, chunkIndex, selected);
+        columnReader.close();
+
+        for (int i = 0, j = 0; i < numRows; ++i)
+        {
+            if (i % 10 != 0)
+            {
+                assert decimalColumnVector1.noNulls == decimalColumnVector.noNulls;
+                assert decimalColumnVector1.isNull[j] == decimalColumnVector.isNull[i];
+                if (decimalColumnVector.noNulls || !decimalColumnVector.isNull[i])
+                {
+                    assert decimalColumnVector1.vector[j * 2] == decimalColumnVector.vector[i * 2];
+                    assert decimalColumnVector1.vector[j * 2 + 1] == decimalColumnVector.vector[i * 2 + 1];
+                }
+                j++;
+            }
+        }
+    }
+
+    @Test
+    public void testLarge() throws IOException
+    {
+        int numBatches = 15;
+        int numRows = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        LongDecimalColumnWriter columnWriter = new LongDecimalColumnWriter(
+                TypeDescription.createDecimal(38, 2), writerOption);
+
+        LongDecimalColumnVector originVector = new LongDecimalColumnVector(numRows, 38, 2);
+        for (int j = 0; j < numRows; j++)
+        {
+            if (j % 100 == 0)
+            {
+                originVector.addNull();
+            }
+            else
+            {
+                originVector.add(1000.00d);
+            }
+        }
+
+        for (int i = 0; i < numBatches; i++)
+        {
+            columnWriter.write(originVector, numRows);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(
+                TypeDescription.createDecimal(38, 2));
+        LongDecimalColumnVector targetVector = new LongDecimalColumnVector(numBatches*numRows, 38, 2);
+        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numBatches*numRows,
+                10000, 0, targetVector, chunkIndex);
+        columnReader.close();
+
+        for (int i = 0; i < numBatches*numRows; i++)
+        {
+            int j = i % numRows;
+            assert targetVector.isNull[i] == originVector.isNull[j];
+            if (targetVector.noNulls || !targetVector.isNull[i])
+            {
+                assert originVector.vector[j * 2] == targetVector.vector[i * 2];
+                assert originVector.vector[j * 2 + 1] == targetVector.vector[i * 2 + 1];
+            }
+        }
+    }
+
+    @Test
+    public void testLargeFragmented() throws IOException
+    {
+        int numBatches = 15;
+        int numRows = 1024;
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        LongDecimalColumnWriter columnWriter = new LongDecimalColumnWriter(
+                TypeDescription.createDecimal(38, 2), writerOption);
+
+        LongDecimalColumnVector originVector = new LongDecimalColumnVector(numRows, 38, 2);
+        for (int j = 0; j < numRows; j++)
+        {
+            if (j % 100 == 0)
+            {
+                originVector.addNull();
+            }
+            else
+            {
+                originVector.add(1000.00d);
+            }
+        }
+
+        for (int i = 0; i < numBatches; i++)
+        {
+            columnWriter.write(originVector, numRows);
+        }
+        columnWriter.flush();
+        columnWriter.close();
+
+        byte[] content = columnWriter.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
+        LongDecimalColumnReader columnReader = new LongDecimalColumnReader(
+                TypeDescription.createDecimal(38, 2));
+        LongDecimalColumnVector targetVector = new LongDecimalColumnVector(numBatches*numRows, 38, 2);
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        columnReader.read(buffer, encoding, 0, 123,
+                10000, 0, targetVector, chunkIndex);
+        columnReader.read(buffer, encoding, 123, 456,
+                10000, 123, targetVector, chunkIndex);
+        columnReader.read(buffer, encoding, 123+456, numBatches*numRows-123-456,
+                10000, 123+456, targetVector, chunkIndex);
+        columnReader.close();
+
+        for (int i = 0; i < numBatches*numRows; i++)
+        {
+            int j = i % numRows;
+            assert targetVector.isNull[i] == originVector.isNull[j];
+            if (targetVector.noNulls || !targetVector.isNull[i])
+            {
+                assert originVector.vector[j * 2] == targetVector.vector[i * 2];
+                assert originVector.vector[j * 2 + 1] == targetVector.vector[i * 2 + 1];
             }
         }
     }

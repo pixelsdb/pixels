@@ -45,13 +45,13 @@ public class SortInput extends Input
      */
     public SortInput()
     {
-        super(-1);
+        super(-1, -1);
     }
 
-    public SortInput(long transId, ScanTableInfo tableInfo, boolean[] projection,
+    public SortInput(long transId, long timestamp, ScanTableInfo tableInfo, boolean[] projection,
                      OutputInfo output, int[] keyColumnIds, boolean isSorted)
     {
-        super(transId);
+        super(transId, timestamp);
         this.tableInfo = tableInfo;
         this.projection = projection;
         this.output = output;

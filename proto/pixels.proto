@@ -64,6 +64,8 @@ message PostScript {
     optional bool partitioned = 8;
     // the number of bytes the start offsets of the column chunks are align to
     optional uint32 columnChunkAlignment = 9;
+    // whether the file contains hidden timestamp columns
+    optional bool hasHiddenColumn = 10;
     // it is always "PIXELS", leave this last in the record
     optional string magic = 8000;
 }
@@ -87,6 +89,10 @@ message Footer {
     repeated RowGroupInformation rowGroupInfos = 3;
     // row group statistics
     repeated RowGroupStatistic rowGroupStats = 4;
+    // hidden timestamp column type
+    optional Type hiddenType = 5;
+    // file level hidden timestamp column statistics
+    optional ColumnStatistic hiddenColumnStats = 6;
 }
 
 message Type {
@@ -139,7 +145,7 @@ message RowGroupInformation {
     // serialized RowGroupFooter length
     optional uint32 footerLength = 3;
     // number of rows in this row group
-    optional uint64 numberOfRows = 4;
+    optional uint32 numberOfRows = 4;
     // the information of the hash partition, if Footer.partitioned is true
     optional PartitionInformation partitionInfo = 5;
 }
@@ -148,6 +154,8 @@ message RowGroupInformation {
 message RowGroupStatistic {
     // statistic for each column chunk that can be used to filter row groups
     repeated ColumnStatistic columnChunkStats = 1;
+    // statistics for the column chunk of hidden timestamp column that can be used to filter row groups
+    optional ColumnStatistic hiddenColumnChunkStats = 2;
 }
 
 message IntegerStatistic  {
@@ -249,10 +257,12 @@ message ColumnChunkIndex {
 
 message RowGroupIndex {
     repeated ColumnChunkIndex columnChunkIndexEntries = 1;
+    optional ColumnChunkIndex hiddenColumnChunkIndexEntry = 2;
 }
 
 message RowGroupEncoding {
     repeated ColumnEncoding columnChunkEncodings = 1;
+    optional ColumnEncoding hiddenColumnChunkEncoding = 2;
 }
 
 message RowGroupFooter {

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.Closeable;
@@ -54,7 +55,7 @@ public abstract class ColumnReader implements Closeable
      */
     int isNullSkipBits = 0;
 
-    public static ColumnReader newColumnReader(TypeDescription type)
+    public static ColumnReader newColumnReader(TypeDescription type, PixelsReaderOption option)
     {
         switch (type.getCategory())
         {
@@ -64,8 +65,16 @@ public abstract class ColumnReader implements Closeable
                 return new ByteColumnReader(type);
             case SHORT:
             case INT:
+                if (option.isReadIntColumnAsIntVector())
+                {
+                    return new IntColumnReader(type);
+                }
+                else
+                {
+                    return new LongColumnReader(type);
+                }
             case LONG:
-                return new IntegerColumnReader(type);
+                return new LongColumnReader(type);
             case DOUBLE:
                 return new DoubleColumnReader(type);
             case DECIMAL: // Issue #196: precision and scale are passed through type.
@@ -120,6 +129,24 @@ public abstract class ColumnReader implements Closeable
     public abstract void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                               int offset, int size, int pixelStride, final int vectorIndex,
                               ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException;
+
+    /**
+     * Read selected values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
+     * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
+     * @throws IOException
+     */
+    public abstract void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
+                                      int offset, int size, int pixelStride, final int vectorIndex,
+                                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected) throws IOException;
 
     /**
      * Closes this column reader and releases any resources associated

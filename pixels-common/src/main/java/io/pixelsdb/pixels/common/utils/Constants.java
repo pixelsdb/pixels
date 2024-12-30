@@ -32,6 +32,9 @@ public final class Constants
     public static final int S3_BUFFER_SIZE = 8 * 1024 * 1024;
     public static final int REDIS_BUFFER_SIZE = 8 * 1024 * 1024;
     public static final int GCS_BUFFER_SIZE = 8 * 1024 * 1024;
+    public static final int STREAM_BUFFER_SIZE = 8 * 1024 * 1024;
+    public static final int STREAM_READER_RG_BUFFER_SIZE = 1024 * 1024;
+    public static final int STREAM_READER_RG_FOOTER_BUFFER_SIZE = 1024;
 
     public static final int MIN_REPEAT = 3;
     public static final int MAX_SCOPE = 512;

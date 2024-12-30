@@ -69,7 +69,7 @@ public class Worker<WI extends WorkerInfo>
         }
     }
 
-    public void termenate()
+    public void terminate()
     {
         synchronized (this.lease)
         {

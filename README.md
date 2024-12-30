@@ -6,7 +6,7 @@ It is optimized for analytical tables stored in on-premises and cloud-native sto
 including S3, GCS, HDFS, Redis, and local file systems.
 Pixels outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to two orders of magnitude.
 
-We have integrated Pixels with popular query engines including DuckDB, Trino (405), Presto (0.279), and Hive (2.3+).
+We have integrated Pixels with popular query engines including DuckDB (1.1.0), Trino (405 and 466), Presto (0.279), and Hive (2.3+).
 
 The DuckDB integration and the C++ implementation of Pixels Reader are in the [cpp](cpp) folder.
 The other integrations are opensourced in separate repositories:
@@ -31,13 +31,13 @@ will result in different monetary costs on resources.
 Pixels is mainly implemented in Java (with some JNI hooks of system calls and C/C++ libs), while there is a C++ implementation of the Pixels Reader.
 The [C++ document](cpp/README.md) gives the instructions of using the C++ reader. Here we explain how to build and use the Java components.
 
-Install JDK 17.0.3 or above, and clone the Pixels codebase into any `SRC_BASE` directory:
+JDK 8 (or above) and Maven 3.8 (or above) are required to build Pixels.
+Earlier Maven versions may work but are not tested.
+After installing these prerequisites, clone the Pixels codebase into any `SRC_BASE` directory:
 ```bash
 git clone https://github.com/pixelsdb/pixels.git
 ```
 Enter `SRC_BASE/pixels`, use `mvn install` to build and install it to the local Maven repository.
-> JDK 17.0.3+ is required by Trino. To run Pixels in Presto or other query engines, please build Pixels and the corresponding connector
-> using the Java version required by the query engine. Pixels by itself is compatible with Java 8 or above.
 
 It may take a couple of minutes to complete. After that, find jar files:
 * `pixels-daemon-*-full.jar` in `pixels-daemon/target`,this is the jar to run Pixels daemons.
@@ -46,15 +46,13 @@ It may take a couple of minutes to complete. After that, find jar files:
 They will be used in the installation of Pixels.
 
 Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
-The query engine integrations can be easily built using maven.
+The query engine integrations also can be built using maven.
 For example, to build the Trino integration for Pixels, just git clone [pixels-trino](https://github.com/pixelsdb/pixels-trino), 
 and build it using `mvn package` in the local git repository.
 
-After building `pixels-trino`, find the following zip files in the build target directories:
-* `pixels-trino-listener-*.zip`, this is the event listener plugin for Trino.
-* `pixels-trino-connector-*.zip`, this is the connector for Trino.
-
-They will be used in the installation of the integration.
+> Pixels by itself is compatible with Java 8+ and Maven 3.8+. However, third-party query engines such as Trino may require
+> a later JDK (e.g., Trino 405/466 requires JDK17.0.3+/23.0.0+) and Maven.
+> It is fine to build the query engine integration (e.g., `pixels-trino`) with the same or higher versions of JDK and Maven than Pixels.
 
 
 ## Develop Pixels in IntelliJ
@@ -71,7 +69,7 @@ To solve this problem, set this property to at least `3600` (i.e., 3.6MB) in `He
 > To run or debug the unit tests or the main classes of Pixels in Intellij, set the `PIXELS_HOME` environment
 > variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
 > Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](docs/INSTALL.md#install-pixels) to put
-> the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
+> the `pixels.properties` into `PIXELS_HOME/etc` and create the `logs` directory where the log files will be
 > written into.
 
 
@@ -93,11 +91,11 @@ Pixels is an academic system aims at providing production-grade quality. It supp
 is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
+> `ICDE'25` [PixelsDB: Serverless and NL-Aided Data Analytics with Flexible Service Levels and Prices](https://arxiv.org/abs/2405.19784)\
+> Haoqiong Bian, Dongyang Geng, Haoyang Li, Yunpeng Chai, Anastasia Ailamaki
+
 > `arXiv'24` [Serverless Query Processing with Flexible Performance SLAs and Prices](https://arxiv.org/abs/2409.01388)\
 > Haoqiong Bian, Dongyang Geng, Yunpeng Chai, Anastasia Ailamaki
-
-> `arXiv'24` [PixelsDB: Serverless and Natural-Language-Aided Data Analytics with Flexible Service Levels and Prices](https://arxiv.org/abs/2405.19784)\
-> Haoqiong Bian, Dongyang Geng, Haoyang Li, Anastasia Ailamaki
 
 > `SIGMOD'23` [Using Cloud Functions as Accelerator for Elastic Data Analytics](https://doi.org/10.1145/3589306)\
 > Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki

@@ -23,8 +23,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.core.RetinaProto;
-import io.pixelsdb.pixels.core.RetinaServiceGrpc;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
@@ -34,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 public class RetinaService
 {
     private final ManagedChannel channel;
-    private final RetinaServiceGrpc.RetinaServiceBlockingStub stub;
+    private final RetinaWorkerServiceGrpc.RetinaWorkerServiceBlockingStub stub;
 
     public RetinaService(String host, int port)
     {
@@ -42,7 +40,7 @@ public class RetinaService
         assert (port > 0 && port <= 65535);
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
-        this.stub = RetinaServiceGrpc.newBlockingStub(channel);
+        this.stub = RetinaWorkerServiceGrpc.newBlockingStub(channel);
     }
 
     public void shutdown() throws InterruptedException

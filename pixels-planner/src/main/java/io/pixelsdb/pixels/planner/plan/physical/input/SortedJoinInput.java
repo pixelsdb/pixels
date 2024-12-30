@@ -41,11 +41,11 @@ public class SortedJoinInput extends JoinInput
          */
         public SortedJoinInput() { }
 
-        public SortedJoinInput(long transId, SortedTableInfo smallTable, SortedTableInfo largeTable,
+        public SortedJoinInput(long transId, long timestamp, SortedTableInfo smallTable, SortedTableInfo largeTable,
                                     SortedJoinInfo joinInfo, boolean partialAggregationPresent,
                                     PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
         {
-            super(transId, partialAggregationPresent, partialAggregationInfo, output);
+            super(transId, timestamp, partialAggregationPresent, partialAggregationInfo, output);
             this.smallTable = smallTable;
             this.largeTable = largeTable;
             this.joinInfo = joinInfo;

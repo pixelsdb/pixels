@@ -18,7 +18,7 @@ Do not use spot instance for this node.
 Login AWS, create an EC2 instance with 8GB disk, install Pixels components following the instructions [HERE](../../docs/INSTALL.md).
 This instance will be used to create the OS image for the worker nodes in the MPP cluster.
 You can skip the installation of MySQL, etcd and Grafana, as these components are only needed on the coordinator node.
-For Pixels, editing and putting `pixels.properties` into `PIXELS_HOME` is enough if you do not use `pixels-cache`.
+For Pixels, editing and putting `pixels.properties` into `PIXELS_HOME/etc` is enough if you do not use `pixels-cache`.
 Otherwise, fully install Pixels, and ensure you can start it as a worker using:
 ```bash
 $PIXELS_HOME/bin/start-daemon.sh worker -daemon
@@ -52,7 +52,7 @@ Click `Create launch template` to create the launch template.
 
 Execute the unit test `testSingle` in `pixels-scaling-ec2/src/test/java/io/pixelsdb/pixels/scaling/ec2/TestCloudWatchMetrics`
 to create a custom metric in CloudWatch. The namespace, dimension name, and dimension value are set by the following three
-properties in `$PIXELS_HOME/pixels.properties` (if the unit test is executed with a valid `$PIXELS_HOME` environment variable):
+properties in `PIXELS_HOME/etc/pixels.properties` (if the unit test is executed with a valid `PIXELS_HOME` environment variable):
 ```properties
 cloud.watch.metrics.namespace=Pixels
 cloud.watch.metrics.dimension.name=cluster

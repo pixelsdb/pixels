@@ -46,21 +46,25 @@ public class HashJoiner extends Joiner
      * In the join result, first comes with the columns from the small table, followed by
      * the columns from the large (a.k.a., right) table.
      *
-     * @param joinType          the join type
-     * @param smallSchema       the schema of the small table
-     * @param smallColumnAlias  the alias of the columns from the small table. These alias
-     *                          are used as the column name in {@link #joinedSchema}
-     * @param smallProjection   denotes whether the columns from {@link #smallSchema}
-     *                          are included in {@link #joinedSchema}
+     * @param joinType the join type
+     * @param smallSchema the schema of the small table
+     * @param smallColumnAlias the alias of the columns from the small table. These alias
+     *                         are used as the column name in {@link #joinedSchema}
+     * @param smallProjection denotes whether the columns from {@link #smallSchema}
+     *                        are included in {@link #joinedSchema}
      * @param smallKeyColumnIds the ids of the key columns of the small table
-     * @param largeSchema       the schema of the large table
-     * @param largeColumnAlias  the alias of the columns from the large table. These alias
-     *                          are used as the column name in {@link #joinedSchema}
-     * @param largeProjection   denotes whether the columns from {@link #largeSchema}
-     *                          are included in {@link #joinedSchema}
+     * @param largeSchema the schema of the large table
+     * @param largeColumnAlias the alias of the columns from the large table. These alias
+     *                         are used as the column name in {@link #joinedSchema}
+     * @param largeProjection denotes whether the columns from {@link #largeSchema}
+     *                        are included in {@link #joinedSchema}
      * @param largeKeyColumnIds the ids of the key columns of the large table
      */
-    public HashJoiner(JoinType joinType, TypeDescription smallSchema, String[] smallColumnAlias, boolean[] smallProjection, int[] smallKeyColumnIds, TypeDescription largeSchema, String[] largeColumnAlias, boolean[] largeProjection, int[] largeKeyColumnIds)
+    public HashJoiner(JoinType joinType,
+                  TypeDescription smallSchema, String[] smallColumnAlias,
+                  boolean[] smallProjection, int[] smallKeyColumnIds,
+                  TypeDescription largeSchema, String[] largeColumnAlias,
+                  boolean[] largeProjection, int[] largeKeyColumnIds)
     {
         super(joinType, smallSchema, smallColumnAlias, smallProjection, smallKeyColumnIds, largeSchema, largeColumnAlias, largeProjection, largeKeyColumnIds);
     }
@@ -73,7 +77,6 @@ public class HashJoiner extends Joiner
      *
      * @param smallBatch a row batch from the left (a.k.a., small) table
      */
-    @Override
     public void populateLeftTable(VectorizedRowBatch smallBatch)
     {
         requireNonNull(smallBatch, "smallBatch is null");
@@ -97,13 +100,12 @@ public class HashJoiner extends Joiner
      * @return the row batches of the join result, could be empty. <b>Note: </b> the returned
      * list is backed by {@link LinkedList}, thus it is not performant to access it randomly.
      */
-    @Override
     public List<VectorizedRowBatch> join(VectorizedRowBatch largeBatch)
     {
         requireNonNull(largeBatch, "largeBatch is null");
         checkArgument(largeBatch.size > 0, "largeBatch is empty");
         List<VectorizedRowBatch> result = new LinkedList<>();
-        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize);
+        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize, TypeDescription.Mode.NONE);
         Tuple.Builder builder = new Tuple.Builder(largeBatch, this.largeKeyColumnIds, this.largeProjection);
         while (builder.hasNext())
         {
@@ -122,7 +124,7 @@ public class HashJoiner extends Joiner
                         if (joinedRowBatch.isFull())
                         {
                             result.add(joinedRowBatch);
-                            joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize);
+                            joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize, TypeDescription.Mode.NONE);
                         }
                         joined.writeTo(joinedRowBatch);
                         break;
@@ -146,7 +148,7 @@ public class HashJoiner extends Joiner
                     if (joinedRowBatch.isFull())
                     {
                         result.add(joinedRowBatch);
-                        joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize);
+                        joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize, TypeDescription.Mode.NONE);
                     }
                     joined.writeTo(joinedRowBatch);
                     smallHead = smallHead.next;
@@ -165,7 +167,6 @@ public class HashJoiner extends Joiner
      * This method should be called after {@link Joiner#join(VectorizedRowBatch) join} is done, if
      * the join is left outer join.
      */
-    @Override
     public boolean writeLeftOuter(PixelsWriter pixelsWriter, int batchSize) throws IOException
     {
         checkArgument(this.joinType == JoinType.EQUI_LEFT || this.joinType == JoinType.EQUI_FULL,
@@ -181,7 +182,7 @@ public class HashJoiner extends Joiner
                 leftOuterTuples.add(small);
             }
         }
-        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize);
+        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
         for (Tuple small : leftOuterTuples)
         {
             if (leftOuterBatch.isFull())
@@ -227,7 +228,7 @@ public class HashJoiner extends Joiner
                 leftOuterTuples.add(small);
             }
         }
-        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize);
+        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
         for (Tuple small : leftOuterTuples)
         {
             if (leftOuterBatch.isFull())
@@ -276,8 +277,11 @@ public class HashJoiner extends Joiner
         return true;
     }
 
+    public TypeDescription getJoinedSchema()
+    {
+        return this.joinedSchema;
+    }
 
-    @Override
     public int getSmallTableSize()
     {
         return this.smallTable.size();

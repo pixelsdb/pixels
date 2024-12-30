@@ -19,325 +19,143 @@
  */
 package io.pixelsdb.pixels.core;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.Constants;
-import io.pixelsdb.pixels.common.utils.HttpServer;
-import io.pixelsdb.pixels.common.utils.HttpServerHandler;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReaderStreamImpl;
-import io.pixelsdb.pixels.core.utils.BlockingMap;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.annotation.concurrent.NotThreadSafe;
-import javax.net.ssl.SSLException;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.security.cert.CertificateException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
 
-import static io.netty.handler.codec.http.HttpHeaderNames.CONNECTION;
-import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
-import static io.netty.handler.codec.http.HttpResponseStatus.*;
 import static io.pixelsdb.pixels.common.utils.Constants.FILE_MAGIC;
-import static java.lang.Thread.sleep;
+
+import static java.util.Objects.requireNonNull;
 
 /**
- * PixelsReaderStreamImpl is an implementation of {@link io.pixelsdb.pixels.core.PixelsReader} that reads
- *  ColumnChunks from a stream, for operator pipelining over HTTP.
- * <p>
- * DESIGN: We adopt the stream protocol defined in the head comment in {@link PixelsWriterStreamImpl}.
- *  In the stream reader, we use a shared queue, or in partitioned mode a blocking hash map (which maps hash value
- *  to the ByteBuf of the corresponding hash partition), to pass received `ByteBuf`s to the record stream reader.
- * <p>
- * TODO: Currently, we assume the HTTP messages arrive in order. Implement a state machine to handle out-of-order
- *  messages (e.g. send a response to the client to ask for retransmission, if the header packet has not arrived
- *  by the time a data packet arrives).
+ * Pixels stream reader default implementation.
+ *
+ * @author huasiy, jasha64
  */
 @NotThreadSafe
 public class PixelsReaderStreamImpl implements PixelsReader
 {
-    private static final Logger logger = LogManager.getLogger(PixelsReaderStreamImpl.class);
     /**
      * The number of bytes that the start offset of each column chunk is aligned to.
      */
-    private static final int CHUNK_ALIGNMENT = Integer.parseInt(ConfigFactory.Instance()
-            .getProperty("column.chunk.alignment"));
-
     private TypeDescription fileSchema;
-    private final HttpServer httpServer;
-    private final CompletableFuture<Void> httpServerFuture;
-    private final BlockingQueue<ByteBuf> byteBufSharedQueue;
-    // In partitioned mode, we use byteBufBlockingMap to map hash value to corresponding ByteBuf
-    private final BlockingMap<Integer, ByteBuf> byteBufBlockingMap;
-    private final boolean partitioned;
-    private final AtomicReference<Integer> numPartitionsReceived = new AtomicReference<>(0);
-    private final List<PixelsRecordReaderStreamImpl> recordReaders;
-
-    /**
-     * The streamHeader is in the first message received on the stream, containing the schema of the file.
-     * It is used to initialize the fileSchema and the recordReaders.
-     * It is set to null until the first message arrives.
-     * The streamHeaderLatch is used to wait for the streamHeader to arrive.
-     */
-    private PixelsStreamProto.StreamHeader streamHeader;
-    private final CountDownLatch streamHeaderLatch = new CountDownLatch(1);
+    private final PhysicalReader physicalReader;
+    private final PixelsStreamProto.StreamHeader streamHeader;
+    private PixelsRecordReader recordReader = null;
 
     public PixelsReaderStreamImpl(String endpoint) throws Exception
     {
-        this(endpoint, false, -1);
+        throw new NotImplementedException();
     }
 
     public PixelsReaderStreamImpl(int port) throws Exception
     {
-        this("http://localhost:" + port + "/");
+        throw new NotImplementedException();
     }
 
     public PixelsReaderStreamImpl(String endpoint, boolean partitioned, int numPartitions)
-            throws URISyntaxException, CertificateException, SSLException
     {
-        this.fileSchema = null;
-        this.streamHeader = null;
-        URI uri = new URI(endpoint);
-        String IP = uri.getHost();
-        int httpPort = uri.getPort();
-        logger.debug("In Pixels stream reader constructor, IP: " + IP + ", port: " + httpPort +
-                ", partitioned: " + partitioned + ", numPartitions: " + numPartitions);
-        if (!Objects.equals(IP, "127.0.0.1") && !Objects.equals(IP, "localhost"))
+        throw new NotImplementedException();
+    }
+
+    private PixelsReaderStreamImpl(TypeDescription fileSchema,
+                                   PhysicalReader physicalReader,
+                                   PixelsStreamProto.StreamHeader streamHeader)
+    {
+        this.fileSchema = fileSchema;
+        this.physicalReader = physicalReader;
+        this.streamHeader = streamHeader;
+    }
+
+    public static class Builder
+    {
+        private Storage builderStorage = null;
+        private String builderPath = null;
+        private TypeDescription builderSchema = null;
+
+        private Builder()
         {
-            throw new UnsupportedOperationException("Currently, only localhost is supported as the server address");
         }
-        this.byteBufSharedQueue = new LinkedBlockingQueue<>();
-        this.byteBufBlockingMap = new BlockingMap<>();
-        this.partitioned = partitioned;
-        this.recordReaders = new ArrayList<>();
 
-        ExecutorService executorService = Executors.newFixedThreadPool(1);
-        this.httpServer = new HttpServer(new HttpServerHandler()
+        public Builder setStorage(Storage storage)
         {
-            @Override
-            public void channelRead0(ChannelHandlerContext ctx, HttpObject msg)
+            this.builderStorage = storage;
+            return this;
+        }
+
+        public Builder setPath(String path)
+        {
+            this.builderPath = requireNonNull(path);
+            return this;
+        }
+
+        public PixelsReader build()
+                throws IllegalArgumentException, IOException
+        {
+            // check arguments
+            if (builderStorage == null || builderPath == null)
             {
-                // Concurrency: async thread. Reads or writes streamHeader, recordReaders, byteBufSharedQueue
-                if (!(msg instanceof HttpRequest)) return;
-                FullHttpRequest req = (FullHttpRequest) msg;
-                if (req.method() != HttpMethod.POST)
-                {
-                    sendResponseAndClose(ctx, req, NOT_FOUND);
-                    return;
-                }
-                if (!Objects.equals(req.headers().get("Content-Type"), "application/x-protobuf"))
-                {
-                    // silent reject
-                    return;
-                }
-                logger.debug("Incoming packet on port: " + httpPort +
-                        ", content_length header: " + req.headers().get("content-length") +
-                        ", connection header: " + req.headers().get("connection") +
-                        ", partition ID header: " + req.headers().get("X-Partition-Id") +
-                        ", HTTP request object body total length: " + req.content().readableBytes());
+                throw new IllegalArgumentException("Missing argument to build PixelsReader");
+            }
+            PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderStorage, builderPath);
+            // get stream header
+            byte[] magic = new byte[FILE_MAGIC.length()];
+            fsReader.readFully(magic);
+            String fileMagic = new String(magic, StandardCharsets.US_ASCII);
+            if (!fileMagic.contentEquals(FILE_MAGIC))
+            {
+                throw new PixelsFileMagicInvalidException(fileMagic);
+            }
+            int headerLength = 0;
+            headerLength = fsReader.readInt(ByteOrder.BIG_ENDIAN);
+            ByteBuffer streamHeaderBuffer = fsReader.readFully(headerLength);
+            PixelsStreamProto.StreamHeader header = PixelsStreamProto.StreamHeader.parseFrom(streamHeaderBuffer);
 
-                ByteBuf byteBuf = req.content();
-                try
-                {
-                    if (streamHeader == null)
-                    {
-                        try
-                        {
-                            streamHeader = parseStreamHeader(byteBuf);
-                            streamHeaderLatch.countDown();
-
-                            for (PixelsRecordReaderStreamImpl recordReader : recordReaders)
-                            {
-                                // XXX: potential data race if `read()` method and this handler are executed in parallel
-                                //  due to concurrent modifications of the `recordReaders` list
-                                recordReader.lateInitialization(streamHeader);
-                            }
-                        } catch (IOException e)
-                        {
-                            logger.error("Invalid stream header values: ", e);
-                            sendResponseAndClose(ctx, req, BAD_REQUEST);
-                            return;
-                        }
-                    } else if (partitioned)
-                    {
-                        // In partitioned mode, every packet brings a streamHeader to prevent errors from possibly
-                        // out-of-order packet arrivals, so we need to parse it, but do not need the return value
-                        // (except for the first incoming packet processed above).
-                        parseStreamHeader(byteBuf);
-                    }
-                } catch (InvalidProtocolBufferException | IndexOutOfBoundsException e)
-                {
-                    logger.error("Malformed or corrupted stream header", e);
-                    sendResponseAndClose(ctx, req, BAD_REQUEST);
-                    return;
-                }
-
-                // We only need to put the byteBuf into the blocking queue to pass it to the recordReader, if the
-                //  client is a data writer (port >= 50100) rather than a schema writer. In the latter case,
-                //  the schema packet has been processed when parsing the stream header above.
-                if (httpPort >= 50100)
-                {
-                    byteBuf.retain();
-                    if (!partitioned) byteBufSharedQueue.add(byteBuf);
-                    else
-                    {
-                        int partitionId = Integer.parseInt(req.headers().get("X-Partition-Id"));
-                        if (partitionId < 0 || partitionId >= numPartitions)
-                        {
-                            logger.warn("Client sent invalid partitionId value: " + partitionId);
-                            sendResponseAndClose(ctx, req, BAD_REQUEST);
-                            return;
-                        }
-                        byteBufBlockingMap.put(partitionId, byteBuf);
-                        if (numPartitionsReceived.accumulateAndGet(1, Integer::sum) == numPartitions)
-                        {
-                            // The reader has read all the partitions, so we can put an artificial empty ByteBuf
-                            //  into the queue to signal the end of the stream.
-                            byteBufBlockingMap.put(numPartitions, Unpooled.buffer(0).retain());
-                        }
-                    }
-                }
-
-                sendResponseAndClose(ctx, req, HttpResponseStatus.OK);
+            // check file MAGIC and file version
+            int fileVersion = header.getVersion();
+            fileMagic = header.getMagic();
+            if (!PixelsVersion.matchVersion(fileVersion))
+            {
+                throw new PixelsFileVersionInvalidException(fileVersion);
+            }
+            if (!fileMagic.contentEquals(FILE_MAGIC))
+            {
+                throw new PixelsFileMagicInvalidException(fileMagic);
             }
 
-            private void sendResponseAndClose(ChannelHandlerContext ctx, FullHttpRequest req, HttpResponseStatus status)
-            {
-                FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), status);
-                response.headers()
-                        .set(HttpHeaderNames.CONTENT_TYPE, "text/plain")
-                        .set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes())
-                        .set(CONNECTION, CLOSE);
-
-                ChannelFuture f = ctx.writeAndFlush(response);
-                f.addListener(future -> {
-                    if (!future.isSuccess())
-                    {
-                        logger.error("Failed to write response: " + future.cause());
-                        ctx.channel().close();
-                    }
-                });
-                if (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()))
-                   f.addListener(ChannelFutureListener.CLOSE);
-                // schema port: only 1 packet expected, so close the connection immediately
-                // partitioned mode: close connection if all partitions received
-                // else (non-partitioned mode, data port): close connection if empty packet received
-                if (httpPort < 50100 || (partitioned && numPartitionsReceived.get() == numPartitions) ||
-                        (Objects.equals(req.headers().get(CONNECTION), CLOSE.toString()) &&
-                                req.content().readableBytes() == 0))
-                {
-                    f.addListener(future -> {
-                        // shutdown the server
-                        ctx.channel().parent().close().addListener(ChannelFutureListener.CLOSE);
-                        // Can delete the port from the map of open ports, but not necessary
-                        // PixelsWriterStreamImpl.delPort(httpPort);
-                    });
-                }
-            }
-        });
-        this.httpServerFuture = CompletableFuture.runAsync(() -> {
-            try
-            {
-                this.httpServer.serve(httpPort);
-            } catch (InterruptedException e)
-            {
-                logger.error("HTTP server interrupted", e);
-            }
-        }, executorService);
+            this.builderSchema = TypeDescription.createSchema(header.getTypesList());
+            return new PixelsReaderStreamImpl(this.builderSchema, fsReader, header);
+        }
     }
 
-    static int calculateCeiling(int value, int multiple)
-    {
-        // to calculate padding length in HttpClient
-
-        if (value <= 0 || multiple <= 0)
-        {
-            throw new IllegalArgumentException("Both value and multiple must be positive.");
-        }
-
-        int remainder = value % multiple;
-        if (remainder == 0)
-        {
-            return value;
-        }
-
-        int difference = multiple - remainder;
-        return value + difference;
-    }
-
-    private PixelsStreamProto.StreamHeader parseStreamHeader(ByteBuf byteBuf)
-            throws InvalidProtocolBufferException, IndexOutOfBoundsException
-    {
-        // check MAGIC
-        int magicLength = FILE_MAGIC.getBytes().length;
-        byte[] magicBytes = new byte[magicLength];
-        byteBuf.getBytes(0, magicBytes);
-        String magic = new String(magicBytes);
-        if (!magic.contentEquals(Constants.FILE_MAGIC))
-        {
-            throw new PixelsFileMagicInvalidException(magic);
-        }
-
-        int metadataLength = byteBuf.getInt(magicLength);
-        ByteBuf metadataBuf = Unpooled.buffer(metadataLength);
-        byteBuf.getBytes(magicLength + Integer.BYTES, metadataBuf);
-        PixelsStreamProto.StreamHeader streamHeader = PixelsStreamProto.StreamHeader.parseFrom(metadataBuf.nioBuffer());
-
-        // check file version
-        int fileVersion = streamHeader.getVersion();
-        if (!PixelsVersion.matchVersion(fileVersion))
-        {
-            throw new PixelsFileVersionInvalidException(fileVersion);
-        }
-
-        // consume the padding bytes
-        byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, 8));
-        if (CHUNK_ALIGNMENT != 0)
-        {
-            byteBuf.readerIndex(calculateCeiling(magicLength + Integer.BYTES + metadataLength, CHUNK_ALIGNMENT));
-        }
-        // At this point, the readerIndex of the byteBuf is past the streamHeader and at the start of
-        // the actual rowGroups.
-
-        this.fileSchema = TypeDescription.createSchema(streamHeader.getTypesList());
-        return streamHeader;
-    }
-
-    public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId)
-    {
-        throw new UnsupportedOperationException("getRowGroupFooter is not supported in a stream");
-    }
+    public static Builder newBuilder() { return new Builder(); }
 
     /**
      * Get a <code>PixelsRecordReader</code>
-     * Currently under streaming mode, only 1 recordReader per Reader.
-     * todo: implement multi-thread read in the future
-     *  (careful - the byteBuf in the HTTP serve method will possibly be shared in that case)
-     *
+     * Only support one record reader now.
      * @return record reader
      */
     @Override
     public PixelsRecordReader read(PixelsReaderOption option) throws IOException
     {
-        assert (recordReaders.size() == 0);
-
-        PixelsRecordReaderStreamImpl recordReader = new PixelsRecordReaderStreamImpl(partitioned, byteBufSharedQueue,
-                byteBufBlockingMap, streamHeader, option);
-        recordReaders.add(recordReader);
+        if (recordReader != null)
+        {
+            throw new IOException("only one record reader is allowed");
+        }
+        recordReader = new PixelsRecordReaderStreamImpl(physicalReader, streamHeader, option);
         return recordReader;
     }
 
@@ -347,10 +165,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
      * @return version number
      */
     @Override
-    public PixelsVersion getFileVersion()
-    {
-        return PixelsVersion.from(this.streamHeader.getVersion());
-    }
+    public PixelsVersion getFileVersion() { return PixelsVersion.from(this.streamHeader.getVersion()); }
 
     /**
      * Unsupported: In streaming mode, the number of rows cannot be determined in advance.
@@ -401,21 +216,9 @@ public class PixelsReaderStreamImpl implements PixelsReader
         return this.streamHeader.getWriterTimezone();
     }
 
-    /**
-     * Get schema of this file
-     *
-     * @return schema
-     */
     @Override
     public TypeDescription getFileSchema()
     {
-        try
-        {
-            streamHeaderLatch.await();
-        } catch (InterruptedException e)
-        {
-            logger.error("Interrupted while waiting for stream header", e);
-        }
         return this.fileSchema;
     }
 
@@ -429,17 +232,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     }
 
     @Override
-    public boolean isPartitioned()
-    {
-        try
-        {
-            streamHeaderLatch.await();
-        } catch (InterruptedException e)
-        {
-            logger.error("Interrupted while waiting for stream header", e);
-        }
-        return this.streamHeader.hasPartitioned() && this.streamHeader.getPartitioned();
-    }
+    public boolean isPartitioned() { return this.streamHeader.hasPartitioned() && this.streamHeader.getPartitioned(); }
 
     /**
      * Get file level statistics of each column. Not required in streaming mode
@@ -456,6 +249,14 @@ public class PixelsReaderStreamImpl implements PixelsReader
     @Override
     public PixelsProto.ColumnStatistic getColumnStat(String columnName)
     {
+        throw new UnsupportedOperationException("getColumnStat is not supported in a stream");
+    }
+
+    /**
+     * Row group id is not used in PixelsReaderStreamImpl.
+     */
+    @Override
+    public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) throws IOException {
         throw new UnsupportedOperationException("getColumnStat is not supported in a stream");
     }
 
@@ -516,42 +317,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     public void close()
             throws IOException
     {
-        new Thread(() -> {
-            // Conditions for closing:
-            // 1. streamHeaderLatch.await() to ensure that the stream header has been received
-            // 2. byteBufSharedQueue and byteBufBlockingMap are both empty, to ensure that all ByteBufs have been read
-            try
-            {
-                streamHeaderLatch.await();
-                while (!byteBufSharedQueue.isEmpty() && !byteBufBlockingMap.isEmpty()) sleep(20);
-            } catch (InterruptedException e)
-            {
-                throw new RuntimeException(e);
-            }
-
-            try
-            {
-                if (!this.httpServerFuture.isDone()) this.httpServerFuture.get(5, TimeUnit.SECONDS);
-            } catch (TimeoutException e)
-            {
-                logger.warn("In close(), HTTP server did not shut down in 5 seconds, doing forceful shutdown");
-                this.httpServerFuture.cancel(true);
-            } catch (InterruptedException | ExecutionException e)
-            {
-                logger.error("Exception during HTTP server shutdown", e);
-            } finally
-            {
-                for (PixelsRecordReader recordReader : recordReaders)
-                {
-                    try
-                    {
-                        recordReader.close();
-                    } catch (IOException e)
-                    {
-                        logger.error("Exception while closing record reader", e);
-                    }
-                }
-            }
-        }).start();
+        recordReader.close();
+        physicalReader.close();
     }
 }

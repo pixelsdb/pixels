@@ -64,6 +64,7 @@ public class BaseSortWorker extends Worker<SortInput, SortOutput>
     {
         SortOutput sortOutput = new SortOutput();
         long startTime = System.currentTimeMillis();
+        long timestamp = event.getTimestamp();
         sortOutput.setStartTimeMs(startTime);
         sortOutput.setRequestId(context.getRequestId());
         sortOutput.setSuccessful(true);
@@ -109,7 +110,7 @@ public class BaseSortWorker extends Worker<SortInput, SortOutput>
                     try
                     {
                         List<Tuple> sortList = new LinkedList<>();
-                        sortFile(transId, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
+                        sortFile(transId, timestamp, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
                                 filter, keyColumnIds, projection, sortList, writerSchema);
                         resultToMerge.add(sortList);
                     } catch (Throwable e)
@@ -183,7 +184,7 @@ public class BaseSortWorker extends Worker<SortInput, SortOutput>
      * @param result        the sort result
      * @param writerSchema  the schema to be used for the sort result writer
      */
-    private void sortFile(long transId, List<InputInfo> scanInputs,
+    private void sortFile(long transId, long timestamp, List<InputInfo> scanInputs,
                           String[] columnsToRead, Storage.Scheme inputScheme,
                           TableScanFilter filter, int[] keyColumnIds, boolean[] projection,
                           List<Tuple> result,
@@ -211,7 +212,7 @@ public class BaseSortWorker extends Worker<SortInput, SortOutput>
                 {
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
-                PixelsReaderOption option = WorkerCommon.getReaderOption(transId, columnsToRead, inputInfo);
+                PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
 

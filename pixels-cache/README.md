@@ -32,7 +32,7 @@ to build and install vmtouch to the operating system.
 ### Install Pixels
 Install Pixels following the instructions [HERE](../docs/INSTALL.md), but do not start Pixels before finishing the following configurations.
 
-Check the following settings related to pixels-cache in `$PIXELS_HOME/pixels.properties` on each node:
+Check the following settings related to pixels-cache in `PIXELS_HOME/etc/pixels.properties` on each node:
 ```properties
 # the location of the cache content file of pixels-cache
 cache.location=/mnt/ramfs/pixels.cache
@@ -66,7 +66,7 @@ sudo mkdir -p /mnt/ramfs
 sudo mount -t tmpfs -o size=65g tmpfs /mnt/ramfs
 ```
 The `size` parameter of the mount command should be larger than or equal to the sum of `cache.size` and `index.size` in
-`PIXELS_HOME/pixels.properties`, but must be smaller than the available physical memory size.
+`PIXELS_HOME/etc/pixels.properties`, but must be smaller than the available physical memory size.
 
 
 ## Start Pixels (with cache)
@@ -75,8 +75,8 @@ Enter `PIXELS_HOME` and start all Pixels daemons using:
 ```bash
 ./sbin/start-pixels.sh
 ```
-If starting the daemons in a cluster of multiple nodes, set the hostnames of the worker nodes in `$PIXELS_HOME/sbin/workers`
-and run `start-pixels.sh` on the coordinator node. Each line in `$PIXELS_HOME/sbin/workers` is the hostname of a
+If starting the daemons in a cluster of multiple nodes, set the hostnames of the worker nodes in `PIXELS_HOME/sbin/workers`
+and run `start-pixels.sh` on the coordinator node. Each line in `PIXELS_HOME/sbin/workers` is the hostname of a
 worker node. If the worker node has a different `PIXELS_HOME` environment variable than the coordinator node, append
 the `PIXELS_HOME` variable to the hostname, separate by a space like this:
 ```properties
@@ -106,7 +106,7 @@ Currently, we only cache the full compact files with the same number of row grou
 `numRowGroupInFile` in the `LAYOUT_COMPACT` field of the layout in metadata. The tail compact file 
 (if exists) with less row groups than `numRowGroupInFile` will be ignored in cache loading or replacement.
 
-If you have modified the `etcd` hostname and port in `$PIXELS_HOME/pixels.properties`, change the `ENDPOINTS` property
+If you have modified the `etcd` hostname and port in `PIXELS_HOME/etc/pixels.properties`, change the `ENDPOINTS` property
 in `load-cache.sh` as well.
 
 ## Stop Pixels and clear cache
@@ -133,5 +133,5 @@ Then, run:
 ./sbin/reset-cache.sh
 ```
 on any node in the cluster to reset the states related to pixels-cache in etcd.
-If you have modified the `etcd` hostname and port in `$PIXELS_HOME/pixels.properties`, change the `ENDPOINTS` property
+If you have modified the `etcd` hostname and port in `PIXELS_HOME/etc/pixels.properties`, change the `ENDPOINTS` property
 in `reset-cache.sh` as well.

@@ -115,7 +115,7 @@ public class PixelsPartitionCacheWriter {
         private String builderHostName = null;
         private PixelsCacheConfig cacheConfig = null;
         private int partitions = 16;
-        // TODO: configure it with pixels.properties
+        // TODO: configure it in pixels.properties
         private Function<MemoryMappedFile, CacheIndexWriter> indexWriterFactory = RadixIndexWriter::new;
         private boolean writeContent = false;
 

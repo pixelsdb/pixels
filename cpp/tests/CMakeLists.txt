@@ -14,7 +14,7 @@
 #
 #add_executable(
 #        unit_tests
-#        unit_tests.cpp)
+#        UnitTests.cpp)
 #
 #target_link_libraries(
 #        unit_tests
@@ -27,3 +27,5 @@
 #include_directories(../pixels-core/include)
 #include_directories(../pixels-common/include)
 #gtest_discover_tests(unit_tests)
+
+add_subdirectory(writer)

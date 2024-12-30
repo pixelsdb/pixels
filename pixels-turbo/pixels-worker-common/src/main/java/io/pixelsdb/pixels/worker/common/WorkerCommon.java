@@ -409,16 +409,18 @@ public class WorkerCommon
      * Create the reader option for a record reader of the given input file.
      *
      * @param transId the transaction id
+     * @param timestamp the transaction timestamp
      * @param cols the column names in the partitioned file
      * @param input the information of the input file
      * @return the reader option
      */
-    public static PixelsReaderOption getReaderOption(long transId, String[] cols, InputInfo input)
+    public static PixelsReaderOption getReaderOption(long transId, long timestamp, String[] cols, InputInfo input)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
+        option.transTimestamp(timestamp);
         option.includeCols(cols);
         option.rgRange(input.getRgStart(), input.getRgLength());
         return option;
@@ -439,19 +441,21 @@ public class WorkerCommon
      * Create the reader option for a record reader of the given hash partition in a partitioned file.
      * It must be checked outside that the given hash partition info exists in the file.
      * @param transId the transaction id
+     * @param timestamp the transaction timestamp
      * @param cols the column names in the partitioned file
      * @param pixelsReader the reader of the partitioned file
      * @param hashValue the hash value of the given hash partition
      * @param numPartition the total number of partitions
      * @return the reader option
      */
-    public static PixelsReaderOption getReaderOption(long transId, String[] cols, PixelsReader pixelsReader,
+    public static PixelsReaderOption getReaderOption(long transId, long timestamp, String[] cols, PixelsReader pixelsReader,
                                                int hashValue, int numPartition)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
+        option.transTimestamp(timestamp);
         option.includeCols(cols);
         if (pixelsReader.getRowGroupNum() == numPartition)
         {
