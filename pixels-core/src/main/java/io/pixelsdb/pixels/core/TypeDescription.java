@@ -1286,6 +1286,11 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         return createRowBatch(VectorizedRowBatch.DEFAULT_SIZE, Mode.NONE);
     }
 
+    public VectorizedRowBatch createRowBatch(int size)
+    {
+        return createRowBatch(size, Mode.NONE);
+    }
+
     public VectorizedRowBatch createRowBatchWithHiddenColumn(int maxSize, int mode, boolean... useEncodedVector)
     {
         VectorizedRowBatch result;

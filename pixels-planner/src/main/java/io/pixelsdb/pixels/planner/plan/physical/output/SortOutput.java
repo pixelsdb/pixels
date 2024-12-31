@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,18 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.join;
+package io.pixelsdb.pixels.planner.plan.physical.output;
+import java.util.List;
+import io.pixelsdb.pixels.common.turbo.Output;
 
-/**
- * @author hank
- * @date 22/05/2022
- */
-public enum JoinAlgorithm
-{
-    UNKNOWN, // The first enum value is the default value.
-    BROADCAST,
-    PARTITIONED,
-    SORTED,
-    BROADCAST_CHAIN,
-    PARTITIONED_CHAIN
+public class SortOutput extends NonPartitionOutput {
+    /**
+     * Default constructor for Jackson.
+     */
+    public SortOutput() { }
+
+
 }

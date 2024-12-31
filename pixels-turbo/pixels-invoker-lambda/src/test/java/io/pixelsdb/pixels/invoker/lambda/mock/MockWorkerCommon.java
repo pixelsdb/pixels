@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,12 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.common;
+package io.pixelsdb.pixels.invoker.lambda.mock;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
@@ -34,6 +33,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,29 +45,18 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.util.Enumeration;
-
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
-import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 import static java.util.Objects.requireNonNull;
 
-/**
- * Some common functions for the lambda workers.
- * @author hank
- * @create 2022-05-15
- */
-public class WorkerCommon
+public class MockWorkerCommon
 {
-    private static final Logger logger = LogManager.getLogger(WorkerCommon.class);
+    private static final Logger logger = LogManager.getLogger(MockWorkerCommon.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
     private static Storage s3;
     protected static Storage minio;
     private static Storage redis;
+    private static Storage file;
     public static final int rowBatchSize;
     protected static final int pixelStride;
     protected static final int rowGroupSize;
@@ -86,24 +78,17 @@ public class WorkerCommon
     {
         try
         {
-            if (WorkerCommon.s3 == null && storageInfo.getScheme() == Storage.Scheme.s3)
+            if (MockWorkerCommon.s3 == null && storageInfo.getScheme() == Storage.Scheme.s3)
             {
-                WorkerCommon.s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-            }
-            else if (WorkerCommon.minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
+                MockWorkerCommon.s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+            } else if (MockWorkerCommon.file == null && storageInfo.getScheme() == Storage.Scheme.file)
             {
-                ConfigMinio(storageInfo.getRegion(), storageInfo.getEndpoint(),
-                        storageInfo.getAccessKey(), storageInfo.getSecretKey());
-                WorkerCommon.minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+                MockWorkerCommon.file = StorageFactory.Instance().getStorage(Storage.Scheme.file);
             }
-            else if (WorkerCommon.redis == null && storageInfo.getScheme() == Storage.Scheme.redis)
-            {
-                ConfigRedis(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
-                WorkerCommon.redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
-            }
+
         } catch (Throwable e)
         {
-            throw new WorkerException("failed to initialize the storage of scheme " + storageInfo.getScheme(), e);
+            throw new RuntimeException("failed to initialize the storage of scheme " + storageInfo.getScheme(), e);
         }
     }
 
@@ -117,6 +102,8 @@ public class WorkerCommon
                 return minio;
             case redis:
                 return redis;
+            case file:
+                return file;
         }
         throw new UnsupportedOperationException("scheme " + scheme + " is not supported");
     }
@@ -125,12 +112,12 @@ public class WorkerCommon
      * Read the schemas of the two joined tables, concurrently using the executor, thus
      * to reduce the latency of the schema reading.
      *
-     * @param executor the executor, a.k.a., the thread pool.
-     * @param leftStorage the storage instance of the left table
-     * @param rightStorage the storage instance of the right table
-     * @param leftSchema the atomic reference to return the schema of the left table
-     * @param rightSchema the atomic reference to return the schema of the right table
-     * @param leftInputSplits the input splits of the left table
+     * @param executor         the executor, a.k.a., the thread pool.
+     * @param leftStorage      the storage instance of the left table
+     * @param rightStorage     the storage instance of the right table
+     * @param leftSchema       the atomic reference to return the schema of the left table
+     * @param rightSchema      the atomic reference to return the schema of the right table
+     * @param leftInputSplits  the input splits of the left table
      * @param rightInputSplits the input splits of the right table
      */
     public static void getFileSchemaFromSplits(ExecutorService executor,
@@ -178,13 +165,13 @@ public class WorkerCommon
      * Read the schemas of the two joined tables, concurrently using the executor, thus
      * to reduce the latency of the schema reading.
      *
-     * @param executor the executor, a.k.a., the thread pool
-     * @param leftStorage the storage instance of the left table
+     * @param executor     the executor, a.k.a., the thread pool
+     * @param leftStorage  the storage instance of the left table
      * @param rightStorage the storage instance of the right table
-     * @param leftSchema the atomic reference to return the schema of the left table
-     * @param rightSchema the atomic reference to return the schema of the right table
-     * @param leftPaths the paths of the input files of the left table
-     * @param rightPaths the paths of the input files of the right table
+     * @param leftSchema   the atomic reference to return the schema of the left table
+     * @param rightSchema  the atomic reference to return the schema of the right table
+     * @param leftPaths    the paths of the input files of the left table
+     * @param rightPaths   the paths of the input files of the right table
      */
     public static void getFileSchemaFromPaths(ExecutorService executor,
                                               Storage leftStorage, Storage rightStorage,
@@ -230,7 +217,7 @@ public class WorkerCommon
     /**
      * Read the schemas of the table.
      *
-     * @param storage the storage instance
+     * @param storage     the storage instance
      * @param inputSplits the list of input info of the input files of the table
      * @return the file schema of the table
      */
@@ -270,12 +257,12 @@ public class WorkerCommon
             TimeUnit.MILLISECONDS.sleep(200);
         }
     }
-    
+
     /**
      * Read the schemas of the table.
      *
      * @param storage the storage instance
-     * @param paths the list of paths of the input files of the table
+     * @param paths   the list of paths of the input files of the table
      * @return the file schema of the table
      */
     public static TypeDescription getFileSchemaFromPaths(Storage storage, List<String> paths)
@@ -310,7 +297,7 @@ public class WorkerCommon
      * Get the schema that only includes the type descriptions of the included columns.
      * The returned schema can be used for the table scan result.
      *
-     * @param fileSchema the schema of the file
+     * @param fileSchema  the schema of the file
      * @param includeCols the name of the included columns
      * @return the result schema
      */
@@ -349,7 +336,7 @@ public class WorkerCommon
      * Get a Pixels reader.
      *
      * @param filePath the file path
-     * @param storage the storage instance
+     * @param storage  the storage instance
      * @return the Pixels reader
      * @throws IOException if failed to build the reader
      */
@@ -362,7 +349,6 @@ public class WorkerCommon
                 .setPath(filePath)
                 .setEnableCache(false)
                 .setCacheOrder(ImmutableList.of())
-                .setPixelsCacheReader(null)
                 .setPixelsFooterCache(footerCache);
         PixelsReader pixelsReader = builder.build();
         return pixelsReader;
@@ -371,13 +357,13 @@ public class WorkerCommon
     /**
      * Get a Pixels writer.
      *
-     * @param schema the schema of the file to write
-     * @param storage the storage instance
-     * @param filePath the file path
-     * @param encoding whether this file is encoded or not
+     * @param schema        the schema of the file to write
+     * @param storage       the storage instance
+     * @param filePath      the file path
+     * @param encoding      whether this file is encoded or not
      * @param isPartitioned whether this file is partitioned or not
-     * @param keyColumnIds the ids of the key columns if this file is partitioned.
-     *                     It can be null if partitioned is false.
+     * @param keyColumnIds  the ids of the key columns if this file is partitioned.
+     *                      It can be null if partitioned is false.
      * @return the Pixels writer
      */
     public static PixelsWriter getWriter(TypeDescription schema, Storage storage,
@@ -409,18 +395,16 @@ public class WorkerCommon
      * Create the reader option for a record reader of the given input file.
      *
      * @param transId the transaction id
-     * @param timestamp the transaction timestamp
-     * @param cols the column names in the partitioned file
-     * @param input the information of the input file
+     * @param cols    the column names in the partitioned file
+     * @param input   the information of the input file
      * @return the reader option
      */
-    public static PixelsReaderOption getReaderOption(long transId, long timestamp, String[] cols, InputInfo input)
+    public static PixelsReaderOption getReaderOption(long transId, String[] cols, InputInfo input)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
-        option.transTimestamp(timestamp);
         option.includeCols(cols);
         option.rgRange(input.getRgStart(), input.getRgLength());
         return option;
@@ -440,22 +424,21 @@ public class WorkerCommon
     /**
      * Create the reader option for a record reader of the given hash partition in a partitioned file.
      * It must be checked outside that the given hash partition info exists in the file.
-     * @param transId the transaction id
-     * @param timestamp the transaction timestamp
-     * @param cols the column names in the partitioned file
+     *
+     * @param transId      the transaction id
+     * @param cols         the column names in the partitioned file
      * @param pixelsReader the reader of the partitioned file
-     * @param hashValue the hash value of the given hash partition
+     * @param hashValue    the hash value of the given hash partition
      * @param numPartition the total number of partitions
      * @return the reader option
      */
-    public static PixelsReaderOption getReaderOption(long transId, long timestamp, String[] cols, PixelsReader pixelsReader,
-                                               int hashValue, int numPartition)
+    public static PixelsReaderOption getReaderOption(long transId, String[] cols, PixelsReader pixelsReader,
+                                                     int hashValue, int numPartition)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
-        option.transTimestamp(timestamp);
         option.includeCols(cols);
         if (pixelsReader.getRowGroupNum() == numPartition)
         {
@@ -474,56 +457,5 @@ public class WorkerCommon
             }
         }
         return option;
-    }
-
-    public static void setPerfMetrics(Output output, WorkerMetrics collector)
-    {
-        output.setCumulativeInputCostMs((int) Math.round(collector.getInputCostNs() / 1000_000.0));
-        output.setCumulativeComputeCostMs((int) Math.round(collector.getComputeCostNs() / 1000_000.0));
-        output.setCumulativeOutputCostMs((int) Math.round(collector.getOutputCostNs() / 1000_000.0));
-        output.setTotalReadBytes(collector.getReadBytes());
-        output.setTotalWriteBytes(collector.getWriteBytes());
-        output.setNumReadRequests(collector.getNumReadRequests());
-        output.setNumWriteRequests(collector.getNumWriteRequests());
-    }
-
-    public static String getIpAddress()
-    {
-        try {
-            Enumeration<NetworkInterface> allNetInterfaces = NetworkInterface.getNetworkInterfaces();
-            InetAddress ip = null;
-            while (allNetInterfaces.hasMoreElements()) {
-                NetworkInterface netInterface = (NetworkInterface) allNetInterfaces.nextElement();
-                if (netInterface.isLoopback() || netInterface.isVirtual() || !netInterface.isUp()) {
-                    continue;
-                } else {
-                    Enumeration<InetAddress> addresses = netInterface.getInetAddresses();
-                    while (addresses.hasMoreElements()) {
-                        ip = addresses.nextElement();
-                        if (ip != null && ip instanceof Inet4Address) {
-                            return ip.getHostAddress();
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("failed to get ip" + e.toString());
-        }
-        return "";
-    }
-
-    public static int getPort()
-    {
-        return port++;
-    }
-
-    public static String getCoordinatorIp()
-    {
-        return coordinatorIp;
-    }
-
-    public static int getCoordinatorPort()
-    {
-        return coordinatorPort;
     }
 }

@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.executor.join.HashJoiner;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.join.Partitioner;
@@ -185,7 +186,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
              * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
              * However, it is safer to turn file schema into result schema here.
              */
-            Joiner joiner = new Joiner(joinType,
+            Joiner joiner = new HashJoiner(joinType,
                     StreamWorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead),
                     leftColAlias, leftProjection, leftKeyColumnIds,
                     StreamWorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead),
@@ -348,7 +349,7 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                                 encoding, true, -1, Arrays.stream(
                                                 outputPartitionInfo.getKeyColumnIds()).boxed().
                                         collect(Collectors.toList()));
-                        joiner.writeLeftOuterAndPartition(pixelsWriter, StreamWorkerCommon.rowBatchSize,
+                        ((HashJoiner) joiner).writeLeftOuterAndPartition(pixelsWriter, StreamWorkerCommon.rowBatchSize,
                                 outputPartitionInfo.getNumPartition(), outputPartitionInfo.getKeyColumnIds());
                     }
                     else
