@@ -62,6 +62,8 @@ public class StageCoordinator
     private final List<Worker<CFWorkerInfo>> workers = new ArrayList<>();
     private final Map<Long, List<Integer>> workerIdToWorkerIndex = new ConcurrentHashMap<>();
     private int workerIndexAssigner;
+    private int leftChildWorkerNum;
+    private int rightChildWorkerNum;
     private final Object lock = new Object();
 
     /**
@@ -82,6 +84,20 @@ public class StageCoordinator
         this.taskQueue = null;
         this.downStreamWorkerNum = 0;
         this.workerIndexAssigner = 0;
+        this.leftChildWorkerNum = 0;
+        this.rightChildWorkerNum = 0;
+    }
+
+    public StageCoordinator(int stageId, int workerNum, int workerIndexAssigner)
+    {
+        this.stageId = stageId;
+        this.isQueued = false;
+        this.fixedWorkerNum = workerNum;
+        this.taskQueue = null;
+        this.downStreamWorkerNum = 0;
+        this.workerIndexAssigner = workerIndexAssigner;
+        this.leftChildWorkerNum = 0;
+        this.rightChildWorkerNum = 0;
     }
 
     /**
@@ -100,6 +116,8 @@ public class StageCoordinator
         this.taskQueue = new TaskQueue<>(pendingTasks);
         this.downStreamWorkerNum = 0;
         this.workerIndexAssigner = workerIndex;
+        this.leftChildWorkerNum = 0;
+        this.rightChildWorkerNum = 0;
     }
 
     /**
@@ -283,5 +301,35 @@ public class StageCoordinator
     public int getFixedWorkerNum()
     {
         return this.fixedWorkerNum;
+    }
+
+    public void setLeftChildWorkerNum(int num)
+    {
+        leftChildWorkerNum = num;
+    }
+
+    public int getLeftChildWorkerNum()
+    {
+        return leftChildWorkerNum;
+    }
+
+    public boolean leftChildWorkerIsEmpty()
+    {
+        return leftChildWorkerNum == 0;
+    }
+
+    public void setRightChildWorkerNum(int num)
+    {
+        rightChildWorkerNum = num;
+    }
+
+    public int getRightChildWorkerNum()
+    {
+        return rightChildWorkerNum;
+    }
+
+    public boolean rightChildWorkerIsEmpty()
+    {
+        return rightChildWorkerNum == 0;
     }
 }
