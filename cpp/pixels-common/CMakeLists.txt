@@ -1,8 +1,17 @@
 project(pixels-common)
 
+set(CMAKE_CXX_STANDARD 17)
+
+include(ExternalProject)
+
 set(pixels_common_cxx
         lib/physical/storage/LocalFS.cpp
+		lib/physical/storage/LocalFSProvider.cpp
+		lib/physical/storage/PhysicalLocalWriter.cpp
+		lib/physical/PhysicalWriterOption.cpp
+		lib/physical/Status.cpp
         lib/physical/Storage.cpp
+		lib/physical/FilePath.cpp
         lib/physical/natives/PixelsRandomAccessFile.cpp
         lib/physical/natives/DirectRandomAccessFile.cpp
         lib/physical/natives/ByteBuffer.cpp
@@ -37,7 +46,9 @@ set(pixels_common_cxx
         include/physical/natives/DirectUringRandomAccessFile.h
         lib/physical/natives/DirectUringRandomAccessFile.cpp
 		include/utils/ColumnSizeCSVReader.h lib/utils/ColumnSizeCSVReader.cpp
-        include/physical/StorageArrayScheduler.h lib/physical/StorageArrayScheduler.cpp)
+        include/physical/StorageArrayScheduler.h lib/physical/StorageArrayScheduler.cpp
+		include/physical/natives/ByteOrder.h
+)
 
 include_directories(include)
 
@@ -50,15 +61,18 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS $ENV{PIXELS_SRC}/proto/pixels.proto)
 add_library(pixels-common ${pixels_common_cxx} ${PROTO_SRCS} ${PROTO_HDRS})
 
 # liburing
-include(ExternalProject)
+set(LIBURING_GIT_REPOSITORY git@github.com:axboe/liburing.git)
+set(LIBURING_GIT_TAG liburing-2.2)
+set(LIBURING_BUILD_COMMAND make -j)
+
 ExternalProject_Add(liburing
-		GIT_REPOSITORY https://github.com/axboe/liburing
-		GIT_TAG liburing-2.2
-		PREFIX ${CMAKE_CURRENT_BINARY_DIR}
+		PREFIX ${CMAKE_CURRENT_BINARY_DIR}/deps
+		GIT_REPOSITORY ${LIBURING_GIT_REPOSITORY}
+		GIT_TAG ${LIBURING_GIT_TAG}
 		SOURCE_DIR "liburing"
 		CONFIGURE_COMMAND ""
 		INSTALL_COMMAND ""
-		BUILD_COMMAND make -j
+		BUILD_COMMAND ${LIBURING_BUILD_COMMAND}
 		BUILD_IN_SOURCE true
 		)
 
@@ -68,5 +82,4 @@ link_directories(${CMAKE_CURRENT_BINARY_DIR}/liburing/src)
 message(${CMAKE_CURRENT_BINARY_DIR}/liburing/src)
 target_link_libraries(pixels-common
         ${Protobuf_LIBRARIES}
-		${CMAKE_CURRENT_BINARY_DIR}/liburing/src/liburing.a
-        )
+		${CMAKE_CURRENT_BINARY_DIR}/liburing/src/liburing.a)

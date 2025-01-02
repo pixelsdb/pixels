@@ -27,6 +27,7 @@ set(pixels_core_cxx
         lib/encoding/RunLenIntDecoder.cpp
         lib/encoding/Encoder.cpp
         lib/encoding/RunLenIntEncoder.cpp
+        lib/encoding/EncodingLevel.cpp
         lib/utils/EncodingUtils.cpp
         lib/utils/EncodingUtils.cpp
         include/vector/DecimalColumnVector.h
@@ -44,7 +45,24 @@ set(pixels_core_cxx
         include/vector/TimestampColumnVector.h
         lib/vector/TimestampColumnVector.cpp
         include/reader/TimestampColumnReader.h
-        lib/reader/TimestampColumnReader.cpp)
+        lib/reader/TimestampColumnReader.cpp
+        lib/writer/ColumnWriter.cpp
+        lib/writer/PixelsWriterOption.cpp
+        lib/encoding/EncodingLevel.cpp
+        lib/PixelsWriterImpl.cpp
+        lib/stats/StatsRecorder.cpp
+        include/utils/BitUtils.h
+        lib/utils/BitUtils.cpp
+        include/writer/ColumnWriterBuilder.h
+        lib/writer/ColumnWriterBuilder.cpp
+        include/writer/IntegerColumnWriter.h
+        lib/writer/IntegerColumnWriter.cpp
+        lib/writer/DecimalColumnWriter.cpp
+        include/writer/TimestampColumnWriter.h
+        lib/writer/TimestampColumnWriter.cpp
+        lib/writer/DateColumnWriter.cpp
+        include/writer/DateColumnWriter.h
+        )
 
 add_library(pixels-core ${pixels_core_cxx})
 
@@ -57,3 +75,4 @@ SET(CMAKE_CXX_FLAGS "-mavx2")
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../pixels-common/liburing/src/include)
 include_directories(../pixels-common/include)
 include_directories(include)
+include_directories(include/writer)

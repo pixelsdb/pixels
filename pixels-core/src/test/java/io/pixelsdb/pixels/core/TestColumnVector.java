@@ -85,13 +85,15 @@ public class TestColumnVector
         int testNum = 1000_000;
         String mockSchema = "struct<a:int,b:double,c:string,d:timestamp>";
 
-        VectorizedRowBatch srcRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
+        VectorizedRowBatch srcRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(
+                testNum, TypeDescription.Mode.NONE);
         LongColumnVector src0 = (LongColumnVector) srcRowBatch.cols[0];
         DoubleColumnVector src1 = (DoubleColumnVector) srcRowBatch.cols[1];
         BinaryColumnVector src2 = (BinaryColumnVector) srcRowBatch.cols[2];
         TimestampColumnVector src3 = (TimestampColumnVector) srcRowBatch.cols[3];
 
-        VectorizedRowBatch dstRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
+        VectorizedRowBatch dstRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(
+                testNum, TypeDescription.Mode.NONE);
         LongColumnVector dst0 = (LongColumnVector) dstRowBatch.cols[0];
         DoubleColumnVector dst1 = (DoubleColumnVector) dstRowBatch.cols[1];
         BinaryColumnVector dst2 = (BinaryColumnVector) dstRowBatch.cols[2];

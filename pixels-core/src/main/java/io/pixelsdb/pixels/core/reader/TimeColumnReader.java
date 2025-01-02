@@ -115,18 +115,21 @@ public class TimeColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
+        boolean endOfPixels;
         for (int i = vectorIndex; numLeft > 0;)
         {
             if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixels = true;
             }
             else
             {
                 numToRead = numLeft;
+                endOfPixels = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixels ? 7 : 0)) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -135,7 +138,7 @@ public class TimeColumnReader extends ColumnReader
                 BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                         inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixels ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
@@ -159,9 +162,11 @@ public class TimeColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        columnVector.set(j, inputBuffer.getInt());
+                        // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                        columnVector.times[j] = inputBuffer.getInt();
                     }
-                } else
+                }
+                else
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
@@ -222,6 +227,7 @@ public class TimeColumnReader extends ColumnReader
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
         boolean[] isNull = null;
+        boolean endOfPixel;
         if (decoding || !nullsPadding)
         {
             isNull = new boolean[size];
@@ -232,12 +238,14 @@ public class TimeColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
             }
             else
             {
                 numToRead = numLeft;
+                endOfPixel = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
 
             // read isNull
             int pixelId = elementIndex / pixelStride;
@@ -266,7 +274,7 @@ public class TimeColumnReader extends ColumnReader
                     }
                 }
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else
@@ -307,7 +315,8 @@ public class TimeColumnReader extends ColumnReader
                         int value = inputBuffer.getInt();
                         if (selected.get(j - vectorIndex))
                         {
-                            columnVector.set(vectorWriteIndex++, value);
+                            // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
+                            columnVector.times[vectorWriteIndex++] = value;
                         }
                     }
                 }

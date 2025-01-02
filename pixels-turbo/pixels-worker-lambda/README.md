@@ -17,7 +17,7 @@ To deploy the workers:
 The java runtime can be either java-8 or java-11. The architecture can be either x86-64 or arm64.
 - Create another `layer` in AWS Lambda that contains the configuration file `pixels.properties` of Pixels.
 A template of this file can be found in `pixels-common/main/resources/`.
-Create a folder named `pixels`, put `pixels.properties` in this folder, and compress
+Create a folder named `pixels/etc`, put `pixels.properties` in this folder, and compress
 this folder into a zip file. Then, use the zip file to create the layer.
 For the serverless workers running in AWS Lambda, only the following configuration properties related to 
 file storage and I/O are used:

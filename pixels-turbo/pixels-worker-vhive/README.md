@@ -3,7 +3,7 @@
 This module is for creating the Docker image for vHive cloud functions.
 
 After [building Pixels](https://github.com/pixelsdb/pixels#build-pixels), we have the executable JAR file `target/pixels-worker-vhive-jar-with-dependencies.jar`.
-Also modify the following items in `pixels.properties`:
+Also modify the following items in `PIXELS_HOME/etc/pixels.properties`:
 ```properties
 # which cloud function service to use, can be lambda (AWS Lambda) or vhive (vHive)
 executor.function.service=vhive

@@ -109,17 +109,21 @@ public class LongDecimalColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
+        boolean endOfPixel;
         for (int i = vectorIndex; numLeft > 0; )
         {
             if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-            } else
+                endOfPixel = true;
+            }
+            else
             {
                 numToRead = numLeft;
+                endOfPixel = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -128,9 +132,10 @@ public class LongDecimalColumnReader extends ColumnReader
                 BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
                         inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits =  endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
-            } else
+            }
+            else
             {
                 Arrays.fill(columnVector.isNull, i, i + numToRead, false);
             }
@@ -145,7 +150,8 @@ public class LongDecimalColumnReader extends ColumnReader
                     columnVector.vector[index + 1] = inputBuffer.getLong(inputIndex);
                     inputIndex += Long.BYTES;
                 }
-            } else
+            }
+            else
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
@@ -210,6 +216,7 @@ public class LongDecimalColumnReader extends ColumnReader
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
         boolean[] isNull = null;
+        boolean endOfPixel;
         if (!nullsPadding)
         {
             isNull = new boolean[size];
@@ -220,12 +227,14 @@ public class LongDecimalColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-            } else
+                endOfPixel = true;
+            }
+            else
             {
                 numToRead = numLeft;
+                endOfPixel = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits) / 8;
-
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -253,7 +262,7 @@ public class LongDecimalColumnReader extends ColumnReader
                     }
                 }
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 columnVector.noNulls = false;
             }
             else

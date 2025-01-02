@@ -28,9 +28,7 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.executor.join.JoinType;
-import io.pixelsdb.pixels.executor.join.Joiner;
-import io.pixelsdb.pixels.executor.join.Partitioner;
+import io.pixelsdb.pixels.executor.join.*;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.BroadcastJoinInput;
@@ -140,7 +138,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                     WorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
                     WorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
                     leftSchema, rightSchema, leftInputs, rightInputs);
-            Joiner joiner = new Joiner(joinType,
+            Joiner joiner = new HashJoiner(joinType,
                     WorkerCommon.getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftProjection, leftKeyColumnIds,
                     WorkerCommon.getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightProjection, rightKeyColumnIds);
             // build the hash table for the left table.
@@ -151,7 +149,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(transId, timestamp, joiner, inputs, leftInputStorageInfo.getScheme(),
+                        buildHashTable(transId, timestamp, (HashJoiner) joiner, inputs, leftInputStorageInfo.getScheme(),
                                 !leftTable.isBase(), leftCols, leftFilter, workerMetrics);
                     }
                     catch (Throwable e)
@@ -298,7 +296,7 @@ public class BaseBroadcastJoinWorker extends Worker<BroadcastJoinInput, JoinOutp
      * @param leftFilter the table scan filter on the left table
      * @param workerMetrics the collector of the performance metrics
      */
-    public static void buildHashTable(long transId, long timestamp, Joiner joiner, List<InputInfo> leftInputs,
+    public static void buildHashTable(long transId, long timestamp, HashJoiner joiner, List<InputInfo> leftInputs,
                                       Storage.Scheme leftScheme, boolean checkExistence, String[] leftCols,
                                       TableScanFilter leftFilter, WorkerMetrics workerMetrics)
     {

@@ -32,6 +32,8 @@ public enum WorkerType
     BROADCAST_CHAIN_JOIN,
     PARTITIONED_JOIN, PARTITIONED_JOIN_STREAMING,
     PARTITIONED_CHAIN_JOIN,
+    SORT,
+    SORTED_JOIN,
     AGGREGATION;
 
     public static WorkerType from(String value)

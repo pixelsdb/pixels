@@ -140,7 +140,6 @@ public abstract class ColumnVector implements AutoCloseable
         throw new UnsupportedOperationException("Adding Integer128 is not supported");
     }
 
-
     public void add(String value)
     {
         throw new UnsupportedOperationException("Adding string is not supported");
@@ -171,6 +170,32 @@ public abstract class ColumnVector implements AutoCloseable
         }
         this.isNull[writeIndex++] = true;
         this.noNulls = false;
+    }
+
+    public void pushWriteIndex(int delta)
+    {
+        if (writeIndex + delta <= length)
+        {
+            // writeIndex == length is valid, meaning this column vector is full.
+            writeIndex += delta;
+        }
+        else
+        {
+            throw new IndexOutOfBoundsException(Integer.toString(writeIndex + delta));
+        }
+    }
+
+    public void setWriteIndex(int writeIndex)
+    {
+        if (writeIndex <= length)
+        {
+            // writeIndex == length is valid, meaning this column vector is full.
+            this.writeIndex = writeIndex;
+        }
+        else
+        {
+            throw new IndexOutOfBoundsException(Integer.toString(writeIndex));
+        }
     }
 
     /**

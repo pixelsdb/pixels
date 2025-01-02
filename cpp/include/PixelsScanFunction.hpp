@@ -1,10 +1,32 @@
-//
-// Created by liyu on 3/26/23.
-//
+/*
+ * Copyright 2023 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/*
+ * @author liyu
+ * @create 2023-03-26
+ */
 #pragma once
 
 #ifndef EXAMPLE_C_PIXELSSCANFUNCTION_HPP
 #define EXAMPLE_C_PIXELSSCANFUNCTION_HPP
+
 #include "duckdb.hpp"
 #include <fstream>
 #include <iostream>
@@ -42,7 +64,9 @@
 #include "physical/BufferPool.h"
 #include "profiler/TimeProfiler.h"
 #include "physical/natives/DirectUringRandomAccessFile.h"
+
 #ifndef DUCKDB_AMALGAMATION
+
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/enums/file_compression_type.hpp"
@@ -64,36 +88,50 @@
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
 #include "duckdb/common/multi_file_reader.hpp"
+
 #endif
 
 using namespace std;
 
-namespace duckdb {
+namespace duckdb
+{
 
-class PixelsScanFunction {
-public:
-	static TableFunctionSet GetFunctionSet();
-	static void PixelsScanImplementation(ClientContext &context, TableFunctionInput &data_p,
-	                                      DataChunk &output);
-	static unique_ptr<FunctionData> PixelsScanBind(ClientContext &context, TableFunctionBindInput &input,
-	                                                vector<LogicalType> &return_types, vector<string> &names);
-	static unique_ptr<GlobalTableFunctionState> PixelsScanInitGlobal(ClientContext &context,
-	                                                                  TableFunctionInitInput &input);
-	static unique_ptr<LocalTableFunctionState>
-	PixelsScanInitLocal(ExecutionContext &context, TableFunctionInitInput &input, GlobalTableFunctionState *gstate_p);
-	static bool PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
-	                                     PixelsReadLocalState &scan_data, PixelsReadGlobalState &parallel_state,
-                                         bool is_init_state = false);
-    static PixelsReaderOption GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state);
-private:
-	static void TransformDuckdbType(const std::shared_ptr<TypeDescription>& type,
-	                         vector<LogicalType> &return_types);
-	static void TransformDuckdbChunk(PixelsReadLocalState & data,
-	                            DataChunk &output,
-	                            const std::shared_ptr<TypeDescription> & schema,
-	                            unsigned long thisOutputChunkRows);
-    static bool enable_filter_pushdown;
-};
+    class PixelsScanFunction
+    {
+    public:
+        static TableFunctionSet GetFunctionSet();
+
+        static void PixelsScanImplementation(ClientContext &context, TableFunctionInput &data_p,
+                                             DataChunk &output);
+
+        static unique_ptr <FunctionData> PixelsScanBind(ClientContext &context, TableFunctionBindInput &input,
+                                                        vector <LogicalType> &return_types, vector <string> &names);
+
+        static unique_ptr <GlobalTableFunctionState> PixelsScanInitGlobal(ClientContext &context,
+                                                                          TableFunctionInitInput &input);
+
+        static unique_ptr <LocalTableFunctionState>
+        PixelsScanInitLocal(ExecutionContext &context, TableFunctionInitInput &input,
+                            GlobalTableFunctionState *gstate_p);
+
+        static bool PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
+                                            PixelsReadLocalState &scan_data, PixelsReadGlobalState &parallel_state,
+                                            bool is_init_state = false);
+
+        static PixelsReaderOption
+        GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state);
+
+    private:
+        static void TransformDuckdbType(const std::shared_ptr <TypeDescription> &type,
+                                        vector <LogicalType> &return_types);
+
+        static void TransformDuckdbChunk(PixelsReadLocalState &data,
+                                         DataChunk &output,
+                                         const std::shared_ptr <TypeDescription> &schema,
+                                         unsigned long thisOutputChunkRows);
+
+        static bool enable_filter_pushdown;
+    };
 
 } // namespace duckdb
 #endif // EXAMPLE_C_PIXELSSCANFUNCTION_HPP

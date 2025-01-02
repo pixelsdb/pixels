@@ -55,7 +55,7 @@ public abstract class ColumnReader implements Closeable
      */
     int isNullSkipBits = 0;
 
-    public static ColumnReader newColumnReader(TypeDescription type)
+    public static ColumnReader newColumnReader(TypeDescription type, PixelsReaderOption option)
     {
         switch (type.getCategory())
         {
@@ -65,8 +65,16 @@ public abstract class ColumnReader implements Closeable
                 return new ByteColumnReader(type);
             case SHORT:
             case INT:
+                if (option.isReadIntColumnAsIntVector())
+                {
+                    return new IntColumnReader(type);
+                }
+                else
+                {
+                    return new LongColumnReader(type);
+                }
             case LONG:
-                return new IntegerColumnReader(type);
+                return new LongColumnReader(type);
             case DOUBLE:
                 return new DoubleColumnReader(type);
             case DECIMAL: // Issue #196: precision and scale are passed through type.

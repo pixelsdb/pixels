@@ -29,9 +29,9 @@ import static java.util.Objects.requireNonNull;
 /**
  * LongColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
  * <p>
- * This class represents a nullable int column vector.
- * This class will be used for operations on all integer types (tinyint, smallint, int, bigint)
- * and as such will use a 64-bit long value to hold the biggest possible value.
+ * This class represents a nullable long column vector.
+ * This class can be used for operations on all integer types (tinyint, smallint, int, bigint)
+ * and as such uses a 64-bit long value to hold the biggest possible value.
  * During copy-in/copy-out, smaller int types will be converted as needed. This will
  * reduce the amount of code that needs to be generated and also will run fast since the
  * machine operates with 64-bit words.

@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.executor.join.HashJoiner;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
@@ -292,7 +293,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                 ChainJoinInfo nextJoinInfo = chainJoinInfos.get(i);
                 TypeDescription nextResultSchema = WorkerCommon.getResultSchema(nextTableSchema, nextTable.getColumnsToRead());
                 readCostTimer.stop();
-                Joiner nextJoiner = new Joiner(nextJoinInfo.getJoinType(),
+                Joiner nextJoiner = new HashJoiner(nextJoinInfo.getJoinType(),
                         currJoiner.getJoinedSchema(), nextJoinInfo.getSmallColumnAlias(),
                         nextJoinInfo.getSmallProjection(), currJoinInfo.getKeyColumnIds(),
                         nextResultSchema, nextJoinInfo.getLargeColumnAlias(),
@@ -305,7 +306,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             TypeDescription rightTableSchema = WorkerCommon.getFileSchemaFromSplits(
                     WorkerCommon.getStorage(rightTable.getStorageInfo().getScheme()), rightTable.getInputSplits());
             TypeDescription rightResultSchema = WorkerCommon.getResultSchema(rightTableSchema, rightTable.getColumnsToRead());
-            Joiner finalJoiner = new Joiner(lastJoinInfo.getJoinType(),
+            Joiner finalJoiner = new HashJoiner(lastJoinInfo.getJoinType(),
                     currJoiner.getJoinedSchema(), lastJoinInfo.getSmallColumnAlias(),
                     lastJoinInfo.getSmallProjection(), lastChainJoin.getKeyColumnIds(),
                     rightResultSchema, lastJoinInfo.getLargeColumnAlias(),
@@ -344,7 +345,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                 WorkerCommon.getStorage(t1.getStorageInfo().getScheme()),
                 WorkerCommon.getStorage(t2.getStorageInfo().getScheme()),
                 t1Schema, t2Schema, t1.getInputSplits(), t2.getInputSplits());
-        Joiner joiner = new Joiner(joinInfo.getJoinType(),
+        Joiner joiner = new HashJoiner(joinInfo.getJoinType(),
                 WorkerCommon.getResultSchema(t1Schema.get(), t1.getColumnsToRead()), joinInfo.getSmallColumnAlias(),
                 joinInfo.getSmallProjection(), t1.getKeyColumnIds(),
                 WorkerCommon.getResultSchema(t2Schema.get(), t2.getColumnsToRead()), joinInfo.getLargeColumnAlias(),
@@ -358,7 +359,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             leftFutures.add(executor.submit(() -> {
                 try
                 {
-                    BaseBroadcastJoinWorker.buildHashTable(transId, timestamp, joiner, inputs, t1.getStorageInfo().getScheme(),
+                    BaseBroadcastJoinWorker.buildHashTable(transId, timestamp, (HashJoiner) joiner, inputs, t1.getStorageInfo().getScheme(),
                             !t1.isBase(), t1.getColumnsToRead(), t1Filter, workerMetrics);
                 }
                 catch (Throwable e)

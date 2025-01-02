@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.19)
 set(CMAKE_CXX_STANDARD 14)
 # Set extension name here
 set(TARGET_NAME pixels)
@@ -8,8 +8,8 @@ project(${TARGET_NAME})
 include_directories(include)
 
 set(EXTENSION_SOURCES
-        pixels_extension.cpp
-        PixelsScanFunction.cpp
+        pixels-duckdb/pixels_extension.cpp
+        pixels-duckdb/PixelsScanFunction.cpp
 )
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 
@@ -20,6 +20,8 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(pixels-common)
 add_subdirectory(pixels-core)
+add_subdirectory(pixels-cli)
+add_subdirectory(third-party/googletest)
 add_subdirectory(tests)
 
 include_directories(pixels-common/include)
@@ -27,14 +29,11 @@ include_directories(pixels-core/include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/pixels-common/liburing/src/include)
 
-
-
 target_link_libraries(
         ${EXTENSION_NAME}
         pixels-common
         pixels-core
 )
-
 
 # Add the subdirectory that contains the build_loadable_extension definition
 

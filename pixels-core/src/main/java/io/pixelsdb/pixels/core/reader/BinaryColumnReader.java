@@ -73,6 +73,7 @@ public class BinaryColumnReader extends ColumnReader
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
+        throw new UnsupportedOperationException("Not implemented yet.");
     }
 
     /**

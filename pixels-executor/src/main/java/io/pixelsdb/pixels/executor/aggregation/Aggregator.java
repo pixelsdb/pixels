@@ -192,7 +192,7 @@ public class Aggregator
 
     public boolean writeAggrOutput(PixelsWriter pixelsWriter) throws IOException
     {
-        VectorizedRowBatch outputRowBatch = this.outputSchema.createRowBatch(this.batchSize);
+        VectorizedRowBatch outputRowBatch = this.outputSchema.createRowBatch(this.batchSize, TypeDescription.Mode.NONE);
         if (partition)
         {
             for (int hash = 0; hash < this.numPartitions; ++hash)

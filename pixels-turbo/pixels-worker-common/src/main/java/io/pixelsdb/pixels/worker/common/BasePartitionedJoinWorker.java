@@ -27,9 +27,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.executor.join.JoinType;
-import io.pixelsdb.pixels.executor.join.Joiner;
-import io.pixelsdb.pixels.executor.join.Partitioner;
+import io.pixelsdb.pixels.executor.join.*;
 import io.pixelsdb.pixels.planner.plan.physical.domain.MultiOutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
@@ -157,7 +155,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
              * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
              * However, it is safer to turn file schema into result schema here.
              */
-            Joiner joiner = new Joiner(joinType,
+            Joiner joiner = new HashJoiner(joinType,
                     WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead),
                     leftColAlias, leftProjection, leftKeyColumnIds,
                     WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead),
@@ -179,7 +177,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(transId, timestamp, joiner, parts, leftColumnsToRead, leftInputStorageInfo.getScheme(),
+                        buildHashTable(transId, timestamp, (HashJoiner) joiner, parts, leftColumnsToRead, leftInputStorageInfo.getScheme(),
                                 hashValues, numPartition, workerMetrics);
                     }
                     catch (Throwable e)
@@ -316,7 +314,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                                 encoding, true, Arrays.stream(
                                         outputPartitionInfo.getKeyColumnIds()).boxed().
                                         collect(Collectors.toList()));
-                        joiner.writeLeftOuterAndPartition(pixelsWriter, WorkerCommon.rowBatchSize,
+                        ((HashJoiner)joiner).writeLeftOuterAndPartition(pixelsWriter, WorkerCommon.rowBatchSize,
                                 outputPartitionInfo.getNumPartition(), outputPartitionInfo.getKeyColumnIds());
                     }
                     else
@@ -372,7 +370,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
      * @param numPartition the total number of partitions
      * @param workerMetrics the collector of the performance metrics
      */
-    protected static void buildHashTable(long transId, long timestamp, Joiner joiner, List<String> leftParts, String[] leftCols,
+
+    protected static void buildHashTable(long transId, long timestamp, HashJoiner joiner, List<String> leftParts, String[] leftCols,
                                          Storage.Scheme leftScheme, List<Integer> hashValues, int numPartition,
                                          WorkerMetrics workerMetrics)
     {

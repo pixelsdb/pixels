@@ -420,9 +420,20 @@ public class WorkerCommon
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
-        option.timestamp(timestamp);
+        option.transTimestamp(timestamp);
         option.includeCols(cols);
         option.rgRange(input.getRgStart(), input.getRgLength());
+        return option;
+    }
+
+    public static PixelsReaderOption getReaderOption(long transId, String[] cols)
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.transId(transId);
+        option.includeCols(cols);
+        option.rgRange(0, -1);
         return option;
     }
 
@@ -444,7 +455,7 @@ public class WorkerCommon
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.transId(transId);
-        option.timestamp(timestamp);
+        option.transTimestamp(timestamp);
         option.includeCols(cols);
         if (pixelsReader.getRowGroupNum() == numPartition)
         {
