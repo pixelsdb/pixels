@@ -19,13 +19,47 @@
  */
 package io.pixelsdb.pixels.daemon.scaling.policy;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class PidPolicy extends Policy
 {
+    private static final Logger log = LogManager.getLogger(BasicPolicy.class);
+    // add a control to make scaling-choice
+    class pidcontrollor
+    {
+        private float kp, ki, kd;
+        private int queryConcurrencyTarget, integral, prerror;
+        pidcontrollor(){
+            this.kp = 0.8F;
+            this.ki = 0.05F;
+            this.kd = 0.05F;
+            this.queryConcurrencyTarget = 1;
+            this.integral = 0;
+            this.prerror = 0;
+        }
+        public float calcuator(int queryConcurrency){
+            int error = queryConcurrency - queryConcurrencyTarget;
+            integral += error;
+            int derivative = error - prerror;
+            float re = kp*error + ki*integral + kd*derivative;
+            prerror = error;
+            return re;
+        }
+        public void argsuit(){ // finetuing the  arg:kp ki kd
+            return;
+        }
+    }
+
+    private pidcontrollor ctl = new pidcontrollor();
     @Override
     public void doAutoScaling()
     {
+        int queryConcurrency = metricsQueue.getLast();
         System.out.println("Receive metrics:" + metricsQueue);
-        System.out.println("TODO: pid policy");
+        float sf = ctl.calcuator(queryConcurrency);
+        log.info("INFO: expand " + sf +" vm");
+        scalingManager.multiplyInstance(sf);
     }
+
 }

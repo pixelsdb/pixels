@@ -346,4 +346,14 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
+
+    @Override
+    public void dumpTrans(TransProto.DumpTransRequest request,
+                          StreamObserver<TransProto.DumpTransResponse> responseObserver) {
+        boolean success = TransContextManager.Instance().dumpTransContext(request.getTimestamp());
+        TransProto.DumpTransResponse response = TransProto.DumpTransResponse.newBuilder()
+                .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
 }
