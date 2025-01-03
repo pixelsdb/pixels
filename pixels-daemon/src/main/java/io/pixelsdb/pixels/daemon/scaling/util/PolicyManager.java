@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.scaling.MetricsQueue;
 import io.pixelsdb.pixels.daemon.scaling.policy.BasicPolicy;
 import io.pixelsdb.pixels.daemon.scaling.policy.PidPolicy;
+import io.pixelsdb.pixels.daemon.scaling.policy.AIASPolicy;
 import io.pixelsdb.pixels.daemon.scaling.policy.Policy;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -46,6 +47,9 @@ public class PolicyManager implements Runnable
         {
             case "pid":
                 policy = new PidPolicy();
+                break;
+            case "AIAS":
+                policy = new AIASPolicy();
                 break;
             default:
                 policy = new BasicPolicy();

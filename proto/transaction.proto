@@ -38,6 +38,7 @@ service TransService {
     rpc UpdateQueryCosts (UpdateQueryCostsRequest) returns (UpdateQueryCostsResponse);
     rpc GetTransConcurrency (GetTransConcurrencyRequest) returns (GetTransConcurrencyResponse);
     rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
+    rpc DumpTrans (DumpTransRequest) returns (DumpTransResponse);
 }
 
 // begin request/response definition for rpc services
@@ -150,6 +151,14 @@ message BindExternalTraceIdRequest {
 }
 
 message BindExternalTraceIdResponse {
+    int32 errorCode = 1;
+}
+
+message DumpTransRequest {
+    uint64 timestamp = 1;
+}
+
+message DumpTransResponse {
     int32 errorCode = 1;
 }
 
