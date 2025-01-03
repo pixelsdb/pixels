@@ -19,9 +19,6 @@
  */
 package io.pixelsdb.pixels.daemon.scaling.policy;
 
-import java.io.IOException;
-import java.io.InputStreamReader;
-
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -31,6 +28,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 
 public class AIASPolicy extends Policy
@@ -49,7 +48,8 @@ public class AIASPolicy extends Policy
         log.info("INFO: expend to "+ WorkerNum1 + " or " + WorkerNum2);
     }
 
-    public boolean transDump(long timestamp){
+    public boolean transDump(long timestamp)
+    {
         String host = ConfigFactory.Instance().getProperty("trans.server.host");
         int port = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
         ManagedChannel channel = ManagedChannelBuilder.forAddress(host,port)

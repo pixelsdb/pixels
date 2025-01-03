@@ -86,25 +86,25 @@ public class DirectIoLib
             {
                 if (JavaVersion <= 11)
                 {
-                    // this is from sun.nio.ch.Util.initDBBRConstructor
+                    // This is from sun.nio.ch.Util.initDBBRConstructor.
                     Class<?> cl = Class.forName("java.nio.DirectByteBufferR");
                     directByteBufferRConstructor = cl.getDeclaredConstructor(
                             int.class, long.class, FileDescriptor.class, Runnable.class);
                 }
-                else if (JavaVersion <= 17)
+                else if (JavaVersion < 21)
                 {
-                    /* the creator of DirectByteBufferR is changed after java 11 and is not compatible with java 8.
+                    /* The creator of DirectByteBufferR is changed after java 11 and is not compatible with java 8.
                      * Therefore, we use DirectByteBuffer to create direct read only buffer.
                      */
                     Class<?> cl = Class.forName("java.nio.DirectByteBuffer");
-                    directByteBufferRConstructor = cl.getDeclaredConstructor(
-                            long.class, int.class);
+                    directByteBufferRConstructor = cl.getDeclaredConstructor(long.class, int.class);
                 }
                 else
                 {
+                    /* the creator of DirectByteBuffer is changed in java 21+.
+                     */
                     Class<?> cl = Class.forName("java.nio.DirectByteBuffer");
-                    directByteBufferRConstructor = cl.getDeclaredConstructor(
-                            long.class, long.class);
+                    directByteBufferRConstructor = cl.getDeclaredConstructor(long.class, long.class);
                 }
                 directByteBufferRConstructor.setAccessible(true);
 

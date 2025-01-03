@@ -68,6 +68,7 @@
         <maven.compiler.target>8</maven.compiler.target>
         <maven.compiler.useIncrementalCompilation>true</maven.compiler.useIncrementalCompilation>
         <maven.plugin.source.version>3.1.0</maven.plugin.source.version>
+        <maven.plugin.compile.version>3.8.1</maven.plugin.compile.version>
         <maven.plugin.shade.version>3.2.2</maven.plugin.shade.version>
         <maven.plugin.assembly.version>3.5.0</maven.plugin.assembly.version>
         <maven.plugin.deploy.version>3.1.0</maven.plugin.deploy.version>
