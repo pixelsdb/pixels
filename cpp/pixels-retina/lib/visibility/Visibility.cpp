@@ -123,13 +123,12 @@ void Visibility::cleanEpochArrAndPatchArr(std::uint64_t cleanUpToEpochTs) {
     } else if (removeCount >= epochArr.size()) {
         throw std::logic_error("Invalid state: cannot remove all epochs");
     } else {
+        std::size_t freePatchUpTo = epochArr[removeCount].patchStartIndex;
+        patchArr.erase(patchArr.begin(), patchArr.begin() + freePatchUpTo);
+        for (auto &epoch : epochArr) {
+            epoch.patchStartIndex -= freePatchUpTo;
+            epoch.patchEndIndex -= freePatchUpTo;
+        }
         epochArr.erase(epochArr.begin(), epochArr.begin() + removeCount);
-    }
-
-    std::size_t freePatchUpTo = epochArr[removeCount].patchStartIndex;
-    patchArr.erase(patchArr.begin(), patchArr.begin() + freePatchUpTo);
-    for (auto &epoch : epochArr) {
-        epoch.patchStartIndex -= freePatchUpTo;
-        epoch.patchEndIndex -= freePatchUpTo;
     }
 }
