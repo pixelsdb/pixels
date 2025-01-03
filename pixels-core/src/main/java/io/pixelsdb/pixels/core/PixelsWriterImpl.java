@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto.CompressionKind;
 import io.pixelsdb.pixels.core.PixelsProto.RowGroupInformation;
 import io.pixelsdb.pixels.core.PixelsProto.RowGroupStatistic;
+import io.pixelsdb.pixels.core.PixelsProto.ColumnStatistic;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
@@ -98,6 +99,7 @@ public class PixelsWriterImpl implements PixelsWriter
     }
 
     private final TypeDescription schema;
+    private final TypeDescription hiddenType;
     private final int rowGroupSize;
     private final CompressionKind compressionKind;
     private final int compressionBlockSize;
@@ -112,6 +114,8 @@ public class PixelsWriterImpl implements PixelsWriter
 
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
+    private ColumnWriter hiddenColumnWriter;
+    private StatsRecorder hiddenFileColStatRecorder;
     private long fileContentLength;
     private int fileRowNum;
 
@@ -126,16 +130,20 @@ public class PixelsWriterImpl implements PixelsWriter
     private boolean hashValueIsSet = false;
     private int currHashValue = 0;
 
-    private final List<RowGroupInformation> rowGroupInfoList;    // row group information in footer
-    private final List<RowGroupStatistic> rowGroupStatisticList; // row group statistic in footer
+    private final List<RowGroupInformation> rowGroupInfoList;        // row group information in footer
+    private final List<RowGroupStatistic> rowGroupStatisticList;     // row group statistic in footer
+    private final List<ColumnStatistic> hiddenRowGroupStatisticList; // hidden column row group statistic in footer if hasHiddenColumn
 
     private final PhysicalWriter physicalWriter;
     private final List<TypeDescription> children;
 
     private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
 
+    private final boolean hasHiddenColumn;
+
     private PixelsWriterImpl(
             TypeDescription schema,
+            boolean hasHiddenColumn,
             int pixelStride,
             int rowGroupSize,
             CompressionKind compressionKind,
@@ -148,6 +156,7 @@ public class PixelsWriterImpl implements PixelsWriter
             Optional<List<Integer>> partKeyColumnIds)
     {
         this.schema = requireNonNull(schema, "schema is null");
+        this.hasHiddenColumn = hasHiddenColumn;
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
         checkArgument(rowGroupSize > 0, "row group size is not positive");
         this.rowGroupSize = rowGroupSize;
@@ -155,9 +164,11 @@ public class PixelsWriterImpl implements PixelsWriter
         checkArgument(compressionBlockSize > 0, "compression block size is not positive");
         this.compressionBlockSize = compressionBlockSize;
         this.timeZone = requireNonNull(timeZone);
+        checkArgument(partitioned == (partKeyColumnIds.isPresent() && !partKeyColumnIds.get().isEmpty()),
+                "partition column ids are present while partitioned is false, or vice versa");
         this.partitioned = partitioned;
         this.partKeyColumnIds = requireNonNull(partKeyColumnIds, "partKeyColumnIds is null");
-        this.children = schema.getChildren();
+        this.children = this.schema.getChildren();
         checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
         this.columnWriters = new ColumnWriter[children.size()];
         this.fileColStatRecorders = new StatsRecorder[children.size()];
@@ -174,13 +185,27 @@ public class PixelsWriterImpl implements PixelsWriter
 
         this.rowGroupInfoList = new LinkedList<>();
         this.rowGroupStatisticList = new LinkedList<>();
-
         this.physicalWriter = physicalWriter;
+        if (hasHiddenColumn)
+        {
+            this.hiddenType = new TypeDescription(TypeDescription.Category.LONG);
+            this.hiddenColumnWriter = newColumnWriter(hiddenType, columnWriterOption);
+            this.hiddenFileColStatRecorder = StatsRecorder.create(hiddenType);
+            this.hiddenRowGroupStatisticList =new LinkedList<>();
+        }
+        else
+        {
+            this.hiddenType = null;
+            this.hiddenColumnWriter = null;
+            this.hiddenFileColStatRecorder = null;
+            this.hiddenRowGroupStatisticList = null;
+        }
     }
 
     public static class Builder
     {
         private TypeDescription builderSchema = null;
+        private boolean builderHasHiddenColumn = false; // default is false
         private int builderPixelStride = 0;
         private int builderRowGroupSize = 0;
         private CompressionKind builderCompressionKind = CompressionKind.NONE;
@@ -204,6 +229,12 @@ public class PixelsWriterImpl implements PixelsWriter
         public Builder setSchema(TypeDescription schema)
         {
             this.builderSchema = requireNonNull(schema);
+            return this;
+        }
+
+        public Builder setHasHiddenColumn(boolean hasHiddenColumn)
+        {
+            this.builderHasHiddenColumn = hasHiddenColumn;
             return this;
         }
 
@@ -303,15 +334,6 @@ public class PixelsWriterImpl implements PixelsWriter
         {
             requireNonNull(this.builderStorage, "storage is not set");
             requireNonNull(this.builderFilePath, "file path is not set");
-            requireNonNull(this.builderSchema, "schema is not set");
-            checkArgument(!requireNonNull(builderSchema.getChildren(),
-                            "schema's children is null").isEmpty(), "schema is empty");
-            checkArgument(this.builderPixelStride > 0, "pixels stride size is not set");
-            checkArgument(this.builderRowGroupSize > 0, "row group size is not set");
-            checkArgument(this.builderPartitioned ==
-                            (this.builderPartKeyColumnIds.isPresent() && !this.builderPartKeyColumnIds.get().isEmpty()),
-                    "partition column ids are present while partitioned is false, or vice versa");
-
             PhysicalWriter fsWriter = null;
             try
             {
@@ -334,6 +356,7 @@ public class PixelsWriterImpl implements PixelsWriter
 
             return new PixelsWriterImpl(
                     builderSchema,
+                    builderHasHiddenColumn,
                     builderPixelStride,
                     builderRowGroupSize,
                     builderCompressionKind,
@@ -355,6 +378,16 @@ public class PixelsWriterImpl implements PixelsWriter
     public TypeDescription getSchema()
     {
         return schema;
+    }
+
+    public TypeDescription getHiddenType()
+    {
+        return hiddenType;
+    }
+
+    public boolean hasHiddenColumn()
+    {
+        return hasHiddenColumn;
     }
 
     @Override
@@ -463,7 +496,8 @@ public class PixelsWriterImpl implements PixelsWriter
     {
         CompletableFuture<?>[] futures = new CompletableFuture[columnVectors.length];
         AtomicInteger dataLength = new AtomicInteger(0);
-        for (int i = 0; i < columnVectors.length; ++i)
+        int commonColumnLength = columnVectors.length - (hasHiddenColumn ? 1 : 0);
+        for (int i = 0; i < commonColumnLength; ++i)
         {
             CompletableFuture<Void> future = new CompletableFuture<>();
             ColumnWriter writer = columnWriters[i];
@@ -480,6 +514,23 @@ public class PixelsWriterImpl implements PixelsWriter
                 }
             });
             futures[i] = future;
+        }
+        if (hasHiddenColumn)
+        {
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            columnWriterService.execute(() ->
+            {
+                try
+                {
+                    dataLength.addAndGet(hiddenColumnWriter.write(
+                            columnVectors[commonColumnLength], rowBatchSize));
+                    future.complete(null);
+                } catch (IOException e)
+                {
+                    throw new CompletionException("failed to write hidden column vector", e);
+                }
+            });
+            futures[commonColumnLength] = future;
         }
         CompletableFuture.allOf(futures).join();
         curRowGroupDataLength += dataLength.get();
@@ -502,6 +553,10 @@ public class PixelsWriterImpl implements PixelsWriter
             for (ColumnWriter cw : columnWriters)
             {
                 cw.close();
+            }
+            if (hasHiddenColumn)
+            {
+                hiddenColumnWriter.close();
             }
             columnWriterService.shutdown();
             columnWriterService.shutdownNow();
@@ -543,6 +598,15 @@ public class PixelsWriterImpl implements PixelsWriter
                 rowGroupDataLength += CHUNK_ALIGNMENT - rowGroupDataLength % CHUNK_ALIGNMENT;
             }
         }
+        if (hasHiddenColumn)
+        {
+            hiddenColumnWriter.flush();
+            rowGroupDataLength += hiddenColumnWriter.getColumnChunkSize();
+            if (CHUNK_ALIGNMENT != 0 && rowGroupDataLength % CHUNK_ALIGNMENT != 0)
+            {
+                rowGroupDataLength += CHUNK_ALIGNMENT - rowGroupDataLength % CHUNK_ALIGNMENT;
+            }
+        }
 
         // write and flush row group content
         try
@@ -574,6 +638,18 @@ public class PixelsWriterImpl implements PixelsWriter
                     if(CHUNK_ALIGNMENT != 0 && rowGroupBuffer.length % CHUNK_ALIGNMENT != 0)
                     {
                         int alignBytes = CHUNK_ALIGNMENT - rowGroupBuffer.length % CHUNK_ALIGNMENT;
+                        physicalWriter.append(CHUNK_PADDING_BUFFER, 0, alignBytes);
+                        writtenBytes += alignBytes;
+                    }
+                }
+                if (hasHiddenColumn)
+                {
+                    byte[] hiddenRowGroupBuffer = hiddenColumnWriter.getColumnChunkContent();
+                    physicalWriter.append(hiddenRowGroupBuffer, 0, hiddenRowGroupBuffer.length);
+                    writtenBytes += hiddenRowGroupBuffer.length;
+                    if(CHUNK_ALIGNMENT != 0 && hiddenRowGroupBuffer.length % CHUNK_ALIGNMENT != 0)
+                    {
+                        int alignBytes = CHUNK_ALIGNMENT - hiddenRowGroupBuffer.length % CHUNK_ALIGNMENT;
                         physicalWriter.append(CHUNK_PADDING_BUFFER, 0, alignBytes);
                         writtenBytes += alignBytes;
                     }
@@ -628,6 +704,28 @@ public class PixelsWriterImpl implements PixelsWriter
              */
             // writer.reset();
             columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
+        }
+
+        // collect hidden column chunk index and statistic
+        if (hasHiddenColumn)
+        {
+            PixelsProto.ColumnChunkIndex.Builder hiddenChunkIndexBuilder = hiddenColumnWriter.getColumnChunkIndex();
+            hiddenChunkIndexBuilder.setChunkOffset(curRowGroupOffset + rowGroupDataLength);
+            hiddenChunkIndexBuilder.setChunkLength(hiddenColumnWriter.getColumnChunkSize());
+            rowGroupDataLength += hiddenColumnWriter.getColumnChunkSize();
+            if(CHUNK_ALIGNMENT != 0 && rowGroupDataLength % CHUNK_ALIGNMENT != 0)
+            {
+                rowGroupDataLength += CHUNK_ALIGNMENT - rowGroupDataLength % CHUNK_ALIGNMENT;
+            }
+            // collect hidden columnChunkIndex from every column chunk into curRowGroupIndex
+            curRowGroupIndex.setHiddenColumnChunkIndexEntry(hiddenChunkIndexBuilder.build());
+            // collect hidden columnChunkStatistic into hiddenRowGroupStatistic
+            hiddenRowGroupStatisticList.add(hiddenColumnWriter.getColumnChunkStat().build());
+            // collect hidden columnChunkEncoding
+            curRowGroupEncoding.setHiddenColumnChunkEncoding(hiddenColumnWriter.getColumnChunkEncoding().build());
+            // update file column statistic
+            hiddenFileColStatRecorder.merge(hiddenColumnWriter.getColumnChunkStatRecorder());
+            hiddenColumnWriter = newColumnWriter(hiddenType, columnWriterOption);
         }
 
         // put curRowGroupIndex into rowGroupFooter
@@ -695,6 +793,17 @@ public class PixelsWriterImpl implements PixelsWriter
         {
             footerBuilder.addRowGroupStats(rowGroupStatistic);
         }
+        if (hasHiddenColumn)
+        {
+            footerBuilder.setHiddenType(PixelsProto.Type.newBuilder()
+                    .setName("commit_timestamp")
+                    .setKind(PixelsProto.Type.Kind.LONG));
+            footerBuilder.setHiddenColumnStats(hiddenFileColStatRecorder.serialize().build());
+            for (ColumnStatistic hiddenRowGroupStatistic : hiddenRowGroupStatisticList)
+            {
+                footerBuilder.addHiddenRowGroupStats(hiddenRowGroupStatistic);
+            }
+        }
         footer = footerBuilder.build();
 
         // build PostScript
@@ -708,6 +817,7 @@ public class PixelsWriterImpl implements PixelsWriter
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setPartitioned(partitioned)
                 .setColumnChunkAlignment(CHUNK_ALIGNMENT)
+                .setHasHiddenColumn(hasHiddenColumn)
                 .setMagic(Constants.FILE_MAGIC)
                 .build();
 

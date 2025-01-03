@@ -88,6 +88,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                     new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
+            long timestamp = event.getTimestamp();
             requireNonNull(event.getTableInfo(), "even.tableInfo is null");
             StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
@@ -156,7 +157,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 threadPool.execute(() -> {
                     try
                     {
-                        scanFile(transId, scanInputs, includeCols, inputStorageInfo.getScheme(),
+                        scanFile(transId, timestamp, scanInputs, includeCols, inputStorageInfo.getScheme(),
                                 scanProjection, filter, outputPaths, scanOutput, encoding, outputStorageInfo.getScheme(),
                                 partialAggregationPresent, aggregator);
                     }
@@ -221,6 +222,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
      * Scan the files in a query split, apply projection and filters, and output the
      * results to the given path.
      * @param transId the transaction id used by I/O scheduler
+     * @param timestamp the transaction timestamp
      * @param scanInputs the information of the files to scan
      * @param columnsToRead the included columns
      * @param inputScheme the storage scheme of the input files
@@ -234,9 +236,9 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
      * @param aggregator the aggregator for the partial aggregation
      * @return the number of row groups that have been written into the output.
      */
-    private int scanFile(long transId, List<InputInfo> scanInputs, String[] columnsToRead, Storage.Scheme inputScheme,
-                         boolean[] scanProjection, TableScanFilter filter, Queue<String> outputPaths,
-                         ScanOutput scanOutput, boolean encoding, Storage.Scheme outputScheme,
+    private int scanFile(long transId, long timestamp, List<InputInfo> scanInputs, String[] columnsToRead,
+                         Storage.Scheme inputScheme, boolean[] scanProjection, TableScanFilter filter,
+                         Queue<String> outputPaths, ScanOutput scanOutput, boolean encoding, Storage.Scheme outputScheme,
                          boolean partialAggregate, Aggregator aggregator)
     {
         PixelsWriter pixelsWriter = null;
@@ -265,7 +267,7 @@ public class BaseScanWorker extends Worker<ScanInput, ScanOutput>
                 {
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
-                PixelsReaderOption option = WorkerCommon.getReaderOption(transId, columnsToRead, inputInfo);
+                PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;

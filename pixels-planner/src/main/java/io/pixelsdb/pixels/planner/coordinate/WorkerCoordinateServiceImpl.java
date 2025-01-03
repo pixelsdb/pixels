@@ -209,7 +209,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         long workerId = request.getWorkerId();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
         TurboProto.TerminateWorkerResponse.Builder builder = TurboProto.TerminateWorkerResponse.newBuilder();
-        worker.termenate();
+        worker.terminate();
         builder.setErrorCode(SUCCESS);
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();

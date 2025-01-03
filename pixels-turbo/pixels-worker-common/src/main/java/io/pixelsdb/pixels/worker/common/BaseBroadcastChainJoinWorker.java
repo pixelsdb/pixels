@@ -85,6 +85,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                     new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
+            long timestamp = event.getTimestamp();
             List<BroadcastTableInfo> chainTables = event.getChainTables();
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
             requireNonNull(chainTables, "chainTables is null");
@@ -134,7 +135,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             }
 
             // build the joiner.
-            Joiner joiner = buildJoiner(transId, threadPool, chainTables, chainJoinInfos,
+            Joiner joiner = buildJoiner(transId, timestamp, threadPool, chainTables, chainJoinInfos,
                     rightTable, lastJoinInfo, workerMetrics);
             logger.info("chain hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
                     (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
@@ -163,10 +164,10 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                         {
                             int numJoinedRows = partitionOutput ?
                                     BaseBroadcastJoinWorker.joinWithRightTableAndPartition(
-                                            transId, joiner, inputs, rightInputStorageInfo.getScheme(),
+                                            transId, timestamp, joiner, inputs, rightInputStorageInfo.getScheme(),
                                             !rightTable.isBase(), rightCols, rightFilter,
                                             outputPartitionInfo, result, workerMetrics) :
-                                    BaseBroadcastJoinWorker.joinWithRightTable(transId, joiner, inputs,
+                                    BaseBroadcastJoinWorker.joinWithRightTable(transId, timestamp, joiner, inputs,
                                             rightInputStorageInfo.getScheme(), !rightTable.isBase(), rightCols,
                                             rightFilter, result.get(0), workerMetrics);
                         } catch (Throwable e)
@@ -261,6 +262,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * Build the joiner for the last join, i.e., the join between the join result of
      * the left tables and the right table.
      * @param transId the transaction id
+     * @param timestamp the transaction timestamp
      * @param executor the thread pool
      * @param leftTables the information of the left tables
      * @param chainJoinInfos the information of the chain joins between the left tables
@@ -270,7 +272,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * @return the joiner of the last join
      */
     private static Joiner buildJoiner(
-            long transId, ExecutorService executor, List<BroadcastTableInfo> leftTables, List<ChainJoinInfo> chainJoinInfos,
+            long transId, long timestamp, ExecutorService executor, List<BroadcastTableInfo> leftTables, List<ChainJoinInfo> chainJoinInfos,
             BroadcastTableInfo rightTable, JoinInfo lastJoinInfo, WorkerMetrics workerMetrics)
     {
         try
@@ -278,7 +280,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
             BroadcastTableInfo t1 = leftTables.get(0);
             BroadcastTableInfo t2 = leftTables.get(1);
-            Joiner currJoiner = buildFirstJoiner(transId, executor, t1, t2, chainJoinInfos.get(0), workerMetrics);
+            Joiner currJoiner = buildFirstJoiner(transId, timestamp, executor, t1, t2, chainJoinInfos.get(0), workerMetrics);
             for (int i = 1; i < leftTables.size() - 1; ++i)
             {
                 BroadcastTableInfo currRightTable = leftTables.get(i);
@@ -295,7 +297,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                         nextJoinInfo.getSmallProjection(), currJoinInfo.getKeyColumnIds(),
                         nextResultSchema, nextJoinInfo.getLargeColumnAlias(),
                         nextJoinInfo.getLargeProjection(), nextTable.getKeyColumnIds());
-                chainJoin(transId, executor, currJoiner, nextJoiner, currRightTable, workerMetrics);
+                chainJoin(transId, timestamp, executor, currJoiner, nextJoiner, currRightTable, workerMetrics);
                 currJoiner = nextJoiner;
             }
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
@@ -308,7 +310,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                     lastJoinInfo.getSmallProjection(), lastChainJoin.getKeyColumnIds(),
                     rightResultSchema, lastJoinInfo.getLargeColumnAlias(),
                     lastJoinInfo.getLargeProjection(), rightTable.getKeyColumnIds());
-            chainJoin(transId, executor, currJoiner, finalJoiner, lastLeftTable, workerMetrics);
+            chainJoin(transId, timestamp, executor, currJoiner, finalJoiner, lastLeftTable, workerMetrics);
             workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
             return finalJoiner;
         } catch (Throwable e)
@@ -321,6 +323,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * Build the joiner for the join between the first two left tables.
      *
      * @param transId the transaction id
+     * @param timestamp the transaction timestamp
      * @param executor the thread pool
      * @param t1 the information of the first left table
      * @param t2 the information of the second left table
@@ -331,7 +334,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * @throws InterruptedException
      */
     protected static Joiner buildFirstJoiner(
-            long transId, ExecutorService executor, BroadcastTableInfo t1, BroadcastTableInfo t2,
+            long transId, long timestamp, ExecutorService executor, BroadcastTableInfo t1, BroadcastTableInfo t2,
             ChainJoinInfo joinInfo, WorkerMetrics workerMetrics) throws ExecutionException, InterruptedException
     {
         AtomicReference<TypeDescription> t1Schema = new AtomicReference<>();
@@ -355,7 +358,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             leftFutures.add(executor.submit(() -> {
                 try
                 {
-                    BaseBroadcastJoinWorker.buildHashTable(transId, joiner, inputs, t1.getStorageInfo().getScheme(),
+                    BaseBroadcastJoinWorker.buildHashTable(transId, timestamp, joiner, inputs, t1.getStorageInfo().getScheme(),
                             !t1.isBase(), t1.getColumnsToRead(), t1Filter, workerMetrics);
                 }
                 catch (Throwable e)
@@ -376,6 +379,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * populate the hash table of the next join.
      *
      * @param transId the transaction id
+     * @param timestamp the transaction timestamp
      * @param executor the thread pool
      * @param currJoiner the joiner of the two left tables
      * @param nextJoiner the joiner of the next join
@@ -384,8 +388,8 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    protected static void chainJoin(long transId, ExecutorService executor, Joiner currJoiner, Joiner nextJoiner,
-                                    BroadcastTableInfo currRightTable, WorkerMetrics workerMetrics)
+    protected static void chainJoin(long transId, long timestamp, ExecutorService executor, Joiner currJoiner,
+                                    Joiner nextJoiner, BroadcastTableInfo currRightTable, WorkerMetrics workerMetrics)
             throws ExecutionException, InterruptedException
     {
         TableScanFilter currRightFilter = JSON.parseObject(currRightTable.getFilter(), TableScanFilter.class);
@@ -396,7 +400,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
             rightFutures.add(executor.submit(() -> {
                 try
                 {
-                    chainJoinSplit(transId, currJoiner, nextJoiner, inputs,
+                    chainJoinSplit(transId, timestamp, currJoiner, nextJoiner, inputs,
                             currRightTable.getStorageInfo().getScheme(), !currRightTable.isBase(),
                             currRightTable.getColumnsToRead(), currRightFilter, workerMetrics);
                 }
@@ -416,6 +420,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * Perform the join of two left tables on one split of the right one.
      *
      * @param transId the transaction id
+     * @param timestamp the transaction timestamp
      * @param currJoiner the joiner of the two left tables
      * @param nextJoiner the joiner of the next join
      * @param rightInputs the information of the input files in the split of the right one
@@ -427,7 +432,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
      * @param workerMetrics the collector of the performance metrics
      */
     private static void chainJoinSplit(
-            long transId, Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
+            long transId, long timestamp, Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
             Storage.Scheme rightScheme, boolean checkExistence, String[] rightCols,
             TableScanFilter rightFilter, WorkerMetrics workerMetrics)
     {
@@ -454,7 +459,7 @@ public class BaseBroadcastChainJoinWorker extends Worker<BroadcastChainJoinInput
                     {
                         input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
                     }
-                    PixelsReaderOption option = WorkerCommon.getReaderOption(transId, rightCols, input);
+                    PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     checkArgument(recordReader.isValid(), "failed to get record reader");

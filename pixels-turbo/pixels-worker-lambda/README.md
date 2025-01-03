@@ -52,6 +52,8 @@ e.g., `ScanWorker`, runtime and architecture are the dependency layer, select or
 read-write permissions of the S3 buckets used for storing tables and intermediate results.
 In advanced settings, enable VPC and select the same VPC of your EC2 instances.
 
+> Note: If your VPC cannot access S3, you need to add an S3 Gateway Endpoint in the VPC. In the `VPC->EndPoints` section, create an `Endpoint`, select the `Amazon Web Services services` service type, add an `S3 Service` of type `Gateway`, then add it to your VPC and grant `Full access` permission.
+
 Then, upload `pixels-worker-lambda.jar` as the code source of the Lambda function.
 In `Runtime settings`, select the handler class of the operator, e.g., `io.pixelsdb.pixels.worker.lambda.ScanWorker`.
 In `Layers`, add the two layers created above.
