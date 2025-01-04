@@ -185,4 +185,24 @@ public class ScalingManager
             reduceSome(-count);
         }
     }
+
+    public void expendTo(int target)
+    {
+        int count = 0;
+        for (String id : instanceMap.keySet())
+        {
+            if (instanceMap.get(id) == InstanceState.RUNNING)
+            {
+                count++;
+            }
+        }
+        count = target - count;
+        if (count >= 0)
+        {
+            expandSome(count);
+        } else
+        {
+            reduceSome(-count);
+        }
+    }
 }

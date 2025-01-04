@@ -54,6 +54,11 @@
             <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
         </dependency>
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 
     <build>

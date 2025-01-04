@@ -20,8 +20,15 @@
 package io.pixelsdb.pixels.daemon.transaction;
 
 import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -114,6 +121,41 @@ public class TransContextManager
             {
                 this.traceIdToTransId.remove(traceId);
             }
+        }
+        return true;
+    }
+//    private static final Logger logger = LogManager.getLogger(TransContextManager.class);
+    public synchronized boolean dumpTransContext(long timestamp)
+    {
+        //dump metrics to file
+        ConfigFactory config = ConfigFactory.Instance();
+        String path = config.getProperty("pixels.historyData.dir") + timestamp + ".csv";
+        File file = new File(path);
+        boolean newfile = !file.exists();
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(path, true))) {
+            if(newfile) {
+                bw.write("createdTime,memoryUsed,cpuTimeTotal,endTime");
+                bw.newLine();
+            }
+            for (Long transId : transIdToContext.keySet()) {
+                TransContext context = getTransContext(transId);
+                if (context.getStatus() == TransProto.TransStatus.COMMIT)
+                {
+                    Properties properties = context.getProperties();
+                    for (Map.Entry<Object, Object> entry : properties.entrySet())
+                    {
+                        String e = (String) entry.getKey();
+                        if (Objects.equals(e, "queryinfo")) {
+                            String v = (String) entry.getValue();
+                            bw.write(v);
+                            bw.newLine();
+                        }
+                    }
+                }
+            }
+            transIdToContext.entrySet().removeIf(entry -> entry.getValue().getStatus()==TransProto.TransStatus.COMMIT);
+        } catch(IOException e) {
+            System.err.println("An error occurred: " + e.getMessage());
         }
         return true;
     }
