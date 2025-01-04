@@ -20,8 +20,16 @@
 
 package io.pixelsdb.pixels.retina;
 
+import com.sun.jna.Platform;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.io.File;
+import java.nio.file.Paths;
+
 public class Visibility implements AutoCloseable
 {
+    private static final Logger logger = LogManager.getLogger(Visibility.class);
     static
     {
         String pixelsHome = System.getenv("PIXELS_HOME");
@@ -30,23 +38,20 @@ public class Visibility implements AutoCloseable
             throw new IllegalStateException("Environment variable PIXELS_HOME is not set");
         }
 
-        String osName = System.getProperty("os.name").toLowerCase();
-        String libName;
-        if (osName.contains("win"))
+        if (!Platform.isLinux())
         {
-            libName = "pixels-retina.dll";
-        } else if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix"))
-        {
-            libName = "libpixels-retina.so";
-        } else if (osName.contains("mac"))
-        {
-            libName = "libpixels-retina.dylib";
-        } else
-        {
-            throw new IllegalStateException("Unsupported OS: " + osName);
+            logger.error("direct io is not supported on OS other than Linux");
         }
-
-        String libPath = pixelsHome + "/lib/" + libName;
+        String libPath = Paths.get(pixelsHome, "lib/libpixels-retina.so").toString();
+        File libFile = new File(libPath);
+        if (!libFile.exists())
+        {
+            throw new IllegalStateException("libpixels-retina.so not found at " + libPath);
+        }
+        if (!libFile.canRead())
+        {
+            throw new IllegalStateException("libpixels-retina.so is not readable at " + libPath);
+        }
         System.load(libPath);
     }
     /**

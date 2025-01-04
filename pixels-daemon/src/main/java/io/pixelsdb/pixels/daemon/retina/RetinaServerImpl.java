@@ -27,13 +27,10 @@ import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.core.PixelsVersion;
-import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
-import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import io.pixelsdb.pixels.retina.RetinaProto;
+import io.pixelsdb.pixels.retina.Visibility;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -41,6 +38,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -53,6 +52,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 {
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
+    private Map<String, Visibility> visibilityMap;
 
     /**
      * Initialize the visibility management for all the records.
@@ -61,6 +61,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     public RetinaServerImpl()
     {
         this.metadataService = MetadataService.Instance();
+        this.visibilityMap = new ConcurrentHashMap<>();
         try {
             boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
             boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
@@ -71,7 +72,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 }
                 List<Table> tables = this.metadataService.getTables(schema.getName());
                 for (Table table : tables) {
-                    System.out.println("Schema: " + schema.getName() + " Table: " + table.getName());
                     List<Layout> layouts = this.metadataService.getLayouts(schema.getName(), table.getName());
                     List<String> files = new LinkedList<>();
                     for (Layout layout : layouts) {
@@ -104,15 +104,19 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         fsReader.seek(fileTailOffset);
                         ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
                         PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
-                        PixelsProto.PostScript postScript = fileTail.getPostscript();
                         PixelsProto.Footer footer = fileTail.getFooter();
-                        System.out.println("File: " + filePath);
-                        // row group num
-                        int rowGroupNum = footer.getRowGroupInfosCount();
-                        System.out.println("Row group num: " + rowGroupNum);
-                        // record num
-                        int recordNum = postScript.getNumberOfRows();
-                        System.out.println("Record num: " + recordNum);
+                        long fileId = this.metadataService.getFileId(filePath);
+                        for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
+                        {
+                            int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
+                            int unitCount = (recordNum + 255) / 255;
+                            for (int unitId = 0; unitId < unitCount; unitId++)
+                            {
+                                Visibility visibility = new Visibility();
+                                String key = fileId + "_" + rgId + "_" + unitId;
+                                visibilityMap.put(key, visibility);
+                            }
+                        }
                     }
                 }
             }
