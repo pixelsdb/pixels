@@ -52,6 +52,11 @@
             <artifactId>pixels-storage-s3</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-retina</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>com.alibaba</groupId>
@@ -82,6 +87,11 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- trino-jdbc -->
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-jdbc</artifactId>
+        </dependency>
         <!-- grpc -->
         <dependency>
             <groupId>io.grpc</groupId>
@@ -188,6 +198,15 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven.plugin.compile.version}</version>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
             </plugin>
         </plugins>
     </build>
