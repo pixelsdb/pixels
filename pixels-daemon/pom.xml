@@ -54,6 +54,12 @@
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-retina</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-index-rocksdb</artifactId>
             <optional>true</optional>
         </dependency>
