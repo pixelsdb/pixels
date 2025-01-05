@@ -119,7 +119,6 @@ message QueryRecordsResponse {
   sint64 pos = 2;
 }
 
-
 message QueryVisibilityRequest {
   RequestHeader header = 1;
   string schemaName = 2;
