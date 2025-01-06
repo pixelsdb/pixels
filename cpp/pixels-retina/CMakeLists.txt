@@ -18,8 +18,8 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Source files
 set(SOURCES
-    lib/visibility/Visibility_JNI.cpp
-    lib/visibility/Visibility.cpp)
+    lib/Visibility_JNI.cpp
+    lib/Visibility.cpp)
 
 # Create shared library
 add_library(pixels-retina SHARED ${SOURCES})
@@ -32,3 +32,18 @@ set_target_properties(pixels-retina PROPERTIES
 # Ensure the library is placed in the PIXELS_HOME directory
 install(TARGETS pixels-retina
         LIBRARY DESTINATION $ENV{PIXELS_HOME}/lib)
+
+## Add the test executable
+#add_executable(VisibilityTest test/VisibilityTest.cpp)
+## Link the test executable with the library
+#target_link_libraries(VisibilityTest pixels-retina)
+## Add a test to CTest
+#add_test(NAME VisibilityTest COMMAND VisibilityTest)
+
+## Set build type to Debug if not specified
+#if(NOT CMAKE_BUILD_TYPE)
+#    set(CMAKE_BUILD_TYPE Debug)
+#endif()
+#
+## Add debug flags
+#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
