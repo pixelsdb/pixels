@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.storage.stream.io;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.asynchttpclient.*;
@@ -62,12 +63,12 @@ public class StreamOutputStream extends OutputStream
     /**
      * The maximum retry count.
      */
-    private static final int MAX_RETRIES = 30;
+    private static final int MAX_RETRIES = Constants.MAX_STREAM_RETRY_COUNT;
 
     /**
      * The delay between two tries.
      */
-    private static final long RETRY_DELAY_MS = 1000;
+    private static final long RETRY_DELAY_MS = Constants.STREAM_DELAY_MS;
 
     /**
      * The temporary buffer used for storing the chunks.
@@ -231,7 +232,7 @@ public class StreamOutputStream extends OutputStream
             } catch (Exception e)
             {
                 retry++;
-                if (retry > this.MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
+                if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
                 {
                     logger.error("failed to close stream reader");
                 }

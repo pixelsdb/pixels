@@ -38,6 +38,7 @@ import io.pixelsdb.pixels.worker.common.*;
 import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -172,6 +173,8 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             JoinType joinType = input.getJoinInfo().getJoinType();
             checkArgument(joinType != JoinType.EQUI_LEFT && joinType != JoinType.EQUI_FULL,
                     "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join");
+            logger.info("small table: " + input.getSmallTable().getTableName() +
+                    ", large table: " + input.getLargeTable().getTableName());
 
             MultiOutputInfo outputInfo = input.getOutput();
             StorageInfo outputStorageInfo = outputInfo.getStorageInfo();
@@ -245,12 +248,13 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                 result.add(new ConcurrentLinkedQueue<>());
             }
 
+            List<Future> rightFutures = new ArrayList<>();
             if (joiner.getSmallTableSize() > 0)
             {
                 for (InputSplit inputSplit : rightInputs)
                 {
                     List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
-                    threadPool.execute(() -> {
+                    rightFutures.add(threadPool.submit(() -> {
                         try
                         {
                             int numJoinedRows = partitionOutput ?
@@ -264,86 +268,145 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                         {
                             throw new WorkerException("error during broadcast join", e);
                         }
-                    });
+                    }));
                 }
-                threadPool.shutdown();
-                try
+                for (Future future : rightFutures)
                 {
-                    while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
-                } catch (InterruptedException e)
-                {
-                    throw new WorkerException("interrupted while waiting for the termination of join", e);
-                }
-
-                if (exceptionHandler.hasException())
-                {
-                    throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+                    future.get();
                 }
             }
             logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
 
-            String outputPath;
+            List<String> outputPaths = new ArrayList<>();
             if (outputStorageInfo.getScheme() == Storage.Scheme.httpstream)
             {
-                outputPath = downStreamWorkers.get(0).getIp() + ":" + (downStreamWorkers.get(0).getPort() + worker.getWorkerPortIndex());
+                int port = worker.getWorkerPortIndex();
+                for (CFWorkerInfo workerInfo : downStreamWorkers)
+                {
+                    outputPaths.add(workerInfo.getIp() + ":" + (workerInfo.getPort() + port));
+                }
             } else
             {
-                outputPath = outputFolder + outputInfo.getFileNames().get(0);
+                outputPaths.add(outputFolder + outputInfo.getFileNames().get(0));
             }
             try
             {
-                PixelsWriter pixelsWriter;
                 WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
-                if (partitionOutput)
+                if (outputStorageInfo.getScheme() == Storage.Scheme.httpstream)
                 {
-                    pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                            encoding, true, Arrays.stream(
-                                            outputPartitionInfo.getKeyColumnIds()).boxed().
-                                    collect(Collectors.toList()));
-                    for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+                    if (partitionOutput)
                     {
-                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
-                        if (!batches.isEmpty())
-                        {
-                            for (VectorizedRowBatch batch : batches)
+                        checkArgument(outputPartitionInfo.getNumPartition() == downStreamWorkers.size(),
+                                "a worker should corresponds to one partition");
+                    }
+                    for (int i = 0; i < outputPaths.size(); i++)
+                    {
+                        logger.info("write to path {}", outputPaths.get(i));
+                        int finalI = i;
+                        threadPool.submit(() -> {
+                            PixelsWriter pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                                    WorkerCommon.getStorage(outputStorageInfo.getScheme()),
+                                    outputPaths.get(finalI), encoding, false, Arrays.stream(
+                                                    outputPartitionInfo.getKeyColumnIds()).boxed().
+                                            collect(Collectors.toList()));
+                            ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches;
+                            if (partitionOutput)
                             {
-                                pixelsWriter.addRowBatch(batch, hash);
+                                rowBatches = result.get(finalI);
+                            } else
+                            {
+                                rowBatches = result.get(0);
+                            }
+                            for (VectorizedRowBatch rowBatch : rowBatches)
+                            {
+                                try
+                                {
+                                    pixelsWriter.addRowBatch(rowBatch);
+                                } catch (IOException e)
+                                {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                            try
+                            {
+                                pixelsWriter.close();
+                            } catch (IOException e)
+                            {
+                                throw new RuntimeException(e);
+                            }
+                            joinOutput.addOutput(outputPaths.get(0), pixelsWriter.getNumRowGroup());
+                            workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                            workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+                        });
+                    }
+                } else
+                {
+                    PixelsWriter pixelsWriter;
+                    if (partitionOutput)
+                    {
+                        pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPaths.get(0),
+                                encoding, true, Arrays.stream(
+                                                outputPartitionInfo.getKeyColumnIds()).boxed().
+                                        collect(Collectors.toList()));
+                        for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+                        {
+                            ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
+                            if (!batches.isEmpty())
+                            {
+                                for (VectorizedRowBatch batch : batches)
+                                {
+                                    pixelsWriter.addRowBatch(batch, hash);
+                                }
                             }
                         }
                     }
-                }
-                else
-                {
-                    logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
-                    pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                            encoding, false, null);
-                    ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
-                    for (VectorizedRowBatch rowBatch : rowBatches)
+                    else
                     {
-                        pixelsWriter.addRowBatch(rowBatch);
+                        pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPaths.get(0),
+                                encoding, false, null);
+                        ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
+                        for (VectorizedRowBatch rowBatch : rowBatches)
+                        {
+                            pixelsWriter.addRowBatch(rowBatch);
+                        }
                     }
+                    pixelsWriter.close();
+                    joinOutput.addOutput(outputPaths.get(0), pixelsWriter.getNumRowGroup());
+                    workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                    workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
                 }
-                pixelsWriter.close();
-                joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
+
                 if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPaths.get(0)))
                     {
                         // Wait for 10ms and see if the output file is visible.
                         TimeUnit.MILLISECONDS.sleep(10);
                     }
                 }
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
-                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
             } catch (Throwable e)
             {
                 throw new WorkerException(
-                        "failed to finish writing and close the join result file '" + outputPath + "'", e);
+                        "failed to finish writing and close the join result file '" +
+                                String.join(",", outputPaths) + "'", e);
             }
 
+            threadPool.shutdown();
+            try
+            {
+                while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+            } catch (InterruptedException e)
+            {
+                throw new WorkerException("interrupted while waiting for the termination of join", e);
+            }
+
+            if (exceptionHandler.hasException())
+            {
+                throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+            }
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(joinOutput, workerMetrics);
             return joinOutput;

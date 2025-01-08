@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -72,7 +73,7 @@ public class WorkerCommon
     protected static int port;
     protected static String coordinatorIp;
     protected static int coordinatorPort;
-    private static HashMap<String, PixelsReader> streamReaders;
+    private static final ConcurrentHashMap<String, PixelsReader> streamReaders;
 
     static
     {
@@ -82,7 +83,7 @@ public class WorkerCommon
         port = Integer.parseInt(configFactory.getProperty("executor.worker.exchange.port"));
         coordinatorIp = configFactory.getProperty("worker.coordinate.server.host");
         coordinatorPort = Integer.parseInt(configFactory.getProperty("worker.coordinate.server.port"));
-        streamReaders = new HashMap<>();
+        streamReaders = new ConcurrentHashMap<>();
     }
 
     public static void initStorage(StorageInfo storageInfo)
@@ -319,6 +320,7 @@ public class WorkerCommon
                 {
                     if (e instanceof IOException)
                     {
+                        logger.error("failed to read file schema", e);
                         continue;
                     }
                     throw new IOException("failed to read file schema", e);
@@ -383,7 +385,6 @@ public class WorkerCommon
     {
         requireNonNull(filePath, "fileName is null");
         requireNonNull(storage, "storage is null");
-        PixelsReaderImpl.Builder builder;
         PixelsReader pixelsReader;
         if (storage.getScheme().equals(Storage.Scheme.httpstream))
         {

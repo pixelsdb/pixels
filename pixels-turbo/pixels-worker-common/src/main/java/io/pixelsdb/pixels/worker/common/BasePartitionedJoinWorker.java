@@ -545,6 +545,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 {
                     if (e instanceof IOException)
                     {
+                        e.printStackTrace();
                         continue;
                     }
                     throw new WorkerException("failed to scan the partitioned file '" +

@@ -38,6 +38,7 @@ import io.pixelsdb.pixels.worker.common.*;
 import io.pixelsdb.pixels.worker.vhive.utils.RequestHandler;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -272,6 +273,7 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
             }
 
             // scan the right table and do the join.
+            List<Future> rightFutures = new ArrayList<>(rightPartitioned.size());
             if (joiner.getSmallTableSize() > 0)
             {
                 int rightSplitSize = rightPartitioned.size() / rightParallelism;
@@ -287,7 +289,7 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
                     {
                         parts.add(rightPartitioned.get(j));
                     }
-                    threadPool.execute(() -> {
+                    rightFutures.add(threadPool.submit(() -> {
                         try
                         {
                             int numJoinedRows = partitionOutput ?
@@ -302,65 +304,107 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
                         {
                             throw new WorkerException("error during hash join", e);
                         }
-                    });
+                    }));
                 }
-                threadPool.shutdown();
-                try
+                for (Future future : rightFutures)
                 {
-                    while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
-                } catch (InterruptedException e)
-                {
-                    throw new WorkerException("interrupted while waiting for the termination of join", e);
-                }
-
-                if (exceptionHandler.hasException())
-                {
-                    throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+                    future.get();
                 }
             }
 
-            String outputPath = outputFolder + outputInfo.getFileNames().get(0);
+            List<String> outputPaths = new ArrayList<>();
+            if (outputInfo.getStorageInfo().getScheme().equals(Storage.Scheme.httpstream))
+            {
+                for (CFWorkerInfo workerInfo : downStreamWorkers)
+                {
+                    outputPaths.add(workerInfo.getIp() + ":" + (workerInfo.getPort() + worker.getWorkerPortIndex()));
+                }
+            } else
+            {
+                outputPaths.add(outputFolder + outputInfo.getFileNames().get(0));
+            }
             try
             {
                 WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
                 PixelsWriter pixelsWriter;
-                if (partitionOutput)
+                if (outputInfo.getStorageInfo().getScheme().equals(Storage.Scheme.httpstream))
                 {
-                    pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                            encoding, true, Arrays.stream(
-                                            outputPartitionInfo.getKeyColumnIds()).boxed().
-                                    collect(Collectors.toList()));
+                    checkArgument(outputPartitionInfo.getNumPartition() == outputPaths.size(),
+                            "a worker should corresponds to one partition");
                     for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
                     {
-                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
-                        if (!batches.isEmpty())
-                        {
-                            for (VectorizedRowBatch batch : batches)
+                        logger.info("outputs to " + outputPaths.get(hash));
+                        int finalHash = hash;
+                        threadPool.submit(() -> {
+                            PixelsWriter writer = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                                    WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPaths.get(finalHash),
+                                    encoding, false, null);
+                            ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(finalHash);
+                            if (!batches.isEmpty())
                             {
-                                pixelsWriter.addRowBatch(batch, hash);
+                                for (VectorizedRowBatch batch : batches)
+                                {
+                                    try
+                                    {
+                                        writer.addRowBatch(batch);
+                                    } catch (IOException e)
+                                    {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+                            }
+                            try
+                            {
+                                writer.close();
+                            } catch (IOException e)
+                            {
+                                throw new RuntimeException(e);
+                            }
+                            workerMetrics.addWriteBytes(writer.getCompletedBytes());
+                            workerMetrics.addNumWriteRequests(writer.getNumWriteRequests());
+                        });
+                    }
+                } else
+                {
+                    logger.info("outputs to " + outputPaths.get(0));
+                    if (partitionOutput)
+                    {
+                        pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPaths.get(0),
+                                encoding, true, Arrays.stream(
+                                                outputPartitionInfo.getKeyColumnIds()).boxed().
+                                        collect(Collectors.toList()));
+                        for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+                        {
+                            ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
+                            if (!batches.isEmpty())
+                            {
+                                for (VectorizedRowBatch batch : batches)
+                                {
+                                    pixelsWriter.addRowBatch(batch, hash);
+                                }
                             }
                         }
                     }
-                }
-                else
-                {
-                    pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
-                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath,
-                            encoding, false, null);
-                    ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
-                    for (VectorizedRowBatch rowBatch : rowBatches)
+                    else
                     {
-                        pixelsWriter.addRowBatch(rowBatch);
+                        pixelsWriter = WorkerCommon.getWriter(joiner.getJoinedSchema(),
+                                WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPaths.get(0),
+                                encoding, false, null);
+                        ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
+                        for (VectorizedRowBatch rowBatch : rowBatches)
+                        {
+                            pixelsWriter.addRowBatch(rowBatch);
+                        }
                     }
+                    pixelsWriter.close();
+                    workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                    workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+                    joinOutput.addOutput(outputPaths.get(0), pixelsWriter.getNumRowGroup());
                 }
-                pixelsWriter.close();
-                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-                joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
                 if (outputStorageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPath))
+                    while (!WorkerCommon.getStorage(Storage.Scheme.minio).exists(outputPaths.get(0)))
                     {
                         // Wait for 10ms and see if the output file is visible.
                         TimeUnit.MILLISECONDS.sleep(10);
@@ -370,7 +414,7 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
                 if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
                 {
                     // output the left-outer tail.
-                    outputPath = outputFolder + outputInfo.getFileNames().get(1);
+                    String outputPath = outputFolder + outputInfo.getFileNames().get(1);
                     if (partitionOutput)
                     {
                         requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
@@ -402,11 +446,24 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
                         }
                     }
                 }
+                threadPool.shutdown();
+                try
+                {
+                    while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                } catch (InterruptedException e)
+                {
+                    throw new WorkerException("interrupted while waiting for the termination of join", e);
+                }
+
+                if (exceptionHandler.hasException())
+                {
+                    throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+                }
                 workerMetrics.addOutputCostNs(writeCostTimer.stop());
             } catch (Throwable e)
             {
                 throw new WorkerException(
-                        "failed to finish writing and close the join result file '" + outputPath + "'", e);
+                        "failed to finish writing and close the join result file '" + outputPaths.get(0) + "'", e);
             }
 
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));

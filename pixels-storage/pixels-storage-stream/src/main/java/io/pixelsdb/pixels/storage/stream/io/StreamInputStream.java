@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.storage.stream.io;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
 import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 import org.apache.logging.log4j.LogManager;
@@ -71,12 +72,12 @@ public class StreamInputStream extends InputStream
     /**
      * The maximum tries to get data.
      */
-    private final int MAX_TRIES = 10;
+    private final int MAX_TRIES = Constants.MAX_STREAM_RETRY_COUNT;
 
     /**
      * The milliseconds to sleep.
      */
-    private final int DELAY_MS = 2000;
+    private final long DELAY_MS = Constants.STREAM_DELAY_MS;
 
     /**
      * The http server for receiving input stream.
@@ -163,14 +164,28 @@ public class StreamInputStream extends InputStream
                 return readBytes > 0 ? readBytes : -1;
             }
             content = this.contentQueue.peek();
-
-            int readLen = Math.min(len - readBytes, content.readableBytes());
-            content.readBytes(buf, off + readBytes, readLen);
-            readBytes += readLen;
-            if (!content.isReadable())
+            if (content == null)
             {
-                content.release();
-                contentQueue.poll();
+                return readBytes > 0 ? readBytes : -1;
+            }
+
+            try
+            {
+                int readLen = Math.min(len - readBytes, content.readableBytes());
+                content.readBytes(buf, off + readBytes, readLen);
+                readBytes += readLen;
+                if (!content.isReadable())
+                {
+                    contentQueue.poll();
+                    content.release();
+                }
+            } catch (Exception e) {
+                if (!content.isReadable())
+                {
+                    contentQueue.poll();
+                    content.release();
+                }
+                throw e;
             }
         }
 
@@ -202,6 +217,10 @@ public class StreamInputStream extends InputStream
                 throw new IOException(e);
             }
         }
+        if (this.contentQueue.isEmpty())
+        {
+            logger.error("retry count {}, exception cause: StreamInputStream failed to receive data", tries);
+        }
 
         return this.contentQueue.isEmpty();
     }
@@ -217,7 +236,7 @@ public class StreamInputStream extends InputStream
     public static class StreamHttpServerHandler extends HttpServerHandler
     {
         private static final Logger logger = LogManager.getLogger(StreamHttpServerHandler.class);
-        private StreamInputStream inputStream;
+        private final StreamInputStream inputStream;
 
         public StreamHttpServerHandler(StreamInputStream inputStream)
         {
@@ -267,6 +286,7 @@ public class StreamInputStream extends InputStream
             } else
             {
                 response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                response.setStatus(status);
                 ctx.writeAndFlush(response);
             }
         }
