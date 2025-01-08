@@ -176,7 +176,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                 checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
             }
 
-            int smallWorkerNum = 0;
+            int smallWorkerNum = joinStageCoordinator.getLeftChildWorkerNum();
             if (!smallPartitionInputs.isEmpty())
             {
                 this.smallPartitionStageId = planCoordinator.assignStageId();
