@@ -69,7 +69,8 @@ void IntegerColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto
             }
             else
             {
-                *(reinterpret_cast<int *>(columnVector->intVector) + i + vectorIndex) = decoder->next();
+                columnVector->intVector[i + vectorIndex] = decoder->next();
+//                *(reinterpret_cast<int *>(columnVector->intVector) + i + vectorIndex) = decoder->next();
             }
             elementIndex++;
         }
@@ -79,15 +80,17 @@ void IntegerColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto
         if (isLong)
         {
             // if long
-            std::memcpy((void *) columnVector->longVector + vectorIndex * sizeof(int64_t),
-                        input->getPointer() + input->getReadPos(), size * sizeof(int64_t));
+            columnVector->longVector = (int64_t *)(input->getPointer() + input->getReadPos());
+//            std::memcpy((void *) columnVector->longVector + vectorIndex * sizeof(int64_t),
+//                        input->getPointer() + input->getReadPos(), size * sizeof(int64_t));
             input->setReadPos(input->getReadPos() + size * sizeof(int64_t));
         }
         else
         {
             // if int
-            std::memcpy((void *) columnVector->intVector + vectorIndex * sizeof(int),
-                        input->getPointer() + input->getReadPos(), size * sizeof(int));
+            columnVector->intVector = (int *)(input->getPointer() + input->getReadPos());
+//            std::memcpy((void *) columnVector->intVector + vectorIndex * sizeof(int),
+//                        input->getPointer() + input->getReadPos(), size * sizeof(int));
             input->setReadPos(input->getReadPos() + size * sizeof(int));
         }
     }

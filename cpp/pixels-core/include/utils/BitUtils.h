@@ -28,6 +28,7 @@
 #include <vector>
 #include <cstdint>
 #include "physical/natives/ByteOrder.h"
+#include "physical/natives/ByteBuffer.h"
 
 class BitUtils
 {
@@ -61,6 +62,16 @@ private:
     static std::vector <uint8_t> bitWiseCompactBE(std::vector <uint8_t> values, int length);
 
     static std::vector <uint8_t> bitWiseCompactLE(std::vector <uint8_t> values, int length);
+
+
+  public:
+    // using for string null value
+    static void bitWiseDeCompact(bool* bits, int bitsOffset, int bitsLength, uint8_t *input, int offset, int skipBits, bool littleEndian);
+
+  private:
+    static void bitWiseDeCompactLE(bool* bits, int bitsOffset, int bitsLength, uint8_t *input, int offset, int skipBits);
+
+    static void bitWiseDeCompactBE(bool* bits, int bitsOffset, int bitsLength, uint8_t *input, int offset, int skipBits);
 };
 
 #endif // PIXELS_BITUTILS_H

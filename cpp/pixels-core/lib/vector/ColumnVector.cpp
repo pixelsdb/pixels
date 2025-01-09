@@ -33,7 +33,7 @@ ColumnVector::ColumnVector(uint64_t len, bool encoding)
     this->encoding = encoding;
     memoryUsage = len + sizeof(int) * 3 + 4;
     closed = false;
-    isNull = new uint8_t[length]();
+    isNull = new bool[length]();
     noNulls = true;
     posix_memalign(reinterpret_cast<void **>(&isValid), 64, ceil(1.0 * len / 64) * sizeof(uint64_t));
 }
@@ -48,6 +48,7 @@ void ColumnVector::close()
         if (isValid != nullptr)
         {
             free(isValid);
+
             isValid = nullptr;
         }
     }
@@ -119,8 +120,8 @@ void ColumnVector::ensureSize(uint64_t size, bool preserveData)
 {
     if (this->length < size)
     {
-        uint8_t *oldArray = this->isNull;
-        this->isNull = new uint8_t[size]();
+        bool *oldArray = this->isNull;
+        this->isNull = new bool[size]();
         if (preserveData && !this->noNulls)
         {
             std::copy(oldArray, oldArray + this->length, this->isNull);

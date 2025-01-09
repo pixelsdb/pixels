@@ -36,6 +36,8 @@ thread_local int BufferPool::currBufferIdx = 1;
 thread_local int BufferPool::nextBufferIdx = 0;
 std::shared_ptr <DirectIoLib> BufferPool::directIoLib;
 
+
+
 void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t> bytes,
                             std::vector <std::string> columnNames)
 {
@@ -72,6 +74,7 @@ void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t
 
                 BufferPool::nrBytes[colId] = buffer->size();
                 BufferPool::buffers[idx][colId] = buffer;
+//                std::cout<<"columnName: "<<columnName<<" colId: "<<colId<<" BufferPool:nrBytes:"<<BufferPool::nrBytes[colId]<<std::endl;
             }
         }
         BufferPool::colCount = colIds.size();
@@ -80,19 +83,41 @@ void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t
     else
     {
         // check if resize the buffer is needed
-        assert(colIds.size() == BufferPool::colCount);
+//        assert(colIds.size() == BufferPool::colCount);
         for (int i = 0; i < colIds.size(); i++)
         {
             uint32_t colId = colIds.at(i);
             uint64_t byte = bytes.at(i);
             std::string columnName = columnNames[colId];
+//            std::cout<<"columnName: "<<columnName<<" colId: "<<colId<<" BufferPool:nrBytes:"<<BufferPool::nrBytes[colId]<<" byte:"<<byte<<std::endl;
             if (BufferPool::nrBytes.find(colId) == BufferPool::nrBytes.end())
             {
-                throw InvalidArgumentException("BufferPool::Initialize: no such the column id.");
+                // add the colId into the BufferPool
+                std::string columnName = columnNames[colId];
+                for (int idx = 0; idx < 2; idx++)
+                {
+                  std::shared_ptr <ByteBuffer> buffer;
+                  if (columnSizePath.empty())
+                  {
+                    buffer = BufferPool::directIoLib->allocateDirectBuffer(byte+ EXTRA_POOL_SIZE);
+                  }
+                  else
+                  {
+                    buffer = BufferPool::directIoLib->allocateDirectBuffer(csvReader->get(columnName));
+                  }
+
+                  BufferPool::nrBytes[colId] = buffer->size();
+                  BufferPool::buffers[idx][colId] = buffer;
+                  //                std::cout<<"columnName: "<<columnName<<" colId: "<<colId<<" BufferPool:nrBytes:"<<BufferPool::nrBytes[colId]<<std::endl;
+                }
+//                throw InvalidArgumentException("BufferPool::Initialize: no such the column id.");
             }
             // Note: this code should never happen in the pixels scenario
+            // resize the BufferPool
             if (BufferPool::nrBytes[colId] < byte)
             {
+
+//              std::cout<<"Error! columnName: "<<columnName<<" colId: "<<colId<<" BufferPool:nrBytes:"<<BufferPool::nrBytes[colId]<<" byte:"<<byte<<std::endl;
                 throw InvalidArgumentException("the new buffer byte cannot larger than the previous buffer byte. ");
             }
         }
@@ -125,5 +150,3 @@ void BufferPool::Switch()
     currBufferIdx = 1 - currBufferIdx;
     nextBufferIdx = 1 - nextBufferIdx;
 }
-
-

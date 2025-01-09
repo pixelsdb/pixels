@@ -66,7 +66,7 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> 
     includedColumnNum = 0;
     endOfFile = false;
     resultRowBatch = nullptr;
-    ::DirectUringRandomAccessFile::Initialize();
+//    ::DirectUringRandomAccessFile::Initialize();
     checkBeforeRead();
 }
 
@@ -188,115 +188,106 @@ void PixelsRecordReaderImpl::UpdateRowGroupInfo()
 // In the current configuration, one batch is 10000 rows. This function creates
 // VectorizedRowBatch with some cols. Each column has 10000 elements. The columns
 // read value from chunkBuffer.
-std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse)
-{
-    if (endOfFile)
-    {
-        endOfFile = true;
-        return createEmptyEOFRowBatch(0);
+std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reuse) {
+  if (endOfFile) {
+    endOfFile = true;
+    return createEmptyEOFRowBatch(0);
+  }
+  if (!everRead) {
+    if (!read()) {
+      throw std::runtime_error("failed to read file");
     }
-    if (!everRead)
-    {
-        if (!read())
-        {
-            throw std::runtime_error("failed to read file");
+  }
+
+  // update current batch size
+  int curBatchSize =std::min(curRGRowCount - curRowInRG, std::min(batchSize, curRGRowCount));
+//      curBatchSize=20000;
+  if (resultRowBatch == nullptr) {
+    resultRowBatch =
+        resultSchema->createRowBatch(curBatchSize, resultColumnsEncoded);
+  } else {
+    resultRowBatch->reset();
+    if (curBatchSize != resultRowBatch->maxSize) {
+      resultRowBatch->resize(curBatchSize);
+    }
+  }
+  auto columnVectors = resultRowBatch->cols;
+  if (filterMask != nullptr) {
+    filterMask->set();
+  }
+
+  std::vector<int> filterColumnIndex;
+
+  if (has_async_task_num_ > 0) {
+    asyncReadComplete(has_async_task_num_);
+  }
+    if (filter != nullptr) {
+      for (auto &filterCol : filter->filters) {
+        if (filterMask->isNone()) {
+          break;
         }
-    }
-
-
-    // TODO: resultRowBatch.projectionSize
-
-
-    // update current batch size
-    int curBatchSize = std::min(curRGRowCount - curRowInRG, std::min(batchSize, curRGRowCount));
-    if (resultRowBatch == nullptr)
-    {
-        resultRowBatch = resultSchema->createRowBatch(curBatchSize, resultColumnsEncoded);
-    }
-    else
-    {
-        resultRowBatch->reset();
-        if (curBatchSize != resultRowBatch->maxSize)
-        {
-            resultRowBatch->resize(curBatchSize);
-        }
-    }
-
-    auto columnVectors = resultRowBatch->cols;
-    if (filterMask != nullptr)
-    {
-        filterMask->set();
-    }
-
-    std::vector<int> filterColumnIndex;
-    if (filter != nullptr)
-    {
-        for (auto &filterCol: filter->filters)
-        {
-            if (filterMask->isNone())
-            {
-                break;
-            }
-            int i = filterCol.first;
-            int index = curChunkBufferIndex.at(i);
-            auto &encoding = curEncoding.at(i);
-            auto &chunkIndex = curChunkIndex.at(i);
-            readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
-                                postScript.pixelstride(), resultRowBatch->rowCount,
-                                columnVectors.at(i), *chunkIndex, filterMask);
-            filterColumnIndex.emplace_back(index);
-            PixelsFilter::ApplyFilter(columnVectors.at(i), *filterCol.second, *filterMask,
-                                      resultSchema->getChildren().at(i));
-        }
+        int i = filterCol.first;
+        int index = curChunkBufferIndex.at(i);
+        auto &encoding = curEncoding.at(i);
+        auto &chunkIndex = curChunkIndex.at(i);
+        readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG,
+                            curBatchSize, postScript.pixelstride(),
+                            resultRowBatch->rowCount, columnVectors.at(i),
+                            *chunkIndex, filterMask);
+        filterColumnIndex.emplace_back(index);
+        PixelsFilter::ApplyFilter(columnVectors.at(i), *filterCol.second,
+                                  *filterMask,
+                                  resultSchema->getChildren().at(i));
+      }
     }
 
     // read vectors
-    for (int i = 0; i < resultColumns.size(); i++)
-    {
-        // TODO: Refer to Issue #564. Disable data skipping
-        //if(filterMask != nullptr) {
-        //    if(filterMask->isNone()) {
-        //        break;
-        //    }
-        //}
-        // Skip the columns that calculate the filter mask, since they are already processed
-        int index = curChunkBufferIndex.at(i);
-        if (std::find(filterColumnIndex.begin(), filterColumnIndex.end(), index) != filterColumnIndex.end())
-        {
-            continue;
-        }
-        auto &encoding = curEncoding.at(i);
-        auto &chunkIndex = curChunkIndex.at(i);
-        readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
-                            postScript.pixelstride(), resultRowBatch->rowCount,
-                            columnVectors.at(i), *chunkIndex, filterMask);
+    for (int i = 0; i < resultColumns.size(); i++) {
+      // TODO: Refer to Issue #564. Disable data skipping
+      // if(filterMask != nullptr) {
+      //    if(filterMask->isNone()) {
+      //        break;
+      //    }
+      //}
+      // Skip the columns that calculate the filter mask, since they are already processed
+      int index = curChunkBufferIndex.at(i);
+      if (std::find(filterColumnIndex.begin(), filterColumnIndex.end(),
+                    index) != filterColumnIndex.end()) {
+        continue;
+      }
+      auto &encoding = curEncoding.at(i);
+      auto &chunkIndex = curChunkIndex.at(i);
+
+      std::cout<<physicalReader->getName()<< " readBatch curRowInRG:"<<curRowInRG<<std::endl;
+      readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG,
+                          curBatchSize, postScript.pixelstride(),
+                          resultRowBatch->rowCount, columnVectors.at(i),
+                          *chunkIndex, filterMask);
     }
 
     // update current row index in the row group
     curRowInRG += curBatchSize;
+    //    std::cout<<"???"<<std::endl;
     resultRowBatch->rowCount += curBatchSize;
     // update row group index if current row index exceeds max row count in the row group
-    if (curRowInRG >= curRGRowCount)
-    {
-        curRGIdx++;
-        if (curRGIdx < targetRGNum)
-        {
-            UpdateRowGroupInfo();
-        }
-        else
-        {
-            // if end of file, set result vectorized row batch endOfFile
-            // TODO: set checkValid to false!
-            endOfFile = true;
-        }
-        curRowInRG = 0;
+    if (curRowInRG >= curRGRowCount) {
+      curRGIdx++;
+      if (curRGIdx < targetRGNum) {
+        UpdateRowGroupInfo();
+      } else {
+        // if end of file, set result vectorized row batch endOfFile
+        // TODO: set checkValid to false!
+        endOfFile = true;
+      }
+      curRowInRG = 0;
     }
     return resultRowBatch;
 }
 
 
-void PixelsRecordReaderImpl::prepareRead()
-{
+
+void PixelsRecordReaderImpl::prepareRead(){
+
     everPrepareRead = true;
     std::vector<bool> includedRGs;
     includedRGs.resize(RGLen);
@@ -391,12 +382,13 @@ void PixelsRecordReaderImpl::prepareRead()
 
 void PixelsRecordReaderImpl::asyncReadComplete(int requestSize)
 {
-    if (ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io"))
-    {
+  if(ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io") && has_async_task_num_ >= requestSize)
+  {
         if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
         {
             auto localReader = std::static_pointer_cast<PhysicalLocalReader>(physicalReader);
             localReader->readAsyncComplete(requestSize);
+            has_async_task_num_ -= requestSize;
         }
         else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
         {
@@ -471,6 +463,9 @@ bool PixelsRecordReaderImpl::read()
         }
 
         auto byteBuffers = scheduler->executeBatch(physicalReader, requestBatch, originalByteBuffers, queryId);
+        if(ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io") && originalByteBuffers.size() > 0) {
+          has_async_task_num_ += diskChunks.size();
+        }
 
         for (int index = 0; index < diskChunks.size(); index++)
         {
@@ -482,6 +477,8 @@ bool PixelsRecordReaderImpl::read()
                 chunkBuffers.at(colId) = bb;
             }
         }
+//        ::DirectUringRandomAccessFile::Reset();
+//        ::BufferPool::Reset();
     }
     return true;
 

@@ -64,6 +64,7 @@ std::shared_ptr <ColumnReader> ColumnReaderBuilder::newColumnReader(std::shared_
 //            break;
 //        case TypeDescription::BINARY:
 //            break;
+        case TypeDescription::STRING:
         case TypeDescription::VARCHAR:
             return std::make_shared<VarcharColumnReader>(type);
         case TypeDescription::CHAR:

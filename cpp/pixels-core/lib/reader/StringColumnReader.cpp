@@ -39,6 +39,7 @@ StringColumnReader::StringColumnReader(std::shared_ptr <TypeDescription> type) :
     dictStartsOffset = 0;
     dictStarts = nullptr;
     startsLength = 0;
+    inputBuffer= nullptr;
 }
 
 void StringColumnReader::close()
@@ -59,12 +60,20 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
         elementIndex = 0;
         bufferOffset = 0;
         isNullOffset = chunkIndex.isnulloffset();
+        isNullSkipBits = 0;
+        inputBuffer = new uint8_t [input->size()];
+        input->getBytes(inputBuffer,input->size());
+//        input->resetPosition();
+        input->resetReaderIndex();
         readContent(input, input->bytesRemaining(), encoding);
     }
 
-    int pixelId = elementIndex / pixelStride;
-    bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
-    setValid(input, pixelStride, vector, pixelId, hasNull);
+//    int pixelId = elementIndex / pixelStride;
+//    bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+//    setValid(input, pixelStride, vector, pixelId, hasNull);
+//    // duckdb need to set valid
+    int elementSizeInCurrPixels = std::min(pixelStride, (int) columnVector->length);
+    int byteSize = ceil(1.0 * elementSizeInCurrPixels / 8);
 
     // TODO: if dictionary encoded
     if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY)
@@ -75,78 +84,190 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
         {
             cascadeRLE = true;
         }
-
-        for (int i = 0; i < size; i++)
-        {
-            bool valid = vector->checkValid(i);
-            if (elementIndex % pixelStride == 0)
+        if(std::dynamic_pointer_cast<std::shared_ptr<BinaryColumnVector>>(columnVector)){
+          // we get bytes here to reduce memory copies and avoid creating many small byte arrays
+          int numLeft = size, numToRead, bytesToDeCompact;
+          bool endOfPixel;
+          for (int i = vectorIndex; numLeft > 0;)
+          {
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
-                int pixelId = elementIndex / pixelStride;
-                // TODO: should write the remaining code
+              // read to the end of the current pixel
+              numToRead = pixelStride - elementIndex % pixelStride;
+              endOfPixel = true;
             }
-            if (vector->checkValid(i) && (filterMask == nullptr || filterMask->get(i)))
+            else
             {
+              numToRead = numLeft;
+              endOfPixel = false;
+            }
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            bool hasNull=chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+            if (hasNull)
+            {
+              BitUtils::bitWiseDeCompact(columnVector->isNull,i,numToRead,
+                                         inputBuffer,isNullOffset,isNullSkipBits,true);
+              isNullOffset += bytesToDeCompact;
+              isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
+              columnVector->noNulls = false;
+              setValid(input, pixelStride, vector, pixelId, hasNull);
+            }
+            else
+            {
+              std::fill(columnVector->isNull,columnVector->isNull+columnVector->length, false);
+
+            }
+            // read content
+            for (int j = i; j < i + numToRead; ++j)
+            {
+//              ((uint8_t *)columnVector->isValid)[j]=static_cast<uint8_t>(!columnVector->isNull[j]);
+              if (hasNull && columnVector->isNull[j])
+              {
+                if ((!cascadeRLE) && chunkIndex.nullspadding())
+                {
+                  contentBuf->skipBytes(sizeof (int));
+                }
+              }
+              else
+              {
                 int originId = cascadeRLE ? (int) contentDecoder->next() : contentBuf->getInt();
                 int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
                 // use setRef instead of setVal to reduce memory copy.
-                columnVector->setRef(i + vectorIndex, dictContentBuf->getPointer(), dictStarts[originId], tmpLen);
+                columnVector->setRef(j, dictContentBuf->getPointer(), dictStarts[originId], tmpLen);
+              }
             }
-            else if (!valid && (!cascadeRLE) && chunkIndex.nullspadding())
-            {
-                // is null: skip this number
-                contentBuf->getInt();
-            }
-            else
-            {
-                // filter out: skip this number
-                if (!cascadeRLE)
-                {
-                    contentBuf->getInt();
-                }
-                else
-                {
-                    contentDecoder->next();
-                }
-            }
-            elementIndex++;
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
+          }
         }
+
+//        for (int i = 0; i < size; i++)
+//        {
+//            bool valid = vector->checkValid(i);
+//            if (elementIndex % pixelStride == 0)
+//            {
+//                int pixelId = elementIndex / pixelStride;
+//                // TODO: should write the remaining code
+//            }
+//            if (vector->checkValid(i) && (filterMask == nullptr || filterMask->get(i)))
+//            {
+//                int originId = cascadeRLE ? (int) contentDecoder->next() : contentBuf->getInt();
+//                int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
+//                // use setRef instead of setVal to reduce memory copy.
+//                columnVector->setRef(i + vectorIndex, dictContentBuf->getPointer(), dictStarts[originId], tmpLen);
+//            }
+//            else if (!valid && (!cascadeRLE) && chunkIndex.nullspadding())
+//            {
+//                // is null: skip this number
+//                contentBuf->getInt();
+//            }
+//            else
+//            {
+//                // filter out: skip this number
+//                if (!cascadeRLE)
+//                {
+//                    contentBuf->getInt();
+//                }
+//                else
+//                {
+//                    contentDecoder->next();
+//                }
+//            }
+//            elementIndex++;
+//        }
     }
     else
     {
-        for (int i = 0; i < size; i++)
-        {
-            if (elementIndex % pixelStride == 0)
-            {
-                int pixelId = elementIndex / pixelStride;
-                // TODO: should write the remaining code
-            }
-            bool valid = vector->checkValid(i);
-            if (valid && (filterMask == nullptr || filterMask->get(i)))
-            {
-                currentStart = nextStart;
-                nextStart = startsBuf->getInt();
-                int len = nextStart - currentStart;
-                // use setRef instead of setVal to reduce memory copy
-                columnVector->setRef(
-                        i + vectorIndex, contentBuf->getPointer(), bufferOffset, len);
-                bufferOffset += len;
-            }
-            else if (!valid)
-            {
-                // is null: skip this number
-                currentStart = nextStart;
-                nextStart = startsBuf->getInt();
-            }
-            else
-            {
-                // filter out: skip this number
-                currentStart = nextStart;
-                nextStart = startsBuf->getInt();
-                int len = nextStart - currentStart;
-                bufferOffset += len;
-            }
-            elementIndex++;
+      int numLeft=size,numToRead,bytesToDeCompact;
+      bool endOfPixel;
+      for(int i=vectorIndex;numLeft>0;){
+        if(elementIndex/pixelStride<(elementIndex+numLeft)/pixelStride){
+          numToRead=pixelStride-elementIndex%pixelStride;
+          endOfPixel=true;
         }
+        else{
+          numToRead=numLeft;
+          endOfPixel=false;
+        }
+        bytesToDeCompact=(numToRead+isNullSkipBits+(endOfPixel? 7:0))/8;
+        // read isNull
+        int pixelId=elementIndex/pixelStride;
+        bool hasNull=chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+        if(hasNull){
+          BitUtils::bitWiseDeCompact(columnVector->isNull,i,numToRead,
+                                     inputBuffer,isNullOffset,isNullSkipBits, true);
+          isNullOffset+=bytesToDeCompact;
+          isNullSkipBits=endOfPixel?0:(numToRead+isNullSkipBits)%8;
+          columnVector->noNulls= false;
+          setValid(input, pixelStride, vector, pixelId, hasNull);
+        }else{
+          // no nulls padding
+          std::fill(columnVector->isNull,columnVector->isNull+columnVector->length, false);
+
+        }
+        // read content
+        for(int j=i;j<i+numToRead;++j){
+//          ((uint8_t *)columnVector->isValid)[j]=static_cast<uint8_t>(!columnVector->isNull[j]);
+          if(hasNull&&columnVector->isNull[j]){
+//            std::cout<<j<<" null"<<std::endl;
+            if(chunkIndex.nullspadding()){
+              currentStart=nextStart;
+              nextStart=startsBuf->getInt();
+              assert(currentStart==nextStart);
+            }
+          }else{
+//            columnVector->isValid[j]=true;
+            currentStart = nextStart;
+            nextStart = startsBuf->getInt();
+            int len = nextStart - currentStart;
+            // use setRef instead of setVal to reduce memory copy
+            columnVector->setRef(
+                j, contentBuf->getPointer(), bufferOffset, len);
+            bufferOffset += len;
+          }
+        }
+        numLeft-=numToRead;
+        elementIndex+=numToRead;
+        i+=numToRead;
+      }
+//        for (int i = 0; i < size; i++)
+//        {
+//            if (elementIndex % pixelStride == 0)
+//            {
+//                int pixelId = elementIndex / pixelStride;
+//                // TODO: should write the remaining code
+//            }
+//            bool valid = vector->checkValid(i);
+//            if (valid && (filterMask == nullptr || filterMask->get(i)))
+//            {
+//                currentStart = nextStart;
+//                nextStart = startsBuf->getInt();
+//                int len = nextStart - currentStart;
+//                // use setRef instead of setVal to reduce memory copy
+//                columnVector->setRef(
+//                        i + vectorIndex, contentBuf->getPointer(), bufferOffset, len);
+//                bufferOffset += len;
+//            }
+//            else if (!valid)
+//            {
+//                // is null: skip this number
+//                currentStart = nextStart;
+//                nextStart = startsBuf->getInt();
+//            }
+//            else
+//            {
+//                // filter out: skip this number
+//                currentStart = nextStart;
+//                nextStart = startsBuf->getInt();
+//                int len = nextStart - currentStart;
+//                bufferOffset += len;
+//            }
+//            elementIndex++;
+//        }
     }
 }
 

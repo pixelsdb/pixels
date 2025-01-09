@@ -38,7 +38,7 @@
 // the remaining pxl file has larger size than the first file, we allocate some extra
 // size (10MB) to each column.
 // TODO: how to evaluate the maximal pool size
-#define EXTRA_POOL_SIZE 3*1024*1024
+#define EXTRA_POOL_SIZE 10*1024*1024
 
 class DirectUringRandomAccessFile;
 // This class is global class. The variable is shared by each thread

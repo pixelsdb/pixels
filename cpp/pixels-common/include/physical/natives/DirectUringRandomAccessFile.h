@@ -59,5 +59,6 @@ private:
     static thread_local struct iovec *iovecs;
     static thread_local uint32_t
     iovecSize;
+    static thread_local std::map<uint32_t,uint64_t> registeredColIds;
 };
 #endif // DUCKDB_DIRECTURINGRANDOMACCESSFILE_H

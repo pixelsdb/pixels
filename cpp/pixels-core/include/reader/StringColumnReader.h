@@ -27,6 +27,8 @@
 
 #include "reader/ColumnReader.h"
 #include "encoding/RunLenIntDecoder.h"
+#include "utils/BitUtils.h"
+#include "physical/natives/ByteOrder.h"
 
 class StringColumnReader : public ColumnReader
 {
@@ -69,6 +71,8 @@ private:
 
     int *dictStarts;
     int startsLength;
+
+    uint8_t * inputBuffer;
 
     /**
      * In this method, we have reduced most of significant memory copies.
