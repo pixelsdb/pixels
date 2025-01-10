@@ -68,12 +68,11 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                     joinOutputs[i] = InvokerFactory.Instance()
                             .getInvoker(WorkerType.PARTITIONED_JOIN_STREAMING).invoke(joinInput);
                 }
-                // Not yet implemented
-//                else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
-//                {
-//                    joinOutputs[i] = InvokerFactory.Instance()
-//                            .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN_STREAMING).invoke(joinInput);
-//                }
+                else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
+                {
+                    joinOutputs[i] = InvokerFactory.Instance()
+                            .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN_STREAMING).invoke(joinInput);
+                }
                 else
                 {
                     throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");

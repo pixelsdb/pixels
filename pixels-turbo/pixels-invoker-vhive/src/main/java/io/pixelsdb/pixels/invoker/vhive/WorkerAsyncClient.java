@@ -120,6 +120,15 @@ public class WorkerAsyncClient
         return this.stub.process(request);
     }
 
+    public ListenableFuture<TurboProto.WorkerResponse> partitionChainJoinStreaming(PartitionedChainJoinInput input)
+    {
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.PARTITIONED_CHAIN_JOIN_STREAMING))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
+                .build();
+        return this.stub.process(request);
+    }
+
     public ListenableFuture<TurboProto.WorkerResponse> partitionJoin(PartitionedJoinInput input)
     {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()

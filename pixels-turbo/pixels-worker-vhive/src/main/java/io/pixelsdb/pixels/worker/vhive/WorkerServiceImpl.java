@@ -76,6 +76,12 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
                 service.execute(request, responseObserver);
                 break;
             }
+            case PARTITIONED_CHAIN_JOIN_STREAMING:
+            {
+                ServiceImpl<PartitionedChainJoinStreamWorker, PartitionedChainJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedChainJoinStreamWorker.class, PartitionedChainJoinInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
             case PARTITIONED_JOIN:
             {
                 ServiceImpl<PartitionedJoinWorker, PartitionedJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedJoinWorker.class, PartitionedJoinInput.class);
