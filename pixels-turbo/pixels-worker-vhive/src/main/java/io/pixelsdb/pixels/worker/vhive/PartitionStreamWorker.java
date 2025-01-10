@@ -163,6 +163,8 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
                 partitioned.add(new ConcurrentLinkedQueue<>());
             }
 
+            Set<Integer> hashValues = new HashSet<>(numPartition);
+            ConcurrentHashMap<Integer, PixelsWriter> pixelsWriters = new ConcurrentHashMap<>();
             // get tasks from worker coordinator
             TaskBatch taskBatch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
             while (!taskBatch.isEndOfTasks())
@@ -174,13 +176,6 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
                     PartitionInput input = JSON.parseObject(taskInfo.getPayload(), PartitionInput.class);
                     requireNonNull(input.getTableInfo(), "task.tableInfo is null");
                     inputSplits.addAll(input.getTableInfo().getInputSplits());
-                }
-                if (writerSchema.get() == null)
-                {
-                    TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(
-                            WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
-                    TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
-                    writerSchema.set(resultSchema);
                 }
                 for (InputSplit inputSplit : inputSplits)
                 {
@@ -203,46 +198,70 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
                 {
                     future.get();
                 }
+                if (writerSchema.get() == null)
+                {
+                    TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(
+                            WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
+                    TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
+                    writerSchema.set(resultSchema);
+                }
+                // write to down stream workers
+                WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
+                List<Future> outputFutures = new ArrayList<>(numPartition);
+                for (int hash = 0; hash < numPartition; hash++)
+                {
+                    int finalHash = hash;
+                    outputFutures.add(threadPool.submit(() -> {
+                        PixelsWriter pixelsWriter;
+                        if (pixelsWriters.containsKey(finalHash))
+                        {
+                            pixelsWriter = pixelsWriters.get(finalHash);
+                        } else
+                        {
+                            pixelsWriter = WorkerCommon.getWriter(writerSchema.get(),
+                                    WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPaths.get(finalHash), encoding,
+                                    true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
+                            pixelsWriters.put(finalHash, pixelsWriter);
+                        }
+                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(finalHash);
+                        int size = 0;
+                        if (!batches.isEmpty())
+                        {
+                            for (VectorizedRowBatch batch : batches)
+                            {
+                                size += batch.size;
+                                try
+                                {
+                                    pixelsWriter.addRowBatch(batch, finalHash);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                            hashValues.add(finalHash);
+                            batches.clear();
+                        }
+                        logger.info("partition {} has {} rows", finalHash, size);
+                        workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                        workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+                    }));
+                }
+                for (Future future : outputFutures)
+                {
+                    future.get();
+                }
+                workerMetrics.addOutputCostNs(writeCostTimer.stop());
                 workerCoordinatorService.completeTasks(worker.getWorkerId(), taskInfos);
                 taskBatch = workerCoordinatorService.getTasksToExecute(worker.getWorkerId());
             }
 
-            // write to down stream workers
-            WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
-            Set<Integer> hashValues = new HashSet<>(numPartition);
-            for (int hash = 0; hash < numPartition; hash++)
+            try
             {
-                int finalHash = hash;
-                threadPool.execute(() -> {
-                    PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema.get(),
-                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPaths.get(finalHash), encoding,
-                            true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
-                    ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(finalHash);
-                    int size = 0;
-                    if (!batches.isEmpty())
-                    {
-                        for (VectorizedRowBatch batch : batches)
-                        {
-                            size += batch.size;
-                            try
-                            {
-                                pixelsWriter.addRowBatch(batch, finalHash);
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }
-                        hashValues.add(finalHash);
-                    }
-                    logger.info("partition {} has {} rows", finalHash, size);
-                    try
-                    {
-                        pixelsWriter.close();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                    workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-                    workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-                });
+                for (PixelsWriter pixelsWriter : pixelsWriters.values())
+                {
+                    pixelsWriter.close();
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
             threadPool.shutdown();
             try
@@ -258,8 +277,6 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
             }
             outputPaths.forEach(partitionOutput::addOutput);
             partitionOutput.setHashValues(hashValues);
-
-            workerMetrics.addOutputCostNs(writeCostTimer.stop());
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(partitionOutput, workerMetrics);
             return partitionOutput;
