@@ -19,103 +19,169 @@
  */
 
 #include "Visibility.h"
-#include "EpochList.h"
-#include "PatchArr.h"
-
-#include <atomic>
 #include <cstring>
 #include <stdexcept>
-#include <iostream>
 
 #ifndef SET_BITMAP_BIT
 #define SET_BITMAP_BIT(bitmap, rowId) \
     ((bitmap)[(rowId) / 64] |= (1ULL << ((rowId) % 64)))
 #endif
 
-struct Visibility::Impl {
-    std::atomic<int8_t> allValue;
-    EpochList epochList;
-    PatchArr patchArr;
-    Impl() {
-        allValue.store(0, std::memory_order_relaxed);
-    }
-};
+Visibility::Visibility() : baseTimestamp(-1UL) {
+    memset(baseBitmap, 0, 4 * sizeof(uint64_t));
+    head.store(nullptr, std::memory_order_release);
+    tail.store(nullptr, std::memory_order_release);
+    tailUsed.store(0, std::memory_order_release);
+}
 
-Visibility::Visibility() {
-    m_impl = new Impl();
+Visibility::Visibility(uint64_t ts, const uint64_t bitmap[4])
+    : baseTimestamp(ts) {
+    memcpy(baseBitmap, bitmap, 4 * sizeof(uint64_t));
+    head.store(nullptr, std::memory_order_release);
+    tail.store(nullptr, std::memory_order_release);
+    tailUsed.store(0, std::memory_order_release);
 }
 
 Visibility::~Visibility() {
-    delete m_impl;
-    m_impl = nullptr;
-}
-
-void Visibility::setAllValue(int8_t value) {
-    m_impl->allValue.store(val, std::memory_order_relaxed);
-}
-
-int8_t Visibility::getAllValue() const {
-    return m_impl->allValue.load(std::memory_order_relaxed);
-}
-
-void Visibility::createNewEpoch(uint64_t epochTs) {
-    /**
-     * TODO: wrong implement, no need to write checkpoint if not full
-     */
-    unsigned char ckp[CHECKPOINT_SIZE];
-    std::memset(ckp, 0, 32);
-    uint8_t chunkIndex = m_impl->patchArr.writeCheckPoint(ckp);
-    m_impl->epochList.addEpoch(epochTs, chunkIndex, 32);
-}
-
-void Visibility::deleteRecord(std::size_t rowId, uint64_t epochTs) {
-    EpochInfo* info = m_impl->epochList.findEpoch(epochTs);
-    if (!info) {
-        std::cerr << "[deleteRecord] Epoch not found: ts=" << epochTs << "\n";
-        return;
-    }
-
-    uint8_t patchIndex = 0;
-    uint16_t patchOffset = 0;
-    m_impl->patchArr.appendDeleteIndex((unsigned char) (rowId & 0xFF), patchIndex, patchOffset);
-
-    info->patchIndex = patchIndex;
-    info->patchOffset = patchOffset;
-}
-
-void Visibility::getVisibilityBitmap(uint64_t epochTs, uint64_t *outBitmap) const {
-    int8_t av = getAllValue();
-    if (av == 0) {
-        std::memset(outBitmap, 0, 4 * sizeof(uint64_t));
-        return;
-    } else if (av == 1) {
-        std::memset(outBitmap, 0xFF, 4 * sizeof(uint64_t));
-        return;
-    }
-
-    EpochInfo* info = m_impl->epochList.findEpoch(epochTs);
-    if (!info) {
-        std::memset(outBitmap, 0, 4 * sizeof(uint64_t));
-        return;
-    }
-
-    std::memset(outBitmap, 0, 4 * sizeof(uint64_t));
-    if (info->patchOffset < 32) {
-        return;
-    }
-
-    unsigned char buffer[64];
-    std::memset(buffer, 0, 64);
-    m_impl->patchArr.readData(info->patchIndex, info->patchOffset, buffer, 64);
-
-    uint16_t pos = 32;
-    while (pos < info->patchOffset) {
-        unsigned char rowId = buffer[pos];
-        SET_BITMAP_BIT(outBitmap, rowId);
-        pos++;
+    DeleteIndexBlock* blk = head.load(std::memory_order_acquire);
+    while (blk) {
+        DeleteIndexBlock* next = blk->next.load(std::memory_order_acquire);
+        delete blk;
+        blk = next;
     }
 }
 
-void Visibility::cleanOldEpochs(uint64_t cutoffTs) {
-    m_impl->epochList.cleanOldEpochs(cutoffTs);
+bool Visibility::deleteRecord(uint8_t rowId, uint64_t ts) {
+    uint64_t item = makeDeleteIndex(rowId, ts);
+
+    while (true) {
+        DeleteIndexBlock* curTail = tail.load(std::memory_order_acquire);
+        uint64_t used = tailUsed.load(std::memory_order_acquire);
+        if (!curTail) { // empty list
+            DeleteIndexBlock* newBlk = new DeleteIndexBlock();
+            newBlk->next.store(nullptr, std::memory_order_relaxed);
+            uint64_t expected = 0;
+            if (!tailUsed.compare_exchange_strong(expected, 1, std::memory_order_acq_rel)) {
+                delete newBlk;
+                continue;
+            }
+            newBlk->items[0] = item;
+            DeleteIndexBlock* expectedTail = nullptr;
+            if (!tail.compare_exchange_strong(expectedTail, newBlk, std::memory_order_acq_rel)) {
+                tailUsed.store(0, std::memory_order_release);
+                delete newBlk;
+                continue;
+            }
+            head.store(newBlk, std::memory_order_release);
+            return true;
+        } else {
+            if (used < 8) {
+                uint64_t oldUsed = tailUsed.fetch_add(1, std::memory_order_acquire);
+                if (oldUsed < 8) {
+                    curTail->items[oldUsed] = item;
+                    return true;
+                } else {
+                    tailUsed.fetch_sub(1, std::memory_order_release);
+                }
+            }
+
+            // curTail is full
+            uint64_t oldVal = tailUsed.exchange(1, std::memory_order_acq_rel);
+            if (oldVal < 8) {
+                // another thread may have already added new block
+                tailUsed.store(oldVal, std::memory_order_release);
+                continue;
+            }
+
+            DeleteIndexBlock* newBlk = new DeleteIndexBlock();
+            newBlk->next.store(nullptr, std::memory_order_relaxed);
+            newBlk->items[0] = item;
+
+            if (tail.load(std::memory_order_acquire) != curTail) {
+                tailUsed.store(0, std::memory_order_release);
+                delete newBlk;
+                continue;
+            }
+
+            DeleteIndexBlock* expectedNext = nullptr;
+            if (!curTail->next.compare_exchange_strong(expectedNext, newBlk, std::memory_order_acq_rel)) {
+                tailUsed.store(oldVal, std::memory_order_release);
+                delete newBlk;
+                continue;
+            }
+
+            tail.compare_exchange_strong(curTail, newBlk, std::memory_order_acq_rel);
+            return true;
+        }
+    }
+    return false;
 }
+
+void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
+    if (ts < baseTimestamp) {
+        throw std::runtime_error("need to read checkpoint from disk");
+    }
+    std::memcpy(outBitmap, baseBitmap, 4 * sizeof(uint64_t));
+    if (ts == baseTimestamp) {
+        return;
+    }
+
+    DeleteIndexBlock* blk = head.load(std::memory_order_acquire);
+    if (!blk) {
+        return;
+    }
+
+    DeleteIndexBlock* tailBlk = tail.load(std::memory_order_acquire);
+    uint64_t usedInTail = tailUsed.load(std::memory_order_acquire);
+    if (usedInTail > 8) {
+        throw std::runtime_error("used in tail is greater than 8");
+    }
+    while (blk) {
+        uint64_t count = (blk == tailBlk) ? usedInTail : 8;
+        for (uint64_t i = 0; i < count; i++) {
+            uint64_t item = blk->items[i];
+            uint64_t delTs = extractTimestamp(item);
+            if (delTs <= ts) {
+                SET_BITMAP_BIT(outBitmap, extractRowId(item));
+            } else {
+                // delTs is increasing, so no need to check further
+                return;
+            }
+        }
+        if (blk == tailBlk) {
+            break;
+        }
+        blk = blk->next.load(std::memory_order_acquire);
+    }
+}
+
+void Visibility::cleanUp(uint64_t ts) {
+    while (true) {
+        DeleteIndexBlock* oldHead = head.load(std::memory_order_acquire);
+        if (!oldHead) {
+            return;
+        }
+
+        DeleteIndexBlock* tailBlk = tail.load(std::memory_order_acquire);
+        if ((oldHead == tailBlk) && (tailUsed.load(std::memory_order_acquire) != 8)) {
+            return;
+        }
+
+        uint64_t item = oldHead->items[7];
+        uint64_t delTs = extractTimestamp(item);
+        if (delTs > ts) {
+            return;
+        }
+
+        DeleteIndexBlock* newHead = oldHead->next.load(std::memory_order_acquire);
+        if (oldHead == tailBlk) {
+            head.store(nullptr, std::memory_order_release);
+            tail.store(nullptr, std::memory_order_release);
+            tailUsed.store(0, std::memory_order_release);
+        } else {
+            head.store(newHead, std::memory_order_release);
+        }
+        delete oldHead;
+    }
+}
+
