@@ -19,18 +19,21 @@
  */
 
 #include "Visibility_JNI.h"
-#include "Visibility.h"
+
 #include <cstdlib>
+
+#include "Visibility.h"
 
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
  * Method:    destroyNativeObject
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeObject
-        (JNIEnv *env, jobject obj, jlong nativeHandle) {
-    Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
-    delete nativeObj;
+JNIEXPORT void JNICALL
+Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeObject(
+    JNIEnv* env, jobject obj, jlong nativeHandle) {
+  Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
+  delete nativeObj;
 }
 
 /*
@@ -38,10 +41,11 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeOb
  * Method:    createNativeObject
  * Signature: ()J
  */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject
-        (JNIEnv *env, jobject obj) {
-    Visibility* nativeObj = new Visibility();
-    return reinterpret_cast<jlong>(nativeObj);
+JNIEXPORT jlong JNICALL
+Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject(JNIEnv* env,
+                                                             jobject obj) {
+  Visibility* nativeObj = new Visibility();
+  return reinterpret_cast<jlong>(nativeObj);
 }
 
 /*
@@ -49,12 +53,14 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeOb
  * Method:    getVisibilityBitmap
  * Signature: (J[JJ)V
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap
-        (JNIEnv *env, jobject obj, jlong epochTs, jlongArray bitmapArray, jlong nativeHandle) {
-    Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
-    std::uint64_t bitmap[4];
-    nativeObj->getVisibilityBitmap(static_cast<std::uint64_t>(epochTs), bitmap);
-    env->SetLongArrayRegion(bitmapArray, 0, 4, reinterpret_cast<jlong*>(bitmap));
+JNIEXPORT void JNICALL
+Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap(
+    JNIEnv* env, jobject obj, jlong epochTs, jlongArray bitmapArray,
+    jlong nativeHandle) {
+  Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
+  std::uint64_t bitmap[4];
+  nativeObj->getVisibilityBitmap(static_cast<std::uint64_t>(epochTs), bitmap);
+  env->SetLongArrayRegion(bitmapArray, 0, 4, reinterpret_cast<jlong*>(bitmap));
 }
 
 /*
@@ -62,8 +68,9 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBi
  * Method:    deleteRecord
  * Signature: (IJJ)V
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_deleteRecord
-        (JNIEnv * env, jobject obj, jint rowId, jlong epochTs, jlong nativeHandle) {
-    Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
-    nativeObj->deleteRecord(static_cast<int>(rowId), static_cast<std::uint64_t>(epochTs));
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_deleteRecord(
+    JNIEnv* env, jobject obj, jint rowId, jlong epochTs, jlong nativeHandle) {
+  Visibility* nativeObj = reinterpret_cast<Visibility*>(nativeHandle);
+  nativeObj->deleteRecord(static_cast<int>(rowId),
+                          static_cast<std::uint64_t>(epochTs));
 }

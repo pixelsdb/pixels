@@ -1,7 +1,9 @@
 # DeleteTracker Native Methods
+
 Compiled here to generate shared libraries, handed over to java to load and call.
 
 ## How to compile
+
 ```bash
 mkdir -p build
 cd build
