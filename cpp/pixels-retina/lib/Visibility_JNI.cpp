@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -18,23 +18,11 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+#include "Visibility.h"
 #include "Visibility_JNI.h"
 
 #include <cstdlib>
-
-#include "Visibility.h"
-
-/*
- * Class:     io_pixelsdb_pixels_retina_Visibility
- * Method:    destroyNativeObject
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL
-Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeObject(
-    JNIEnv *env, jobject obj, jlong nativeHandle) {
-    Visibility *nativeObj = reinterpret_cast<Visibility *>(nativeHandle);
-    delete nativeObj;
-}
+#include <stdexcept>
 
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
@@ -42,10 +30,52 @@ Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeObject(
  * Signature: ()J
  */
 JNIEXPORT jlong JNICALL
-Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject(JNIEnv *env,
-                                                             jobject obj) {
+Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject__(JNIEnv *env,
+                                                               jobject obj) {
     Visibility *nativeObj = new Visibility();
     return reinterpret_cast<jlong>(nativeObj);
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    createNativeObject
+ * Signature: (J[J)J
+ */
+JNIEXPORT jlong JNICALL
+Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject__J_3J(
+    JNIEnv *env, jobject obj, jlong timestamp, jlongArray bitmapArray) {
+    jsize length = env->GetArrayLength(bitmapArray);
+    if (length != 4) {
+        throw std::invalid_argument("Bitmap array must have 4 elements");
+    }
+    jlong *bitmapArrayElements = env->GetLongArrayElements(bitmapArray, nullptr);
+    if (bitmapArrayElements == nullptr) {
+        throw std::runtime_error("Failed to get bitmap array elements");
+    }
+
+    std::uint64_t bitmap[4];
+    for (int i = 0; i < 4; i++) {
+        bitmap[i] = static_cast<std::uint64_t>(bitmapArrayElements[i]);
+    }
+
+    Visibility *nativeObj =
+        new Visibility(static_cast<std::uint64_t>(timestamp),
+                       bitmap);
+
+    env->ReleaseLongArrayElements(bitmapArray, bitmapArrayElements, JNI_ABORT);
+    return reinterpret_cast<jlong>(nativeObj);
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    destroyNativeObject
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL
+Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeObject(JNIEnv *env, jobject obj,
+                                                              jlong nativeHandle) {
+    Visibility *nativeObj = reinterpret_cast<Visibility *>(nativeHandle);
+    delete nativeObj;
 }
 
 /*
@@ -54,12 +84,12 @@ Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject(JNIEnv *env,
  * Signature: (J[JJ)V
  */
 JNIEXPORT void JNICALL
-Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap(
-    JNIEnv *env, jobject obj, jlong epochTs, jlongArray bitmapArray,
-    jlong nativeHandle) {
+Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap(JNIEnv *env, jobject obj,
+                                                              jlong timestamp, jlongArray bitmapArray,
+                                                              jlong nativeHandle) {
     Visibility *nativeObj = reinterpret_cast<Visibility *>(nativeHandle);
     std::uint64_t bitmap[4];
-    nativeObj->getVisibilityBitmap(static_cast<std::uint64_t>(epochTs), bitmap);
+    nativeObj->getVisibilityBitmap(static_cast<std::uint64_t>(timestamp), bitmap);
     env->SetLongArrayRegion(bitmapArray, 0, 4,
                             reinterpret_cast<jlong *>(bitmap));
 }
@@ -70,8 +100,11 @@ Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap(
  * Signature: (IJJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_deleteRecord(
-    JNIEnv *env, jobject obj, jint rowId, jlong epochTs, jlong nativeHandle) {
+    JNIEnv *env, jobject obj, jint rowId, jlong timestamp, jlong nativeHandle) {
+    if (rowId < 0 || rowId > 255) {
+        throw std::invalid_argument("Row ID must be between 0 and 255");
+    }
     Visibility *nativeObj = reinterpret_cast<Visibility *>(nativeHandle);
-    nativeObj->deleteRecord(static_cast<int>(rowId),
-                            static_cast<std::uint64_t>(epochTs));
-}
+    nativeObj->deleteRecord(static_cast<uint8_t>(rowId),
+                            static_cast<std::uint64_t>(timestamp));
+};

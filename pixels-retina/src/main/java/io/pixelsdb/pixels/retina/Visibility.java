@@ -26,6 +26,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Visibility implements AutoCloseable
 {
@@ -57,51 +58,54 @@ public class Visibility implements AutoCloseable
     /**
      * Constructor creates C++ object and returns handle
      */
-    private final long nativeHandle;
+    private final AtomicLong nativeHandle = new AtomicLong();
 
     /**
      * Constructor
      */
     public Visibility()
     {
-        this.nativeHandle = createNativeObject();
+        this.nativeHandle.set(createNativeObject());
+    }
+
+    public Visibility(long timestamp, long[] visibilityBitmap)
+    {
+        this.nativeHandle.set(createNativeObject(timestamp, visibilityBitmap));
     }
 
     @Override
     public void close() throws Exception
     {
-        if (this.nativeHandle != 0)
+        if (this.nativeHandle.get() != 0)
         {
-            destroyNativeObject(this.nativeHandle);
+            destroyNativeObject(this.nativeHandle.get());
         }
     }
 
     // native methods
-    private native void destroyNativeObject(long nativeHandle);
     private native long createNativeObject();
-    public native void getVisibilityBitmap(long epochTs, long[] visibilityBitmap, long nativeHandle);
-    public native void deleteRecord(int rowId, long epochTs, long nativeHandle);
-    public native void createNewEpoch(long epochTs, long nativeHandle);
-    public native void cleanEpochArrAndPatchArr(long epochTs, long nativeHandle);
+    private native long createNativeObject(long timestamp, long[] visibilityBitmap);
+    private native void destroyNativeObject(long nativeHandle);
+    public native void getVisibilityBitmap(long timestamp, long[] visibilityBitmap, long nativeHandle);
+    public native void deleteRecord(int rowId, long timestamp, long nativeHandle);
 
-    public long[] getVisibilityBitmap(long epochTs, long[] visibilityBitmap)
+    public void getVisibilityBitmap(long timestamp, long[] visibilityBitmap)
     {
-        getVisibilityBitmap(epochTs, visibilityBitmap, this.nativeHandle);
-        return visibilityBitmap;
+        getVisibilityBitmap(timestamp, visibilityBitmap, this.nativeHandle.get());
     }
 
-    public void deleteRecord(int rowId, long epochTs)
+    public void deleteRecord(int rowId, long timestamp)
     {
-        deleteRecord(rowId, epochTs, this.nativeHandle);
+        deleteRecord(rowId, timestamp, this.nativeHandle.get());
     }
 
-    public void createNewEpoch(long epochTs)
+    public void cleanUp(long timestamp)
     {
-        createNewEpoch(epochTs, this.nativeHandle);
-    }
-
-    public void cleanEpochArrAndPatchArr(long epochTs)
-    {
-        cleanEpochArrAndPatchArr(epochTs, this.nativeHandle);
+        long[] visibilityBitmap = new long[4];
+        long oldNativeHandle = this.nativeHandle.get();
+        getVisibilityBitmap(timestamp, visibilityBitmap, oldNativeHandle);
+        long newNativeHandle = createNativeObject(timestamp, visibilityBitmap);
+        nativeHandle.set(newNativeHandle);
+        destroyNativeObject(oldNativeHandle);
     }
 }

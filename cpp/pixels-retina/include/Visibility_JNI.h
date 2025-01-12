@@ -9,19 +9,27 @@ extern "C" {
 #endif
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
- * Method:    destroyNativeObject
- * Signature: (J)V
+ * Method:    createNativeObject
+ * Signature: ()J
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeObject
-  (JNIEnv *, jobject, jlong);
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject__
+    (JNIEnv *, jobject);
 
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
  * Method:    createNativeObject
- * Signature: ()J
+ * Signature: (J[J)J
  */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject
-  (JNIEnv *, jobject);
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeObject__J_3J
+    (JNIEnv *, jobject, jlong, jlongArray);
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_Visibility
+ * Method:    destroyNativeObject
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_destroyNativeObject
+    (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
@@ -29,7 +37,7 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNativeOb
  * Signature: (J[JJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBitmap
-  (JNIEnv *, jobject, jlong, jlongArray, jlong);
+    (JNIEnv *, jobject, jlong, jlongArray, jlong);
 
 /*
  * Class:     io_pixelsdb_pixels_retina_Visibility
@@ -37,7 +45,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBi
  * Signature: (IJJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_deleteRecord
-  (JNIEnv *, jobject, jint, jlong, jlong);
+    (JNIEnv *, jobject, jint, jlong, jlong);
 
 #ifdef __cplusplus
 }
