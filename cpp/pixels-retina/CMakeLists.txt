@@ -33,17 +33,17 @@ set_target_properties(pixels-retina PROPERTIES
 install(TARGETS pixels-retina
         LIBRARY DESTINATION $ENV{PIXELS_HOME}/lib)
 
-## Add the test executable
-#add_executable(VisibilityTest test/VisibilityTest.cpp)
-## Link the test executable with the library
-#target_link_libraries(VisibilityTest pixels-retina)
-## Add a test to CTest
-#add_test(NAME VisibilityTest COMMAND VisibilityTest)
+# Add the test executable
+add_executable(VisibilityTest test/VisibilityTest.cpp)
+# Link the test executable with the library
+target_link_libraries(VisibilityTest pixels-retina)
+# Add a test to CTest
+add_test(NAME VisibilityTest COMMAND VisibilityTest)
 
-## Set build type to Debug if not specified
-#if(NOT CMAKE_BUILD_TYPE)
-#    set(CMAKE_BUILD_TYPE Debug)
-#endif()
-#
-## Add debug flags
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
+# Set build type to Debug if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)
+endif()
+
+# Add debug flags
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")

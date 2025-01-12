@@ -39,22 +39,6 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_getVisibilityBi
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_deleteRecord
   (JNIEnv *, jobject, jint, jlong, jlong);
 
-/*
- * Class:     io_pixelsdb_pixels_retina_Visibility
- * Method:    createNewEpoch
- * Signature: (JJ)V
- */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_createNewEpoch
-  (JNIEnv *, jobject, jlong, jlong);
-
-/*
- * Class:     io_pixelsdb_pixels_retina_Visibility
- * Method:    cleanEpochArrAndPatchArr
- * Signature: (JJ)V
- */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_Visibility_cleanEpochArrAndPatchArr
-  (JNIEnv *, jobject, jlong, jlong);
-
 #ifdef __cplusplus
 }
 #endif

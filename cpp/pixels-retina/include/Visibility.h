@@ -38,6 +38,7 @@ inline uint64_t extractTimestamp(uint64_t raw) {
 }
 
 struct DeleteIndexBlock {
+    std::atomic<uint8_t> used{0};
     static constexpr size_t BLOCK_CAPACITY = 8;
     uint64_t items[BLOCK_CAPACITY] = {0};
     std::atomic<DeleteIndexBlock*> next{nullptr};
@@ -48,18 +49,18 @@ public:
     Visibility();
     Visibility(uint64_t ts, const uint64_t bitmap[4]);
     ~Visibility();
-    bool deleteRecord(uint8_t rowId, uint64_t ts);
+    void deleteRecord(uint8_t rowId, uint64_t ts);
     void getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const;
     void cleanUp(uint64_t ts);
 private:
     Visibility(const Visibility&) = delete;
     Visibility& operator=(const Visibility&) = delete;
+    void createNewBlock();
 
     uint64_t baseBitmap[4]{};
     uint64_t baseTimestamp;
     std::atomic<DeleteIndexBlock*> head;
     std::atomic<DeleteIndexBlock*> tail;
-    std::atomic<uint64_t> tailUsed;
 };
 
 #endif //PIXELS_RETINA_VISIBILITY_H

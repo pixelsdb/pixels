@@ -19,6 +19,7 @@
  */
 
 #include "Visibility.h"
+
 #include <cstring>
 #include <stdexcept>
 
@@ -27,11 +28,10 @@
     ((bitmap)[(rowId) / 64] |= (1ULL << ((rowId) % 64)))
 #endif
 
-Visibility::Visibility() : baseTimestamp(-1UL) {
+Visibility::Visibility() : baseTimestamp(0UL) {
     memset(baseBitmap, 0, 4 * sizeof(uint64_t));
     head.store(nullptr, std::memory_order_release);
     tail.store(nullptr, std::memory_order_release);
-    tailUsed.store(0, std::memory_order_release);
 }
 
 Visibility::Visibility(uint64_t ts, const uint64_t bitmap[4])
@@ -39,7 +39,6 @@ Visibility::Visibility(uint64_t ts, const uint64_t bitmap[4])
     memcpy(baseBitmap, bitmap, 4 * sizeof(uint64_t));
     head.store(nullptr, std::memory_order_release);
     tail.store(nullptr, std::memory_order_release);
-    tailUsed.store(0, std::memory_order_release);
 }
 
 Visibility::~Visibility() {
@@ -51,70 +50,58 @@ Visibility::~Visibility() {
     }
 }
 
-bool Visibility::deleteRecord(uint8_t rowId, uint64_t ts) {
+void Visibility::deleteRecord(uint8_t rowId, uint64_t ts) {
     uint64_t item = makeDeleteIndex(rowId, ts);
-
     while (true) {
         DeleteIndexBlock* curTail = tail.load(std::memory_order_acquire);
-        uint64_t used = tailUsed.load(std::memory_order_acquire);
-        if (!curTail) { // empty list
+        if (!curTail) {  // empty list
+            /**
+             * Issue: There is a delay in reading.
+             * Reads are judged from the head, and if the head pointer is
+             * not changed in time, the latest data cannot be read.
+             */
             DeleteIndexBlock* newBlk = new DeleteIndexBlock();
-            newBlk->next.store(nullptr, std::memory_order_relaxed);
-            uint64_t expected = 0;
-            if (!tailUsed.compare_exchange_strong(expected, 1, std::memory_order_acq_rel)) {
-                delete newBlk;
-                continue;
-            }
             newBlk->items[0] = item;
+            newBlk->next.store(nullptr, std::memory_order_relaxed);
+            newBlk->used.store(1, std::memory_order_release);
             DeleteIndexBlock* expectedTail = nullptr;
-            if (!tail.compare_exchange_strong(expectedTail, newBlk, std::memory_order_acq_rel)) {
-                tailUsed.store(0, std::memory_order_release);
+            if (!tail.compare_exchange_strong(expectedTail, newBlk,
+                                              std::memory_order_acq_rel)) {
                 delete newBlk;
                 continue;
             }
             head.store(newBlk, std::memory_order_release);
-            return true;
+            return;
         } else {
-            if (used < 8) {
-                uint64_t oldUsed = tailUsed.fetch_add(1, std::memory_order_acquire);
-                if (oldUsed < 8) {
-                    curTail->items[oldUsed] = item;
-                    return true;
-                } else {
-                    tailUsed.fetch_sub(1, std::memory_order_release);
+            uint8_t pos = curTail->used.fetch_add(1, std::memory_order_acquire);
+            if (pos < 8) {
+                curTail->items[pos] = item;
+                return;
+            } else {
+                curTail->used.fetch_sub(1, std::memory_order_release);
+                // curTail is full, need to add new block
+                DeleteIndexBlock* newBlk = new DeleteIndexBlock();
+                newBlk->items[0] = item;
+                newBlk->next.store(nullptr, std::memory_order_relaxed);
+                newBlk->used.store(1, std::memory_order_release);
+                if (tail.load(std::memory_order_acquire) != curTail) {
+                    delete newBlk;
+                    continue;
                 }
+
+                DeleteIndexBlock* expectedNext = nullptr;
+                if (!curTail->next.compare_exchange_strong(
+                        expectedNext, newBlk, std::memory_order_acq_rel)) {
+                    delete newBlk;
+                    continue;
+                }
+
+                tail.compare_exchange_strong(curTail, newBlk,
+                                             std::memory_order_acq_rel);
+                return;
             }
-
-            // curTail is full
-            uint64_t oldVal = tailUsed.exchange(1, std::memory_order_acq_rel);
-            if (oldVal < 8) {
-                // another thread may have already added new block
-                tailUsed.store(oldVal, std::memory_order_release);
-                continue;
-            }
-
-            DeleteIndexBlock* newBlk = new DeleteIndexBlock();
-            newBlk->next.store(nullptr, std::memory_order_relaxed);
-            newBlk->items[0] = item;
-
-            if (tail.load(std::memory_order_acquire) != curTail) {
-                tailUsed.store(0, std::memory_order_release);
-                delete newBlk;
-                continue;
-            }
-
-            DeleteIndexBlock* expectedNext = nullptr;
-            if (!curTail->next.compare_exchange_strong(expectedNext, newBlk, std::memory_order_acq_rel)) {
-                tailUsed.store(oldVal, std::memory_order_release);
-                delete newBlk;
-                continue;
-            }
-
-            tail.compare_exchange_strong(curTail, newBlk, std::memory_order_acq_rel);
-            return true;
         }
     }
-    return false;
 }
 
 void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
@@ -127,17 +114,11 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
     }
 
     DeleteIndexBlock* blk = head.load(std::memory_order_acquire);
-    if (!blk) {
-        return;
-    }
-
-    DeleteIndexBlock* tailBlk = tail.load(std::memory_order_acquire);
-    uint64_t usedInTail = tailUsed.load(std::memory_order_acquire);
-    if (usedInTail > 8) {
-        throw std::runtime_error("used in tail is greater than 8");
-    }
     while (blk) {
-        uint64_t count = (blk == tailBlk) ? usedInTail : 8;
+        uint8_t count = blk->used.load(std::memory_order_acquire);
+        if (count > 8) {
+            throw std::runtime_error("invalid count");
+        }
         for (uint64_t i = 0; i < count; i++) {
             uint64_t item = blk->items[i];
             uint64_t delTs = extractTimestamp(item);
@@ -147,9 +128,6 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
                 // delTs is increasing, so no need to check further
                 return;
             }
-        }
-        if (blk == tailBlk) {
-            break;
         }
         blk = blk->next.load(std::memory_order_acquire);
     }
@@ -163,8 +141,9 @@ void Visibility::cleanUp(uint64_t ts) {
         }
 
         DeleteIndexBlock* tailBlk = tail.load(std::memory_order_acquire);
-        if ((oldHead == tailBlk) && (tailUsed.load(std::memory_order_acquire) != 8)) {
-            return;
+        if ((oldHead == tailBlk) &&
+            (tailBlk->used.load(std::memory_order_acquire) != 8)) {
+            return;  // don't delete non-full block
         }
 
         uint64_t item = oldHead->items[7];
@@ -173,15 +152,14 @@ void Visibility::cleanUp(uint64_t ts) {
             return;
         }
 
-        DeleteIndexBlock* newHead = oldHead->next.load(std::memory_order_acquire);
+        DeleteIndexBlock* newHead =
+            oldHead->next.load(std::memory_order_acquire);
         if (oldHead == tailBlk) {
             head.store(nullptr, std::memory_order_release);
             tail.store(nullptr, std::memory_order_release);
-            tailUsed.store(0, std::memory_order_release);
         } else {
             head.store(newHead, std::memory_order_release);
         }
         delete oldHead;
     }
 }
-
