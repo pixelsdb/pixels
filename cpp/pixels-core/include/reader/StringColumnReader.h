@@ -46,6 +46,9 @@ public:
               pixels::proto::ColumnChunkIndex &chunkIndex,
               std::shared_ptr <PixelsBitMask> filterMask) override;
 
+    void setValidForString(const std::shared_ptr <ByteBuffer> &input, int pixelStride,
+                  const std::shared_ptr <ColumnVector> &columnVector, int pixelId, bool hasNull);
+
 private:
     /**
      * RLE decoder of string content element length if no dictionary encoded.

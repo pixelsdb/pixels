@@ -70,6 +70,7 @@ public:
     void setValid(const std::shared_ptr <ByteBuffer> &input, int pixelStride,
                   const std::shared_ptr <ColumnVector> &columnVector, int pixelId, bool hasNull);
 
+
 protected:
     int elementIndex;
     std::shared_ptr <TypeDescription> type;

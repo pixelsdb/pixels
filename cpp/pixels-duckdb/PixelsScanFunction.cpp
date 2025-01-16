@@ -440,6 +440,8 @@ namespace duckdb
 //                    binaryCol->print(rowCount);
                     Vector vector(LogicalType::VARCHAR,
                                   (data_ptr_t)(binaryCol->current()), col->currentValid());
+                    auto flat_sel = FlatVector::IncrementalSelectionVector();
+                    vector.Verify(vector,*flat_sel,2048);
                     output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<duckdb::string_t>(output.data.at(col_id));
 //                memcpy(result_ptr, binaryCol->vector + row_offset, thisOutputChunkRows * sizeof(string_t));

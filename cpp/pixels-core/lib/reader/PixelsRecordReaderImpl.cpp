@@ -263,6 +263,7 @@ std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reus
                           curBatchSize, postScript.pixelstride(),
                           resultRowBatch->rowCount, columnVectors.at(i),
                           *chunkIndex, filterMask);
+      std::cout<<"finish "<<std::endl;
     }
 
     // update current row index in the row group

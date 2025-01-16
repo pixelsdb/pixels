@@ -112,10 +112,11 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
               isNullOffset += bytesToDeCompact;
               isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
               columnVector->noNulls = false;
-              setValid(input, pixelStride, vector, pixelId, hasNull);
+              setValidForString(input, pixelStride, vector, pixelId, hasNull);
             }
             else
             {
+              memset(((uint8_t *) columnVector->isValid), 0xFF, byteSize);
               std::fill(columnVector->isNull,columnVector->isNull+columnVector->length, false);
 
             }
@@ -144,41 +145,6 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
             i += numToRead;
           }
         }
-
-//        for (int i = 0; i < size; i++)
-//        {
-//            bool valid = vector->checkValid(i);
-//            if (elementIndex % pixelStride == 0)
-//            {
-//                int pixelId = elementIndex / pixelStride;
-//                // TODO: should write the remaining code
-//            }
-//            if (vector->checkValid(i) && (filterMask == nullptr || filterMask->get(i)))
-//            {
-//                int originId = cascadeRLE ? (int) contentDecoder->next() : contentBuf->getInt();
-//                int tmpLen = dictStarts[originId + 1] - dictStarts[originId];
-//                // use setRef instead of setVal to reduce memory copy.
-//                columnVector->setRef(i + vectorIndex, dictContentBuf->getPointer(), dictStarts[originId], tmpLen);
-//            }
-//            else if (!valid && (!cascadeRLE) && chunkIndex.nullspadding())
-//            {
-//                // is null: skip this number
-//                contentBuf->getInt();
-//            }
-//            else
-//            {
-//                // filter out: skip this number
-//                if (!cascadeRLE)
-//                {
-//                    contentBuf->getInt();
-//                }
-//                else
-//                {
-//                    contentDecoder->next();
-//                }
-//            }
-//            elementIndex++;
-//        }
     }
     else
     {
@@ -203,9 +169,10 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
           isNullOffset+=bytesToDeCompact;
           isNullSkipBits=endOfPixel?0:(numToRead+isNullSkipBits)%8;
           columnVector->noNulls= false;
-          setValid(input, pixelStride, vector, pixelId, hasNull);
+          setValidForString(input, pixelStride, vector, pixelId, hasNull);
         }else{
           // no nulls padding
+          memset(((uint8_t *) columnVector->isValid), 0xFF, byteSize);
           std::fill(columnVector->isNull,columnVector->isNull+columnVector->length, false);
 
         }
@@ -234,40 +201,6 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
         elementIndex+=numToRead;
         i+=numToRead;
       }
-//        for (int i = 0; i < size; i++)
-//        {
-//            if (elementIndex % pixelStride == 0)
-//            {
-//                int pixelId = elementIndex / pixelStride;
-//                // TODO: should write the remaining code
-//            }
-//            bool valid = vector->checkValid(i);
-//            if (valid && (filterMask == nullptr || filterMask->get(i)))
-//            {
-//                currentStart = nextStart;
-//                nextStart = startsBuf->getInt();
-//                int len = nextStart - currentStart;
-//                // use setRef instead of setVal to reduce memory copy
-//                columnVector->setRef(
-//                        i + vectorIndex, contentBuf->getPointer(), bufferOffset, len);
-//                bufferOffset += len;
-//            }
-//            else if (!valid)
-//            {
-//                // is null: skip this number
-//                currentStart = nextStart;
-//                nextStart = startsBuf->getInt();
-//            }
-//            else
-//            {
-//                // filter out: skip this number
-//                currentStart = nextStart;
-//                nextStart = startsBuf->getInt();
-//                int len = nextStart - currentStart;
-//                bufferOffset += len;
-//            }
-//            elementIndex++;
-//        }
     }
 }
 
@@ -353,4 +286,24 @@ StringColumnReader::~StringColumnReader()
     {
         delete[] dictStarts;
     }
+}
+void StringColumnReader::setValidForString(
+    const std::shared_ptr<ByteBuffer> &input, int pixelStride,
+    const std::shared_ptr<ColumnVector> &columnVector, int pixelId,
+    bool hasNull) {
+  int elementSizeInCurrPixels = std::min(pixelStride, (int) columnVector->length);
+  int byteSize = ceil(1.0 * elementSizeInCurrPixels / 8);
+
+  if (hasNull)
+  {
+    for (int byteOffset = 0; byteOffset < byteSize; byteOffset++)
+    {
+      ((uint8_t *) columnVector->isValid)[byteOffset] = ~(columnVector->isNull[byteOffset]);
+    }
+    //        isNullOffset += byteSize;
+  }
+  else
+  {
+    memset(((uint8_t *) columnVector->isValid), 0xFF, byteSize);
+  }
 }
