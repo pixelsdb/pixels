@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.worker.common;
 
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;

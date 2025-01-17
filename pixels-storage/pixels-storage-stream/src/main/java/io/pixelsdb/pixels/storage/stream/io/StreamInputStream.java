@@ -217,9 +217,10 @@ public class StreamInputStream extends InputStream
                 throw new IOException(e);
             }
         }
-        if (this.contentQueue.isEmpty())
+        if (tries == this.MAX_TRIES)
         {
-            logger.error("retry count {}, exception cause: StreamInputStream failed to receive data", tries);
+            logger.error("retry count {}, httpServerFuture {}, " +
+                    "exception cause: StreamInputStream failed to receive data", tries, this.httpServerFuture.isDone());
         }
 
         return this.contentQueue.isEmpty();

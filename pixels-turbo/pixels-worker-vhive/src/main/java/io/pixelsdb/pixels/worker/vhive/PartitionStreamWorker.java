@@ -80,9 +80,6 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
             CFWorkerInfo workerInfo = new CFWorkerInfo(ip, port, transId, stageId, Constants.PARTITION_OPERATOR_NAME, Collections.emptyList());
             workerCoordinatorService = new WorkerCoordinateService(coordinatorIp, coordinatorPort);
             worker = workerCoordinatorService.registerWorker(workerInfo);
-            downStreamWorkers = workerCoordinatorService.getDownstreamWorkers(worker.getWorkerId());
-            checkArgument(!downStreamWorkers.isEmpty(),
-                    "at least one downstream worker is allowed");
             PartitionOutput output = process(input);
             workerCoordinatorService.terminateWorker(worker.getWorkerId());
             workerCoordinatorService.shutdown();
@@ -143,10 +140,6 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
                     "output.storageInfo is null");
             checkArgument(event.getOutput().getStorageInfo().getScheme().equals(Storage.Scheme.httpstream));
             List<String> outputPaths = new ArrayList<>(numPartition);
-            for (int i = 0; i < numPartition; i++)
-            {
-                outputPaths.add(downStreamWorkers.get(i).getIp() + ":" + (downStreamWorkers.get(i).getPort() + worker.getWorkerPortIndex()));
-            }
             boolean encoding = event.getOutput().isEncoding();
 
             WorkerCommon.initStorage(inputStorageInfo);
@@ -205,7 +198,18 @@ public class PartitionStreamWorker extends BasePartitionWorker implements Reques
                     TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
                     writerSchema.set(resultSchema);
                 }
+
                 // write to down stream workers
+                if (downStreamWorkers == null)
+                {
+                    downStreamWorkers = workerCoordinatorService.getDownstreamWorkers(worker.getWorkerId());
+                    checkArgument(!downStreamWorkers.isEmpty(),
+                            "at least one downstream worker is allowed");
+                    for (int i = 0; i < numPartition; i++)
+                    {
+                        outputPaths.add(downStreamWorkers.get(i).getIp() + ":" + (downStreamWorkers.get(i).getPort() + worker.getWorkerPortIndex()));
+                    }
+                }
                 WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
                 List<Future> outputFutures = new ArrayList<>(numPartition);
                 for (int hash = 0; hash < numPartition; hash++)

@@ -78,9 +78,6 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                     Constants.BROADCAST_OPERATOR_NAME, Collections.emptyList());
             workerCoordinatorService = new WorkerCoordinateService(coordinatorIp, coordinatorPort);
             worker = workerCoordinatorService.registerWorker(workerInfo);
-            downStreamWorkers = workerCoordinatorService.getDownstreamWorkers(worker.getWorkerId());
-            checkArgument( downStreamWorkers.isEmpty() || downStreamWorkers.size() == 1,
-                    "most one downstream worker is allowed");
             JoinOutput output = process(input);
             workerCoordinatorService.terminateWorker(worker.getWorkerId());
             workerCoordinatorService.shutdown();
@@ -275,8 +272,9 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                     future.get();
                 }
             }
-            logger.info("joiner joined schema is {}", joiner.getJoinedSchema().getChildren());
 
+            logger.info("write to down stream workers");
+            downStreamWorkers = workerCoordinatorService.getDownstreamWorkers(worker.getWorkerId());
             List<String> outputPaths = new ArrayList<>();
             if (outputStorageInfo.getScheme() == Storage.Scheme.httpstream)
             {

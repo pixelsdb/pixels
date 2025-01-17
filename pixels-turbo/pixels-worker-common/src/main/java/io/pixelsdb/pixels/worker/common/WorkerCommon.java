@@ -34,9 +34,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -46,7 +44,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.util.Enumeration;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
@@ -209,28 +206,71 @@ public class WorkerCommon
         requireNonNull(rightSchema, "rightSchema is null");
         requireNonNull(leftPaths, "leftPaths is null");
         requireNonNull(rightPaths, "rightPaths is null");
-        Future<?> leftFuture = executor.submit(() -> {
-            try
+        List<Future<?>> leftFutures = new ArrayList<>();
+        if (leftStorage.getScheme().equals(Storage.Scheme.httpstream))
+        {
+            for (String path: leftPaths)
             {
-                leftSchema.set(getFileSchemaFromPaths(leftStorage, leftPaths));
-            } catch (IOException | InterruptedException e)
-            {
-                logger.error("failed to read the file schema for the left table", e);
+                leftFutures.add(executor.submit(() -> {
+                    try
+                    {
+                        leftSchema.set(getFileSchemaFromPath(leftStorage, path));
+                    } catch (IOException e)
+                    {
+                        logger.error("failed to read the file schema for the left table", e);
+                    }
+                }));
             }
-        });
-        Future<?> rightFuture = executor.submit(() -> {
-            try
+        } else
+        {
+            leftFutures.add(executor.submit(() -> {
+                try
+                {
+                    leftSchema.set(getFileSchemaFromPaths(leftStorage, leftPaths));
+                } catch (IOException | InterruptedException e)
+                {
+                    logger.error("failed to read the file schema for the left table", e);
+                }
+            }));
+        }
+        List<Future<?>> rightFutures = new ArrayList<>();
+        if (rightStorage.getScheme().equals(Storage.Scheme.httpstream))
+        {
+            for (String path: rightPaths)
             {
-                rightSchema.set(getFileSchemaFromPaths(rightStorage, rightPaths));
-            } catch (IOException | InterruptedException e)
-            {
-                logger.error("failed to read the file schema for the right table", e);
+                rightFutures.add(executor.submit(() -> {
+                    try
+                    {
+                        rightSchema.set(getFileSchemaFromPath(rightStorage, path));
+                    } catch (IOException e)
+                    {
+                        logger.error("failed to read the file schema for the right table", e);
+                    }
+                }));
             }
-        });
+        } else
+        {
+            rightFutures.add(executor.submit(() -> {
+                try
+                {
+                    rightSchema.set(getFileSchemaFromPaths(rightStorage, rightPaths));
+                } catch (IOException | InterruptedException e)
+                {
+                    logger.error("failed to read the file schema for the right table", e);
+                }
+            }));
+        }
+
         try
         {
-            leftFuture.get();
-            rightFuture.get();
+            for (Future<?> future: leftFutures)
+            {
+                future.get();
+            }
+            for (Future<?> future: rightFutures)
+            {
+                future.get();
+            }
         } catch (Throwable e)
         {
             logger.error("interrupted while waiting for the termination of schema read", e);
@@ -332,6 +372,30 @@ public class WorkerCommon
             }
             TimeUnit.MILLISECONDS.sleep(200);
         }
+    }
+
+    public static TypeDescription getFileSchemaFromPath(Storage storage, String path)
+            throws IOException
+    {
+        requireNonNull(storage, "storage is null");
+        requireNonNull(path, "path is null");
+
+        TypeDescription fileSchema = null;
+        try
+        {
+            logger.info("try to get path " + path);
+            PixelsReader reader = getReader(path, storage);
+            fileSchema = reader.getFileSchema();
+            logger.info("succeed to get path " + path);
+        } catch (Throwable e)
+        {
+            if (e instanceof IOException)
+            {
+                logger.error("failed to read file schema", e);
+            }
+            throw new IOException("failed to read file schema", e);
+        }
+        return fileSchema;
     }
 
     /**

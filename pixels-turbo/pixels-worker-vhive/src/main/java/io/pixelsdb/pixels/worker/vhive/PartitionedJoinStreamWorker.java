@@ -119,8 +119,6 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
-                    new WorkerThreadFactory(exceptionHandler));
 
             long transId = event.getTransId();
             long timestamp = event.getTimestamp();
@@ -178,6 +176,8 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
             logger.info("small table: " + event.getSmallTable().getTableName() +
                     ", large table: " + event.getLargeTable().getTableName() +
                     ", number of partitions (" + numPartition + ")");
+            ExecutorService threadPool = Executors.newFixedThreadPool(leftPartitioned.size() +
+                            rightPartitioned.size(), new WorkerThreadFactory(exceptionHandler));
 
             MultiOutputInfo outputInfo = event.getOutput();
             StorageInfo outputStorageInfo = outputInfo.getStorageInfo();
