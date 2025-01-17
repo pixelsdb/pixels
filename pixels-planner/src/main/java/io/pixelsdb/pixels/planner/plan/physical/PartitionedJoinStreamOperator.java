@@ -32,6 +32,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -56,12 +57,14 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
     {
         return executePrev().handle((result, exception) ->
         {
+            if (exception != null)
+            {
+                throw new CompletionException("failed to complete the previous stages", exception);
+            }
             joinOutputs = new CompletableFuture[joinInputs.size()];
             for (int i = 0; i < joinInputs.size(); ++i)
             {
                 JoinInput joinInput = joinInputs.get(i);
-                joinInput.setSmallPartitionWorkerNum(smallPartitionInputs.size());  // XXX: could be 0
-                joinInput.setLargePartitionWorkerNum(largePartitionInputs.size());
                 if (joinAlgo == JoinAlgorithm.PARTITIONED)
                 {
                     joinOutputs[i] = InvokerFactory.Instance()
@@ -78,11 +81,7 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 }
             }
 
-            // Wait for the readiness of the join workers
-            long transId = joinInputs.get(0).getTransId();
-            PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(transId);
-            planCoordinator.getStageCoordinator(joinInputs.get(0).getStageId()).waitForAllWorkersReady();
-
+            logger.debug("invoke " + this.getName());
             return joinOutputs;
         });
     }
