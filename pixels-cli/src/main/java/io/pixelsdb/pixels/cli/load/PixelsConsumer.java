@@ -118,13 +118,14 @@ public class PixelsConsumer extends Consumer
                     long timestamp = parameters.getTimestamp();
                     while ((line = reader.readLine()) != null)
                     {
+                        if(line.isEmpty())
+                        {
+                            System.err.println("thread: " + currentThread().getName() + " got empty line.");
+                            continue;
+                        }
+
                         if (initPixelsFile)
                         {
-                            if(line.isEmpty())
-                            {
-                                System.err.println("thread: " + currentThread().getName() + " got empty line.");
-                                continue;
-                            }
                             // we create a new pixels file if we can read a next line from the source file
 
                             // choose the target output directory using round-robin

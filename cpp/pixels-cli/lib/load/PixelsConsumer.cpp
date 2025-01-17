@@ -100,13 +100,14 @@ void PixelsConsumer::run()
 
             while (std::getline(reader, line))
             {
+                if (line.empty())
+                {
+                    std::cout << "got empty line" << std::endl;
+                    continue;
+                }
+
                 if (initPixelsFile)
                 {
-                    if (line.empty())
-                    {
-                        std::cout << "got empty line" << std::endl;
-                        continue;
-                    }
                     LocalFS targetStorage;
                     targetFileName =
                             std::to_string(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())) +
