@@ -56,7 +56,6 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
     {
         return executePrev().handle((result, exception) ->
         {
-            // First, bootstrap the join workers.
             joinOutputs = new CompletableFuture[joinInputs.size()];
             for (int i = 0; i < joinInputs.size(); ++i)
             {
@@ -79,82 +78,10 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
                 }
             }
 
-            // Then, wait for the readiness of the join workers, and then bootstrap the partition workers
-            //  because the partition workers will write to the ports of the join workers.
+            // Wait for the readiness of the join workers
             long transId = joinInputs.get(0).getTransId();
             PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(transId);
             planCoordinator.getStageCoordinator(joinInputs.get(0).getStageId()).waitForAllWorkersReady();
-
-            CompletableFuture<CompletableFuture<? extends Output>[]> smallChildFuture = null;
-            CompletableFuture<CompletableFuture<? extends Output>[]> largeChildFuture = null;
-            if (smallChild != null && largeChild != null)
-            {
-                // both children exist, we should execute both children.
-                checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
-                checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-                smallChildFuture = smallChild.execute();
-                largeChildFuture = largeChild.execute();
-            }
-            else if (smallChild != null)
-            {
-                // only small child exists, we should invoke the large table partitioning and execute the small child.
-                checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
-                checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-                smallChildFuture = smallChild.execute();
-                largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
-                int i = 0;
-                for (PartitionInput partitionInput : largePartitionInputs)
-                {
-                    largePartitionOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
-                }
-
-                logger.debug("invoke large partition of " + this.getName());
-            }
-            else if (largeChild != null)
-            {
-                // only large child exists, we should invoke the small table partitioning.
-                checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
-                checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-                smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
-                int i = 0;
-                for (PartitionInput partitionInput : smallPartitionInputs)
-                {
-                    smallPartitionOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
-                }
-
-                logger.debug("invoke small partition of " + this.getName());
-
-                largeChildFuture = largeChild.execute();
-            }
-            else
-            {
-                // no children exist, partition both tables and wait for the small table partitioning.
-                checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
-                checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-                smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
-                int i = 0;
-                for (PartitionInput partitionInput : smallPartitionInputs)
-                {
-                    smallPartitionOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
-                }
-
-                logger.debug("invoke small partition of " + this.getName());
-
-                largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
-                i = 0;
-                for (PartitionInput partitionInput : largePartitionInputs)
-                {
-                    largePartitionOutputs[i++] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
-                }
-
-                logger.debug("invoke large partition of " + this.getName());
-            }
-
-            // todo: Finally, wait for the readiness of the partition operators
 
             return joinOutputs;
         });
@@ -163,6 +90,72 @@ public class PartitionedJoinStreamOperator extends PartitionedJoinOperator
     @Override
     public CompletableFuture<Void> executePrev()
     {
+        if (smallChild != null && largeChild != null)
+        {
+            // both children exist, we should execute both children.
+            checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
+            checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+            smallChild.execute();
+            largeChild.execute();
+        }
+        else if (smallChild != null)
+        {
+            // only small child exists, we should invoke the large table partitioning and execute the small child.
+            checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
+            checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
+            smallChild.execute();
+            largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
+            int i = 0;
+            for (PartitionInput partitionInput : largePartitionInputs)
+            {
+                largePartitionOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
+            }
+
+            logger.debug("invoke large partition of " + this.getName());
+        }
+        else if (largeChild != null)
+        {
+            // only large child exists, we should invoke the small table partitioning.
+            checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
+            checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+            smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
+            int i = 0;
+            for (PartitionInput partitionInput : smallPartitionInputs)
+            {
+                smallPartitionOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
+            }
+
+            logger.debug("invoke small partition of " + this.getName());
+
+            largeChild.execute();
+        }
+        else
+        {
+            // no children exist, partition both tables and wait for the small table partitioning.
+            checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
+            checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
+            smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
+            int i = 0;
+            for (PartitionInput partitionInput : smallPartitionInputs)
+            {
+                smallPartitionOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
+            }
+
+            logger.debug("invoke small partition of " + this.getName());
+
+            largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
+            i = 0;
+            for (PartitionInput partitionInput : largePartitionInputs)
+            {
+                largePartitionOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.PARTITION_STREAMING).invoke((partitionInput));
+            }
+
+            logger.debug("invoke large partition of " + this.getName());
+        }
         return Completed;
     }
 }
