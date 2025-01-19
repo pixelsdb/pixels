@@ -66,3 +66,17 @@ long DirectIoLib::blockEnd(long value)
     return (value + fsBlockSize - 1) & fsBlockNotMask;
 }
 
+std::shared_ptr<ByteBuffer>
+DirectIoLib::expandDirectBuffer(std::shared_ptr<ByteBuffer> buffer,
+                                long newSize) {
+  int toAllocate = blockEnd(newSize)+ (newSize == 1? 0 : fsBlockSize);
+  uint8_t* newDirectBufferPointer;
+  posix_memalign((void**)&newDirectBufferPointer, fsBlockSize, toAllocate);
+
+  std::memcpy(newDirectBufferPointer, buffer->getPointer(), buffer->size());
+
+  auto newBuffer = std::make_shared<ByteBuffer>(newDirectBufferPointer, toAllocate, false);
+  buffer.reset();
+
+  return newBuffer;
+}

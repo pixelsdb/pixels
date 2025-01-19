@@ -29,6 +29,8 @@ thread_local bool DirectUringRandomAccessFile::isRegistered = false;
 thread_local struct iovec *DirectUringRandomAccessFile::iovecs = nullptr;
 thread_local uint32_t
 DirectUringRandomAccessFile::iovecSize = 0;
+thread_local std::map<uint32_t, uint64_t>
+    DirectUringRandomAccessFile::registeredColIds;
 
 DirectUringRandomAccessFile::DirectUringRandomAccessFile(const std::string &file) : DirectRandomAccessFile(file)
 {
@@ -37,7 +39,31 @@ DirectUringRandomAccessFile::DirectUringRandomAccessFile(const std::string &file
 
 void DirectUringRandomAccessFile::RegisterBufferFromPool(std::vector <uint32_t> colIds)
 {
-    std::vector <std::shared_ptr<ByteBuffer>> tmpBuffers;
+  std::vector <std::shared_ptr<ByteBuffer>> tmpBuffers;
+//  for(auto colId:colIds) {
+//      if(DirectUringRandomAccessFile::registeredColIds.find(colId)==DirectUringRandomAccessFile::registeredColIds.end()){
+//        for(auto buffer: ::BufferPool::buffers){
+//          tmpBuffers.emplace_back(buffer[colId]);
+//        }
+//        iovecs = (iovec *) calloc(tmpBuffers.size(), sizeof(struct iovec));
+//        iovecSize = tmpBuffers.size();
+//        for (auto i = 0; i < tmpBuffers.size(); i++)
+//        {
+//          auto buffer = tmpBuffers.at(i);
+//          iovecs[i].iov_base = buffer->getPointer();
+//          iovecs[i].iov_len = buffer->size();
+//          memset(iovecs[i].iov_base, 0, buffer->size());
+//        }
+//        int ret = io_uring_register_buffers(ring, iovecs, iovecSize);
+//        if (ret != 0)
+//        {
+//          throw InvalidArgumentException("DirectUringRandomAccessFile::RegisterBuffer: register buffer fails. ");
+//        }
+//        DirectUringRandomAccessFile::registeredColIds[colId]=1;
+//      }
+//    }
+
+
     if (!isRegistered)
     {
         for (auto buffer: ::BufferPool::buffers)

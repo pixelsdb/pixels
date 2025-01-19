@@ -67,6 +67,8 @@ public:
 
     long blockEnd(long value);
 
+    std::shared_ptr<ByteBuffer> expandDirectBuffer(std::shared_ptr<ByteBuffer> buffer, long newSize);
+
 private:
     int fsBlockSize;
     long fsBlockNotMask;

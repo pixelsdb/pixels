@@ -32,8 +32,7 @@ class LongColumnVector : public ColumnVector
 {
 public:
     long *longVector;
-    long *intVector;
-
+    int *intVector;
     /**
     * Use this constructor by default. All column vectors
     * should normally be the default size.

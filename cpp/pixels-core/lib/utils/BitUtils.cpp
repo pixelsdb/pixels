@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include "utils/BitUtils.h"
 
+
 std::vector <uint8_t> BitUtils::bitWiseCompactLE(std::vector<bool> values)
 {
     return bitWiseCompactLE(values, values.size());
@@ -318,4 +319,60 @@ std::vector <uint8_t> BitUtils::bitWiseCompactBE(bool *values, int length)
 
     return bitWiseOutput;
 }
+void BitUtils::bitWiseDeCompact(bool *bits, int bitsOffset, int bitsLength,
+                                uint8_t *input, int offset, int skipBits,
+                                bool littleEndian) {
+  assert(bitsOffset>=0&&bitsLength>0);
+  assert(offset>=0);
+  assert(skipBits>=0&&skipBits<8);
 
+
+  if (littleEndian) {
+    bitWiseDeCompactLE(bits, bitsOffset, bitsLength, input, offset, skipBits);
+  }
+  else {
+    bitWiseDeCompactBE(bits, bitsOffset, bitsLength, input, offset, skipBits);
+  }
+}
+void BitUtils::bitWiseDeCompactLE(bool *bits, int bitsOffset, int bitsLength,
+                                  uint8_t *input, int offset, int skipBits) {
+  char currBit = 0;
+  char b;
+  int bitsEnd = bitsOffset + bitsLength;
+  b = input[offset++];
+  for (int i = 0; i < 8 && bitsOffset < bitsEnd; ++i) {
+    if (skipBits-- > 0) {
+      continue;
+    }
+    bits[bitsOffset++] = (0x01 & (b >> i)) == 1;
+  }
+  for (int i = offset; bitsOffset < bitsEnd; ++i) {
+    b = input[i];
+    while (currBit < 8 && bitsOffset < bitsEnd) {
+      bits[bitsOffset++] = (0x01 & (b >> currBit)) == 1;
+      currBit++;
+    }
+    currBit = 0;
+  }
+}
+void BitUtils::bitWiseDeCompactBE(bool *bits, int bitsOffset, int bitsLength,
+                                  uint8_t *input, int offset, int skipBits) {
+
+  char bitsLeft = 8;
+  int bitsEnd = bitsOffset + bitsLength;
+  char b = input[offset++];
+  for (int i = 7; i >= 0 && bitsOffset < bitsEnd; --i) {
+    if (skipBits-- > 0) {
+      continue;
+    }
+    bits[bitsOffset++] = (0x01 & (b >> i)) == 1;
+  }
+  for (int i = offset; bitsOffset < bitsEnd; ++i) {
+    b = input[i];
+    while (bitsLeft > 0 && bitsOffset < bitsEnd) {
+      bitsLeft--;
+      bits[bitsOffset++] = (0x01 & (b >> bitsLeft)) == 1;
+    }
+    bitsLeft = 8;
+  }
+}

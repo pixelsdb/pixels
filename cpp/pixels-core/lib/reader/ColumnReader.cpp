@@ -84,7 +84,7 @@ void ColumnReader::setValid(const std::shared_ptr <ByteBuffer> &input, int pixel
                             const std::shared_ptr <ColumnVector> &columnVector, int pixelId, bool hasNull)
 {
     int elementSizeInCurrPixels = std::min(pixelStride, (int) columnVector->length);
-    columnVector->isNull = input->getPointer() + isNullOffset;
+    columnVector->isNull = (bool*)input->getPointer() + isNullOffset;
 
     int byteSize = ceil(1.0 * elementSizeInCurrPixels / 8);
 

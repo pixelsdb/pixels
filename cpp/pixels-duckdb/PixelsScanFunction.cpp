@@ -280,8 +280,9 @@ namespace duckdb
         {
             switch (columnType->getCategory())
             {
-                //        case TypeDescription::BOOLEAN:
-                //            break;
+                case TypeDescription::BOOLEAN:
+                  return_types.emplace_back(LogicalType::BOOLEAN);
+                            break;
                 //        case TypeDescription::BYTE:
                 //            break;
                 case TypeDescription::SHORT:
@@ -312,6 +313,7 @@ namespace duckdb
                     //            break;
                     //        case TypeDescription::BINARY:
                     //            break;
+                case TypeDescription::STRING:
                 case TypeDescription::VARCHAR:
                     return_types.emplace_back(LogicalType::VARCHAR);
                     break;
@@ -428,12 +430,18 @@ namespace duckdb
                     //            break;
                     //        case TypeDescription::BINARY:
                     //            break;
+                case TypeDescription::STRING:
                 case TypeDescription::VARCHAR:
                 case TypeDescription::CHAR:
                 {
                     auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
+                    // read tests
+                    int rowCount=vectorizedRowBatch->rowCount;
+//                    binaryCol->print(rowCount);
                     Vector vector(LogicalType::VARCHAR,
                                   (data_ptr_t)(binaryCol->current()), col->currentValid());
+                    auto flat_sel = FlatVector::IncrementalSelectionVector();
+                    vector.Verify(vector,*flat_sel,2048);
                     output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<duckdb::string_t>(output.data.at(col_id));
 //                memcpy(result_ptr, binaryCol->vector + row_offset, thisOutputChunkRows * sizeof(string_t));

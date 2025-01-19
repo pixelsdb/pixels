@@ -183,7 +183,7 @@ void LongColumnVector::ensureSize(uint64_t size, bool preserveData)
         }
         else
         {
-            long *oldVector = intVector;
+            int *oldVector = intVector;
             posix_memalign(reinterpret_cast<void **>(&intVector), 32,
                            size * sizeof(int32_t));
             if (preserveData)

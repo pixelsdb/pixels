@@ -74,7 +74,7 @@ public:
      * is null, otherwise false. The array is always allocated, so a batch can be re-used
      * later and nulls added.
      */
-    uint8_t *isNull;
+    bool *isNull;
 
     // If the whole column vector has no nulls, this is true, otherwise false.
     bool noNulls;

@@ -70,9 +70,14 @@ public:
     void setValid(const std::shared_ptr <ByteBuffer> &input, int pixelStride,
                   const std::shared_ptr <ColumnVector> &columnVector, int pixelId, bool hasNull);
 
+
 protected:
     int elementIndex;
     std::shared_ptr <TypeDescription> type;
     uint32_t isNullOffset;
+    /**
+     * The number of bits to skip in the first byte (start from isNullOffset) when decompacting the isNull array.
+     */
+    int isNullSkipBits = 0;
 };
 #endif //PIXELS_COLUMNREADER_H

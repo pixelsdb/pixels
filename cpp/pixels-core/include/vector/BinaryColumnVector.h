@@ -52,6 +52,9 @@ class BinaryColumnVector : public ColumnVector
 {
 public:
     duckdb::string_t *vector;
+    uint8_t ** std_vector;
+    int* start_vector;
+    int* len_vector;
 
     /**
     * Use this constructor by default. All column vectors

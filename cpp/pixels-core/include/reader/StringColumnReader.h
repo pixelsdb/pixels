@@ -27,6 +27,8 @@
 
 #include "reader/ColumnReader.h"
 #include "encoding/RunLenIntDecoder.h"
+#include "utils/BitUtils.h"
+#include "physical/natives/ByteOrder.h"
 
 class StringColumnReader : public ColumnReader
 {
@@ -43,6 +45,9 @@ public:
               int vectorIndex, std::shared_ptr <ColumnVector> vector,
               pixels::proto::ColumnChunkIndex &chunkIndex,
               std::shared_ptr <PixelsBitMask> filterMask) override;
+
+    void setValidForString(const std::shared_ptr <ByteBuffer> &input, int pixelStride,
+                  const std::shared_ptr <ColumnVector> &columnVector, int pixelId, bool hasNull);
 
 private:
     /**
@@ -69,6 +74,8 @@ private:
 
     int *dictStarts;
     int startsLength;
+
+    uint8_t * inputBuffer;
 
     /**
      * In this method, we have reduced most of significant memory copies.

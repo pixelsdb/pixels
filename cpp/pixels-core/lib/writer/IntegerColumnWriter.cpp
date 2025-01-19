@@ -53,7 +53,7 @@ int IntegerColumnWriter::write(std::shared_ptr <ColumnVector> vector, int size)
     }
     else
     {
-        values = columnVector->intVector;
+        values = reinterpret_cast<long *>(columnVector->intVector);
     }
 
     int curPartLength;         // size of the partition which belongs to current pixel
