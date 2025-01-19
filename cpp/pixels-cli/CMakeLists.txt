@@ -7,19 +7,27 @@ include(ProcessorCount)
 
 # get core count
 ProcessorCount(CORES)
-if (CORES EQUAL 0)
+if(CORES EQUAL 0)
     set(CORES 1)
-endif ()
+endif()
 
 # boost-dev
-set(BOOST_LIBRARIES "regex,program_options")
+set(BOOST_LIBRARIES "program_options,regex")
 set(BOOST_BOOTSTRAP_COMMAND ./bootstrap.sh --with-libraries=${BOOST_LIBRARIES})
 set(BOOST_BUILD_TOOL ./b2)
 set(BOOST_CXXFLAGS "cxxflags=-std=c++11")
 set(BOOST_GIT_REPOSITORY git@github.com:boostorg/boost.git)
 set(BOOST_GIT_TAG boost-1.74.0)
 set(BOOST_GIT_SUBMODULES
-        libs/config libs/core libs/headers libs/regex libs/program_options
+        libs/headers libs/regex libs/program_options libs/algorithm
+        # The primary dependencies for algorithm, program_options, and regex:
+        libs/any libs/bind libs/config libs/core libs/detail libs/function libs/iterator libs/lexical_cast
+        libs/smart_ptr libs/static_assert libs/throw_exception libs/tokenizer libs/type_traits libs/assert
+        libs/concept_check libs/container_hash libs/integer libs/mpl libs/predef libs/preprocessor libs/conversion
+        libs/function_types libs/fusion libs/optional libs/utility libs/move libs/typeof libs/tuple libs/io
+        libs/type_index libs/array libs/container libs/math libs/numeric/conversion libs/range libs/intrusive
+        libs/atomic libs/lambda libs/mp11 libs/winapi libs/exception libs/unordered
+        # The tools required to build boost:
         tools/auto_index tools/bcp tools/boost_install tools/boostbook tools/boostdep
         tools/build tools/check_build tools/cmake tools/docca tools/inspect tools/litre tools/quickbook)
 
@@ -45,24 +53,22 @@ ExternalProject_Add(boost
         LOG_CONFIGURE true
         LOG_BUILD true
         LOG_INSTALL true
-        )
+)
 
 ExternalProject_Get_Property(boost SOURCE_DIR)
 set(BOOST_INCLUDE_DIR ${SOURCE_DIR})
 set(BOOST_LIBRARY_PREFIX ${SOURCE_DIR}/stage/lib/${CMAKE_STATIC_LIBRARY_PREFIX})
-
-# boost regex library
-add_library(Boost::regex STATIC IMPORTED GLOBAL)
-set_property(TARGET Boost::regex PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${BOOST_INCLUDE_DIR})
-set_property(TARGET Boost::regex PROPERTY IMPORTED_LOCATION ${BOOST_LIBRARY_PREFIX}boost_regex${CMAKE_STATIC_LIBRARY_SUFFIX})
-add_dependencies(Boost::regex boost)
-
-# boost program_options library
+# boost algorithm is a header only library, no need to add dependency
+# add boost program_options library
 add_library(Boost::program_options STATIC IMPORTED GLOBAL)
 set_property(TARGET Boost::program_options PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${BOOST_INCLUDE_DIR})
 set_property(TARGET Boost::program_options PROPERTY IMPORTED_LOCATION ${BOOST_LIBRARY_PREFIX}boost_program_options${CMAKE_STATIC_LIBRARY_SUFFIX})
 add_dependencies(Boost::program_options boost)
-
+# add boost regex library
+add_library(Boost::regex STATIC IMPORTED GLOBAL)
+set_property(TARGET Boost::regex PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${BOOST_INCLUDE_DIR})
+set_property(TARGET Boost::regex PROPERTY IMPORTED_LOCATION ${BOOST_LIBRARY_PREFIX}boost_regex${CMAKE_STATIC_LIBRARY_SUFFIX})
+add_dependencies(Boost::regex boost)
 unset(SOURCE_DIR)
 
 set(pixels_cli_cxx
@@ -74,4 +80,5 @@ add_executable(pixels-cli ${pixels_cli_cxx})
 include_directories(include)
 include_directories(../pixels-core/include)
 include_directories(../pixels-common/include)
-target_link_libraries(pixels-cli Boost::program_options Boost::regex duckdb)
+target_link_libraries(pixels-cli
+        Boost::program_options Boost::regex duckdb)
