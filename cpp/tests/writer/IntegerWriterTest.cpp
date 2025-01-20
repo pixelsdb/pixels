@@ -43,7 +43,7 @@ TEST(IntegerWriterTest, WriteRunLengthEncodeIntWithoutNull) {
         /**----------------------------------------------
          * *                   INFO
          *   Case1: RunLengthEncode
-         *   
+         *
          *---------------------------------------------**/
         auto option = std::make_shared<PixelsWriterOption>();
         option->setPixelsStride(pixel_stride);
@@ -58,7 +58,7 @@ TEST(IntegerWriterTest, WriteRunLengthEncodeIntWithoutNull) {
         auto content = integer_column_writer->getColumnChunkContent();
         EXPECT_GT(content.size(), 0);
 
-       
+
         std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
         integer_column_writer->close();
 
@@ -106,7 +106,7 @@ TEST(IntegerWriterTest, DISABLED_WriteIntWithoutNull) {
         /**----------------------------------------------
          * *                   INFO
          *   Case2: Without RunLengthEncode
-         *   
+         *
          *---------------------------------------------**/
         auto option = std::make_shared<PixelsWriterOption>();
         option->setPixelsStride(pixel_stride);
@@ -122,7 +122,7 @@ TEST(IntegerWriterTest, DISABLED_WriteIntWithoutNull) {
         auto content = integer_column_writer->getColumnChunkContent();
         EXPECT_GT(content.size(), 0);
 
-       
+
         std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
         integer_column_writer->close();
 
@@ -157,9 +157,9 @@ TEST(IntegerWriterTest, DISABLED_WriteIntWithoutNull) {
 }
 
 TEST(EncodeTest, DISABLED_EncodeLong) {
-    const size_t len = 10;
+    const long len = 10;
     std::array<long, len> data;
-    for(int i = 0; i < len; i++) {
+    for(long i = 0; i < len; i++) {
         data[i] = INT64_MAX - i;
     }
     auto encode_buffer = std::make_shared<ByteBuffer>();
@@ -172,7 +172,7 @@ TEST(EncodeTest, DISABLED_EncodeLong) {
 
     bool is_signed = true;
     auto decoder = std::make_unique<RunLenIntDecoder>(encode_buffer, is_signed);
-    for(int i = 0; i < len; i++) {
+    for(long i = 0; i < len; i++) {
         EXPECT_EQ(decoder->next(), data[i]);
     }
 }
@@ -255,7 +255,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
         /**----------------------------------------------
          * *                   INFO
          *   Case: RunLengthEncode
-         *   
+         *
          *---------------------------------------------**/
         auto option = std::make_shared<PixelsWriterOption>();
         option->setPixelsStride(pixel_stride);
@@ -270,7 +270,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
         auto content = integer_column_writer->getColumnChunkContent();
         EXPECT_GT(content.size(), 0);
 
-       
+
         std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
         integer_column_writer->close();
 

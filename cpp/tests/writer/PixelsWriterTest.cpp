@@ -71,7 +71,6 @@ TEST_F(PIXELS_WRITER_TEST, DISABLED_SINGLE_INT)
         {
             for (int i = 0; i < row_num; ++i)
             {
-                auto row = row_batch->rowCount++;
                 va->add(i);
                 if (row_batch->rowCount == row_batch->getMaxSize())
                 {
@@ -117,7 +116,6 @@ TEST_F(PIXELS_WRITER_TEST, DISABLED_WRITE_AND_READ)
         {
             for (int i = 0; i < row_num; ++i)
             {
-                auto row = row_batch->rowCount++;
                 va->add(i);
                 if (row_batch->rowCount == row_batch->getMaxSize())
                 {
@@ -164,8 +162,6 @@ TEST_F(PIXELS_WRITER_TEST, DISABLED_WRITE_AND_READ)
                 EXPECT_EQ(*( (int*)vector->intVector + i ), i);
             }
         }
-        auto pause = true;
-        return;
     }
 
 }
@@ -197,7 +193,6 @@ TEST_F(PIXELS_WRITER_TEST, DISABLED_WRITE_TWO_COLUMN)
         {
             for (int i = 0; i < row_num; ++i)
             {
-                auto row = row_batch->rowCount++;
                 va->add(i);
                 vb->add(i * i);
                 if (row_batch->rowCount == row_batch->getMaxSize())
@@ -245,7 +240,6 @@ TEST_F(PIXELS_WRITER_TEST, DISABLED_SINGLE_INT_WITHOUT_RUNLENENCODE)
         {
             for (int i = 0; i < row_num; ++i)
             {
-                auto row = row_batch->rowCount++;
                 va->add(i);
                 if (row_batch->rowCount == row_batch->getMaxSize())
                 {
@@ -292,7 +286,6 @@ TEST_F(PIXELS_WRITER_TEST, WRITE_TWO_COLUMN_WITHOUT_RUNLENENCODE)
         {
             for (int i = 0; i < row_num; ++i)
             {
-                auto row = row_batch->rowCount++;
                 va->add(i);
                 vb->add(i * i);
                 if (row_batch->rowCount == row_batch->getMaxSize())
@@ -311,5 +304,4 @@ TEST_F(PIXELS_WRITER_TEST, WRITE_TWO_COLUMN_WITHOUT_RUNLENENCODE)
         auto duration = end_time_ts - start_time_ts;
         std::cerr << "[DEBUG] Time: " << duration.count() << std::endl;
     }
-
 }
