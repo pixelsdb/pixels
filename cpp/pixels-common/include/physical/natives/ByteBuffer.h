@@ -58,11 +58,9 @@ public:
     uint8_t
     get(); // Relative get method. Reads the uint8_t at the buffers current position then increments the position
     uint8_t get(uint32_t index); // Absolute get method. Read uint8_t at index
-    // this is the same as read(byte b[], int off, int len) in InputStream.java
     int getBufferOffset();
-
     uint8_t *getBuffer();
-
+    // this is the same as read(byte b[], int off, int len) in InputStream.java
     int read(uint8_t *buffer, uint32_t off, uint32_t len);
 
     void getBytes(uint8_t *buffer, uint32_t len); // Absolute read into array buf of length len

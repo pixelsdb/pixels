@@ -38,7 +38,6 @@ void BinaryColumnVector::close()
         ColumnVector::close();
         free(vector);
         vector = nullptr;
-
     }
 }
 
@@ -78,4 +77,27 @@ void *BinaryColumnVector::current()
     {
         return vector + readIndex;
     }
+}
+
+
+void BinaryColumnVector::add(std::string value)
+{
+    size_t len = value.size();
+    uint8_t* buffer = new uint8_t[len];
+    std::memcpy(buffer, value.data(), len);
+    add(buffer,len);
+    delete[] buffer;
+}
+
+void BinaryColumnVector::add(uint8_t *v,int len)
+{
+    if(writeIndex >= length)
+    {
+        ensureSize(writeIndex*2,true);
+    }
+    setVal(writeIndex++,v,0,len);
+}
+
+void BinaryColumnVector::setVal(int elemnetNum, uint8_t *sourceBuf,int start,int length)
+{
 }

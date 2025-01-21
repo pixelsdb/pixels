@@ -39,7 +39,7 @@ class DateColumnWriter : public ColumnWriter
     void newPixel() override;
 
     void
-    writeCurPartTime(std::shared_ptr <ColumnVector> columnVector, long *values, int curPartLength, int curPartOffset);
+    writeCurPartTime(std::shared_ptr <ColumnVector> columnVector, int *values, int curPartLength, int curPartOffset);
 
     bool decideNullsPadding(std::shared_ptr <PixelsWriterOption> writerOption) override;
 

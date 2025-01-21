@@ -37,7 +37,7 @@
  * explicitly present, as opposed to provided by a dictionary reference.
  * In some cases, all the values will be in the same byte array to begin with,
  * but this need not be the case. If each value is in a separate byte
- * array to start with, or not all of the values are in the same original
+ * array to start with, or not all the values are in the same original
  * byte array, you can still assign data by reference into this column vector.
  * This gives flexibility to use this in multiple situations.
  * <p>
@@ -47,7 +47,6 @@
  * You can mix "by value" and "by reference" in the same column vector,
  * though that use is probably not typical.
  */
-
 class BinaryColumnVector : public ColumnVector
 {
 public:
@@ -70,6 +69,11 @@ public:
      * @param length     length of source byte sequence
      */
     void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
+
+    void add(std::string value);
+    void add(uint8_t* v,int length);
+    void setVal(int elemnetNum,uint8_t* sourceBuf);
+    void setVal(int elementNum, uint8_t* sourceBuf, int start, int length);
 
     void *current() override;
 

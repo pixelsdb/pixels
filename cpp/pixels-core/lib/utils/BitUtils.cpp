@@ -318,4 +318,3 @@ std::vector <uint8_t> BitUtils::bitWiseCompactBE(bool *values, int length)
 
     return bitWiseOutput;
 }
-
