@@ -35,7 +35,8 @@ public:
     uint64_t start;
     uint64_t length;
 
-    Request(uint64_t queryId_, uint64_t start_, uint64_t length_, int64_t bufferId = -1);
+    Request(uint64_t queryId_, uint64_t start_, uint64_t length_,
+            int64_t bufferId = -1);
 
     int hashCode();
 

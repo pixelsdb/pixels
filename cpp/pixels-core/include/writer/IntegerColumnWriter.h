@@ -45,7 +45,7 @@ public:
 
     bool decideNullsPadding(std::shared_ptr <PixelsWriterOption> writerOption) override;
 
-    pixels::proto::ColumnEncoding getColumnChunkEncoding();
+    pixels::proto::ColumnEncoding getColumnChunkEncoding() const override;
 
 private:
     bool isLong; //current column type is long or int, used for the first pixel

@@ -51,7 +51,7 @@ std::shared_ptr <pixels::proto::ColumnChunkIndex> ColumnWriter::getColumnChunkIn
     return columnChunkIndex;
 }
 
-pixels::proto::ColumnEncoding ColumnWriter::getColumnChunkEncoding()
+pixels::proto::ColumnEncoding ColumnWriter::getColumnChunkEncoding() const
 {
     pixels::proto::ColumnEncoding encoding;
     encoding.set_kind(pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_NONE);

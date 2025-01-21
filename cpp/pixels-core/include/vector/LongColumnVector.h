@@ -59,7 +59,7 @@ public:
 
     void ensureSize(uint64_t size, bool preserveData) override;
 
-    bool isLongVectore();
+    bool isLongVector();
 
 private:
     bool isLong;

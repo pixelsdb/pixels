@@ -41,7 +41,7 @@ void StringColumnWriter::flush()
 
 void StringColumnWriter::flushStarts()
 {
-    size_t startsFieldOffset = outputStream->size();
+    size_t startsFieldOffset = outputStream->getWritePos();
     startsArray->add(startOffset);
     if(byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN)
     {
