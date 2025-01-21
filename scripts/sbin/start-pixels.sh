@@ -12,3 +12,6 @@ sleep 5
 
 $PIXELS_HOME/sbin/start-workers.sh -daemon
 
+sleep 5
+
+$PIXELS_HOME/sbin/start-retina.sh -daemon
