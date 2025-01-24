@@ -81,7 +81,6 @@
         <dep.hadoop.version>3.3.1</dep.hadoop.version>
         <dep.ozone.version>0.5.0-beta</dep.ozone.version>
         <dep.awssdk.version>2.29.31</dep.awssdk.version>
-        <dep.awssdk.preview.version>2.29.31</dep.awssdk.preview.version>
         <dep.jedis.version>4.2.0</dep.jedis.version>
         <dep.gcp.version>26.1.2</dep.gcp.version>
 
@@ -444,12 +443,6 @@
                 <version>${dep.awssdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>aws-crt-client</artifactId>
-                <version>${dep.awssdk.preview.version}</version>
             </dependency>
 
             <!-- google cloud -->
