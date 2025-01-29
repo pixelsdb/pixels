@@ -29,7 +29,6 @@
 const int ColumnWriter::ISNULL_ALIGNMENT = std::stoi(ConfigFactory::Instance().getProperty("isnull.bitmap.alignment"));
 const std::vector <uint8_t> ColumnWriter::ISNULL_PADDING_BUFFER(ColumnWriter::ISNULL_ALIGNMENT, 0);
 
-
 std::vector <uint8_t> ColumnWriter::getColumnChunkContent() const
 {
     auto begin = outputStream->getPointer() + outputStream->getReadPos();
@@ -45,7 +44,6 @@ int ColumnWriter::getColumnChunkSize() const
 pixels::proto::ColumnChunkIndex ColumnWriter::getColumnChunkIndex()
 {
     return *columnChunkIndex;
-//    return columnChunkIndex.get();
 }
 
 std::shared_ptr <pixels::proto::ColumnChunkIndex> ColumnWriter::getColumnChunkIndexPtr()
@@ -53,13 +51,12 @@ std::shared_ptr <pixels::proto::ColumnChunkIndex> ColumnWriter::getColumnChunkIn
     return columnChunkIndex;
 }
 
-pixels::proto::ColumnEncoding ColumnWriter::getColumnChunkEncoding()
+pixels::proto::ColumnEncoding ColumnWriter::getColumnChunkEncoding() const
 {
     pixels::proto::ColumnEncoding encoding;
     encoding.set_kind(pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_NONE);
     return encoding;
 }
-
 
 void ColumnWriter::flush()
 {
@@ -123,7 +120,6 @@ void ColumnWriter::close()
     isNullStream->clear();
 }
 
-
 ColumnWriter::ColumnWriter(std::shared_ptr <TypeDescription> type,
                            std::shared_ptr <PixelsWriterOption> writerOption)
         : pixelStride(writerOption->getPixelsStride()),
@@ -139,5 +135,3 @@ ColumnWriter::ColumnWriter(std::shared_ptr <TypeDescription> type,
     columnChunkIndex->set_nullspadding(nullsPadding);
     columnChunkIndex->set_isnullalignment(ISNULL_ALIGNMENT);
 }
-
-

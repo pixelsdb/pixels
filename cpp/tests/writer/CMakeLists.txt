@@ -1,24 +1,19 @@
-add_executable(IntegerWriterTest
+add_executable(
+        IntegerWriterTest
         IntegerWriterTest.cpp
-        )
+)
 
-add_executable(PixelsWriterTest
+add_executable(
+        PixelsWriterTest
         PixelsWriterTest.cpp
-        )
+)
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(
-            CMAKE_CPP_FLAGS
-            "${CMAKE_CPP_FLAGS} -Werror -fsanitize=undefined -fsanitize=address"
-    )
-    target_link_options(IntegerWriterTest
-            BEFORE PUBLIC -fsanitize=undefined PUBLIC -fsanitize=address
-            )
-
-    target_link_options(PixelsWriterTest
-            BEFORE PUBLIC -fsanitize=undefined PUBLIC -fsanitize=address
-            )
+    set(CMAKE_CPP_FLAGS "${CMAKE_CPP_FLAGS} -fsanitize=undefined -fsanitize=address")
+    target_link_options(IntegerWriterTest BEFORE PUBLIC -fsanitize=undefined PUBLIC -fsanitize=address)
+    target_link_options(PixelsWriterTest BEFORE PUBLIC -fsanitize=undefined PUBLIC -fsanitize=address)
 endif ()
+
 target_link_libraries(
         IntegerWriterTest
         gtest_main

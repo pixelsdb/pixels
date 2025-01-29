@@ -55,7 +55,6 @@ void IntegerColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto
     }
 
     int pixelId = elementIndex / pixelStride;
-    // still need to add pixelsStatistics in the writer
     bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
     setValid(input, pixelStride, vector, pixelId, hasNull);
 
@@ -79,16 +78,17 @@ void IntegerColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto
         if (isLong)
         {
             // if long
-            std::memcpy((void *) columnVector->longVector + vectorIndex * sizeof(int64_t),
-                        input->getPointer() + input->getReadPos(), size * sizeof(int64_t));
+            std::memcpy(reinterpret_cast<int64_t *>(columnVector->longVector) + vectorIndex,
+                        input->getPointer() + input->getReadPos(),
+                        size * sizeof(int64_t));
             input->setReadPos(input->getReadPos() + size * sizeof(int64_t));
         }
         else
         {
             // if int
-            std::memcpy((void *) columnVector->intVector + vectorIndex * sizeof(int),
-                        input->getPointer() + input->getReadPos(), size * sizeof(int));
-            input->setReadPos(input->getReadPos() + size * sizeof(int));
+            std::memcpy(reinterpret_cast<int32_t *>(columnVector->intVector) + vectorIndex,
+                        input->getPointer() + input->getReadPos(), size * sizeof(int32_t));
+            input->setReadPos(input->getReadPos() + size * sizeof(int32_t));
         }
     }
 }

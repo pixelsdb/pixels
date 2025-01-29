@@ -26,6 +26,7 @@
 #define PIXELS_PIXELSRUNTIMEEXCEPTION_H
 
 #include <exception>
+#include <cstdint>
 #include <string>
 #include <iostream>
 #include "PixelsVersion.h"

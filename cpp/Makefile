@@ -46,7 +46,8 @@ deps:
 	make -j install
 
 clean:
-	rm -rf build
+	rm -rf build/release
+	rm -rf build/debug
 	cd pixels-duckdb/duckdb && make clean
 
 # Main build

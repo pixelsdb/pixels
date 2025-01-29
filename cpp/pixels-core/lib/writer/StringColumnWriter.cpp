@@ -17,3 +17,48 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
+#include "writer/StringColumnWriter.h"
+
+StringColumnWriter::StringColumnWriter(std::shared_ptr<TypeDescription> type,
+                                       std::shared_ptr<PixelsWriterOption> writerOption):
+ColumnWriter(type,writerOption), curPixelVector(pixelStride)
+{
+    encodingUtils= std::make_shared<EncodingUtils>();
+    runlengthEncoding = encodingLevel.ge(EncodingLevel::Level::EL2);
+    if (runlengthEncoding)
+    {
+      encoder = std::make_unique<RunLenIntEncoder>();
+    }
+    startsArray=std::make_shared<DynamicIntArray>();
+}
+
+void StringColumnWriter::flush()
+{
+    ColumnWriter::flush();
+    flushStarts();
+}
+
+void StringColumnWriter::flushStarts()
+{
+    size_t startsFieldOffset = outputStream->getWritePos();
+    startsArray->add(startOffset);
+    if(byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN)
+    {
+        for (int i = 0; i<startsArray->size(); i++)
+        {
+          encodingUtils->writeIntLE(outputStream,startsArray->get(i));
+        }
+    }
+    else
+    {
+        for(int i=0;i<startsArray->size();i++)
+        {
+            encodingUtils->writeIntBE(outputStream,startsArray->get(i));
+        }
+    }
+    startsArray->clear();
+    std::shared_ptr<ByteBuffer> offsetBuffer=std::make_shared<ByteBuffer>(4);
+    offsetBuffer->putInt(static_cast<int>(startsFieldOffset));
+    outputStream->putBytes(offsetBuffer->getPointer(),offsetBuffer->getWritePos());
+}

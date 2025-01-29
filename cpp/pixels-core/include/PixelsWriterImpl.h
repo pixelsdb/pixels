@@ -86,6 +86,5 @@ private:
     std::vector <pixels::proto::RowGroupStatistic> rowGroupStatisticList;
     std::shared_ptr <PhysicalWriter> physicalWriter;
     std::vector <std::shared_ptr<TypeDescription>> children;
-
 };
 #endif //PIXELS_PIXELSWRITERIMPL_H

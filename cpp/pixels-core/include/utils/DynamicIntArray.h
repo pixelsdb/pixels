@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+* Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,27 +19,45 @@
  */
 
 /*
- * @author liyu
- * @create 2023-03-07
+ * @author whz
+ * @create 2025-01-13
  */
-#ifndef PIXELS_REQUEST_H
-#define PIXELS_REQUEST_H
+#ifndef DYNAMICINTARRAY_H
+#define DYNAMICINTARRAY_H
 
 #include <iostream>
+#include <cstring>
 
-class Request
-{
+class DynamicIntArray {
 public:
-    int64_t bufferId;
-    uint64_t queryId;
-    uint64_t start;
-    uint64_t length;
+  DynamicIntArray();
+  DynamicIntArray(int chunkSize);
 
-    Request(uint64_t queryId_, uint64_t start_, uint64_t length_,
-            int64_t bufferId = -1);
+  int get(int index);
 
-    int hashCode();
+  void set(int index, int value);
 
-    int comparedTo(Request o);
+  void increment(int index, int value);
+
+  void add(int value);
+
+  int size();
+
+  void clear();
+
+  std::string toString();
+
+  int* toArray();
+
+private:
+  static const int DEFAULT_CHUNKSIZE = 8 * 1024;
+  static const int INIT_CHUNKS = 256;
+  int chunkSize;
+  int** data;
+  int length;
+  int initializedChunks;
+
+  void grow(int chunkIndex);
 };
-#endif //PIXELS_REQUEST_H
+
+#endif //DYNAMICINTARRAY_H

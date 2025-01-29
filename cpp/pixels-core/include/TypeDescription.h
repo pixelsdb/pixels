@@ -74,6 +74,7 @@ public:
         CHAR,
         STRUCT
     };
+
     class StringPosition
     {
         friend class TypeDescription;

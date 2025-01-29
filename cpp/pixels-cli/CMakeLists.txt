@@ -76,6 +76,7 @@ set(pixels_cli_cxx
         lib/executor/LoadExecutor.cpp
         lib/load/Parameters.cpp
         lib/load/PixelsConsumer.cpp)
+
 add_executable(pixels-cli ${pixels_cli_cxx})
 include_directories(include)
 include_directories(../pixels-core/include)

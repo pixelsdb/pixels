@@ -62,7 +62,11 @@ set(pixels_core_cxx
         lib/writer/TimestampColumnWriter.cpp
         lib/writer/DateColumnWriter.cpp
         include/writer/DateColumnWriter.h
-        )
+        include/utils/DynamicIntArray.h
+        lib/utils/DynamicIntArray.cpp
+        include/writer/StringColumnWriter.h
+        lib/writer/StringColumnWriter.cpp
+)
 
 add_library(pixels-core ${pixels_core_cxx})
 

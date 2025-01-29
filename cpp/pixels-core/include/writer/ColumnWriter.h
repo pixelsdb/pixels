@@ -58,7 +58,7 @@ public:
 
     virtual std::shared_ptr <pixels::proto::ColumnChunkIndex> getColumnChunkIndexPtr();
 
-    virtual pixels::proto::ColumnEncoding getColumnChunkEncoding();
+    virtual pixels::proto::ColumnEncoding getColumnChunkEncoding() const;
 
     virtual void reset();
 

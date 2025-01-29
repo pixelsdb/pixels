@@ -44,7 +44,7 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> 
     batchSize = option.getBatchSize();
     // batchSize must be larger than STANDARD_VECTOR_SIZE
     // for test purpose, can we comment it temporarily
-//    assert(batchSize >= STANDARD_VECTOR_SIZE);
+    // assert(batchSize >= STANDARD_VECTOR_SIZE);
     enabledFilterPushDown = option.isEnabledFilterPushDown();
     if (enabledFilterPushDown)
     {
@@ -66,7 +66,6 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> 
     includedColumnNum = 0;
     endOfFile = false;
     resultRowBatch = nullptr;
-    ::DirectUringRandomAccessFile::Initialize();
     checkBeforeRead();
 }
 
@@ -226,6 +225,11 @@ std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reus
     if (filterMask != nullptr)
     {
         filterMask->set();
+    }
+
+    if(asyncReadRequestNum > 0)
+    {
+        asyncReadComplete(asyncReadRequestNum);
     }
 
     std::vector<int> filterColumnIndex;
@@ -391,12 +395,14 @@ void PixelsRecordReaderImpl::prepareRead()
 
 void PixelsRecordReaderImpl::asyncReadComplete(int requestSize)
 {
-    if (ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io"))
+    if (ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io")
+        && asyncReadRequestNum >= requestSize)
     {
         if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
         {
             auto localReader = std::static_pointer_cast<PhysicalLocalReader>(physicalReader);
             localReader->readAsyncComplete(requestSize);
+            asyncReadRequestNum -= requestSize;
         }
         else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
         {
@@ -470,7 +476,14 @@ bool PixelsRecordReaderImpl::read()
             originalByteBuffers.emplace_back(::BufferPool::GetBuffer(colId));
         }
 
-        auto byteBuffers = scheduler->executeBatch(physicalReader, requestBatch, originalByteBuffers, queryId);
+        auto byteBuffers = scheduler->executeBatch(
+            physicalReader, requestBatch, originalByteBuffers, queryId);
+
+        if(ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io")
+            && originalByteBuffers.size() > 0)
+        {
+            asyncReadRequestNum += diskChunks.size();
+        }
 
         for (int index = 0; index < diskChunks.size(); index++)
         {

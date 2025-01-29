@@ -149,5 +149,6 @@ private:
     std::shared_ptr <TypeDescription> fileSchema;
     std::shared_ptr <TypeDescription> resultSchema;
     std::shared_ptr <VectorizedRowBatch> resultRowBatch;
+    int asyncReadRequestNum{0};
 };
 #endif //PIXELS_PIXELSRECORDREADERIMPL_H
