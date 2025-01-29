@@ -79,8 +79,7 @@ void *BinaryColumnVector::current()
     }
 }
 
-
-void BinaryColumnVector::add(std::string value)
+void BinaryColumnVector::add(std::string &value)
 {
     size_t len = value.size();
     uint8_t* buffer = new uint8_t[len];

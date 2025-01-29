@@ -21,8 +21,8 @@
 #include "writer/StringColumnWriter.h"
 
 StringColumnWriter::StringColumnWriter(std::shared_ptr<TypeDescription> type,
-    std::shared_ptr<PixelsWriterOption> writerOption):
-    ColumnWriter(type,writerOption), curPixelVector(pixelStride)
+                                       std::shared_ptr<PixelsWriterOption> writerOption):
+ColumnWriter(type,writerOption), curPixelVector(pixelStride)
 {
     encodingUtils= std::make_shared<EncodingUtils>();
     runlengthEncoding = encodingLevel.ge(EncodingLevel::Level::EL2);

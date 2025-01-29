@@ -32,6 +32,7 @@
 
 class StringColumnWriter : public ColumnWriter
 {
+public:
     StringColumnWriter(std::shared_ptr<TypeDescription> type,std::shared_ptr<PixelsWriterOption> writerOption);
 
     // vector should be converted to BinaryColumnVector
@@ -41,12 +42,9 @@ class StringColumnWriter : public ColumnWriter
 
     bool decideNullsPadding(std::shared_ptr<PixelsWriterOption> writerOption) override;
 
-    void writeCurPartWithoutDict(std::shared_ptr<PixelsWriterOption> writerOption,uint8_t ** values,
-                                 int* vLens,int* vOffsets,int curPartLength,int curPartOffset);
-
     void flush() override;
 
-    pixels::proto::ColumnEncoding getColumnChunkEncoding();
+    pixels::proto::ColumnEncoding getColumnChunkEncoding() const override;
 
     void flushStarts();
 
@@ -58,6 +56,9 @@ private:
     std::shared_ptr<EncodingUtils>  encodingUtils;
     std::unique_ptr<RunLenIntEncoder> encoder;
     int  startOffset=0;
+
+    void writeCurPartWithoutDict(std::shared_ptr<PixelsWriterOption> writerOption,uint8_t ** values,
+                                 int* vLens,int* vOffsets,int curPartLength,int curPartOffset);
 };
 
 #endif // DUCKDB_STRINGCOLUMNWRITER_H

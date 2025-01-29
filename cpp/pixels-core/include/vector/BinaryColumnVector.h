@@ -70,7 +70,7 @@ public:
      */
     void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
 
-    void add(std::string value);
+    void add(std::string &value) override;
     void add(uint8_t* v,int length);
     void setVal(int elemnetNum,uint8_t* sourceBuf);
     void setVal(int elementNum, uint8_t* sourceBuf, int start, int length);

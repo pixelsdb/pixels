@@ -39,17 +39,15 @@ public:
 
     void newPixel() override;
 
-    void
-    writeCurPartTime(std::shared_ptr <ColumnVector> columnVector, int *values, int curPartLength, int curPartOffset);
-
     bool decideNullsPadding(std::shared_ptr <PixelsWriterOption> writerOption) override;
 
-    pixels::proto::ColumnEncoding getColumnChunkEncoding() const;
+    pixels::proto::ColumnEncoding getColumnChunkEncoding() const override;
 
 private:
     bool runlengthEncoding;
     std::unique_ptr <RunLenIntEncoder> encoder;
     std::vector<long> curPixelVector; // current pixel value vector haven't written out yet
 
+    void writeCurPartTime(std::shared_ptr <ColumnVector> columnVector, int *values, int curPartLength, int curPartOffset);
 };
 #endif // DUCKDB_DATECOLUMNWRITER_H

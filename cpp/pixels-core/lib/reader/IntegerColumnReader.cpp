@@ -78,7 +78,7 @@ void IntegerColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto
         if (isLong)
         {
             // if long
-            std::memcpy(reinterpret_cast<int64_t *>(columnVector->longVector) +vectorIndex,
+            std::memcpy(reinterpret_cast<int64_t *>(columnVector->longVector) + vectorIndex,
                         input->getPointer() + input->getReadPos(),
                         size * sizeof(int64_t));
             input->setReadPos(input->getReadPos() + size * sizeof(int64_t));
@@ -86,9 +86,9 @@ void IntegerColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto
         else
         {
             // if int
-            std::memcpy(reinterpret_cast<int *>(columnVector->intVector) + vectorIndex,
-                        input->getPointer() + input->getReadPos(), size * sizeof(int));
-            input->setReadPos(input->getReadPos() + size * sizeof(int));
+            std::memcpy(reinterpret_cast<int32_t *>(columnVector->intVector) + vectorIndex,
+                        input->getPointer() + input->getReadPos(), size * sizeof(int32_t));
+            input->setReadPos(input->getReadPos() + size * sizeof(int32_t));
         }
     }
 }
