@@ -31,6 +31,7 @@ import java.nio.ByteBuffer;
  */
 public class RangeIndex extends Base
 {
+    private boolean isPrimary;
     private ByteBuffer indexStruct;
     private KeyColumns keyColumns;
     private String keyColumnsJson;
@@ -43,10 +44,21 @@ public class RangeIndex extends Base
     public RangeIndex(MetadataProto.RangeIndex rangeIndex)
     {
         this.setId(rangeIndex.getId());
+        this.isPrimary = rangeIndex.getIsPrimary();
         this.indexStruct = rangeIndex.getIndexStruct().asReadOnlyByteBuffer();
         this.keyColumnsJson = rangeIndex.getKeyColumns();
         this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
         this.tableId = rangeIndex.getTableId();
+    }
+
+    public boolean isPrimary()
+    {
+        return isPrimary;
+    }
+
+    public void setPrimary(boolean primary)
+    {
+        isPrimary = primary;
     }
 
     public ByteBuffer getIndexStruct()
@@ -92,7 +104,7 @@ public class RangeIndex extends Base
     @Override
     public MetadataProto.RangeIndex toProto()
     {
-        return MetadataProto.RangeIndex.newBuilder().setId(this.getId())
+        return MetadataProto.RangeIndex.newBuilder().setId(this.getId()).setIsPrimary(this.isPrimary)
                 .setIndexStruct(ByteString.copyFrom(this.indexStruct)).setKeyColumns(this.keyColumnsJson)
                 .setTableId(this.tableId).build();
     }
