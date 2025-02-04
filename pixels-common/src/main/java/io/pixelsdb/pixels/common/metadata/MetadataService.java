@@ -752,15 +752,15 @@ public class MetadataService
         return true;
     }
 
-    public boolean addRangeIndex(RangeIndex rangeIndex) throws MetadataException
+    public boolean createRangeIndex(RangeIndex rangeIndex) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.AddRangeIndexRequest request = MetadataProto.AddRangeIndexRequest.newBuilder()
+        MetadataProto.CreateRangeIndexRequest request = MetadataProto.CreateRangeIndexRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setRangeIndex(rangeIndex.toProto()).build();
         try
         {
-            MetadataProto.AddRangeIndexResponse response = this.stub.addRangeIndex(request);
+            MetadataProto.CreateRangeIndexResponse response = this.stub.createRangeIndex(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
@@ -845,15 +845,15 @@ public class MetadataService
         return true;
     }
 
-    public boolean deleteRangeIndex(long tableId) throws MetadataException
+    public boolean dropRangeIndex(long tableId) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.DeleteRangeIndexRequest request = MetadataProto.DeleteRangeIndexRequest.newBuilder()
+        MetadataProto.DropRangeIndexRequest request = MetadataProto.DropRangeIndexRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setTableId(tableId).build();
         try
         {
-            MetadataProto.DeleteRangeIndexResponse response = this.stub.deleteRangeIndex(request);
+            MetadataProto.DropRangeIndexResponse response = this.stub.dropRangeIndex(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()

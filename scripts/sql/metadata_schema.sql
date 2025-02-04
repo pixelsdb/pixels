@@ -153,7 +153,6 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES`
 (
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `RI_IS_PRIMARY` TINYINT NOT NULL,
-    `RI_INDEX_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
     `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,

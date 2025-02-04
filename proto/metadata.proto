@@ -126,10 +126,9 @@ message PeerPath {
 message RangeIndex {
     uint64 id = 1;
     bool isPrimary = 2;
-    bytes indexStruct = 3;
-    string keyColumns = 4;
-    uint64 tableId = 5;
-    uint64 schemaVersionId = 6;
+    string keyColumns = 3;
+    uint64 tableId = 4;
+    uint64 schemaVersionId = 5;
 }
 
 message Range {
