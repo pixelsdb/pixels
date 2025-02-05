@@ -20,10 +20,7 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.JSON;
-import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.daemon.MetadataProto;
-
-import java.nio.ByteBuffer;
 
 /**
  * @author hank
@@ -31,7 +28,6 @@ import java.nio.ByteBuffer;
  */
 public class RangeIndex extends Base
 {
-    private ByteBuffer indexStruct;
     private KeyColumns keyColumns;
     private String keyColumnsJson;
     private long tableId;
@@ -43,20 +39,9 @@ public class RangeIndex extends Base
     public RangeIndex(MetadataProto.RangeIndex rangeIndex)
     {
         this.setId(rangeIndex.getId());
-        this.indexStruct = rangeIndex.getIndexStruct().asReadOnlyByteBuffer();
         this.keyColumnsJson = rangeIndex.getKeyColumns();
         this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
         this.tableId = rangeIndex.getTableId();
-    }
-
-    public ByteBuffer getIndexStruct()
-    {
-        return indexStruct;
-    }
-
-    public void setIndexStruct(ByteBuffer indexStruct)
-    {
-        this.indexStruct = indexStruct;
     }
 
     public KeyColumns getKeyColumns()
@@ -93,7 +78,6 @@ public class RangeIndex extends Base
     public MetadataProto.RangeIndex toProto()
     {
         return MetadataProto.RangeIndex.newBuilder().setId(this.getId())
-                .setIndexStruct(ByteString.copyFrom(this.indexStruct)).setKeyColumns(this.keyColumnsJson)
-                .setTableId(this.tableId).build();
+                .setKeyColumns(this.keyColumnsJson).setTableId(this.tableId).build();
     }
 }

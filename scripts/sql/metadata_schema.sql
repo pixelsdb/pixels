@@ -38,10 +38,10 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`TBLS` (
     INDEX `fk_TBLS_DBS_idx` (`DBS_DB_ID` ASC),
     UNIQUE INDEX `TBL_NAME_DB_ID_UNIQUE` (`TBL_NAME` ASC, `DBS_DB_ID` ASC),
     CONSTRAINT `fk_TBLS_DBS`
-    FOREIGN KEY (`DBS_DB_ID`)
-    REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`DBS_DB_ID`)
+            REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -64,10 +64,10 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`COLS` (
     INDEX `fk_COLS_TBLS_idx` (`TBLS_TBL_ID` ASC),
     UNIQUE INDEX `COL_NAME_TBL_ID_UNIQUE` (`COL_NAME` ASC, `TBLS_TBL_ID` ASC),
     CONSTRAINT `fk_COLS_TBLS`
-    FOREIGN KEY (`TBLS_TBL_ID`)
-    REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`TBLS_TBL_ID`)
+            REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -84,10 +84,10 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SCHEMA_VERSIONS` (
     PRIMARY KEY (`SV_ID`),
     INDEX `fk_SCHEMA_VERSIONS_TBLS_idx` (`TBLS_TBL_ID` ASC),
     CONSTRAINT `fk_SCHEMA_VERSIONS_TBLS`
-    FOREIGN KEY (`TBLS_TBL_ID`)
-    REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`TBLS_TBL_ID`)
+            REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -111,15 +111,15 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`LAYOUTS` (
     INDEX `fk_LAYOUTS_TBLS_idx` (`TBLS_TBL_ID` ASC),
     INDEX `fk_LAYOUTS_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
     CONSTRAINT `fk_LAYOUTS_TBLS`
-    FOREIGN KEY (`TBLS_TBL_ID`)
-    REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
+        FOREIGN KEY (`TBLS_TBL_ID`)
+            REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
     CONSTRAINT `fk_LAYOUTS_SCHEMA_VERSIONS`
-    FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
-    REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
+            REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -137,10 +137,10 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
     PRIMARY KEY (`VIEW_ID`),
     INDEX `fk_VIEWS_DBS_idx` (`DBS_DB_ID` ASC),
     CONSTRAINT `fk_VIEWS_DBS`
-    FOREIGN KEY (`DBS_DB_ID`)
-    REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`DBS_DB_ID`)
+            REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -149,26 +149,26 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 -- -----------------------------------------------------
 -- Table `pixels_metadata`.`RANGE_INDEXES`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES`
+(
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `RI_INDEX_STRUCT` MEDIUMBLOB NOT NULL COMMENT 'The serialized structure of the range index, with which we do not need to rebuild the in-memory range index from the ranges.',
     `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RI_ID`),
     INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
     INDEX `fk_RANGE_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
-    UNIQUE INDEX `TBLS_TBL_ID_UNIQUE` (`TBLS_TBL_ID` ASC, `SCHEMA_VERSIONS_SV_ID` ASC) COMMENT 'We ensure every (table, schema_version) has only one range index.',
+    UNIQUE INDEX `TBL_ID_SV_ID_UNIQUE` (`TBLS_TBL_ID` ASC, `SCHEMA_VERSIONS_SV_ID` ASC) COMMENT 'We ensure every (table, schema_version) has only one range index.',
     CONSTRAINT `fk_RANGE_INDEX_TBLS`
-    FOREIGN KEY (`TBLS_TBL_ID`)
-    REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
+        FOREIGN KEY (`TBLS_TBL_ID`)
+            REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
     CONSTRAINT `fk_RANGE_INDEXES_SCHEMA_VERSIONS`
-    FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
-    REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
+            REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -187,15 +187,15 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
     INDEX `fk_RANGES_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC),
     INDEX `fk_RANGES_RANGES_idx` (`RANGE_PARENT_ID` ASC),
     CONSTRAINT `fk_RANGES_RANGE_INDEXES`
-    FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
-    REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
+        FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
+            REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
     CONSTRAINT `fk_RANGES_RANGES`
-    FOREIGN KEY (`RANGE_PARENT_ID`)
-    REFERENCES `pixels_metadata`.`RANGES` (`RANGE_ID`)
-    ON DELETE SET NULL
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`RANGE_PARENT_ID`)
+            REFERENCES `pixels_metadata`.`RANGES` (`RANGE_ID`)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -215,15 +215,15 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PATHS` (
     INDEX `fk_PATHS_LAYOUTS_idx` (`LAYOUTS_LAYOUT_ID` ASC),
     UNIQUE INDEX `PATH_URI_UNIQUE` (`PATH_URI` ASC),
     CONSTRAINT `fk_PATHS_RANGES`
-    FOREIGN KEY (`RANGES_RANGE_ID`)
-    REFERENCES `pixels_metadata`.`RANGES` (`RANGE_ID`)
-    ON DELETE SET NULL
-    ON UPDATE CASCADE,
+        FOREIGN KEY (`RANGES_RANGE_ID`)
+            REFERENCES `pixels_metadata`.`RANGES` (`RANGE_ID`)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE,
     CONSTRAINT `fk_PATHS_LAYOUTS`
-    FOREIGN KEY (`LAYOUTS_LAYOUT_ID`)
-    REFERENCES `pixels_metadata`.`LAYOUTS` (`LAYOUT_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`LAYOUTS_LAYOUT_ID`)
+            REFERENCES `pixels_metadata`.`LAYOUTS` (`LAYOUT_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -255,15 +255,15 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`USER_HAS_DB` (
     INDEX `fk_USERS_has_DBS_DBS_idx` (`DBS_DB_ID` ASC),
     INDEX `fk_USERS_has_DBS_USERS_idx` (`USERS_USER_ID` ASC),
     CONSTRAINT `fk_USERS_has_DBS_USERS`
-    FOREIGN KEY (`USERS_USER_ID`)
-    REFERENCES `pixels_metadata`.`USERS` (`USER_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
+        FOREIGN KEY (`USERS_USER_ID`)
+            REFERENCES `pixels_metadata`.`USERS` (`USER_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
     CONSTRAINT `fk_USERS_has_DBS_DBS`
-    FOREIGN KEY (`DBS_DB_ID`)
-    REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`DBS_DB_ID`)
+            REFERENCES `pixels_metadata`.`DBS` (`DB_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -299,15 +299,15 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
     INDEX `fk_PEER_PATHS_PATHS_idx` (`PATHS_PATH_ID` ASC),
     INDEX `fk_PEER_PATHS_PEERS_idx` (`PEERS_PEER_ID` ASC),
     CONSTRAINT `fk_PEER_PATHS_PATHS`
-    FOREIGN KEY (`PATHS_PATH_ID`)
-    REFERENCES `pixels_metadata`.`PATHS` (`PATH_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
+        FOREIGN KEY (`PATHS_PATH_ID`)
+            REFERENCES `pixels_metadata`.`PATHS` (`PATH_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
     CONSTRAINT `fk_PEER_PATHS_PEERS`
-    FOREIGN KEY (`PEERS_PEER_ID`)
-    REFERENCES `pixels_metadata`.`PEERS` (`PEER_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`PEERS_PEER_ID`)
+            REFERENCES `pixels_metadata`.`PEERS` (`PEER_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
@@ -323,12 +323,12 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
     `PATHS_PATH_ID` BIGINT NOT NULL,
     PRIMARY KEY (`FILE_ID`),
     INDEX `fk_FILES_PATHS_idx` (`PATHS_PATH_ID` ASC),
-    UNIQUE INDEX `PATHS_PATH_ID_FILE_NAME_UNIQUE` (`PATHS_PATH_ID` ASC, `FILE_NAME` ASC),
+    UNIQUE INDEX `PATH_ID_FILE_NAME_UNIQUE` (`PATHS_PATH_ID` ASC, `FILE_NAME` ASC),
     CONSTRAINT `fk_FILES_PATHS`
-    FOREIGN KEY (`PATHS_PATH_ID`)
-    REFERENCES `pixels_metadata`.`PATHS` (`PATH_ID`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE)
+        FOREIGN KEY (`PATHS_PATH_ID`)
+            REFERENCES `pixels_metadata`.`PATHS` (`PATH_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;

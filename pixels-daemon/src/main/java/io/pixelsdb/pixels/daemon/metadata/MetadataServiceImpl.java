@@ -798,8 +798,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void addRangeIndex(MetadataProto.AddRangeIndexRequest request,
-                                 StreamObserver<MetadataProto.AddRangeIndexResponse> responseObserver)
+    public void createRangeIndex(MetadataProto.CreateRangeIndexRequest request,
+                                 StreamObserver<MetadataProto.CreateRangeIndexResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -813,7 +813,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             headerBuilder.setErrorCode(METADATA_ADD_RANGE_INDEX_FAILED).setErrorMsg("add range index failed");
         }
 
-        MetadataProto.AddRangeIndexResponse response = MetadataProto.AddRangeIndexResponse.newBuilder()
+        MetadataProto.CreateRangeIndexResponse response = MetadataProto.CreateRangeIndexResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
@@ -863,8 +863,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void deleteRangeIndex(MetadataProto.DeleteRangeIndexRequest request,
-                                 StreamObserver<MetadataProto.DeleteRangeIndexResponse> responseObserver)
+    public void dropRangeIndex(MetadataProto.DropRangeIndexRequest request,
+                                 StreamObserver<MetadataProto.DropRangeIndexResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -876,7 +876,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         {
             headerBuilder.setErrorCode(METADATA_DELETE_RANGE_INDEX_FAILED).setErrorMsg("delete range index failed");
         }
-        MetadataProto.DeleteRangeIndexResponse response = MetadataProto.DeleteRangeIndexResponse.newBuilder()
+        MetadataProto.DropRangeIndexResponse response = MetadataProto.DropRangeIndexResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
