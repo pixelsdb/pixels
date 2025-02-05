@@ -52,7 +52,6 @@ public class RdbRangeIndexDao extends RangeIndexDao
             {
                 MetadataProto.RangeIndex rangeIndex = MetadataProto.RangeIndex.newBuilder()
                         .setId(id)
-                        .setIsPrimary(rs.getBoolean("RI_IS_PRIMARY"))
                         .setKeyColumns(rs.getString("RI_KEY_COLUMNS"))
                         .setTableId(rs.getLong("TBLS_TBL_ID"))
                         .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID")).build();
@@ -78,7 +77,6 @@ public class RdbRangeIndexDao extends RangeIndexDao
             {
                 MetadataProto.RangeIndex rangeIndex = MetadataProto.RangeIndex.newBuilder()
                         .setId(rs.getLong("RI_ID"))
-                        .setIsPrimary(rs.getBoolean("RI_IS_PRIMARY"))
                         .setKeyColumns(rs.getString("RI_KEY_COLUMNS"))
                         .setTableId(tableId)
                         .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID")).build();
@@ -106,7 +104,6 @@ public class RdbRangeIndexDao extends RangeIndexDao
             {
                 MetadataProto.RangeIndex rangeIndex = MetadataProto.RangeIndex.newBuilder()
                         .setId(rs.getLong("RI_ID"))
-                        .setIsPrimary(rs.getBoolean("RI_IS_PRIMARY"))
                         .setKeyColumns(rs.getString("RI_KEY_COLUMNS"))
                         .setTableId(tableId)
                         .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID")).build();
@@ -145,16 +142,14 @@ public class RdbRangeIndexDao extends RangeIndexDao
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO RANGE_INDEXES(" +
-                "`RI_IS_PRIMARY`," +
                 "`RI_KEY_COLUMNS`," +
                 "`TBLS_TBL_ID`," +
-                "`SCHEMA_VERSIONS_SV_ID`) VALUES (?,?,?,?)";
+                "`SCHEMA_VERSIONS_SV_ID`) VALUES (?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setBoolean(1, rangeIndex.getIsPrimary());
-            pst.setString(2, rangeIndex.getKeyColumns());
-            pst.setLong(3, rangeIndex.getTableId());
-            pst.setLong(4, rangeIndex.getSchemaVersionId());
+            pst.setString(1, rangeIndex.getKeyColumns());
+            pst.setLong(2, rangeIndex.getTableId());
+            pst.setLong(3, rangeIndex.getSchemaVersionId());
             if (pst.executeUpdate() == 1)
             {
                 ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
@@ -185,18 +180,16 @@ public class RdbRangeIndexDao extends RangeIndexDao
         Connection conn = db.getConnection();
         String sql = "UPDATE RANGE_INDEXES\n" +
                 "SET\n" +
-                "`RI_IS_PRIMARY` = ?," +
                 "`RI_KEY_COLUMNS` = ?," +
                 "`TBLS_TBL_ID` = ?," +
                 "`SCHEMA_VERSION_SV_ID` = ?\n" +
                 "WHERE `RI_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setBoolean(1, rangeIndex.getIsPrimary());
-            pst.setString(2, rangeIndex.getKeyColumns());
-            pst.setLong(3, rangeIndex.getTableId());
-            pst.setLong(4, rangeIndex.getSchemaVersionId());
-            pst.setLong(5, rangeIndex.getId());
+            pst.setString(1, rangeIndex.getKeyColumns());
+            pst.setLong(2, rangeIndex.getTableId());
+            pst.setLong(3, rangeIndex.getSchemaVersionId());
+            pst.setLong(4, rangeIndex.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {

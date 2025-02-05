@@ -152,13 +152,13 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES`
 (
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
-    `RI_IS_PRIMARY` TINYINT NOT NULL,
     `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RI_ID`),
     INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
     INDEX `fk_RANGE_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    UNIQUE INDEX `TBL_ID_SV_ID_UNIQUE` (`TBLS_TBL_ID` ASC, `SCHEMA_VERSIONS_SV_ID` ASC) COMMENT 'We ensure every (table, schema_version) has only one range index.',
     CONSTRAINT `fk_RANGE_INDEX_TBLS`
         FOREIGN KEY (`TBLS_TBL_ID`)
             REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES`
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_bin;
+
 
 -- -----------------------------------------------------
 -- Table `pixels_metadata`.`RANGES`
@@ -322,7 +323,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
     `PATHS_PATH_ID` BIGINT NOT NULL,
     PRIMARY KEY (`FILE_ID`),
     INDEX `fk_FILES_PATHS_idx` (`PATHS_PATH_ID` ASC),
-    UNIQUE INDEX `PATHS_PATH_ID_FILE_NAME_UNIQUE` (`PATHS_PATH_ID` ASC, `FILE_NAME` ASC),
+    UNIQUE INDEX `PATH_ID_FILE_NAME_UNIQUE` (`PATHS_PATH_ID` ASC, `FILE_NAME` ASC),
     CONSTRAINT `fk_FILES_PATHS`
         FOREIGN KEY (`PATHS_PATH_ID`)
             REFERENCES `pixels_metadata`.`PATHS` (`PATH_ID`)

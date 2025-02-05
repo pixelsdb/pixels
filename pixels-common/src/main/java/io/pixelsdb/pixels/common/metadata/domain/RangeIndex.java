@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.daemon.MetadataProto;
  */
 public class RangeIndex extends Base
 {
-    private boolean isPrimary;
     private KeyColumns keyColumns;
     private String keyColumnsJson;
     private long tableId;
@@ -40,20 +39,9 @@ public class RangeIndex extends Base
     public RangeIndex(MetadataProto.RangeIndex rangeIndex)
     {
         this.setId(rangeIndex.getId());
-        this.isPrimary = rangeIndex.getIsPrimary();
         this.keyColumnsJson = rangeIndex.getKeyColumns();
         this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
         this.tableId = rangeIndex.getTableId();
-    }
-
-    public boolean isPrimary()
-    {
-        return isPrimary;
-    }
-
-    public void setPrimary(boolean primary)
-    {
-        isPrimary = primary;
     }
 
     public KeyColumns getKeyColumns()
@@ -89,7 +77,7 @@ public class RangeIndex extends Base
     @Override
     public MetadataProto.RangeIndex toProto()
     {
-        return MetadataProto.RangeIndex.newBuilder().setId(this.getId()).setIsPrimary(this.isPrimary)
+        return MetadataProto.RangeIndex.newBuilder().setId(this.getId())
                 .setKeyColumns(this.keyColumnsJson).setTableId(this.tableId).build();
     }
 }
