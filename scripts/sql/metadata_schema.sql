@@ -147,6 +147,33 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 
 
 -- -----------------------------------------------------
+-- Table `pixels_metadata`.`SECONDARY_INDEXES`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SECONDARY_INDEXES` (
+    `SI_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `SI_KEY_COLUMNS` TEXT NOT NULL,
+    `SI_INDEX_SCHEME` VARCHAR(32) NOT NULL,
+    `TBLS_TBL_ID` BIGINT NOT NULL,
+    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
+    PRIMARY KEY (`SI_ID`),
+    INDEX `fk_SECONDARY_INDEXES_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_SECONDARY_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    CONSTRAINT `fk_SECONDARY_INDEXES_TBLS`
+        FOREIGN KEY (`TBLS_TBL_ID`)
+            REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
+    CONSTRAINT `fk_SECONDARY_INDEXES_SCHEMA_VERSIONS`
+        FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
+            REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_bin;
+
+
+-- -----------------------------------------------------
 -- Table `pixels_metadata`.`RANGE_INDEXES`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES`
