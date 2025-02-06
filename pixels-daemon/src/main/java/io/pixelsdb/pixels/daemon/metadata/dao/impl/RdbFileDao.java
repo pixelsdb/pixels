@@ -53,6 +53,8 @@ public class RdbFileDao extends FileDao
                 return MetadataProto.File.newBuilder().setId(id)
                         .setName(rs.getString("FILE_NAME"))
                         .setNumRowGroup(rs.getInt("FILE_NUM_RG"))
+                        .setMinRowId(rs.getLong("FILE_MIN_ROW_ID"))
+                        .setMaxRowId(rs.getLong("FILE_MAX_ROW_ID"))
                         .setPathId(rs.getLong("PATHS_PATH_ID")).build();
             }
         } catch (SQLException e)
@@ -77,6 +79,8 @@ public class RdbFileDao extends FileDao
                         .setId(rs.getLong("FILE_ID"))
                         .setName(rs.getString("FILE_NAME"))
                         .setNumRowGroup(rs.getInt("FILE_NUM_RG"))
+                        .setMinRowId(rs.getLong("FILE_MIN_ROW_ID"))
+                        .setMaxRowId(rs.getLong("FILE_MAX_ROW_ID"))
                         .setPathId(rs.getLong("PATHS_PATH_ID"));
                 files.add(builder.build());
             }
@@ -93,7 +97,7 @@ public class RdbFileDao extends FileDao
     public MetadataProto.File getByPathIdAndFileName(long pathId, String fileName)
     {
         Connection conn = db.getConnection();
-        String sql = "SELECT FILE_ID, FILE_NUM_RG FROM FILES WHERE PATHS_PATH_ID=? AND FILE_NAME=?";
+        String sql = "SELECT FILE_ID, FILE_NUM_RG, FILE_MIN_ROW_ID, FILE_MAX_ROW_ID FROM FILES WHERE PATHS_PATH_ID=? AND FILE_NAME=?";
         try (PreparedStatement st = conn.prepareStatement(sql))
         {
             st.setLong(1, pathId);
@@ -105,6 +109,8 @@ public class RdbFileDao extends FileDao
                         .setId(rs.getLong("FILE_ID"))
                         .setName(fileName)
                         .setNumRowGroup(rs.getInt("FILE_NUM_RG"))
+                        .setMinRowId(rs.getLong("FILE_MIN_ROW_ID"))
+                        .setMaxRowId(rs.getLong("FILE_MAX_ROW_ID"))
                         .setPathId(pathId).build();
             }
         } catch (SQLException e)
@@ -142,12 +148,16 @@ public class RdbFileDao extends FileDao
         String sql = "INSERT INTO FILES(" +
                 "`FILE_NAME`," +
                 "`FILE_NUM_RG`," +
-                "`PATHS_PATH_ID`) VALUES (?,?,?)";
+                "`FILE_MIN_ROW_ID`," +
+                "`FILE_MAX_ROW_ID`," +
+                "`PATHS_PATH_ID`) VALUES (?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, file.getName());
             pst.setInt(2, file.getNumRowGroup());
-            pst.setLong(3, file.getPathId());
+            pst.setLong(3, file.getMinRowId());
+            pst.setLong(4, file.getMaxRowId());
+            pst.setLong(5, file.getPathId());
             if (pst.executeUpdate() == 1)
             {
                 ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
@@ -179,14 +189,18 @@ public class RdbFileDao extends FileDao
         String sql = "INSERT INTO FILES(" +
                 "`FILE_NAME`," +
                 "`FILE_NUM_RG`," +
-                "`PATHS_PATH_ID`) VALUES (?,?,?)";
+                "`FILE_MIN_ROW_ID`," +
+                "`FILE_MAX_ROW_ID`," +
+                "`PATHS_PATH_ID`) VALUES (?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             for (MetadataProto.File file : files)
             {
                 pst.setString(1, file.getName());
                 pst.setInt(2, file.getNumRowGroup());
-                pst.setLong(3, file.getPathId());
+                pst.setLong(3, file.getMinRowId());
+                pst.setLong(4, file.getMaxRowId());
+                pst.setLong(5, file.getPathId());
                 pst.addBatch();
             }
             pst.executeBatch();
@@ -202,16 +216,19 @@ public class RdbFileDao extends FileDao
     public boolean update(MetadataProto.File file)
     {
         Connection conn = db.getConnection();
-        String sql = "UPDATE FILES\n" +
-                "SET\n" +
+        String sql = "UPDATE FILES SET\n" +
                 "`FILE_NAME` = ?," +
-                "`FILE_NUM_RG` = ?\n" +
+                "`FILE_NUM_RG` = ?," +
+                "`FILE_MIN_ROW_ID` = ?," +
+                "`FILE_MAX_ROW_ID` = ?\n" +
                 "WHERE `FILE_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, file.getName());
             pst.setInt(2, file.getNumRowGroup());
-            pst.setLong(3, file.getId());
+            pst.setLong(3, file.getMinRowId());
+            pst.setLong(4, file.getMaxRowId());
+            pst.setLong(5, file.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {

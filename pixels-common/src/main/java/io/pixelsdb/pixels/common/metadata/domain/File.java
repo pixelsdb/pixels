@@ -34,6 +34,8 @@ public class File extends Base
 {
     private String name;
     private int numRowGroup;
+    private long minRowId;
+    private long maxRowId;
     private long pathId;
 
     public File()
@@ -45,6 +47,8 @@ public class File extends Base
         this.setId(file.getId());
         this.name = file.getName();
         this.numRowGroup = file.getNumRowGroup();
+        this.minRowId = file.getMinRowId();
+        this.maxRowId = file.getMaxRowId();
         this.pathId = file.getPathId();
     }
 
@@ -66,6 +70,26 @@ public class File extends Base
     public void setNumRowGroup(int numRowGroup)
     {
         this.numRowGroup = numRowGroup;
+    }
+
+    public long getMinRowId()
+    {
+        return minRowId;
+    }
+
+    public void setMinRowId(long minRowId)
+    {
+        this.minRowId = minRowId;
+    }
+
+    public long getMaxRowId()
+    {
+        return maxRowId;
+    }
+
+    public void setMaxRowId(long maxRowId)
+    {
+        this.maxRowId = maxRowId;
     }
 
     public long getPathId()
@@ -123,8 +147,8 @@ public class File extends Base
     @Override
     public MetadataProto.File toProto()
     {
-        MetadataProto.File.Builder builder = MetadataProto.File.newBuilder()
-                .setId(this.getId()).setName(this.name).setNumRowGroup(this.numRowGroup);
+        MetadataProto.File.Builder builder = MetadataProto.File.newBuilder().setId(this.getId()).setName(this.name)
+                .setNumRowGroup(this.numRowGroup).setMinRowId(this.minRowId).setMaxRowId(this.maxRowId);
         return builder.setPathId(this.pathId).build();
     }
 }
