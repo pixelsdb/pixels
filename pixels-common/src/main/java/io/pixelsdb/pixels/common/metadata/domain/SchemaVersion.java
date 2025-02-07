@@ -38,6 +38,7 @@ public class SchemaVersion extends Base
 
     public SchemaVersion(MetadataProto.SchemaVersion schemaVersion)
     {
+        this.setId(schemaVersion.getId());
         this.columns = Column.convertColumns(schemaVersion.getColumnsList());
         this.transTs = schemaVersion.getTransTs();
         this.tableId = schemaVersion.getTableId();

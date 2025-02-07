@@ -32,6 +32,7 @@ public class Schema extends Base
 
     public Schema(MetadataProto.Schema schema)
     {
+        this.setId(schema.getId());
         this.name = schema.getName();
         this.desc = schema.getDesc();
     }

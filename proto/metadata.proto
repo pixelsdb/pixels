@@ -138,6 +138,14 @@ message Range {
     uint64 rangeIndexId = 5;
 }
 
+message SecondaryIndex {
+    uint64 id = 1;
+    string keyColumns = 2;
+    string indexScheme = 3;
+    uint64 tableId = 4;
+    uint64 schemaVersionId = 5;
+}
+
 message Path {
     enum Type {
         ORDERED = 0;

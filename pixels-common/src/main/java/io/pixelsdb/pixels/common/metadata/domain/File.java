@@ -147,8 +147,7 @@ public class File extends Base
     @Override
     public MetadataProto.File toProto()
     {
-        MetadataProto.File.Builder builder = MetadataProto.File.newBuilder().setId(this.getId()).setName(this.name)
-                .setNumRowGroup(this.numRowGroup).setMinRowId(this.minRowId).setMaxRowId(this.maxRowId);
-        return builder.setPathId(this.pathId).build();
+        return MetadataProto.File.newBuilder().setId(this.getId()).setName(this.name).setNumRowGroup(this.numRowGroup)
+                .setMinRowId(this.minRowId).setMaxRowId(this.maxRowId).setPathId(this.pathId).build();
     }
 }
