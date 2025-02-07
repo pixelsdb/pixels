@@ -45,6 +45,7 @@ public class Table extends Base
 
     public Table(MetadataProto.Table table, List<MetadataProto.Layout> layouts)
     {
+        this.setId(table.getId());
         this.name = table.getName();
         this.type = table.getType();
         this.storageScheme = Storage.Scheme.from(table.getStorageScheme());

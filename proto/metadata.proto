@@ -52,6 +52,10 @@ service MetadataService {
     rpc GetRange (GetRangeRequest) returns (GetRangeResponse);
     rpc GetRanges (GetRangesRequest) returns (GetRangesResponse);
     rpc DeleteRange (DeleteRangeRequest) returns (DeleteRangeResponse);
+    rpc CreateSecondaryIndex (CreateSecondaryIndexRequest) returns (CreateSecondaryIndexResponse);
+    rpc GetSecondaryIndex (GetSecondaryIndexRequest) returns (GetSecondaryIndexResponse);
+    rpc UpdateSecondaryIndex (UpdateSecondaryIndexRequest) returns (UpdateSecondaryIndexResponse);
+    rpc DropSecondaryIndex (DropSecondaryIndexRequest) returns (DropSecondaryIndexResponse);
     rpc AddPath (AddPathRequest) returns (AddPathResponse);
     rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
     rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
@@ -138,6 +142,14 @@ message Range {
     uint64 rangeIndexId = 5;
 }
 
+message SecondaryIndex {
+    uint64 id = 1;
+    string keyColumns = 2;
+    string indexScheme = 3;
+    uint64 tableId = 4;
+    uint64 schemaVersionId = 5;
+}
+
 message Path {
     enum Type {
         ORDERED = 0;
@@ -154,8 +166,10 @@ message Path {
 message File {
     uint64 id = 1;
     string name = 2;
-    int32 numRowGroup = 3;
-    uint64 pathId = 4;
+    uint32 numRowGroup = 3;
+    uint64 minRowId = 4;
+    uint64 maxRowId = 5;
+    uint64 pathId = 6;
 }
 
 message SchemaVersion {
@@ -474,6 +488,44 @@ message DeleteRangeRequest {
 }
 
 message DeleteRangeResponse {
+    ResponseHeader header = 1;
+};
+
+// secondary index
+message CreateSecondaryIndexRequest {
+    RequestHeader header = 1;
+    SecondaryIndex secondaryIndex = 2;
+}
+
+message CreateSecondaryIndexResponse {
+    ResponseHeader header = 1;
+}
+
+message GetSecondaryIndexRequest {
+    RequestHeader header = 1;
+    int64 tableId = 2;
+}
+
+message GetSecondaryIndexResponse {
+    ResponseHeader header = 1;
+    SecondaryIndex secondaryIndex = 2;
+}
+
+message UpdateSecondaryIndexRequest {
+    RequestHeader header = 1;
+    SecondaryIndex secondaryIndex = 2;
+}
+
+message UpdateSecondaryIndexResponse {
+    ResponseHeader header = 1;
+};
+
+message DropSecondaryIndexRequest {
+    RequestHeader header = 1;
+    int64 tableId = 2;
+}
+
+message DropSecondaryIndexResponse {
     ResponseHeader header = 1;
 };
 

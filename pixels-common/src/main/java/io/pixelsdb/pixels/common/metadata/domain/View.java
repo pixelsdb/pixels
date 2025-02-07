@@ -35,6 +35,7 @@ public class View extends Base
 
     public View(MetadataProto.View view)
     {
+        this.setId(view.getId());
         this.name = view.getName();
         this.type = view.getType();
         this.data = view.getData();

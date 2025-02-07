@@ -149,8 +149,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 -- -----------------------------------------------------
 -- Table `pixels_metadata`.`RANGE_INDEXES`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES`
-(
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
@@ -317,9 +316,11 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
 -- Table `pixels_metadata`.`FILES`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
-    `FILE_ID` INT NOT NULL AUTO_INCREMENT,
+    `FILE_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `FILE_NAME` VARCHAR(128) NOT NULL,
     `FILE_NUM_RG` INT NOT NULL,
+    `FILE_MIN_ROW_ID` BIGINT NOT NULL,
+    `FILE_MAX_ROW_ID` BIGINT NOT NULL,
     `PATHS_PATH_ID` BIGINT NOT NULL,
     PRIMARY KEY (`FILE_ID`),
     INDEX `fk_FILES_PATHS_idx` (`PATHS_PATH_ID` ASC),
@@ -327,6 +328,33 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
     CONSTRAINT `fk_FILES_PATHS`
         FOREIGN KEY (`PATHS_PATH_ID`)
             REFERENCES `pixels_metadata`.`PATHS` (`PATH_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_bin;
+
+
+-- -----------------------------------------------------
+-- Table `pixels_metadata`.`SECONDARY_INDEXES`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SECONDARY_INDEXES` (
+    `SI_ID` BIGINT NOT NULL,
+    `SI_KEY_COLUMNS` TEXT NOT NULL,
+    `SI_INDEX_SCHEME` VARCHAR(32) NOT NULL,
+    `TBLS_TBL_ID` BIGINT NOT NULL,
+    `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
+    PRIMARY KEY (`SI_ID`),
+    INDEX `fk_SECONDARY_INDEXES_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_SECONDARY_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    CONSTRAINT `fk_SECONDARY_INDEXES_TBLS`
+        FOREIGN KEY (`TBLS_TBL_ID`)
+            REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
+    CONSTRAINT `fk_SECONDARY_INDEXES_SCHEMA_VERSIONS`
+        FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
+            REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
             ON DELETE CASCADE
             ON UPDATE CASCADE)
     ENGINE = InnoDB
