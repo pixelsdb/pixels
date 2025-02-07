@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.JSON;
-import com.google.protobuf.MessageOrBuilder;
 import io.pixelsdb.pixels.common.index.SecondaryIndex.Scheme;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
@@ -89,7 +88,7 @@ public class SecondaryIndex extends Base
     }
 
     @Override
-    public MessageOrBuilder toProto()
+    public MetadataProto.SecondaryIndex toProto()
     {
         return MetadataProto.SecondaryIndex.newBuilder().setId(this.getId()).setKeyColumns(this.keyColumnsJson)
                 .setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();

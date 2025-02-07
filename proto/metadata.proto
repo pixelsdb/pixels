@@ -52,6 +52,10 @@ service MetadataService {
     rpc GetRange (GetRangeRequest) returns (GetRangeResponse);
     rpc GetRanges (GetRangesRequest) returns (GetRangesResponse);
     rpc DeleteRange (DeleteRangeRequest) returns (DeleteRangeResponse);
+    rpc CreateSecondaryIndex (CreateSecondaryIndexRequest) returns (CreateSecondaryIndexResponse);
+    rpc GetSecondaryIndex (GetSecondaryIndexRequest) returns (GetSecondaryIndexResponse);
+    rpc UpdateSecondaryIndex (UpdateSecondaryIndexRequest) returns (UpdateSecondaryIndexResponse);
+    rpc DropSecondaryIndex (DropSecondaryIndexRequest) returns (DropSecondaryIndexResponse);
     rpc AddPath (AddPathRequest) returns (AddPathResponse);
     rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
     rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
@@ -484,6 +488,44 @@ message DeleteRangeRequest {
 }
 
 message DeleteRangeResponse {
+    ResponseHeader header = 1;
+};
+
+// secondary index
+message CreateSecondaryIndexRequest {
+    RequestHeader header = 1;
+    SecondaryIndex secondaryIndex = 2;
+}
+
+message CreateSecondaryIndexResponse {
+    ResponseHeader header = 1;
+}
+
+message GetSecondaryIndexRequest {
+    RequestHeader header = 1;
+    int64 tableId = 2;
+}
+
+message GetSecondaryIndexResponse {
+    ResponseHeader header = 1;
+    SecondaryIndex secondaryIndex = 2;
+}
+
+message UpdateSecondaryIndexRequest {
+    RequestHeader header = 1;
+    SecondaryIndex secondaryIndex = 2;
+}
+
+message UpdateSecondaryIndexResponse {
+    ResponseHeader header = 1;
+};
+
+message DropSecondaryIndexRequest {
+    RequestHeader header = 1;
+    int64 tableId = 2;
+}
+
+message DropSecondaryIndexResponse {
     ResponseHeader header = 1;
 };
 

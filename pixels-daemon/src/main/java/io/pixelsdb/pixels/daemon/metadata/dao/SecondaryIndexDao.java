@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -25,45 +25,45 @@ import java.util.List;
 
 /**
  * @author hank
- * @create 2024-05-25
+ * @create 2025-02-07
  */
-public abstract class RangeIndexDao implements Dao<MetadataProto.RangeIndex>
+public abstract class SecondaryIndexDao implements Dao<MetadataProto.SecondaryIndex>
 {
     @Override
-    public abstract MetadataProto.RangeIndex getById(long id);
+    public abstract MetadataProto.SecondaryIndex getById(long id);
 
     @Override
-    public List<MetadataProto.RangeIndex> getAll()
+    public List<MetadataProto.SecondaryIndex> getAll()
     {
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public abstract MetadataProto.RangeIndex getByTableId(long tableId);
+    public abstract MetadataProto.SecondaryIndex getByTableId(long tableId);
 
-    public abstract List<MetadataProto.RangeIndex> getAllByTableId(long tableId);
+    public abstract List<MetadataProto.SecondaryIndex> getAllByTableId(long tableId);
 
-    public boolean save (MetadataProto.RangeIndex rangeIndex)
+    public boolean save (MetadataProto.SecondaryIndex secondaryIndex)
     {
-        if (exists(rangeIndex))
+        if (exists(secondaryIndex))
         {
-            return update(rangeIndex);
+            return update(secondaryIndex);
         }
         else
         {
-            return insert(rangeIndex) > 0;
+            return insert(secondaryIndex) > 0;
         }
     }
 
-    abstract public boolean exists (MetadataProto.RangeIndex rangeIndex);
+    abstract public boolean exists (MetadataProto.SecondaryIndex secondaryIndex);
 
     /**
-     * Insert the range index into metadata.
-     * @param rangeIndex the range index
-     * @return the auto-increment id of the inserted range index, <= 0 if insert is failed
+     * Insert the secondary index into metadata.
+     * @param secondaryIndex the secondary index
+     * @return the auto-increment id of the inserted secondary index, <= 0 if insert is failed
      */
-    abstract public long insert (MetadataProto.RangeIndex rangeIndex);
+    abstract public long insert (MetadataProto.SecondaryIndex secondaryIndex);
 
-    abstract public boolean update (MetadataProto.RangeIndex rangeIndex);
+    abstract public boolean update (MetadataProto.SecondaryIndex secondaryIndex);
 
     abstract public boolean deleteByTableId(long tableId);
 }

@@ -773,7 +773,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to add range index", e);
+            throw new MetadataException("failed to create range index", e);
         }
         return true;
     }
@@ -866,7 +866,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to delete range index", e);
+            throw new MetadataException("failed to drop range index", e);
         }
         return true;
     }
@@ -982,6 +982,124 @@ public class MetadataService
         catch (Exception e)
         {
             throw new MetadataException("failed to delete range", e);
+        }
+        return true;
+    }
+
+    public boolean createSecondaryIndex(SecondaryIndex secondaryIndex) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.CreateSecondaryIndexRequest request = MetadataProto.CreateSecondaryIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSecondaryIndex(secondaryIndex.toProto()).build();
+        try
+        {
+            MetadataProto.CreateSecondaryIndexResponse response = this.stub.createSecondaryIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to create secondary index", e);
+        }
+        return true;
+    }
+
+    /**
+     * Get secondary index by table id.
+     * @param tableId the table id
+     * @return null if secondary index is not found for the table id
+     * @throws MetadataException
+     */
+    public SecondaryIndex getSecondaryIndex(long tableId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetSecondaryIndexRequest request = MetadataProto.GetSecondaryIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTableId(tableId).build();
+        try
+        {
+            MetadataProto.GetSecondaryIndexResponse response = this.stub.getSecondaryIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                if (response.getHeader().getErrorCode() == METADATA_RANGE_INDEX_NOT_FOUND)
+                {
+                    /**
+                     * return null if secondary index is not found, this is useful for clients
+                     * as they can hardly deal with error code.
+                     */
+                    return null;
+                }
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return new SecondaryIndex(response.getSecondaryIndex());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get secondary index", e);
+        }
+    }
+
+    public boolean updateSecondaryIndex(SecondaryIndex secondaryIndex) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.UpdateSecondaryIndexRequest request = MetadataProto.UpdateSecondaryIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSecondaryIndex(secondaryIndex.toProto()).build();
+        try
+        {
+            MetadataProto.UpdateSecondaryIndexResponse response = this.stub.updateSecondaryIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update secondary index", e);
+        }
+        return true;
+    }
+
+    public boolean dropSecondaryIndex(long tableId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.DropSecondaryIndexRequest request = MetadataProto.DropSecondaryIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTableId(tableId).build();
+        try
+        {
+            MetadataProto.DropSecondaryIndexResponse response = this.stub.dropSecondaryIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to drop secondary index", e);
         }
         return true;
     }
