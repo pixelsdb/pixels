@@ -56,25 +56,25 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
     /**
      * Initialize the visibility management for all the records.
-     *
      */
     public RetinaServerImpl()
     {
         this.metadataService = MetadataService.Instance();
         this.visibilityMap = new ConcurrentHashMap<>();
-        try {
+        try
+        {
             boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
             boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
             List<Schema> schemas = this.metadataService.getSchemas();
-            for (Schema schema : schemas) {
-                if (schema.getName().equals("tpch_4")) {
-                    continue;
-                }
+            for (Schema schema : schemas)
+            {
                 List<Table> tables = this.metadataService.getTables(schema.getName());
-                for (Table table : tables) {
+                for (Table table : tables)
+                {
                     List<Layout> layouts = this.metadataService.getLayouts(schema.getName(), table.getName());
                     List<String> files = new LinkedList<>();
-                    for (Layout layout : layouts) {
+                    for (Layout layout : layouts)
+                    {
                         if (layout.isReadable())
                         {
                             if (orderedEnabled)
@@ -93,34 +93,46 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                             }
                         }
                     }
-                    for (String filePath: files)
+                    for (String filePath : files)
                     {
-                        Storage storage = StorageFactory.Instance().getStorage(filePath);
-                        PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(storage, filePath);
-                        long fileLen = fsReader.getFileLength();
-                        fsReader.seek(fileLen - Long.BYTES);
-                        long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
-                        int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
-                        fsReader.seek(fileTailOffset);
-                        ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
-                        PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
-                        PixelsProto.Footer footer = fileTail.getFooter();
-                        long fileId = this.metadataService.getFileId(filePath);
-                        for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
-                        {
-                            int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
-                            int unitCount = (recordNum + 255) / 255;
-                            for (int unitId = 0; unitId < unitCount; unitId++)
-                            {
-                                Visibility visibility = new Visibility();
-                                String key = fileId + "_" + rgId + "_" + unitId;
-                                visibilityMap.put(key, visibility);
-                            }
-                        }
+                        addVisibility(filePath);
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
+            logger.error("Error while initializing RetinaServerImpl", e);
+        }
+    }
+
+    public void addVisibility(String filePath)
+    {
+        try
+        {
+            Storage storage = StorageFactory.Instance().getStorage(filePath);
+            PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(storage, filePath);
+            long fileLen = fsReader.getFileLength();
+            fsReader.seek(fileLen - Long.BYTES);
+            long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
+            int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
+            fsReader.seek(fileTailOffset);
+            ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
+            PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
+            PixelsProto.Footer footer = fileTail.getFooter();
+            long fileId = this.metadataService.getFileId(filePath);
+            for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
+            {
+                int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
+                int unitCount = (recordNum + 255) / 255;
+                for (int unitId = 0; unitId < unitCount; unitId++)
+                {
+                    Visibility visibility = new Visibility();
+                    String key = fileId + "_" + rgId + "_" + unitId;
+                    visibilityMap.put(key, visibility);
+                }
+            }
+        } catch (Exception e)
+        {
             logger.error("Error while initializing RetinaServerImpl", e);
         }
     }
@@ -148,34 +160,62 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
     @Override
     public void queryRecords(RetinaProto.QueryRecordsRequest request,
-                            StreamObserver<RetinaProto.QueryRecordsResponse> responseObserver)
+                             StreamObserver<RetinaProto.QueryRecordsResponse> responseObserver)
     {
         // TODO: Implement QueryRecords
     }
 
     @Override
     public void finishRecords(RetinaProto.QueryAck request,
-                            StreamObserver<RetinaProto.ResponseHeader> responseObserver)
+                              StreamObserver<RetinaProto.ResponseHeader> responseObserver)
     {
         // TODO: Implement FinishRecords
+    }
+
+    @Override
+    public void addVisibility(RetinaProto.AddVisibilityRequest request,
+                              StreamObserver<RetinaProto.AddVisibilityResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        String filePath = request.getFilePath();
+        addVisibility(filePath);
+
+        RetinaProto.AddVisibilityResponse response = RetinaProto.AddVisibilityResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
     public void queryVisibility(RetinaProto.QueryVisibilityRequest request,
                                 StreamObserver<RetinaProto.QueryVisibilityResponse> responseObserver)
     {
-        // TODO: Implement QueryVisibility
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        int rgId = request.getRgid();
+        String filePath = request.getFilePath();
+        int startIndex = request.getStartIndex();
+        int length = request.getLength();
+        long timestamp = request.getTimestamp();
+
+
+        // getfileuri
+        // getfileId(fileuri)
     }
 
     @Override
     public void finishVisibility(RetinaProto.QueryAck request,
-                                StreamObserver<RetinaProto.ResponseHeader> responseObserver)
+                                 StreamObserver<RetinaProto.ResponseHeader> responseObserver)
     {
         // TODO: Implement FinishVisibility
     }
 
     /**
      * Check if the order or compact paths from pixels metadata is valid.
+     *
      * @param paths the order or compact paths from pixels metadata.
      */
     public static void validateOrderedOrCompactPaths(String[] paths)

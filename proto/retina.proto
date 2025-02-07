@@ -48,6 +48,7 @@ service RetinaWorkerService {
   rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
   rpc QueryRecords (QueryRecordsRequest) returns (QueryRecordsResponse);
   rpc FinishRecords (QueryAck) returns (ResponseHeader);
+  rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
   rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
   rpc FinishVisibility (QueryAck) returns (ResponseHeader);
 }
@@ -96,7 +97,7 @@ message InsertRecordRequest {
   string tableName = 3;
   sint64 timestamp = 4;
   sint32 pkId = 5;
-  repeated Value values = 7;
+  repeated Value values = 6;
 }
 
 message InsertRecordResponse {
@@ -116,6 +117,15 @@ message DeleteRecordResponse {
   ResponseHeader header = 1;
 }
 
+message AddVisibilityRequest {
+  RequestHeader header = 1;
+  string filePath = 2;
+}
+
+message AddVisibilityResponse {
+  ResponseHeader header = 1;
+}
+
 message QueryRecordsRequest {
   RequestHeader header = 1;
   string schemaName = 2;
@@ -131,18 +141,19 @@ message QueryRecordsResponse {
 
 message QueryVisibilityRequest {
   RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  sint32 rgid = 4;
-  sint64 timestamp = 5;
+  string filePath = 2;
+  sint32 rgid = 3;
+  sint32 startIndex = 4;
+  sint32 length = 5;
+  sint64 timestamp = 6;
 }
 
 message QueryVisibilityResponse {
   ResponseHeader header = 1;
-  sint64 pos = 2;
+  uint64 bitmap = 2;
 }
 
 message QueryAck {
   RequestHeader header = 1;
-  sint64 pos = 2;
+  repeated uint64 bitmap = 2;
 }

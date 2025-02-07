@@ -1094,6 +1094,9 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     }
                 }
 
+                // TODO: check visibility
+                // getVisibility(filePath, rgid, curRowInRG, curBatchSize)
+
                 // read vectors with selected rows
                 for (int i = 0; i < resultColumns.length; i++)
                 {
