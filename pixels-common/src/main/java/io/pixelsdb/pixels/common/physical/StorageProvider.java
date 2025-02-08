@@ -49,7 +49,7 @@ public interface StorageProvider
 
     /**
      * @param scheme the given storage scheme.
-     * @return true if this physical reader provider is compatible with the given storage scheme.
+     * @return true if this storage provider is compatible with the given storage scheme.
      */
     boolean compatibleWith(@Nonnull Storage.Scheme scheme);
 }

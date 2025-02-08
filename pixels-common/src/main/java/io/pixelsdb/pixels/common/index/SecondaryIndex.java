@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
 /**
  * @author hank
  * @create 2025-02-07
@@ -70,4 +73,20 @@ public interface SecondaryIndex
             return this == other;
         }
     }
+
+    long getUniqueRowId(ByteBuffer key);
+
+    long[] getRowIds(ByteBuffer key);
+
+    boolean putRowId(ByteBuffer key, long rowId);
+
+    boolean deleteRowId(ByteBuffer key);
+
+    /**
+     * Close the secondary index. This method is to be used by the secondary index factory to close the
+     * managed secondary index instances when the process is shutting down.
+     * Users do not need to close the managed secondary index instances by themselves.
+     * @throws IOException
+     */
+    void close() throws IOException;
 }

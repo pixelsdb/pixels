@@ -227,17 +227,7 @@ public class CacheCoordinator implements Server
             // Issue #708: no need the shut down the metadata service instance created using the configured host and port.
             metadataService = null;
         }
-        if (storage != null)
-        {
-            try
-            {
-                storage.close();
-            }
-            catch (IOException e)
-            {
-                logger.error("Failed to close cache storage while shutting down cache coordinator.", e);
-            }
-        }
+        // No need to close the storage instance as it is managed by the StorageFactory.
         if (runningLatch != null)
         {
             runningLatch.countDown();

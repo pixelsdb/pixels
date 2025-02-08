@@ -287,7 +287,8 @@ public interface Storage
     boolean directCopy(String src, String dest) throws IOException;
 
     /**
-     * Close the storage.
+     * Close the storage. This method is to be used by the storage factory to close the managed storage instances
+     * when the process is shutting down. Users do not need to close the managed storage instances by themselves.
      * @throws IOException
      */
     void close() throws IOException;
