@@ -8,7 +8,7 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>pixels-secondary-rocksdb</artifactId>
+    <artifactId>pixels-index-rocksdb</artifactId>
     <description>Pixels secondary index backed by RocksDB-compatible storage.</description>
 
     <properties>
@@ -25,8 +25,8 @@
         </dependency>
 
         <dependency>
-            <groupId>net.java.dev.jna</groupId>
-            <artifactId>jna</artifactId>
+            <groupId>org.rocksdb</groupId>
+            <artifactId>rocksdbjni</artifactId>
         </dependency>
 
         <dependency>
