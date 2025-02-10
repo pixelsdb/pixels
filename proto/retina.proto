@@ -28,132 +28,94 @@ option java_outer_classname = "RetinaProto";
 
 package retina.proto;
 
-/*
-service RetinaCoordinatorService {
-  rpc SplitRange (SplitRangeRequest) returns (SplitRangeResponse);
-  rpc MergeRange (MergeRangeRequest) returns (MergeRangeResponse);
-  rpc DropRange (DropRangeRequest) returns (DropRangeResponse);
-  rpc MoveRange (MoveRangeRequest) returns (MoveRangeResponse);
-  rpc LookupRange (LookupRangeRequest) returns (LookupRangeResponse);
-}
-*/
-
-// The following rpc methods are defined by the old retina implementation.
-// They will be replaced by the new implementation.
-
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
-  rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
-  rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
-  rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
-  rpc QueryRecords (QueryRecordsRequest) returns (QueryRecordsResponse);
-  rpc FinishRecords (QueryAck) returns (ResponseHeader);
-  rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
-  rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
-  rpc FinishVisibility (QueryAck) returns (ResponseHeader);
+    rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
+    rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
+    rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
+    rpc BeginRowGroupRead (BeginRowGroupReadRequest) returns (BeginRowGroupReadResponse);
+    rpc EndRowGroupRead (EndRowGroupReadRequest) returns (EndRowGroupReadResponse);
+    rpc BeginGarbageCollect (BeginGarbageCollectRequest) returns (BeginGarbageCollectResponse);
+    rpc EndGarbageCollect (EndGarbageCollectRequest) returns (EndGarbageCollectResponse);
 }
 
 // header
 message RequestHeader {
-  string token = 1;
+    string token = 1;
 }
 
 message ResponseHeader {
-  string token = 1;
-  int32 errorCode = 2; // errorCode == 0 means success
-  string errorMsg = 3; // empty if errorCode == 0
-}
-
-message Value {
-  oneof value {
-    sint32 integerValue = 1;
-    sint64 longValue = 2;
-    double doubleValue = 3;
-    string stringValue = 4;
-    sint64 timestampValue = 5;
-    sint32 dateValue = 6;
-    sint32 timeValue = 7;
-  }
-}
-
-message UpdateRecordRequest {
-  RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  Value primaryKey = 4;
-  sint64 timestamp = 5;
-  sint32 pkId = 6;
-  repeated Value originalValues = 7;
-  repeated Value newValues = 8;
-}
-
-message UpdateRecordResponse {
-  ResponseHeader header = 1;
-}
-
-message InsertRecordRequest {
-  RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  sint64 timestamp = 4;
-  sint32 pkId = 5;
-  repeated Value values = 6;
-}
-
-message InsertRecordResponse {
-  ResponseHeader header = 1;
+    string token = 1;
+    int32 errorCode = 2; // errorCode == 0 means success
+    string errorMsg = 3; // empty if errorCode == 0
 }
 
 message DeleteRecordRequest {
-  RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  sint64 timestamp = 4;
-  sint32 pkId = 5;
-  Value primaryKey = 6;
+    RequestHeader header = 1;
+    string filePath = 2;
+    sint64 rgid = 3;
+    sint64 rowId = 4;
+    sint64 timestamp = 5;
 }
 
 message DeleteRecordResponse {
-  ResponseHeader header = 1;
+    ResponseHeader header = 1;
 }
-
+  
 message AddVisibilityRequest {
-  RequestHeader header = 1;
-  string filePath = 2;
+    RequestHeader header = 1;
+    string filePath = 2;
 }
 
 message AddVisibilityResponse {
-  ResponseHeader header = 1;
+    ResponseHeader header = 1;
 }
-
-message QueryRecordsRequest {
-  RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  sint32 rgid = 4;
-  sint64 timestamp = 5;
-}
-
-message QueryRecordsResponse {
-  ResponseHeader header = 1;
-  sint64 pos = 2;
-}
-
+  
 message QueryVisibilityRequest {
-  RequestHeader header = 1;
-  string filePath = 2;
-  sint32 rgid = 3;
-  sint32 startIndex = 4;
-  sint32 length = 5;
-  sint64 timestamp = 6;
+    RequestHeader header = 1;
+    string filePath = 2;
+    sint32 rgid = 3;
+    sint64 timestamp = 4;
 }
-
+  
 message QueryVisibilityResponse {
-  ResponseHeader header = 1;
-  uint64 bitmap = 2;
+    ResponseHeader header = 1;
+    uint64 bitmap = 2;
 }
 
-message QueryAck {
-  RequestHeader header = 1;
-  repeated uint64 bitmap = 2;
+message BeginRowGroupReadRequest {
+    RequestHeader header = 1;
+    string filePath = 2;
+    sint64 rgid = 3;
+}
+
+message BeginRowGroupReadResponse {
+    ResponseHeader header = 1;
+}
+
+message EndRowGroupReadRequest {
+    RequestHeader header = 1;
+}
+
+message EndRowGroupReadResponse {
+    ResponseHeader header = 1;
+}
+
+message BeginGarbageCollectRequest {
+    RequestHeader header = 1;
+    string filePath = 2;
+    sint64 rgid = 3;
+    sint64 timestamp = 4;
+}
+
+message BeginGarbageCollectResponse {
+    ResponseHeader header = 1;
+}
+
+message EndGarbageCollectRequest {
+    RequestHeader header = 1;
+}
+
+message EndGarbageCollectResponse {
+    ResponseHeader header = 1;
 }

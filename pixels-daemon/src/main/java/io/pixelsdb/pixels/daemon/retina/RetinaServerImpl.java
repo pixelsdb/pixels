@@ -29,8 +29,8 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
+import io.pixelsdb.pixels.retina.Retina;
 import io.pixelsdb.pixels.retina.RetinaProto;
-import io.pixelsdb.pixels.retina.Visibility;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -52,7 +52,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 {
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
-    private Map<String, Visibility> visibilityMap;
+    private final Map<String, Retina> retinaMap;
 
     /**
      * Initialize the visibility management for all the records.
@@ -60,7 +60,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     public RetinaServerImpl()
     {
         this.metadataService = MetadataService.Instance();
-        this.visibilityMap = new ConcurrentHashMap<>();
+        this.retinaMap = new ConcurrentHashMap<>();
         try
         {
             boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
@@ -123,13 +123,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
             {
                 int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
-                int unitCount = (recordNum + 255) / 255;
-                for (int unitId = 0; unitId < unitCount; unitId++)
-                {
-                    Visibility visibility = new Visibility();
-                    String key = fileId + "_" + rgId + "_" + unitId;
-                    visibilityMap.put(key, visibility);
-                }
+                Retina retina = new Retina(recordNum);
+                String rgKey = fileId + "_" + rgId;
+                retinaMap.put(rgKey, retina);
             }
         } catch (Exception e)
         {
@@ -138,38 +134,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     @Override
-    public void updateRecord(RetinaProto.UpdateRecordRequest request,
-                             StreamObserver<RetinaProto.UpdateRecordResponse> responseObserver)
-    {
-        // TODO: Implement updateRecord
-    }
-
-    @Override
-    public void insertRecord(RetinaProto.InsertRecordRequest request,
-                             StreamObserver<RetinaProto.InsertRecordResponse> responseObserver)
-    {
-        // TODO: Implement insertRecord
-    }
-
-    @Override
     public void deleteRecord(RetinaProto.DeleteRecordRequest request,
                              StreamObserver<RetinaProto.DeleteRecordResponse> responseObserver)
     {
         // TODO: Implement DeleteRecord
-    }
-
-    @Override
-    public void queryRecords(RetinaProto.QueryRecordsRequest request,
-                             StreamObserver<RetinaProto.QueryRecordsResponse> responseObserver)
-    {
-        // TODO: Implement QueryRecords
-    }
-
-    @Override
-    public void finishRecords(RetinaProto.QueryAck request,
-                              StreamObserver<RetinaProto.ResponseHeader> responseObserver)
-    {
-        // TODO: Implement FinishRecords
     }
 
     @Override
@@ -197,20 +165,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         int rgId = request.getRgid();
         String filePath = request.getFilePath();
-        int startIndex = request.getStartIndex();
-        int length = request.getLength();
         long timestamp = request.getTimestamp();
-
-
+        
         // getfileuri
         // getfileId(fileuri)
-    }
-
-    @Override
-    public void finishVisibility(RetinaProto.QueryAck request,
-                                 StreamObserver<RetinaProto.ResponseHeader> responseObserver)
-    {
-        // TODO: Implement FinishVisibility
     }
 
     /**
