@@ -61,6 +61,7 @@
         <module>pixels-turbo/pixels-invoker-vhive</module>
         <module>pixels-turbo/pixels-scaling-general</module>
         <module>pixels-index/pixels-index-rocksdb</module>
+        <module>pixels-index/pixels-index-main</module>
     </modules>
 
     <properties>
