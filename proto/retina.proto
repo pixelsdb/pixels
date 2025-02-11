@@ -28,16 +28,6 @@ option java_outer_classname = "RetinaProto";
 
 package retina.proto;
 
-/*
-service RetinaCoordinatorService {
-  rpc SplitRange (SplitRangeRequest) returns (SplitRangeResponse);
-  rpc MergeRange (MergeRangeRequest) returns (MergeRangeResponse);
-  rpc DropRange (DropRangeRequest) returns (DropRangeResponse);
-  rpc MoveRange (MoveRangeRequest) returns (MoveRangeResponse);
-  rpc LookupRange (LookupRangeRequest) returns (LookupRangeResponse);
-}
-*/
-
 // The following rpc methods are defined by the old retina implementation.
 // They will be replaced by the new implementation.
 
