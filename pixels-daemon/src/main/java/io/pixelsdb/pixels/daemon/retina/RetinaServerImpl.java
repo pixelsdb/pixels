@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.daemon.retina;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
@@ -50,7 +51,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServiceImplBase
 {
-    private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
+    private static final Logger log = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
     private final Map<String, Retina> retinaMap;
 
@@ -101,11 +102,23 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             }
         } catch (Exception e)
         {
-            logger.error("Error while initializing RetinaServerImpl", e);
+            log.error("Error while initializing RetinaServerImpl", e);
         }
     }
 
-    public void addVisibility(String filePath)
+    public void deleteRecord(String filePath, long rgId, long rowId, long timestamp) throws RetinaException
+    {
+        try
+        {
+            Retina retina = checkRetina(filePath, rgId);
+            retina.deleteRecord(rowId, timestamp);
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while deleting record", e);
+        }
+    }
+
+    public void addVisibility(String filePath) throws RetinaException
     {
         try
         {
@@ -129,31 +142,122 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             }
         } catch (Exception e)
         {
-            logger.error("Error while initializing RetinaServerImpl", e);
+            throw new RetinaException("Error while adding visibility", e);
         }
     }
 
+    public long[] queryVisibility(String filePath, long rgId, long timestamp) throws RetinaException
+    {
+        try
+        {
+            Retina retina = checkRetina(filePath, rgId);
+            long[] visibilityBitmap = retina.getVisibilityBitmap(timestamp);
+            if (visibilityBitmap == null)
+            {
+                throw new RetinaException("Visibility bitmap not found for filePath: " + filePath + " and rgId: " + rgId);
+            }
+            return visibilityBitmap;
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while getting visibility bitmap", e);
+        }
+    }
+
+    public void beginAccess(String filePath, long rgId) throws RetinaException
+    {
+        try 
+        {
+            Retina retina = checkRetina(filePath, rgId);
+            retina.beginAccess();
+        } catch (Exception e) {
+            throw new RetinaException("Error while beginning row group read", e);
+        }
+    }
+    
+    public void endAccess(String filePath, long rgId) throws RetinaException
+    {
+        try 
+        {
+            Retina retina = checkRetina(filePath, rgId);
+            retina.endAccess();
+        } catch (Exception e) {
+            throw new RetinaException("Error while ending row group read", e);
+        }
+    }
+    
+    public void beginGarbageCollect(String filePath, long rgId, long timestamp) throws RetinaException
+    {
+        try 
+        {
+            Retina retina = checkRetina(filePath, rgId);
+            retina.beginGarbageCollect(timestamp);
+        } catch (Exception e) {
+            throw new RetinaException("Error while beginning garbage collect", e);
+        }
+    }
+
+    public void endGarbageCollect(String filePath, long rgId) throws RetinaException
+    {
+        try 
+        {
+            Retina retina = checkRetina(filePath, rgId);
+            retina.endGarbageCollect();
+        } catch (Exception e) {
+            throw new RetinaException("Error while ending garbage collect", e);
+        }
+    }
+    
     @Override
     public void deleteRecord(RetinaProto.DeleteRecordRequest request,
                              StreamObserver<RetinaProto.DeleteRecordResponse> responseObserver)
     {
-        // TODO: Implement DeleteRecord
-    }
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
 
+        try {
+            String filePath = request.getFilePath();
+            long rgId = request.getRgid();
+            long rowId = request.getRowId();
+            long timestamp = request.getTimestamp();
+            deleteRecord(filePath, rgId, rowId, timestamp);
+
+            RetinaProto.DeleteRecordResponse response = RetinaProto.DeleteRecordResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (RetinaException e) {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.DeleteRecordResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+    
     @Override
     public void addVisibility(RetinaProto.AddVisibilityRequest request,
                               StreamObserver<RetinaProto.AddVisibilityResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
+        
+        try
+        {
+            String filePath = request.getFilePath();
+            addVisibility(filePath);
 
-        String filePath = request.getFilePath();
-        addVisibility(filePath);
-
-        RetinaProto.AddVisibilityResponse response = RetinaProto.AddVisibilityResponse.newBuilder()
-                .setHeader(headerBuilder.build()).build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+            RetinaProto.AddVisibilityResponse response = RetinaProto.AddVisibilityResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (RetinaException e) 
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.AddVisibilityResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
     }
 
     @Override
@@ -163,12 +267,135 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        int rgId = request.getRgid();
-        String filePath = request.getFilePath();
-        long timestamp = request.getTimestamp();
-        
-        // getfileuri
-        // getfileId(fileuri)
+        try 
+        {
+            String filePath = request.getFilePath();
+            int rgId = request.getRgid();
+            long timestamp = request.getTimestamp();
+            long[] visibilityBitmap = queryVisibility(filePath, rgId, timestamp);
+
+            RetinaProto.QueryVisibilityResponse.Builder responseBuilder = RetinaProto.QueryVisibilityResponse.newBuilder()
+                    .setHeader(headerBuilder.build());
+            for (long value : visibilityBitmap) 
+            {
+                responseBuilder.addBitmap(value);
+            }
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+        } catch (RetinaException e) 
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.QueryVisibilityResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+    
+    @Override
+    public void beginAccess(RetinaProto.BeginAccessRequest request,
+                                 StreamObserver<RetinaProto.BeginAccessResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try 
+        {
+            String filePath = request.getFilePath();
+            long rgId = request.getRgid();
+            beginAccess(filePath, rgId);
+
+        RetinaProto.BeginAccessResponse response = RetinaProto.BeginAccessResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (RetinaException e) 
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.BeginAccessResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void endAccess(RetinaProto.EndAccessRequest request,
+                                StreamObserver<RetinaProto.EndAccessResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try 
+        {
+            String filePath = request.getFilePath();
+            long rgId = request.getRgid();
+            endAccess(filePath, rgId);
+
+        RetinaProto.EndAccessResponse response = RetinaProto.EndAccessResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (RetinaException e) 
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.EndAccessResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+    
+    @Override
+    public void beginGarbageCollect(RetinaProto.BeginGarbageCollectRequest request,
+                                   StreamObserver<RetinaProto.BeginGarbageCollectResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try {
+            String filePath = request.getFilePath();
+            long rgId = request.getRgid();
+            long timestamp = request.getTimestamp();
+            beginGarbageCollect(filePath, rgId, timestamp);
+
+            RetinaProto.BeginGarbageCollectResponse response = RetinaProto.BeginGarbageCollectResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (RetinaException e) {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.BeginGarbageCollectResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+    
+    @Override
+    public void endGarbageCollect(RetinaProto.EndGarbageCollectRequest request,
+                                  StreamObserver<RetinaProto.EndGarbageCollectResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try 
+        {
+            String filePath = request.getFilePath();
+            long rgId = request.getRgid();
+            endGarbageCollect(filePath, rgId);
+
+        RetinaProto.EndGarbageCollectResponse response = RetinaProto.EndGarbageCollectResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted(); 
+        } catch (RetinaException e) 
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.EndGarbageCollectResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+        }
     }
 
     /**
@@ -180,18 +407,42 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         requireNonNull(paths, "paths is null");
         checkArgument(paths.length > 0, "paths must contain at least one valid directory");
-        try
+        try 
         {
             Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths[0]);
-            for (int i = 1; i < paths.length; ++i)
+            for (int i = 1; i < paths.length; ++i) 
             {
                 Storage.Scheme scheme = Storage.Scheme.fromPath(paths[i]);
                 checkArgument(firstScheme.equals(scheme),
                         "all the directories in the paths must have the same storage scheme");
             }
-        } catch (Throwable e)
-        {
+        } catch (Throwable e) {
             throw new RuntimeException("failed to parse storage scheme from paths", e);
+        }
+    }
+    
+    /**
+     * Check if the retina exists for the given filePath and rgId.
+     * 
+     * @param filePath the file path.
+     * @param rgId the row group id.
+     * @throws RetinaException if the retina does not exist.
+     */
+    private Retina checkRetina(String filePath, long rgId) throws RetinaException
+    {
+        try 
+        {
+            long fileId = this.metadataService.getFileId(filePath);
+            String retinaKey = fileId + "_" + rgId;
+            Retina retina = this.retinaMap.get(retinaKey);
+            if (retina == null) 
+            {
+                throw new RetinaException("Retina not found for filePath: " + filePath + " and rgId: " + rgId);
+            }
+            return retina;
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while checking retina", e);
         }
     }
 }

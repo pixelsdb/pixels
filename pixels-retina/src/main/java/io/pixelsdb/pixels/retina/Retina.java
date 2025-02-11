@@ -36,19 +36,23 @@ public class Retina implements AutoCloseable
     static
     {
         String pixelsHome = System.getenv("PIXELS_HOME");
-        if (pixelsHome == null || pixelsHome.isEmpty()) {
+        if (pixelsHome == null || pixelsHome.isEmpty()) 
+        {
             throw new IllegalStateException("Environment variable PIXELS_HOME is not set");
         }
 
-        if (!Platform.isLinux()) {
+        if (!Platform.isLinux()) 
+        {
             logger.error("direct io is not supported on OS other than Linux");
         }
         String libPath = Paths.get(pixelsHome, "lib/libpixels-retina.so").toString();
         File libFile = new File(libPath);
-        if (!libFile.exists()) {
+        if (!libFile.exists()) 
+        {
             throw new IllegalStateException("libpixels-retina.so not found at " + libPath);
         }
-        if (!libFile.canRead()) {
+        if (!libFile.canRead()) 
+        {
             throw new IllegalStateException("libpixels-retina.so is not readable at " + libPath);
         }
         System.load(libPath);
@@ -67,7 +71,8 @@ public class Retina implements AutoCloseable
     @Override
     public void close()
     {
-        if (this.nativeHandle != 0) {
+        if (this.nativeHandle != 0) 
+        {
             destroyNativeObject(this.nativeHandle);
         }
     }
@@ -75,21 +80,21 @@ public class Retina implements AutoCloseable
     // native methods
     private native long createNativeObject(long rgRecordNum);
     private native void destroyNativeObject(long nativeHandle);
-    private native void beginRowGroupRead(long nativeHandle);
-    private native void endRowGroupRead(long nativeHandle);
+    private native void beginAccess(long nativeHandle);
+    private native void endAccess(long nativeHandle);
     private native void deleteRecord(long rowId, long timestamp, long nativeHandle);
-    private native void getVisibilityBitmap(long timestamp, long[] visibilityBitmap, long nativeHandle);
+    private native long[] getVisibilityBitmap(long timestamp, long nativeHandle);
     private native void beginGarbageCollect(long timestamp, long nativeHandle);
     private native void endGarbageCollect(long nativeHandle);
 
-    public void beginRowGroupRead()
+    public void beginAccess()
     {
-        beginRowGroupRead(this.nativeHandle);
+        beginAccess(this.nativeHandle);
     }
 
-    public void endRowGroupRead()
+    public void endAccess()
     {
-        endRowGroupRead(this.nativeHandle);
+        endAccess(this.nativeHandle);
     }
 
     public void deleteRecord(long rowId, long timestamp)
@@ -97,9 +102,9 @@ public class Retina implements AutoCloseable
         deleteRecord(rowId, timestamp, this.nativeHandle);
     }
 
-    public void getVisibilityBitmap(long timestamp, long[] visibilityBitmap)
+    public long[] getVisibilityBitmap(long timestamp)
     {
-        getVisibilityBitmap(timestamp, visibilityBitmap, this.nativeHandle);
+        return getVisibilityBitmap(timestamp, this.nativeHandle);
     }
 
     public void beginGarbageCollect(long timestamp)

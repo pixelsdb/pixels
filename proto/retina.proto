@@ -33,8 +33,8 @@ service RetinaWorkerService {
     rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
     rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
     rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
-    rpc BeginRowGroupRead (BeginRowGroupReadRequest) returns (BeginRowGroupReadResponse);
-    rpc EndRowGroupRead (EndRowGroupReadRequest) returns (EndRowGroupReadResponse);
+    rpc BeginAccess (BeginAccessRequest) returns (BeginAccessResponse);
+    rpc EndAccess (EndAccessRequest) returns (EndAccessResponse);
     rpc BeginGarbageCollect (BeginGarbageCollectRequest) returns (BeginGarbageCollectResponse);
     rpc EndGarbageCollect (EndGarbageCollectRequest) returns (EndGarbageCollectResponse);
 }
@@ -80,24 +80,26 @@ message QueryVisibilityRequest {
   
 message QueryVisibilityResponse {
     ResponseHeader header = 1;
-    uint64 bitmap = 2;
+    repeated uint64 bitmap = 2;
 }
 
-message BeginRowGroupReadRequest {
+message BeginAccessRequest {
     RequestHeader header = 1;
     string filePath = 2;
     sint64 rgid = 3;
 }
 
-message BeginRowGroupReadResponse {
+message BeginAccessResponse {
     ResponseHeader header = 1;
 }
 
-message EndRowGroupReadRequest {
+message EndAccessRequest {
     RequestHeader header = 1;
+    string filePath = 2;
+    sint64 rgid = 3;
 }
 
-message EndRowGroupReadResponse {
+message EndAccessResponse {
     ResponseHeader header = 1;
 }
 
@@ -114,6 +116,8 @@ message BeginGarbageCollectResponse {
 
 message EndGarbageCollectRequest {
     RequestHeader header = 1;
+    string filePath = 2;
+    sint64 rgid = 3;
 }
 
 message EndGarbageCollectResponse {
