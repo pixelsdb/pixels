@@ -20,9 +20,14 @@
 package io.pixelsdb.pixels.index.main;
 
 /**
+ * The main index of a table is the mapping from row id to data file.
+ * Each version of each row has a unique row id.
+ * The row id of each table is an unsigned int_64 increases from zero.
+ *
  * @author hank
  * @create 2025-02-10
  */
 public class MainIndex
 {
+
 }

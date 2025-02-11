@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.common.index;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author hank
@@ -78,9 +80,13 @@ public interface SecondaryIndex
 
     long[] getRowIds(ByteBuffer key);
 
-    boolean putRowId(ByteBuffer key, long rowId);
+    boolean putEntry(ByteBuffer key, long rowId);
 
-    boolean deleteRowId(ByteBuffer key);
+    boolean putEntries(Map<ByteBuffer, Long> entries);
+
+    boolean deleteEntry(ByteBuffer key);
+
+    boolean deleteEntries(List<ByteBuffer> keys);
 
     /**
      * Close the secondary index. This method is to be used by the secondary index factory to close the

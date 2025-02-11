@@ -23,6 +23,8 @@ import io.pixelsdb.pixels.common.index.SecondaryIndex;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author hank
@@ -43,13 +45,25 @@ public class RocksDBIndex implements SecondaryIndex
     }
 
     @Override
-    public boolean putRowId(ByteBuffer key, long rowId)
+    public boolean putEntry(ByteBuffer key, long rowId)
     {
         return false;
     }
 
     @Override
-    public boolean deleteRowId(ByteBuffer key)
+    public boolean putEntries(Map<ByteBuffer, Long> entries)
+    {
+        return false;
+    }
+
+    @Override
+    public boolean deleteEntry(ByteBuffer key)
+    {
+        return false;
+    }
+
+    @Override
+    public boolean deleteEntries(List<ByteBuffer> keys)
     {
         return false;
     }
