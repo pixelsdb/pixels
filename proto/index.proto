@@ -30,9 +30,65 @@ package retina.proto;
 
 // The index services definition.
 service IndexService {
-  //rpc LookupIndex (LookupIndexRequest) returns (LookupIndexResponse);
-  //rpc PutIndexEntry (PutIndexEntryRequest) returns (PutIndexEntryResponse);
-  //rpc DeleteIndexEntry (DeleteIndexEntryRequest) returns (DeleteIndexEntryResponse);
-  //rpc PutIndexEntries (PutIndexEntriesRequest) returns (PutIndexEntriesResponse);
-  //rpc DeleteIndexEntries (DeleteIndexEntryiesRequest) returns (DeleteIndexEntriesResponse);
+  rpc LookupIndex (LookupIndexRequest) returns (LookupIndexResponse);
+  rpc PutIndexEntry (PutIndexEntryRequest) returns (PutIndexEntryResponse);
+  rpc DeleteIndexEntry (DeleteIndexEntryRequest) returns (DeleteIndexEntryResponse);
+  rpc PutIndexEntries (PutIndexEntriesRequest) returns (PutIndexEntriesResponse);
+  rpc DeleteIndexEntries (DeleteIndexEntriesRequest) returns (DeleteIndexEntriesResponse);
+}
+
+message IndexKey {
+  bytes key = 1; // index key
+  uint64 timestamp = 2; // transaction timestamp
+}
+
+message RowLocation {
+  uint64 fileId = 1; // the id of the file in pixels metadata
+  uint32 rgIndex = 2; // the index of the row group inside the file
+  uint32 rowIndex = 3; // the index of the row index the row group
+}
+
+message IndexEntry {
+  IndexKey indexKey = 1;
+  RowLocation rowLocation = 2;
+}
+
+message LookupIndexRequest {
+  IndexKey indexKey = 1;
+}
+
+message LookupIndexResponse {
+  RowLocation rowLocation = 1;
+}
+
+message PutIndexEntryRequest {
+  IndexEntry indexEntry = 1;
+}
+
+message PutIndexEntryResponse {
+  int32 errorCode = 1;
+}
+
+message DeleteIndexEntryRequest {
+  IndexKey indexKey = 1;
+}
+
+message DeleteIndexEntryResponse {
+  int32 errorCode = 1;
+}
+
+message PutIndexEntriesRequest {
+  repeated IndexEntry indexEntries = 1;
+}
+
+message PutIndexEntriesResponse {
+  int32 errorCode = 1;
+}
+
+message DeleteIndexEntriesRequest {
+  repeated IndexKey indexKeys = 1;
+}
+
+message DeleteIndexEntriesResponse {
+  int32 errorCode = 1;
 }

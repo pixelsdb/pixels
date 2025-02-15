@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.main;
+package io.pixelsdb.pixels.common.index;
 
 /**
  * The main index of a table is the mapping from row id to data file.
