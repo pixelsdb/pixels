@@ -23,16 +23,15 @@ public class TestVisibility
 {
     public static void main(String[] args)
     {
-        try (Visibility tracker = new Visibility()) {
+        try (RGVisibility tracker = new RGVisibility(1000)) {
             // Test getReadableBitmap method
-            long[] bitmap = new long[4];
-            tracker.getVisibilityBitmap(0, bitmap);
+            long[] bitmap = tracker.getVisibilityBitmap(0);
             System.out.println("Readable Bitmap: " + java.util.Arrays.toString(bitmap));
 
             // Test deleteRow method
             tracker.deleteRecord(1, 1);
             System.out.println("Row 1 deleted at timestamp 1");
-            tracker.getVisibilityBitmap(99, bitmap);
+            bitmap = tracker.getVisibilityBitmap(99);
             System.out.println("Readable Bitmap: " + java.util.Arrays.toString(bitmap));
         } catch (Exception e) {
             e.printStackTrace();

@@ -30,7 +30,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
-import io.pixelsdb.pixels.retina.Retina;
+import io.pixelsdb.pixels.retina.RGVisibility;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -51,9 +51,9 @@ import static java.util.Objects.requireNonNull;
  */
 public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServiceImplBase
 {
-    private static final Logger log = LogManager.getLogger(RetinaServerImpl.class);
+    private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
-    private final Map<String, Retina> retinaMap;
+    private final Map<String, RGVisibility> retinaMap;
 
     /**
      * Initialize the visibility management for all the records.
@@ -102,7 +102,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             }
         } catch (Exception e)
         {
-            log.error("Error while initializing RetinaServerImpl", e);
+            logger.error("Error while initializing RetinaServerImpl", e);
         }
     }
 
@@ -110,7 +110,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try
         {
-            Retina retina = checkRetina(filePath, rgId);
+            RGVisibility retina = checkRetina(filePath, rgId);
             retina.deleteRecord(rowId, timestamp);
         } catch (Exception e)
         {
@@ -136,7 +136,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
             {
                 int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
-                Retina retina = new Retina(recordNum);
+                RGVisibility retina = new RGVisibility(recordNum);
                 String rgKey = fileId + "_" + rgId;
                 retinaMap.put(rgKey, retina);
             }
@@ -150,7 +150,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try
         {
-            Retina retina = checkRetina(filePath, rgId);
+            RGVisibility retina = checkRetina(filePath, rgId);
             long[] visibilityBitmap = retina.getVisibilityBitmap(timestamp);
             if (visibilityBitmap == null)
             {
@@ -167,7 +167,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try 
         {
-            Retina retina = checkRetina(filePath, rgId);
+            RGVisibility retina = checkRetina(filePath, rgId);
             retina.beginAccess();
         } catch (Exception e) {
             throw new RetinaException("Error while beginning row group read", e);
@@ -178,7 +178,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try 
         {
-            Retina retina = checkRetina(filePath, rgId);
+            RGVisibility retina = checkRetina(filePath, rgId);
             retina.endAccess();
         } catch (Exception e) {
             throw new RetinaException("Error while ending row group read", e);
@@ -189,7 +189,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try 
         {
-            Retina retina = checkRetina(filePath, rgId);
+            RGVisibility retina = checkRetina(filePath, rgId);
             retina.beginGarbageCollect(timestamp);
         } catch (Exception e) {
             throw new RetinaException("Error while beginning garbage collect", e);
@@ -200,7 +200,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try 
         {
-            Retina retina = checkRetina(filePath, rgId);
+            RGVisibility retina = checkRetina(filePath, rgId);
             retina.endGarbageCollect();
         } catch (Exception e) {
             throw new RetinaException("Error while ending garbage collect", e);
@@ -428,13 +428,13 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
      * @param rgId the row group id.
      * @throws RetinaException if the retina does not exist.
      */
-    private Retina checkRetina(String filePath, long rgId) throws RetinaException
+    private RGVisibility checkRetina(String filePath, long rgId) throws RetinaException
     {
         try 
         {
             long fileId = this.metadataService.getFileId(filePath);
             String retinaKey = fileId + "_" + rgId;
-            Retina retina = this.retinaMap.get(retinaKey);
+            RGVisibility retina = this.retinaMap.get(retinaKey);
             if (retina == null) 
             {
                 throw new RetinaException("Retina not found for filePath: " + filePath + " and rgId: " + rgId);

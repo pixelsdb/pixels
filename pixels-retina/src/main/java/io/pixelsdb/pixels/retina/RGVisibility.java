@@ -30,9 +30,9 @@ import java.nio.file.Paths;
  * This class is used to manage the visibility of a row-group.
  * It provides methods to add visibility, delete record, and garbage collect.
  */
-public class Retina implements AutoCloseable
+public class RGVisibility implements AutoCloseable
 {
-    private static final Logger logger = LogManager.getLogger(Retina.class);
+    private static final Logger logger = LogManager.getLogger(RGVisibility.class);
     static
     {
         String pixelsHome = System.getenv("PIXELS_HOME");
@@ -63,7 +63,7 @@ public class Retina implements AutoCloseable
      */
     private final long nativeHandle;
 
-    public Retina(long rgRecordNum)
+    public RGVisibility(long rgRecordNum)
     {
         this.nativeHandle = createNativeObject(rgRecordNum);
     }

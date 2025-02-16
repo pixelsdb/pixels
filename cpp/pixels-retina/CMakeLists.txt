@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(pixels-retina)
 
-cmake_policy(SET CMP0177 NEW)
-
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -18,8 +16,9 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Source files
 set(SOURCES
-        lib/Visibility_JNI.cpp
-        lib/Visibility.cpp)
+        lib/Retina.cpp
+        lib/Visibility.cpp
+)
 
 # Create shared library
 add_library(pixels-retina SHARED ${SOURCES})

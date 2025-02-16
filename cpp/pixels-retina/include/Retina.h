@@ -21,10 +21,35 @@
 #define VISIBILITYUTIL_H
 
 #include "Visibility.h"
+#include <memory>
+#include <atomic>
 
 class Retina
 {
-    
-}
+    explicit Retina(uint64_t rgRecordNum);
+    ~Retina();
+
+    void beginAccess();
+    void endAccess();
+
+    void deleteRecord(uint64_t rowId, uint64_t timestamp);
+    uint64_t* getVisibilityBitmap(uint64_t timestamp);
+
+    void garbageCollect(uint64_t timestamp);
+
+private:
+    static constexpr uint32_t VISIBILITY_RECORD_CAPACITY = 256;
+    static constexpr uint32_t MAX_ACCESS_COUNT = 0x007FFFFF;
+    static constexpr uint32_t GC_MASK = 0xFF000000;
+    static constexpr uint32_t ACCESS_MASK = 0x00FFFFFF;
+    static constexpr uint32_t ACCESS_INC = 0x00000001;
+    static constexpr uint32_t BITMAP_SIZE_PER_VISIBILITY = 4;
+
+    Visibility* visibilities;
+    const uint64_t numVisibilities;
+    std::atomic<uint32_t> flag; // high 1 byte is the gc flag, low 3 bytes are the access count
+
+    Visibility* getVisibility(uint64_t rowId) const;
+};
 
 #endif //VISIBILITYUTIL_H

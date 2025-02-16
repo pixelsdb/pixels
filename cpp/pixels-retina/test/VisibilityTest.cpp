@@ -25,106 +25,252 @@
 #include <random>
 #include <thread>
 #include <vector>
+#include <mutex>
+#include <sstream>
 
 #include "Visibility.h"
 
+#define BITMAP_SIZE 4
 #ifndef GET_BITMAP_BIT
 #define GET_BITMAP_BIT(bitmap, rowId)                                          \
     (((bitmap)[(rowId) / 64] >> ((rowId) % 64)) & 1ULL)
 #endif
 
-static const int NUM_READ_THREADS = 3;
-static const int TOTAL_DELETES = 25;
+bool checkBitmap(const uint64_t* actual, const uint64_t* expected, int size = BITMAP_SIZE) {
+    for (int i = 0; i < size; i++) {
+        if (actual[i] != expected[i]) {
+            std::cout << "bits between " << (64 * i) << " and " << (64 * i + 63)
+                      << " are not as expected\n";
+            std::cout << "actual: " << std::bitset<64>(actual[i]) << std::endl;
+            std::cout << "expect: " << std::bitset<64>(expected[i]) << std::endl;
+            return false;
+        }
+    }
+    return true;
+}
 
-std::atomic<bool> g_stop{false};
+void testBaseFunction() {
+    Visibility v;
+    v.deleteRecord(1, 100);
+    v.deleteRecord(2, 101);
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
 
-void readerThreadFunc(Visibility *vis, int threadId) {
-    std::mt19937 rng(std::random_device{}());
-    std::uniform_int_distribution<int> distSleep(1, 10);
+    v.getVisibilityBitmap(50, actualBitmap);
+    assert(checkBitmap(actualBitmap, expectedBitmap));
 
-    while (!g_stop.load(std::memory_order_acquire)) {
-        // Generate a random timestamp in [0, 2000)
-        uint64_t ts = rng() % 2000;
+    v.getVisibilityBitmap(100, actualBitmap);
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    assert(checkBitmap(actualBitmap, expectedBitmap));
 
-        // Prepare output bitmap
-        uint64_t outBmp[4];
-        std::memset(outBmp, 0, 4 * sizeof(uint64_t));
+    v.getVisibilityBitmap(101, actualBitmap);
+    SET_BITMAP_BIT(expectedBitmap, 2);
+    assert(checkBitmap(actualBitmap, expectedBitmap));
 
-        // Call getVisibilityBitmap
-        vis->getVisibilityBitmap(ts, outBmp);
+    v.garbageCollect(101);
+    v.getVisibilityBitmap(101, actualBitmap);
+    assert(checkBitmap(actualBitmap, expectedBitmap));
+    std::cout << "testBaseFunction passed." << std::endl;
+}
 
-        // Occasionally print row10, row20 for demonstration
-        static thread_local int counter = 0;
-        if (++counter % 50 == 0) {
-            // print binary visibility bitmap for all rows
-            std::cout << "[Reader#" << threadId << "] ts=" << ts << " -> ";
-            for (int i = 0; i < 4; i++) {
-                std::cout << std::bitset<64>(outBmp[i]) << " ";
+void testDeleteRecord() {
+    Visibility v;
+    uint64_t actualBitmap[4] = {};
+    uint64_t expectedBitmap[4] = {};
+    for (int i = 0; i < 256; i++) {
+        v.deleteRecord(i, i + 100);
+        SET_BITMAP_BIT(expectedBitmap, i);
+        v.getVisibilityBitmap(i + 100, actualBitmap);
+        assert(checkBitmap(actualBitmap, expectedBitmap));
+    }
+    std::cout << "testDeleteRecord passed." << std::endl;
+}
+
+void testGarbageCollect() {
+    Visibility v;
+    for (int i = 0; i < 100; i++) {
+        v.deleteRecord(i, i + 100);
+    }
+    v.garbageCollect(150);
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    v.getVisibilityBitmap(150, actualBitmap);
+    for (int i = 0; i <= 50; i++) {
+        SET_BITMAP_BIT(expectedBitmap, i);
+    }
+    assert(checkBitmap(actualBitmap, expectedBitmap));
+    for (int i = 51; i < 100; i++) {
+        SET_BITMAP_BIT(expectedBitmap, i);
+    }
+    v.garbageCollect(200);
+    v.getVisibilityBitmap(200, actualBitmap);
+    assert(checkBitmap(actualBitmap, expectedBitmap));
+    std::cout << "testGarbageCollect passed." << std::endl;
+}
+
+struct DeleteRecord {
+    uint64_t timestamp;
+    uint64_t rowId;
+    DeleteRecord(uint64_t timestamp, uint64_t rowId) : timestamp(timestamp), rowId(rowId) {}
+};
+
+void testMultiThread() {
+    Visibility v;
+    std::vector<DeleteRecord> deleteHistory;
+    std::mutex historyMutex;
+    std::mutex printMutex;
+    std::atomic<bool> running{true};
+    std::atomic<uint64_t> currentMaxTimestamp{0};
+    std::atomic<int> verificationCount{0};
+    
+    auto printError = [&](const std::string& msg) {
+        std::lock_guard<std::mutex> lock(printMutex);
+        std::cerr << "\n[ERROR] " << msg << std::endl;
+    };
+
+    auto verifyBitmap = [&](uint64_t timestamp, const uint64_t* bitmap) {
+        uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+        std::vector<DeleteRecord> historySnapshot;
+        
+        {
+            std::lock_guard<std::mutex> lock(historyMutex);
+            historySnapshot = deleteHistory;
+        }
+        
+        for (const auto& record : historySnapshot) {
+            if (record.timestamp <= timestamp) {
+                SET_BITMAP_BIT(expectedBitmap, record.rowId);
             }
-            std::cout << std::endl;
+        }
+        
+        for (int i = 0; i < BITMAP_SIZE; i++) {
+            if (bitmap[i] != expectedBitmap[i]) {
+                std::stringstream ss;
+                ss << "Bitmap verification failed at timestamp " << timestamp << "\n";
+                ss << "Bitmap segment " << i << " (rows " << (i*64) << "-" << (i*64+63) << "):\n";
+                ss << "Actual:   " << std::bitset<64>(bitmap[i]) << "\n";
+                ss << "Expected: " << std::bitset<64>(expectedBitmap[i]) << "\n\n";
+                ss << "Delete history up to timestamp " << timestamp << ":\n";
+                for (const auto& record : historySnapshot) {
+                    if (record.timestamp <= timestamp) {
+                        ss << "- Timestamp " << record.timestamp << ": deleted row " << record.rowId << "\n";
+                    }
+                }
+                printError(ss.str());
+                return false;
+            }
+        }
+        verificationCount++;
+        return true;
+    };
+
+    auto deleteThread = std::thread([&]() {
+        uint64_t timestamp = 1;
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        
+        std::vector<uint64_t> remainingRows;
+        for (uint64_t i = 0; i < 256; i++) {
+            remainingRows.push_back(i);
         }
 
-        // Random sleep to simulate concurrent reads
-        std::this_thread::sleep_for(std::chrono::milliseconds(distSleep(rng)));
+        while (!remainingRows.empty() && running) {
+            std::uniform_int_distribution<size_t> indexDist(0, remainingRows.size() - 1);
+            size_t index = indexDist(gen);
+            uint64_t rowId = remainingRows[index];
+
+            remainingRows[index] = remainingRows.back();
+            remainingRows.pop_back();
+
+            v.deleteRecord(rowId, timestamp);
+
+            {
+                std::lock_guard<std::mutex> lock(historyMutex);
+                deleteHistory.emplace_back(timestamp, rowId);
+            }
+
+            currentMaxTimestamp.store(timestamp);
+            timestamp++;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        
+        {
+            std::lock_guard<std::mutex> lock(printMutex);
+            std::cout << "Delete thread completed: deleted " << deleteHistory.size() 
+                      << " rows with max timestamp " << (timestamp-1) << std::endl;
+        }
+
+        running.store(false);
+    });
+
+    std::vector<std::thread> getThreads;
+    for (int i = 0; i < 1000; i++) {
+        getThreads.emplace_back([&, i]() {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            int localVerificationCount = 0;
+            
+            while (running) {
+                uint64_t maxTs = currentMaxTimestamp.load();
+                if (maxTs == 0) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    continue;
+                }
+                
+                std::uniform_int_distribution<uint64_t> tsDist(0, maxTs);
+                uint64_t queryTs = tsDist(gen);
+                
+                uint64_t actualBitmap[BITMAP_SIZE] = {0};
+                v.getVisibilityBitmap(queryTs, actualBitmap);
+                
+                if (!verifyBitmap(queryTs, actualBitmap)) {
+                    printError("Verification failed in get thread " + std::to_string(i));
+                    running.store(false);
+                    assert(false);
+                }
+                localVerificationCount++;
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            
+            {
+                std::lock_guard<std::mutex> lock(printMutex);
+                std::cout << "Get thread " << i << " completed: performed " 
+                          << localVerificationCount << " verifications" << std::endl;
+            }
+        });
     }
-    std::cout << "[Reader#" << threadId << "] stopping.\n";
-}
 
-// Writer thread function: performs deleteRecord with increasing timestamps
-void writerThreadFunc(Visibility *vis) {
-    // rowIds: 10, 20, 30, ... up to 10 + (TOTAL_DELETES-1)*10
-    // timestamps: starting at 1 and increment by 10 each time
-    uint64_t ts = 1;
-    for (int i = 0; i < TOTAL_DELETES; i++) {
-        uint8_t rowId = static_cast<uint8_t>(10 + i * 10);
-        vis->deleteRecord(rowId, ts);
-
-        std::cout << "[Writer] deleteRecord(rowId=" << (int)rowId
-                  << ", ts=" << ts << ")\n";
-
-        ts += 10; // Increment timestamp for next delete
-
-        // Sleep a bit to let readers observe incremental changes
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-
-    // After all deletes, signal readers to stop
-    g_stop.store(true, std::memory_order_release);
-    std::cout << "[Writer] finished.\n";
-}
-
-int main() {
-    Visibility vis;
-
-    // Start one writer thread
-    std::thread wthread(writerThreadFunc, &vis);
-
-    // Start multiple reader threads
-    std::vector<std::thread> readers;
-    for (int i = 0; i < NUM_READ_THREADS; i++) {
-        readers.emplace_back(std::thread(readerThreadFunc, &vis, i));
-    }
-
-    // Wait for writer to finish
-    wthread.join();
-    // Wait for all readers to stop
-    for (auto &t : readers) {
+    deleteThread.join();
+    for (auto& t : getThreads) {
         t.join();
     }
 
-    std::cout << "[Main] All threads finished.\n";
-
-    // Final check: call getVisibilityBitmap with a large timestamp
-    // to ensure all deleted rows are indeed marked as deleted (1).
-    uint64_t outBmp[4];
-    vis.getVisibilityBitmap(999999, outBmp); // Large timestamp
-
-    // We expect rowIds: 10, 20, 30, ... 10+(TOTAL_DELETES-1)*10
-    for (int i = 0; i < TOTAL_DELETES; i++) {
-        uint8_t rowId = static_cast<uint8_t>(10 + i * 10);
-        std::cout << "Final rowId=" << (int)rowId << " -> "
-                  << GET_BITMAP_BIT(outBmp, rowId) << std::endl;
+    uint64_t finalBitmap[BITMAP_SIZE] = {0};
+    v.getVisibilityBitmap(currentMaxTimestamp.load(), finalBitmap);
+    uint64_t expectedFinalBitmap[BITMAP_SIZE];
+    std::memset(expectedFinalBitmap, 0xFF, sizeof(expectedFinalBitmap));
+    
+    if (!checkBitmap(finalBitmap, expectedFinalBitmap)) {
+        std::stringstream ss;
+        ss << "Final bitmap verification failed!\n";
+        ss << "Expected all bits to be set after all deletions.\n";
+        ss << "Final timestamp: " << currentMaxTimestamp.load() << "\n";
+        ss << "Total deletions: " << deleteHistory.size() << "\n";
+        printError(ss.str());
+        assert(false);
     }
+    
+    std::cout << "\nTest Summary:\n"
+              << "- Total rows deleted: " << deleteHistory.size() << "\n"
+              << "- Total verifications: " << verificationCount.load() << "\n"
+              << "- Final timestamp: " << currentMaxTimestamp.load() << "\n"
+              << "testMultiThread passed successfully!" << std::endl;
+}
 
+int main() {
+    testBaseFunction();
+    testDeleteRecord();
+    testGarbageCollect();
+    testMultiThread();
     return 0;
 }

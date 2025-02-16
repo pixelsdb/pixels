@@ -23,15 +23,11 @@
 #include <cstring>
 #include <stdexcept>
 
-#ifndef SET_BITMAP_BIT
-#define SET_BITMAP_BIT(bitmap, rowId)                                          \
-    ((bitmap)[(rowId) / 64] |= (1ULL << ((rowId) % 64)))
-#endif
-
 Visibility::Visibility() : baseTimestamp(0UL) {
     memset(baseBitmap, 0, 4 * sizeof(uint64_t));
     head.store(nullptr, std::memory_order_release);
     tail.store(nullptr, std::memory_order_release);
+    tailUsed.store(0, std::memory_order_release);
 }
 
 Visibility::Visibility(uint64_t ts, const uint64_t bitmap[4])
@@ -62,28 +58,27 @@ void Visibility::deleteRecord(uint8_t rowId, uint64_t ts) {
              */
             DeleteIndexBlock *newBlk = new DeleteIndexBlock();
             newBlk->items[0] = item;
-            newBlk->next.store(nullptr, std::memory_order_relaxed);
-            newBlk->used.store(1, std::memory_order_release);
             DeleteIndexBlock *expectedTail = nullptr;
+            
             if (!tail.compare_exchange_strong(expectedTail, newBlk,
                                               std::memory_order_acq_rel)) {
                 delete newBlk;
                 continue;
             }
             head.store(newBlk, std::memory_order_release);
+            tailUsed.store(1, std::memory_order_release);
             return;
         } else {
-            uint8_t pos = curTail->used.fetch_add(1, std::memory_order_acquire);
-            if (pos < 8) {
+            size_t pos = tailUsed.fetch_add(1, std::memory_order_acquire);
+            if (pos < DeleteIndexBlock::BLOCK_CAPACITY) {
                 curTail->items[pos] = item;
                 return;
             } else {
-                curTail->used.fetch_sub(1, std::memory_order_release);
+                tailUsed.fetch_sub(1, std::memory_order_release);
                 // curTail is full, need to add new block
                 DeleteIndexBlock *newBlk = new DeleteIndexBlock();
                 newBlk->items[0] = item;
-                newBlk->next.store(nullptr, std::memory_order_relaxed);
-                newBlk->used.store(1, std::memory_order_release);
+
                 if (tail.load(std::memory_order_acquire) != curTail) {
                     delete newBlk;
                     continue;
@@ -98,6 +93,7 @@ void Visibility::deleteRecord(uint8_t rowId, uint64_t ts) {
 
                 tail.compare_exchange_strong(curTail, newBlk,
                                              std::memory_order_acq_rel);
+                tailUsed.store(1, std::memory_order_release);
                 return;
             }
         }
@@ -115,8 +111,10 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
 
     DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
     while (blk) {
-        uint8_t count = blk->used.load(std::memory_order_acquire);
-        if (count > 8) {
+        size_t count = (blk == tail.load(std::memory_order_acquire)) 
+                        ? tailUsed.load(std::memory_order_acquire)
+                        : DeleteIndexBlock::BLOCK_CAPACITY;
+        if (count > DeleteIndexBlock::BLOCK_CAPACITY) {
             throw std::runtime_error("invalid count");
         }
         for (uint64_t i = 0; i < count; i++) {
@@ -130,5 +128,52 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
             }
         }
         blk = blk->next.load(std::memory_order_acquire);
+    }
+}
+
+void Visibility::garbageCollect(uint64_t ts)
+{
+    // The upper layers have ensured that there are no reads or writes at this point
+    // so we can safely delete the records
+
+    DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
+    DeleteIndexBlock *lastFullBlk = nullptr;
+    uint64_t newBaseTimestamp = baseTimestamp;
+
+    while (blk)
+    {
+        size_t count = (blk == tail.load(std::memory_order_acquire)) 
+                        ? tailUsed.load(std::memory_order_acquire)
+                        : DeleteIndexBlock::BLOCK_CAPACITY;
+        if (count > DeleteIndexBlock::BLOCK_CAPACITY)
+        {
+            throw std::runtime_error("invalid count");
+        }
+        
+        uint64_t lastItemTs = extractTimestamp(blk->items[count - 1]);
+        if (lastItemTs <= ts)
+        {
+            lastFullBlk = blk;
+            newBaseTimestamp = lastItemTs;
+        } else {
+            break;
+        }
+
+        blk = blk->next.load(std::memory_order_acquire);
+    }
+
+    if (lastFullBlk)
+    {
+        getVisibilityBitmap(ts, baseBitmap);
+        baseTimestamp = newBaseTimestamp;
+
+        DeleteIndexBlock* current = head.load(std::memory_order_acquire);
+        head.store(lastFullBlk->next.load(std::memory_order_acquire), std::memory_order_release);
+        while (current != lastFullBlk->next.load(std::memory_order_acquire))
+        {
+            DeleteIndexBlock* next = current->next.load(std::memory_order_acquire);
+            delete current;
+            current = next;
+        }
     }
 }
