@@ -28,6 +28,7 @@
 #include <mutex>
 #include <sstream>
 
+#include "gtest/gtest.h"
 #include "Visibility.h"
 
 #define BITMAP_SIZE 4
@@ -36,93 +37,117 @@
     (((bitmap)[(rowId) / 64] >> ((rowId) % 64)) & 1ULL)
 #endif
 
-bool checkBitmap(const uint64_t* actual, const uint64_t* expected, int size = BITMAP_SIZE) {
-    for (int i = 0; i < size; i++) {
-        if (actual[i] != expected[i]) {
-            std::cout << "bits between " << (64 * i) << " and " << (64 * i + 63)
-                      << " are not as expected\n";
-            std::cout << "actual: " << std::bitset<64>(actual[i]) << std::endl;
-            std::cout << "expect: " << std::bitset<64>(expected[i]) << std::endl;
-            return false;
+class VisibilityTest : public ::testing::Test {
+public:
+    static bool DEBUG;
+
+protected:
+    void SetUp() override {
+        v = new Visibility();
+    }
+
+    void TearDown() override {
+        delete v;
+    }
+
+    bool checkBitmap(const uint64_t* actual, const uint64_t* expected, int size = BITMAP_SIZE) {
+        for (int i = 0; i < size; i++) {
+            if (actual[i] != expected[i]) {
+                if (DEBUG) {
+                    std::cout << "bits between " << (64 * i) << " and " << (64 * i + 63)
+                          << " are not as expected\n";
+                    std::cout << "actual: " << std::bitset<64>(actual[i]) << std::endl;
+                    std::cout << "expect: " << std::bitset<64>(expected[i]) << std::endl;
+                }
+                return false;
+            }
         }
+        return true;
     }
-    return true;
-}
 
-void testBaseFunction() {
-    Visibility v;
-    v.deleteRecord(1, 100);
-    v.deleteRecord(2, 101);
+    Visibility* v;
+};
+
+bool VisibilityTest::DEBUG = false;
+
+class GlobalTest : public ::testing::Environment {
+public:
+    void SetUp() override {
+        const char* debug = std::getenv("VISIBILITY_TEST_DEBUG");
+        VisibilityTest::DEBUG = debug != nullptr && std::string(debug) == "1";
+    }
+};
+
+TEST_F(VisibilityTest, BaseFunction) {
+    v->deleteRecord(1, 100);
+    v->deleteRecord(2, 101);
+
     uint64_t actualBitmap[BITMAP_SIZE] = {0};
     uint64_t expectedBitmap[BITMAP_SIZE] = {0};
 
-    v.getVisibilityBitmap(50, actualBitmap);
-    assert(checkBitmap(actualBitmap, expectedBitmap));
+    v->getVisibilityBitmap(50, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 
-    v.getVisibilityBitmap(100, actualBitmap);
+    v->getVisibilityBitmap(100, actualBitmap);
     SET_BITMAP_BIT(expectedBitmap, 1);
-    assert(checkBitmap(actualBitmap, expectedBitmap));
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 
-    v.getVisibilityBitmap(101, actualBitmap);
+    v->getVisibilityBitmap(101, actualBitmap);
     SET_BITMAP_BIT(expectedBitmap, 2);
-    assert(checkBitmap(actualBitmap, expectedBitmap));
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 
-    v.garbageCollect(101);
-    v.getVisibilityBitmap(101, actualBitmap);
-    assert(checkBitmap(actualBitmap, expectedBitmap));
-    std::cout << "testBaseFunction passed." << std::endl;
+    v->garbageCollect(101);
+    v->getVisibilityBitmap(101, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
 
-void testDeleteRecord() {
-    Visibility v;
-    uint64_t actualBitmap[4] = {};
-    uint64_t expectedBitmap[4] = {};
-    for (int i = 0; i < 256; i++) {
-        v.deleteRecord(i, i + 100);
-        SET_BITMAP_BIT(expectedBitmap, i);
-        v.getVisibilityBitmap(i + 100, actualBitmap);
-        assert(checkBitmap(actualBitmap, expectedBitmap));
-    }
-    std::cout << "testDeleteRecord passed." << std::endl;
-}
-
-void testGarbageCollect() {
-    Visibility v;
-    for (int i = 0; i < 100; i++) {
-        v.deleteRecord(i, i + 100);
-    }
-    v.garbageCollect(150);
+TEST_F(VisibilityTest, DeleteRecord) {
     uint64_t actualBitmap[BITMAP_SIZE] = {0};
     uint64_t expectedBitmap[BITMAP_SIZE] = {0};
-    v.getVisibilityBitmap(150, actualBitmap);
+
+    for (int i = 0; i < 256; i++) {
+        v->deleteRecord(i, i + 100);
+        SET_BITMAP_BIT(expectedBitmap, i);
+        v->getVisibilityBitmap(i + 100, actualBitmap);
+        EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+    }
+}
+
+TEST_F(VisibilityTest, GarbageCollect) {
+    for (int i = 0; i < 100; i++) {
+        v->deleteRecord(i, i + 100);
+    }
+    v->garbageCollect(150);
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+
+    v->getVisibilityBitmap(150, actualBitmap);
     for (int i = 0; i <= 50; i++) {
         SET_BITMAP_BIT(expectedBitmap, i);
     }
-    assert(checkBitmap(actualBitmap, expectedBitmap));
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
     for (int i = 51; i < 100; i++) {
         SET_BITMAP_BIT(expectedBitmap, i);
     }
-    v.garbageCollect(200);
-    v.getVisibilityBitmap(200, actualBitmap);
-    assert(checkBitmap(actualBitmap, expectedBitmap));
-    std::cout << "testGarbageCollect passed." << std::endl;
+    v->garbageCollect(200);
+    v->getVisibilityBitmap(200, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
 
-struct DeleteRecord {
-    uint64_t timestamp;
-    uint64_t rowId;
-    DeleteRecord(uint64_t timestamp, uint64_t rowId) : timestamp(timestamp), rowId(rowId) {}
-};
+TEST_F(VisibilityTest, MultiThread) {
+    struct DeleteRecord {
+        uint64_t timestamp;
+        uint64_t rowId;
+        DeleteRecord(uint64_t timestamp, uint64_t rowId) : timestamp(timestamp), rowId(rowId) {}
+    };
 
-void testMultiThread() {
-    Visibility v;
     std::vector<DeleteRecord> deleteHistory;
     std::mutex historyMutex;
     std::mutex printMutex;
     std::atomic<bool> running{true};
     std::atomic<uint64_t> currentMaxTimestamp{0};
     std::atomic<int> verificationCount{0};
-    
+
     auto printError = [&](const std::string& msg) {
         std::lock_guard<std::mutex> lock(printMutex);
         std::cerr << "\n[ERROR] " << msg << std::endl;
@@ -145,18 +170,20 @@ void testMultiThread() {
         
         for (int i = 0; i < BITMAP_SIZE; i++) {
             if (bitmap[i] != expectedBitmap[i]) {
-                std::stringstream ss;
-                ss << "Bitmap verification failed at timestamp " << timestamp << "\n";
-                ss << "Bitmap segment " << i << " (rows " << (i*64) << "-" << (i*64+63) << "):\n";
-                ss << "Actual:   " << std::bitset<64>(bitmap[i]) << "\n";
-                ss << "Expected: " << std::bitset<64>(expectedBitmap[i]) << "\n\n";
-                ss << "Delete history up to timestamp " << timestamp << ":\n";
-                for (const auto& record : historySnapshot) {
-                    if (record.timestamp <= timestamp) {
-                        ss << "- Timestamp " << record.timestamp << ": deleted row " << record.rowId << "\n";
+                if (DEBUG) {
+                    std::stringstream ss;
+                    ss << "Bitmap verification failed at timestamp " << timestamp << "\n";
+                    ss << "Bitmap segment " << i << " (rows " << (i*64) << "-" << (i*64+63) << "):\n";
+                    ss << "Actual:   " << std::bitset<64>(bitmap[i]) << "\n";
+                    ss << "Expected: " << std::bitset<64>(expectedBitmap[i]) << "\n\n";
+                    ss << "Delete history up to timestamp " << timestamp << ":\n";
+                    for (const auto& record : historySnapshot) {
+                        if (record.timestamp <= timestamp) {
+                            ss << "- Timestamp " << record.timestamp << ": deleted row " << record.rowId << "\n";
+                        }
                     }
+                    printError(ss.str());
                 }
-                printError(ss.str());
                 return false;
             }
         }
@@ -182,7 +209,7 @@ void testMultiThread() {
             remainingRows[index] = remainingRows.back();
             remainingRows.pop_back();
 
-            v.deleteRecord(rowId, timestamp);
+            v->deleteRecord(rowId, timestamp);
 
             {
                 std::lock_guard<std::mutex> lock(historyMutex);
@@ -193,8 +220,8 @@ void testMultiThread() {
             timestamp++;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        
-        {
+
+        if (DEBUG) {
             std::lock_guard<std::mutex> lock(printMutex);
             std::cout << "Delete thread completed: deleted " << deleteHistory.size() 
                       << " rows with max timestamp " << (timestamp-1) << std::endl;
@@ -221,18 +248,14 @@ void testMultiThread() {
                 uint64_t queryTs = tsDist(gen);
                 
                 uint64_t actualBitmap[BITMAP_SIZE] = {0};
-                v.getVisibilityBitmap(queryTs, actualBitmap);
+                v->getVisibilityBitmap(queryTs, actualBitmap);
                 
-                if (!verifyBitmap(queryTs, actualBitmap)) {
-                    printError("Verification failed in get thread " + std::to_string(i));
-                    running.store(false);
-                    assert(false);
-                }
+                EXPECT_TRUE(verifyBitmap(queryTs, actualBitmap));
                 localVerificationCount++;
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
             
-            {
+            if (DEBUG) {
                 std::lock_guard<std::mutex> lock(printMutex);
                 std::cout << "Get thread " << i << " completed: performed " 
                           << localVerificationCount << " verifications" << std::endl;
@@ -246,31 +269,15 @@ void testMultiThread() {
     }
 
     uint64_t finalBitmap[BITMAP_SIZE] = {0};
-    v.getVisibilityBitmap(currentMaxTimestamp.load(), finalBitmap);
+    v->getVisibilityBitmap(currentMaxTimestamp.load(), finalBitmap);
     uint64_t expectedFinalBitmap[BITMAP_SIZE];
     std::memset(expectedFinalBitmap, 0xFF, sizeof(expectedFinalBitmap));
     
-    if (!checkBitmap(finalBitmap, expectedFinalBitmap)) {
-        std::stringstream ss;
-        ss << "Final bitmap verification failed!\n";
-        ss << "Expected all bits to be set after all deletions.\n";
-        ss << "Final timestamp: " << currentMaxTimestamp.load() << "\n";
-        ss << "Total deletions: " << deleteHistory.size() << "\n";
-        printError(ss.str());
-        assert(false);
-    }
-    
-    std::cout << "\nTest Summary:\n"
-              << "- Total rows deleted: " << deleteHistory.size() << "\n"
-              << "- Total verifications: " << verificationCount.load() << "\n"
-              << "- Final timestamp: " << currentMaxTimestamp.load() << "\n"
-              << "testMultiThread passed successfully!" << std::endl;
+    EXPECT_TRUE(checkBitmap(finalBitmap, expectedFinalBitmap));
 }
 
-int main() {
-    testBaseFunction();
-    testDeleteRecord();
-    testGarbageCollect();
-    testMultiThread();
-    return 0;
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::AddGlobalTestEnvironment(new GlobalTest);
+    return RUN_ALL_TESTS();
 }

@@ -24,13 +24,13 @@
 #include <memory>
 #include <atomic>
 
-class Retina
-{
+class Retina {
+public:
     explicit Retina(uint64_t rgRecordNum);
     ~Retina();
 
-    void beginAccess();
-    void endAccess();
+    long beginAccess();
+    bool endAccess(long lease);
 
     void deleteRecord(uint64_t rowId, uint64_t timestamp);
     uint64_t* getVisibilityBitmap(uint64_t timestamp);
@@ -44,6 +44,7 @@ private:
     static constexpr uint32_t ACCESS_MASK = 0x00FFFFFF;
     static constexpr uint32_t ACCESS_INC = 0x00000001;
     static constexpr uint32_t BITMAP_SIZE_PER_VISIBILITY = 4;
+    static constexpr uint32_t RG_READ_LEASE_MS = 100;
 
     Visibility* visibilities;
     const uint64_t numVisibilities;
