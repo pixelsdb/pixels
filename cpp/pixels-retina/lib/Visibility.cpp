@@ -112,8 +112,10 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
 
     DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
     while (blk) {
-        size_t count = (blk == tail.load(std::memory_order_acquire)) 
-                        ? tailUsed.load(std::memory_order_acquire)
+        DeleteIndexBlock *currentTail = tail.load(std::memory_order_acquire);
+        size_t currentTailUsed = tailUsed.load(std::memory_order_acquire);
+        size_t count = (blk == currentTail) 
+                        ? currentTailUsed
                         : DeleteIndexBlock::BLOCK_CAPACITY;
         if (count > DeleteIndexBlock::BLOCK_CAPACITY) {
             continue; // retry get count
@@ -128,6 +130,15 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
                 return;
             }
         }
+
+        if (blk == currentTail) {
+            if (currentTail != tail.load(std::memory_order_acquire) ||
+                currentTailUsed != tailUsed.load(std::memory_order_acquire)) {
+                // no need to reset outBitmap, just lost the latest deletion
+                continue;
+            }
+        }
+
         blk = blk->next.load(std::memory_order_acquire);
     }
 }
