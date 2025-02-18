@@ -29,9 +29,6 @@ public:
     explicit Retina(uint64_t rgRecordNum);
     ~Retina();
 
-    long beginAccess();
-    bool endAccess(long lease);
-
     void deleteRecord(uint64_t rowId, uint64_t timestamp);
     uint64_t* getVisibilityBitmap(uint64_t timestamp);
 
@@ -51,6 +48,8 @@ private:
     std::atomic<uint32_t> flag; // high 1 byte is the gc flag, low 3 bytes are the access count
 
     Visibility* getVisibility(uint64_t rowId) const;
+    void beginAccess();
+    void endAccess();
 };
 
 #endif //VISIBILITYUTIL_H

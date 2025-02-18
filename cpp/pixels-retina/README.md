@@ -12,3 +12,10 @@ make
 ```
 
 You can get `libDeleteTrackerNative.so` after compilation, and you can find this file in the `$PIXELS_HOME/lib` path.
+
+## How to test
+
+```bash
+./visibility_tests
+./retina_tests
+```

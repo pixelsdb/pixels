@@ -21,7 +21,6 @@
 #include <stdexcept>
 #include <cstring>
 #include <thread>
-#include <chrono>
 
 Retina::Retina(uint64_t rgRecordNum)
     : numVisibilities((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
@@ -33,7 +32,7 @@ Retina::~Retina() {
     delete[] visibilities;
 }
 
-long Retina::beginAccess() {
+void Retina::beginAccess() {
     while (true) {
         uint32_t v = flag.load(std::memory_order_acquire);
         uint32_t accessCount = v & ACCESS_MASK;
@@ -53,15 +52,9 @@ long Retina::beginAccess() {
         }
         break;
     }
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()
-    ).count();
 }
 
-bool Retina::endAccess(long lease) {
-    if (std::chrono::system_clock::now().time_since_epoch().count() - lease >= RG_READ_LEASE_MS) {
-        return false;
-    }
+void Retina::endAccess() {
     uint32_t v = flag.load(std::memory_order_acquire);
     while((v & ACCESS_MASK) > 0) {
         if (flag.compare_exchange_strong(v, v - ACCESS_INC, std::memory_order_acq_rel)) {
@@ -69,14 +62,11 @@ bool Retina::endAccess(long lease) {
         }
         v = flag.load(std::memory_order_acquire);
     }
-    return true;
 }
 
 void Retina::garbageCollect(uint64_t timestamp) {
     // Set the gc flag.
     flag.store(flag.load(std::memory_order_acquire) | GC_MASK, std::memory_order_release);
-    const int sleepMs = 10;
-    int waitMs = 0;
 
     // Wait for all access to end.
     while (true) {
@@ -84,14 +74,11 @@ void Retina::garbageCollect(uint64_t timestamp) {
         if ((v & ACCESS_MASK) == 0) {
             break;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
-        waitMs += sleepMs;
-        if (waitMs > RG_READ_LEASE_MS) {
-            // clear access count to continue gc.
-            flag.store(flag.load(std::memory_order_acquire) & ~ACCESS_MASK, std::memory_order_release);
-            break;
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+
+    assert((flag.load(std::memory_order_acquire) & GC_MASK) > 0);
+    assert((flag.load(std::memory_order_acquire) & ACCESS_MASK) == 0);
 
     // Garbage collect.
     for (uint64_t i = 0; i < numVisibilities; i++) {
@@ -112,21 +99,31 @@ Visibility* Retina::getVisibility(uint64_t rowId) const {
 
 void Retina::deleteRecord(uint64_t rowId, uint64_t timestamp) {
     try {
+        // beginAccess();
         Visibility* visibility = getVisibility(rowId);
         visibility->deleteRecord(rowId % VISIBILITY_RECORD_CAPACITY, timestamp);
+        // endAccess();
     }
     catch (const std::runtime_error& e) {
+        // endAccess();
         throw std::runtime_error("Failed to delete record: " + std::string(e.what()));
     }
 }
 
 uint64_t* Retina::getVisibilityBitmap(uint64_t timestamp) {
+    // beginAccess();
     uint64_t* bitmap = new uint64_t[numVisibilities * BITMAP_SIZE_PER_VISIBILITY];
     memset(bitmap, 0, numVisibilities * BITMAP_SIZE_PER_VISIBILITY * sizeof(uint64_t));
 
-    for (uint64_t i = 0; i < numVisibilities; i++) {
-        visibilities[i].getVisibilityBitmap(timestamp, bitmap + i * BITMAP_SIZE_PER_VISIBILITY);
+    try {
+        for (uint64_t i = 0; i < numVisibilities; i++) {
+            visibilities[i].getVisibilityBitmap(timestamp, bitmap + i * BITMAP_SIZE_PER_VISIBILITY);
+        }
+        // endAccess();
+        return bitmap;
+    } catch (const std::runtime_error& e) {
+        delete[] bitmap;
+        // endAccess();
+        throw std::runtime_error("Failed to get visibility bitmap: " + std::string(e.what()));
     }
-
-    return bitmap;
 }

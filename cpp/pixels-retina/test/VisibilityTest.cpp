@@ -37,10 +37,9 @@
     (((bitmap)[(rowId) / 64] >> ((rowId) % 64)) & 1ULL)
 #endif
 
-class VisibilityTest : public ::testing::Test {
-public:
-    static bool DEBUG;
+bool VISIBILITY_TEST_DEBUG = true;
 
+class VisibilityTest : public ::testing::Test {
 protected:
     void SetUp() override {
         v = new Visibility();
@@ -53,7 +52,7 @@ protected:
     bool checkBitmap(const uint64_t* actual, const uint64_t* expected, int size = BITMAP_SIZE) {
         for (int i = 0; i < size; i++) {
             if (actual[i] != expected[i]) {
-                if (DEBUG) {
+                if (VISIBILITY_TEST_DEBUG) {
                     std::cout << "bits between " << (64 * i) << " and " << (64 * i + 63)
                           << " are not as expected\n";
                     std::cout << "actual: " << std::bitset<64>(actual[i]) << std::endl;
@@ -66,16 +65,6 @@ protected:
     }
 
     Visibility* v;
-};
-
-bool VisibilityTest::DEBUG = false;
-
-class GlobalTest : public ::testing::Environment {
-public:
-    void SetUp() override {
-        const char* debug = std::getenv("VISIBILITY_TEST_DEBUG");
-        VisibilityTest::DEBUG = debug != nullptr && std::string(debug) == "1";
-    }
 };
 
 TEST_F(VisibilityTest, BaseFunction) {
@@ -150,7 +139,7 @@ TEST_F(VisibilityTest, MultiThread) {
 
     auto printError = [&](const std::string& msg) {
         std::lock_guard<std::mutex> lock(printMutex);
-        std::cerr << "\n[ERROR] " << msg << std::endl;
+        ADD_FAILURE() << msg;
     };
 
     auto verifyBitmap = [&](uint64_t timestamp, const uint64_t* bitmap) {
@@ -170,7 +159,7 @@ TEST_F(VisibilityTest, MultiThread) {
         
         for (int i = 0; i < BITMAP_SIZE; i++) {
             if (bitmap[i] != expectedBitmap[i]) {
-                if (DEBUG) {
+                if (VISIBILITY_TEST_DEBUG) {
                     std::stringstream ss;
                     ss << "Bitmap verification failed at timestamp " << timestamp << "\n";
                     ss << "Bitmap segment " << i << " (rows " << (i*64) << "-" << (i*64+63) << "):\n";
@@ -221,7 +210,7 @@ TEST_F(VisibilityTest, MultiThread) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
-        if (DEBUG) {
+        if (VISIBILITY_TEST_DEBUG) {
             std::lock_guard<std::mutex> lock(printMutex);
             std::cout << "Delete thread completed: deleted " << deleteHistory.size() 
                       << " rows with max timestamp " << (timestamp-1) << std::endl;
@@ -231,7 +220,7 @@ TEST_F(VisibilityTest, MultiThread) {
     });
 
     std::vector<std::thread> getThreads;
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 10000; i++) {
         getThreads.emplace_back([&, i]() {
             std::random_device rd;
             std::mt19937 gen(rd());
@@ -255,7 +244,7 @@ TEST_F(VisibilityTest, MultiThread) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
             
-            if (DEBUG) {
+            if (VISIBILITY_TEST_DEBUG) {
                 std::lock_guard<std::mutex> lock(printMutex);
                 std::cout << "Get thread " << i << " completed: performed " 
                           << localVerificationCount << " verifications" << std::endl;
@@ -274,10 +263,4 @@ TEST_F(VisibilityTest, MultiThread) {
     std::memset(expectedFinalBitmap, 0xFF, sizeof(expectedFinalBitmap));
     
     EXPECT_TRUE(checkBitmap(finalBitmap, expectedFinalBitmap));
-}
-
-int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    ::testing::AddGlobalTestEnvironment(new GlobalTest);
-    return RUN_ALL_TESTS();
 }

@@ -43,18 +43,21 @@ install(TARGETS pixels-retina
         LIBRARY DESTINATION $ENV{PIXELS_HOME}/lib)
 
 # Add the test executable
-add_executable(retina_tests
-    test/VisibilityTest.cpp
-    test/RetinaTest.cpp
-)
+add_executable(visibility_tests test/VisibilityTest.cpp)
+add_executable(retina_tests test/RetinaTest.cpp)
 
 # Link the test executable with the library
+target_link_libraries(visibility_tests
+    pixels-retina
+    GTest::gtest_main
+)
 target_link_libraries(retina_tests
     pixels-retina
     GTest::gtest_main
 )
 
 include(GoogleTest)
+gtest_discover_tests(visibility_tests)
 gtest_discover_tests(retina_tests)
 
 # Set build type to Debug if not specified
