@@ -115,7 +115,7 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
                         ? tailUsed.load(std::memory_order_acquire)
                         : DeleteIndexBlock::BLOCK_CAPACITY;
         if (count > DeleteIndexBlock::BLOCK_CAPACITY) {
-            throw std::runtime_error("invalid count");
+            continue; // retry get count
         }
         for (uint64_t i = 0; i < count; i++) {
             uint64_t item = blk->items[i];
@@ -147,7 +147,7 @@ void Visibility::garbageCollect(uint64_t ts)
                         : DeleteIndexBlock::BLOCK_CAPACITY;
         if (count > DeleteIndexBlock::BLOCK_CAPACITY)
         {
-            throw std::runtime_error("invalid count");
+            continue; // retry get count
         }
         
         uint64_t lastItemTs = extractTimestamp(blk->items[count - 1]);
