@@ -69,12 +69,13 @@ void Visibility::deleteRecord(uint8_t rowId, uint64_t ts) {
             tailUsed.store(1, std::memory_order_release);
             return;
         } else {
-            size_t pos = tailUsed.fetch_add(1, std::memory_order_acquire);
+            size_t pos = tailUsed.load(std::memory_order_acquire);
             if (pos < DeleteIndexBlock::BLOCK_CAPACITY) {
-                curTail->items[pos] = item;
-                return;
+                if (tailUsed.compare_exchange_strong(pos, pos + 1, std::memory_order_acq_rel)) {
+                    curTail->items[pos] = item;
+                    return;
+                }
             } else {
-                tailUsed.fetch_sub(1, std::memory_order_release);
                 // curTail is full, need to add new block
                 DeleteIndexBlock *newBlk = new DeleteIndexBlock();
                 newBlk->items[0] = item;
