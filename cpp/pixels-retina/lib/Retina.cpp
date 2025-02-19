@@ -99,19 +99,19 @@ Visibility* Retina::getVisibility(uint64_t rowId) const {
 
 void Retina::deleteRecord(uint64_t rowId, uint64_t timestamp) {
     try {
-        // beginAccess();
+        beginAccess();
         Visibility* visibility = getVisibility(rowId);
         visibility->deleteRecord(rowId % VISIBILITY_RECORD_CAPACITY, timestamp);
-        // endAccess();
+        endAccess();
     }
     catch (const std::runtime_error& e) {
-        // endAccess();
+        endAccess();
         throw std::runtime_error("Failed to delete record: " + std::string(e.what()));
     }
 }
 
 uint64_t* Retina::getVisibilityBitmap(uint64_t timestamp) {
-    // beginAccess();
+    beginAccess();
     uint64_t* bitmap = new uint64_t[numVisibilities * BITMAP_SIZE_PER_VISIBILITY];
     memset(bitmap, 0, numVisibilities * BITMAP_SIZE_PER_VISIBILITY * sizeof(uint64_t));
 
@@ -119,11 +119,11 @@ uint64_t* Retina::getVisibilityBitmap(uint64_t timestamp) {
         for (uint64_t i = 0; i < numVisibilities; i++) {
             visibilities[i].getVisibilityBitmap(timestamp, bitmap + i * BITMAP_SIZE_PER_VISIBILITY);
         }
-        // endAccess();
+        endAccess();
         return bitmap;
     } catch (const std::runtime_error& e) {
         delete[] bitmap;
-        // endAccess();
+        endAccess();
         throw std::runtime_error("Failed to get visibility bitmap: " + std::string(e.what()));
     }
 }

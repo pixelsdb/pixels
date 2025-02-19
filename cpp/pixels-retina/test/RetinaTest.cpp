@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#define ROW_COUNT 256
+#define ROW_COUNT 25600
 #define VISIBILITIES_NUM (ROW_COUNT + 256 - 1) / 256
 #define BITMAP_SIZE (VISIBILITIES_NUM * 4)
 #define INVALID_BITS_COUNT (-ROW_COUNT & 255)
@@ -34,7 +34,7 @@
 #include <cstring>
 #include <sstream>
 
-bool RETINA_TEST_DEBUG = true;
+bool RETINA_TEST_DEBUG = false;
 
 class RetinaTest : public ::testing::Test {
 protected:
@@ -78,8 +78,8 @@ TEST_F(RetinaTest, MultiThread) {
     std::mutex historyMutex;
     std::mutex printMutex;
     std::atomic<bool> running{true};
-    std::atomic<uint64_t> currentMaxTimestamp{0};
-    std::atomic<uint64_t> lastGCTimestamp{0};
+    std::atomic<uint64_t> MaxTimestamp{0};
+    std::atomic<uint64_t> MinTimestamp{0};
     std::atomic<int> verificationCount{0};
     
     auto printError = [&](const std::string& msg) {
@@ -153,7 +153,7 @@ TEST_F(RetinaTest, MultiThread) {
                 deleteHistory.emplace_back(timestamp, rowId);
             }
 
-            currentMaxTimestamp.store(timestamp);
+            MaxTimestamp.store(timestamp);
             timestamp++;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
@@ -167,44 +167,45 @@ TEST_F(RetinaTest, MultiThread) {
         running.store(false);
     });
 
-    // auto gcThread = std::thread([&]() {
-    //     while (running) {
-    //         uint64_t currentTs = currentMaxTimestamp.load();
-    //         if (currentTs >= lastGCTimestamp.load()) {
-    //             retina->garbageCollect(lastGCTimestamp.load());
-    //             if (RETINA_TEST_DEBUG) {
-    //                 std::lock_guard<std::mutex> lock(printMutex);
-    //                 std::cout << "GC thread completed: GCed up to timestamp " << lastGCTimestamp.load() << std::endl;
-    //             }
-    //             lastGCTimestamp.store(lastGCTimestamp.load() + 10);
-    //         }
-    //         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    //     }
-    // });
+    auto gcThread = std::thread([&]() {
+        uint64_t gcTs = 0;
+        while (running) {
+            gcTs += 10;
+            if (gcTs <= MinTimestamp.load()) {
+                retina->garbageCollect(gcTs);
+                if (RETINA_TEST_DEBUG) {
+                    std::lock_guard<std::mutex> lock(printMutex);
+                    std::cout << "GC thread completed: GCed up to timestamp " << gcTs << std::endl;
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    });
 
     std::vector<std::thread> getThreads;
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < 100; i++) {
         getThreads.emplace_back([&, i]() {
             std::random_device rd;
             std::mt19937 gen(rd());
             int localVerificationCount = 0;
             
             while (running) {
-                uint64_t maxTs = currentMaxTimestamp.load();
-                uint64_t gcTs = lastGCTimestamp.load();
-                if (maxTs == 0) {
+                uint64_t maxTs = MaxTimestamp.load();
+                uint64_t minTs = MinTimestamp.load();
+                if (maxTs == 0 || minTs > maxTs) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     continue;
                 }
                 
-                std::uniform_int_distribution<uint64_t> tsDist(gcTs, maxTs);
+                std::uniform_int_distribution<uint64_t> tsDist(minTs, maxTs);
                 uint64_t queryTs = tsDist(gen);
                 uint64_t* bitmap = retina->getVisibilityBitmap(queryTs);
-                
+
                 EXPECT_TRUE(verifyBitmap(queryTs, bitmap));
-                
+
                 delete[] bitmap;
                 localVerificationCount++;
+                MinTimestamp.fetch_add(1);
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
 
@@ -217,12 +218,12 @@ TEST_F(RetinaTest, MultiThread) {
     }
 
     deleteThread.join();
-    // gcThread.join();
+    gcThread.join();
     for (auto& t : getThreads) {
         t.join();
     }
 
-    uint64_t* finalBitmap = retina->getVisibilityBitmap(currentMaxTimestamp.load());
+    uint64_t* finalBitmap = retina->getVisibilityBitmap(MaxTimestamp.load());
     uint64_t* expectedFinalBitmap = new uint64_t[BITMAP_SIZE]();
     std::memset(expectedFinalBitmap, 0xFF, sizeof(uint64_t) * BITMAP_SIZE);
     if (INVALID_BITS_COUNT != 0) {
@@ -231,7 +232,7 @@ TEST_F(RetinaTest, MultiThread) {
         }
     }
     
-    EXPECT_TRUE(verifyBitmap(currentMaxTimestamp.load(), finalBitmap));
+    EXPECT_TRUE(verifyBitmap(MaxTimestamp.load(), finalBitmap));
     
     delete[] finalBitmap;
     delete[] expectedFinalBitmap;

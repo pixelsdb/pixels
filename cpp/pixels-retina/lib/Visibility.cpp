@@ -143,28 +143,32 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
     }
 }
 
-void Visibility::garbageCollect(uint64_t ts)
-{
+void Visibility::garbageCollect(uint64_t ts) {
     // The upper layers have ensured that there are no reads or writes at this point
     // so we can safely delete the records
+
+    if (ts < baseTimestamp) {
+        throw std::runtime_error("need to read checkpoint from disk");
+    }
+
+    if (ts == baseTimestamp) {
+        return;
+    }
 
     DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
     DeleteIndexBlock *lastFullBlk = nullptr;
     uint64_t newBaseTimestamp = baseTimestamp;
 
-    while (blk)
-    {
+    while (blk) {
         size_t count = (blk == tail.load(std::memory_order_acquire)) 
                         ? tailUsed.load(std::memory_order_acquire)
                         : DeleteIndexBlock::BLOCK_CAPACITY;
-        if (count > DeleteIndexBlock::BLOCK_CAPACITY)
-        {
-            continue; // retry get count
+        if (count > DeleteIndexBlock::BLOCK_CAPACITY) {
+            throw std::runtime_error("The number of item in block is bigger than BLOCK_CAPCITY");
         }
         
         uint64_t lastItemTs = extractTimestamp(blk->items[count - 1]);
-        if (lastItemTs <= ts)
-        {
+        if (lastItemTs <= ts) {
             lastFullBlk = blk;
             newBaseTimestamp = lastItemTs;
         } else {
@@ -174,15 +178,22 @@ void Visibility::garbageCollect(uint64_t ts)
         blk = blk->next.load(std::memory_order_acquire);
     }
 
-    if (lastFullBlk)
-    {
+    if (lastFullBlk) {
         getVisibilityBitmap(ts, baseBitmap);
         baseTimestamp = newBaseTimestamp;
 
         DeleteIndexBlock* current = head.load(std::memory_order_acquire);
-        head.store(lastFullBlk->next.load(std::memory_order_acquire), std::memory_order_release);
-        while (current != lastFullBlk->next.load(std::memory_order_acquire))
-        {
+        DeleteIndexBlock* newHead =
+            lastFullBlk->next.load(std::memory_order_acquire);
+        
+        head.store(newHead, std::memory_order_release);
+
+        DeleteIndexBlock* curTail = tail.load(std::memory_order_acquire);
+        if (!newHead) {
+            tail.store(newHead, std::memory_order_release);
+        }
+
+        while (current != lastFullBlk->next.load(std::memory_order_acquire)) {
             DeleteIndexBlock* next = current->next.load(std::memory_order_acquire);
             delete current;
             current = next;
