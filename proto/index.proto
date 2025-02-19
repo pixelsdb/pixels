@@ -23,10 +23,10 @@
 syntax = "proto3";
 
 option java_multiple_files = false;
-option java_package = "io.pixelsdb.pixels.retina";
+option java_package = "io.pixelsdb.pixels.index";
 option java_outer_classname = "IndexProto";
 
-package retina.proto;
+package index.proto;
 
 // The index services definition.
 service IndexService {
@@ -43,9 +43,9 @@ message IndexKey {
 }
 
 message RowLocation {
-  uint64 fileId = 1; // the id of the file in pixels metadata
-  uint32 rgIndex = 2; // the index of the row group inside the file
-  uint32 rowIndex = 3; // the index of the row index the row group
+  uint64 fileId = 1; // the id of the file in pixels metadata, starts from 1
+  uint32 rgId = 2; // the index of the row group inside the file, starts from 0
+  uint32 rgRowId = 3; // the index of the row index the row group, starts from 0
 }
 
 message IndexEntry {

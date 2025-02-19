@@ -20,11 +20,10 @@
 package io.pixelsdb.pixels.index.rocksdb;
 
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
+import io.pixelsdb.pixels.retina.IndexProto;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author hank
@@ -33,37 +32,43 @@ import java.util.Map;
 public class RocksDBIndex implements SecondaryIndex
 {
     @Override
-    public long getUniqueRowId(ByteBuffer key)
+    public long getUniqueRowId(IndexProto.IndexKey key)
     {
         return 0;
     }
 
     @Override
-    public long[] getRowIds(ByteBuffer key)
+    public long[] getRowIds(IndexProto.IndexKey key)
     {
         return new long[0];
     }
 
     @Override
-    public boolean putEntry(ByteBuffer key, long rowId)
+    public boolean putEntry(IndexProto.IndexKey key, long rowId)
     {
         return false;
     }
 
     @Override
-    public boolean putEntries(Map<ByteBuffer, Long> entries)
+    public boolean putEntry(Entry entry)
     {
         return false;
     }
 
     @Override
-    public boolean deleteEntry(ByteBuffer key)
+    public boolean putEntries(List<Entry> entries)
     {
         return false;
     }
 
     @Override
-    public boolean deleteEntries(List<ByteBuffer> keys)
+    public boolean deleteEntry(IndexProto.IndexKey key)
+    {
+        return false;
+    }
+
+    @Override
+    public boolean deleteEntries(List<IndexProto.IndexKey> keys)
     {
         return false;
     }

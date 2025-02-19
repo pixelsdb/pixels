@@ -19,16 +19,17 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.retina.IndexProto;
+
+import java.io.Closeable;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author hank
  * @create 2025-02-07
  */
-public interface SecondaryIndex
+public interface SecondaryIndex extends Closeable
 {
     /**
      * If we want to add more secondary index schemes here, modify this enum.
@@ -76,17 +77,19 @@ public interface SecondaryIndex
         }
     }
 
-    long getUniqueRowId(ByteBuffer key);
+    long getUniqueRowId(IndexProto.IndexKey key);
 
-    long[] getRowIds(ByteBuffer key);
+    long[] getRowIds(IndexProto.IndexKey key);
 
-    boolean putEntry(ByteBuffer key, long rowId);
+    boolean putEntry(IndexProto.IndexKey key, long rowId);
 
-    boolean putEntries(Map<ByteBuffer, Long> entries);
+    boolean putEntry(Entry entry);
 
-    boolean deleteEntry(ByteBuffer key);
+    boolean putEntries(List<Entry> entries);
 
-    boolean deleteEntries(List<ByteBuffer> keys);
+    boolean deleteEntry(IndexProto.IndexKey key);
+
+    boolean deleteEntries(List<IndexProto.IndexKey> keys);
 
     /**
      * Close the secondary index. This method is to be used by the secondary index factory to close the
@@ -94,5 +97,43 @@ public interface SecondaryIndex
      * Users do not need to close the managed secondary index instances by themselves.
      * @throws IOException
      */
+    @Override
     void close() throws IOException;
+
+    class Entry
+    {
+        private final IndexProto.IndexKey key;
+        private final long rowId;
+
+        public Entry(IndexProto.IndexKey key, long rowId)
+        {
+            this.key = key;
+            this.rowId = rowId;
+        }
+
+        public IndexProto.IndexKey getKey()
+        {
+            return key;
+        }
+
+        public long getRowId()
+        {
+            return rowId;
+        }
+
+        @Override
+        public boolean equals(Object other)
+        {
+            if (!(other instanceof Entry))
+            {
+                return false;
+            }
+            Entry that = (Entry) other;
+            if (this.key == null || that.key == null)
+            {
+                return this.key == that.key && this.rowId == that.rowId;
+            }
+            return this.key.equals(that.key) && this.rowId == that.rowId;
+        }
+    }
 }
