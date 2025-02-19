@@ -1,6 +1,7 @@
 .idea
 build
 target
+tmp
 .classpath*
 .settings
 *.bak

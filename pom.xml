@@ -60,6 +60,8 @@
         <module>pixels-turbo/pixels-worker-vhive</module>
         <module>pixels-turbo/pixels-invoker-vhive</module>
         <module>pixels-turbo/pixels-scaling-general</module>
+        <module>pixels-index/pixels-index-rocksdb</module>
+        <module>pixels-index/pixels-index-rockset</module>
     </modules>
 
     <properties>
@@ -83,6 +85,7 @@
         <dep.awssdk.version>2.29.31</dep.awssdk.version>
         <dep.jedis.version>4.2.0</dep.jedis.version>
         <dep.gcp.version>26.1.2</dep.gcp.version>
+        <dep.rocksdb.version>9.10.0</dep.rocksdb.version>
 
         <!-- common libraries -->
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
@@ -471,6 +474,12 @@
                 <groupId>io.airlift</groupId>
                 <artifactId>slice</artifactId>
                 <version>${dep.airlift.slice.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.rocksdb</groupId>
+                <artifactId>rocksdbjni</artifactId>
+                <version>${dep.rocksdb.version}</version>
             </dependency>
 
             <!-- guava -->

@@ -31,8 +31,8 @@ import java.util.concurrent.TimeUnit;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * Created at: 19-4-17
- * Author: hank
+ * @author hank
+ * @create 2019-04-17
  */
 public class MetadataServer implements Server
 {
@@ -63,7 +63,7 @@ public class MetadataServer implements Server
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e)
         {
-            log.error("interrupted when shutdown rpc server", e);
+            log.error("interrupted when shutdown metadata server", e);
         }
         MetaDBUtil.Instance().close();
     }

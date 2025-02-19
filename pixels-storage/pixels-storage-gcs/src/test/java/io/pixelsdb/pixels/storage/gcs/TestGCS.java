@@ -87,7 +87,6 @@ public class TestGCS
         io.pixelsdb.pixels.common.physical.Storage storage = io.pixelsdb.pixels.common.physical.StorageFactory.Instance().getStorage(
                 io.pixelsdb.pixels.common.physical.Storage.Scheme.gcs);
         storage.mkdirs("pixels-test/hello-world/");
-        storage.close();
     }
 
     @Test
@@ -103,7 +102,6 @@ public class TestGCS
         output.write(buffer);
         output.flush();
         output.close();
-        storage.close();
     }
 
     @Test
@@ -117,7 +115,6 @@ public class TestGCS
         input.readFully(buffer);
         System.out.println(buffer[0]);
         System.out.println(buffer[2]);
-        storage.close();
     }
 
     @Test

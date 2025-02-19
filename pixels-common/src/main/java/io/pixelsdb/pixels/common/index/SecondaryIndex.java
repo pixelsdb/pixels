@@ -19,18 +19,25 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.index.IndexProto;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.List;
+
 /**
  * @author hank
  * @create 2025-02-07
  */
-public interface SecondaryIndex
+public interface SecondaryIndex extends Closeable
 {
     /**
      * If we want to add more secondary index schemes here, modify this enum.
      */
     enum Scheme
     {
-        rocksdb;  // secondary index stored in rocksdb
+        rocksdb,  // secondary index stored in rocksdb
+        rockset;  // secondary index stored in rockset (rocksdb-cloud)
 
         /**
          * Case-insensitive parsing from String name to enum value.
@@ -68,6 +75,66 @@ public interface SecondaryIndex
         {
             // enums in Java can be compared using '=='.
             return this == other;
+        }
+    }
+
+    long getUniqueRowId(IndexProto.IndexKey key);
+
+    long[] getRowIds(IndexProto.IndexKey key);
+
+    boolean putEntry(IndexProto.IndexKey key, long rowId);
+
+    boolean putEntry(Entry entry);
+
+    boolean putEntries(List<Entry> entries);
+
+    boolean deleteEntry(IndexProto.IndexKey key);
+
+    boolean deleteEntries(List<IndexProto.IndexKey> keys);
+
+    /**
+     * Close the secondary index. This method is to be used by the secondary index factory to close the
+     * managed secondary index instances when the process is shutting down.
+     * Users do not need to close the managed secondary index instances by themselves.
+     * @throws IOException
+     */
+    @Override
+    void close() throws IOException;
+
+    class Entry
+    {
+        private final IndexProto.IndexKey key;
+        private final long rowId;
+
+        public Entry(IndexProto.IndexKey key, long rowId)
+        {
+            this.key = key;
+            this.rowId = rowId;
+        }
+
+        public IndexProto.IndexKey getKey()
+        {
+            return key;
+        }
+
+        public long getRowId()
+        {
+            return rowId;
+        }
+
+        @Override
+        public boolean equals(Object other)
+        {
+            if (!(other instanceof Entry))
+            {
+                return false;
+            }
+            Entry that = (Entry) other;
+            if (this.key == null || that.key == null)
+            {
+                return this.key == that.key && this.rowId == that.rowId;
+            }
+            return this.key.equals(that.key) && this.rowId == that.rowId;
         }
     }
 }

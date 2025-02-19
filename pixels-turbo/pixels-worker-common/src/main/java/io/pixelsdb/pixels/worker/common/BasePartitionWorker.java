@@ -154,6 +154,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                     WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
                     true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
             Set<Integer> hashValues = new HashSet<>(numPartition);
+
             for (int hash = 0; hash < numPartition; ++hash)
             {
                 ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
