@@ -60,7 +60,7 @@ public class TransServer implements Server
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e)
         {
-            log.error("Interrupted when shutdown rpc server.", e);
+            log.error("Interrupted when shutdown transaction server.", e);
         }
     }
 

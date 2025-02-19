@@ -19,10 +19,40 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.index.IndexProto;
+
+import java.util.List;
+
 /**
  * @author hank
  * @create 2025-02-16
  */
 public class IndexService
 {
+    // TODO: implement
+
+    public IndexProto.RowLocation lookupIndex(IndexProto.IndexKey key)
+    {
+        return null;
+    }
+
+    public boolean putIndexEntry(IndexProto.IndexEntry entry)
+    {
+        return false;
+    }
+
+    public boolean deleteIndexEntry(IndexProto.IndexKey key)
+    {
+        return false;
+    }
+
+    public boolean putIndexEntries(List<IndexProto.IndexEntry> entries)
+    {
+        return false;
+    }
+
+    public boolean deleteIndexEntries(List<IndexProto.IndexKey> keys)
+    {
+        return false;
+    }
 }

@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.retina.IndexProto;
+import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
 import java.io.IOException;

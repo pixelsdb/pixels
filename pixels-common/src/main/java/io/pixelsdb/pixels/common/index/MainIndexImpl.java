@@ -17,60 +17,40 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.rocksdb;
+package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  * @author hank
- * @create 2025-02-09
+ * @create 2025-02-19
  */
-public class RocksDBIndex implements SecondaryIndex
+public class MainIndexImpl implements MainIndex
 {
     // TODO: implement
 
     @Override
-    public long getUniqueRowId(IndexProto.IndexKey key)
+    public IndexProto.RowLocation getLocation(long rowId)
     {
-        return 0;
+        return null;
     }
 
     @Override
-    public long[] getRowIds(IndexProto.IndexKey key)
-    {
-        return new long[0];
-    }
-
-    @Override
-    public boolean putEntry(IndexProto.IndexKey key, long rowId)
+    public boolean putRowIdsOfRg(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
     {
         return false;
     }
 
     @Override
-    public boolean putEntry(Entry entry)
+    public boolean deleteRowIdRange(RowIdRange rowIdRange)
     {
         return false;
     }
 
     @Override
-    public boolean putEntries(List<Entry> entries)
-    {
-        return false;
-    }
-
-    @Override
-    public boolean deleteEntry(IndexProto.IndexKey key)
-    {
-        return false;
-    }
-
-    @Override
-    public boolean deleteEntries(List<IndexProto.IndexKey> keys)
+    public boolean persist()
     {
         return false;
     }

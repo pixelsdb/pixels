@@ -59,7 +59,7 @@ public class ScalingMetricsServer implements Server
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e)
         {
-            log.error("interrupted when shutdown rpc server", e);
+            log.error("interrupted when shutdown scaling metrics server", e);
         }
     }
 
