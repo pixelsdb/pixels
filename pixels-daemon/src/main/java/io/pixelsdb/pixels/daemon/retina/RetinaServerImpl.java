@@ -148,7 +148,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
     public long[] queryVisibility(String filePath, long rgId, long timestamp) throws RetinaException
     {
-        try
+        try 
         {
             RGVisibility retina = checkRetina(filePath, rgId);
             long[] visibilityBitmap = retina.getVisibilityBitmap(timestamp);
@@ -163,47 +163,14 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void beginAccess(String filePath, long rgId) throws RetinaException
+    public void garbageCollect(String filePath, long rgId, long timestamp) throws RetinaException
     {
         try 
         {
             RGVisibility retina = checkRetina(filePath, rgId);
-            retina.beginAccess();
+            retina.garbageCollect(timestamp);
         } catch (Exception e) {
-            throw new RetinaException("Error while beginning row group read", e);
-        }
-    }
-    
-    public void endAccess(String filePath, long rgId) throws RetinaException
-    {
-        try 
-        {
-            RGVisibility retina = checkRetina(filePath, rgId);
-            retina.endAccess();
-        } catch (Exception e) {
-            throw new RetinaException("Error while ending row group read", e);
-        }
-    }
-    
-    public void beginGarbageCollect(String filePath, long rgId, long timestamp) throws RetinaException
-    {
-        try 
-        {
-            RGVisibility retina = checkRetina(filePath, rgId);
-            retina.beginGarbageCollect(timestamp);
-        } catch (Exception e) {
-            throw new RetinaException("Error while beginning garbage collect", e);
-        }
-    }
-
-    public void endGarbageCollect(String filePath, long rgId) throws RetinaException
-    {
-        try 
-        {
-            RGVisibility retina = checkRetina(filePath, rgId);
-            retina.endGarbageCollect();
-        } catch (Exception e) {
-            throw new RetinaException("Error while ending garbage collect", e);
+            throw new RetinaException("Error while garbage collecting", e);
         }
     }
     
@@ -214,7 +181,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        try {
+        try 
+        {
             String filePath = request.getFilePath();
             long rgId = request.getRgid();
             long rowId = request.getRowId();
@@ -274,7 +242,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             long timestamp = request.getTimestamp();
             long[] visibilityBitmap = queryVisibility(filePath, rgId, timestamp);
 
-            RetinaProto.QueryVisibilityResponse.Builder responseBuilder = RetinaProto.QueryVisibilityResponse.newBuilder()
+            RetinaProto.QueryVisibilityResponse.Builder responseBuilder = RetinaProto.QueryVisibilityResponse
+                    .newBuilder()
                     .setHeader(headerBuilder.build());
             for (long value : visibilityBitmap) 
             {
@@ -293,108 +262,30 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
     
     @Override
-    public void beginAccess(RetinaProto.BeginAccessRequest request,
-                                 StreamObserver<RetinaProto.BeginAccessResponse> responseObserver)
+    public void garbageCollect(RetinaProto.GarbageCollectRequest request,
+                              StreamObserver<RetinaProto.GarbageCollectResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        try 
+        try
         {
-            String filePath = request.getFilePath();
-            long rgId = request.getRgid();
-            beginAccess(filePath, rgId);
-
-        RetinaProto.BeginAccessResponse response = RetinaProto.BeginAccessResponse.newBuilder()
-                .setHeader(headerBuilder.build()).build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (RetinaException e) 
-        {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.BeginAccessResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .build());
-            responseObserver.onCompleted();
-        }
-    }
-
-    @Override
-    public void endAccess(RetinaProto.EndAccessRequest request,
-                                StreamObserver<RetinaProto.EndAccessResponse> responseObserver)
-    {
-        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        try 
-        {
-            String filePath = request.getFilePath();
-            long rgId = request.getRgid();
-            endAccess(filePath, rgId);
-
-        RetinaProto.EndAccessResponse response = RetinaProto.EndAccessResponse.newBuilder()
-                .setHeader(headerBuilder.build()).build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (RetinaException e) 
-        {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.EndAccessResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .build());
-            responseObserver.onCompleted();
-        }
-    }
-    
-    @Override
-    public void beginGarbageCollect(RetinaProto.BeginGarbageCollectRequest request,
-                                   StreamObserver<RetinaProto.BeginGarbageCollectResponse> responseObserver)
-    {
-        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        try {
             String filePath = request.getFilePath();
             long rgId = request.getRgid();
             long timestamp = request.getTimestamp();
-            beginGarbageCollect(filePath, rgId, timestamp);
+            garbageCollect(filePath, rgId, timestamp);
 
-            RetinaProto.BeginGarbageCollectResponse response = RetinaProto.BeginGarbageCollectResponse.newBuilder()
+            RetinaProto.GarbageCollectResponse response = RetinaProto.GarbageCollectResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-        } catch (RetinaException e) {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.BeginGarbageCollectResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .build());
-            responseObserver.onCompleted();
-        }
-    }
-    
-    @Override
-    public void endGarbageCollect(RetinaProto.EndGarbageCollectRequest request,
-                                  StreamObserver<RetinaProto.EndGarbageCollectResponse> responseObserver)
-    {
-        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        try 
-        {
-            String filePath = request.getFilePath();
-            long rgId = request.getRgid();
-            endGarbageCollect(filePath, rgId);
-
-        RetinaProto.EndGarbageCollectResponse response = RetinaProto.EndGarbageCollectResponse.newBuilder()
-                .setHeader(headerBuilder.build()).build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted(); 
         } catch (RetinaException e) 
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.EndGarbageCollectResponse.newBuilder()
+            responseObserver.onNext(RetinaProto.GarbageCollectResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
+            responseObserver.onCompleted();
         }
     }
 

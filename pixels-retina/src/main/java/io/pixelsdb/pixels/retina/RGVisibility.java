@@ -80,22 +80,9 @@ public class RGVisibility implements AutoCloseable
     // native methods
     private native long createNativeObject(long rgRecordNum);
     private native void destroyNativeObject(long nativeHandle);
-    private native void beginAccess(long nativeHandle);
-    private native void endAccess(long nativeHandle);
     private native void deleteRecord(long rowId, long timestamp, long nativeHandle);
     private native long[] getVisibilityBitmap(long timestamp, long nativeHandle);
-    private native void beginGarbageCollect(long timestamp, long nativeHandle);
-    private native void endGarbageCollect(long nativeHandle);
-
-    public void beginAccess()
-    {
-        beginAccess(this.nativeHandle);
-    }
-
-    public void endAccess()
-    {
-        endAccess(this.nativeHandle);
-    }
+    private native void garbageCollect(long timestamp, long nativeHandle);
 
     public void deleteRecord(long rowId, long timestamp)
     {
@@ -107,13 +94,8 @@ public class RGVisibility implements AutoCloseable
         return getVisibilityBitmap(timestamp, this.nativeHandle);
     }
 
-    public void beginGarbageCollect(long timestamp)
+    public void garbageCollect(long timestamp)
     {
-        beginGarbageCollect(timestamp, this.nativeHandle);
-    }
-
-    public void endGarbageCollect()
-    {
-        endGarbageCollect(this.nativeHandle);
+        garbageCollect(timestamp, this.nativeHandle);
     }
 }

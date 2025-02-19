@@ -33,10 +33,7 @@ service RetinaWorkerService {
     rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
     rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
     rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
-    rpc BeginAccess (BeginAccessRequest) returns (BeginAccessResponse);
-    rpc EndAccess (EndAccessRequest) returns (EndAccessResponse);
-    rpc BeginGarbageCollect (BeginGarbageCollectRequest) returns (BeginGarbageCollectResponse);
-    rpc EndGarbageCollect (EndGarbageCollectRequest) returns (EndGarbageCollectResponse);
+    rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
 }
 
 // header
@@ -83,43 +80,13 @@ message QueryVisibilityResponse {
     repeated uint64 bitmap = 2;
 }
 
-message BeginAccessRequest {
-    RequestHeader header = 1;
-    string filePath = 2;
-    sint64 rgid = 3;
-}
-
-message BeginAccessResponse {
-    ResponseHeader header = 1;
-}
-
-message EndAccessRequest {
-    RequestHeader header = 1;
-    string filePath = 2;
-    sint64 rgid = 3;
-}
-
-message EndAccessResponse {
-    ResponseHeader header = 1;
-}
-
-message BeginGarbageCollectRequest {
+message GarbageCollectRequest {
     RequestHeader header = 1;
     string filePath = 2;
     sint64 rgid = 3;
     sint64 timestamp = 4;
 }
 
-message BeginGarbageCollectResponse {
-    ResponseHeader header = 1;
-}
-
-message EndGarbageCollectRequest {
-    RequestHeader header = 1;
-    string filePath = 2;
-    sint64 rgid = 3;
-}
-
-message EndGarbageCollectResponse {
+message GarbageCollectResponse {
     ResponseHeader header = 1;
 }
