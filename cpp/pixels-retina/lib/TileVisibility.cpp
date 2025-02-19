@@ -18,26 +18,26 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-#include "Visibility.h"
+#include "TileVisibility.h"
 
 #include <cstring>
 #include <stdexcept>
 
-Visibility::Visibility() : baseTimestamp(0UL) {
+TileVisibility::TileVisibility() : baseTimestamp(0UL) {
     memset(baseBitmap, 0, 4 * sizeof(uint64_t));
     head.store(nullptr, std::memory_order_release);
     tail.store(nullptr, std::memory_order_release);
     tailUsed.store(0, std::memory_order_release);
 }
 
-Visibility::Visibility(uint64_t ts, const uint64_t bitmap[4])
+TileVisibility::TileVisibility(uint64_t ts, const uint64_t bitmap[4])
     : baseTimestamp(ts) {
     memcpy(baseBitmap, bitmap, 4 * sizeof(uint64_t));
     head.store(nullptr, std::memory_order_release);
     tail.store(nullptr, std::memory_order_release);
 }
 
-Visibility::~Visibility() {
+TileVisibility::~TileVisibility() {
     DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
     while (blk) {
         DeleteIndexBlock *next = blk->next.load(std::memory_order_acquire);
@@ -46,7 +46,7 @@ Visibility::~Visibility() {
     }
 }
 
-void Visibility::deleteRecord(uint8_t rowId, uint64_t ts) {
+void TileVisibility::deleteTileRecord(uint8_t rowId, uint64_t ts) {
     uint64_t item = makeDeleteIndex(rowId, ts);
     while (true) {
         DeleteIndexBlock *curTail = tail.load(std::memory_order_acquire);
@@ -101,7 +101,7 @@ void Visibility::deleteRecord(uint8_t rowId, uint64_t ts) {
     }
 }
 
-void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
+void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
     if (ts < baseTimestamp) {
         throw std::runtime_error("need to read checkpoint from disk");
     }
@@ -143,7 +143,7 @@ void Visibility::getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
     }
 }
 
-void Visibility::garbageCollect(uint64_t ts) {
+void TileVisibility::collectTileGarbage(uint64_t ts) {
     // The upper layers have ensured that there are no reads or writes at this point
     // so we can safely delete the records
 
@@ -179,7 +179,7 @@ void Visibility::garbageCollect(uint64_t ts) {
     }
 
     if (lastFullBlk) {
-        getVisibilityBitmap(ts, baseBitmap);
+        getTileVisibilityBitmap(ts, baseBitmap);
         baseTimestamp = newBaseTimestamp;
 
         DeleteIndexBlock* current = head.load(std::memory_order_acquire);

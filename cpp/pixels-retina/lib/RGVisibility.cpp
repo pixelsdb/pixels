@@ -17,22 +17,22 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#include "Retina.h"
+#include "RGVisibility.h"
 #include <stdexcept>
 #include <cstring>
 #include <thread>
 
-Retina::Retina(uint64_t rgRecordNum)
-    : numVisibilities((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
+RGVisibility::RGVisibility(uint64_t rgRecordNum)
+    : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
     flag.store(0);
-    visibilities = new Visibility[numVisibilities];
+    tileVisibilities = new TileVisibility[tileCount];
 }
 
-Retina::~Retina() {
-    delete[] visibilities;
+RGVisibility::~RGVisibility() {
+    delete[] tileVisibilities;
 }
 
-void Retina::beginAccess() {
+void RGVisibility::beginRGAccess() {
     while (true) {
         uint32_t v = flag.load(std::memory_order_acquire);
         uint32_t accessCount = v & ACCESS_MASK;
@@ -54,7 +54,7 @@ void Retina::beginAccess() {
     }
 }
 
-void Retina::endAccess() {
+void RGVisibility::endRGAccess() {
     uint32_t v = flag.load(std::memory_order_acquire);
     while((v & ACCESS_MASK) > 0) {
         if (flag.compare_exchange_strong(v, v - ACCESS_INC, std::memory_order_acq_rel)) {
@@ -64,7 +64,7 @@ void Retina::endAccess() {
     }
 }
 
-void Retina::garbageCollect(uint64_t timestamp) {
+void RGVisibility::collectRGGarbage(uint64_t timestamp) {
     // Set the gc flag.
     flag.store(flag.load(std::memory_order_acquire) | GC_MASK, std::memory_order_release);
 
@@ -81,49 +81,53 @@ void Retina::garbageCollect(uint64_t timestamp) {
     assert((flag.load(std::memory_order_acquire) & ACCESS_MASK) == 0);
 
     // Garbage collect.
-    for (uint64_t i = 0; i < numVisibilities; i++) {
-        visibilities[i].garbageCollect(timestamp);
+    for (uint64_t i = 0; i < tileCount; i++) {
+        tileVisibilities[i].collectTileGarbage(timestamp);
     }
 
     // Clear the gc flag.
     flag.store(flag.load(std::memory_order_acquire) & ~GC_MASK, std::memory_order_release);
 }
 
-Visibility* Retina::getVisibility(uint64_t rowId) const {
-    uint64_t visibilityIndex = rowId / VISIBILITY_RECORD_CAPACITY;
-    if (visibilityIndex >= numVisibilities) {
+TileVisibility* RGVisibility::getTileVisibility(uint64_t rowId) const {
+    uint64_t tileIndex = rowId / VISIBILITY_RECORD_CAPACITY;
+    if (tileIndex >= tileCount) {
         throw std::runtime_error("Row id is out of range.");
     }
-    return &visibilities[visibilityIndex];
+    return &tileVisibilities[tileIndex];
 }
 
-void Retina::deleteRecord(uint64_t rowId, uint64_t timestamp) {
+void RGVisibility::deleteRGRecord(uint64_t rowId, uint64_t timestamp) {
     try {
-        beginAccess();
-        Visibility* visibility = getVisibility(rowId);
-        visibility->deleteRecord(rowId % VISIBILITY_RECORD_CAPACITY, timestamp);
-        endAccess();
+        beginRGAccess();
+        TileVisibility* tileVisibility = getTileVisibility(rowId);
+        tileVisibility->deleteTileRecord(rowId % VISIBILITY_RECORD_CAPACITY, timestamp);
+        endRGAccess();
     }
     catch (const std::runtime_error& e) {
-        endAccess();
+        endRGAccess();
         throw std::runtime_error("Failed to delete record: " + std::string(e.what()));
     }
 }
 
-uint64_t* Retina::getVisibilityBitmap(uint64_t timestamp) {
-    beginAccess();
-    uint64_t* bitmap = new uint64_t[numVisibilities * BITMAP_SIZE_PER_VISIBILITY];
-    memset(bitmap, 0, numVisibilities * BITMAP_SIZE_PER_VISIBILITY * sizeof(uint64_t));
+uint64_t* RGVisibility::getRGVisibilityBitmap(uint64_t timestamp) {
+    beginRGAccess();
+    uint64_t* bitmap = new uint64_t[tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY];
+    memset(bitmap, 0, tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY * sizeof(uint64_t));
 
     try {
-        for (uint64_t i = 0; i < numVisibilities; i++) {
-            visibilities[i].getVisibilityBitmap(timestamp, bitmap + i * BITMAP_SIZE_PER_VISIBILITY);
+        for (uint64_t i = 0; i < tileCount; i++) {
+            tileVisibilities[i].getTileVisibilityBitmap(timestamp, bitmap + i * BITMAP_SIZE_PER_TILE_VISIBILITY);
         }
-        endAccess();
+        endRGAccess();
         return bitmap;
     } catch (const std::runtime_error& e) {
         delete[] bitmap;
-        endAccess();
+        endRGAccess();
         throw std::runtime_error("Failed to get visibility bitmap: " + std::string(e.what()));
     }
+}
+
+uint64_t RGVisibility::getBitmapSize() const {
+    return tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
 }

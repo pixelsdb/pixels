@@ -17,22 +17,24 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#ifndef VISIBILITYUTIL_H
-#define VISIBILITYUTIL_H
+#ifndef RG_VISIBILITY_H
+#define RG_VISIBILITY_H
 
-#include "Visibility.h"
+#include "TileVisibility.h"
 #include <memory>
 #include <atomic>
 
-class Retina {
+class RGVisibility {
 public:
-    explicit Retina(uint64_t rgRecordNum);
-    ~Retina();
+    explicit RGVisibility(uint64_t rgRecordNum);
+    ~RGVisibility();
 
-    void deleteRecord(uint64_t rowId, uint64_t timestamp);
-    uint64_t* getVisibilityBitmap(uint64_t timestamp);
+    void deleteRGRecord(uint64_t rowId, uint64_t timestamp);
+    uint64_t* getRGVisibilityBitmap(uint64_t timestamp);
 
-    void garbageCollect(uint64_t timestamp);
+    void collectRGGarbage(uint64_t timestamp);
+
+    uint64_t getBitmapSize() const;
 
 private:
     static constexpr uint32_t VISIBILITY_RECORD_CAPACITY = 256;
@@ -40,16 +42,16 @@ private:
     static constexpr uint32_t GC_MASK = 0xFF000000;
     static constexpr uint32_t ACCESS_MASK = 0x00FFFFFF;
     static constexpr uint32_t ACCESS_INC = 0x00000001;
-    static constexpr uint32_t BITMAP_SIZE_PER_VISIBILITY = 4;
+    static constexpr uint32_t BITMAP_SIZE_PER_TILE_VISIBILITY = 4;
     static constexpr uint32_t RG_READ_LEASE_MS = 100;
 
-    Visibility* visibilities;
-    const uint64_t numVisibilities;
+    TileVisibility* tileVisibilities;
+    const uint64_t tileCount;
     std::atomic<uint32_t> flag; // high 1 byte is the gc flag, low 3 bytes are the access count
 
-    Visibility* getVisibility(uint64_t rowId) const;
-    void beginAccess();
-    void endAccess();
+    TileVisibility* getTileVisibility(uint64_t rowId) const;
+    void beginRGAccess();
+    void endRGAccess();
 };
 
-#endif //VISIBILITYUTIL_H
+#endif //RG_VISIBILITY_H

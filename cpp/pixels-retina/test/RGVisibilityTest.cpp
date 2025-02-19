@@ -17,113 +17,57 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#include <atomic>
-#include <bitset>
-#include <chrono>
-#include <cstring>
-#include <iostream>
-#include <random>
-#include <thread>
-#include <vector>
-#include <mutex>
-#include <sstream>
+#define ROW_COUNT 25600
+#define VISIBILITIES_NUM (ROW_COUNT + 256 - 1) / 256
+#define BITMAP_SIZE (VISIBILITIES_NUM * 4)
+#define INVALID_BITS_COUNT (-ROW_COUNT & 255)
 
 #include "gtest/gtest.h"
-#include "Visibility.h"
+#include "RGVisibility.h"
 
-#define BITMAP_SIZE 4
-#ifndef GET_BITMAP_BIT
-#define GET_BITMAP_BIT(bitmap, rowId)                                          \
-    (((bitmap)[(rowId) / 64] >> ((rowId) % 64)) & 1ULL)
-#endif
+#include <bitset>
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <random>
+#include <cstring>
+#include <sstream>
 
-bool VISIBILITY_TEST_DEBUG = true;
+bool RETINA_TEST_DEBUG = true;
 
-class VisibilityTest : public ::testing::Test {
+class RGVisibilityTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        v = new Visibility();
+        rgVisibility = new RGVisibility(ROW_COUNT);
     }
-
+    
     void TearDown() override {
-        delete v;
+        delete rgVisibility;
     }
 
-    bool checkBitmap(const uint64_t* actual, const uint64_t* expected, int size = BITMAP_SIZE) {
-        for (int i = 0; i < size; i++) {
-            if (actual[i] != expected[i]) {
-                if (VISIBILITY_TEST_DEBUG) {
-                    std::cout << "bits between " << (64 * i) << " and " << (64 * i + 63)
-                          << " are not as expected\n";
-                    std::cout << "actual: " << std::bitset<64>(actual[i]) << std::endl;
-                    std::cout << "expect: " << std::bitset<64>(expected[i]) << std::endl;
-                }
-                return false;
-            }
-        }
-        return true;
-    }
-
-    Visibility* v;
+    RGVisibility* rgVisibility;
 };
 
-TEST_F(VisibilityTest, BaseFunction) {
-    v->deleteRecord(1, 100);
-    v->deleteRecord(2, 101);
+TEST_F(RGVisibilityTest, BasicDeleteAndVisibility) {
+    uint64_t timestamp1 = 100;
+    uint64_t timestamp2 = 200;
 
-    uint64_t actualBitmap[BITMAP_SIZE] = {0};
-    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    rgVisibility->deleteRGRecord(5, timestamp1);
+    rgVisibility->deleteRGRecord(10, timestamp1);
+    rgVisibility->deleteRGRecord(15, timestamp2);
+    rgVisibility->collectRGGarbage(timestamp1);
 
-    v->getVisibilityBitmap(50, actualBitmap);
-    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+    uint64_t* bitmap1 = rgVisibility->getRGVisibilityBitmap(timestamp1);
+    EXPECT_EQ(bitmap1[0], 0b0000010000100000);
+    delete[] bitmap1;
 
-    v->getVisibilityBitmap(100, actualBitmap);
-    SET_BITMAP_BIT(expectedBitmap, 1);
-    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
-
-    v->getVisibilityBitmap(101, actualBitmap);
-    SET_BITMAP_BIT(expectedBitmap, 2);
-    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
-
-    v->garbageCollect(101);
-    v->getVisibilityBitmap(101, actualBitmap);
-    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+    uint64_t* bitmap2 = rgVisibility->getRGVisibilityBitmap(timestamp2);
+    EXPECT_EQ(bitmap2[0], 0b1000010000100000);
+    delete[] bitmap2;
 }
 
-TEST_F(VisibilityTest, DeleteRecord) {
-    uint64_t actualBitmap[BITMAP_SIZE] = {0};
-    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
-
-    for (int i = 0; i < 256; i++) {
-        v->deleteRecord(i, i + 100);
-        SET_BITMAP_BIT(expectedBitmap, i);
-        v->getVisibilityBitmap(i + 100, actualBitmap);
-        EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
-    }
-}
-
-TEST_F(VisibilityTest, GarbageCollect) {
-    for (int i = 0; i < 100; i++) {
-        v->deleteRecord(i, i + 100);
-    }
-    v->garbageCollect(150);
-    uint64_t actualBitmap[BITMAP_SIZE] = {0};
-    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
-
-    v->getVisibilityBitmap(150, actualBitmap);
-    for (int i = 0; i <= 50; i++) {
-        SET_BITMAP_BIT(expectedBitmap, i);
-    }
-    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
-    for (int i = 51; i < 100; i++) {
-        SET_BITMAP_BIT(expectedBitmap, i);
-    }
-    v->garbageCollect(200);
-    v->getVisibilityBitmap(200, actualBitmap);
-    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
-}
-
-TEST_F(VisibilityTest, MultiThread) {
+TEST_F(RGVisibilityTest, MultiThread) {
     struct DeleteRecord {
         uint64_t timestamp;
         uint64_t rowId;
@@ -134,9 +78,10 @@ TEST_F(VisibilityTest, MultiThread) {
     std::mutex historyMutex;
     std::mutex printMutex;
     std::atomic<bool> running{true};
-    std::atomic<uint64_t> currentMaxTimestamp{0};
+    std::atomic<uint64_t> MaxTimestamp{0};
+    std::atomic<uint64_t> MinTimestamp{0};
     std::atomic<int> verificationCount{0};
-
+    
     auto printError = [&](const std::string& msg) {
         std::lock_guard<std::mutex> lock(printMutex);
         ADD_FAILURE() << msg;
@@ -153,13 +98,15 @@ TEST_F(VisibilityTest, MultiThread) {
         
         for (const auto& record : historySnapshot) {
             if (record.timestamp <= timestamp) {
-                SET_BITMAP_BIT(expectedBitmap, record.rowId);
+                uint64_t bitmapIndex = record.rowId / 64;
+                uint64_t bitOffset = record.rowId % 64;
+                expectedBitmap[bitmapIndex] |= (1ULL << bitOffset);
             }
         }
-        
-        for (int i = 0; i < BITMAP_SIZE; i++) {
+
+        for (size_t i = 0; i < BITMAP_SIZE; i++) {
             if (bitmap[i] != expectedBitmap[i]) {
-                if (VISIBILITY_TEST_DEBUG) {
+                if (RETINA_TEST_DEBUG) {
                     std::stringstream ss;
                     ss << "Bitmap verification failed at timestamp " << timestamp << "\n";
                     ss << "Bitmap segment " << i << " (rows " << (i*64) << "-" << (i*64+63) << "):\n";
@@ -176,6 +123,7 @@ TEST_F(VisibilityTest, MultiThread) {
                 return false;
             }
         }
+        
         verificationCount++;
         return true;
     };
@@ -186,7 +134,7 @@ TEST_F(VisibilityTest, MultiThread) {
         std::mt19937 gen(rd());
         
         std::vector<uint64_t> remainingRows;
-        for (uint64_t i = 0; i < 256; i++) {
+        for (uint64_t i = 0; i < ROW_COUNT; i++) {
             remainingRows.push_back(i);
         }
 
@@ -200,16 +148,16 @@ TEST_F(VisibilityTest, MultiThread) {
 
             {
                 std::lock_guard<std::mutex> lock(historyMutex);
-                v->deleteRecord(rowId, timestamp);
+                rgVisibility->deleteRGRecord(rowId, timestamp);
                 deleteHistory.emplace_back(timestamp, rowId);
             }
 
-            currentMaxTimestamp.store(timestamp);
+            MaxTimestamp.store(timestamp);
             timestamp++;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
-        if (VISIBILITY_TEST_DEBUG) {
+        if (RETINA_TEST_DEBUG) {
             std::lock_guard<std::mutex> lock(printMutex);
             std::cout << "Delete thread completed: deleted " << deleteHistory.size() 
                       << " rows with max timestamp " << (timestamp-1) << std::endl;
@@ -218,32 +166,49 @@ TEST_F(VisibilityTest, MultiThread) {
         running.store(false);
     });
 
+    auto gcThread = std::thread([&]() {
+        uint64_t gcTs = 0;
+        while (running) {
+            gcTs += 10;
+            if (gcTs <= MinTimestamp.load()) {
+                rgVisibility->collectRGGarbage(gcTs);
+                if (RETINA_TEST_DEBUG) {
+                    std::lock_guard<std::mutex> lock(printMutex);
+                    std::cout << "GC thread completed: GCed up to timestamp " << gcTs << std::endl;
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    });
+
     std::vector<std::thread> getThreads;
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < 100; i++) {
         getThreads.emplace_back([&, i]() {
             std::random_device rd;
             std::mt19937 gen(rd());
             int localVerificationCount = 0;
             
             while (running) {
-                uint64_t maxTs = currentMaxTimestamp.load();
-                if (maxTs == 0) {
+                uint64_t maxTs = MaxTimestamp.load();
+                uint64_t minTs = MinTimestamp.load();
+                if (maxTs == 0 || minTs > maxTs) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     continue;
                 }
                 
-                std::uniform_int_distribution<uint64_t> tsDist(0, maxTs);
+                std::uniform_int_distribution<uint64_t> tsDist(minTs, maxTs);
                 uint64_t queryTs = tsDist(gen);
-                
-                uint64_t actualBitmap[BITMAP_SIZE] = {0};
-                v->getVisibilityBitmap(queryTs, actualBitmap);
-                
-                EXPECT_TRUE(verifyBitmap(queryTs, actualBitmap));
+                uint64_t* bitmap = rgVisibility->getRGVisibilityBitmap(queryTs);
+
+                EXPECT_TRUE(verifyBitmap(queryTs, bitmap));
+
+                delete[] bitmap;
                 localVerificationCount++;
+                MinTimestamp.fetch_add(1, std::memory_order_relaxed);
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
-            
-            if (VISIBILITY_TEST_DEBUG) {
+
+            if (RETINA_TEST_DEBUG) {
                 std::lock_guard<std::mutex> lock(printMutex);
                 std::cout << "Get thread " << i << " completed: performed " 
                           << localVerificationCount << " verifications" << std::endl;
@@ -252,14 +217,22 @@ TEST_F(VisibilityTest, MultiThread) {
     }
 
     deleteThread.join();
+    gcThread.join();
     for (auto& t : getThreads) {
         t.join();
     }
 
-    uint64_t finalBitmap[BITMAP_SIZE] = {0};
-    v->getVisibilityBitmap(currentMaxTimestamp.load(), finalBitmap);
-    uint64_t expectedFinalBitmap[BITMAP_SIZE];
-    std::memset(expectedFinalBitmap, 0xFF, sizeof(expectedFinalBitmap));
+    uint64_t* finalBitmap = rgVisibility->getRGVisibilityBitmap(MaxTimestamp.load());
+    uint64_t* expectedFinalBitmap = new uint64_t[BITMAP_SIZE]();
+    std::memset(expectedFinalBitmap, 0xFF, sizeof(uint64_t) * BITMAP_SIZE);
+    if (INVALID_BITS_COUNT != 0) {
+        for (size_t i = ROW_COUNT; i < ROW_COUNT + INVALID_BITS_COUNT; i++) {
+            expectedFinalBitmap[i / 64] &= ~(1ULL << (i % 64));
+        }
+    }
     
-    EXPECT_TRUE(checkBitmap(finalBitmap, expectedFinalBitmap));
+    EXPECT_TRUE(verifyBitmap(MaxTimestamp.load(), finalBitmap));
+    
+    delete[] finalBitmap;
+    delete[] expectedFinalBitmap;
 }

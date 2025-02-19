@@ -26,8 +26,9 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Source files
 set(SOURCES
-        lib/Retina.cpp
-        lib/Visibility.cpp
+        lib/TileVisibility.cpp
+        lib/RGVisibility.cpp
+        lib/RGVisibilityJni.cpp
 )
 
 # Create shared library
@@ -36,29 +37,34 @@ add_library(pixels-retina SHARED ${SOURCES})
 # Set the target properties
 set_target_properties(pixels-retina PROPERTIES
         OUTPUT_NAME "pixels-retina"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+)
+
+target_link_libraries(pixels-retina
+    ${JNI_LIBRARIES}
+)
 
 # Ensure the library is placed in the PIXELS_HOME directory
 install(TARGETS pixels-retina
         LIBRARY DESTINATION $ENV{PIXELS_HOME}/lib)
 
 # Add the test executable
-add_executable(visibility_tests test/VisibilityTest.cpp)
-add_executable(retina_tests test/RetinaTest.cpp)
+add_executable(tile_visibility_tests test/TileVisibilityTest.cpp)
+add_executable(rg_visibility_tests test/RGVisibilityTest.cpp)
 
 # Link the test executable with the library
-target_link_libraries(visibility_tests
+target_link_libraries(tile_visibility_tests
     pixels-retina
     GTest::gtest_main
 )
-target_link_libraries(retina_tests
+target_link_libraries(rg_visibility_tests
     pixels-retina
     GTest::gtest_main
 )
 
 include(GoogleTest)
-gtest_discover_tests(visibility_tests)
-gtest_discover_tests(retina_tests)
+gtest_discover_tests(tile_visibility_tests)
+gtest_discover_tests(rg_visibility_tests)
 
 # Set build type to Debug if not specified
 if (NOT CMAKE_BUILD_TYPE)

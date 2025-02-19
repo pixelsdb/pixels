@@ -17,8 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#ifndef PIXELS_RETINA_VISIBILITY_H
-#define PIXELS_RETINA_VISIBILITY_H
+#ifndef PIXELS_RETINA_TILE_VISIBILITY_H
+#define PIXELS_RETINA_TILE_VISIBILITY_H
 
 #ifndef SET_BITMAP_BIT
 #define SET_BITMAP_BIT(bitmap, rowId) \
@@ -48,18 +48,18 @@ struct DeleteIndexBlock {
     std::atomic<DeleteIndexBlock *> next{nullptr};
 };
 
-class Visibility {
+class TileVisibility {
   public:
-    Visibility();
-    Visibility(uint64_t ts, const uint64_t bitmap[4]);
-    ~Visibility();
-    void deleteRecord(uint8_t rowId, uint64_t ts);
-    void getVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const;
-    void garbageCollect(uint64_t ts);
+    TileVisibility();
+    TileVisibility(uint64_t ts, const uint64_t bitmap[4]);
+    ~TileVisibility();
+    void deleteTileRecord(uint8_t rowId, uint64_t ts);
+    void getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const;
+    void collectTileGarbage(uint64_t ts);
 
   private:
-    Visibility(const Visibility &) = delete;
-    Visibility &operator=(const Visibility &) = delete;
+    TileVisibility(const TileVisibility &) = delete;
+    TileVisibility &operator=(const TileVisibility &) = delete;
 
     uint64_t baseBitmap[4];
     uint64_t baseTimestamp;
@@ -68,4 +68,4 @@ class Visibility {
     std::atomic<size_t> tailUsed;
 };
 
-#endif // PIXELS_RETINA_VISIBILITY_H
+#endif // PIXELS_RETINA_TILE_VISIBILITY_H
