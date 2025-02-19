@@ -34,7 +34,7 @@
 #include <cstring>
 #include <sstream>
 
-bool RETINA_TEST_DEBUG = false;
+bool RETINA_TEST_DEBUG = true;
 
 class RetinaTest : public ::testing::Test {
 protected:
@@ -145,11 +145,10 @@ TEST_F(RetinaTest, MultiThread) {
 
             remainingRows[index] = remainingRows.back();
             remainingRows.pop_back();
- 
-            retina->deleteRecord(rowId, timestamp);
 
             {
                 std::lock_guard<std::mutex> lock(historyMutex);
+                retina->deleteRecord(rowId, timestamp);
                 deleteHistory.emplace_back(timestamp, rowId);
             }
 
@@ -205,7 +204,7 @@ TEST_F(RetinaTest, MultiThread) {
 
                 delete[] bitmap;
                 localVerificationCount++;
-                MinTimestamp.fetch_add(1);
+                MinTimestamp.fetch_add(1, std::memory_order_relaxed);
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
 

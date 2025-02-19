@@ -198,10 +198,9 @@ TEST_F(VisibilityTest, MultiThread) {
             remainingRows[index] = remainingRows.back();
             remainingRows.pop_back();
 
-            v->deleteRecord(rowId, timestamp);
-
             {
                 std::lock_guard<std::mutex> lock(historyMutex);
+                v->deleteRecord(rowId, timestamp);
                 deleteHistory.emplace_back(timestamp, rowId);
             }
 
