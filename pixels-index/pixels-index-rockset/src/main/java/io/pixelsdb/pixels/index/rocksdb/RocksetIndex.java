@@ -29,7 +29,7 @@ import java.util.List;
  * @author hank
  * @create 2025-02-19
  */
-public class RocksDBIndex implements SecondaryIndex
+public class RocksetIndex implements SecondaryIndex
 {
     // TODO: implement
 

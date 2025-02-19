@@ -20,18 +20,12 @@
 package io.pixelsdb.pixels.index.rocksdb;
 
 import org.junit.Test;
-import org.rocksdb.*;
-import org.rocksdb.util.SizeUnit;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * @author hank
  * @create 2025-02-19
  */
-public class TestRocksDB
+public class TestRockset
 {
     @Test
     public void testBasic()

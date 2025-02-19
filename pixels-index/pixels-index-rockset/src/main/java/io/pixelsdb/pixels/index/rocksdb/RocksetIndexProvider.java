@@ -29,7 +29,7 @@ import java.io.IOException;
  * @author hank
  * @create 2025-02-19
  */
-public class RocksDBIndexProvider implements SecondaryIndexProvider
+public class RocksetIndexProvider implements SecondaryIndexProvider
 {
     // TODO: implement
 
