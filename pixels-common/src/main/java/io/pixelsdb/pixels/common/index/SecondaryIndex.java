@@ -36,7 +36,8 @@ public interface SecondaryIndex extends Closeable
      */
     enum Scheme
     {
-        rocksdb;  // secondary index stored in rocksdb
+        rocksdb,  // secondary index stored in rocksdb
+        rockset;  // secondary index stored in rockset (rocksdb-cloud)
 
         /**
          * Case-insensitive parsing from String name to enum value.
