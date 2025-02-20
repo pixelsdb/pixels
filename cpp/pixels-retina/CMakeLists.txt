@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 find_package(Java REQUIRED)
 find_package(JNI REQUIRED)
 
+# Disable gtest installation
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+
 # Find gtest
 include(FetchContent)
 FetchContent_Declare(
