@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.retina;
 
+
 public class TestVisibility
 {
     public static void main(String[] args)
