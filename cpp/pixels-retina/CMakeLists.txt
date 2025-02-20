@@ -13,6 +13,11 @@ find_package(JNI REQUIRED)
 include(FetchContent)
 FetchContent_Declare(
     googletest
+    # if network error, try to download the zip file from the internet
+    # and unzip it to the third_party/googletest directory
+    # and uncomment the following line
+    # SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/googletest
+
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG release-1.12.1
 )
