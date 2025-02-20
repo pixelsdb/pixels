@@ -105,6 +105,7 @@
                                     <arg line="-B ${project.basedir}/../cpp/pixels-retina/build -S ${project.basedir}/../cpp/pixels-retina"/>
                                 </exec>
                                 <exec executable="make" dir="${project.basedir}/../cpp/pixels-retina/build" failonerror="true" outputproperty="make.output" errorproperty="make.error">
+                                    <arg value="install"/>
                                 </exec>
                             </target>
                         </configuration>
