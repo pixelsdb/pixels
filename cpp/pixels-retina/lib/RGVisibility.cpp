@@ -24,7 +24,7 @@
 
 RGVisibility::RGVisibility(uint64_t rgRecordNum)
     : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
-    flag.store(0);
+    flag.store(0, std::memory_order_relaxed);
     tileVisibilities = new TileVisibility[tileCount];
 }
 

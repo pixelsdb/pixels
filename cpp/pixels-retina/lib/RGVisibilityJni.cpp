@@ -58,10 +58,10 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_destroyNative
  * Signature: (JJJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_deleteRecord
-  (JNIEnv* env, jobject, jlong handle, jlong rowId, jlong timestamp) {
+  (JNIEnv* env, jobject, jlong rowId, jlong timestamp, jlong handle) {
     try {
         auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
-        rgVisibility->deleteRGRecord(rowId, timestamp);
+        rgVisibility->deleteRGRecord(static_cast<uint64_t>(rowId), static_cast<uint64_t>(timestamp));
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
     }
@@ -73,15 +73,18 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_deleteRecord
  * Signature: (JJ)[J
  */
 JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisibilityBitmap
-  (JNIEnv* env, jobject, jlong handle, jlong timestamp) {
+  (JNIEnv* env, jobject, jlong timestamp, jlong handle) {
+    uint64_t* bitmap = nullptr;
     try {
         auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
-        auto* bitmap = rgVisibility->getRGVisibilityBitmap(timestamp);
+        bitmap = rgVisibility->getRGVisibilityBitmap(static_cast<uint64_t>(timestamp));
         uint64_t bitmapSize = rgVisibility->getBitmapSize();
         jlongArray result = env->NewLongArray(bitmapSize);
         env->SetLongArrayRegion(result, 0, bitmapSize, reinterpret_cast<const jlong*>(bitmap));
+        delete[] bitmap;
         return result;
     } catch (const std::exception& e) {
+        delete[] bitmap;
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
         return nullptr;
     }
@@ -93,10 +96,10 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
  * Signature: (JJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollect
-  (JNIEnv* env, jobject, jlong handle, jlong timestamp) {
+  (JNIEnv* env, jobject, jlong timestamp, jlong handle) {
     try {
         auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
-        rgVisibility->collectRGGarbage(timestamp);
+        rgVisibility->collectRGGarbage(static_cast<uint64_t>(timestamp));
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
     }
