@@ -100,7 +100,7 @@ public class StreamInputStream extends InputStream
         this.host = host;
         this.port = port;
         this.uri = this.schema + "://" + host + ":" + port;
-        this.httpServer = new HttpServer(new StreamHttpServerHandler(this));
+        this.httpServer = new HttpServer(new StreamHttpServerHandler(this.contentQueue));
         this.executorService = Executors.newFixedThreadPool(1);
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
             try
@@ -237,11 +237,11 @@ public class StreamInputStream extends InputStream
     public static class StreamHttpServerHandler extends HttpServerHandler
     {
         private static final Logger logger = LogManager.getLogger(StreamHttpServerHandler.class);
-        private final StreamInputStream inputStream;
+        private final BlockingQueue<ByteBuf> contentQueue;
 
-        public StreamHttpServerHandler(StreamInputStream inputStream)
+        public StreamHttpServerHandler(BlockingQueue<ByteBuf> contentQueue)
         {
-            this.inputStream = inputStream;
+            this.contentQueue = contentQueue;
         }
 
         @Override
@@ -254,8 +254,8 @@ public class StreamInputStream extends InputStream
             FullHttpRequest req = (FullHttpRequest) msg;
             if (req.method() != HttpMethod.POST)
             {
-                req.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                sendResponse(ctx, req, HttpResponseStatus.BAD_REQUEST);
+                sendResponse(ctx, req, HttpResponseStatus.OK);
+                return;
             }
 
             if (!req.headers().get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-protobuf"))
@@ -266,7 +266,7 @@ public class StreamInputStream extends InputStream
             if (content.isReadable())
             {
                 content.retain();
-                this.inputStream.contentQueue.add(content);
+                contentQueue.add(content);
             }
             sendResponse(ctx, req, HttpResponseStatus.OK);
         }

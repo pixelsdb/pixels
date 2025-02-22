@@ -29,6 +29,8 @@ import org.asynchttpclient.*;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class StreamOutputStream extends OutputStream
 {
@@ -90,6 +92,8 @@ public class StreamOutputStream extends OutputStream
      */
     private final AsyncHttpClient httpClient;
 
+    private AtomicInteger counter = new AtomicInteger(0);
+
     public StreamOutputStream(String host, int port, int bufferCapacity)
     {
         this.open = true;
@@ -100,6 +104,37 @@ public class StreamOutputStream extends OutputStream
         this.buffer = new byte[bufferCapacity];
         this.bufferPosition = 0;
         this.httpClient = Dsl.asyncHttpClient();
+
+        int retry = 0;
+        while (true)
+        {
+            try
+            {
+                this.httpClient.prepareGet(this.uri)
+                        .execute()
+                        .toCompletableFuture()
+                        .join();
+                break;
+            } catch (Exception e)
+            {
+                retry++;
+                if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
+                {
+                    logger.error("retry count {}, exception cause {}, excepetion {}", retry, e.getCause(), e.getMessage());
+                }
+                else
+                {
+                    try
+                    {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException e1)
+                    {
+                        logger.error("sleep interrupted exception cause {}, excepetion {}", retry, e.getCause(), e.getMessage());
+                    }
+                }
+            }
+        }
+
     }
 
     /**
@@ -149,11 +184,67 @@ public class StreamOutputStream extends OutputStream
         assertOpen();
         try
         {
-            flushBufferAndRewind();
+            flushBufferAndRewindAsync();
         } catch (IOException e)
         {
             logger.error(e);
         }
+    }
+
+    protected void flushBufferAndRewindAsync() throws IOException
+    {
+        logger.debug("Sending {} bytes async to stream", this.bufferPosition);
+        ByteBuffer bufferCopy = ByteBuffer.wrap(Arrays.copyOf(this.buffer, this.bufferPosition));
+        Request req = httpClient.preparePost(this.uri)
+                .setBody(bufferCopy)
+                .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
+                .addHeader(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(this.bufferPosition))
+                .addHeader(HttpHeaderNames.CONNECTION, "keep-alive")
+                .build();
+        int retry = 0;
+        while (true)
+        {
+            StreamHttpClientHandler handler = new StreamHttpClientHandler();
+            try
+            {
+                ListenableFuture<Response> future = httpClient.executeRequest(req, handler);
+                counter.incrementAndGet();
+                future.addListener(() -> {
+                    try
+                    {
+                        Response response = future.get();
+                        counter.decrementAndGet();
+                        if (response.getStatusCode() != 200)
+                        {
+                            logger.error("Request failed: " + response.getStatusCode());
+                        }
+                    } catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }, null);
+                this.bufferPosition = 0;
+                break;
+            } catch (Exception e)
+            {
+                retry++;
+                if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
+                {
+                    logger.error("retry count {}, exception cause {}, excepetion {}", retry, e.getCause(), e.getMessage());
+                    throw new IOException("Connect to stream failed");
+                } else
+                {
+                    try
+                    {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException e1)
+                    {
+                        throw new IOException(e1);
+                    }
+                }
+            }
+        }
+        this.bufferPosition = 0;
     }
 
     protected void flushBufferAndRewind() throws IOException
@@ -162,8 +253,8 @@ public class StreamOutputStream extends OutputStream
         Request req = httpClient.preparePost(this.uri)
                 .setBody(ByteBuffer.wrap(this.buffer, 0, this.bufferPosition))
                 .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
-                .addHeader(HttpHeaderNames.CONTENT_LENGTH, this.bufferPosition)
-                .addHeader(HttpHeaderNames.CONNECTION, "keep-aliva")
+                .addHeader(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(this.bufferPosition))
+                .addHeader(HttpHeaderNames.CONNECTION, "keep-alive")
                 .build();
         int retry = 0;
         while (true)
@@ -216,9 +307,19 @@ public class StreamOutputStream extends OutputStream
      */
     private void closeStreamReader()
     {
+        while (counter.get() > 0)
+        {
+            try
+            {
+                Thread.sleep(RETRY_DELAY_MS);
+            } catch (InterruptedException e)
+            {
+                throw new RuntimeException(e);
+            }
+        }
         Request req = httpClient.preparePost(this.uri)
                 .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
-                .addHeader(HttpHeaderNames.CONTENT_LENGTH, 0)
+                .addHeader(HttpHeaderNames.CONTENT_LENGTH, "0")
                 .addHeader(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE)
                 .build();
         int retry = 0;
