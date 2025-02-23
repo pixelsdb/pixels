@@ -31,6 +31,8 @@ import java.sql.SQLException;
  */
 public class MetaDBUtil
 {
+    private static final Logger log = LogManager.getLogger(MetaDBUtil.class);
+
     private static final MetaDBUtil INSTANCE = new MetaDBUtil();
 
     public static MetaDBUtil Instance()
@@ -39,7 +41,6 @@ public class MetaDBUtil
     }
 
     private Connection connection = null;
-    private static final Logger log = LogManager.getLogger(MetaDBUtil.class);
 
     private String url;
     private String user;
