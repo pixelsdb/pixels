@@ -67,7 +67,7 @@ message AddVisibilityRequest {
 message AddVisibilityResponse {
     ResponseHeader header = 1;
 }
-  
+
 message QueryVisibilityRequest {
     RequestHeader header = 1;
     string filePath = 2;
