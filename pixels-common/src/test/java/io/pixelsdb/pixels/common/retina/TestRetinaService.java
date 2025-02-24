@@ -157,8 +157,11 @@ public class TestRetinaService
 
                 try
                 {
-                    retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, rowId, timestamp);
-                    deleteHistory.add(new DeleteRecord(timestamp, rowId));
+                    synchronized (deleteHistory)
+                    {
+                        retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, rowId, timestamp);
+                        deleteHistory.add(new DeleteRecord(timestamp, rowId));
+                    }
                     maxTimestamp.set(timestamp);
                     timestamp++;
                 } catch (RetinaException e)
