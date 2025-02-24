@@ -12,6 +12,6 @@ sleep 5
 
 $PIXELS_HOME/sbin/start-workers.sh -daemon
 
-sleep 5
+sleep 10 # ensure metadata service is up
 
 $PIXELS_HOME/sbin/start-retina.sh -daemon

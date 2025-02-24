@@ -71,7 +71,7 @@ message AddVisibilityResponse {
 message QueryVisibilityRequest {
     RequestHeader header = 1;
     string filePath = 2;
-    sint32 rgid = 3;
+    sint64 rgid = 3;
     sint64 timestamp = 4;
 }
   

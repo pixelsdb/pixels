@@ -53,7 +53,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 {
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
-    private final Map<String, RGVisibility> retinaMap;
+    private final Map<String, RGVisibility> rgVisibilityMap;
 
     /**
      * Initialize the visibility management for all the records.
@@ -61,7 +61,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     public RetinaServerImpl()
     {
         this.metadataService = MetadataService.Instance();
-        this.retinaMap = new ConcurrentHashMap<>();
+        this.rgVisibilityMap = new ConcurrentHashMap<>();
         try
         {
             boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
@@ -110,8 +110,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try
         {
-            RGVisibility retina = checkRetina(filePath, rgId);
-            retina.deleteRecord(rowId, timestamp);
+            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
+            rgVisibility.deleteRecord(rowId, timestamp);
         } catch (Exception e)
         {
             throw new RetinaException("Error while deleting record", e);
@@ -136,9 +136,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
             {
                 int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
-                RGVisibility retina = new RGVisibility(recordNum);
+                RGVisibility rgVisibility = new RGVisibility(recordNum);
                 String rgKey = fileId + "_" + rgId;
-                retinaMap.put(rgKey, retina);
+                rgVisibilityMap.put(rgKey, rgVisibility);
             }
         } catch (Exception e)
         {
@@ -150,8 +150,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try 
         {
-            RGVisibility retina = checkRetina(filePath, rgId);
-            long[] visibilityBitmap = retina.getVisibilityBitmap(timestamp);
+            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
+            long[] visibilityBitmap = rgVisibility.getVisibilityBitmap(timestamp);
             if (visibilityBitmap == null)
             {
                 throw new RetinaException("Visibility bitmap not found for filePath: " + filePath + " and rgId: " + rgId);
@@ -167,8 +167,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         try 
         {
-            RGVisibility retina = checkRetina(filePath, rgId);
-            retina.garbageCollect(timestamp);
+            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
+            rgVisibility.garbageCollect(timestamp);
         } catch (Exception e) {
             throw new RetinaException("Error while garbage collecting", e);
         }
@@ -238,7 +238,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         try 
         {
             String filePath = request.getFilePath();
-            int rgId = request.getRgid();
+            long rgId = request.getRgid();
             long timestamp = request.getTimestamp();
             long[] visibilityBitmap = queryVisibility(filePath, rgId, timestamp);
 
@@ -319,18 +319,18 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
      * @param rgId the row group id.
      * @throws RetinaException if the retina does not exist.
      */
-    private RGVisibility checkRetina(String filePath, long rgId) throws RetinaException
+    private RGVisibility checkRGVisibility(String filePath, long rgId) throws RetinaException
     {
-        try 
+        try
         {
             long fileId = this.metadataService.getFileId(filePath);
             String retinaKey = fileId + "_" + rgId;
-            RGVisibility retina = this.retinaMap.get(retinaKey);
-            if (retina == null) 
+            RGVisibility rgVisibility = this.rgVisibilityMap.get(retinaKey);
+            if (rgVisibility == null)
             {
                 throw new RetinaException("Retina not found for filePath: " + filePath + " and rgId: " + rgId);
             }
-            return retina;
+            return rgVisibility;
         } catch (Exception e)
         {
             throw new RetinaException("Error while checking retina", e);
