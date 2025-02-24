@@ -214,6 +214,12 @@ public abstract class AbstractS3Reader implements PhysicalReader
         return pathStr;
     }
 
+    @Override
+    public String getPathUri()
+    {
+        return "s3://" + pathStr;
+    }
+
     /**
      * Get the last domain in path.
      *

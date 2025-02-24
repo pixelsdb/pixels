@@ -151,6 +151,12 @@ public class PhysicalRedisReader implements PhysicalReader
     }
 
     @Override
+    public String getPathUri()
+    {
+        return "redis://" + getPath();
+    }
+
+    @Override
     public String getName()
     {
         return new String(this.path, StandardCharsets.UTF_8);

@@ -245,6 +245,12 @@ public class PhysicalGCSReader implements PhysicalReader
         return pathStr;
     }
 
+    @Override
+    public String getPathUri()
+    {
+        return "gs://" + pathStr;
+    }
+
     /**
      * Get the last domain in path.
      *

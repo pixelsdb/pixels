@@ -95,6 +95,8 @@ public interface PhysicalReader extends Closeable
 
     String getPath();
 
+    String getPathUri();
+
     /**
      * Get the last domain in path.
      * @return

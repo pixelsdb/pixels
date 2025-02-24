@@ -231,6 +231,12 @@ public class PhysicalHDFSReader implements PhysicalReader
     }
 
     @Override
+    public String getPathUri()
+    {
+        return "hdfs://" + path;
+    }
+
+    @Override
     public String getName()
     {
         return new Path(path).getName();
