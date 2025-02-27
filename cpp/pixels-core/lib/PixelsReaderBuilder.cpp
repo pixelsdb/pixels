@@ -76,17 +76,7 @@ std::shared_ptr <PixelsReader> PixelsReaderBuilder::build()
         long fileLen = fsReader->getFileLength();
         std::cout << "filelen: " << fsReader->getFileLength() << std::endl;
         fsReader->seek(fileLen - (long) sizeof(long));
-        long SmallEndianFileTailOffset = fsReader->readLong();
-        long BigEndianFileTailOffset = (long) __builtin_bswap64(SmallEndianFileTailOffset);
-        long fileTailOffset = 0;
-        if (SmallEndianFileTailOffset < 0)
-        {
-            fileTailOffset = BigEndianFileTailOffset;
-        }
-        else
-        {
-            fileTailOffset = SmallEndianFileTailOffset;
-        }
+        long fileTailOffset = (long) __builtin_bswap64(fsReader->readLong());
         std::cout << "fileTailOffset: " << fileTailOffset << std::endl;
         int fileTailLength = (int) (fileLen - fileTailOffset - sizeof(long));
         fsReader->seek(fileTailOffset);
