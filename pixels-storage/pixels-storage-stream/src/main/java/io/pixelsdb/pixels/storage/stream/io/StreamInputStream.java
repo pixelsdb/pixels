@@ -237,11 +237,11 @@ public class StreamInputStream extends InputStream
     public static class StreamHttpServerHandler extends HttpServerHandler
     {
         private static final Logger logger = LogManager.getLogger(StreamHttpServerHandler.class);
-        private final BlockingQueue<ByteBuf> contentQueue;
+        private final BlockingQueue<ByteBuf> contenQueue;
 
-        public StreamHttpServerHandler(BlockingQueue<ByteBuf> contentQueue)
+        public StreamHttpServerHandler(BlockingQueue<ByteBuf> contenQueue)
         {
-            this.contentQueue = contentQueue;
+            this.contenQueue = contenQueue;
         }
 
         @Override
@@ -266,7 +266,7 @@ public class StreamInputStream extends InputStream
             if (content.isReadable())
             {
                 content.retain();
-                contentQueue.add(content);
+                this.contenQueue.add(content);
             }
             sendResponse(ctx, req, HttpResponseStatus.OK);
         }

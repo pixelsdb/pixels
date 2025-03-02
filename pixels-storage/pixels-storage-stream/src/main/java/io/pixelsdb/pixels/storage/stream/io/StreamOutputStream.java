@@ -110,10 +110,7 @@ public class StreamOutputStream extends OutputStream
         {
             try
             {
-                this.httpClient.prepareGet(this.uri)
-                        .execute()
-                        .toCompletableFuture()
-                        .join();
+                this.httpClient.prepareGet(this.uri).execute().get();
                 break;
             } catch (Exception e)
             {
@@ -121,15 +118,15 @@ public class StreamOutputStream extends OutputStream
                 if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
                 {
                     logger.error("retry count {}, exception cause {}, excepetion {}", retry, e.getCause(), e.getMessage());
-                }
-                else
+                } else
                 {
                     try
                     {
                         Thread.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException e1)
                     {
-                        logger.error("sleep interrupted exception cause {}, excepetion {}", retry, e.getCause(), e.getMessage());
+                        logger.error("sleep interrupted exception cause {}, excepetion {}",
+                                retry, e1.getCause(), e1.getMessage());
                     }
                 }
             }
@@ -184,7 +181,7 @@ public class StreamOutputStream extends OutputStream
         assertOpen();
         try
         {
-            flushBufferAndRewindAsync();
+            flushBufferAndRewind();
         } catch (IOException e)
         {
             logger.error(e);
@@ -259,11 +256,9 @@ public class StreamOutputStream extends OutputStream
         int retry = 0;
         while (true)
         {
-            StreamHttpClientHandler handler = new StreamHttpClientHandler();
             try
             {
-                httpClient.executeRequest(req, handler).get();
-                this.bufferPosition = 0;
+                httpClient.executeRequest(req).get();
                 break;
             } catch (Exception e)
             {
