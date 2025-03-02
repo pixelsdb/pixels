@@ -29,8 +29,6 @@ import org.asynchttpclient.*;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class StreamOutputStream extends OutputStream
 {
@@ -92,8 +90,6 @@ public class StreamOutputStream extends OutputStream
      */
     private final AsyncHttpClient httpClient;
 
-    private AtomicInteger counter = new AtomicInteger(0);
-
     public StreamOutputStream(String host, int port, int bufferCapacity)
     {
         this.open = true;
@@ -131,7 +127,6 @@ public class StreamOutputStream extends OutputStream
                 }
             }
         }
-
     }
 
     /**
@@ -188,62 +183,6 @@ public class StreamOutputStream extends OutputStream
         }
     }
 
-    protected void flushBufferAndRewindAsync() throws IOException
-    {
-        logger.debug("Sending {} bytes async to stream", this.bufferPosition);
-        ByteBuffer bufferCopy = ByteBuffer.wrap(Arrays.copyOf(this.buffer, this.bufferPosition));
-        Request req = httpClient.preparePost(this.uri)
-                .setBody(bufferCopy)
-                .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
-                .addHeader(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(this.bufferPosition))
-                .addHeader(HttpHeaderNames.CONNECTION, "keep-alive")
-                .build();
-        int retry = 0;
-        while (true)
-        {
-            StreamHttpClientHandler handler = new StreamHttpClientHandler();
-            try
-            {
-                ListenableFuture<Response> future = httpClient.executeRequest(req, handler);
-                counter.incrementAndGet();
-                future.addListener(() -> {
-                    try
-                    {
-                        Response response = future.get();
-                        counter.decrementAndGet();
-                        if (response.getStatusCode() != 200)
-                        {
-                            logger.error("Request failed: " + response.getStatusCode());
-                        }
-                    } catch (Exception e)
-                    {
-                        e.printStackTrace();
-                    }
-                }, null);
-                this.bufferPosition = 0;
-                break;
-            } catch (Exception e)
-            {
-                retry++;
-                if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
-                {
-                    logger.error("retry count {}, exception cause {}, excepetion {}", retry, e.getCause(), e.getMessage());
-                    throw new IOException("Connect to stream failed");
-                } else
-                {
-                    try
-                    {
-                        Thread.sleep(RETRY_DELAY_MS);
-                    } catch (InterruptedException e1)
-                    {
-                        throw new IOException(e1);
-                    }
-                }
-            }
-        }
-        this.bufferPosition = 0;
-    }
-
     protected void flushBufferAndRewind() throws IOException
     {
         logger.debug("Sending {} bytes to stream", this.bufferPosition);
@@ -265,7 +204,8 @@ public class StreamOutputStream extends OutputStream
                 retry++;
                 if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
                 {
-                    logger.error("retry count {}, exception cause {}, excepetion {}", retry, e.getCause(), e.getMessage());
+                    logger.error("retry count {}, exception cause {}, excepetion {}",
+                            retry, e.getCause(), e.getMessage());
                     throw new IOException("Connect to stream failed");
                 } else
                 {
@@ -302,16 +242,6 @@ public class StreamOutputStream extends OutputStream
      */
     private void closeStreamReader()
     {
-        while (counter.get() > 0)
-        {
-            try
-            {
-                Thread.sleep(RETRY_DELAY_MS);
-            } catch (InterruptedException e)
-            {
-                throw new RuntimeException(e);
-            }
-        }
         Request req = httpClient.preparePost(this.uri)
                 .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
                 .addHeader(HttpHeaderNames.CONTENT_LENGTH, "0")
@@ -320,17 +250,18 @@ public class StreamOutputStream extends OutputStream
         int retry = 0;
         while (true)
         {
-            StreamHttpClientHandler handler = new StreamHttpClientHandler();
             try
             {
-                httpClient.executeRequest(req, handler).get();
+                httpClient.executeRequest(req).get();
                 break;
             } catch (Exception e)
             {
                 retry++;
                 if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
                 {
-                    logger.error("failed to close stream reader");
+                    logger.error("failed to close stream reader, retry count {}, exception cause {}",
+                            retry, e.getCause());
+                    break;
                 }
             }
         }
