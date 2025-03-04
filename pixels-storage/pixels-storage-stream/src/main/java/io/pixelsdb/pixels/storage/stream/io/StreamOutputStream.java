@@ -29,6 +29,8 @@ import org.asynchttpclient.*;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.concurrent.*;
 
 public class StreamOutputStream extends OutputStream
 {
@@ -86,12 +88,21 @@ public class StreamOutputStream extends OutputStream
     private int bufferCapacity;
 
     /**
+     * The background thread to send requests.
+     */
+    private final ExecutorService executorService;
+
+    /**
      * The http client.
      */
     private final AsyncHttpClient httpClient;
 
-    public StreamOutputStream(String host, int port, int bufferCapacity)
-    {
+    /**
+     * The queue to put pending requests.
+     */
+    private final BlockingQueue<byte[]> contentQueue;
+
+    public StreamOutputStream(String host, int port, int bufferCapacity) {
         this.open = true;
         this.host = host;
         this.port = port;
@@ -100,33 +111,36 @@ public class StreamOutputStream extends OutputStream
         this.buffer = new byte[bufferCapacity];
         this.bufferPosition = 0;
         this.httpClient = Dsl.asyncHttpClient();
+        this.executorService = Executors.newSingleThreadExecutor();
+        this.contentQueue = new LinkedBlockingQueue<>();
 
-        int retry = 0;
-        while (true)
-        {
-            try
+        // Start background thread to send requests.
+        this.executorService.submit(() -> {
+            while (true)
             {
-                this.httpClient.prepareGet(this.uri).execute().get();
-                break;
-            } catch (Exception e)
-            {
-                retry++;
-                if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
+                try
                 {
-                    logger.error("retry count {}, exception cause {}, excepetion {}", retry, e.getCause(), e.getMessage());
-                } else
-                {
-                    try
+                    byte[] content = contentQueue.take();
+                    if (content.length == 0)
                     {
-                        Thread.sleep(RETRY_DELAY_MS);
-                    } catch (InterruptedException e1)
-                    {
-                        logger.error("sleep interrupted exception cause {}, excepetion {}",
-                                retry, e1.getCause(), e1.getMessage());
+                        closeStreamReader();
+                        break;
                     }
+                    sendContentWithRetry(content);
+                } catch (InterruptedException e)
+                {
+                    logger.error("Background thread interrupted", e);
+                    break;
                 }
             }
-        }
+            try
+            {
+                this.httpClient.close();
+            } catch (IOException e)
+            {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     /**
@@ -174,52 +188,19 @@ public class StreamOutputStream extends OutputStream
     public synchronized void flush()
     {
         assertOpen();
-        try
+        if (this.bufferPosition > 0)
         {
-            flushBufferAndRewind();
-        } catch (IOException e)
-        {
-            logger.error(e);
+            this.contentQueue.add(Arrays.copyOfRange(this.buffer, 0, this.bufferPosition));
+            this.bufferPosition = 0;
         }
     }
 
     protected void flushBufferAndRewind() throws IOException
     {
         logger.debug("Sending {} bytes to stream", this.bufferPosition);
-        Request req = httpClient.preparePost(this.uri)
-                .setBody(ByteBuffer.wrap(this.buffer, 0, this.bufferPosition))
-                .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
-                .addHeader(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(this.bufferPosition))
-                .addHeader(HttpHeaderNames.CONNECTION, "keep-alive")
-                .build();
-        int retry = 0;
-        while (true)
-        {
-            try
-            {
-                httpClient.executeRequest(req).get();
-                break;
-            } catch (Exception e)
-            {
-                retry++;
-                if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
-                {
-                    logger.error("retry count {}, exception cause {}, excepetion {}",
-                            retry, e.getCause(), e.getMessage());
-                    throw new IOException("Connect to stream failed");
-                } else
-                {
-                    try
-                    {
-                        Thread.sleep(RETRY_DELAY_MS);
-                    } catch (InterruptedException e1)
-                    {
-                        throw new IOException(e1);
-                    }
-                }
-            }
-        }
+        byte[] content = Arrays.copyOfRange(this.buffer, 0, this.bufferPosition);
         this.bufferPosition = 0;
+        this.contentQueue.add(content);
     }
 
     @Override
@@ -230,10 +211,56 @@ public class StreamOutputStream extends OutputStream
             this.open = false;
             if (this.bufferPosition > 0)
             {
-                flushBufferAndRewind();
+                flush();
             }
-            closeStreamReader();
-            this.httpClient.close();
+            this.contentQueue.add(new byte[0]);
+            this.executorService.shutdown();
+            try
+            {
+                if (!this.executorService.awaitTermination(60, TimeUnit.SECONDS))
+                {
+                    this.executorService.shutdownNow();
+                }
+            } catch (InterruptedException e)
+            {
+                throw new IOException("Interrupted while waiting for termination", e);
+            }
+        }
+    }
+
+    private void sendContentWithRetry(byte[] content)
+    {
+        int retry = 0;
+        while (retry <= MAX_RETRIES)
+        {
+            try
+            {
+                Request req = httpClient.preparePost(this.uri)
+                        .setBody(ByteBuffer.wrap(content))
+                        .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
+                        .addHeader(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(content.length))
+                        .addHeader(HttpHeaderNames.CONNECTION, "keep-alive")
+                        .build();
+                httpClient.executeRequest(req).get();
+                break;
+            } catch (Exception e)
+            {
+                retry++;
+                if (retry > MAX_RETRIES ||
+                        !(e.getCause() instanceof java.net.ConnectException || e.getCause() instanceof java.io.IOException))
+                {
+                    logger.error("Failed to send content after {} retries, exception: {}", retry, e.getMessage());
+                    break;
+                }
+                try
+                {
+                    Thread.sleep(RETRY_DELAY_MS);
+                } catch (InterruptedException e1)
+                {
+                    logger.error("Retry interrupted", e1);
+                    break;
+                }
+            }
         }
     }
 
@@ -248,7 +275,7 @@ public class StreamOutputStream extends OutputStream
                 .addHeader(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE)
                 .build();
         int retry = 0;
-        while (true)
+        while (retry <= MAX_RETRIES)
         {
             try
             {
@@ -259,8 +286,15 @@ public class StreamOutputStream extends OutputStream
                 retry++;
                 if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
                 {
-                    logger.error("failed to close stream reader, retry count {}, exception cause {}",
-                            retry, e.getCause());
+                    logger.error("Failed to close stream reader after {} retries, exception: {}", retry, e.getMessage());
+                    break;
+                }
+                try
+                {
+                    Thread.sleep(RETRY_DELAY_MS);
+                } catch (InterruptedException e1)
+                {
+                    logger.error("Retry interrupted", e1);
                     break;
                 }
             }
@@ -272,25 +306,6 @@ public class StreamOutputStream extends OutputStream
         if (!this.open)
         {
             throw new IllegalStateException("Closed");
-        }
-    }
-
-    public static class StreamHttpClientHandler extends AsyncCompletionHandler<Response>
-    {
-        @Override
-        public Response onCompleted(Response response) throws Exception
-        {
-            if (response.getStatusCode() != 200)
-            {
-                throw new IOException("Failed to send package to server, status code: " + response.getStatusCode());
-            }
-            return response;
-        }
-
-        @Override
-        public void onThrowable(Throwable t)
-        {
-            logger.error("stream http client handler, {}", t.getMessage());
         }
     }
 }
