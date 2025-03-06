@@ -32,10 +32,17 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     // TODO: implement
 
     @Override
-    public void lookupIndex(IndexProto.LookupIndexRequest request,
-                            StreamObserver<IndexProto.LookupIndexResponse> responseObserver)
+    public void lookupUniqueIndex(IndexProto.LookupUniqueIndexRequest request,
+                            StreamObserver<IndexProto.LookupUniqueIndexResponse> responseObserver)
     {
-        super.lookupIndex(request, responseObserver);
+        super.lookupUniqueIndex(request, responseObserver);
+    }
+
+    @Override
+    public void lookupNonUniqueIndex(IndexProto.LookupNonUniqueIndexRequest request,
+                                  StreamObserver<IndexProto.LookupNonUniqueIndexResponse> responseObserver)
+    {
+        super.lookupNonUniqueIndex(request, responseObserver);
     }
 
     @Override

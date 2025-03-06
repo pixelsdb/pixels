@@ -31,6 +31,7 @@ public class SecondaryIndex extends Base
 {
     private KeyColumns keyColumns;
     private String keyColumnsJson;
+    private boolean unique;
     private Scheme indexScheme;
     private long tableId;
 
@@ -43,6 +44,7 @@ public class SecondaryIndex extends Base
         this.setId(secondaryIndex.getId());
         this.keyColumnsJson = secondaryIndex.getKeyColumns();
         this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
+        this.unique = secondaryIndex.getUnique();
         this.indexScheme = Scheme.from(secondaryIndex.getIndexScheme());
         this.tableId = secondaryIndex.getTableId();
     }
@@ -65,6 +67,16 @@ public class SecondaryIndex extends Base
     public void setKeyColumnsJson(String keyColumnsJson)
     {
         this.keyColumnsJson = keyColumnsJson;
+    }
+
+    public boolean isUnique()
+    {
+        return unique;
+    }
+
+    public void setUnique(boolean unique)
+    {
+        this.unique = unique;
     }
 
     public Scheme getIndexScheme()
@@ -91,6 +103,6 @@ public class SecondaryIndex extends Base
     public MetadataProto.SecondaryIndex toProto()
     {
         return MetadataProto.SecondaryIndex.newBuilder().setId(this.getId()).setKeyColumns(this.keyColumnsJson)
-                .setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();
+                .setUnique(this.unique).setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();
     }
 }

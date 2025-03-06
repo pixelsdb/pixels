@@ -30,7 +30,8 @@ package index.proto;
 
 // The index services definition.
 service IndexService {
-  rpc LookupIndex (LookupIndexRequest) returns (LookupIndexResponse);
+  rpc LookupUniqueIndex (LookupUniqueIndexRequest) returns (LookupUniqueIndexResponse);
+  rpc LookupNonUniqueIndex (LookupNonUniqueIndexRequest) returns (LookupNonUniqueIndexResponse);
   rpc PutIndexEntry (PutIndexEntryRequest) returns (PutIndexEntryResponse);
   rpc DeleteIndexEntry (DeleteIndexEntryRequest) returns (DeleteIndexEntryResponse);
   rpc PutIndexEntries (PutIndexEntriesRequest) returns (PutIndexEntriesResponse);
@@ -53,12 +54,20 @@ message IndexEntry {
   RowLocation rowLocation = 2;
 }
 
-message LookupIndexRequest {
+message LookupUniqueIndexRequest {
   IndexKey indexKey = 1;
 }
 
-message LookupIndexResponse {
+message LookupUniqueIndexResponse {
   RowLocation rowLocation = 1;
+}
+
+message LookupNonUniqueIndexRequest {
+  IndexKey indexKey = 1;
+}
+
+message LookupNonUniqueIndexResponse {
+  repeated RowLocation rowLocation = 1;
 }
 
 message PutIndexEntryRequest {

@@ -145,9 +145,10 @@ message Range {
 message SecondaryIndex {
     uint64 id = 1;
     string keyColumns = 2;
-    string indexScheme = 3;
-    uint64 tableId = 4;
-    uint64 schemaVersionId = 5;
+    bool unique = 3;
+    string indexScheme = 4;
+    uint64 tableId = 5;
+    uint64 schemaVersionId = 6;
 }
 
 message Path {
