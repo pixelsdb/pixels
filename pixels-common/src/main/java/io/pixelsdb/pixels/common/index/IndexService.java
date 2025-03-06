@@ -31,7 +31,12 @@ public class IndexService
 {
     // TODO: implement
 
-    public IndexProto.RowLocation lookupIndex(IndexProto.IndexKey key)
+    public IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key)
+    {
+        return null;
+    }
+
+    public List<IndexProto.RowLocation> lookupNonUniqueIndex(IndexProto.IndexKey key)
     {
         return null;
     }

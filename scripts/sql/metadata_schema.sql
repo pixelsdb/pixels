@@ -342,7 +342,8 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SECONDARY_INDEXES` (
     `SI_ID` BIGINT NOT NULL,
     `SI_KEY_COLUMNS` TEXT NOT NULL,
-    `SI_INDEX_SCHEME` VARCHAR(32) NOT NULL,
+    `SI_UNIQUE` TINYINT NOT NULL COMMENT 'True if this secondary index is an unique index.',
+    `SI_INDEX_SCHEME` VARCHAR(32) NOT NULL COMMENT 'The index scheme, e.g., rocksdb or rockset, of this secondary index.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
     PRIMARY KEY (`SI_ID`),

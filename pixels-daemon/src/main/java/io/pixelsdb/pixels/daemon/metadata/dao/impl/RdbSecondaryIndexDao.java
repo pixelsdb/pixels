@@ -55,6 +55,7 @@ public class RdbSecondaryIndexDao extends SecondaryIndexDao
                 MetadataProto.SecondaryIndex secondaryIndex = MetadataProto.SecondaryIndex.newBuilder()
                         .setId(id)
                         .setKeyColumns(rs.getString("SI_KEY_COLUMNS"))
+                        .setUnique(rs.getBoolean("SI_UNIQUE"))
                         .setIndexScheme(rs.getString("SI_INDEX_SCHEME"))
                         .setTableId(rs.getLong("TBLS_TBL_ID"))
                         .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID")).build();
@@ -81,6 +82,7 @@ public class RdbSecondaryIndexDao extends SecondaryIndexDao
                 MetadataProto.SecondaryIndex secondaryIndex = MetadataProto.SecondaryIndex.newBuilder()
                         .setId(rs.getLong("SI_ID"))
                         .setKeyColumns(rs.getString("SI_KEY_COLUMNS"))
+                        .setUnique(rs.getBoolean("SI_UNIQUE"))
                         .setIndexScheme(rs.getString("SI_INDEX_SCHEME"))
                         .setTableId(tableId)
                         .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID")).build();
@@ -109,6 +111,7 @@ public class RdbSecondaryIndexDao extends SecondaryIndexDao
                 MetadataProto.SecondaryIndex secondaryIndex = MetadataProto.SecondaryIndex.newBuilder()
                         .setId(rs.getLong("SI_ID"))
                         .setKeyColumns(rs.getString("SI_KEY_COLUMNS"))
+                        .setUnique(rs.getBoolean("SI_UNIQUE"))
                         .setIndexScheme(rs.getString("SI_INDEX_SCHEME"))
                         .setTableId(tableId)
                         .setSchemaVersionId(rs.getLong("SCHEMA_VERSIONS_SV_ID")).build();
@@ -148,15 +151,17 @@ public class RdbSecondaryIndexDao extends SecondaryIndexDao
         Connection conn = db.getConnection();
         String sql = "INSERT INTO SECONDARY_INDEXES(" +
                 "`SI_KEY_COLUMNS`," +
+                "`SI_UNIQUE`," +
                 "`SI_INDEX_SCHEME`," +
                 "`TBLS_TBL_ID`," +
-                "`SCHEMA_VERSIONS_SV_ID`) VALUES (?,?,?)";
+                "`SCHEMA_VERSIONS_SV_ID`) VALUES (?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, secondaryIndex.getKeyColumns());
-            pst.setString(2, secondaryIndex.getIndexScheme());
-            pst.setLong(3, secondaryIndex.getTableId());
-            pst.setLong(4, secondaryIndex.getSchemaVersionId());
+            pst.setBoolean(2, secondaryIndex.getUnique());
+            pst.setString(3, secondaryIndex.getIndexScheme());
+            pst.setLong(4, secondaryIndex.getTableId());
+            pst.setLong(5, secondaryIndex.getSchemaVersionId());
             if (pst.executeUpdate() == 1)
             {
                 ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
@@ -186,6 +191,7 @@ public class RdbSecondaryIndexDao extends SecondaryIndexDao
         String sql = "UPDATE SECONDARY_INDEXES\n" +
                 "SET\n" +
                 "`RI_KEY_COLUMNS` = ?," +
+                "`SI_UNIQUE` = ?," +
                 "`RI_INDEX_SCHEME` = ?," +
                 "`TBLS_TBL_ID` = ?," +
                 "`SCHEMA_VERSION_SV_ID` = ?\n" +
@@ -193,10 +199,11 @@ public class RdbSecondaryIndexDao extends SecondaryIndexDao
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, secondaryIndex.getKeyColumns());
-            pst.setString(2, secondaryIndex.getIndexScheme());
-            pst.setLong(3, secondaryIndex.getTableId());
-            pst.setLong(4, secondaryIndex.getSchemaVersionId());
-            pst.setLong(5, secondaryIndex.getId());
+            pst.setBoolean(2, secondaryIndex.getUnique());
+            pst.setString(3, secondaryIndex.getIndexScheme());
+            pst.setLong(4, secondaryIndex.getTableId());
+            pst.setLong(5, secondaryIndex.getSchemaVersionId());
+            pst.setLong(6, secondaryIndex.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
