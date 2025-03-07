@@ -67,14 +67,18 @@ public class MemoryMappedFile
     {
         try
         {
-            if (JavaVersion <= 11)
+            if (javaVersion <= 11)
             {
                 mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
             }
-            else
+            else if (javaVersion <= 17)
             {
                 // Issue #393: Java 17 adds one additional parameter (i.e., isAsync) for persistent memory.
                 mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class, boolean.class);
+            }
+            else
+            {
+                throw new UnsupportedOperationException("Unsupported Java version: " + javaVersion);
             }
             mmap.setAccessible(true);
             unmmap = getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
@@ -111,14 +115,18 @@ public class MemoryMappedFile
         final FileChannel ch = backingFile.getChannel();
         try
         {
-            if (JavaVersion <= 11)
+            if (javaVersion <= 11)
             {
                 this.addr = (long) mmap.invoke(ch, 1, 0L, this.size);
             }
-            else
+            else if (javaVersion <= 17)
             {
                 // Issue #393: isAsync (the last parameter) should be false as we do not use persistent memory.
                 this.addr = (long) mmap.invoke(ch, 1, 0L, this.size, false);
+            }
+            else
+            {
+                throw new UnsupportedOperationException("Unsupported Java version: " + javaVersion);
             }
         }
         catch (Throwable e)
@@ -175,7 +183,7 @@ public class MemoryMappedFile
         this.addr = addr;
     }
 
-    // return a view of the MemoryMappedFile given a offset in bytes
+    // return a view of the MemoryMappedFile given an offset in bytes
     public MemoryMappedFile regionView(final long offset, final long size) {
 
         if (offset + size >= this.size) {
