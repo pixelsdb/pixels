@@ -51,7 +51,6 @@ import static io.pixelsdb.pixels.common.utils.JvmUtils.*;
  *
  * @author hank
  */
-
 @SuppressWarnings("restriction")
 public class MemoryMappedFile
 {
@@ -67,6 +66,8 @@ public class MemoryMappedFile
     {
         try
         {
+            //RandomAccessFile accessFile = new RandomAccessFile("memoryMappedFile", "rw");
+            //FileChannel channel = accessFile.getChannel();
             if (javaVersion <= 11)
             {
                 mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);

@@ -76,7 +76,7 @@ public class TestNatives
     @Test
     public void testDirectRaf() throws IOException
     {
-        PixelsRandomAccessFile raf = new DirectRandomAccessFile(new File("/home/hank/20230126155625_0.pxl"));
+        PixelsRandomAccessFile raf = new DirectRandomAccessFile(new File("/home/hank/20240626033559_0.pxl"));
         raf.seek(raf.length()-8);
         int a = raf.readInt();
         System.out.println(a);
@@ -89,7 +89,7 @@ public class TestNatives
     @Test
     public void testMappedRaf() throws Exception
     {
-        PixelsRandomAccessFile raf = new MappedRandomAccessFile(new File("/home/hank/20230126155625_0.pxl"));
+        PixelsRandomAccessFile raf = new MappedRandomAccessFile(new File("/home/hank/20240626033559_0.pxl"));
         raf.seek(raf.length()-8);
         int a = raf.readInt();
         System.out.println(a);
