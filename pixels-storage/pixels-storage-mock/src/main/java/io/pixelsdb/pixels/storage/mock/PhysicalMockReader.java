@@ -161,6 +161,12 @@ public class PhysicalMockReader implements PhysicalReader
     }
 
     @Override
+    public String getPathUri()
+    {
+        return null;
+    }
+
+    @Override
     public String getName()
     {
         return null;

@@ -127,6 +127,12 @@ public class PhysicalStreamReader implements PhysicalReader
     @Override
     public String getPath() { return path; }
 
+    @Override
+    public String getPathUri()
+    {
+        return path;
+    }
+
     /**
      * Get the port in path.
      *
