@@ -74,7 +74,7 @@ message QueryVisibilityRequest {
     sint64 rgid = 3;
     sint64 timestamp = 4;
 }
-  
+
 message QueryVisibilityResponse {
     ResponseHeader header = 1;
     repeated uint64 bitmap = 2;
