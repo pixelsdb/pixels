@@ -3,7 +3,7 @@
 if [ $# -lt 1 ];
 then
   echo "USAGE: $0 role [-daemon]"
-  echo "role can be coordinator or worker."
+  echo "role can be coordinator, worker, or retina."
   exit 1
 fi
 
@@ -23,6 +23,10 @@ case ${DAEMON_ROLE} in
   worker)
     MAIN_CLASS=${MAIN_CLASS}".PixelsWorker"
     EXTRA_ARGS=${EXTRA_ARGS}" -role worker"
+    ;;
+  retina)
+    MAIN_CLASS=${MAIN_CLASS}".PixelsRetina"
+    EXTRA_ARGS=${EXTRA_ARGS}" -role retina"
     ;;
   *)
     echo "invalid DAEMON_ROLE: "$DAEMON_ROLE
