@@ -31,6 +31,8 @@
  */
 package io.pixelsdb.pixels.common.physical.natives;
 
+import sun.nio.ch.DirectBuffer;
+
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -57,7 +59,6 @@ public class MemoryMappedFile
 
     private long addr;
     private MappedByteBuffer mappedBuffer;
-    private RandomAccessFile backingFile;
     private final long size;
     private final String loc;
 
@@ -80,12 +81,12 @@ public class MemoryMappedFile
 
     private void mapAndSetOffset(boolean forceSize) throws IOException
     {
-        this.backingFile = new RandomAccessFile(this.loc, "rw");
+        RandomAccessFile backingFile = new RandomAccessFile(this.loc, "rw");
         if (forceSize)
         {
-            this.backingFile.setLength(this.size);
+            backingFile.setLength(this.size);
         }
-        final FileChannel ch = this.backingFile.getChannel();
+        final FileChannel ch = backingFile.getChannel();
         try
         {
             this.mappedBuffer = ch.map(FileChannel.MapMode.READ_WRITE, 0L, this.size);
@@ -98,6 +99,16 @@ public class MemoryMappedFile
         catch (Throwable e)
         {
             throw new IOException("mmap failed", e);
+        }
+        finally
+        {
+            /*
+             * Issue #841:
+             * Closing the channel and the backing file does not affect the mapped buffer.
+             * The mapped memory region is only unmapped when the mapped buffer is cleaned or garbage collected.
+             */
+            ch.close();
+            backingFile.close();
         }
     }
 
@@ -153,12 +164,11 @@ public class MemoryMappedFile
         return new MemoryMappedFile(this.loc, this.addr + offset, size);
     }
 
-    public void unmap()
-            throws IOException
+    public void unmap() throws IOException
     {
         try
         {
-            this.backingFile.close();
+            ((DirectBuffer) this.mappedBuffer).cleaner().clear();
         }
         catch (Throwable e)
         {

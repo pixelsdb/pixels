@@ -84,6 +84,7 @@ public class TestNatives
         int b = raf.readInt();
         System.out.println(b);
         System.out.println(raf.length());
+        raf.close();
     }
 
     @Test
