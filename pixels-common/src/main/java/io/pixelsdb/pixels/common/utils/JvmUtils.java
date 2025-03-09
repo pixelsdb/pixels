@@ -37,8 +37,10 @@ public final class JvmUtils
 {
     public static final Unsafe unsafe;
     public static final ByteOrder nativeOrder;
-    public static int JavaVersion = -1;
+    public static int javaVersion = -1;
     public static final boolean nativeIsLittleEndian;
+
+    private static final int[] supportedJavaVersions = {8, 11, 17, 21, 23};
 
     static
     {
@@ -62,15 +64,28 @@ public final class JvmUtils
             {
                 if (versionNumbers.get(1) >= 8)
                 {
-                    JavaVersion = versionNumbers.get(1);
+                    javaVersion = versionNumbers.get(1);
                 }
             } else if (versionNumbers.get(0) > 8)
             {
-                JavaVersion = versionNumbers.get(0);
+                javaVersion = versionNumbers.get(0);
             }
-            if (JavaVersion < 0)
+            if (javaVersion < 0)
             {
-                throw new Exception(String.format("Java version: %s is not supported", System.getProperty("java.version")));
+                throw new Exception(String.format("java version '%s' is not recognized", System.getProperty("java.version")));
+            }
+            boolean versionValid = false;
+            for (int v : supportedJavaVersions)
+            {
+                if (v == javaVersion)
+                {
+                    versionValid = true;
+                    break;
+                }
+            }
+            if (!versionValid)
+            {
+                throw new Exception(String.format("java version '%s' is not supported", System.getProperty("java.version")));
             }
         }
         catch (Exception e)

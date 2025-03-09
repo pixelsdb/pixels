@@ -31,17 +31,18 @@
  */
 package io.pixelsdb.pixels.common.physical.natives;
 
-import sun.nio.ch.FileChannelImpl;
+import sun.nio.ch.DirectBuffer;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 
 import static io.pixelsdb.pixels.common.physical.natives.DirectIoLib.wrapReadOnlyDirectByteBuffer;
-import static io.pixelsdb.pixels.common.utils.JvmUtils.*;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
 
 /**
  * This class has been tested.
@@ -51,15 +52,13 @@ import static io.pixelsdb.pixels.common.utils.JvmUtils.*;
  *
  * @author hank
  */
-
 @SuppressWarnings("restriction")
 public class MemoryMappedFile
 {
-    private static final Method mmap;
-    private static final Method unmmap;
     private static final int BYTE_ARRAY_OFFSET;
 
     private long addr;
+    private MappedByteBuffer mappedBuffer;
     private final long size;
     private final String loc;
 
@@ -67,18 +66,6 @@ public class MemoryMappedFile
     {
         try
         {
-            if (JavaVersion <= 11)
-            {
-                mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
-            }
-            else
-            {
-                // Issue #393: Java 17 adds one additional parameter (i.e., isAsync) for persistent memory.
-                mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class, boolean.class);
-            }
-            mmap.setAccessible(true);
-            unmmap = getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
-            unmmap.setAccessible(true);
             BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
         }
         catch (Exception e)
@@ -87,23 +74,14 @@ public class MemoryMappedFile
         }
     }
 
-    private static Method getMethod(Class<?> cls, String name, Class<?>... params)
-            throws Exception
-    {
-        Method m = cls.getDeclaredMethod(name, params);
-        m.setAccessible(true);
-        return m;
-    }
-
     public static long roundTo4096(long i)
     {
         return (i + 0xfffL) & ~0xfffL;
     }
 
-    private void mapAndSetOffset(boolean forceSize)
-            throws IOException
+    private void mapAndSetOffset(boolean forceSize) throws IOException
     {
-        final RandomAccessFile backingFile = new RandomAccessFile(this.loc, "rw");
+        RandomAccessFile backingFile = new RandomAccessFile(this.loc, "rw");
         if (forceSize)
         {
             backingFile.setLength(this.size);
@@ -111,15 +89,12 @@ public class MemoryMappedFile
         final FileChannel ch = backingFile.getChannel();
         try
         {
-            if (JavaVersion <= 11)
+            this.mappedBuffer = ch.map(FileChannel.MapMode.READ_WRITE, 0L, this.size);
+            if (!this.mappedBuffer.isDirect())
             {
-                this.addr = (long) mmap.invoke(ch, 1, 0L, this.size);
+                throw new IOException("the file is not mapped as a direct buffer, which is unexpected");
             }
-            else
-            {
-                // Issue #393: isAsync (the last parameter) should be false as we do not use persistent memory.
-                this.addr = (long) mmap.invoke(ch, 1, 0L, this.size, false);
-            }
+            this.addr = DirectIoLib.getAddress(this.mappedBuffer);
         }
         catch (Throwable e)
         {
@@ -127,6 +102,11 @@ public class MemoryMappedFile
         }
         finally
         {
+            /*
+             * Issue #841:
+             * Closing the channel and the backing file does not affect the mapped buffer.
+             * The mapped memory region is only unmapped when the mapped buffer is cleaned or garbage collected.
+             */
             ch.close();
             backingFile.close();
         }
@@ -175,7 +155,7 @@ public class MemoryMappedFile
         this.addr = addr;
     }
 
-    // return a view of the MemoryMappedFile given a offset in bytes
+    // return a view of the MemoryMappedFile given an offset in bytes
     public MemoryMappedFile regionView(final long offset, final long size) {
 
         if (offset + size >= this.size) {
@@ -184,12 +164,11 @@ public class MemoryMappedFile
         return new MemoryMappedFile(this.loc, this.addr + offset, size);
     }
 
-    public void unmap()
-            throws IOException
+    public void unmap() throws IOException
     {
         try
         {
-            unmmap.invoke(null, addr, this.size);
+            ((DirectBuffer) this.mappedBuffer).cleaner().clear();
         }
         catch (Throwable e)
         {

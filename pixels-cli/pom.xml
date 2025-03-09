@@ -15,8 +15,8 @@
     <description>The command line tool of Pixels that provides data manipulations support.</description>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <mainClass>io.pixelsdb.pixels.cli.Main</mainClass>
         <maven.deploy.skip>true</maven.deploy.skip>

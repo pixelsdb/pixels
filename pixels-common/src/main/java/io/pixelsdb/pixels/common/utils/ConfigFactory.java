@@ -90,7 +90,7 @@ public class ConfigFactory
         if (pixelsConfig == null)
         {
             // neither PIXELS_CONFIG nor PIXELS_HOME is found, use the config file under CLASS_PATH.
-            System.err.println("Neither PIXELS_CONFIG nor PIXELS_HOME exists, using pixels.properties under CLASS_PATH");
+            System.err.println("neither PIXELS_CONFIG nor PIXELS_HOME exists, using pixels.properties under CLASS_PATH");
             in = this.getClass().getResourceAsStream("/pixels.properties");
         }
         else

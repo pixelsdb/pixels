@@ -46,6 +46,9 @@ It may take a couple of minutes to complete. After that, find jar files:
 
 They will be used in the installation of Pixels.
 
+> Note: Some Junit tests in Pixels access some low-level packages in the JDK, such as sun.nio and java.nio.
+> Compiling and running such test cases require lower version JDKs (e.g., 1.8). However, these tests are not necessary for the aforementioned build process.
+
 Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
 The query engine integrations also can be built using maven.
 For example, to build the Trino integration for Pixels, just git clone [pixels-trino](https://github.com/pixelsdb/pixels-trino), 

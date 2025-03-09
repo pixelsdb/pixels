@@ -37,7 +37,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.pixelsdb.pixels.common.utils.JvmUtils.JavaVersion;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.javaVersion;
 
 /**
  * Mapping Linux I/O functions to native methods.
@@ -84,14 +84,14 @@ public class DirectIoLib
         {
             try
             {
-                if (JavaVersion <= 11)
+                if (javaVersion <= 11)
                 {
                     // This is from sun.nio.ch.Util.initDBBRConstructor.
                     Class<?> cl = Class.forName("java.nio.DirectByteBufferR");
                     directByteBufferRConstructor = cl.getDeclaredConstructor(
                             int.class, long.class, FileDescriptor.class, Runnable.class);
                 }
-                else if (JavaVersion < 21)
+                else if (javaVersion < 21)
                 {
                     /* The creator of DirectByteBufferR is changed after java 11 and is not compatible with java 8.
                      * Therefore, we use DirectByteBuffer to create direct read only buffer.
@@ -169,7 +169,7 @@ public class DirectIoLib
             }
         } catch (Throwable e)
         {
-            logger.error("unable to register libc at class load time: " + e.getMessage(), e);
+            logger.error("unable to register libc at class load time: {}", e.getMessage(), e);
         }
     }
 
@@ -230,7 +230,7 @@ public class DirectIoLib
         ByteBuffer buffer;
         try
         {
-            if (JavaVersion <= 11)
+            if (javaVersion <= 11)
             {
                 buffer = (ByteBuffer) directByteBufferRConstructor.newInstance(
                         new Object[]{size, address, null, null});
