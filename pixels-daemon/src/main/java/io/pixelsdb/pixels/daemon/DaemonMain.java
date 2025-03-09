@@ -131,9 +131,6 @@ public class DaemonMain
                         CacheWorker cacheWorker = new CacheWorker();
                         container.addServer("cache_worker", cacheWorker);
                     }
-                    // start retina server on worker node
-                    RetinaServer retinaServer = new RetinaServer(retinaServerPort);
-                    container.addServer("retina", retinaServer);
                 } catch (Throwable e)
                 {
                     log.error("failed to start worker", e);
