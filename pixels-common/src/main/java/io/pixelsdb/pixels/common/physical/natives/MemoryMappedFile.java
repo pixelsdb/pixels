@@ -31,17 +31,16 @@
  */
 package io.pixelsdb.pixels.common.physical.natives;
 
-import sun.nio.ch.FileChannelImpl;
-
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 
 import static io.pixelsdb.pixels.common.physical.natives.DirectIoLib.wrapReadOnlyDirectByteBuffer;
-import static io.pixelsdb.pixels.common.utils.JvmUtils.*;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
 
 /**
  * This class has been tested.
@@ -54,11 +53,11 @@ import static io.pixelsdb.pixels.common.utils.JvmUtils.*;
 @SuppressWarnings("restriction")
 public class MemoryMappedFile
 {
-    private static final Method mmap;
-    private static final Method unmmap;
     private static final int BYTE_ARRAY_OFFSET;
 
     private long addr;
+    private MappedByteBuffer mappedBuffer;
+    private RandomAccessFile backingFile;
     private final long size;
     private final String loc;
 
@@ -66,24 +65,6 @@ public class MemoryMappedFile
     {
         try
         {
-            //RandomAccessFile accessFile = new RandomAccessFile("memoryMappedFile", "rw");
-            //FileChannel channel = accessFile.getChannel();
-            if (javaVersion <= 11)
-            {
-                mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
-            }
-            else if (javaVersion <= 17)
-            {
-                // Issue #393: Java 17 adds one additional parameter (i.e., isAsync) for persistent memory.
-                mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class, boolean.class);
-            }
-            else
-            {
-                throw new UnsupportedOperationException("Unsupported Java version: " + javaVersion);
-            }
-            mmap.setAccessible(true);
-            unmmap = getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
-            unmmap.setAccessible(true);
             BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
         }
         catch (Exception e)
@@ -92,52 +73,31 @@ public class MemoryMappedFile
         }
     }
 
-    private static Method getMethod(Class<?> cls, String name, Class<?>... params)
-            throws Exception
-    {
-        Method m = cls.getDeclaredMethod(name, params);
-        m.setAccessible(true);
-        return m;
-    }
-
     public static long roundTo4096(long i)
     {
         return (i + 0xfffL) & ~0xfffL;
     }
 
-    private void mapAndSetOffset(boolean forceSize)
-            throws IOException
+    private void mapAndSetOffset(boolean forceSize) throws IOException
     {
-        final RandomAccessFile backingFile = new RandomAccessFile(this.loc, "rw");
+        this.backingFile = new RandomAccessFile(this.loc, "rw");
         if (forceSize)
         {
-            backingFile.setLength(this.size);
+            this.backingFile.setLength(this.size);
         }
-        final FileChannel ch = backingFile.getChannel();
+        final FileChannel ch = this.backingFile.getChannel();
         try
         {
-            if (javaVersion <= 11)
+            this.mappedBuffer = ch.map(FileChannel.MapMode.READ_WRITE, 0L, this.size);
+            if (!this.mappedBuffer.isDirect())
             {
-                this.addr = (long) mmap.invoke(ch, 1, 0L, this.size);
+                throw new IOException("the file is not mapped as a direct buffer, which is unexpected");
             }
-            else if (javaVersion <= 17)
-            {
-                // Issue #393: isAsync (the last parameter) should be false as we do not use persistent memory.
-                this.addr = (long) mmap.invoke(ch, 1, 0L, this.size, false);
-            }
-            else
-            {
-                throw new UnsupportedOperationException("Unsupported Java version: " + javaVersion);
-            }
+            this.addr = DirectIoLib.getAddress(this.mappedBuffer);
         }
         catch (Throwable e)
         {
             throw new IOException("mmap failed", e);
-        }
-        finally
-        {
-            ch.close();
-            backingFile.close();
         }
     }
 
@@ -198,7 +158,7 @@ public class MemoryMappedFile
     {
         try
         {
-            unmmap.invoke(null, addr, this.size);
+            this.backingFile.close();
         }
         catch (Throwable e)
         {
