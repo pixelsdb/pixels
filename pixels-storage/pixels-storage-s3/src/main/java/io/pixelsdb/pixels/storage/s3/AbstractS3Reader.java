@@ -215,9 +215,9 @@ public abstract class AbstractS3Reader implements PhysicalReader
     }
 
     @Override
-    public String getPathUri()
+    public String getPathUri() throws IOException
     {
-        return "s3://" + pathStr;
+        return s3.ensureSchemePrefix(pathStr);
     }
 
     /**

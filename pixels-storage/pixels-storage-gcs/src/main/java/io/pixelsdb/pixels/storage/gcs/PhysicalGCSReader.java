@@ -246,9 +246,9 @@ public class PhysicalGCSReader implements PhysicalReader
     }
 
     @Override
-    public String getPathUri()
+    public String getPathUri() throws IOException
     {
-        return "gs://" + pathStr;
+        return gcs.ensureSchemePrefix(pathStr);
     }
 
     /**

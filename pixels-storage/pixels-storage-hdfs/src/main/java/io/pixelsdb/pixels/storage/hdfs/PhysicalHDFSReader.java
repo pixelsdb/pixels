@@ -231,9 +231,9 @@ public class PhysicalHDFSReader implements PhysicalReader
     }
 
     @Override
-    public String getPathUri()
+    public String getPathUri() throws IOException
     {
-        return "hdfs://" + path;
+        return hdfs.ensureSchemePrefix(path);
     }
 
     @Override

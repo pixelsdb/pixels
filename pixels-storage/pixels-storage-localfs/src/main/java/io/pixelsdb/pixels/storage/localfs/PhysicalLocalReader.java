@@ -182,9 +182,9 @@ public class PhysicalLocalReader implements PhysicalReader
     }
 
     @Override
-    public String getPathUri()
+    public String getPathUri() throws IOException
     {
-        return "file://" + path;
+        return local.ensureSchemePrefix(path);
     }
 
     /**

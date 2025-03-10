@@ -128,9 +128,9 @@ public class PhysicalStreamReader implements PhysicalReader
     public String getPath() { return path; }
 
     @Override
-    public String getPathUri()
+    public String getPathUri() throws IOException
     {
-        return path;
+        return stream.ensureSchemePrefix(path);
     }
 
     /**
