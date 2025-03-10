@@ -37,7 +37,8 @@ import java.util.List;
 public class TestPixelsReaderWithDeletion
 {
     private final static RetinaService retinaService = RetinaService.Instance();
-    private final static String currentPath = "/home/gengdy/data/tpch/1g/nation/v-0-ordered/20250224025359_12.pxl";
+    // private final static String currentPath = "/home/gengdy/data/tpch/1g/nation/v-0-ordered/20250224025359_12.pxl";
+    private final static String currentPath = "/home/gengdy/data/tpch/1g/nation/v-0-compact/20250224025622_24_compact.pxl";
     private final static String currentPathUri = "file://" + currentPath;
 
     public static void printRecord(long timestamp)

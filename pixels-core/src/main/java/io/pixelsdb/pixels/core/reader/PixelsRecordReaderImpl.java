@@ -118,14 +118,15 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private int qualifiedRowNum = 0;
     private boolean endOfFile = false;
 
-    private int targetRGNum = 0;         // number of target row groups
-    private int curRGIdx = 0;            // index of current reading row group in targetRGs
-    private int curRowInRG = 0;          // starting index of values to read by reader in current row group
+    private int targetRGNum = 0;           // number of target row groups
+    private int curRGIdx = 0;              // index of current reading row group in targetRGs
+    private int curRowInRG = 0;            // starting index of values to read by reader in current row group
 
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
     // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ByteBuffer[] chunkBuffers;
-    private ColumnReader[] readers;      // column readers for each target columns
+    private ColumnReader[] readers;        // column readers for each target columns
+    private long[][] rgVisibilityBitmaps;  // bitmaps of row group visibility
     private final boolean enableEncodedVector;
     private final int typeMode;
 
@@ -495,6 +496,28 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
         }
         targetRGNum = targetRGIdx;
+
+        // query visibility bitmap of target row groups
+        if (this.option.hasValidTransTimestamp())
+        {
+            rgVisibilityBitmaps = new long[targetRGNum][];
+            for (int i = 0; i < targetRGNum; ++i)
+            {
+                try
+                {
+                    rgVisibilityBitmaps[i] = retinaService.queryVisibility(physicalReader.getPathUri(),
+                            targetRGs[i], option.getTransTimestamp());
+                } catch (IOException e)
+                {
+                    logger.error("Failed to get path uri for row group " + targetRGs[i], e);
+                    throw new IOException("Failed to get path uri for row group " + targetRGs[i], e);
+                } catch (RetinaException e)
+                {
+                    logger.error("Failed to query visibility bitmap for row group " + targetRGs[i], e);
+                    throw new IOException("Failed to query visibility bitmap for row group " + targetRGs[i], e);
+                }
+            }
+        }
 
         if (targetRGNum == 0)
         {
@@ -1063,20 +1086,6 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             rgRowCount = footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
-        long [] rgVisibiltyBitmap = null;
-        if (option.hasValidTransTimestamp())
-        {
-            try
-            {
-                rgVisibiltyBitmap = retinaService.queryVisibility(physicalReader.getPathUri(),
-                        targetRGs[curRGIdx], option.getTransTimestamp());
-            } catch (RetinaException e)
-            {
-                logger.error("Failed to query visibility bitmap for row group " + targetRGs[curRGIdx], e);
-                throw new IOException("Failed to query visibility bitmap for row group " + targetRGs[curRGIdx], e);
-            }
-        }
-
         if (option.hasValidTransTimestamp())
         {
             while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
@@ -1114,7 +1123,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 for (int i = 0; i < curBatchSize; i++)
                 {
                     if ((hiddenTimestampVector == null || hiddenTimestampVector.vector[i] <= this.transTimestamp)
-                        && (rgVisibiltyBitmap == null || !checkBit(rgVisibiltyBitmap, curRowInRG + i)))
+                        && (!checkBit(rgVisibilityBitmaps[curRGIdx], curRowInRG + i)))
                     {
                         selectedRows.set(i);
                         addedRows++;
