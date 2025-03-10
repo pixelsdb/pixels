@@ -214,6 +214,12 @@ public abstract class AbstractS3Reader implements PhysicalReader
         return pathStr;
     }
 
+    @Override
+    public String getPathUri() throws IOException
+    {
+        return s3.ensureSchemePrefix(pathStr);
+    }
+
     /**
      * Get the last domain in path.
      *

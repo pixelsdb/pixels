@@ -245,6 +245,12 @@ public class PhysicalGCSReader implements PhysicalReader
         return pathStr;
     }
 
+    @Override
+    public String getPathUri() throws IOException
+    {
+        return gcs.ensureSchemePrefix(pathStr);
+    }
+
     /**
      * Get the last domain in path.
      *
