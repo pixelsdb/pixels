@@ -31,6 +31,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class RetinaService
 {
@@ -113,13 +114,13 @@ public class RetinaService
         }
     }
 
-    public boolean deleteRecord(String filePath, long rgId, long rowId, long timestamp) throws RetinaException
+    public boolean deleteRecord(String filePath, int rgId, long rowId, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.DeleteRecordRequest request = RetinaProto.DeleteRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setFilePath(filePath)
-                .setRgid(rgId)
+                .setRgId(rgId)
                 .setRowId(rowId)
                 .setTimestamp(timestamp)
                 .build();
@@ -156,13 +157,13 @@ public class RetinaService
         return true;
     }
 
-    public long[] queryVisibility(String filePath, long rgId, long timestamp) throws RetinaException
+    public long[][] queryVisibility(String filePath, int[] rgIds, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.QueryVisibilityRequest request = RetinaProto.QueryVisibilityRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setFilePath(filePath)
-                .setRgid(rgId)
+                .addAllRgIds(Arrays.stream(rgIds).boxed().collect(Collectors.toList()))
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.QueryVisibilityResponse response = this.stub.queryVisibility(request);
@@ -175,21 +176,22 @@ public class RetinaService
         {
             throw new RetinaException("response token does not match.");
         }
-        long[] visibilityBitmap = new long[response.getBitmapCount()];
-        for (int i = 0; i < response.getBitmapCount(); i++)
+        long[][] visibilityBitmaps = new long[rgIds.length][];
+        for (int i = 0; i < response.getBitmapsCount(); i++)
         {
-            visibilityBitmap[i] = response.getBitmap(i);
+            RetinaProto.VisibilityBitmap bitmap = response.getBitmaps(i);
+            visibilityBitmaps[i] = bitmap.getBitmapList().stream().mapToLong(Long::longValue).toArray();
         }
-        return visibilityBitmap;
+        return visibilityBitmaps;
     }
 
-    public boolean garbageCollect(String filePath, long rgId, long timestamp) throws RetinaException
+    public boolean garbageCollect(String filePath, int[] rgIds, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.GarbageCollectRequest request = RetinaProto.GarbageCollectRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setFilePath(filePath)
-                .setRgid(rgId)
+                .addAllRgIds(Arrays.stream(rgIds).boxed().collect(Collectors.toList()))
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.GarbageCollectResponse response = this.stub.garbageCollect(request);

@@ -40,7 +40,7 @@ public class TestRetinaService
     private static final int ROW_COUNT = 150000;
     private static final boolean DEBUG = true;
     private static final String TEST_FILE = "file:///home/gengdy/data/tpch/1g/customer/v-0-ordered/20250224025327_0.pxl";
-    private static final long TEST_RG_ID = 0;
+    private static final int TEST_RG_ID = 0;
 
     @Test
     public void testBasicDeleteAndVisibility() throws RetinaException
@@ -55,13 +55,13 @@ public class TestRetinaService
         retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, 5, timestamp1);
         retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, 10, timestamp1);
         retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, 15, timestamp2);
-        retinaService.garbageCollect(TEST_FILE, TEST_RG_ID, timestamp1);
+        retinaService.garbageCollect(TEST_FILE, new int[]{TEST_RG_ID}, timestamp1);
 
-        long[] bitmap1 = retinaService.queryVisibility(TEST_FILE, TEST_RG_ID, timestamp1);
-        assertEquals(0b0000010000100000L, bitmap1[0]);
+        long[][] bitmaps1 = retinaService.queryVisibility(TEST_FILE, new int[]{TEST_RG_ID}, timestamp1);
+        assertEquals(0b0000010000100000L, bitmaps1[0][0]);
 
-        long[] bitmap2 = retinaService.queryVisibility(TEST_FILE, TEST_RG_ID, timestamp2);
-        assertEquals(0b1000010000100000L, bitmap2[0]);
+        long[][] bitmaps2 = retinaService.queryVisibility(TEST_FILE, new int[]{TEST_RG_ID}, timestamp2);
+        assertEquals(0b1000010000100000L, bitmaps2[0][0]);
     }
 
     @Test
@@ -204,7 +204,7 @@ public class TestRetinaService
                 {
                     try
                     {
-                        retinaService.garbageCollect(TEST_FILE, TEST_RG_ID, gcTs);
+                        retinaService.garbageCollect(TEST_FILE, new int[]{TEST_RG_ID}, gcTs);
                         if (DEBUG)
                         {
                             printLock.lock();
@@ -261,8 +261,8 @@ public class TestRetinaService
                     long queryTs = minTs + random.nextInt((int) (maxTs - minTs + 1));
                     try
                     {
-                        long[] bitmap = retinaService.queryVisibility(TEST_FILE, TEST_RG_ID, queryTs);
-                        verifyBitmap.accept(queryTs, bitmap);
+                        long[][] bitmaps = retinaService.queryVisibility(TEST_FILE, new int[]{TEST_RG_ID}, queryTs);
+                        verifyBitmap.accept(queryTs, bitmaps[0]);
                         localVerificationCount++;
                         minTimestamp.incrementAndGet();
                     } catch (RetinaException e)
@@ -309,8 +309,8 @@ public class TestRetinaService
 
         try
         {
-            long[] finalBitmap = retinaService.queryVisibility(TEST_FILE, TEST_RG_ID, maxTimestamp.get());
-            long[] expectedFinalBitmap = new long[finalBitmap.length];
+            long[][] finalBitmaps = retinaService.queryVisibility(TEST_FILE, new int[]{TEST_RG_ID}, maxTimestamp.get());
+            long[] expectedFinalBitmap = new long[finalBitmaps[0].length];
             Arrays.fill(expectedFinalBitmap, -1L);
 
             int invalidBitsCount = (int) (-ROW_COUNT & 255);
@@ -324,7 +324,7 @@ public class TestRetinaService
                 }
             }
 
-            verifyBitmap.accept(maxTimestamp.get(), finalBitmap);
+            verifyBitmap.accept(maxTimestamp.get(), finalBitmaps[0]);
         } catch (RetinaException e)
         {
             fail("Final verification failed: " + e.getMessage());

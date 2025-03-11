@@ -37,10 +37,12 @@ import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -106,11 +108,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void deleteRecord(String filePath, long rgId, long rowId, long timestamp) throws RetinaException
+    public void deleteRecord(String filePath, int rgId, long rowId, long timestamp) throws RetinaException
     {
-        try
+        try (RGVisibility rgVisibility = checkRGVisibility(filePath, rgId))
         {
-            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
             rgVisibility.deleteRecord(rowId, timestamp);
         } catch (Exception e)
         {
@@ -146,11 +147,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public long[] queryVisibility(String filePath, long rgId, long timestamp) throws RetinaException
+    public long[] queryVisibility(String filePath, int rgId, long timestamp) throws RetinaException
     {
-        try 
+        try (RGVisibility rgVisibility = checkRGVisibility(filePath, rgId))
         {
-            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
             long[] visibilityBitmap = rgVisibility.getVisibilityBitmap(timestamp);
             if (visibilityBitmap == null)
             {
@@ -163,11 +163,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void garbageCollect(String filePath, long rgId, long timestamp) throws RetinaException
+    public void garbageCollect(String filePath, int rgId, long timestamp) throws RetinaException
     {
-        try 
+        try (RGVisibility rgVisibility = checkRGVisibility(filePath, rgId))
         {
-            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
             rgVisibility.garbageCollect(timestamp);
         } catch (Exception e) {
             throw new RetinaException("Error while garbage collecting", e);
@@ -184,7 +183,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         try 
         {
             String filePath = request.getFilePath();
-            long rgId = request.getRgid();
+            int rgId = request.getRgId();
             long rowId = request.getRowId();
             long timestamp = request.getTimestamp();
             deleteRecord(filePath, rgId, rowId, timestamp);
@@ -238,16 +237,20 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         try 
         {
             String filePath = request.getFilePath();
-            long rgId = request.getRgid();
+            int[] rgIds = request.getRgIdsList().stream().mapToInt(Integer::intValue).toArray();
             long timestamp = request.getTimestamp();
-            long[] visibilityBitmap = queryVisibility(filePath, rgId, timestamp);
 
             RetinaProto.QueryVisibilityResponse.Builder responseBuilder = RetinaProto.QueryVisibilityResponse
                     .newBuilder()
                     .setHeader(headerBuilder.build());
-            for (long value : visibilityBitmap) 
+            
+            for (int rgId : rgIds)
             {
-                responseBuilder.addBitmap(value);
+                long[] visibilityBitmap = queryVisibility(filePath, rgId, timestamp);
+                RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
+                    .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
+                        .build();
+                responseBuilder.addBitmaps(bitmap);
             }
             responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
@@ -271,9 +274,12 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         try
         {
             String filePath = request.getFilePath();
-            long rgId = request.getRgid();
+            int[] rgIds = request.getRgIdsList().stream().mapToInt(Integer::intValue).toArray();
             long timestamp = request.getTimestamp();
-            garbageCollect(filePath, rgId, timestamp);
+            for (int rgId : rgIds)
+            {
+                garbageCollect(filePath, rgId, timestamp);
+            }
 
             RetinaProto.GarbageCollectResponse response = RetinaProto.GarbageCollectResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
@@ -319,7 +325,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
      * @param rgId the row group id.
      * @throws RetinaException if the retina does not exist.
      */
-    private RGVisibility checkRGVisibility(String filePath, long rgId) throws RetinaException
+    private RGVisibility checkRGVisibility(String filePath, int rgId) throws RetinaException
     {
         try
         {

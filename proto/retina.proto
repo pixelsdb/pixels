@@ -36,6 +36,11 @@ service RetinaWorkerService {
     rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
 }
 
+// bitmap
+message VisibilityBitmap {
+    repeated uint64 bitmap = 1;
+}
+
 // header
 message RequestHeader {
     string token = 1;
@@ -50,7 +55,7 @@ message ResponseHeader {
 message DeleteRecordRequest {
     RequestHeader header = 1;
     string filePath = 2;
-    sint64 rgid = 3;
+    sint32 rgId = 3;
     sint64 rowId = 4;
     sint64 timestamp = 5;
 }
@@ -71,19 +76,19 @@ message AddVisibilityResponse {
 message QueryVisibilityRequest {
     RequestHeader header = 1;
     string filePath = 2;
-    sint64 rgid = 3;
+    repeated sint32 rgIds = 3;
     sint64 timestamp = 4;
 }
 
 message QueryVisibilityResponse {
     ResponseHeader header = 1;
-    repeated uint64 bitmap = 2;
+    repeated VisibilityBitmap bitmaps = 2;
 }
 
 message GarbageCollectRequest {
     RequestHeader header = 1;
     string filePath = 2;
-    sint64 rgid = 3;
+    repeated sint32 rgIds = 3;
     sint64 timestamp = 4;
 }
 

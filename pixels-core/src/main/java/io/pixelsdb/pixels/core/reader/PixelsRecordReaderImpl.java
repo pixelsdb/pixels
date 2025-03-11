@@ -500,22 +500,18 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         // query visibility bitmap of target row groups
         if (this.option.hasValidTransTimestamp())
         {
-            rgVisibilityBitmaps = new long[targetRGNum][];
-            for (int i = 0; i < targetRGNum; ++i)
+            try
             {
-                try
-                {
-                    rgVisibilityBitmaps[i] = retinaService.queryVisibility(physicalReader.getPathUri(),
-                            targetRGs[i], option.getTransTimestamp());
-                } catch (IOException e)
-                {
-                    logger.error("Failed to get path uri for row group " + targetRGs[i], e);
-                    throw new IOException("Failed to get path uri for row group " + targetRGs[i], e);
-                } catch (RetinaException e)
-                {
-                    logger.error("Failed to query visibility bitmap for row group " + targetRGs[i], e);
-                    throw new IOException("Failed to query visibility bitmap for row group " + targetRGs[i], e);
-                }
+                rgVisibilityBitmaps = retinaService.queryVisibility(physicalReader.getPathUri(),
+                        targetRGs, option.getTransTimestamp());
+            } catch (IOException e)
+            {
+                logger.error("Failed to get path uri for file " + physicalReader.getPathUri(), e);
+                throw new IOException("Failed to get path uri for file " + physicalReader.getPathUri(), e);
+            } catch (RetinaException e)
+            {
+                logger.error("Failed to query visibility bitmap for file " + physicalReader.getPathUri(), e);
+                throw new IOException("Failed to query visibility bitmap for file " + physicalReader.getPathUri(), e);
             }
         }
 
