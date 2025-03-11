@@ -110,8 +110,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
     public void deleteRecord(String filePath, int rgId, long rowId, long timestamp) throws RetinaException
     {
-        try (RGVisibility rgVisibility = checkRGVisibility(filePath, rgId))
+        try
         {
+            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
             rgVisibility.deleteRecord(rowId, timestamp);
         } catch (Exception e)
         {
@@ -149,8 +150,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
     public long[] queryVisibility(String filePath, int rgId, long timestamp) throws RetinaException
     {
-        try (RGVisibility rgVisibility = checkRGVisibility(filePath, rgId))
+        try
         {
+            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
             long[] visibilityBitmap = rgVisibility.getVisibilityBitmap(timestamp);
             if (visibilityBitmap == null)
             {
@@ -165,8 +167,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
     public void garbageCollect(String filePath, int rgId, long timestamp) throws RetinaException
     {
-        try (RGVisibility rgVisibility = checkRGVisibility(filePath, rgId))
+        try
         {
+            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
             rgVisibility.garbageCollect(timestamp);
         } catch (Exception e) {
             throw new RetinaException("Error while garbage collecting", e);
