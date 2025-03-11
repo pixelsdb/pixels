@@ -31,10 +31,9 @@
  */
 package io.pixelsdb.pixels.common.physical.natives;
 
-import sun.nio.ch.DirectBuffer;
-
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
@@ -57,6 +56,7 @@ public class MemoryMappedFile
 {
     private static final int BYTE_ARRAY_OFFSET;
 
+    private static final Method fileChannelUnmap;
     private long addr;
     private MappedByteBuffer mappedBuffer;
     private final long size;
@@ -66,6 +66,21 @@ public class MemoryMappedFile
     {
         try
         {
+            /* Issue #841:
+             * In Java 21+, sun.nio.ch.FileChannelImpl no longer provides the map0() and unmap0() native methods.
+             * Hence, we can not reflect these methods to mmap and unmap the shared memory.
+             *
+             * Therefore, we use sun.nio.ch.FileChannelImpl.map() and unmap() methods instead. However, unmap() is
+             * a private static method. So we have to reflect it here.
+             *
+             * unmap uses ((DirectBuffer)mappedBuffer).cleaner().clean() to unmap the memory explicitly.
+             * However, we can not directly do this in our code. Because Cleaner has different definitions in different
+             * versions of Java. If the code is compiled and run by different versions of Java, calling
+             * DirectBuffer.cleaner() may leads to MethodNotFound exception due to the inconsistent return types.
+             */
+            fileChannelUnmap = Class.forName("sun.nio.ch.FileChannelImpl")
+                    .getDeclaredMethod("unmap", MappedByteBuffer.class);
+            fileChannelUnmap.setAccessible(true);
             BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
         }
         catch (Exception e)
@@ -149,17 +164,26 @@ public class MemoryMappedFile
         mapAndSetOffset(forceRound4K);
     }
 
-    private MemoryMappedFile(final String loc, long addr, long len) {
+    private MemoryMappedFile(final String loc, long addr, long len)
+    {
         this.loc = loc;
         this.size = len;
         this.addr = addr;
     }
 
-    // return a view of the MemoryMappedFile given an offset in bytes
-    public MemoryMappedFile regionView(final long offset, final long size) {
+    /**
+     * Get a view of the MemoryMappedFile given an offset in bytes.
+     * @param offset the offset in the MemoryMappedFile
+     * @param size the size of the view
+     * @return the view
+     */
+    public MemoryMappedFile regionView(final long offset, final long size)
+    {
 
-        if (offset + size >= this.size) {
-            throw new IllegalArgumentException("offset=" + offset + " plus size=" + size +  " is bigger than this.size=" + this.size);
+        if (offset + size >= this.size)
+        {
+            throw new IllegalArgumentException("offset=" + offset + " plus size=" + size +
+                    " is bigger than this.size=" + this.size);
         }
         return new MemoryMappedFile(this.loc, this.addr + offset, size);
     }
@@ -168,11 +192,18 @@ public class MemoryMappedFile
     {
         try
         {
-            ((DirectBuffer) this.mappedBuffer).cleaner().clear();
+            if (this.mappedBuffer.isDirect())
+            {
+                fileChannelUnmap.invoke(null, this.mappedBuffer);
+            }
+            else
+            {
+                throw new IllegalAccessException("the mapped buffer is not direct");
+            }
         }
         catch (Throwable e)
         {
-            throw new IOException("unmmap failed", e);
+            throw new IOException("unmap failed", e);
         }
     }
 

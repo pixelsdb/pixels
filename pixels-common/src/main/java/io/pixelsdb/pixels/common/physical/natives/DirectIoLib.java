@@ -91,26 +91,28 @@ public class DirectIoLib
                     directByteBufferRConstructor = cl.getDeclaredConstructor(
                             int.class, long.class, FileDescriptor.class, Runnable.class);
                 }
-                else if (javaVersion < 21)
-                {
-                    /* The creator of DirectByteBufferR is changed after java 11 and is not compatible with java 8.
-                     * Therefore, we use DirectByteBuffer to create direct read only buffer.
-                     */
-                    Class<?> cl = Class.forName("java.nio.DirectByteBuffer");
-                    directByteBufferRConstructor = cl.getDeclaredConstructor(long.class, int.class);
-                }
                 else
                 {
-                    /* the creator of DirectByteBuffer is changed in java 21+.
+                    /* The creator of DirectByteBufferR is changed after java 11 and is not compatible with java 8.
+                     * Therefore, we use DirectByteBuffer to create direct read-only buffer.
                      */
                     Class<?> cl = Class.forName("java.nio.DirectByteBuffer");
-                    directByteBufferRConstructor = cl.getDeclaredConstructor(long.class, long.class);
+                    if (javaVersion < 21)
+                    {
+                        directByteBufferRConstructor = cl.getDeclaredConstructor(long.class, int.class);
+                    }
+                    else
+                    {
+                        // The second parameter capacity in the creator of DirectByteBuffer becomes long in java 21+.
+                        directByteBufferRConstructor = cl.getDeclaredConstructor(long.class, long.class);
+                    }
                 }
                 directByteBufferRConstructor.setAccessible(true);
 
                 jnaPointerPeer = Class.forName("com.sun.jna.Pointer").getDeclaredField("peer");
                 jnaPointerPeer.setAccessible(true);
-                directByteBufferAddress = Class.forName("java.nio.DirectByteBuffer").getDeclaredMethod("address");
+                // sun.nio.ch.DirectBuffer is the parent of java.nio.DirectByteBuffer(R)
+                directByteBufferAddress = Class.forName("sun.nio.ch.DirectBuffer").getDeclaredMethod("address");
                 directByteBufferAddress.setAccessible(true);
             } catch (Throwable e)
             {
@@ -215,7 +217,10 @@ public class DirectIoLib
         {
             return (long) directByteBufferAddress.invoke(byteBuffer);
         }
-        throw new IllegalAccessException("non direct byte buffer does not have absolute address");
+        else
+        {
+            throw new IllegalAccessException("non direct byte buffer does not have absolute address");
+        }
     }
 
     /**
