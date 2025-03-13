@@ -29,3 +29,4 @@ resources/*.xml
 *.so
 *.o
 .vscode
+cpp/pixels-retina/third_party/

@@ -53,12 +53,15 @@ public class PixelsConsumer extends Consumer
     private final BlockingQueue<String> queue;
     private final Parameters parameters;
     private final ConcurrentLinkedQueue<File> loadedFiles;
+    private final ConcurrentLinkedQueue<Path> loadedPaths;
 
-    public PixelsConsumer(BlockingQueue<String> queue, Parameters parameters, ConcurrentLinkedQueue<File> loadedFiles)
+    public PixelsConsumer(BlockingQueue<String> queue, Parameters parameters,
+                          ConcurrentLinkedQueue<File> loadedFiles, ConcurrentLinkedQueue<Path> loadedPaths)
     {
         this.queue = queue;
         this.parameters = parameters;
         this.loadedFiles = loadedFiles;
+        this.loadedPaths = loadedPaths;
     }
 
     @Override
@@ -255,5 +258,6 @@ public class PixelsConsumer extends Consumer
         loadedFile.setNumRowGroup(pixelsWriter.getNumRowGroup());
         loadedFile.setPathId(filePath.getId());
         this.loadedFiles.offer(loadedFile);
+        this.loadedPaths.offer(filePath);
     }
 }

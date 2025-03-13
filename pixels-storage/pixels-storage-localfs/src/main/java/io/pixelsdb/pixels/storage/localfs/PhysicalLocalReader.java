@@ -181,6 +181,12 @@ public class PhysicalLocalReader implements PhysicalReader
         return path;
     }
 
+    @Override
+    public String getPathUri() throws IOException
+    {
+        return local.ensureSchemePrefix(path);
+    }
+
     /**
      * Get the last domain in path.
      *
