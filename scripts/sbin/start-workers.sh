@@ -15,9 +15,3 @@ do
     echo "Starting worker on ${worker}..."
     ssh -n "${worker}" "${REMOTE_SCRIPT}"
 done < $PIXELS_HOME/etc/workers
-
-
-
-
-
-

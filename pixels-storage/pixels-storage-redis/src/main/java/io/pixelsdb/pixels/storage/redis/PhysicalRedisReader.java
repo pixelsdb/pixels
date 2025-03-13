@@ -151,6 +151,12 @@ public class PhysicalRedisReader implements PhysicalReader
     }
 
     @Override
+    public String getPathUri() throws IOException
+    {
+        return redis.ensureSchemePrefix(new String(this.path, StandardCharsets.UTF_8));
+    }
+
+    @Override
     public String getName()
     {
         return new String(this.path, StandardCharsets.UTF_8);

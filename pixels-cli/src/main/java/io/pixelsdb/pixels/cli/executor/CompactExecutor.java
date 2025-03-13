@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.cli.executor;
 
 import com.google.common.base.Joiner;
 import io.pixelsdb.pixels.cli.Main;
+import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.File;
@@ -29,6 +30,7 @@ import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
 import io.pixelsdb.pixels.core.compactor.CompactLayout;
@@ -37,6 +39,7 @@ import net.sourceforge.argparse4j.inf.Namespace;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -51,6 +54,8 @@ import static java.util.Objects.requireNonNull;
  */
 public class CompactExecutor implements CommandExecutor
 {
+    private final RetinaService retinaService = RetinaService.Instance();
+
     @Override
     public void execute(Namespace ns, String command) throws Exception
     {
@@ -100,6 +105,7 @@ public class CompactExecutor implements CommandExecutor
         List<Status> statuses = orderStorage.listStatus(layout.getOrderedPathUris());
         List<Path> targetPaths = layout.getCompactPaths();
         ConcurrentLinkedQueue<File> compactFiles = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<Path> compactPaths = new ConcurrentLinkedQueue<>();
         int targetPathId = 0;
 
         // compact
@@ -179,6 +185,7 @@ public class CompactExecutor implements CommandExecutor
                     compactFile.setNumRowGroup(pixelsCompactor.getNumRowGroup());
                     compactFile.setPathId(targetPath.getId());
                     compactFiles.offer(compactFile);
+                    compactPaths.offer(targetPath);
                 } catch (IOException e)
                 {
                     System.err.println("write compact file '" + targetFilePath + "' failed");
@@ -194,6 +201,21 @@ public class CompactExecutor implements CommandExecutor
         compactExecutor.shutdown();
         while (!compactExecutor.awaitTermination(100, TimeUnit.SECONDS));
         metadataService.addFiles(compactFiles);
+
+        Iterator<File> fileIterator = compactFiles.iterator();
+        Iterator<Path> pathIterator = compactPaths.iterator();
+        while (fileIterator.hasNext() && pathIterator.hasNext())
+        {
+            File file = fileIterator.next();
+            Path path = pathIterator.next();
+            try
+            {
+                retinaService.addVisibility(File.getFilePath(path, file));
+            } catch (RetinaException e)
+            {
+                System.out.println("add visibility for compact file '" + file + "' failed");
+            }
+        }
 
         long endTime = System.currentTimeMillis();
         System.out.println("Pixels files in '" + Joiner.on(";").join(layout.getOrderedPathUris()) + "' are compacted into '" +

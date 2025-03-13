@@ -87,6 +87,31 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${maven.plugin.antrun.version}</version>
+                <executions>
+                    <execution>
+                        <id>compile-cpp</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <exec executable="cmake" failonerror="true" outputproperty="cmake.output" errorproperty="cmake.error">
+                                    <arg line="-B ${project.basedir}/../cpp/pixels-retina/build -S ${project.basedir}/../cpp/pixels-retina"/>
+                                </exec>
+                                <exec executable="make" dir="${project.basedir}/../cpp/pixels-retina/build" failonerror="true" outputproperty="make.output" errorproperty="make.error">
+                                    <arg value="install"/>
+                                </exec>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>
