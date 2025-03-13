@@ -22,10 +22,12 @@ package io.pixelsdb.pixels.core.reader;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.cache.ColumnChunkId;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
+import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -53,6 +55,7 @@ import java.util.concurrent.CompletableFuture;
 public class PixelsRecordReaderImpl implements PixelsRecordReader
 {
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
+    private final RetinaService retinaService = RetinaService.Instance();
 
     private final PhysicalReader physicalReader;
     private final PixelsProto.PostScript postScript;
@@ -116,14 +119,15 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private int qualifiedRowNum = 0;
     private boolean endOfFile = false;
 
-    private int targetRGNum = 0;         // number of target row groups
-    private int curRGIdx = 0;            // index of current reading row group in targetRGs
-    private int curRowInRG = 0;          // starting index of values to read by reader in current row group
+    private int targetRGNum = 0;           // number of target row groups
+    private int curRGIdx = 0;              // index of current reading row group in targetRGs
+    private int curRowInRG = 0;            // starting index of values to read by reader in current row group
 
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
     // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ByteBuffer[] chunkBuffers;
-    private ColumnReader[] readers;      // column readers for each target columns
+    private ColumnReader[] readers;        // column readers for each target columns
+    private long[][] rgVisibilityBitmaps;  // bitmaps of row group visibility
     private final boolean enableEncodedVector;
     private final int typeMode;
 
@@ -131,6 +135,11 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private long cacheReadBytes = 0L;
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;
+
+    private static boolean checkBit(long[] bitmap, int k)
+    {
+        return (bitmap[k / 64] & (1L << (k % 64))) != 0;
+    }
 
     public PixelsRecordReaderImpl(PhysicalReader physicalReader,
                                   PixelsProto.PostScript postScript,
@@ -489,6 +498,24 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         }
         targetRGNum = targetRGIdx;
 
+        // query visibility bitmap of target row groups
+        if (this.option.hasValidTransTimestamp())
+        {
+            try
+            {
+                rgVisibilityBitmaps = retinaService.queryVisibility(physicalReader.getPathUri(),
+                        targetRGs, option.getTransTimestamp());
+            } catch (IOException e)
+            {
+                logger.error("Failed to get path uri for file " + physicalReader.getPathUri(), e);
+                throw new IOException("Failed to get path uri for file " + physicalReader.getPathUri(), e);
+            } catch (RetinaException e)
+            {
+                logger.error("Failed to query visibility bitmap for file " + physicalReader.getPathUri(), e);
+                throw new IOException("Failed to query visibility bitmap for file " + physicalReader.getPathUri(), e);
+            }
+        }
+
         if (targetRGNum == 0)
         {
             /**
@@ -725,8 +752,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 short rgId = columnChunkId.rowGroupId;
                 short colId = columnChunkId.columnId;
 //                long getBegin = System.nanoTime();
-                ByteBuffer columnChunk = cacheReader.get(blockId, rgId, colId,
-                        columnChunkId.direct);
+                ByteBuffer columnChunk = cacheReader.get(blockId, rgId, colId, columnChunkId.direct);
                 if(columnChunk != null)
                 {
                     memoryUsage += columnChunkId.direct ? 0 : columnChunk.capacity();
@@ -1062,7 +1088,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             rgRowCount = footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
-        if (this.shouldReadHiddenColumn)
+        if (option.hasValidTransTimestamp())
         {
             while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
             {
@@ -1073,18 +1099,22 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     curBatchSize = batchSize - resultRowBatch.size;
                 }
 
-                // read the hidden timestamp column
-                LongColumnVector hiddenTimestampVector = new LongColumnVector(curBatchSize);
+                LongColumnVector hiddenTimestampVector = null;
                 PixelsProto.RowGroupFooter rowGroupFooter = rowGroupFooters[curRGIdx];
-                int hiddenTimestampColId = includedColumns.length;
-                PixelsProto.ColumnEncoding hiddenTimestampEncoding = rowGroupFooter.getRowGroupEncoding()
-                        .getHiddenColumnChunkEncoding();
-                int hiddenTimestampIndex = curRGIdx * (includedColumns.length + 1) + hiddenTimestampColId;
-                PixelsProto.ColumnChunkIndex hiddenTimestampChunkIndex = rowGroupFooter.getRowGroupIndexEntry()
-                        .getHiddenColumnChunkIndexEntry();
-                readers[readers.length - 1].read(chunkBuffers[hiddenTimestampIndex], hiddenTimestampEncoding,
-                        curRowInRG, curBatchSize, postScript.getPixelStride(), 0,
-                        hiddenTimestampVector, hiddenTimestampChunkIndex);
+                if (this.shouldReadHiddenColumn)
+                {
+                    // read the hidden timestamp column
+                    hiddenTimestampVector = new LongColumnVector(curBatchSize);
+                    int hiddenTimestampColId = includedColumns.length;
+                    PixelsProto.ColumnEncoding hiddenTimestampEncoding = rowGroupFooter.getRowGroupEncoding()
+                            .getHiddenColumnChunkEncoding();
+                    int hiddenTimestampIndex = curRGIdx * (includedColumns.length + 1) + hiddenTimestampColId;
+                    PixelsProto.ColumnChunkIndex hiddenTimestampChunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                            .getHiddenColumnChunkIndexEntry();
+                    readers[readers.length - 1].read(chunkBuffers[hiddenTimestampIndex], hiddenTimestampEncoding,
+                            curRowInRG, curBatchSize, postScript.getPixelStride(), 0,
+                            hiddenTimestampVector, hiddenTimestampChunkIndex);
+                }
 
                 /**
                  * construct the selected rows bitmap, size is curBatchSize
@@ -1094,7 +1124,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 int addedRows = 0;
                 for (int i = 0; i < curBatchSize; i++)
                 {
-                    if (hiddenTimestampVector.vector[i] <= this.transTimestamp)
+                    if ((hiddenTimestampVector == null || hiddenTimestampVector.vector[i] <= this.transTimestamp)
+                        && (!checkBit(rgVisibilityBitmaps[curRGIdx], curRowInRG + i)))
                     {
                         selectedRows.set(i);
                         addedRows++;
