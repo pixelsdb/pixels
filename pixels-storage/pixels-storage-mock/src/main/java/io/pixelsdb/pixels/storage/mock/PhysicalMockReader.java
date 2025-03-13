@@ -161,6 +161,12 @@ public class PhysicalMockReader implements PhysicalReader
     }
 
     @Override
+    public String getPathUri() throws IOException
+    {
+        return null;
+    }
+
+    @Override
     public String getName()
     {
         return null;

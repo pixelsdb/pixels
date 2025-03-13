@@ -28,9 +28,6 @@ option java_outer_classname = "RetinaProto";
 
 package retina.proto;
 
-// The following rpc methods are defined by the old retina implementation.
-// They will be replaced by the new implementation.
-
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
   rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
