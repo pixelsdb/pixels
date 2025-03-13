@@ -36,14 +36,14 @@ public class DaemonMain
 
         if (role == null || operation == null)
         {
-            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker}");
+            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker|retina}");
             System.exit(1);
         }
 
-        if (!role.equalsIgnoreCase("coordinator") && !role.equalsIgnoreCase("worker")||
-                !operation.equalsIgnoreCase("start") && !operation.equalsIgnoreCase("stop"))
+        if ((!role.equalsIgnoreCase("coordinator") && !role.equalsIgnoreCase("worker") && !role.equalsIgnoreCase("retina")) ||
+                (!operation.equalsIgnoreCase("start") && !operation.equalsIgnoreCase("stop")))
         {
-            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker}");
+            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker|retina}");
             System.exit(1);
         }
 
@@ -119,11 +119,10 @@ public class DaemonMain
                 {
                     log.error("failed to start coordinator", e);
                 }
-            } else
+            } else if (role.equalsIgnoreCase("worker"))
             {
                 boolean metricsServerEnabled = Boolean.parseBoolean(
                         ConfigFactory.Instance().getProperty("metrics.server.enabled"));
-                int retinaServerPort = Integer.parseInt(config.getProperty("retina.server.port"));
 
                 try
                 {
@@ -141,12 +140,22 @@ public class DaemonMain
                         CacheWorker cacheWorker = new CacheWorker();
                         container.addServer("cache_worker", cacheWorker);
                     }
-                    // start retina server on worker node
-                    RetinaServer retinaServer = new RetinaServer(retinaServerPort);
-                    container.addServer("retina", retinaServer);
                 } catch (Throwable e)
                 {
                     log.error("failed to start worker", e);
+                }
+            } else
+            {
+                int retinaServerPort = Integer.parseInt(config.getProperty("retina.server.port"));
+
+                try
+                {
+                    // start retina server on worker node
+                    RetinaServer retinaServer = new RetinaServer(retinaServerPort);
+                    container.addServer("retina", retinaServer);
+                } catch (Exception e)
+                {
+                    log.error("failed to start retina", e);
                 }
             }
 
@@ -235,7 +244,8 @@ public class DaemonMain
                         continue;
                     }
                     if (splits[1].contains(PixelsCoordinator.class.getName()) ||
-                            splits[1].contains(PixelsWorker.class.getName()))
+                             splits[1].contains(PixelsWorker.class.getName()) ||
+                             splits[1].contains(PixelsRetina.class.getName()))
                     {
                         boolean roleFound = false;
                         boolean isStartOperation = false;

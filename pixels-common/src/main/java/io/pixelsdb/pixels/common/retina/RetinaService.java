@@ -21,14 +21,17 @@ package io.pixelsdb.pixels.common.retina;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class RetinaService
 {
@@ -111,39 +114,96 @@ public class RetinaService
         }
     }
 
-    // TODO: implement this
-    public boolean updateRecord()
+    public boolean deleteRecord(String filePath, int rgId, long rowId, long timestamp) throws RetinaException
     {
-        return false;
+        String token = UUID.randomUUID().toString();
+        RetinaProto.DeleteRecordRequest request = RetinaProto.DeleteRecordRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setFilePath(filePath)
+                .setRgId(rgId)
+                .setRowId(rowId)
+                .setTimestamp(timestamp)
+                .build();
+        RetinaProto.DeleteRecordResponse response = this.stub.deleteRecord(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("failed to delete record: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("response token does not match.");
+        }
+        return true;
     }
 
-    public boolean insertRecord()
+    public boolean addVisibility(String filePath) throws RetinaException
     {
-        return false;
+        String token = UUID.randomUUID().toString();
+        RetinaProto.AddVisibilityRequest request = RetinaProto.AddVisibilityRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setFilePath(filePath)
+                .build();
+        RetinaProto.AddVisibilityResponse response = this.stub.addVisibility(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("failed to add visibility: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("response token does not match.");
+        }
+        return true;
     }
 
-    public boolean deleteRecord()
+    public long[][] queryVisibility(String filePath, int[] rgIds, long timestamp) throws RetinaException
     {
-        return false;
+        String token = UUID.randomUUID().toString();
+        RetinaProto.QueryVisibilityRequest request = RetinaProto.QueryVisibilityRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setFilePath(filePath)
+                .addAllRgIds(Arrays.stream(rgIds).boxed().collect(Collectors.toList()))
+                .setTimestamp(timestamp)
+                .build();
+        RetinaProto.QueryVisibilityResponse response = this.stub.queryVisibility(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("failed to query visibility: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("response token does not match.");
+        }
+        long[][] visibilityBitmaps = new long[rgIds.length][];
+        for (int i = 0; i < response.getBitmapsCount(); i++)
+        {
+            RetinaProto.VisibilityBitmap bitmap = response.getBitmaps(i);
+            visibilityBitmaps[i] = bitmap.getBitmapList().stream().mapToLong(Long::longValue).toArray();
+        }
+        return visibilityBitmaps;
     }
 
-    public void queryRecords()
+    public boolean garbageCollect(String filePath, int[] rgIds, long timestamp) throws RetinaException
     {
-
-    }
-
-    public void finishRecords()
-    {
-
-    }
-
-    public void queryVisibility()
-    {
-
-    }
-
-    public void finishVisibility()
-    {
-
+        String token = UUID.randomUUID().toString();
+        RetinaProto.GarbageCollectRequest request = RetinaProto.GarbageCollectRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setFilePath(filePath)
+                .addAllRgIds(Arrays.stream(rgIds).boxed().collect(Collectors.toList()))
+                .setTimestamp(timestamp)
+                .build();
+        RetinaProto.GarbageCollectResponse response = this.stub.garbageCollect(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("failed to garbage collect: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("response token does not match.");
+        }
+        return true;
     }
 }

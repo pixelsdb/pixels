@@ -93,7 +93,18 @@ public interface PhysicalReader extends Closeable
 
     void close() throws IOException;
 
+    /**
+     * Get file path without prefix.
+     * @return
+     */
     String getPath();
+
+    /**
+     * Get file path with prefix.
+     *
+     * @return
+     */
+    String getPathUri() throws IOException;
 
     /**
      * Get the last domain in path.
