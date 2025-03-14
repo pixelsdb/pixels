@@ -36,28 +36,28 @@ public class RGVisibility implements AutoCloseable
     static
     {
         String pixelsHome = System.getenv("PIXELS_HOME");
-        if (pixelsHome == null || pixelsHome.isEmpty()) 
+        if (pixelsHome == null || pixelsHome.isEmpty())
         {
             throw new IllegalStateException("Environment variable PIXELS_HOME is not set");
         }
 
-        if (!Platform.isLinux()) 
+        if (!Platform.isLinux())
         {
             logger.error("direct io is not supported on OS other than Linux");
         }
         String libPath = Paths.get(pixelsHome, "lib/libpixels-retina.so").toString();
         File libFile = new File(libPath);
-        if (!libFile.exists()) 
+        if (!libFile.exists())
         {
             throw new IllegalStateException("libpixels-retina.so not found at " + libPath);
         }
-        if (!libFile.canRead()) 
+        if (!libFile.canRead())
         {
             throw new IllegalStateException("libpixels-retina.so is not readable at " + libPath);
         }
         System.load(libPath);
     }
-    
+
     /**
      * Constructor creates C++ object and returns handle
      */
@@ -71,12 +71,12 @@ public class RGVisibility implements AutoCloseable
     @Override
     public void close()
     {
-        if (this.nativeHandle != 0) 
+        if (this.nativeHandle != 0)
         {
             destroyNativeObject(this.nativeHandle);
         }
     }
-    
+
     // native methods
     private native long createNativeObject(long rgRecordNum);
     private native void destroyNativeObject(long nativeHandle);
