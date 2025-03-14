@@ -30,13 +30,15 @@ package retina.proto;
 
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
-  rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
-  rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
   rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
-  rpc QueryRecords (QueryRecordsRequest) returns (QueryRecordsResponse);
-  rpc FinishRecords (QueryAck) returns (ResponseHeader);
+  rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
   rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
-  rpc FinishVisibility (QueryAck) returns (ResponseHeader);
+  rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
+}
+
+// bitmap
+message VisibilityBitmap {
+  repeated uint64 bitmap = 1;
 }
 
 // header
@@ -50,86 +52,46 @@ message ResponseHeader {
   string errorMsg = 3; // empty if errorCode == 0
 }
 
-message Value {
-  oneof value {
-    sint32 integerValue = 1;
-    sint64 longValue = 2;
-    double doubleValue = 3;
-    string stringValue = 4;
-    sint64 timestampValue = 5;
-    sint32 dateValue = 6;
-    sint32 timeValue = 7;
-  }
-}
-
-message UpdateRecordRequest {
-  RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  Value primaryKey = 4;
-  sint64 timestamp = 5;
-  sint32 pkId = 6;
-  repeated Value originalValues = 7;
-  repeated Value newValues = 8;
-}
-
-message UpdateRecordResponse {
-  ResponseHeader header = 1;
-}
-
-message InsertRecordRequest {
-  RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  sint64 timestamp = 4;
-  sint32 pkId = 5;
-  repeated Value values = 7;
-}
-
-message InsertRecordResponse {
-  ResponseHeader header = 1;
-}
-
 message DeleteRecordRequest {
   RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  sint64 timestamp = 4;
-  sint32 pkId = 5;
-  Value primaryKey = 6;
+  string filePath = 2;
+  sint32 rgId = 3;
+  sint64 rowId = 4;
+  sint64 timestamp = 5;
 }
 
 message DeleteRecordResponse {
   ResponseHeader header = 1;
 }
 
-message QueryRecordsRequest {
+message AddVisibilityRequest {
   RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  sint32 rgid = 4;
-  sint64 timestamp = 5;
+  string filePath = 2;
 }
 
-message QueryRecordsResponse {
+message AddVisibilityResponse {
   ResponseHeader header = 1;
-  sint64 pos = 2;
 }
 
 message QueryVisibilityRequest {
   RequestHeader header = 1;
-  string schemaName = 2;
-  string tableName = 3;
-  sint32 rgid = 4;
-  sint64 timestamp = 5;
+  string filePath = 2;
+  repeated sint32 rgIds = 3;
+  sint64 timestamp = 4;
 }
 
 message QueryVisibilityResponse {
   ResponseHeader header = 1;
-  sint64 pos = 2;
+  repeated VisibilityBitmap bitmaps = 2;
 }
 
-message QueryAck {
+message GarbageCollectRequest {
   RequestHeader header = 1;
-  sint64 pos = 2;
+  string filePath = 2;
+  repeated sint32 rgIds = 3;
+  sint64 timestamp = 4;
+}
+
+message GarbageCollectResponse {
+  ResponseHeader header = 1;
 }
