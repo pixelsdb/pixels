@@ -452,7 +452,7 @@ public class WorkerCommon
         PixelsReader pixelsReader;
         if (storage.getScheme().equals(Storage.Scheme.httpstream))
         {
-            if (!streamReaders.containsKey(filePath))
+            if (!streamReaders.containsKey(filePath) || streamReaders.get(filePath).getFileSchema() == null)
             {
                 pixelsReader = PixelsReaderStreamImpl.newBuilder()
                         .setStorage(storage)
