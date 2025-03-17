@@ -114,20 +114,57 @@ public class RetinaService
         }
     }
 
-    public boolean deleteRecord(String filePath, int rgId, long rowId, long timestamp) throws RetinaException
+    public boolean deleteRecord(long fileId, int rgId, int rgRowId, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.DeleteRecordRequest request = RetinaProto.DeleteRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setFilePath(filePath)
+                .setFileId(fileId)
                 .setRgId(rgId)
-                .setRowId(rowId)
+                .setRgRowId(rgRowId)
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.DeleteRecordResponse response = this.stub.deleteRecord(request);
         if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("failed to delete record: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("response token does not match.");
+        }
+        return true;
+    }
+
+    public boolean deleteRecords(long[] fileIds, int[] rgIds, int[] rgRowIds, long timestamp) throws RetinaException
+    {
+        String token = UUID.randomUUID().toString();
+
+        if (fileIds == null || rgIds == null || rgRowIds == null ||
+            fileIds.length != rgIds.length || rgIds.length != rgRowIds.length)
+        {
+            throw new RetinaException("Invalid input arrays: Length mismatch");
+        }
+
+        RetinaProto.DeleteRecordsRequest.Builder requestBuiler = RetinaProto.DeleteRecordsRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTimestamp(timestamp);
+
+        for (int i = 0; i < fileIds.length; i++)
+        {
+            RetinaProto.RowLocation row = RetinaProto.RowLocation.newBuilder()
+                    .setFileId(fileIds[i])
+                    .setRgId(rgIds[i])
+                    .setRgRowId(rgRowIds[i])
+                    .build();
+            requestBuiler.addRows(row);
+        }
+
+        RetinaProto.DeleteRecordsResponse response = this.stub.deleteRecords(requestBuiler.build());
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("failed to delete records: " + response.getHeader().getErrorCode()
                     + " " + response.getHeader().getErrorMsg());
         }
         if (!response.getHeader().getToken().equals(token))

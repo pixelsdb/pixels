@@ -108,12 +108,12 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void deleteRecord(String filePath, int rgId, long rowId, long timestamp) throws RetinaException
+    public void deleteRecord(long fileId, int rgId, int rgRowId, long timestamp) throws RetinaException
     {
         try
         {
-            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
-            rgVisibility.deleteRecord(rowId, timestamp);
+            RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
+            rgVisibility.deleteRecord(rgRowId, timestamp);
         } catch (Exception e)
         {
             throw new RetinaException("Error while deleting record", e);
@@ -185,11 +185,11 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try 
         {
-            String filePath = request.getFilePath();
+            long fileId = request.getFileId();
             int rgId = request.getRgId();
-            long rowId = request.getRowId();
+            int rgRowId = request.getRgRowId();
             long timestamp = request.getTimestamp();
-            deleteRecord(filePath, rgId, rowId, timestamp);
+            deleteRecord(fileId, rgId, rgRowId, timestamp);
 
             RetinaProto.DeleteRecordResponse response = RetinaProto.DeleteRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
@@ -198,6 +198,37 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         } catch (RetinaException e) {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.DeleteRecordResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void deleteRecords(RetinaProto.DeleteRecordsRequest request,
+                              StreamObserver<RetinaProto.DeleteRecordsResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            long timestamp = request.getTimestamp();
+            for (RetinaProto.RowLocation row : request.getRowsList())
+            {
+                long fileId = row.getFileId();
+                int rgId = row.getRgId();
+                int rgRowId = row.getRgRowId();
+                deleteRecord(fileId, rgId, rgRowId, timestamp);
+            }
+
+            RetinaProto.DeleteRecordsResponse response = RetinaProto.DeleteRecordsResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (RetinaException e) {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.DeleteRecordsResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
             responseObserver.onCompleted();
@@ -338,6 +369,30 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             if (rgVisibility == null)
             {
                 throw new RetinaException("Retina not found for filePath: " + filePath + " and rgId: " + rgId);
+            }
+            return rgVisibility;
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while checking retina", e);
+        }
+    }
+
+    /**
+     * Check if the retina exists for the given filePath and rgId.
+     *
+     * @param fileId the file id.
+     * @param rgId the row group id.
+     * @throws RetinaException if the retina does not exist.
+     */
+    private RGVisibility checkRGVisibility(long fileId, int rgId) throws RetinaException
+    {
+        try
+        {
+            String retinaKey = fileId + "_" + rgId;
+            RGVisibility rgVisibility = this.rgVisibilityMap.get(retinaKey);
+            if (rgVisibility == null)
+            {
+                throw new RetinaException("Retina not found for fileId: " + fileId + " and rgId: " + rgId);
             }
             return rgVisibility;
         } catch (Exception e)
