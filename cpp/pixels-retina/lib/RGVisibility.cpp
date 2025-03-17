@@ -89,15 +89,15 @@ void RGVisibility::collectRGGarbage(uint64_t timestamp) {
     flag.store(flag.load(std::memory_order_acquire) & ~GC_MASK, std::memory_order_release);
 }
 
-TileVisibility* RGVisibility::getTileVisibility(uint64_t rowId) const {
-    uint64_t tileIndex = rowId / VISIBILITY_RECORD_CAPACITY;
+TileVisibility* RGVisibility::getTileVisibility(uint32_t rowId) const {
+    uint32_t tileIndex = rowId / VISIBILITY_RECORD_CAPACITY;
     if (tileIndex >= tileCount) {
         throw std::runtime_error("Row id is out of range.");
     }
     return &tileVisibilities[tileIndex];
 }
 
-void RGVisibility::deleteRGRecord(uint64_t rowId, uint64_t timestamp) {
+void RGVisibility::deleteRGRecord(uint32_t rowId, uint64_t timestamp) {
     try {
         beginRGAccess();
         TileVisibility* tileVisibility = getTileVisibility(rowId);

@@ -37,8 +37,10 @@ import java.util.List;
 public class TestPixelsReaderWithDeletion
 {
     private final static RetinaService retinaService = RetinaService.Instance();
-    // private final static String currentPath = "/home/gengdy/data/tpch/1g/nation/v-0-ordered/20250224025359_12.pxl";
-    private final static String currentPath = "/home/gengdy/data/tpch/1g/nation/v-0-compact/20250224025622_24_compact.pxl";
+    // private final static String currentPath = "/home/gengdy/data/tpch/1g/nation/v-0-ordered/20250314082208_12.pxl";
+    // private final static long currentFileId = 55;
+    private final static String currentPath = "/home/gengdy/data/tpch/1g/nation/v-0-compact/20250314082324_24_compact.pxl";
+    private final static long currentFileId = 67;
     private final static String currentPathUri = "file://" + currentPath;
 
     public static void printRecord(long timestamp)
@@ -56,7 +58,8 @@ public class TestPixelsReaderWithDeletion
             List<String> fieldNames = schema.getFieldNames();
             System.out.println("fieldNames: " + fieldNames);
             String[] cols = new String[fieldNames.size()];
-            for (int i = 0; i < fieldNames.size(); i++) {
+            for (int i = 0; i < fieldNames.size(); i++)
+            {
                 cols[i] = fieldNames.get(i);
             }
 
@@ -71,16 +74,19 @@ public class TestPixelsReaderWithDeletion
             int batchSize = 10000;
 
             VectorizedRowBatch rowBatch;
-            while (true) {
+            while (true)
+            {
                 rowBatch = recordReader.readBatch(batchSize);
                 System.out.println("rowBatch: " + rowBatch);
-                if (rowBatch.endOfFile) {
+                if (rowBatch.endOfFile)
+                {
                     break;
                 }
             }
 
             reader.close();
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             System.out.println("Err path: " + currentPath.toString());
             e.printStackTrace();
         }
@@ -93,10 +99,10 @@ public class TestPixelsReaderWithDeletion
         // delete some records
         try
         {
-            retinaService.deleteRecord(currentPathUri, 0, 5, 5);
-            retinaService.deleteRecord(currentPathUri, 0, 10, 10);
-            retinaService.deleteRecord(currentPathUri, 0, 15, 15);
-            retinaService.deleteRecord(currentPathUri, 0, 20, 20);
+            retinaService.deleteRecord(currentFileId, 0, 5, 5);
+            retinaService.deleteRecord(currentFileId, 0, 10, 10);
+            retinaService.deleteRecord(currentFileId, 0, 15, 15);
+            retinaService.deleteRecord(currentFileId, 0, 20, 20);
         } catch (RetinaException e)
         {
             throw new RuntimeException("Failed to delete records", e);
