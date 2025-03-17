@@ -126,8 +126,8 @@ TEST_F(TileVisibilityTest, GarbageCollect) {
 TEST_F(TileVisibilityTest, MultiThread) {
     struct DeleteRecord {
         uint64_t timestamp;
-        uint64_t rowId;
-        DeleteRecord(uint64_t timestamp, uint64_t rowId) : timestamp(timestamp), rowId(rowId) {}
+        uint32_t rowId;
+        DeleteRecord(uint64_t timestamp, uint32_t rowId) : timestamp(timestamp), rowId(rowId) {}
     };
 
     std::vector<DeleteRecord> deleteHistory;
@@ -185,15 +185,15 @@ TEST_F(TileVisibilityTest, MultiThread) {
         std::random_device rd;
         std::mt19937 gen(rd());
         
-        std::vector<uint64_t> remainingRows;
-        for (uint64_t i = 0; i < 256; i++) {
+        std::vector<uint32_t> remainingRows;
+        for (uint32_t i = 0; i < 256; i++) {
             remainingRows.push_back(i);
         }
 
         while (!remainingRows.empty() && running) {
             std::uniform_int_distribution<size_t> indexDist(0, remainingRows.size() - 1);
             size_t index = indexDist(gen);
-            uint64_t rowId = remainingRows[index];
+            uint32_t rowId = remainingRows[index];
 
             remainingRows[index] = remainingRows.back();
             remainingRows.pop_back();

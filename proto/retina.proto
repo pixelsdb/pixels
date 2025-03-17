@@ -30,68 +30,131 @@ package retina.proto;
 
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
-  rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
-  rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
-  rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
-  rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
-}
-
-// bitmap
-message VisibilityBitmap {
-  repeated uint64 bitmap = 1;
+    rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
+    rpc InsertRecords (InsertRecordsRequest) returns (InsertRecordsResponse);
+    rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
+    rpc DeleteRecords (DeleteRecordsRequest) returns (DeleteRecordsResponse);
+    rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
+    rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
+    rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
 }
 
 // header
 message RequestHeader {
-  string token = 1;
+    string token = 1;
 }
 
 message ResponseHeader {
-  string token = 1;
-  int32 errorCode = 2; // errorCode == 0 means success
-  string errorMsg = 3; // empty if errorCode == 0
+    string token = 1;
+    int32 errorCode = 2;  // errorCode == 0 means success
+    string errorMsg = 3;  // empty if errorCode == 0
 }
 
+message VisibilityBitmap {
+    repeated uint64 bitmap = 1;
+}
+
+message RowLocation {
+    uint64 fileId = 1;   // the id of the file in pixels metadata, starts from 1
+    uint32 rgId = 2;     // the index of the row group inside the file, starts from 0
+    uint32 rgRowId = 3;  // the index of the row index the row group, starts from 0
+}
+
+message ColumnValue {
+    oneof value {
+        bytes bytesVal = 1;
+        string stringVal = 2;
+        string numberVal = 3;
+        bool boolVal = 4;
+    }
+}
+
+message RowValue {
+    repeated ColumnValue values = 1;
+}
+
+message InsertData {
+    string schema = 1;
+    string table = 2;
+    RowValue row = 3;
+}
+
+// insert
+message InsertRecordRequest {
+    RequestHeader header = 1;
+    string schema = 2;
+    string table = 3;
+    RowValue row = 4;
+    uint64 timestamp = 5;
+}
+
+message InsertRecordResponse {
+    ResponseHeader header = 1;
+}
+
+message InsertRecordsRequest {
+    RequestHeader header = 1;
+    repeated InsertData data = 2;
+    uint64 timestamp = 3;
+}
+
+message InsertRecordsResponse {
+    ResponseHeader header = 1;
+}
+
+// delete
 message DeleteRecordRequest {
-  RequestHeader header = 1;
-  string filePath = 2;
-  sint32 rgId = 3;
-  sint64 rowId = 4;
-  sint64 timestamp = 5;
+    RequestHeader header = 1;
+    uint64 fileId = 2;
+    uint32 rgId = 3;
+    uint32 rgRowId = 4;
+    uint64 timestamp = 5;
 }
 
 message DeleteRecordResponse {
-  ResponseHeader header = 1;
+    ResponseHeader header = 1;
 }
 
+message DeleteRecordsRequest {
+    RequestHeader header = 1;
+    repeated RowLocation rows = 2;
+    uint64 timestamp = 3;
+}
+
+message DeleteRecordsResponse {
+    ResponseHeader header = 1;
+}
+
+// visibility
 message AddVisibilityRequest {
-  RequestHeader header = 1;
-  string filePath = 2;
+    RequestHeader header = 1;
+    string filePath = 2;
 }
 
 message AddVisibilityResponse {
-  ResponseHeader header = 1;
+    ResponseHeader header = 1;
 }
 
 message QueryVisibilityRequest {
-  RequestHeader header = 1;
-  string filePath = 2;
-  repeated sint32 rgIds = 3;
-  sint64 timestamp = 4;
+    RequestHeader header = 1;
+    string filePath = 2;
+    repeated uint32 rgIds = 3;
+    uint64 timestamp = 4;
 }
 
 message QueryVisibilityResponse {
-  ResponseHeader header = 1;
-  repeated VisibilityBitmap bitmaps = 2;
+    ResponseHeader header = 1;
+    repeated VisibilityBitmap bitmaps = 2;
 }
 
+// garbage collection
 message GarbageCollectRequest {
-  RequestHeader header = 1;
-  string filePath = 2;
-  repeated sint32 rgIds = 3;
-  sint64 timestamp = 4;
+    RequestHeader header = 1;
+    string filePath = 2;
+    repeated uint32 rgIds = 3;
+    uint64 timestamp = 4;
 }
 
 message GarbageCollectResponse {
-  ResponseHeader header = 1;
+    ResponseHeader header = 1;
 }
