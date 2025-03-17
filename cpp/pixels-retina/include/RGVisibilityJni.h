@@ -29,7 +29,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_destroyNative
  * Signature: (JJJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_deleteRecord
-  (JNIEnv *, jobject, jlong, jlong, jlong);
+  (JNIEnv *, jobject, jint, jlong, jlong);
 
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
