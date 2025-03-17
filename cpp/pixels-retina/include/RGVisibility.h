@@ -29,7 +29,7 @@ public:
     explicit RGVisibility(uint64_t rgRecordNum);
     ~RGVisibility();
 
-    void deleteRGRecord(uint64_t rowId, uint64_t timestamp);
+    void deleteRGRecord(uint32_t rowId, uint64_t timestamp);
     uint64_t* getRGVisibilityBitmap(uint64_t timestamp);
 
     void collectRGGarbage(uint64_t timestamp);
@@ -49,7 +49,7 @@ private:
     const uint64_t tileCount;
     std::atomic<uint32_t> flag; // high 1 byte is the gc flag, low 3 bytes are the access count
 
-    TileVisibility* getTileVisibility(uint64_t rowId) const;
+    TileVisibility* getTileVisibility(uint32_t rowId) const;
     void beginRGAccess();
     void endRGAccess();
 };

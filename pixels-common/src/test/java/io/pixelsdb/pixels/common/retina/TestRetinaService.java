@@ -39,7 +39,8 @@ public class TestRetinaService
      */
     private static final int ROW_COUNT = 150000;
     private static final boolean DEBUG = true;
-    private static final String TEST_FILE = "file:///home/gengdy/data/tpch/1g/customer/v-0-ordered/20250224025327_0.pxl";
+    private static final String TEST_FILE = "file:///home/gengdy/data/tpch/1g/customer/v-0-ordered/20250314082122_0.pxl";
+    private static final long TEST_FILE_ID = 43;
     private static final int TEST_RG_ID = 0;
 
     @Test
@@ -52,9 +53,9 @@ public class TestRetinaService
 
         retinaService.addVisibility(TEST_FILE);
 
-        retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, 5, timestamp1);
-        retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, 10, timestamp1);
-        retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, 15, timestamp2);
+        retinaService.deleteRecord(TEST_FILE_ID, TEST_RG_ID, 5, timestamp1);
+        retinaService.deleteRecord(TEST_FILE_ID, TEST_RG_ID, 10, timestamp1);
+        retinaService.deleteRecord(TEST_FILE_ID, TEST_RG_ID, 15, timestamp2);
         retinaService.garbageCollect(TEST_FILE, new int[]{TEST_RG_ID}, timestamp1);
 
         long[][] bitmaps1 = retinaService.queryVisibility(TEST_FILE, new int[]{TEST_RG_ID}, timestamp1);
@@ -72,9 +73,9 @@ public class TestRetinaService
         class DeleteRecord
         {
             final long timestamp;
-            final long rowId;
+            final int rowId;
 
-            DeleteRecord(long timestamp, long rowId)
+            DeleteRecord(long timestamp, int rowId)
             {
                 this.timestamp = timestamp;
                 this.rowId = rowId;
@@ -111,40 +112,40 @@ public class TestRetinaService
                         expectedBitmap[bitmapIndex] |= (1L << bitOffset);
                     }
                 }
-            }
 
-            for (int i = 0; i < bitmap.length; i++)
-            {
-                if (bitmap[i] != expectedBitmap[i])
+                for (int i = 0; i < bitmap.length; i++)
                 {
-                    if (DEBUG)
+                    if (bitmap[i] != expectedBitmap[i])
                     {
-                        printLock.lock();
-                        try
+                        if (DEBUG)
                         {
-                            System.err.printf("Bitmap verification failed at timestamp %d%n", timestamp);
-                            System.err.printf("Bitmap segment %d (rows %d-%d):%n", i, i * 64, (i * 64 + 63));
-                            System.err.printf("Actual:   %s%n",
-                                    String.format("%64s", Long.toBinaryString(bitmap[i])).replace(' ', '0'));
-                            System.err.printf("Expected: %s%n",
-                                    String.format("%64s", Long.toBinaryString(expectedBitmap[i])).replace(' ', '0'));
-                        } finally
-                        {
-                            printLock.unlock();
+                            printLock.lock();
+                            try
+                            {
+                                System.err.printf("Bitmap verification failed at timestamp %d%n", timestamp);
+                                System.err.printf("Bitmap segment %d (rows %d-%d):%n", i, i * 64, (i * 64 + 63));
+                                System.err.printf("Actual:   %s%n",
+                                        String.format("%64s", Long.toBinaryString(bitmap[i])).replace(' ', '0'));
+                                System.err.printf("Expected: %s%n",
+                                        String.format("%64s", Long.toBinaryString(expectedBitmap[i])).replace(' ', '0'));
+                            } finally
+                            {
+                                printLock.unlock();
+                            }
                         }
+                        fail("Bitmap verification failed at index " + i);
                     }
-                    fail("Bitmap verification failed at index " + i);
                 }
+                verificationCount.incrementAndGet();
             }
-            verificationCount.incrementAndGet();
         };
 
         Thread deleteThread = new Thread(() ->
         {
             long timestamp = 1;
             Random random = new Random();
-            List<Long> remainingRows = new ArrayList<>();
-            for (long i = 0; i < ROW_COUNT; i++)
+            List<Integer> remainingRows = new ArrayList<>();
+            for (int i = 0; i < ROW_COUNT; i++)
             {
                 remainingRows.add(i);
             }
@@ -152,14 +153,14 @@ public class TestRetinaService
             while (!remainingRows.isEmpty() && running.get())
             {
                 int index = random.nextInt(remainingRows.size());
-                long rowId = remainingRows.get(index);
+                int rowId = remainingRows.get(index);
                 remainingRows.remove(index);
 
                 try
                 {
                     synchronized (deleteHistory)
                     {
-                        retinaService.deleteRecord(TEST_FILE, TEST_RG_ID, rowId, timestamp);
+                        retinaService.deleteRecord(TEST_FILE_ID, TEST_RG_ID, rowId, timestamp);
                         deleteHistory.add(new DeleteRecord(timestamp, rowId));
                     }
                     maxTimestamp.set(timestamp);
