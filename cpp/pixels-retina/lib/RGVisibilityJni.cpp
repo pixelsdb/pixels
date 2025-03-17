@@ -58,10 +58,10 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_destroyNative
  * Signature: (JJJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_deleteRecord
-  (JNIEnv* env, jobject, jlong rowId, jlong timestamp, jlong handle) {
+  (JNIEnv* env, jobject, jint rowId, jlong timestamp, jlong handle) {
     try {
         auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
-        rgVisibility->deleteRGRecord(static_cast<uint64_t>(rowId), static_cast<uint64_t>(timestamp));
+        rgVisibility->deleteRGRecord(static_cast<uint32_t>(rowId), static_cast<uint64_t>(timestamp));
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
     }
