@@ -35,6 +35,26 @@
 #include "physical/PhysicalReader.h"
 #include "physical/PhysicalReaderUtil.h"
 #include "PixelsVersion.h"
+#include <arpa/inet.h>
+
+
+// Convert a 64-bit integer from host byte order to network byte order (big-endian).
+long htonll(long value) {
+  // Constant for endianness check
+  const int num = 42;
+  // Check if host is little-endian
+  if (*reinterpret_cast<const char*>(&num) == num) {
+    // Host is little-endian, convert high 32 bits
+    const uint32_t high_part = htonl(static_cast<uint32_t>(value >> 32));
+    // Convert low 32 bits
+    const uint32_t low_part = htonl(static_cast<uint32_t>(value & 0xFFFFFFFFLL));
+    // Reconstruct the converted 64-bit value
+    return (static_cast<long>(low_part) << 32) | high_part;
+  } else {
+    // Host is big-endian, no conversion needed
+    return value;
+  }
+}
 
 const int PixelsWriterImpl::CHUNK_ALIGNMENT = std::stoi(
         ConfigFactory::Instance().getProperty("column.chunk.alignment"));
@@ -295,8 +315,9 @@ void PixelsWriterImpl::writeFileTail()
     fileTail.SerializeToArray(fileTailBuffer->getPointer(), fileTail.ByteSizeLong());
     long tailOffset = physicalWriter->append(fileTailBuffer->getPointer(), 0, fileTail.ByteSizeLong());
     std::cout << "fileTailOffset:" << tailOffset << std::endl;
-    std::shared_ptr <ByteBuffer> tailOffsetBuffer = std::make_shared<ByteBuffer>(8);
-    tailOffsetBuffer->putLong(tailOffset);
+    std::shared_ptr<ByteBuffer> tailOffsetBuffer = std::make_shared<ByteBuffer>(8);
+    long tailOffsetBigEndian = htonll(tailOffset);  // convert To BigEndian
+    tailOffsetBuffer->putLong(tailOffsetBigEndian);
     physicalWriter->append(tailOffsetBuffer);
     writtenBytes += fileTailLen;
     physicalWriter->flush();
