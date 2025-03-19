@@ -3,14 +3,12 @@ package io.pixelsdb.pixels.daemon.sink;
 import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.sink.SinkProvider;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import org.apache.kerby.config.Conf;
 
 import java.util.*;
 public class SinkServer implements Server {
-    private boolean running = false;
     private final SinkProvider sinkProvider;
-    private final ConfigFactory config;
-    public SinkServer(ConfigFactory config) {
-        this.config = config;
+    public SinkServer() {
         ServiceLoader<SinkProvider> sinkProviders = ServiceLoader.load(SinkProvider.class);
         for(SinkProvider sinkProvider: sinkProviders) {
             this.sinkProvider = sinkProvider;
@@ -27,12 +25,11 @@ public class SinkServer implements Server {
 
     @Override
     public void shutdown() {
-        this.running = false;
         sinkProvider.shutdown();
     }
 
     @Override
     public void run() {
-        sinkProvider.start(config);
+        sinkProvider.start(ConfigFactory.Instance());
     }
 }
