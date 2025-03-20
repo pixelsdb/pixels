@@ -60,23 +60,10 @@ message RowLocation {
     uint32 rgRowId = 3;  // the index of the row index the row group, starts from 0
 }
 
-message ColumnValue {
-    oneof value {
-        bytes bytesVal = 1;
-        string stringVal = 2;
-        string numberVal = 3;
-        bool boolVal = 4;
-    }
-}
-
-message RowValue {
-    repeated ColumnValue values = 1;
-}
-
 message InsertData {
     string schema = 1;
     string table = 2;
-    RowValue row = 3;
+    repeated string colValues = 3;
 }
 
 // insert
@@ -84,7 +71,7 @@ message InsertRecordRequest {
     RequestHeader header = 1;
     string schema = 2;
     string table = 3;
-    RowValue row = 4;
+    repeated string colValues = 4;
     uint64 timestamp = 5;
 }
 

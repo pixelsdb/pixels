@@ -29,6 +29,7 @@ import java.io.Serializable;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -442,6 +443,154 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                             type.getKind());
             }
             schema.addField(fieldName, fieldType);
+        }
+        return schema;
+    }
+
+    /**
+     * Based on the column type, create the corresponding schema.
+     * Column types are represented as string types, e.g. "decimal(15, 2)", "varchar(10)".
+     * @param typeNames
+     * @return
+     */
+    public static TypeDescription createSchemaFromStrings(List<String> typeNames)
+    {
+        TypeDescription schema = TypeDescription.createStruct();
+        for (String typeName : typeNames)
+        {
+            typeName = typeName.trim().toLowerCase();
+            TypeDescription fieldType;
+
+            if (typeName.startsWith("decimal"))
+            {
+                Matcher matcher = Pattern.compile("decimal\\((\\d+),(\\d+)\\)").matcher(typeName);
+                if (matcher.matches())
+                {
+                    int precision = Integer.parseInt(matcher.group(1));
+                    int scale = Integer.parseInt(matcher.group(2));
+                    fieldType = TypeDescription.createDecimal(precision, scale);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else if (typeName.startsWith("varchar"))
+            {
+                Matcher matchar = Pattern.compile("varchar\\((\\d+)\\)").matcher(typeName);
+                if (matchar.matches())
+                {
+                    int maxLength = Integer.parseInt(matchar.group(1));
+                    fieldType = TypeDescription.createVarchar(maxLength);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else if (typeName.startsWith("char"))
+            {
+                Matcher matcher = Pattern.compile("char\\((\\d+)\\)").matcher(typeName);
+                if (matcher.matches())
+                {
+                    int maxLength = Integer.parseInt(matcher.group(1));
+                    fieldType = TypeDescription.createChar(maxLength);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else if (typeName.startsWith("varbinary"))
+            {
+                Matcher matcher = Pattern.compile("varbinary\\((\\d+)\\)").matcher(typeName);
+                if (matcher.matches())
+                {
+                    int maxLength = Integer.parseInt(matcher.group(1));
+                    fieldType = TypeDescription.createVarbinary(maxLength);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else if (typeName.startsWith("binary"))
+            {
+                Matcher matcher = Pattern.compile("binary\\((\\d+)\\)").matcher(typeName);
+                if (matcher.matches())
+                {
+                    int maxLength = Integer.parseInt(matcher.group(1));
+                    fieldType = TypeDescription.createBinary(maxLength);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else if (typeName.startsWith("time"))
+            {
+                Matcher matcher = Pattern.compile("time\\((\\d+)\\)").matcher(typeName);
+                if (matcher.matches())
+                {
+                    int precision = Integer.parseInt(matcher.group(1));
+                    fieldType = TypeDescription.createTime(precision);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else if (typeName.startsWith("timestamp"))
+            {
+                Matcher matcher = Pattern.compile("timestamp\\((\\d+)\\)").matcher(typeName);
+                if (matcher.matches())
+                {
+                    int precision = Integer.parseInt(matcher.group(1));
+                    fieldType = TypeDescription.createTimestamp(precision);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else if (typeName.startsWith("vector") || typeName.startsWith("array"))
+            {
+                Matcher matcher = Pattern.compile("(vector|array)\\((\\d+)\\)").matcher(typeName);
+                if (matcher.matches())
+                {
+                    int dimension = Integer.parseInt(matcher.group(1));
+                    fieldType = TypeDescription.createVector(dimension);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else
+            {
+                switch (typeName)
+                {
+                    case "boolean":
+                        fieldType = TypeDescription.createBoolean();
+                        break;
+                    case "tinyint":
+                    case "byte":
+                        fieldType = TypeDescription.createByte();
+                        break;
+                    case "smallint":
+                    case "short":
+                        fieldType = TypeDescription.createShort();
+                        break;
+                    case "integer":
+                    case "int":
+                        fieldType = TypeDescription.createInt();
+                        break;
+                    case "bigint":
+                    case "long":
+                        fieldType = TypeDescription.createLong();
+                        break;
+                    case "float":
+                    case "real":
+                        fieldType = TypeDescription.createFloat();
+                        break;
+                    case "double":
+                        fieldType = TypeDescription.createDouble();
+                        break;
+                    case "string":
+                        fieldType = TypeDescription.createString();
+                        break;
+                    case "date":
+                        fieldType = TypeDescription.createDate();
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            }
+            schema.addField(typeName, fieldType);
         }
         return schema;
     }

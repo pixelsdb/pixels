@@ -29,9 +29,9 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
-public class WriterBufferRecordReader implements PixelsRecordReader
+public class PixelsWriterBufferRecordReader implements PixelsRecordReader
 {
-    private static final Logger logger = LogManager.getLogger(WriterBufferRecordReader.class);
+    private static final Logger logger = LogManager.getLogger(PixelsWriterBufferRecordReader.class);
 
     private final TypeDescription schema;
     private VectorizedRowBatch rowBatch;
@@ -44,7 +44,7 @@ public class WriterBufferRecordReader implements PixelsRecordReader
     private boolean isValid = true;
     private boolean isEndOfFile = false;
 
-    public WriterBufferRecordReader(TypeDescription schema)
+    public PixelsWriterBufferRecordReader(TypeDescription schema)
     {
         this.schema = schema;
         this.rowBatch = schema.createRowBatchWithHiddenColumn();
