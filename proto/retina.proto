@@ -63,7 +63,7 @@ message RowLocation {
 message InsertData {
     string schema = 1;
     string table = 2;
-    repeated string colValues = 3;
+    repeated bytes colValues = 3;
 }
 
 // insert
@@ -71,7 +71,7 @@ message InsertRecordRequest {
     RequestHeader header = 1;
     string schema = 2;
     string table = 3;
-    repeated string colValues = 4;
+    repeated bytes colValues = 4;
     uint64 timestamp = 5;
 }
 
