@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -48,7 +49,7 @@ public class PixelsWriterBuffer
     private static final Logger logger = LogManager.getLogger(PixelsWriterBuffer.class);
 
     private final TypeDescription schema;
-    
+
     //
     private final VectorizedRowBatch buffer1;
     private final VectorizedRowBatch buffer2;
@@ -63,7 +64,7 @@ public class PixelsWriterBuffer
     private final AtomicInteger buffer1RowCount;
     private final AtomicInteger buffer2RowCount;
 
-    private final int pixelsStride;
+    private final int pixelStride;
     private final int rowGroupSize;
     private final long blockSize;
     private final short replication;
@@ -73,24 +74,18 @@ public class PixelsWriterBuffer
 
     private final ExecutorService flushExecutor;
 
-    private PixelsWriterBuffer(
-            TypeDescription schema,
-            int pixelStride,
-            int rowGroupSize,
-            long blockSize,
-            short replication,
-            EncodingLevel encodingLevel,
-            boolean nullsPadding,
-            int maxBufferSize)
+    public PixelsWriterBuffer(TypeDescription schema)
     {
         this.schema = schema;
-        this.pixelsStride = pixelStride;
-        this.rowGroupSize = rowGroupSize;
-        this.blockSize = blockSize;
-        this.replication = replication;
-        this.encodingLevel = encodingLevel;
-        this.nullsPadding = nullsPadding;
-        this.maxBufferSize = maxBufferSize;
+
+        ConfigFactory configFactory = ConfigFactory.Instance();
+        this.pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
+        this.rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
+        this.blockSize = Long.parseLong(configFactory.getProperty("block.size"));
+        this.replication = Short.parseShort(configFactory.getProperty("block.replication"));
+        this.encodingLevel = EncodingLevel.from(Integer.parseInt(configFactory.getProperty("retina.buffer.flush.encodingLevel")));
+        this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
+        this.maxBufferSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
 
         this.buffer1 = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
         this.buffer2 = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
@@ -106,94 +101,6 @@ public class PixelsWriterBuffer
             t.setDaemon(true);
             return t;
         });
-    }
-
-    public static class Builder
-    {
-        private TypeDescription builderSchema;
-        private int builderPixelStride = 0;
-        private int builderRowGroupSize = 0;
-        private long builderBlockSize = DEFAULT_HDFS_BLOCK_SIZE;
-        private short builderReplication = 3;
-        private EncodingLevel builderEncodingLevel = EncodingLevel.EL0;
-        private boolean builderNullsPadding = false;
-        private int builderMaxBufferSize;
-        
-        private Builder()
-        {
-        }
-
-        public Builder setSchema(TypeDescription schema)
-        {
-            this.builderSchema = schema;
-            return this;
-        }
-
-        public Builder setPixelStride(int stride)
-        {
-            if (stride % 8 != 0)
-            {
-                logger.warn("Pixel stride is recommended to be multiple of 8 for better performance");
-            }
-            this.builderPixelStride = stride;
-            return this;
-        }
-
-        public Builder setRowGroupSize(int rowGroupSize)
-        {
-            this.builderRowGroupSize = rowGroupSize;
-            return this;
-        }
-
-        public Builder setBlockSize(long blockSize)
-        {
-            checkArgument(blockSize > 0, "block size should be positive");
-            this.builderBlockSize = blockSize;
-            return this;
-        }
-
-        public Builder setReplication(short replication)
-        {
-            checkArgument(replication > 0, "num of replicas should be positive");
-            this.builderReplication = replication;
-            return this;
-        }
-
-        public Builder setNullsPadding(boolean nullsPadding)
-        {
-            this.builderNullsPadding = nullsPadding;
-            return this;
-        }
-
-        public Builder setEncodingLevel(EncodingLevel encodingLevel)
-        {
-            this.builderEncodingLevel = encodingLevel;
-            return this;
-        }
-        
-        public Builder setMaxBufferSize(int maxBufferSize)
-        {
-            this.builderMaxBufferSize = maxBufferSize;
-            return this;
-        }
-
-        public PixelsWriterBuffer build() throws Exception
-        {
-            return new PixelsWriterBuffer(
-                builderSchema,
-                builderPixelStride,
-                builderRowGroupSize,
-                builderBlockSize,
-                builderReplication,
-                builderEncodingLevel,
-                builderNullsPadding,
-                builderMaxBufferSize);
-        };
-    }
-
-    public static Builder newBuilder()
-    {
-        return new Builder();
     }
 
     public boolean addRow(String[] values, long timestamp)
@@ -306,7 +213,7 @@ public class PixelsWriterBuffer
             PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
                     .setSchema(schema)
                     .setHasHiddenColumn(true)
-                    .setPixelStride(pixelsStride)
+                    .setPixelStride(pixelStride)
                     .setRowGroupSize(rowGroupSize)
                     .setStorage(targetStorage)
                     .setPath(targetFilePath)
