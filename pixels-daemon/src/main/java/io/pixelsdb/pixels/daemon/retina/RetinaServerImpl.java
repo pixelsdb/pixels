@@ -189,11 +189,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
             List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnTypes);
-            PixelsWriterBuffer pixelsWriterBuffer = PixelsWriterBuffer.newBuilder()
-                    .setSchema(schema)
-                    .setPixelStride(1)
-                    .setBlockSize(1)
-                    .build();
+            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema);
             String writerBufferKey = schemaName + "_" + tableName;
             pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
         } catch (Exception e)
