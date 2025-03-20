@@ -23,21 +23,16 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
 
 import java.io.IOException;
-import java.io.Writer;
-import java.lang.reflect.Type;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.checkerframework.checker.units.qual.A;
 
-import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
@@ -48,14 +43,11 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
-public class WriterBuffer
+public class PixelsWriterBuffer
 {
-    private static final Logger logger = LogManager.getLogger(WriterBuffer.class);
+    private static final Logger logger = LogManager.getLogger(PixelsWriterBuffer.class);
 
-    // 
     private final TypeDescription schema;
-    private final String schemaName;
-    private final String tableName;
     
     //
     private final VectorizedRowBatch buffer1;
@@ -81,10 +73,8 @@ public class WriterBuffer
 
     private final ExecutorService flushExecutor;
 
-    private WriterBuffer(
+    private PixelsWriterBuffer(
             TypeDescription schema,
-            String schemaName,
-            String tableName,
             int pixelStride,
             int rowGroupSize,
             long blockSize,
@@ -94,8 +84,6 @@ public class WriterBuffer
             int maxBufferSize)
     {
         this.schema = schema;
-        this.schemaName = schemaName;
-        this.tableName = tableName;
         this.pixelsStride = pixelStride;
         this.rowGroupSize = rowGroupSize;
         this.blockSize = blockSize;
@@ -114,7 +102,7 @@ public class WriterBuffer
         this.buffer2RowCount = new AtomicInteger(0);
 
         this.flushExecutor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "WriterBuffer-Flush-" + schemaName + "." + tableName);
+            Thread t = new Thread(r, "pixelsWriterBuffer");
             t.setDaemon(true);
             return t;
         });
@@ -123,8 +111,6 @@ public class WriterBuffer
     public static class Builder
     {
         private TypeDescription builderSchema;
-        private String builderSchemaName;
-        private String builderTableName;
         private int builderPixelStride = 0;
         private int builderRowGroupSize = 0;
         private long builderBlockSize = DEFAULT_HDFS_BLOCK_SIZE;
@@ -137,21 +123,9 @@ public class WriterBuffer
         {
         }
 
-        private Builder setSchema(TypeDescription schema)
+        public Builder setSchema(TypeDescription schema)
         {
             this.builderSchema = schema;
-            return this;
-        }
-
-        private Builder setSchemaName(String schemaName)
-        {
-            this.builderSchemaName = schemaName;
-            return this;
-        }
-
-        private Builder setTableName(String tableName)
-        {
-            this.builderTableName = tableName;
             return this;
         }
 
@@ -203,12 +177,10 @@ public class WriterBuffer
             return this;
         }
 
-        public WriterBuffer build() throws Exception
+        public PixelsWriterBuffer build() throws Exception
         {
-            return new WriterBuffer(
+            return new PixelsWriterBuffer(
                 builderSchema,
-                builderSchemaName,
-                builderTableName,
                 builderPixelStride,
                 builderRowGroupSize,
                 builderBlockSize,
@@ -217,6 +189,11 @@ public class WriterBuffer
                 builderNullsPadding,
                 builderMaxBufferSize);
         };
+    }
+
+    public static Builder newBuilder()
+    {
+        return new Builder();
     }
 
     public boolean addRow(String[] values, long timestamp)

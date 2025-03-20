@@ -29,6 +29,8 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
+import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.retina.PixelsWriterBuffer;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import io.pixelsdb.pixels.retina.RGVisibility;
 import io.pixelsdb.pixels.retina.RetinaProto;
@@ -56,6 +58,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
+    private final Map<String, PixelsWriterBuffer> pixelsWriterBufferMap;
 
     /**
      * Initialize the visibility management for all the records.
@@ -64,6 +67,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         this.metadataService = MetadataService.Instance();
         this.rgVisibilityMap = new ConcurrentHashMap<>();
+        this.pixelsWriterBufferMap = new ConcurrentHashMap<>();
         try
         {
             boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
@@ -100,6 +104,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     {
                         addVisibility(filePath);
                     }
+
+                    addWriterBuffer(schema.getName(), table.getName());
                 }
             }
         } catch (Exception e)
@@ -173,6 +179,26 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             rgVisibility.garbageCollect(timestamp);
         } catch (Exception e) {
             throw new RetinaException("Error while garbage collecting", e);
+        }
+    }
+
+    public void addWriterBuffer(String schemaName, String tableName) throws RetinaException
+    {
+        try
+        {
+            List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
+            List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
+            TypeDescription schema = TypeDescription.createSchemaFromStrings(columnTypes);
+            PixelsWriterBuffer pixelsWriterBuffer = PixelsWriterBuffer.newBuilder()
+                    .setSchema(schema)
+                    .setPixelStride(1)
+                    .setBlockSize(1)
+                    .build();
+            String writerBufferKey = schemaName + "_" + tableName;
+            pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while adding writer buffer", e);
         }
     }
     
