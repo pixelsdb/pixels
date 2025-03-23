@@ -25,9 +25,6 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
@@ -41,7 +38,6 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 public class PixelsWriterBuffer
@@ -159,11 +155,12 @@ public class PixelsWriterBuffer
             }
 
             activeBufferRowCount++;
+            activeBuffer.size++;
             for (int i = 0; i < values.length; ++i)
             {
                 this.activeBuffer.cols[i].add(new String(values[i]));
             }
-            this.activeBuffer.cols[columnCount - 1].add(timestamp);
+            this.activeBuffer.cols[columnCount].add(timestamp);
         }
         return true;
     }
@@ -218,6 +215,11 @@ public class PixelsWriterBuffer
         {
             synchronized (bufferLock)
             {
+                if (immutableBuffer != null)
+                {
+                    writer.addRowBatch(immutableBuffer);
+                    immutableBuffer.reset();
+                }
                 writer.close();
                 writer = null;
                 totalRowsWritten = 0;
@@ -240,6 +242,20 @@ public class PixelsWriterBuffer
     {
         try
         {
+            synchronized (bufferLock)
+            {
+                if (immutableBuffer != null)
+                {
+                    writer.addRowBatch(immutableBuffer);
+                    immutableBuffer.reset();
+                }
+                if (activeBuffer != null)
+                {
+                    writer.addRowBatch(activeBuffer);
+                    activeBuffer.reset();
+                }
+                writer.close();
+            }
             flushExecutor.shutdown();
             try
             {
