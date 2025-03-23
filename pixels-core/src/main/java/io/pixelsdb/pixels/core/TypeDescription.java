@@ -450,15 +450,18 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
     /**
      * Based on the column type, create the corresponding schema.
      * Column types are represented as string types, e.g. "decimal(15, 2)", "varchar(10)".
+     * @param fieldNames
      * @param typeNames
      * @return
      */
-    public static TypeDescription createSchemaFromStrings(List<String> typeNames)
+    public static TypeDescription createSchemaFromStrings(List<String> fieldNames ,List<String> typeNames)
     {
+        checkArgument(fieldNames.size() == typeNames.size(),
+                "field name and type names must have the same length");
         TypeDescription schema = TypeDescription.createStruct();
-        for (String typeName : typeNames)
+        for (int i = 0; i < fieldNames.size(); i++)
         {
-            typeName = typeName.trim().toLowerCase();
+            String typeName = typeNames.get(i).trim().toLowerCase();
             TypeDescription fieldType;
 
             if (typeName.startsWith("decimal"))
@@ -590,7 +593,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                         throw new IllegalArgumentException("Unknown type: " + typeName);
                 }
             }
-            schema.addField(typeName, fieldType);
+            schema.addField(fieldNames.get(i), fieldType);
         }
         return schema;
     }
