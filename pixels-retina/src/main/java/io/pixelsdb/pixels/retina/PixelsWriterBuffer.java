@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.retina;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
@@ -34,6 +33,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
@@ -48,22 +48,11 @@ public class PixelsWriterBuffer
 {
     private static final Logger logger = LogManager.getLogger(PixelsWriterBuffer.class);
 
+    // Column information is recorded to create rowBatch.
     private final TypeDescription schema;
 
-    //
-    private final VectorizedRowBatch buffer1;
-    private final VectorizedRowBatch buffer2;
-
-    private final AtomicReference<VectorizedRowBatch> activeBuffer;
-
-    // 
-    private final AtomicBoolean buffer1Active;
-    private final AtomicBoolean buffer1Immutable;
-    private final AtomicBoolean buffer2Immutable;
-
-    private final AtomicInteger buffer1RowCount;
-    private final AtomicInteger buffer2RowCount;
-
+    // PixelsWriter and its configuration information
+    private PixelsWriter writer;
     private final int pixelStride;
     private final int rowGroupSize;
     private final long blockSize;
@@ -71,31 +60,44 @@ public class PixelsWriterBuffer
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
     private final int maxBufferSize;
+    private final String targetOrderedDirPath;
+    private final String targetCompactDirPath;
+    private final Storage targetOrderedStorage;
+    private final Storage targetCompactStorage;
 
+    // double writer buffer
+    private VectorizedRowBatch activeBuffer;
+    private VectorizedRowBatch immutableBuffer = null;
+    private int activeBufferRowCount = 0;
+    private long totalRowsWritten = 0;
+
+    // Backend Flush
     private final ExecutorService flushExecutor;
+    private final Object bufferLock = new Object();
 
-    public PixelsWriterBuffer(TypeDescription schema)
+    public PixelsWriterBuffer(TypeDescription schema, String targetOrderedDirPath, String targetCompactDirPath) throws RetinaException
     {
         this.schema = schema;
 
         ConfigFactory configFactory = ConfigFactory.Instance();
         this.pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         this.rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
+        this.targetOrderedDirPath = targetOrderedDirPath;
+        this.targetCompactDirPath = targetCompactDirPath;
+        try
+        {
+            this.targetOrderedStorage = StorageFactory.Instance().getStorage(targetOrderedDirPath);
+            this.targetCompactStorage = StorageFactory.Instance().getStorage(targetCompactDirPath);
+        } catch (Exception e)
+        {
+            throw new RetinaException("Failed to get storage" + e);
+        }
         this.blockSize = Long.parseLong(configFactory.getProperty("block.size"));
         this.replication = Short.parseShort(configFactory.getProperty("block.replication"));
         this.encodingLevel = EncodingLevel.from(Integer.parseInt(configFactory.getProperty("retina.buffer.flush.encodingLevel")));
         this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
         this.maxBufferSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
-
-        this.buffer1 = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
-        this.buffer2 = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
-        this.activeBuffer = new AtomicReference<>(buffer1);
-        this.buffer1Active = new AtomicBoolean(true);
-        this.buffer1Immutable = new AtomicBoolean(false);
-        this.buffer2Immutable = new AtomicBoolean(false);
-        this.buffer1RowCount = new AtomicInteger(0);
-        this.buffer2RowCount = new AtomicInteger(0);
-
+        this.activeBuffer = this.schema.createRowBatchWithHiddenColumn(this.pixelStride, TypeDescription.Mode.NONE);
         this.flushExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "pixelsWriterBuffer");
             t.setDaemon(true);
@@ -103,159 +105,141 @@ public class PixelsWriterBuffer
         });
     }
 
-    public boolean addRow(String[] values, long timestamp)
+    /**
+     * values is all column values, add values and timestamp into buffer
+     * @param values
+     * @param timestamp
+     * @return
+     */
+    public boolean addRow(byte[][] values, long timestamp)
     {
-        checkArgument(values.length == schema.getChildren().size(),
+        int columnCount = schema.getChildren().size();
+        checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
-
-        VectorizedRowBatch buffer = activeBuffer.get();
-        AtomicInteger rowCount = (buffer == buffer1) ? buffer1RowCount : buffer2RowCount;
-        AtomicBoolean immutable = (buffer == buffer1) ? buffer1Immutable : buffer2Immutable;
-
-        if (immutable.get() || rowCount.get() >= maxBufferSize) {
-            if (!switchBuffer()) {
-                return false;
+        synchronized (bufferLock)
+        {
+            if (writer == null)
+            {
+                try
+                {
+                    createNewWriter();
+                } catch (RetinaException e)
+                {
+                    throw new RuntimeException("Failed to create new writer", e);
+                }
             }
 
-            buffer = activeBuffer.get();
-            rowCount = (buffer == buffer1) ? buffer1RowCount : buffer2RowCount;
-            immutable = (buffer == buffer1) ? buffer1Immutable : buffer2Immutable;
-        }
+            // active buffer is full
+            if (activeBufferRowCount >= pixelStride)
+            {
+                while (immutableBuffer != null)
+                {
+                    try
+                    {
+                        bufferLock.wait();
+                    } catch (InterruptedException e)
+                    {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                }
 
-        int rowIndex = rowCount.getAndIncrement();
-
-        if (rowIndex >= maxBufferSize) {
-            rowCount.decrementAndGet();
-            return false;
-        }
-
-        ColumnVector[] columnVectors = buffer.cols;
-        for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null) {
-                columnVectors[i].noNulls = false;
-                columnVectors[i].isNull[rowIndex] = true;
-            } else {
-                columnVectors[i].add(values[i]);
+                immutableBuffer = activeBuffer;
+                activeBuffer = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
+                activeBufferRowCount = 0;
+                flushExecutor.submit(() -> {
+                   try
+                   {
+                       flushBuffer(immutableBuffer);
+                   } catch (IOException e)
+                   {
+                       logger.error("Failed to flush buffer", e);
+                   }
+                });
             }
+
+            activeBufferRowCount++;
+            for (int i = 0; i < values.length; ++i)
+            {
+                this.activeBuffer.cols[i].add(new String(values[i]));
+            }
+            this.activeBuffer.cols[columnCount - 1].add(timestamp);
         }
-
-        columnVectors[columnVectors.length - 1].isNull[rowIndex] = false;
-        columnVectors[columnVectors.length - 1].add(timestamp);
-
-        buffer.size = Math.max(buffer.size, rowIndex + 1);
-
-        if (rowCount.get() >= maxBufferSize) {
-            switchBuffer();
-        }
-
         return true;
     }
-    
-    private boolean switchBuffer()
+
+    private void createNewWriter() throws RetinaException
     {
-        boolean isBuffer1Active = buffer1Active.get();
-        VectorizedRowBatch currentBuffer = isBuffer1Active ? buffer1 : buffer2;
-        AtomicBoolean currentImmutable = isBuffer1Active ? buffer1Immutable : buffer2Immutable;
-        AtomicInteger currentRowCount = isBuffer1Active ? buffer1RowCount : buffer2RowCount;
-
-        // current buffer is still available
-        if (!currentImmutable.get() && currentRowCount.get() < maxBufferSize) {
-            return true;
+        if (writer != null)
+        {
+            throw new RetinaException("Writer already exists");
         }
-
-        AtomicBoolean otherImmutable = isBuffer1Active ? buffer2Immutable : buffer1Immutable;
-        if (otherImmutable.get()) {
-            return false; // another buffer is not available
-        }
-
-        currentImmutable.set(true);
-
-        VectorizedRowBatch newBuffer = isBuffer1Active ? buffer2 : buffer1;
-        activeBuffer.set(newBuffer);
-        buffer1Active.set(!isBuffer1Active);
-
-        final VectorizedRowBatch bufferToFlush = currentBuffer;
-        final boolean isBuffer1 = isBuffer1Active;
-
-        flushExecutor.submit(() -> {
-            try 
-            {
-                flushBuffer(bufferToFlush, isBuffer1);
-            } catch (IOException e) 
-            {
-                logger.error("Failed to flush buffer ", e);
-            }
-        });
-
-        return true;
-    }
-    
-    private void flushBuffer(VectorizedRowBatch buffer, boolean isBuffer1) throws IOException
-    {
-        if (buffer.size == 0) {
-            if (isBuffer1) {
-                buffer1Immutable.set(false);
-                buffer1RowCount.set(0);
-            } else {
-                buffer1Immutable.set(false);
-                buffer1RowCount.set(0);
-            }
-            return;
-        }
-
-        try {
-            String targetDirPath = "";
+        try
+        {
             String targetFileName = DateUtil.getCurTime() + ".pxl";
-            String targetFilePath = targetDirPath + targetFileName;
-
-            Storage targetStorage = StorageFactory.Instance().getStorage(targetDirPath);
-
-            PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
-                    .setSchema(schema)
+            String targetFilePath = targetOrderedDirPath + targetFileName;
+            writer = PixelsWriterImpl.newBuilder()
+                    .setSchema(this.schema)
                     .setHasHiddenColumn(true)
-                    .setPixelStride(pixelStride)
-                    .setRowGroupSize(rowGroupSize)
-                    .setStorage(targetStorage)
+                    .setPixelStride(this.pixelStride)
+                    .setRowGroupSize(this.rowGroupSize)
+                    .setStorage(this.targetOrderedStorage)
                     .setPath(targetFilePath)
-                    .setBlockSize(blockSize)
-                    .setReplication(replication)
+                    .setBlockSize(this.blockSize)
+                    .setReplication(this.replication)
                     .setBlockPadding(true)
-                    .setEncodingLevel(encodingLevel)
-                    .setNullsPadding(nullsPadding)
+                    .setEncodingLevel(this.encodingLevel)
+                    .setNullsPadding(this.nullsPadding)
                     .setCompressionBlockSize(1)
                     .build();
-
-            pixelsWriter.addRowBatch(buffer);
-            pixelsWriter.close();
-
-            buffer.reset();
-            if (isBuffer1) {
-                buffer1Immutable.set(false);
-                buffer1RowCount.set(0);
-            } else {
-                buffer2Immutable.set(false);
-                buffer1RowCount.set(0);
-            }
-        } catch (Exception e) {
-            logger.error("Failed to flush buffer ", e);
-            throw new IOException("Failed to flush buffer ", e);
+        } catch (Exception e)
+        {
+            throw new RetinaException("Failed to create new writer", e);
         }
     }
-    
+
+    /*
+     * flush buffer into disk file
+     * if size is up maxbuffersize, close writer(will write file into disk) and create a new writer
+     */
+    private void flushBuffer(VectorizedRowBatch buffer) throws IOException
+    {
+        writer.addRowBatch(buffer);
+        totalRowsWritten += this.pixelStride;
+
+        synchronized (bufferLock)
+        {
+            buffer.reset();
+            immutableBuffer = null;
+            bufferLock.notifyAll();
+        }
+
+        if (totalRowsWritten >= maxBufferSize)
+        {
+            synchronized (bufferLock)
+            {
+                writer.close();
+                writer = null;
+                totalRowsWritten = 0;
+                try
+                {
+                    createNewWriter();
+                } catch (RetinaException e)
+                {
+                    throw new IOException("Failed to create new writer", e);
+                }
+            }
+        }
+    }
+
+    /**
+     * collect resouces
+     * @throws IOException
+     */
     public void close() throws IOException
     {
         try
         {
-            if (buffer1RowCount.get() > 0 && !buffer1Immutable.getAndSet(true))
-            {
-                flushBuffer(buffer1, true);
-            }
-    
-            if (buffer2RowCount.get() > 0 && !buffer2Immutable.getAndSet(true))
-            {
-                flushBuffer(buffer2, false);
-            }
-
             flushExecutor.shutdown();
             try
             {

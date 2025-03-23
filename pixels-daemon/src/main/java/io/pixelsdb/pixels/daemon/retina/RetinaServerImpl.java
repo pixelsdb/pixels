@@ -109,7 +109,12 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         addVisibility(filePath);
                     }
 
-                    addWriterBuffer(schema.getName(), table.getName());
+                    Layout latestLayout = this.metadataService.getLatestLayout(schema.getName(), table.getName());
+                    List<Path> orderedPaths = latestLayout.getOrderedPaths();
+                    validateOrderedOrCompactPaths(orderedPaths);
+                    List<Path> compactPaths = latestLayout.getCompactPaths();
+                    validateOrderedOrCompactPaths(compactPaths);
+                    addWriterBuffer(schema.getName(), table.getName(), orderedPaths.get(0).getUri(), compactPaths.get(0).getUri());
                 }
             }
         } catch (Exception e)
@@ -186,14 +191,14 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void addWriterBuffer(String schemaName, String tableName) throws RetinaException
+    public void addWriterBuffer(String schemaName, String tableName, String orderedDirPath, String compactDirPath) throws RetinaException
     {
         try
         {
             List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
             List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnTypes);
-            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema);
+            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema, orderedDirPath, compactDirPath);
             String writerBufferKey = schemaName + "_" + tableName;
             pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
         } catch (Exception e)
