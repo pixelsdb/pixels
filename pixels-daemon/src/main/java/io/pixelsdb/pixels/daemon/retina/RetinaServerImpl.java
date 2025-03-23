@@ -86,17 +86,21 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         {
                             if (orderedEnabled)
                             {
-                                String[] orderedPaths = layout.getOrderedPathUris();
+                                List<Path> orderedPaths = layout.getOrderedPaths();
                                 validateOrderedOrCompactPaths(orderedPaths);
-                                Storage storage = StorageFactory.Instance().getStorage(orderedPaths[0]);
-                                files.addAll(storage.listPaths(orderedPaths));
+                                List<File> orderedFiles = this.metadataService.getFiles(orderedPaths.get(0).getId());
+                                files.addAll(orderedFiles.stream()
+                                        .map(file -> orderedPaths.get(0).getUri() + "/" + file.getName())
+                                        .collect(Collectors.toList()));
                             }
                             if (compactEnabled)
                             {
-                                String[] compactPaths = layout.getCompactPathUris();
+                                List<Path> compactPaths = layout.getCompactPaths();
                                 validateOrderedOrCompactPaths(compactPaths);
-                                Storage storage = StorageFactory.Instance().getStorage(compactPaths[0]);
-                                files.addAll(storage.listPaths(compactPaths));
+                                List<File> compactFiles = this.metadataService.getFiles(compactPaths.get(0).getId());
+                                files.addAll(compactFiles.stream()
+                                        .map(file -> compactPaths.get(0).getUri() + "/" + file.getName())
+                                        .collect(Collectors.toList()));
                             }
                         }
                     }
@@ -356,16 +360,17 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
      *
      * @param paths the order or compact paths from pixels metadata.
      */
-    public static void validateOrderedOrCompactPaths(String[] paths)
+    public static void validateOrderedOrCompactPaths(List<Path> paths)
     {
         requireNonNull(paths, "paths is null");
-        checkArgument(paths.length > 0, "paths must contain at least one valid directory");
-        try 
+        checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
+        try
         {
-            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths[0]);
-            for (int i = 1; i < paths.length; ++i) 
+            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths.get(0).getUri());
+            assert firstScheme != null;
+            for (int i = 1; i < paths.size(); ++i)
             {
-                Storage.Scheme scheme = Storage.Scheme.fromPath(paths[i]);
+                Storage.Scheme scheme = Storage.Scheme.fromPath(paths.get(i).getUri());
                 checkArgument(firstScheme.equals(scheme),
                         "all the directories in the paths must have the same storage scheme");
             }
@@ -373,7 +378,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             throw new RuntimeException("failed to parse storage scheme from paths", e);
         }
     }
-    
+
     /**
      * Check if the retina exists for the given filePath and rgId.
      * 
