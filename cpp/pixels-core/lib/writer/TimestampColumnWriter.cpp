@@ -17,3 +17,55 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
+#include "writer/TimestampColumnWriter.h"
+#include "utils/BitUtils.h"
+
+TimestampColumnWriter::TimestampColumnWriter(std::shared_ptr<TypeDescription> type, std::shared_ptr<PixelsWriterOption> writerOption) :
+ColumnWriter(type, writerOption)
+{
+
+}
+
+int TimestampColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
+{
+    // std::cout<<"In TimestampColumnWriter"<<std::endl;
+    auto columnVector = std::static_pointer_cast<TimestampColumnVector>(vector);
+
+    if (!columnVector)
+    {
+        throw std::invalid_argument("Invalid vector type");
+    }
+
+    long* values = columnVector->times;
+    EncodingUtils encodingUtils;
+
+    for (int i = 0; i < size; i++) {
+        isNull[curPixelIsNullIndex] = columnVector->isNull[i];
+        curPixelEleIndex++;
+
+        if (columnVector->isNull[i]) {
+            hasNull = true;
+            encodingUtils.writeLongLE(outputStream, 0L);
+        }
+        else {
+            if (byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN) {
+                encodingUtils.writeLongLE(outputStream, values[i]);
+            }
+            else {
+                encodingUtils.writeLongBE(outputStream, values[i]);
+            }
+        }
+
+        if (curPixelEleIndex >= pixelStride) {
+            newPixel();
+        }
+    }
+    return outputStream->getWritePos();
+}
+
+bool TimestampColumnWriter::decideNullsPadding(std::shared_ptr<PixelsWriterOption> writerOption)
+{
+    return writerOption->isNullsPadding();
+}
+

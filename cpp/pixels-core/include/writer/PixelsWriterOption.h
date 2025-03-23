@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author gengdy
- * @create 2024-11-25
- */
+//
+// Created by gengdy on 24-11-25.
+//
+
 #ifndef PIXELS_PIXELSWRITEROPTION_H
 #define PIXELS_PIXELSWRITEROPTION_H
 
@@ -29,23 +29,15 @@
 #include <memory>
 #include "physical/natives/ByteOrder.h"
 
-class PixelsWriterOption : public std::enable_shared_from_this<PixelsWriterOption>
-{
+class PixelsWriterOption : public std::enable_shared_from_this<PixelsWriterOption> {
 public:
     PixelsWriterOption();
-
     int getPixelsStride() const;
-
-    std::shared_ptr <PixelsWriterOption> setPixelsStride(int pixelsStride);
-
+    std::shared_ptr<PixelsWriterOption> setPixelsStride(int pixelsStride);
     EncodingLevel getEncodingLevel() const;
-
-    std::shared_ptr <PixelsWriterOption> setEncodingLevel(EncodingLevel encodingLevel);
-
+    std::shared_ptr<PixelsWriterOption> setEncodingLevel(EncodingLevel encodingLevel);
     bool isNullsPadding() const;
-
-    std::shared_ptr <PixelsWriterOption> setNullsPadding(bool nullsPadding);
-
+    std::shared_ptr<PixelsWriterOption> setNullsPadding(bool nullsPadding);
 private:
     int pixelsStride;
     EncodingLevel encodingLevel;
@@ -56,7 +48,6 @@ private:
     ByteOrder byteOrder{ByteOrder::PIXELS_LITTLE_ENDIAN};
 public:
     ByteOrder getByteOrder() const;
-
     void setByteOrder(ByteOrder byte_order);
 };
 #endif //PIXELS_PIXELSWRITEROPTION_H

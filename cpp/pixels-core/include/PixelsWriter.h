@@ -18,28 +18,26 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author gengdy
- * @create 2024-11-25
- */
+//
+// Created by gengdy on 24-11-25.
+//
+
 #ifndef PIXELS_PIXELSWRITER_H
 #define PIXELS_PIXELSWRITER_H
 
 #include "TypeDescription.h"
 
-class PixelsWriter
-{
+class PixelsWriter {
 public:
 
     virtual ~PixelsWriter() = default;
-
     /**
      * Add row batch into the file that is not hash partitioned.
      *
      * @param rowBatch the row batch to be written.
      * @return if the file adds a new row group, returns false. Otherwise, returns true.
      */
-    virtual bool addRowBatch(std::shared_ptr <VectorizedRowBatch> rowBatch) = 0;
+    virtual bool addRowBatch(std::shared_ptr<VectorizedRowBatch> rowBatch) = 0;
 
     virtual void close() = 0;
 

@@ -61,6 +61,8 @@ namespace duckdb
 
         TableFilterSet *filters;
 
+        atomic<idx_t> cur_file_index;
+
         idx_t MaxThreads() const override
         {
             return max_threads;

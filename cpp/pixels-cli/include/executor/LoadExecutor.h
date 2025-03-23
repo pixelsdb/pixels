@@ -24,18 +24,21 @@
  */
 #ifndef PIXELS_LOADEXECUTOR_H
 #define PIXELS_LOADEXECUTOR_H
-
 #include <executor/CommandExecutor.h>
 #include <vector>
 #include <load/Parameters.h>
+#include <map>
+#include <string>
 
 class LoadExecutor : public CommandExecutor
 {
 public:
-    void execute(const bpo::variables_map &ns, const std::string &command) override;
+  // Execute the load command with parsed options
+  void execute(const std::map<std::string, std::string>& options, const std::string& command) override;
 
 private:
-    bool startConsumers(const std::vector <std::string> &inputFiles, Parameters parameters,
-                        const std::vector <std::string> &loadedFiles);
+  // Start consumers to process input files
+  bool startConsumers(const std::vector<std::string>& inputFiles, Parameters parameters,
+                      const std::vector<std::string>& loadedFiles);
 };
 #endif //PIXELS_LOADEXECUTOR_H

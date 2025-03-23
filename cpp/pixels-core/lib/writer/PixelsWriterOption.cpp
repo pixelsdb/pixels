@@ -18,55 +18,46 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author gengdy
- * @create 2024-11-25
- */
+//
+// Created by gengdy on 24-11-25.
+//
+
 #include "writer/PixelsWriterOption.h"
 #include <iostream>
 
-PixelsWriterOption::PixelsWriterOption()
-{}
+PixelsWriterOption::PixelsWriterOption() {}
 
-int PixelsWriterOption::getPixelsStride() const
-{
+int PixelsWriterOption::getPixelsStride() const {
     return this->pixelsStride;
 }
 
-std::shared_ptr <PixelsWriterOption> PixelsWriterOption::setPixelsStride(int pixelsStride)
-{
+std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setPixelsStride(int pixelsStride) {
     this->pixelsStride = pixelsStride;
     return shared_from_this();
 }
 
-EncodingLevel PixelsWriterOption::getEncodingLevel() const
-{
+EncodingLevel PixelsWriterOption::getEncodingLevel() const {
     return this->encodingLevel;
 }
 
-std::shared_ptr <PixelsWriterOption> PixelsWriterOption::setEncodingLevel(EncodingLevel encodingLevel)
-{
+std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setEncodingLevel(EncodingLevel encodingLevel) {
     this->encodingLevel = encodingLevel;
     return shared_from_this();
 }
 
-bool PixelsWriterOption::isNullsPadding() const
-{
+bool PixelsWriterOption::isNullsPadding() const {
     return this->nullsPadding;
 }
 
-std::shared_ptr <PixelsWriterOption> PixelsWriterOption::setNullsPadding(bool nullsPadding)
-{
+std::shared_ptr<PixelsWriterOption> PixelsWriterOption::setNullsPadding(bool nullsPadding) {
     this->nullsPadding = nullsPadding;
     return shared_from_this();
 }
 
-ByteOrder PixelsWriterOption::getByteOrder() const
-{
+ByteOrder PixelsWriterOption::getByteOrder() const {
     return byteOrder;
 }
 
-void PixelsWriterOption::setByteOrder(ByteOrder byte_order)
-{
+void PixelsWriterOption::setByteOrder(ByteOrder byte_order) {
     byteOrder = byte_order;
 }

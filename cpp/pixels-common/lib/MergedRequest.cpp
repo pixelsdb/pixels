@@ -1,31 +1,10 @@
-/*
- * Copyright 2023 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
+//
+// Created by yuly on 01.05.23.
+//
 
-/*
- * @author liyu
- * @create 2023-05-01
- */
 #include "physical/MergedRequest.h"
 
-std::shared_ptr <MergedRequest> MergedRequest::merge(Request curr)
-{
+std::shared_ptr<MergedRequest> MergedRequest::merge(Request curr) {
     if (curr.start < this->end)
     {
         throw InvalidArgumentException("MergedRequest: Can not merge backward request.");
@@ -35,8 +14,7 @@ std::shared_ptr <MergedRequest> MergedRequest::merge(Request curr)
         throw InvalidArgumentException("MergedRequest: Can not merge requests from different queries (transactions).");
     }
     long gap = curr.start - this->end;
-    if (gap <= maxGap && this->length + gap + curr.length <= std::numeric_limits<int>::max())
-    {
+    if(gap <= maxGap && this->length + gap + curr.length <= std::numeric_limits<int>::max()) {
         this->offsets.emplace_back(this->length + (int) gap);
         this->lengths.emplace_back(curr.length);
         this->length += gap + curr.length;
@@ -47,8 +25,7 @@ std::shared_ptr <MergedRequest> MergedRequest::merge(Request curr)
     return std::make_shared<MergedRequest>(curr);
 }
 
-MergedRequest::MergedRequest(Request first)
-{
+MergedRequest::MergedRequest(Request first) {
     this->queryId = first.queryId;
     this->start = first.start;
     this->end = first.start + first.length;
@@ -60,11 +37,9 @@ MergedRequest::MergedRequest(Request first)
 }
 
 // when the data has been read, split the merged buffer to original buffer
-std::vector <std::shared_ptr<ByteBuffer>> MergedRequest::complete(std::shared_ptr <ByteBuffer> buffer)
-{
-    std::vector <std::shared_ptr<ByteBuffer>> bbs;
-    for (int i = 0; i < this->size; i++)
-    {
+std::vector<std::shared_ptr<ByteBuffer>> MergedRequest::complete(std::shared_ptr<ByteBuffer> buffer) {
+    std::vector<std::shared_ptr<ByteBuffer>> bbs;
+    for(int i = 0; i < this->size; i++) {
         auto bb = std::make_shared<ByteBuffer>(*buffer,
                                                offsets.at(i),
                                                lengths.at(i));
@@ -73,23 +48,19 @@ std::vector <std::shared_ptr<ByteBuffer>> MergedRequest::complete(std::shared_pt
     return bbs;
 }
 
-long MergedRequest::getStart()
-{
+long MergedRequest::getStart() {
     return start;
 }
 
-int MergedRequest::getLength()
-{
+int MergedRequest::getLength() {
     return length;
 }
 
-int MergedRequest::getSize()
-{
+int MergedRequest::getSize() {
     return size;
 }
 
-long MergedRequest::getQueryId()
-{
+long MergedRequest::getQueryId() {
     return queryId;
 }
 

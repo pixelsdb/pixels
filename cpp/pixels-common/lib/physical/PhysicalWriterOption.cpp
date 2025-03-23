@@ -18,45 +18,38 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author gengdy
- * @create 2024-11-25
- */
+//
+// Created by gengdy on 24-11-25.
+//
+
 #include "physical/PhysicalWriterOption.h"
 
 PhysicalWriterOption::PhysicalWriterOption(std::int64_t blockSize, bool addBlockPadding, bool overwrite)
-        : blockSize(blockSize), addBlockPadding(addBlockPadding), overwrite(overwrite)
-{}
+    : blockSize(blockSize), addBlockPadding(addBlockPadding), overwrite(overwrite) {}
 
-std::int64_t PhysicalWriterOption::getBlockSize() const
-{
+std::int64_t PhysicalWriterOption::getBlockSize() const {
     return blockSize;
 }
 
-std::shared_ptr <PhysicalWriterOption> PhysicalWriterOption::setBlockSize(std::int64_t blockSize)
-{
+std::shared_ptr<PhysicalWriterOption> PhysicalWriterOption::setBlockSize(std::int64_t blockSize) {
     this->blockSize = blockSize;
     return shared_from_this();
 }
 
-bool PhysicalWriterOption::isAddBlockPadding() const
-{
+bool PhysicalWriterOption::isAddBlockPadding() const {
     return addBlockPadding;
 }
 
-std::shared_ptr <PhysicalWriterOption> PhysicalWriterOption::setAddBlockPadding(bool addBlockPadding)
-{
+std::shared_ptr<PhysicalWriterOption> PhysicalWriterOption::setAddBlockPadding(bool addBlockPadding) {
     this->addBlockPadding = addBlockPadding;
     return shared_from_this();
 }
 
-bool PhysicalWriterOption::isOverwrite() const
-{
+bool PhysicalWriterOption::isOverwrite() const {
     return overwrite;
 }
 
-std::shared_ptr <PhysicalWriterOption> PhysicalWriterOption::setOverwrite(bool overwrite)
-{
+std::shared_ptr<PhysicalWriterOption> PhysicalWriterOption::setOverwrite(bool overwrite) {
     this->overwrite = overwrite;
     return shared_from_this();
 }

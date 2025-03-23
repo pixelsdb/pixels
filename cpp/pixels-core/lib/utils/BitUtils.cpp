@@ -18,21 +18,20 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author whz
- * @create 2024-11-27
- */
+//
+// Created by whz on 11/27/24.
+//
 #include <stdexcept>
 #include "utils/BitUtils.h"
 
-std::vector <uint8_t> BitUtils::bitWiseCompactLE(std::vector<bool> values)
+std::vector<uint8_t> BitUtils::bitWiseCompactLE(std::vector<bool> values)
 {
     return bitWiseCompactLE(values, values.size());
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompactLE(std::vector<bool> values, int length)
+std::vector<uint8_t> BitUtils::bitWiseCompactLE(std::vector<bool> values, int length)
 {
-    std::vector <uint8_t> bitWiseOutput;
+    std::vector<uint8_t> bitWiseOutput;
     int currBit = 0;
     uint8_t current = 0;
 
@@ -58,14 +57,14 @@ std::vector <uint8_t> BitUtils::bitWiseCompactLE(std::vector<bool> values, int l
     return bitWiseOutput; // Return the compacted byte vector
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompactBE(std::vector<bool> values)
+std::vector<uint8_t> BitUtils::bitWiseCompactBE(std::vector<bool> values)
 {
     return bitWiseCompactBE(values, values.size());
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompactBE(std::vector<bool> values, int length)
+std::vector<uint8_t> BitUtils::bitWiseCompactBE(std::vector<bool> values, int length)
 {
-    std::vector <uint8_t> bitWiseOutput;
+    std::vector<uint8_t> bitWiseOutput;
     int bitsLeft = 8;
     uint8_t current = 0;
 
@@ -91,7 +90,7 @@ std::vector <uint8_t> BitUtils::bitWiseCompactBE(std::vector<bool> values, int l
     return bitWiseOutput;
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompact(bool *values, int length, ByteOrder byteOrder)
+std::vector<uint8_t> BitUtils::bitWiseCompact(bool *values, int length, ByteOrder byteOrder)
 {
     if (byteOrder == ByteOrder::PIXELS_BIG_ENDIAN)
     {
@@ -103,14 +102,14 @@ std::vector <uint8_t> BitUtils::bitWiseCompact(bool *values, int length, ByteOrd
     }
 }
 
-std::vector <uint8_t> bitWiseCompactLE(bool *values, int length)
+std::vector<uint8_t> bitWiseCompactLE(bool *values, int length)
 {
     if (!values || length < 0)
     {
         throw std::runtime_error("Invalid input: values must not be null and length must be non-negative.");
     }
 
-    std::vector <uint8_t> bitWiseOutput;
+    std::vector<uint8_t> bitWiseOutput;
     int currBit = 0;
     uint8_t current = 0;
 
@@ -136,14 +135,14 @@ std::vector <uint8_t> bitWiseCompactLE(bool *values, int length)
     return bitWiseOutput; // Return the compacted byte vector
 }
 
-std::vector <uint8_t> bitWiseCompactBE(bool *values, int length)
+std::vector<uint8_t> bitWiseCompactBE(bool *values, int length)
 {
     if (values == nullptr || length < 0)
     {
         throw std::runtime_error("Invalid input: values must not be null and length must be non-negative.");
     }
 
-    std::vector <uint8_t> bitWiseOutput;
+    std::vector<uint8_t> bitWiseOutput;
     int bitsLeft = 8;
     uint8_t current = 0;
 
@@ -169,12 +168,12 @@ std::vector <uint8_t> bitWiseCompactBE(bool *values, int length)
     return bitWiseOutput;
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompact(std::vector<bool> values, ByteOrder byteOrder)
+std::vector<uint8_t> BitUtils::bitWiseCompact(std::vector<bool> values, ByteOrder byteOrder)
 {
     return bitWiseCompact(values, values.size(), byteOrder);
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompact(std::vector<bool> values, int length, ByteOrder byteOrder)
+std::vector<uint8_t> BitUtils::bitWiseCompact(std::vector<bool> values, int length, ByteOrder byteOrder)
 {
     if (byteOrder == ByteOrder::PIXELS_BIG_ENDIAN)
     {
@@ -186,7 +185,7 @@ std::vector <uint8_t> BitUtils::bitWiseCompact(std::vector<bool> values, int len
     }
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompact(std::vector <uint8_t> values, int length, ByteOrder byteOrder)
+std::vector<uint8_t> BitUtils::bitWiseCompact(std::vector<uint8_t> values, int length, ByteOrder byteOrder)
 {
     if (byteOrder == ByteOrder::PIXELS_BIG_ENDIAN)
     {
@@ -198,9 +197,9 @@ std::vector <uint8_t> BitUtils::bitWiseCompact(std::vector <uint8_t> values, int
     }
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompactBE(std::vector <uint8_t> values, int length)
+std::vector<uint8_t> BitUtils::bitWiseCompactBE(std::vector<uint8_t> values, int length)
 {
-    std::vector <uint8_t> bitWiseOutput;
+    std::vector<uint8_t> bitWiseOutput;
     // Issue #99: remove to improve performance.
     // int bitsToWrite = 1;
     int bitsLeft = 8;
@@ -226,9 +225,9 @@ std::vector <uint8_t> BitUtils::bitWiseCompactBE(std::vector <uint8_t> values, i
     return bitWiseOutput;
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompactLE(std::vector <uint8_t> values, int length)
+std::vector<uint8_t> BitUtils::bitWiseCompactLE(std::vector<uint8_t> values, int length)
 {
-    std::vector <uint8_t> bitWiseOutput;
+    std::vector<uint8_t> bitWiseOutput;
     int currBit = 0;
     uint8_t current = 0;
 
@@ -253,14 +252,14 @@ std::vector <uint8_t> BitUtils::bitWiseCompactLE(std::vector <uint8_t> values, i
     return bitWiseOutput;
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompactLE(bool *values, int length)
+std::vector<uint8_t> BitUtils::bitWiseCompactLE(bool *values, int length)
 {
     if (!values || length < 0)
     {
         throw std::runtime_error("Invalid input: values must not be null and length must be non-negative.");
     }
 
-    std::vector <uint8_t> bitWiseOutput;
+    std::vector<uint8_t> bitWiseOutput;
     int currBit = 0;
     uint8_t current = 0;
 
@@ -286,14 +285,14 @@ std::vector <uint8_t> BitUtils::bitWiseCompactLE(bool *values, int length)
     return bitWiseOutput; // Return the compacted byte vector
 }
 
-std::vector <uint8_t> BitUtils::bitWiseCompactBE(bool *values, int length)
+std::vector<uint8_t> BitUtils::bitWiseCompactBE(bool *values, int length)
 {
     if (values == nullptr || length < 0)
     {
         throw std::runtime_error("Invalid input: values must not be null and length must be non-negative.");
     }
 
-    std::vector <uint8_t> bitWiseOutput;
+    std::vector<uint8_t> bitWiseOutput;
     int bitsLeft = 8;
     uint8_t current = 0;
 

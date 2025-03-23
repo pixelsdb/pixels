@@ -43,12 +43,14 @@ namespace duckdb
                                  const GlobalTableFunctionState *global_state)
     {
         auto &bind_data = (PixelsReadBindData & ) * bind_data_p;
+        auto &gstate=global_state->Cast<PixelsReadGlobalState>();
+
+
         if (bind_data.files.empty())
         {
             return 100.0;
         }
-        auto percentage = bind_data.curFileId * 100.0 / bind_data.files.size();
-        return percentage;
+        return 100.0* static_cast<double>(gstate.cur_file_index) / static_cast<double>(bind_data.files.size());
     }
 
     static unique_ptr <NodeStatistics> PixelsCardinality(ClientContext &context, const FunctionData *bind_data)
@@ -214,7 +216,6 @@ namespace duckdb
     unique_ptr <GlobalTableFunctionState> PixelsScanFunction::PixelsScanInitGlobal(
             ClientContext &context, TableFunctionInitInput &input)
     {
-
         auto &bind_data = (PixelsReadBindData & ) * input.bind_data;
 
         auto result = make_uniq<PixelsReadGlobalState>();
@@ -236,6 +237,7 @@ namespace duckdb
         result->batch_index = 0;
 
         result->filters = input.filters.get();
+        result->cur_file_index=0;
 
         return std::move(result);
     }
@@ -300,6 +302,9 @@ namespace duckdb
                     break;
                     //        case TypeDescription::STRING:
                     //            break;
+                case TypeDescription::STRING:
+                    return_types.emplace_back(LogicalType::VARCHAR);
+                    break;
                 case TypeDescription::DATE:
                     return_types.emplace_back(LogicalType::DATE);
                     break;
@@ -430,6 +435,7 @@ namespace duckdb
                     //            break;
                 case TypeDescription::VARCHAR:
                 case TypeDescription::CHAR:
+                case TypeDescription::STRING:
                 {
                     auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
                     Vector vector(LogicalType::VARCHAR,
@@ -489,6 +495,7 @@ namespace duckdb
             return false;
         }
 
+        parallel_state.cur_file_index++;
         scan_data.curr_file_index = scan_data.next_file_index;
         scan_data.curr_batch_index = scan_data.next_batch_index;
         scan_data.next_file_index = parallel_state.file_index.at(scan_data.deviceID);

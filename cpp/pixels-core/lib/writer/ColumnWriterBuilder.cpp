@@ -18,18 +18,19 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author whz
- * @create 2024-11-29
- */
+//
+// Created by whz on 24-11-29.
+//
+//#include "writer/ColumnWriterBuilder.h"
 #include "writer/ColumnWriterBuilder.h"
 #include "writer/IntegerColumnWriter.h"
+#include "writer/DateColumnWriter.h"
+#include "writer/TimestampColumnWriter.h"
+#include "writer/DecimalColumnWriter.h"
+#include "writer/StringColumnWriter.h"
 
-std::shared_ptr <ColumnWriter> ColumnWriterBuilder::newColumnWriter(std::shared_ptr <TypeDescription> type,
-                                                                    std::shared_ptr <PixelsWriterOption> writerOption)
-{
-    switch (type->getCategory())
-    {
+std::shared_ptr<ColumnWriter> ColumnWriterBuilder::newColumnWriter(std::shared_ptr<TypeDescription> type, std::shared_ptr<PixelsWriterOption> writerOption) {
+    switch(type->getCategory()) {
         case TypeDescription::SHORT:
         case TypeDescription::INT:
         case TypeDescription::LONG:
@@ -44,7 +45,7 @@ std::shared_ptr <ColumnWriter> ColumnWriterBuilder::newColumnWriter(std::shared_
         case TypeDescription::DOUBLE:
             break;
         case TypeDescription::STRING:
-            break;
+            return std::make_shared<StringColumnWriter>(type, writerOption);
         case TypeDescription::TIME:
             break;
         case TypeDescription::VARBINARY:
@@ -53,9 +54,14 @@ std::shared_ptr <ColumnWriter> ColumnWriterBuilder::newColumnWriter(std::shared_
             break;
         case TypeDescription::STRUCT:
             break;
+        case TypeDescription::DATE:
+            return std::make_shared<DateColumnWriter>(type, writerOption);
+        case TypeDescription::TIMESTAMP:
+            return std::make_shared<TimestampColumnWriter>(type, writerOption);
+        case TypeDescription::DECIMAL:
+            return std::make_shared<DecimalColumnWriter>(type, writerOption);
         default:
-            throw InvalidArgumentException(
-                    "bad column type in ColumnReaderBuilder: " + std::to_string(type->getCategory()));
+            throw InvalidArgumentException("bad column type in ColumnWriterBuilder: " + std::to_string(type->getCategory()));
     }
     return std::shared_ptr<ColumnWriter>();
 }

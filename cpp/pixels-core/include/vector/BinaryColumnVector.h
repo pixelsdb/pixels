@@ -1,27 +1,7 @@
-/*
- * Copyright 2023 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
+//
+// Created by liyu on 3/17/23.
+//
 
-/*
- * @author liyu
- * @create 2023-03-17
- */
 #ifndef PIXELS_BINARYCOLUMNVECTOR_H
 #define PIXELS_BINARYCOLUMNVECTOR_H
 
@@ -48,10 +28,11 @@
  * though that use is probably not typical.
  */
 
-class BinaryColumnVector : public ColumnVector
-{
+class BinaryColumnVector: public ColumnVector {
 public:
-    duckdb::string_t *vector;
+    duckdb::string_t * vector;
+
+    std::vector<std::string> str_vec;
 
     /**
     * Use this constructor by default. All column vectors
@@ -59,8 +40,7 @@ public:
     */
     explicit BinaryColumnVector(uint64_t len = VectorizedRowBatch::DEFAULT_SIZE, bool encoding = false);
 
-    ~BinaryColumnVector();
-
+	~BinaryColumnVector();
     /**
      * Set a field by reference.
      *
@@ -69,12 +49,15 @@ public:
      * @param start      start byte position within source
      * @param length     length of source byte sequence
      */
-    void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
-
-    void *current() override;
-
+    void setRef(int elementNum, uint8_t * const & sourceBuf, int start, int length);
+    void * current() override;
     void close() override;
-
     void print(int rowCount) override;
+
+    void add(std::string& value) override;
+    void add(uint8_t* v,int length);
+    //void setVal(int elemnetNum,uint8_t* sourceBuf);
+    void setVal(int elementNum, uint8_t* sourceBuf, int start, int length);
+    void ensureSize(uint64_t size, bool preserveData) override;
 };
 #endif //PIXELS_BINARYCOLUMNVECTOR_H

@@ -1,37 +1,13 @@
-/*
- * Copyright 2024 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
+//
+// Created by liyu on 1/24/24.
+//
 
-/*
- * @author liyu
- * @create 2024-01-24
- */
 #include "utils/ColumnSizeCSVReader.h"
 
-int ColumnSizeCSVReader::get(const std::string &columnName)
-{
-    if (!colSize.count(columnName))
-    {
+int ColumnSizeCSVReader::get(const std::string & columnName) {
+    if (!colSize.count(columnName)) {
         throw InvalidArgumentException("ColumnSizeCSVReader::get: wrong column name!");
-    }
-    else
-    {
+    } else {
         return colSize[columnName];
     }
 }

@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author gengdy
- * @create 2024-11-25
- */
+//
+// Created by gengdy on 24-11-25.
+//
+
 #ifndef PIXELS_PHYSICALWRITER_H
 #define PIXELS_PHYSICALWRITER_H
 
@@ -30,11 +30,9 @@
 #include "physical/natives/ByteBuffer.h"
 
 
-class PhysicalWriter
-{
+class PhysicalWriter {
 public:
     virtual ~PhysicalWriter() = default;
-
     /**
      * Prepare the writer to ensure the length can fit into current block.
      *
@@ -43,7 +41,6 @@ public:
      * due to the specified length cannot fit into current block.
      */
     virtual std::int64_t prepare(int length) = 0;
-
     /**
      * Append content to the file.
      *
@@ -53,19 +50,16 @@ public:
      * @return start offset of content in the file.
      */
     virtual std::int64_t append(const uint8_t *buffer, int offset, int length) = 0;
-
     /**
      * Append content to the file.
      * @param buffer content buffer
      * @return start offset of content in the file
      */
-    virtual std::int64_t append(std::shared_ptr <ByteBuffer> byteBuffer) = 0;
-
+     virtual std::int64_t append(std::shared_ptr<ByteBuffer> byteBuffer) =0 ;
     /**
      * Close writer.
      */
     virtual void close() = 0;
-
     /**
      * Flush writer.
      */

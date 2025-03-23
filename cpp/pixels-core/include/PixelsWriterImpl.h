@@ -18,10 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author gengdy
- * @create 2024-11-25
- */
+//
+// Created by gengdy on 24-11-25.
+//
+
 #ifndef PIXELS_PIXELSWRITERIMPL_H
 #define PIXELS_PIXELSWRITERIMPL_H
 
@@ -37,21 +37,15 @@
 #include <unicode/unistr.h>
 #include <unicode/locid.h>
 
-class PixelsWriterImpl : public PixelsWriter
-{
+class PixelsWriterImpl : public PixelsWriter {
 public:
-    PixelsWriterImpl(std::shared_ptr <TypeDescription> schema, int pixelsStride, int rowGroupSize,
+    PixelsWriterImpl(std::shared_ptr<TypeDescription> schema, int pixelsStride, int rowGroupSize,
                      const std::string &targetFilePath, int blockSize, bool blockPadding,
-                     EncodingLevel encodingLevel, bool nullsPadding, bool partitioned, int compressionBlockSize);
-
-    bool addRowBatch(std::shared_ptr <VectorizedRowBatch> rowBatch) override;
-
-    void writeColumnVectors(std::vector <std::shared_ptr<ColumnVector>> &columnVectors, int rowBatchSize);
-
+                     EncodingLevel encodingLevel, bool nullsPadding,bool partitioned, int compressionBlockSize);
+    bool addRowBatch(std::shared_ptr<VectorizedRowBatch> rowBatch) override;
+    void writeColumnVectors(std::vector<std::shared_ptr<ColumnVector>> &columnVectors, int rowBatchSize);
     void writeRowGroup();
-
     void writeFileTail();
-
     void close() override;
 
 private:
@@ -62,16 +56,16 @@ private:
     /**
      * The byte buffer padded to each column chunk for alignment.
      */
-    static const std::vector <uint8_t> CHUNK_PADDING_BUFFER;
+    static const std::vector<uint8_t> CHUNK_PADDING_BUFFER;
 
-    std::shared_ptr <TypeDescription> schema;
+    std::shared_ptr<TypeDescription> schema;
     int rowGroupSize;
     pixels::proto::CompressionKind compressionKind;
     int compressionBlockSize;
     // std::unique_ptr<icu::TimeZone> timeZone;
-    std::shared_ptr <PixelsWriterOption> columnWriterOption;
-    std::vector <std::shared_ptr<ColumnWriter>> columnWriters;
-    std::vector <StatsRecorder> fileColStatRecorders;
+    std::shared_ptr<PixelsWriterOption> columnWriterOption;
+    std::vector<std::shared_ptr<ColumnWriter>> columnWriters;
+    std::vector<StatsRecorder> fileColStatRecorders;
     std::int64_t fileContentLength;
     int fileRowNum;
     std::int64_t writtenBytes = 0;
@@ -82,10 +76,10 @@ private:
     bool haseValueIsSet = false;
     int currHashValue = 0;
     bool partitioned;
-    std::vector <pixels::proto::RowGroupInformation> rowGroupInfoList;
-    std::vector <pixels::proto::RowGroupStatistic> rowGroupStatisticList;
-    std::shared_ptr <PhysicalWriter> physicalWriter;
-    std::vector <std::shared_ptr<TypeDescription>> children;
+    std::vector<pixels::proto::RowGroupInformation> rowGroupInfoList;
+    std::vector<pixels::proto::RowGroupStatistic> rowGroupStatisticList;
+    std::shared_ptr<PhysicalWriter> physicalWriter;
+    std::vector<std::shared_ptr<TypeDescription>> children;
 
 };
 #endif //PIXELS_PIXELSWRITERIMPL_H

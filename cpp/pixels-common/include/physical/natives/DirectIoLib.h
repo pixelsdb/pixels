@@ -1,27 +1,7 @@
-/*
- * Copyright 2023 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
+//
+// Created by yuly on 19.04.23.
+//
 
-/*
- * @author liyu
- * @create 2023-04-19
- */
 #ifndef DUCKDB_DIRECTIOLIB_H
 #define DUCKDB_DIRECTIOLIB_H
 
@@ -44,32 +24,25 @@
 #include "liburing/io_uring.h"
 
 
-struct uringData
-{
-    int idx;
-    ByteBuffer *bb;
+struct uringData {
+	int idx;
+	ByteBuffer * bb;
 };
 
 
-class DirectIoLib
-{
+class DirectIoLib {
 public:
-    /**
+	/**
      * the start address/size of direct buffer is the multiple of block Size
-     */
-    DirectIoLib(int fsBlockSize);
-
-    std::shared_ptr <ByteBuffer> allocateDirectBuffer(long size);
-
-    std::shared_ptr <ByteBuffer> read(int fd, long fileOffset, std::shared_ptr <ByteBuffer> directBuffer, long length);
-
-    long blockStart(long value);
-
-    long blockEnd(long value);
-
+	 */
+	DirectIoLib(int fsBlockSize);
+	std::shared_ptr<ByteBuffer> allocateDirectBuffer(long size);
+	std::shared_ptr<ByteBuffer> read(int fd, long fileOffset, std::shared_ptr<ByteBuffer> directBuffer, long length);
+	long blockStart(long value);
+	long blockEnd(long value);
 private:
-    int fsBlockSize;
-    long fsBlockNotMask;
+	int fsBlockSize;
+	long fsBlockNotMask;
 };
 
 #endif // DUCKDB_DIRECTIOLIB_H

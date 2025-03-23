@@ -62,7 +62,12 @@ set(pixels_core_cxx
         lib/writer/TimestampColumnWriter.cpp
         lib/writer/DateColumnWriter.cpp
         include/writer/DateColumnWriter.h
-        )
+        include/utils/DynamicIntArray.h
+        lib/utils/DynamicIntArray.cpp
+        lib/writer/StringColumnWriter.cpp
+        lib/utils/Endianness.cpp
+        include/utils/Endianness.h
+)
 
 add_library(pixels-core ${pixels_core_cxx})
 
@@ -76,3 +81,4 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/../pixels-common/liburing/src/in
 include_directories(../pixels-common/include)
 include_directories(include)
 include_directories(include/writer)
+include_directories(../pixels_duckdb/src/include)

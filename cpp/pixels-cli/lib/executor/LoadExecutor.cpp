@@ -30,49 +30,63 @@
 #include <chrono>
 #include <load/PixelsConsumer.h>
 
-void LoadExecutor::execute(const bpo::variables_map &ns, const std::string &command)
+void LoadExecutor::execute(const std::map<std::string, std::string>& options, const std::string& command)
 {
-    std::string schema = ns["schema"].as<std::string>();
-    std::string origin = ns["origin"].as<std::string>();
-    std::string target = ns["target"].as<std::string>();
-    int rowNum = ns["row_num"].as<int>();
-    std::string regex = ns["row_regex"].as<std::string>();
-    EncodingLevel encodingLevel = EncodingLevel::from(ns["encoding_level"].as<int>());
-    bool nullPadding = ns["nulls_padding"].as<bool>();
+  // Extract parameters from the options map
+  // schema s
+  std::string schema = options.at("s");
+  // origin o
+  std::string origin = options.at("o");
+  // target t
+  std::string target = options.at("t");
+  // row_num n
+  int rowNum = std::stoi(options.at("n"));
+  // row_regex r
+  std::string regex = options.at("r");
+  // encoding_level e (default value: 2)
+  int encodingLevelValue = options.count("e") ? std::stoi(options.at("e")) : 2;
+  EncodingLevel encodingLevel = EncodingLevel::from(encodingLevelValue);
+  // null_padding p (default value: false)
+  bool nullPadding = options.count("p") ? options.at("p") == "true" : false;
 
-    if (origin.back() != '/')
-    {
-        origin += "/";
-    }
+  // Ensure origin path ends with '/'
+  if (origin.back() != '/')
+  {
+    origin += "/";
+  }
 
-    Parameters parameters(schema, rowNum, regex, target, encodingLevel, nullPadding);
-    LocalFS localFs;
-    std::vector <std::string> fileList = localFs.listPaths(origin);
-    std::vector <std::string> inputFiles, loadedFiles;
-    for (auto filePath: fileList)
-    {
-        inputFiles.push_back(localFs.ensureSchemePrefix(filePath));
-    }
+  // Create Parameters object
+  Parameters parameters(schema, rowNum, regex, target, encodingLevel, nullPadding);
 
-    auto startTime = std::chrono::system_clock::now();
-    if (startConsumers(inputFiles, parameters, loadedFiles))
-    {
-        std::cout << command << " is successful" << std::endl;
-    }
-    else
-    {
-        std::cout << command << " failed" << std::endl;
-    }
-    auto endTime = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsedSeconds = endTime - startTime;
-    std::cout << "Text file in " << origin << " are loaded by 1 thread in "
-              << elapsedSeconds.count() << " seconds." << std::endl;
+  // List files in the origin directory
+  LocalFS localFs;
+  std::vector<std::string> fileList = localFs.listPaths(origin);
+  std::vector<std::string> inputFiles, loadedFiles;
+  for (const auto& filePath : fileList)
+  {
+    inputFiles.push_back(localFs.ensureSchemePrefix(filePath));
+  }
+
+  // Start processing files
+  auto startTime = std::chrono::system_clock::now();
+  if (startConsumers(inputFiles, parameters, loadedFiles))
+  {
+    std::cout << command << " is successful" << std::endl;
+  }
+  else
+  {
+    std::cout << command << " failed" << std::endl;
+  }
+  auto endTime = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsedSeconds = endTime - startTime;
+  std::cout << "Text files in " << origin << " are loaded by 1 thread in "
+            << elapsedSeconds.count() << " seconds." << std::endl;
 }
 
-bool LoadExecutor::startConsumers(const std::vector <std::string> &inputFiles, Parameters parameters,
-                                  const std::vector <std::string> &loadedFiles)
+bool LoadExecutor::startConsumers(const std::vector<std::string>& inputFiles, Parameters parameters,
+                                  const std::vector<std::string>& loadedFiles)
 {
-    PixelsConsumer consumer(inputFiles, parameters, loadedFiles);
-    consumer.run();
-    return true;
+  PixelsConsumer consumer(inputFiles, parameters, loadedFiles);
+  consumer.run();
+  return true;
 }

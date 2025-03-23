@@ -18,14 +18,13 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/*
- * @author whz
- * @create 2024-11-27
- */
+//
+// Created by whz on 11/27/24.
+//
+
 #ifndef DUCKDB_BYTEORDER_H
 #define DUCKDB_BYTEORDER_H
-enum class ByteOrder
-{
+enum class ByteOrder {
     PIXELS_LITTLE_ENDIAN,
     PIXELS_BIG_ENDIAN
 };

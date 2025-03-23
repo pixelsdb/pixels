@@ -1,39 +1,16 @@
-/*
- * Copyright 2023 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
+//
+// Created by liyu on 3/19/23.
+//
 
-/*
- * @author liyu
- * @create 2023-03-19
- */
 #include "reader/ColumnReader.h"
 
-ColumnReader::ColumnReader(std::shared_ptr <TypeDescription> type)
-{
+ColumnReader::ColumnReader(std::shared_ptr<TypeDescription> type) {
     this->type = type;
     this->elementIndex = 0;
 }
 
-std::shared_ptr <ColumnReader> ColumnReader::newColumnReader(std::shared_ptr <TypeDescription> type)
-{
-    switch (type->getCategory())
-    {
+std::shared_ptr<ColumnReader> ColumnReader::newColumnReader(std::shared_ptr<TypeDescription> type) {
+    switch(type->getCategory()) {
         case TypeDescription::BOOLEAN:
             break;
         case TypeDescription::BYTE:
@@ -69,36 +46,29 @@ std::shared_ptr <ColumnReader> ColumnReader::newColumnReader(std::shared_ptr <Ty
         case TypeDescription::STRUCT:
             break;
     }
-    throw InvalidArgumentException("This function is not supported yet. ");
+	throw InvalidArgumentException("This function is not supported yet. ");
 }
 
 void
-ColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset, int size,
-                   int pixelStride, int vectorIndex, std::shared_ptr <ColumnVector> vector,
-                   pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
-{
+ColumnReader::read(std::shared_ptr<ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset, int size,
+                   int pixelStride, int vectorIndex, std::shared_ptr<ColumnVector> vector,
+                   pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr<PixelsBitMask> filterMask) {
 }
 
 
-void ColumnReader::setValid(const std::shared_ptr <ByteBuffer> &input, int pixelStride,
-                            const std::shared_ptr <ColumnVector> &columnVector, int pixelId, bool hasNull)
-{
-    int elementSizeInCurrPixels = std::min(pixelStride, (int) columnVector->length);
+void ColumnReader::setValid(const std::shared_ptr<ByteBuffer>& input, int pixelStride, const std::shared_ptr<ColumnVector>& columnVector, int pixelId, bool hasNull) {
+    int elementSizeInCurrPixels = std::min(pixelStride, (int)columnVector->length);
     columnVector->isNull = input->getPointer() + isNullOffset;
 
     int byteSize = ceil(1.0 * elementSizeInCurrPixels / 8);
 
-    if (hasNull)
-    {
-        for (int byteOffset = 0; byteOffset < byteSize; byteOffset++)
-        {
+    if (hasNull) {
+        for(int byteOffset = 0; byteOffset < byteSize; byteOffset++) {
             ((uint8_t *) columnVector->isValid)[byteOffset] = ~(columnVector->isNull[byteOffset]);
         }
         isNullOffset += byteSize;
-    }
-    else
-    {
-        memset(((uint8_t *) columnVector->isValid), 0xFF, byteSize);
+    } else {
+        memset(((uint8_t *)columnVector->isValid), 0xFF, byteSize);
     }
 //    while (currentElementIndex < initElementIndex + columnVector->length) {
 //        int elementSizeInCurrPixels = std::min(pixelStride, (int)(initElementIndex + columnVector->length) - pixelId * pixelStride);

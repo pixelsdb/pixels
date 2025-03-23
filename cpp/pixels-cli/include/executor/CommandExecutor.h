@@ -25,16 +25,16 @@
 #ifndef PIXELS_COMMANDEXECUTOR_H
 #define PIXELS_COMMANDEXECUTOR_H
 
-#include <boost/program_options.hpp>
 #include <string>
-
-namespace bpo = boost::program_options;
+#include <map>
+#include <vector>
 
 class CommandExecutor
 {
 public:
-    virtual ~CommandExecutor() = default;
+  virtual ~CommandExecutor() = default;
 
-    virtual void execute(const bpo::variables_map &ns, const std::string &command) = 0;
+  // Execute a command with parsed options
+  virtual void execute(const std::map<std::string, std::string>& options, const std::string& command) = 0;
 };
 #endif //PIXELS_COMMANDEXECUTOR_H
