@@ -24,8 +24,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -34,6 +35,7 @@ import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
+import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -64,14 +66,30 @@ public class PixelsWriterBuffer
     // double writer buffer
     private VectorizedRowBatch activeBuffer;
     private VectorizedRowBatch immutableBuffer = null;
-    private int activeBufferRowCount = 0;
-    private long totalRowsWritten = 0;
+    private AtomicInteger activeBufferRowCount = new AtomicInteger(0);
+    private long totaolBytesWritten = 0;
+    private final String bufferKeyPrefix;
+    private final String bufferWritingFlagKey;
+    private AtomicInteger etcdBufferStartIndex = new AtomicInteger(0);
+
+    // State flag
+    private AtomicInteger immutableBufferState = new AtomicInteger(0);
+    private AtomicInteger etcdBufferState = new AtomicInteger(0);
+    private static final int BUFFER_WRITING_FLAG_MASK = 0xFF000000;
+    private static final int BUFFER_READER_COUNT_MASK = 0x00FFFFFF;
+    private static final int ETCD_WRITING_FLAG_MASK = 0xFF000000;
+    private static final int ETCD_BUFFER_COUNT_MASK = 0x00FFFFFF;
 
     // Backend Flush
-    private final ExecutorService flushExecutor;
-    private final Object bufferLock = new Object();
+    private final ExecutorService etcdFlushExecutor;
+    private final ExecutorService fileWriteExecutor;
 
-    public PixelsWriterBuffer(TypeDescription schema, String targetOrderedDirPath, String targetCompactDirPath) throws RetinaException
+    // ETCD
+    private final EtcdUtil etcdUtil = EtcdUtil.Instance();
+    private static final long BUFFER_EXPIRY_TIME = 3600;
+
+    public PixelsWriterBuffer(TypeDescription schema, String schemaName, String tableName,
+            String targetOrderedDirPath, String targetCompactDirPath) throws RetinaException
     {
         this.schema = schema;
 
@@ -94,8 +112,25 @@ public class PixelsWriterBuffer
         this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
         this.maxBufferSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
         this.activeBuffer = this.schema.createRowBatchWithHiddenColumn(this.pixelStride, TypeDescription.Mode.NONE);
-        this.flushExecutor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "pixelsWriterBuffer");
+
+        this.bufferKeyPrefix = schemaName + "/" + tableName + "/";
+        this.bufferWritingFlagKey = bufferKeyPrefix + "writing_flag";
+        try
+        {
+            etcdUtil.putKeyValue(bufferWritingFlagKey, "false");
+        } catch (Exception e)
+        {
+            throw new RetinaException("Failed to initialize etcd writing flag", e);
+        }
+
+        this.etcdFlushExecutor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "pixels-etcd-flush");
+            t.setDaemon(true);
+            return t;
+        });
+
+        this.fileWriteExecutor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "pixels-file-writer");
             t.setDaemon(true);
             return t;
         });
@@ -112,56 +147,61 @@ public class PixelsWriterBuffer
         int columnCount = schema.getChildren().size();
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
-        synchronized (bufferLock)
+
+        // activeBuffer is full, switch to immutable and flush it into etcd
+        if (activeBufferRowCount.get() >= pixelStride)
         {
-            if (writer == null)
+            int oldState = immutableBufferState.getAndUpdate(state -> state | BUFFER_WRITING_FLAG_MASK);
+            if ((oldState & BUFFER_WRITING_FLAG_MASK) != 0)
             {
-                try
-                {
-                    createNewWriter();
-                } catch (RetinaException e)
-                {
-                    throw new RuntimeException("Failed to create new writer", e);
-                }
+                logger.error("Adding elements too quickly, before having time to save the last immutable buffer");
+                return false;
             }
 
-            // active buffer is full
-            if (activeBufferRowCount >= pixelStride)
+            try
             {
-                while (immutableBuffer != null)
+                // wait for all readers to finish
+                while ((immutableBufferState.get() & BUFFER_READER_COUNT_MASK) != 0)
                 {
-                    try
-                    {
-                        bufferLock.wait();
-                    } catch (InterruptedException e)
-                    {
-                        Thread.currentThread().interrupt();
-                        return false;
-                    }
+                    logger.warn("Waiting for readers to finish");
+                    Thread.sleep(100);
                 }
 
+                // switch active buffer to immutable buffer
                 immutableBuffer = activeBuffer;
-                activeBuffer = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
-                activeBufferRowCount = 0;
-                flushExecutor.submit(() -> {
+                activeBuffer = this.schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
+                activeBufferRowCount.set(0);
+
+                // clear the buffer writing flag
+                immutableBufferState.updateAndGet(state -> state & ~BUFFER_WRITING_FLAG_MASK);
+
+                // flush immutable buffer to etcd
+                etcdFlushExecutor.submit(() -> {
                    try
                    {
-                       flushBuffer(immutableBuffer);
+                        immutableBufferState.updateAndGet(state -> (state & ~BUFFER_READER_COUNT_MASK) | ((state & BUFFER_READER_COUNT_MASK) + 1));
+                        flushBufferToEtcd(immutableBuffer);
                    } catch (IOException e)
                    {
-                       logger.error("Failed to flush buffer", e);
+                       logger.error("Failed to flush buffer to etcd", e);
+                   } finally
+                   {
+                       immutableBufferState.updateAndGet(state -> (state & ~BUFFER_READER_COUNT_MASK) | ((state & BUFFER_READER_COUNT_MASK) - 1));
                    }
                 });
-            }
-
-            activeBufferRowCount++;
-            activeBuffer.size++;
-            for (int i = 0; i < values.length; ++i)
+            } catch (Exception e)
             {
-                this.activeBuffer.cols[i].add(new String(values[i]));
+                throw new RuntimeException("Failed to swich active buffer to immutable buffer", e);
             }
-            this.activeBuffer.cols[columnCount].add(timestamp);
         }
+
+        activeBufferRowCount.incrementAndGet();
+        activeBuffer.size++;
+        for (int i = 0; i < values.length; ++i)
+        {
+            this.activeBuffer.cols[i].add(new String(values[i]));
+        }
+        this.activeBuffer.cols[columnCount].add(timestamp);
         return true;
     }
 
@@ -199,38 +239,78 @@ public class PixelsWriterBuffer
      * flush buffer into disk file
      * if size is up maxbuffersize, close writer(will write file into disk) and create a new writer
      */
-    private void flushBuffer(VectorizedRowBatch buffer) throws IOException
+    private void flushBufferToEtcd(VectorizedRowBatch buffer) throws IOException
     {
-        writer.addRowBatch(buffer);
-        totalRowsWritten += this.pixelStride;
+        // marks immutable buffer being put into etcd.
+        int bufferIndex = etcdBufferState.getAndUpdate(state -> (state & ~ETCD_WRITING_FLAG_MASK) | ((state & ETCD_BUFFER_COUNT_MASK) + 1));
 
-        synchronized (bufferLock)
-        {
-            buffer.reset();
-            immutableBuffer = null;
-            bufferLock.notifyAll();
-        }
+        String bufferKey = bufferKeyPrefix + "buffer_" + bufferIndex;
+        byte[] serializedBuffer = null; // = serializeBuffer(buffer);
+        totaolBytesWritten += serializedBuffer.length;
 
-        if (totalRowsWritten >= maxBufferSize)
+        // put immutable buffer into etcd
+        etcdUtil.putKeyValueWithExpireTime(bufferKey, new String(serializedBuffer), BUFFER_EXPIRY_TIME);
+        // clear the writing flag and increment the buffer count, return the buffer count
+        int newEtcdBufferCount = etcdBufferState.updateAndGet(state ->
+                (state & ~ETCD_WRITING_FLAG_MASK) | ((state & ETCD_BUFFER_COUNT_MASK) + 1)
+        ) & ETCD_BUFFER_COUNT_MASK;
+
+        // check weather need to write buffer into disk file
+        if (totaolBytesWritten >= maxBufferSize)
         {
-            synchronized (bufferLock)
-            {
-                if (immutableBuffer != null)
-                {
-                    writer.addRowBatch(immutableBuffer);
-                    immutableBuffer.reset();
-                }
-                writer.close();
-                writer = null;
-                totalRowsWritten = 0;
+            fileWriteExecutor.submit(() -> {
                 try
                 {
-                    createNewWriter();
-                } catch (RetinaException e)
+                    flushEtcdBuffersToFile(newEtcdBufferCount);
+                } catch (Exception e)
                 {
-                    throw new IOException("Failed to create new writer", e);
+                    logger.error("Failed to flush etcd buffers to file", e);
                 }
+            });
+        }
+    }
+
+    private void flushEtcdBuffersToFile(int bufferCount) throws RetinaException
+    {
+        try
+        {
+            if (writer == null)
+            {
+                createNewWriter();
+                int bufferKeyIndex = etcdBufferStartIndex.get();
+                while (bufferKeyIndex < bufferCount)
+                {
+                    String bufferKey = bufferKeyPrefix + "buffer_" + bufferKeyIndex;
+                    KeyValue value = etcdUtil.getKeyValue(bufferKey);
+                    if (value != null)
+                    {
+                        VectorizedRowBatch batch = null; //deserializeBuffer(value.getValue().toString());
+                        if (batch != null)
+                        {
+                            writer.addRowBatch(batch);
+                        }
+                    }
+                    bufferKeyIndex++;
+                }
+                writer.close();
+
+                // TODO: atomicity switching metadata, update etcd buffer start index and buffer count
+                bufferKeyIndex = etcdBufferStartIndex.getAndSet(bufferCount);
+                int finalBufferKeyIndex = bufferKeyIndex;
+                etcdBufferState.updateAndGet(state -> (state & ~ETCD_BUFFER_COUNT_MASK) | ((bufferCount - finalBufferKeyIndex) & ETCD_BUFFER_COUNT_MASK));
+
+                // delete buffer from etcd
+                while (bufferKeyIndex < bufferCount)
+                {
+                    String bufferKey = bufferKeyPrefix + "buffer_" + bufferKeyIndex;
+                    etcdUtil.delete(bufferKey);
+                }
+
+                totaolBytesWritten = 0;
             }
+        } catch (Exception e)
+        {
+            throw new RetinaException("Failed to flush etcd buffers to file", e);
         }
     }
 
@@ -242,32 +322,41 @@ public class PixelsWriterBuffer
     {
         try
         {
-            synchronized (bufferLock)
+            if (immutableBuffer != null)
             {
-                if (immutableBuffer != null)
+                if (writer == null)
                 {
-                    writer.addRowBatch(immutableBuffer);
-                    immutableBuffer.reset();
+                    createNewWriter();
                 }
-                if (activeBuffer != null)
+                writer.addRowBatch(immutableBuffer);
+                immutableBuffer = null;
+            }
+            if (activeBuffer != null)
+            {
+                if (writer == null)
                 {
-                    writer.addRowBatch(activeBuffer);
-                    activeBuffer.reset();
+                    createNewWriter();
                 }
+                writer.addRowBatch(activeBuffer);
+                activeBuffer = null;
+            }
+            if (writer != null)
+            {
                 writer.close();
+                writer = null;
             }
-            flushExecutor.shutdown();
-            try
+
+            if (immutableBuffer != null)
             {
-                if (!flushExecutor.awaitTermination(10, TimeUnit.SECONDS))
-                {
-                    flushExecutor.shutdownNow();
-                }
-            } catch (InterruptedException e)
-            {
-                flushExecutor.shutdownNow();
-                Thread.currentThread().interrupt();
+                writer.addRowBatch(immutableBuffer);
+                immutableBuffer.reset();
             }
+            if (activeBuffer != null)
+            {
+                writer.addRowBatch(activeBuffer);
+                activeBuffer.reset();
+            }
+            writer.close();
         } catch (Exception e)
         {
             logger.error("Falied to close WriterBuffer ", e);
