@@ -199,7 +199,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             List<String> columnNames = columns.stream().map(Column::getName).collect(Collectors.toList());
             List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
-            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema, orderedDirPath, compactDirPath);
+            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema, schemaName, tableName, orderedDirPath, compactDirPath);
             String writerBufferKey = schemaName + "_" + tableName;
             pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
         } catch (Exception e)

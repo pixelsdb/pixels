@@ -17,25 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.retina;
+package io.pixelsdb.pixels.retina.Util;
 
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-
-public class PixelsWriterBufferRecordReader
+public class BufferSerializationUtil
 {
-    private static final Logger logger = LogManager.getLogger(PixelsWriterBufferRecordReader.class);
-
-
-    public void close() throws IOException
-    {
-
-    }
 }
