@@ -23,7 +23,8 @@
  * @create 2024-11-29
  */
 #include "writer/ColumnWriterBuilder.h"
-#include "writer/IntegerColumnWriter.h"
+#include "writer/IntColumnWriter.h"
+#include "writer/LongColumnWriter.h"
 
 std::shared_ptr <ColumnWriter> ColumnWriterBuilder::newColumnWriter(std::shared_ptr <TypeDescription> type,
                                                                     std::shared_ptr <PixelsWriterOption> writerOption)
@@ -32,8 +33,9 @@ std::shared_ptr <ColumnWriter> ColumnWriterBuilder::newColumnWriter(std::shared_
     {
         case TypeDescription::SHORT:
         case TypeDescription::INT:
+          return  std::make_shared<IntColumnWriter>(type,writerOption);
         case TypeDescription::LONG:
-            return std::make_shared<IntegerColumnWriter>(type, writerOption);
+          return std::make_shared<LongColumnWriter>(type,writerOption);
         case TypeDescription::BOOLEAN:
             break;
         case TypeDescription::BYTE:

@@ -115,17 +115,17 @@ void PixelsFilter::TemplatedFilterOperation(std::shared_ptr <ColumnVector> vecto
         case TypeDescription::SHORT:
         case TypeDescription::INT:
         {
-            auto longColumnVector = std::static_pointer_cast<LongColumnVector>(vector);
+            auto intColumnVector = std::static_pointer_cast<IntColumnVector>(vector);
             int i = 0;
 #ifdef  ENABLE_SIMD_FILTER
             for (; i < vector->length - vector->length % 8; i += 8) {
-                uint8_t mask = CompareAvx2<T, OP>(longColumnVector->intVector + i, constant_value);
+                uint8_t mask = CompareAvx2<T, OP>(intColumnVector->intVector + i, constant_value);
                 filter_mask.setByteAligned(i, mask);
             }
 #endif
             for (; i < vector->length; i++)
             {
-                filter_mask.set(i, OP::Operation((T) longColumnVector->intVector[i],
+                filter_mask.set(i, OP::Operation((T) intColumnVector->intVector[i],
                                                  constant_value));
             }
             break;

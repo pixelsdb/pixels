@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,33 +17,32 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-
-/*
- * @author liyu
- * @create 2023-03-17
- */
-#include "vector/LongColumnVector.h"
+//
+// Created by whz on 4/1/25.
+//
 #include <algorithm>
+#include <vector/IntColumnVector.h>
 
-LongColumnVector::LongColumnVector(uint64_t len, bool encoding, bool isLong)
+IntColumnVector::IntColumnVector(uint64_t len, bool encoding, bool isLong)
     : ColumnVector(len, encoding) {
-  posix_memalign(reinterpret_cast<void **>(&longVector), 32,
-                 len * sizeof(int64_t));
+
+  posix_memalign(reinterpret_cast<void **>(&intVector), 32,
+                 len * sizeof(int32_t));
 
   memoryUsage += (long)sizeof(long) * len;
 }
 
-void LongColumnVector::close() {
+void IntColumnVector::close() {
   if (!closed) {
     ColumnVector::close();
-    if (encoding && longVector != nullptr) {
-      free(longVector);
+    if (encoding && intVector != nullptr) {
+      free(intVector);
     }
-    longVector = nullptr;
+    intVector = nullptr;
   }
 }
 
-void LongColumnVector::print(int rowCount) {
+void IntColumnVector::print(int rowCount) {
   throw InvalidArgumentException("not support print longcolumnvector.");
   //    for(int i = 0; i < rowCount; i++) {
   //        std::cout<<longVector[i]<<std::endl;
@@ -51,22 +50,21 @@ void LongColumnVector::print(int rowCount) {
   //    }
 }
 
-LongColumnVector::~LongColumnVector() {
+IntColumnVector::~IntColumnVector() {
   if (!closed) {
-    LongColumnVector::close();
+    IntColumnVector::close();
   }
 }
 
-void *LongColumnVector::current() {
-
-  if (longVector == nullptr) {
+void *IntColumnVector::current() {
+  if (intVector == nullptr) {
     return nullptr;
   } else {
-    return longVector + readIndex;
+    return intVector + readIndex;
   }
 }
 
-void LongColumnVector::add(std::string &value) {
+void IntColumnVector::add(std::string &value) {
   std::transform(value.begin(), value.end(), value.begin(), ::tolower);
   if (value == "true") {
     add(1);
@@ -77,41 +75,39 @@ void LongColumnVector::add(std::string &value) {
   }
 }
 
-void LongColumnVector::add(bool value) { add(value ? 1 : 0); }
+void IntColumnVector::add(bool value) { add(value ? 1 : 0); }
 
-void LongColumnVector::add(int64_t value) {
+void IntColumnVector::add(int64_t value) {
   if (writeIndex >= length) {
     ensureSize(writeIndex * 2, true);
   }
   int index = writeIndex++;
 
-  longVector[index] = value;
+  intVector[index] = value;
 
   isNull[index] = false;
 }
 
-void LongColumnVector::add(int value) {
+void IntColumnVector::add(int value) {
   if (writeIndex >= length) {
     ensureSize(writeIndex * 2, true);
   }
   int index = writeIndex++;
-  longVector[index] = value;
-
+  intVector[index] = value;
   isNull[index] = false;
 }
 
-void LongColumnVector::ensureSize(uint64_t size, bool preserveData) {
+void IntColumnVector::ensureSize(uint64_t size, bool preserveData) {
   ColumnVector::ensureSize(size, preserveData);
   if (length < size) {
-
-    long *oldVector = longVector;
-    posix_memalign(reinterpret_cast<void **>(&longVector), 32,
-                   size * sizeof(int64_t));
+    int *oldVector = intVector;
+    posix_memalign(reinterpret_cast<void **>(&intVector), 32,
+                   size * sizeof(int32_t));
     if (preserveData) {
-      std::copy(oldVector, oldVector + length, longVector);
+      std::copy(oldVector, oldVector + length, intVector);
     }
     delete[] oldVector;
-    memoryUsage += (long)sizeof(long) * (size - length);
+    memoryUsage += (long)sizeof(int) * (size - length);
     resize(size);
   }
 }

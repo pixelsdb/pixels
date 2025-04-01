@@ -22,20 +22,24 @@
  * @author whz
  * @create 2024-11-25
  */
-#include "reader/IntegerColumnReader.h"
+#include "vector/IntColumnVector.h"
 #include "vector/LongColumnVector.h"
-#include "writer/IntegerColumnWriter.h"
+#include "reader/IntColumnReader.h"
+#include "reader/LongColumnReader.h"
+#include "writer/IntColumnWriter.h"
+#include "writer/LongColumnWriter.h"
+
 
 #include "gtest/gtest.h"
 #include <array>
 
-TEST(IntegerWriterTest, WriteRunLengthEncodeIntWithoutNull) {
+TEST(IntWriterTest, WriteRunLengthEncodeIntWithoutNull) {
   int len = 10;
   int pixel_stride = 5;
-  bool is_long = false;
+//  bool is_long = false;
   bool encoding = true;
   auto integer_column_vector =
-      std::make_shared<LongColumnVector>(len, encoding, is_long);
+      std::make_shared<IntColumnVector>(len, encoding);
   ASSERT_TRUE(integer_column_vector);
   for (int i = 0; i < len; ++i) {
     integer_column_vector->add(i);
@@ -50,7 +54,7 @@ TEST(IntegerWriterTest, WriteRunLengthEncodeIntWithoutNull) {
   option->setNullsPadding(false);
   option->setEncodingLevel(EncodingLevel(EncodingLevel::EL2));
 
-  auto integer_column_writer = std::make_unique<IntegerColumnWriter>(
+  auto integer_column_writer = std::make_unique<IntColumnWriter>(
       TypeDescription::createInt(), option);
   auto write_size = integer_column_writer->write(integer_column_vector, len);
   EXPECT_NE(write_size, 0);
@@ -65,12 +69,12 @@ TEST(IntegerWriterTest, WriteRunLengthEncodeIntWithoutNull) {
    **      Write End. Use Reader to check
    *------------------------**/
   auto integer_column_reader =
-      std::make_unique<IntegerColumnReader>(TypeDescription::createInt());
+      std::make_unique<IntColumnReader>(TypeDescription::createInt());
   auto buffer = std::make_shared<ByteBuffer>(content.size());
   buffer->putBytes(content.data(), content.size());
   auto column_chunk_encoding = integer_column_writer->getColumnChunkEncoding();
   auto int_result_vector =
-      std::make_shared<LongColumnVector>(len, encoding, is_long);
+      std::make_shared<IntColumnVector>(len, encoding);
   auto bit_mask = std::make_shared<PixelsBitMask>(len);
 
   auto num_to_read = len;
@@ -94,13 +98,13 @@ TEST(IntegerWriterTest, WriteRunLengthEncodeIntWithoutNull) {
   }
 }
 
-TEST(IntegerWriterTest, DISABLED_WriteIntWithoutNull) {
+TEST(IntWriterTest, DISABLED_WriteIntWithoutNull) {
   int len = 10;
   int pixel_stride = 5;
   bool is_long = false;
   bool encoding = false;
   auto integer_column_vector =
-      std::make_shared<LongColumnVector>(len, encoding, is_long);
+      std::make_shared<IntColumnVector>(len, encoding);
   ASSERT_TRUE(integer_column_vector);
   for (int i = 0; i < len; ++i) {
     integer_column_vector->add(i);
@@ -116,7 +120,7 @@ TEST(IntegerWriterTest, DISABLED_WriteIntWithoutNull) {
   option->setByteOrder(ByteOrder::PIXELS_LITTLE_ENDIAN);
   option->setEncodingLevel(EncodingLevel(EncodingLevel::EL0));
 
-  auto integer_column_writer = std::make_unique<IntegerColumnWriter>(
+  auto integer_column_writer = std::make_unique<IntColumnWriter>(
       TypeDescription::createInt(), option);
   auto write_size = integer_column_writer->write(integer_column_vector, len);
   EXPECT_NE(write_size, 0);
@@ -131,12 +135,12 @@ TEST(IntegerWriterTest, DISABLED_WriteIntWithoutNull) {
    **      Write End. Use Reader to check
    *------------------------**/
   auto integer_column_reader =
-      std::make_unique<IntegerColumnReader>(TypeDescription::createInt());
+      std::make_unique<IntColumnReader>(TypeDescription::createInt());
   auto buffer = std::make_shared<ByteBuffer>(content.size());
   buffer->putBytes(content.data(), content.size());
   auto column_chunk_encoding = integer_column_writer->getColumnChunkEncoding();
   auto int_result_vector =
-      std::make_shared<LongColumnVector>(len, encoding, is_long);
+      std::make_shared<IntColumnVector>(len, encoding);
   auto bit_mask = std::make_shared<PixelsBitMask>(len);
 
   auto num_to_read = len;
@@ -182,7 +186,7 @@ TEST(EncodeTest, DISABLED_EncodeLong) {
   }
 }
 
-TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
+TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
   int len = 23;
   int pixel_stride = 5;
   bool is_long = true;
@@ -199,7 +203,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
   option->setNullsPadding(false);
   option->setEncodingLevel(EncodingLevel(EncodingLevel::EL2));
 
-  auto long_column_writer = std::make_unique<IntegerColumnWriter>(
+  auto long_column_writer = std::make_unique<IntColumnWriter>(
       TypeDescription::createLong(), option);
   auto write_size = long_column_writer->write(long_column_vector, len);
   EXPECT_NE(write_size, 0);
@@ -212,7 +216,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
    **      Write End. Use Reader to check
    *------------------------**/
   auto long_column_reader =
-      std::make_unique<IntegerColumnReader>(TypeDescription::createLong());
+      std::make_unique<IntColumnReader>(TypeDescription::createLong());
   auto buffer = std::make_shared<ByteBuffer>(content.size());
   buffer->putBytes(content.data(), content.size());
   auto column_chunk_encoding = long_column_writer->getColumnChunkEncoding();
@@ -242,7 +246,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
   long_column_writer->close();
 }
 
-TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
+TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
   int len = 23;
   int pixel_stride = 5;
   bool is_long = false;
@@ -267,7 +271,7 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
   option->setNullsPadding(false);
   option->setEncodingLevel(EncodingLevel(EncodingLevel::EL2));
 
-  auto integer_column_writer = std::make_unique<IntegerColumnWriter>(
+  auto integer_column_writer = std::make_unique<IntColumnWriter>(
       TypeDescription::createInt(), option);
   auto write_size = integer_column_writer->write(integer_column_vector, len);
   EXPECT_NE(write_size, 0);
@@ -282,12 +286,12 @@ TEST(IntegerWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
    **      Write End. Use Reader to check
    *------------------------**/
   auto integer_column_reader =
-      std::make_unique<IntegerColumnReader>(TypeDescription::createInt());
+      std::make_unique<IntColumnReader>(TypeDescription::createInt());
   auto buffer = std::make_shared<ByteBuffer>(content.size());
   buffer->putBytes(content.data(), content.size());
   auto column_chunk_encoding = integer_column_writer->getColumnChunkEncoding();
   auto int_result_vector =
-      std::make_shared<LongColumnVector>(len, encoding, is_long);
+      std::make_shared<IntColumnVector>(len, encoding);
   auto bit_mask = std::make_shared<PixelsBitMask>(len);
 
   auto num_to_read = len;
