@@ -38,6 +38,7 @@ public class Ec2Manager implements InstanceManager
     private final Ec2Client ec2;
     private final String keyName;
     private final String amiId;
+    private final String ltid;
     private final List<String> securityGroups;
     private static final Logger log = LogManager
             .getLogger(Ec2Manager.class);
@@ -47,6 +48,7 @@ public class Ec2Manager implements InstanceManager
         ConfigFactory config = ConfigFactory.Instance();
         this.amiId = config.getProperty("vm.ami.id");
         this.keyName = config.getProperty("vm.key.name");
+        this.ltid = config.getProperty("vm.lt.id");
         this.securityGroups = Arrays.asList(config.getProperty("vm.security.groups").split(","));
         String accessKeyId = System.getenv("AWS_ACCESS_KEY_ID");
         String secretAccessKey = System.getenv("AWS_SECRET_ACCESS_KEY");
@@ -63,19 +65,18 @@ public class Ec2Manager implements InstanceManager
     public String createInstance(String name)
     {
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
-                .imageId(amiId)
-                .instanceType(InstanceType.M5_2_XLARGE)
+                .launchTemplate(lt->lt.launchTemplateId(this.ltid))
+                .instanceType(InstanceType.M5_4_XLARGE)
                 .maxCount(1)
                 .minCount(1)
                 .keyName(keyName)
                 .securityGroups(securityGroups)
                 .build();
-
         RunInstancesResponse response = ec2.runInstances(runRequest);
         String instanceId = response.instances().get(0).instanceId();
 
         Tag tag = Tag.builder()
-                .key("name")
+                .key("Name")
                 .value(name)
                 .build();
 
@@ -136,10 +137,20 @@ public class Ec2Manager implements InstanceManager
                 {
                     for (Instance instance : reservation.instances())
                     {
-                        if (!instance.imageId().equals(amiId) || !instance.keyName().equals(keyName) || !instance.tags().get(0).value().startsWith(PREFIX))
+                        if (!instance.imageId().equals(amiId) || !instance.keyName().equals(keyName))
                         {
                             break;
                         }
+                        String insname = ";";
+                        for(Tag tag : instance.tags())
+                        {
+                            if(tag.key().equals("Name"))
+                            {
+                                insname = tag.value();
+                                break;
+                            }
+                        }
+                        if(insname.startsWith(PREFIX)){break;}
                         switch (instance.state().name())
                         {
                             case RUNNING:
