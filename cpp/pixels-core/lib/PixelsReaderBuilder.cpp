@@ -23,6 +23,7 @@
  * @create 2023-03-06
  */
 #include "PixelsReaderBuilder.h"
+#include "utils/Endianness.h"
 
 PixelsReaderBuilder::PixelsReaderBuilder()
 {
@@ -78,15 +79,12 @@ std::shared_ptr <PixelsReader> PixelsReaderBuilder::build()
         fsReader->seek(fileLen - (long) sizeof(long));
         long SmallEndianFileTailOffset = fsReader->readLong();
         long BigEndianFileTailOffset = (long) __builtin_bswap64(SmallEndianFileTailOffset);
-        long fileTailOffset = 0;
-        if (SmallEndianFileTailOffset < 0)
-        {
-            fileTailOffset = BigEndianFileTailOffset;
+
+        long fileTailOffset=fsReader->readLong();
+        if(Endianness::isLittleEndian()){
+          fileTailOffset=(long)__builtin_bswap64(fileTailOffset);
         }
-        else
-        {
-            fileTailOffset = SmallEndianFileTailOffset;
-        }
+
         std::cout << "fileTailOffset: " << fileTailOffset << std::endl;
         int fileTailLength = (int) (fileLen - fileTailOffset - sizeof(long));
         fsReader->seek(fileTailOffset);

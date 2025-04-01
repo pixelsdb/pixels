@@ -66,6 +66,8 @@ set(pixels_core_cxx
         lib/utils/DynamicIntArray.cpp
         include/writer/StringColumnWriter.h
         lib/writer/StringColumnWriter.cpp
+        include/utils/Endianness.h
+        lib/utils/Endianness.cpp
 )
 
 add_library(pixels-core ${pixels_core_cxx})

@@ -35,6 +35,7 @@
 #include "physical/PhysicalReader.h"
 #include "physical/PhysicalReaderUtil.h"
 #include "PixelsVersion.h"
+#include "utils/Endianness.h"
 
 const int PixelsWriterImpl::CHUNK_ALIGNMENT = std::stoi(
         ConfigFactory::Instance().getProperty("column.chunk.alignment"));
@@ -289,12 +290,17 @@ void PixelsWriterImpl::writeFileTail()
 
     // flush filetail
     int fileTailLen = fileTail.ByteSizeLong() + 8;
-    std::cout << "fileTailLen:" << fileTailLen << std::endl;
+//    std::cout << "fileTailLen:" << fileTailLen << std::endl;
     physicalWriter->prepare(fileTailLen);
     std::shared_ptr <ByteBuffer> fileTailBuffer = std::make_shared<ByteBuffer>(fileTail.ByteSizeLong());
     fileTail.SerializeToArray(fileTailBuffer->getPointer(), fileTail.ByteSizeLong());
     long tailOffset = physicalWriter->append(fileTailBuffer->getPointer(), 0, fileTail.ByteSizeLong());
-    std::cout << "fileTailOffset:" << tailOffset << std::endl;
+
+    if(Endianness::isLittleEndian()){
+      tailOffset=(long)__builtin_bswap64(tailOffset);
+    }
+
+//    std::cout << "fileTailOffset:" << tailOffset << std::endl;
     std::shared_ptr <ByteBuffer> tailOffsetBuffer = std::make_shared<ByteBuffer>(8);
     tailOffsetBuffer->putLong(tailOffset);
     physicalWriter->append(tailOffsetBuffer);
