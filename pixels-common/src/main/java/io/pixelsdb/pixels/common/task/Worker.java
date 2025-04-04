@@ -31,6 +31,9 @@ import static java.util.Objects.requireNonNull;
 public class Worker<WI extends WorkerInfo>
 {
     private final long workerId;
+    /**
+     * The port where current worker is receiving data from upstream workers
+     */
     private int workerPortIndex;
     private final Lease lease;
     private final WI workerInfo;
