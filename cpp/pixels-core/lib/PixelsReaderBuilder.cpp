@@ -83,7 +83,7 @@ std::shared_ptr<PixelsReader> PixelsReaderBuilder::build()
             fileTailOffset = (long) __builtin_bswap64(fileTailOffset);
 
         }
-
+        
         int fileTailLength = (int) (fileLen - fileTailOffset - sizeof(long));
         fsReader->seek(fileTailOffset);
         std::shared_ptr<ByteBuffer> fileTailBuffer = fsReader->readFully(fileTailLength);
