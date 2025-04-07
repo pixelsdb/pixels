@@ -17,9 +17,10 @@
 * License along with Pixels.  If not, see
 * <https://www.gnu.org/licenses/>.
 */
-//
-// Created by whz on 4/1/25.
-//
+/*
+ * @author whz
+ * @create 25-04-01
+ */
 
 #ifndef PIXELS_LONGCOLUMNREADER_H
 #define PIXELS_LONGCOLUMNREADER_H

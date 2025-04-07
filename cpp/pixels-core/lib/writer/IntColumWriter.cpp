@@ -18,9 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-//
-// Created by whz on 4/1/25.
-//
+/*
+ * @author whz
+ * @create 2025-04-01
+ */
 
 #include "utils/BitUtils.h"
 #include "writer/IntColumnWriter.h"
@@ -28,17 +29,22 @@
 IntColumnWriter::IntColumnWriter(
     std::shared_ptr<TypeDescription> type,
     std::shared_ptr<PixelsWriterOption> writerOption)
-    : ColumnWriter(type, writerOption), curPixelVector(pixelStride) {
+    : ColumnWriter(type, writerOption), curPixelVector(pixelStride)
+{
   runlengthEncoding = encodingLevel.ge(EncodingLevel::Level::EL2);
-  if (runlengthEncoding) {
+  if (runlengthEncoding)
+  {
     encoder = std::make_unique<RunLenIntEncoder>();
   }
 }
 
-int IntColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size) {
+int
+IntColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
+{
   std::cout << "In IntColumnWriter" << std::endl;
   auto columnVector = std::static_pointer_cast<IntColumnVector>(vector);
-  if (!columnVector) {
+  if (!columnVector)
+  {
     throw std::invalid_argument("Invalid vector type");
   }
   int *values;
@@ -46,15 +52,16 @@ int IntColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size) {
   values = columnVector->intVector;
 
   int curPartLength; // size of the partition which belongs to current pixel
-  int curPartOffset =
-      0; // starting offset of the partition which belongs to current pixel
-  int nextPartLength =
-      size; // size of the partition which belongs to next pixel
+  int curPartOffset
+      = 0; // starting offset of the partition which belongs to current pixel
+  int nextPartLength
+      = size; // size of the partition which belongs to next pixel
 
   // do the calculation to partition the vector into current pixel and next one
   // doing this pre-calculation to eliminate branch prediction inside the for
   // loop
-  while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+  while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+  {
     curPartLength = pixelStride - curPixelIsNullIndex;
     writeCurPartInt(columnVector, values, curPartLength, curPartOffset);
     newPixel();
@@ -68,25 +75,34 @@ int IntColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size) {
   return outputStream->getWritePos();
 }
 
-void IntColumnWriter::close() {
-  if (runlengthEncoding && encoder) {
+void
+IntColumnWriter::close()
+{
+  if (runlengthEncoding && encoder)
+  {
     encoder->clear();
   }
   ColumnWriter::close();
 }
 
-void IntColumnWriter::writeCurPartInt(
-    std::shared_ptr<ColumnVector> columnVector, int *values, int curPartLength,
-    int curPartOffset) {
-  for (int i = 0; i < curPartLength; i++) {
+void
+IntColumnWriter::writeCurPartInt(std::shared_ptr<ColumnVector> columnVector,
+                                 int *values, int curPartLength,
+                                 int curPartOffset)
+{
+  for (int i = 0; i < curPartLength; i++)
+  {
     curPixelEleIndex++;
-    if (columnVector->isNull[i + curPartOffset]) {
+    if (columnVector->isNull[i + curPartOffset])
+    {
       hasNull = true;
-      if (nullsPadding) {
+      if (nullsPadding)
+      {
         // padding 0 for nulls
         curPixelVector[curPixelVectorIndex++] = 0L;
       }
-    } else {
+    } else
+    {
       curPixelVector[curPixelVectorIndex++] = values[i + curPartOffset];
     }
   }
@@ -96,35 +112,49 @@ void IntColumnWriter::writeCurPartInt(
   curPixelIsNullIndex += curPartLength;
 }
 
-bool IntColumnWriter::decideNullsPadding(
-    std::shared_ptr<PixelsWriterOption> writerOption) {
-  if (writerOption->getEncodingLevel().ge(EncodingLevel::Level::EL2)) {
+bool
+IntColumnWriter::decideNullsPadding(
+    std::shared_ptr<PixelsWriterOption> writerOption)
+{
+  if (writerOption->getEncodingLevel().ge(EncodingLevel::Level::EL2))
+  {
     return false;
   }
   return writerOption->isNullsPadding();
 }
 
-void IntColumnWriter::newPixel() {
+void
+IntColumnWriter::newPixel()
+{
   // write out current pixel vector
-  if (runlengthEncoding) {
-    std::vector<byte> buffer(curPixelVectorIndex * sizeof(int));
+  if (runlengthEncoding)
+  {
+    std::vector<byte> buffer(curPixelVectorIndex *
+    sizeof(int));
     int resLen;
-    encoder->encode(curPixelVector.data(), buffer.data(), curPixelVectorIndex,
-                    resLen);
+    encoder->encode(curPixelVector.data(), buffer.data(),
+                    curPixelVectorIndex, resLen);
     outputStream->putBytes(buffer.data(), resLen);
-  } else {
+  } else
+  {
     std::shared_ptr<ByteBuffer> curVecPartitionBuffer;
     EncodingUtils encodingUtils;
 
-    curVecPartitionBuffer =
-        std::make_shared<ByteBuffer>(curPixelVectorIndex * sizeof(int));
-    if (byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN) {
-      for (int i = 0; i < curPixelVectorIndex; i++) {
-        encodingUtils.writeIntLE(curVecPartitionBuffer, (int)curPixelVector[i]);
+    curVecPartitionBuffer
+        = std::make_shared<ByteBuffer>(curPixelVectorIndex * sizeof(int));
+    if (byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN)
+    {
+      for (int i = 0; i < curPixelVectorIndex; i++)
+      {
+        encodingUtils.writeIntLE(curVecPartitionBuffer,
+                                 (int) curPixelVector[i]);
       }
-    } else {
-      for (int i = 0; i < curPixelVectorIndex; i++) {
-        encodingUtils.writeIntBE(curVecPartitionBuffer, (int)curPixelVector[i]);
+    } else
+    {
+      for (int i = 0; i < curPixelVectorIndex; i++)
+      {
+        encodingUtils.writeIntBE(curVecPartitionBuffer,
+                                 (int) curPixelVector[i]);
       }
     }
 
@@ -135,12 +165,16 @@ void IntColumnWriter::newPixel() {
   ColumnWriter::newPixel();
 }
 
-pixels::proto::ColumnEncoding IntColumnWriter::getColumnChunkEncoding() const {
+pixels::proto::ColumnEncoding
+IntColumnWriter::getColumnChunkEncoding() const
+{
   pixels::proto::ColumnEncoding columnEncoding;
-  if (runlengthEncoding) {
+  if (runlengthEncoding)
+  {
     columnEncoding.set_kind(
         pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_RUNLENGTH);
-  } else {
+  } else
+  {
     columnEncoding.set_kind(
         pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_NONE);
   }

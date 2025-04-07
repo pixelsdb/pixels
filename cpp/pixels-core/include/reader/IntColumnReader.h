@@ -18,9 +18,10 @@
 * <https://www.gnu.org/licenses/>.
 */
 
-//
-// Created by whz on 4/1/25.
-//
+/*
+ * @author whz
+ * @create 2025-04-01
+ */
 
 #ifndef PIXELS_INTCOLUMNREADER_H
 #define PIXELS_INTCOLUMNREADER_H
@@ -30,21 +31,20 @@
 
 class IntColumnReader : public ColumnReader
 {
-public:
-  explicit IntColumnReader(std::shared_ptr <TypeDescription> type);
+ public:
+  explicit IntColumnReader(std::shared_ptr<TypeDescription> type);
 
   void close() override;
 
-  void read(std::shared_ptr <ByteBuffer> input,
+  void read(std::shared_ptr<ByteBuffer> input,
             pixels::proto::ColumnEncoding &encoding,
             int offset, int size, int pixelStride,
-            int vectorIndex, std::shared_ptr <ColumnVector> vector,
+            int vectorIndex, std::shared_ptr<ColumnVector> vector,
             pixels::proto::ColumnChunkIndex &chunkIndex,
-            std::shared_ptr <PixelsBitMask> filterMask) override;
+            std::shared_ptr<PixelsBitMask> filterMask) override;
 
-private:
-  std::shared_ptr <RunLenIntDecoder> decoder;
+ private:
+  std::shared_ptr<RunLenIntDecoder> decoder;
 };
-
 
 #endif // PIXELS_INTCOLUMNREADER_H
