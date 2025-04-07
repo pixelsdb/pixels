@@ -55,7 +55,16 @@ public class WorkerCoordinateService
 
     public void shutdown() throws InterruptedException
     {
-        this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        try
+        {
+            if (!channel.shutdown().awaitTermination(5, TimeUnit.SECONDS))
+            {
+                channel.shutdownNow();
+            }
+        } catch (InterruptedException e)
+        {
+            channel.shutdownNow();
+        }
     }
 
     /**
@@ -75,7 +84,7 @@ public class WorkerCoordinateService
             throw new WorkerCoordinateException("failed to register worker, error code=" + response.getErrorCode());
         }
         return new Worker<>(response.getWorkerId(),
-                new Lease(response.getLeasePeriodMs(), response.getLeaseStartTimeMs()), workerInfo);
+                new Lease(response.getLeasePeriodMs(), response.getLeaseStartTimeMs()), response.getWorkerPortIndex(), workerInfo);
     }
 
     /**

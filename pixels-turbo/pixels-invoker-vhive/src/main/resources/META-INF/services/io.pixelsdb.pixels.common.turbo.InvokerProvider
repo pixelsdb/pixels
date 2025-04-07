@@ -5,6 +5,9 @@ io.pixelsdb.pixels.invoker.vhive.PartitionStreamInvokerProvider
 io.pixelsdb.pixels.invoker.vhive.PartitionJoinInvokerProvider
 io.pixelsdb.pixels.invoker.vhive.PartitionedJoinStreamInvokerProvider
 io.pixelsdb.pixels.invoker.vhive.PartitionChainJoinInvokerProvider
+io.pixelsdb.pixels.invoker.vhive.PartitionChainJoinStreamInvokerProvider
+io.pixelsdb.pixels.invoker.vhive.BroadcastJoinStreamInvokerProvider
 io.pixelsdb.pixels.invoker.vhive.BroadcastJoinInvokerProvider
+io.pixelsdb.pixels.invoker.vhive.BroadcastChainJoinStreamInvokerProvider
 io.pixelsdb.pixels.invoker.vhive.BroadcastChainJoinInvokerProvider
 io.pixelsdb.pixels.invoker.vhive.AggregationInvokerProvider

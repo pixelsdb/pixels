@@ -319,5 +319,7 @@ public class PixelsReaderStreamImpl implements PixelsReader
     {
         recordReader.close();
         physicalReader.close();
+        fileSchema = null;
+        recordReader = null;
     }
 }
