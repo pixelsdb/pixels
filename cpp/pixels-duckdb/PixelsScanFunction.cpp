@@ -354,7 +354,7 @@ namespace duckdb
                 case TypeDescription::SHORT:
                 case TypeDescription::INT:
                 {
-                    auto intCol = std::static_pointer_cast<LongColumnVector>(col);
+                    auto intCol = std::static_pointer_cast<IntColumnVector>(col);
                     Vector vector(LogicalType::INTEGER,
                                   (data_ptr_t)(intCol->current()), col->currentValid());
                     output.data.at(col_id).Reference(vector);

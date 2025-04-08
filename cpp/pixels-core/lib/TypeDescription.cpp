@@ -373,9 +373,9 @@ std::shared_ptr <ColumnVector> TypeDescription::createColumn(int maxSize, std::v
     {
         case SHORT:
         case INT:
-            return std::make_shared<LongColumnVector>(maxSize, useEncodedVector.at(0), false);
+            return std::make_shared<IntColumnVector>(maxSize, useEncodedVector.at(0));
         case LONG:
-            return std::make_shared<LongColumnVector>(maxSize, useEncodedVector.at(0), true);
+            return std::make_shared<LongColumnVector>(maxSize, useEncodedVector.at(0));
         case DATE:
             return std::make_shared<DateColumnVector>(maxSize, useEncodedVector.at(0));
         case DECIMAL:

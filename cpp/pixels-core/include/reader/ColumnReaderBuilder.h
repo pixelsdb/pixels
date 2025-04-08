@@ -26,12 +26,13 @@
 #define PIXELS_COLUMNREADERBUILDER_H
 
 #include "reader/ColumnReader.h"
-#include "reader/IntegerColumnReader.h"
 #include "reader/CharColumnReader.h"
 #include "reader/VarcharColumnReader.h"
 #include "reader/DecimalColumnReader.h"
 #include "reader/DateColumnReader.h"
 #include "reader/TimestampColumnReader.h"
+#include "reader/IntColumnReader.h"
+#include "reader/LongColumnReader.h"
 
 class ColumnReaderBuilder
 {

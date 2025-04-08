@@ -44,6 +44,7 @@
 #include "vector/DecimalColumnVector.h"
 #include "vector/DateColumnVector.h"
 #include "vector/TimestampColumnVector.h"
+#include "vector/IntColumnVector.h"
 
 struct CategoryProperty
 {
