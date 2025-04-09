@@ -30,24 +30,15 @@
 
 class DateColumnWriter : public ColumnWriter
 {
-public:
-    DateColumnWriter(std::shared_ptr <TypeDescription> type, std::shared_ptr <PixelsWriterOption> writerOption);
+ public:
+  DateColumnWriter(std::shared_ptr<TypeDescription> type, std::shared_ptr<PixelsWriterOption> writerOption);
 
-    int write(std::shared_ptr <ColumnVector> vector, int length) override;
+  int write(std::shared_ptr<ColumnVector> vector, int length) override;
+  bool decideNullsPadding(std::shared_ptr<PixelsWriterOption> writerOption) override;
 
-    void close() override;
-
-    void newPixel() override;
-
-    bool decideNullsPadding(std::shared_ptr <PixelsWriterOption> writerOption) override;
-
-    pixels::proto::ColumnEncoding getColumnChunkEncoding() const override;
-
-private:
-    bool runlengthEncoding;
-    std::unique_ptr <RunLenIntEncoder> encoder;
-    std::vector<long> curPixelVector; // current pixel value vector haven't written out yet
-
-    void writeCurPartTime(std::shared_ptr <ColumnVector> columnVector, int *values, int curPartLength, int curPartOffset);
+ private:
+  bool runlengthEncoding;
+  std::unique_ptr<RunLenIntEncoder> encoder;
+  std::vector<long> curPixelVector; // current pixel value vector haven't written out yet
 };
 #endif // DUCKDB_DATECOLUMNWRITER_H

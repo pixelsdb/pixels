@@ -32,58 +32,58 @@
 
 class PixelsReaderOption
 {
-public:
-    PixelsReaderOption();
+ public:
+  PixelsReaderOption();
 
-    void setIncludeCols(const std::vector <std::string> &columnNames);
+  void setIncludeCols(const std::vector<std::string> &columnNames);
 
-    std::vector <std::string> getIncludedCols();
+  std::vector<std::string> getIncludedCols();
 
-    void setSkipCorruptRecords(bool s);
+  void setSkipCorruptRecords(bool s);
 
-    bool isSkipCorruptRecords();
+  bool isSkipCorruptRecords();
 
-    void setQueryId(long qId);
+  void setQueryId(long qId);
 
-    void setBatchSize(int batchSize);
+  void setBatchSize(int batchSize);
 
-    void setEnabledFilterPushDown(bool enabledFilterPushDown);
+  void setEnabledFilterPushDown(bool enabledFilterPushDown);
 
-    bool isEnabledFilterPushDown();
+  bool isEnabledFilterPushDown();
 
-    long getQueryId();
+  long getQueryId();
 
-    void setRGRange(int start, int len);
+  void setRGRange(int start, int len);
 
-    void setFilter(duckdb::TableFilterSet *filter);
+  void setFilter(duckdb::TableFilterSet *filter);
 
-    duckdb::TableFilterSet *getFilter();
+  duckdb::TableFilterSet *getFilter();
 
-    int getRGStart();
+  int getRGStart();
 
-    int getRGLen();
+  int getRGLen();
 
-    int getBatchSize() const;
+  int getBatchSize() const;
 
-    void setTolerantSchemaEvolution(bool t);
+  void setTolerantSchemaEvolution(bool t);
 
-    bool isTolerantSchemaEvolution();
+  bool isTolerantSchemaEvolution();
 
-    void setEnableEncodedColumnVector(bool enabled);
+  void setEnableEncodedColumnVector(bool enabled);
 
-    bool isEnableEncodedColumnVector();
+  bool isEnableEncodedColumnVector();
 
-private:
-    std::vector <std::string> includedCols;
-    duckdb::TableFilterSet *filter;
-    // TODO: pixelsPredicate
-    bool skipCorruptRecords;
-    bool tolerantSchemaEvolution;     // this may lead to column missing due to schema evolution
-    bool enableEncodedColumnVector;   // whether read encoded column vectors directly when possible
-    bool enableFilterPushDown;        // if filter pushDown is enabled
-    long queryId;
-    int batchSize;
-    int rgStart;
-    int rgLen;
+ private:
+  std::vector<std::string> includedCols;
+  duckdb::TableFilterSet *filter;
+  // TODO: pixelsPredicate
+  bool skipCorruptRecords;
+  bool tolerantSchemaEvolution;     // this may lead to column missing due to schema evolution
+  bool enableEncodedColumnVector;   // whether read encoded column vectors directly when possible
+  bool enableFilterPushDown;        // if filter pushDown is enabled
+  long queryId;
+  int batchSize;
+  int rgStart;
+  int rgLen;
 };
 #endif //PIXELS_PIXELSREADEROPTION_H

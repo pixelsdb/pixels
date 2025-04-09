@@ -33,6 +33,7 @@
 #include "reader/TimestampColumnReader.h"
 #include "reader/IntColumnReader.h"
 #include "reader/LongColumnReader.h"
+#include "reader/StringColumnReader.h"
 
 class ColumnReaderBuilder
 {
