@@ -27,6 +27,13 @@
 
 #include "writer/ColumnWriter.h"
 #include "writer/PixelsWriterOption.h"
+#include "writer/ColumnWriterBuilder.h"
+#include "writer/IntColumnWriter.h"
+#include "writer/LongColumnWriter.h"
+#include "writer/DateColumnWriter.h"
+#include "writer/TimestampColumnWriter.h"
+#include "writer/DecimalColumnWriter.h"
+#include "writer/StringColumnWriter.h"
 
 class ColumnWriterBuilder
 {

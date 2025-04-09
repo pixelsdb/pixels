@@ -392,6 +392,7 @@ std::shared_ptr <ColumnVector> TypeDescription::createColumn(int maxSize, std::v
         case TIMESTAMP:
             return std::make_shared<TimestampColumnVector>(maxSize, 0, useEncodedVector.at(0));
         case STRING:
+          return std::make_shared<BinaryColumnVector>(maxSize, useEncodedVector.at(0));
         case BINARY:
         case VARBINARY:
         case CHAR:
