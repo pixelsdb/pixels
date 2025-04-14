@@ -17,9 +17,11 @@
 * License along with Pixels.  If not, see
 * <https://www.gnu.org/licenses/>.
 */
-//
-// Created by whz on 3/20/25.
-//
+
+/*
+ * @author whz
+ * @create 25-03-20
+ */
 
 #ifndef DUCKDB_ENDIANNESS_H
 #define DUCKDB_ENDIANNESS_H
