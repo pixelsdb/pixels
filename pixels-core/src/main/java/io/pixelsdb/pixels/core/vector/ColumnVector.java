@@ -244,6 +244,16 @@ public abstract class ColumnVector implements AutoCloseable
         return memoryUsage;
     }
 
+    public boolean getPreFlattenIsRepeating()
+    {
+        return preFlattenIsRepeating;
+    }
+
+    public boolean getPreFlattenNoNulls()
+    {
+        return preFlattenNoNulls;
+    }
+
     /**
      * Get the accumulative hash code of the elements in this column vector.
      * For ith element in this column vector, the hash code is computed as:
