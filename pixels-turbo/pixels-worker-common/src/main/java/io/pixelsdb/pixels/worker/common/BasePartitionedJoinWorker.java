@@ -389,11 +389,18 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                         leftPartitioned, WorkerCommon.getStorage(leftScheme)))
                 {
                     readCostTimer.stop();
-                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    Set<Integer> leftHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                    Set<Integer> leftHashValues;
+                    if (leftScheme.equals(Storage.Scheme.httpstream))
                     {
-                        leftHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                        leftHashValues = new HashSet<>(hashValues);
+                    } else
+                    {
+                        checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+                        leftHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
+                        for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                        {
+                            leftHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                        }
                     }
                     for (int hashValue : hashValues)
                     {
@@ -485,11 +492,18 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                         rightPartitioned, WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
-                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                    Set<Integer> rightHashValues;
+                    if (rightScheme.equals(Storage.Scheme.httpstream))
                     {
-                        rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                        rightHashValues = new HashSet<>(hashValues);
+                    } else
+                    {
+                        checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+                        rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
+                        for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                        {
+                            rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                        }
                     }
                     for (int hashValue : hashValues)
                     {
@@ -531,6 +545,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 {
                     if (e instanceof IOException)
                     {
+                        e.printStackTrace();
                         continue;
                     }
                     throw new WorkerException("failed to scan the partitioned file '" +
@@ -594,11 +609,18 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                         rightPartitioned, WorkerCommon.getStorage(rightScheme)))
                 {
                     readCostTimer.stop();
-                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                    Set<Integer> rightHashValues;
+                    if (rightScheme.equals(Storage.Scheme.httpstream))
                     {
-                        rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                        rightHashValues = new HashSet<>(hashValues);
+                    } else
+                    {
+                        checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+                        rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
+                        for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                        {
+                            rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                        }
                     }
                     for (int hashValue : hashValues)
                     {

@@ -170,6 +170,93 @@ public class TestStream
         }
     }
 
+    /**
+     * Test whether data sent in groups can be completely received as different groups.
+     * @throws IOException
+     */
+    @Test
+    public void testPhysicalReaderAndWriter2() throws IOException
+    {
+        int[] lengths = {0, 1*1024*1024, 2*1024*1024, 4*1024*1024, 8*1024*1024, 16*1024*1024, 32*1024*1024, 64*1024*1024};
+        byte[] contents = {'a', 'a', 'b', 'c', 'd', 'e', 'f'};
+        Storage stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+        Thread readerThread = new Thread(() -> {
+            try
+            {
+                try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(stream, "stream://localhost:29920"))
+                {
+                    boolean failed = false;
+                    for (int i = 0; i < sendNum; i++)
+                    {
+                        int len = fsReader.readInt(ByteOrder.BIG_ENDIAN);
+                        ByteBuffer buffer;
+                        buffer = fsReader.readFully(lengths[len]);
+                        for (int j = 0; j < lengths[len]; j++)
+                        {
+                            byte tmp = buffer.get();
+                            if (tmp != contents[len])
+                            {
+                                System.out.println("failed sendNum " + i + " sendLen " + len + " tmp: " + tmp);
+                                failed = true;
+                            }
+                        }
+                    }
+                    Thread.sleep(30000);
+                    if (failed)
+                    {
+                        throw new IOException("failed");
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            } catch (IOException e)
+            {
+                readerException = e;
+                throw new RuntimeException(e);
+            }
+        });
+        Thread writerThread = new Thread(() -> {
+            try
+            {
+                try (PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalWriter(stream, "stream://localhost:29920", null))
+                {
+                    for (int i = 0; i < sendNum; i++)
+                    {
+                        int index = i%6 + 1;
+                        ByteBuffer buffer = ByteBuffer.allocate(4);
+                        buffer.order(ByteOrder.BIG_ENDIAN);
+                        buffer.putInt(index);
+                        fsWriter.append(buffer);
+                        buffer = ByteBuffer.allocate(lengths[index]);
+                        for (int j = 0; j < lengths[index]; j++)
+                        {
+                            buffer.put(contents[index]);
+                        }
+                        fsWriter.append(buffer);
+                        fsWriter.flush();
+                    }
+                }
+            } catch (IOException e)
+            {
+                writerException = e;
+                throw new RuntimeException(e);
+            }
+        });
+        readerThread.start();
+        writerThread.start();
+        try
+        {
+            readerThread.join();
+            writerThread.join();
+            if (this.readerException != null || this.writerException != null)
+            {
+                throw new IOException();
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Test
     public void testStream() throws IOException
     {

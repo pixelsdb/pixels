@@ -34,9 +34,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -45,7 +44,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.util.Enumeration;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
@@ -65,12 +63,14 @@ public class WorkerCommon
     private static Storage s3;
     protected static Storage minio;
     private static Storage redis;
+    private static Storage stream;
     public static final int rowBatchSize;
     protected static final int pixelStride;
     protected static final int rowGroupSize;
     protected static int port;
     protected static String coordinatorIp;
     protected static int coordinatorPort;
+    private static final ConcurrentHashMap<String, PixelsReader> streamReaders;
 
     static
     {
@@ -80,6 +80,7 @@ public class WorkerCommon
         port = Integer.parseInt(configFactory.getProperty("executor.worker.exchange.port"));
         coordinatorIp = configFactory.getProperty("worker.coordinate.server.host");
         coordinatorPort = Integer.parseInt(configFactory.getProperty("worker.coordinate.server.port"));
+        streamReaders = new ConcurrentHashMap<>();
     }
 
     public static void initStorage(StorageInfo storageInfo)
@@ -101,6 +102,10 @@ public class WorkerCommon
                 ConfigRedis(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                 WorkerCommon.redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
             }
+            else if (WorkerCommon.stream == null && storageInfo.getScheme() == Storage.Scheme.httpstream)
+            {
+                WorkerCommon.stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+            }
         } catch (Throwable e)
         {
             throw new WorkerException("failed to initialize the storage of scheme " + storageInfo.getScheme(), e);
@@ -117,6 +122,8 @@ public class WorkerCommon
                 return minio;
             case redis:
                 return redis;
+            case httpstream:
+                return stream;
         }
         throw new UnsupportedOperationException("scheme " + scheme + " is not supported");
     }
@@ -199,28 +206,71 @@ public class WorkerCommon
         requireNonNull(rightSchema, "rightSchema is null");
         requireNonNull(leftPaths, "leftPaths is null");
         requireNonNull(rightPaths, "rightPaths is null");
-        Future<?> leftFuture = executor.submit(() -> {
-            try
+        List<Future<?>> leftFutures = new ArrayList<>();
+        if (leftStorage.getScheme().equals(Storage.Scheme.httpstream))
+        {
+            for (String path: leftPaths)
             {
-                leftSchema.set(getFileSchemaFromPaths(leftStorage, leftPaths));
-            } catch (IOException | InterruptedException e)
-            {
-                logger.error("failed to read the file schema for the left table", e);
+                leftFutures.add(executor.submit(() -> {
+                    try
+                    {
+                        leftSchema.set(getFileSchemaFromPath(leftStorage, path));
+                    } catch (IOException e)
+                    {
+                        logger.error("failed to read the file schema for the left table", e);
+                    }
+                }));
             }
-        });
-        Future<?> rightFuture = executor.submit(() -> {
-            try
+        } else
+        {
+            leftFutures.add(executor.submit(() -> {
+                try
+                {
+                    leftSchema.set(getFileSchemaFromPaths(leftStorage, leftPaths));
+                } catch (IOException | InterruptedException e)
+                {
+                    logger.error("failed to read the file schema for the left table", e);
+                }
+            }));
+        }
+        List<Future<?>> rightFutures = new ArrayList<>();
+        if (rightStorage.getScheme().equals(Storage.Scheme.httpstream))
+        {
+            for (String path: rightPaths)
             {
-                rightSchema.set(getFileSchemaFromPaths(rightStorage, rightPaths));
-            } catch (IOException | InterruptedException e)
-            {
-                logger.error("failed to read the file schema for the right table", e);
+                rightFutures.add(executor.submit(() -> {
+                    try
+                    {
+                        rightSchema.set(getFileSchemaFromPath(rightStorage, path));
+                    } catch (IOException e)
+                    {
+                        logger.error("failed to read the file schema for the right table", e);
+                    }
+                }));
             }
-        });
+        } else
+        {
+            rightFutures.add(executor.submit(() -> {
+                try
+                {
+                    rightSchema.set(getFileSchemaFromPaths(rightStorage, rightPaths));
+                } catch (IOException | InterruptedException e)
+                {
+                    logger.error("failed to read the file schema for the right table", e);
+                }
+            }));
+        }
+
         try
         {
-            leftFuture.get();
-            rightFuture.get();
+            for (Future<?> future: leftFutures)
+            {
+                future.get();
+            }
+            for (Future<?> future: rightFutures)
+            {
+                future.get();
+            }
         } catch (Throwable e)
         {
             logger.error("interrupted while waiting for the termination of schema read", e);
@@ -239,6 +289,7 @@ public class WorkerCommon
     {
         requireNonNull(storage, "storage is null");
         requireNonNull(inputSplits, "inputSplits is null");
+        TypeDescription fileSchema = null;
         while (true)
         {
             for (InputSplit inputSplit : inputSplits)
@@ -254,9 +305,12 @@ public class WorkerCommon
                     {
                         checkedPath = inputInfo.getPath();
                         PixelsReader reader = getReader(checkedPath, storage);
-                        TypeDescription fileSchema = reader.getFileSchema();
-                        reader.close();
-                        return fileSchema;
+                        fileSchema = reader.getFileSchema();
+                        if (!storage.getScheme().equals(Storage.Scheme.httpstream))
+                        {
+                            reader.close();
+                            return fileSchema;
+                        }
                     } catch (Throwable e)
                     {
                         if (e instanceof IOException)
@@ -266,6 +320,10 @@ public class WorkerCommon
                         throw new IOException("failed to read file schema", e);
                     }
                 }
+            }
+            if (storage.getScheme().equals(Storage.Scheme.httpstream))
+            {
+                return fileSchema;
             }
             TimeUnit.MILLISECONDS.sleep(200);
         }
@@ -283,6 +341,8 @@ public class WorkerCommon
     {
         requireNonNull(storage, "storage is null");
         requireNonNull(paths, "paths is null");
+
+        TypeDescription fileSchema = null;
         while (true)
         {
             for (String path : paths)
@@ -290,20 +350,52 @@ public class WorkerCommon
                 try
                 {
                     PixelsReader reader = getReader(path, storage);
-                    TypeDescription fileSchema = reader.getFileSchema();
-                    reader.close();
-                    return fileSchema;
+                    fileSchema = reader.getFileSchema();
+                    if (!storage.getScheme().equals(Storage.Scheme.httpstream))
+                    {
+                        reader.close();
+                        return fileSchema;
+                    }
                 } catch (Throwable e)
                 {
                     if (e instanceof IOException)
                     {
+                        logger.error("failed to read file schema", e);
                         continue;
                     }
                     throw new IOException("failed to read file schema", e);
                 }
             }
+            if (storage.getScheme().equals(Storage.Scheme.httpstream))
+            {
+                return fileSchema;
+            }
             TimeUnit.MILLISECONDS.sleep(200);
         }
+    }
+
+    public static TypeDescription getFileSchemaFromPath(Storage storage, String path)
+            throws IOException
+    {
+        requireNonNull(storage, "storage is null");
+        requireNonNull(path, "path is null");
+
+        TypeDescription fileSchema = null;
+        try
+        {
+            logger.info("try to get path " + path);
+            PixelsReader reader = getReader(path, storage);
+            fileSchema = reader.getFileSchema();
+            logger.info("succeed to get path " + path);
+        } catch (Throwable e)
+        {
+            if (e instanceof IOException)
+            {
+                logger.error("failed to read file schema", e);
+            }
+            throw new IOException("failed to read file schema", e);
+        }
+        return fileSchema;
     }
 
     /**
@@ -357,14 +449,29 @@ public class WorkerCommon
     {
         requireNonNull(filePath, "fileName is null");
         requireNonNull(storage, "storage is null");
-        PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
-                .setStorage(storage)
-                .setPath(filePath)
-                .setEnableCache(false)
-                .setCacheOrder(ImmutableList.of())
-                .setPixelsCacheReader(null)
-                .setPixelsFooterCache(footerCache);
-        PixelsReader pixelsReader = builder.build();
+        PixelsReader pixelsReader;
+        if (storage.getScheme().equals(Storage.Scheme.httpstream))
+        {
+            if (!streamReaders.containsKey(filePath) || streamReaders.get(filePath).getFileSchema() == null)
+            {
+                pixelsReader = PixelsReaderStreamImpl.newBuilder()
+                        .setStorage(storage)
+                        .setPath(filePath)
+                        .build();
+                streamReaders.put(filePath, pixelsReader);
+            }
+            pixelsReader = streamReaders.get(filePath);
+        } else
+        {
+            pixelsReader = PixelsReaderImpl.newBuilder()
+                    .setStorage(storage)
+                    .setPath(filePath)
+                    .setEnableCache(false)
+                    .setCacheOrder(ImmutableList.of())
+                    .setPixelsCacheReader(null)
+                    .setPixelsFooterCache(footerCache)
+                    .build();
+        }
         return pixelsReader;
     }
 
@@ -389,20 +496,40 @@ public class WorkerCommon
         requireNonNull(storage, "storage is null");
         checkArgument(!isPartitioned || keyColumnIds != null,
                 "keyColumnIds is null whereas isPartitioned is true");
-        PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder()
-                .setSchema(schema)
-                .setPixelStride(pixelStride)
-                .setRowGroupSize(rowGroupSize)
-                .setStorage(storage)
-                .setPath(filePath)
-                .setOverwrite(true) // set overwrite to true to avoid existence checking.
-                .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
-                .setPartitioned(isPartitioned);
-        if (isPartitioned)
+        PixelsWriter writer;
+        if (storage.getScheme() == Storage.Scheme.httpstream)
         {
-            builder.setPartKeyColumnIds(keyColumnIds);
+            PixelsWriterStreamImpl.Builder builder =  PixelsWriterStreamImpl.newBuilder()
+                    .setSchema(schema)
+                    .setPixelStride(pixelStride)
+                    .setRowGroupSize(rowGroupSize)
+                    .setStorage(storage)
+                    .setPath(filePath)
+                    .setEncodingLevel(EncodingLevel.EL2)
+                    .setPartitioned(isPartitioned);
+            if (isPartitioned)
+            {
+                builder.setPartKeyColumnIds(keyColumnIds);
+            }
+            writer = builder.build();
+        } else
+        {
+            PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder()
+                    .setSchema(schema)
+                    .setPixelStride(pixelStride)
+                    .setRowGroupSize(rowGroupSize)
+                    .setStorage(storage)
+                    .setPath(filePath)
+                    .setOverwrite(true) // set overwrite to true to avoid existence checking.
+                    .setEncodingLevel(EncodingLevel.EL2) // it is worth to do encoding
+                    .setPartitioned(isPartitioned);
+            if (isPartitioned)
+            {
+                builder.setPartKeyColumnIds(keyColumnIds);
+            }
+            writer = builder.build();
         }
-        return builder.build();
+        return writer;
     }
 
     /**
@@ -457,19 +584,22 @@ public class WorkerCommon
         option.transId(transId);
         option.transTimestamp(timestamp);
         option.includeCols(cols);
-        if (pixelsReader.getRowGroupNum() == numPartition)
+        if (pixelsReader instanceof PixelsReaderImpl)
         {
-            option.rgRange(hashValue, 1);
-        } else
-        {
-            for (int i = 0; i < pixelsReader.getRowGroupNum(); ++i)
+            if (pixelsReader.getRowGroupNum() == numPartition)
             {
-                PixelsProto.RowGroupInformation info = pixelsReader.getRowGroupInfo(i);
-                if (info.getPartitionInfo().getHashValue() == hashValue)
+                option.rgRange(hashValue, 1);
+            } else
+            {
+                for (int i = 0; i < pixelsReader.getRowGroupNum(); ++i)
                 {
-                    // Note: DO NOT use hashValue as the row group start index.
-                    option.rgRange(i, 1);
-                    break;
+                    PixelsProto.RowGroupInformation info = pixelsReader.getRowGroupInfo(i);
+                    if (info.getPartitionInfo().getHashValue() == hashValue)
+                    {
+                        // Note: DO NOT use hashValue as the row group start index.
+                        option.rgRange(i, 1);
+                        break;
+                    }
                 }
             }
         }
@@ -514,7 +644,7 @@ public class WorkerCommon
 
     public static int getPort()
     {
-        return port++;
+        return port;
     }
 
     public static String getCoordinatorIp()
