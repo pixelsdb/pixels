@@ -19,7 +19,10 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.BinaryColumnVectorFlat;
+import io.pixelsdb.pixels.core.utils.flat.ByteArray;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -804,5 +807,31 @@ public class BinaryColumnVector extends ColumnVector
             }
             this.vector = null;
         }
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int[] byteArrayOffsets = new int[vector.length];
+        for (int i = 0; i < vector.length; ++i)
+        {
+            int bytesOffset = ByteArray.createBytesVector(builder, vector[i]);
+            ByteArray.startByteArray(builder);
+            ByteArray.addBytes(builder, bytesOffset);
+            byteArrayOffsets[i] = ByteArray.endByteArray(builder);
+        }
+
+        BinaryColumnVectorFlat.startBinaryColumnVectorFlat(builder);
+        BinaryColumnVectorFlat.addBase(builder, baseOffset);
+        BinaryColumnVectorFlat.addVector(builder, BinaryColumnVectorFlat.createVectorVector(builder, byteArrayOffsets));
+        BinaryColumnVectorFlat.addStart(builder, BinaryColumnVectorFlat.createStartVector(builder, start));
+        BinaryColumnVectorFlat.addLens(builder, BinaryColumnVectorFlat.createLensVector(builder, lens));
+        BinaryColumnVectorFlat.addBuffer(builder, BinaryColumnVectorFlat.createBufferVector(builder, buffer));
+        BinaryColumnVectorFlat.addNextFree(builder, nextFree);
+        BinaryColumnVectorFlat.addSmallBuffer(builder, BinaryColumnVectorFlat.createBufferVector(builder, smallBuffer));
+        BinaryColumnVectorFlat.addSmallBufferNextFree(builder, smallBufferNextFree);
+        BinaryColumnVectorFlat.addBufferAllocationCount(builder, bufferAllocationCount);
+        return BinaryColumnVectorFlat.endBinaryColumnVectorFlat(builder);
     }
 }

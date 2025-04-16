@@ -19,7 +19,9 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.DictionaryColumnVectorFlat;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
@@ -373,5 +375,18 @@ public class DictionaryColumnVector extends ColumnVector
         this.dictArray = null;
         this.dictOffsets = null;
         this.ids = null;
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+
+        DictionaryColumnVectorFlat.startDictionaryColumnVectorFlat(builder);
+        DictionaryColumnVectorFlat.addBase(builder, baseOffset);
+        DictionaryColumnVectorFlat.addDictArray(builder, DictionaryColumnVectorFlat.createDictArrayVector(builder, dictArray));
+        DictionaryColumnVectorFlat.addDictOffsets(builder, DictionaryColumnVectorFlat.createDictOffsetsVector(builder, dictOffsets));
+        DictionaryColumnVectorFlat.addIds(builder, DictionaryColumnVectorFlat.createIdsVector(builder, ids));
+        return DictionaryColumnVectorFlat.endDictionaryColumnVectorFlat(builder);
     }
 }
