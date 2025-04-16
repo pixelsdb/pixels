@@ -19,8 +19,10 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Integer128;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorBaseFlat;
 
 import java.sql.Date;
 import java.sql.Time;
@@ -244,16 +246,6 @@ public abstract class ColumnVector implements AutoCloseable
         return memoryUsage;
     }
 
-    public boolean getPreFlattenIsRepeating()
-    {
-        return preFlattenIsRepeating;
-    }
-
-    public boolean getPreFlattenNoNulls()
-    {
-        return preFlattenNoNulls;
-    }
-
     /**
      * Get the accumulative hash code of the elements in this column vector.
      * For ith element in this column vector, the hash code is computed as:
@@ -463,5 +455,21 @@ public abstract class ColumnVector implements AutoCloseable
         preFlattenNoNulls = true;
         preFlattenIsRepeating = false;
         writeIndex = 0;
+    }
+
+    public int serialize(FlatBufferBuilder builder)
+    {
+        ColumnVectorBaseFlat.startColumnVectorBaseFlat(builder);
+        ColumnVectorBaseFlat.addLength(builder, length);
+        ColumnVectorBaseFlat.addWriteIndex(builder, writeIndex);
+        ColumnVectorBaseFlat.addMemoryUsage(builder, memoryUsage);
+        ColumnVectorBaseFlat.addIsRepeating(builder, isRepeating);
+        ColumnVectorBaseFlat.addDuplicated(builder, duplicated);
+        ColumnVectorBaseFlat.addOriginVecId(builder, originVecId);
+        ColumnVectorBaseFlat.addIsNull(builder, ColumnVectorBaseFlat.createIsNullVector(builder, isNull));
+        ColumnVectorBaseFlat.addNoNulls(builder, noNulls);
+        ColumnVectorBaseFlat.addPreFlattenIsRepeating(builder, preFlattenIsRepeating);
+        ColumnVectorBaseFlat.addPreFlattenNoNulls(builder, preFlattenNoNulls);
+        return ColumnVectorBaseFlat.endColumnVectorBaseFlat(builder);
     }
 }

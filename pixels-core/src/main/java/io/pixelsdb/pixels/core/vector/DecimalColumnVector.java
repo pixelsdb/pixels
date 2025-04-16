@@ -19,7 +19,9 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.DecimalColumnVectorFlat;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -387,5 +389,18 @@ public class DecimalColumnVector extends ColumnVector
                 }
             }
         }
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+
+        DecimalColumnVectorFlat.startDecimalColumnVectorFlat(builder);
+        DecimalColumnVectorFlat.addBase(builder, baseOffset);
+        DecimalColumnVectorFlat.addVector(builder, DecimalColumnVectorFlat.createVectorVector(builder, vector));
+        DecimalColumnVectorFlat.addPrecision(builder, precision);
+        DecimalColumnVectorFlat.addScale(builder, scale);
+        return DecimalColumnVectorFlat.endDecimalColumnVectorFlat(builder);
     }
 }

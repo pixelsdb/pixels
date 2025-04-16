@@ -19,7 +19,11 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.VectorizedRowBatchFlat;
+
+import java.nio.ByteBuffer;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -322,5 +326,38 @@ public class VectorizedRowBatch implements AutoCloseable
             }
             this.cols = null;
         }
+    }
+
+    /**
+     * Serialize VectorizedRowBatch to byte array
+     * @return
+     */
+    public byte[] serialize(FlatBufferBuilder builder)
+    {
+        int[] columnVectorOffsets = new int[numCols];
+        for (int i = 0; i < numCols; ++i)
+        {
+            columnVectorOffsets[i] = cols[i].serialize(builder);
+        }
+        int colsOffset = VectorizedRowBatchFlat.createColsVector(builder, columnVectorOffsets);
+
+        VectorizedRowBatchFlat.startVectorizedRowBatchFlat(builder);
+        VectorizedRowBatchFlat.addNumCols(builder, numCols);
+        VectorizedRowBatchFlat.addNumCols(builder, colsOffset);
+        VectorizedRowBatchFlat.addSize(builder, size);
+        VectorizedRowBatchFlat.addProjectionSize(builder, projectionSize);
+        VectorizedRowBatchFlat.addMaxSize(builder, maxSize);
+        VectorizedRowBatchFlat.addMemoryUsage(builder, memoryUsage);
+        VectorizedRowBatchFlat.addEndOfFile(builder, endOfFile);
+        int batchOffset = VectorizedRowBatchFlat.endVectorizedRowBatchFlat(builder);
+
+        builder.finish(batchOffset);
+        return builder.sizedByteArray();
+    }
+
+    public static VectorizedRowBatch deserialize(byte[] data)
+    {
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+        VectorizedRowBatchFlat batchFlat = VectorizedRowBatchFlat.getRootAsVectorizedRowBatchFlat(buffer);
     }
 }

@@ -120,6 +120,9 @@
         <!-- testing -->
         <dep.junit.version>4.13.1</dep.junit.version>
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
+
+        <!-- flat buffers -->
+        <google.flatbuffers.version>2.0.8</google.flatbuffers.version>
     </properties>
 
     <repositories>

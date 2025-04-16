@@ -1,6 +1,9 @@
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.DoubleArray;
+import io.pixelsdb.pixels.core.utils.flat.VectorColumnVectorFlat;
 
 import java.util.Arrays;
 
@@ -250,5 +253,25 @@ public class VectorColumnVector extends ColumnVector
         int index = writeIndex++;
         vector[index] = vec;
         isNull[index] = false;
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int[] doubleArrayOffsets = new int[vector.length];
+        for (int i = 0; i < vector.length; ++i)
+        {
+            int doublesOffset = DoubleArray.createDoublesVector(builder, vector[i]);
+            DoubleArray.startDoubleArray(builder);
+            DoubleArray.addDoubles(builder, doublesOffset);
+            doubleArrayOffsets[i] = DoubleArray.endDoubleArray(builder);
+        }
+
+        VectorColumnVectorFlat.startVectorColumnVectorFlat(builder);
+        VectorColumnVectorFlat.addBase(builder, baseOffset);
+        VectorColumnVectorFlat.addVector(builder, VectorColumnVectorFlat.createVectorVector(builder, doubleArrayOffsets));
+        VectorColumnVectorFlat.addDimension(builder, dimension);
+        return VectorColumnVectorFlat.endVectorColumnVectorFlat(builder);
     }
 }

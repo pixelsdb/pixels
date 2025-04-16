@@ -19,7 +19,9 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.StructColumnVectorFlat;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -250,5 +252,22 @@ public class StructColumnVector extends ColumnVector
         {
             fields[i].unFlatten();
         }
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int[] fieldOffsets = new int[fields.length];
+        for (int i = 0; i  < fields.length; ++i)
+        {
+            fieldOffsets[i] = fields[i].serialize(builder);
+        }
+        int fieldsOffset = StructColumnVectorFlat.createFieldsVector(builder, fieldOffsets);
+
+        StructColumnVectorFlat.startStructColumnVectorFlat(builder);
+        StructColumnVectorFlat.addBase(builder, baseOffset);
+        StructColumnVectorFlat.addFields(builder, fieldsOffset);
+        return StructColumnVectorFlat.endStructColumnVectorFlat(builder);
     }
 }
