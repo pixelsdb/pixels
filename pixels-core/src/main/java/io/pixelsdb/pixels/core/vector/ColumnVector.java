@@ -522,7 +522,7 @@ public abstract class ColumnVector implements AutoCloseable
             case ColumnVectorFlat.TimestampColumnVectorFlat:
                 return TimestampColumnVector.deserialize((TimestampColumnVectorFlat) table);
             default:
-                throw new UnsupportedOperationException("Unsupported column vector type: " + vectorFlat.columnVectorType());
+                throw new UnsupportedOperationException("Unsupported column vector type: " + type);
         }
     }
 }
