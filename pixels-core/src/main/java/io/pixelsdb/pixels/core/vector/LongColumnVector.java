@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.vector;
 import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.flat.LongColumnVectorFlat;
+import io.pixelsdb.pixels.core.utils.flat.LongDecimalColumnVectorFlat;
 
 import java.util.Arrays;
 
@@ -328,5 +329,16 @@ public class LongColumnVector extends ColumnVector
         LongColumnVectorFlat.addBase(builder, baseOffsets);
         LongColumnVectorFlat.addVector(builder, LongColumnVectorFlat.createVectorVector(builder, vector));
         return LongColumnVectorFlat.endLongColumnVectorFlat(builder);
+    }
+
+    public static LongColumnVector deserialize(LongDecimalColumnVectorFlat flat)
+    {
+        LongColumnVector vector = new LongColumnVector(flat.base().length());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
     }
 }

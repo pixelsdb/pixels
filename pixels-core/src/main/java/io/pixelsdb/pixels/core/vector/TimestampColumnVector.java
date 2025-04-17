@@ -538,4 +538,16 @@ public class TimestampColumnVector extends ColumnVector
         TimestampColumnVectorFlat.addScratchTimestamp(builder, scratchTimestamp.getTime());
         return TimestampColumnVectorFlat.endTimestampColumnVectorFlat(builder);
     }
+
+    public static TimestampColumnVector deserialize(TimestampColumnVectorFlat flat)
+    {
+        TimestampColumnVector vector = new TimestampColumnVector(flat.base().length(), flat.precision());
+        for (int i = 0;i < flat.timesLength(); ++i)
+        {
+            vector.times[i] = flat.times(i);
+        }
+        vector.scratchTimestamp.setTime(flat.scratchTimestamp());
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

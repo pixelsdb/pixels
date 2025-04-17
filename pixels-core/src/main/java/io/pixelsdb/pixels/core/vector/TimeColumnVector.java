@@ -570,4 +570,16 @@ public class TimeColumnVector extends ColumnVector
         TimeColumnVectorFlat.addScratchTime(builder, scratchTime.getTime());
         return TimeColumnVectorFlat.endTimeColumnVectorFlat(builder);
     }
+
+    public static TimeColumnVector deserialize(TimeColumnVectorFlat flat)
+    {
+        TimeColumnVector vector = new TimeColumnVector(flat.base().length(), flat.precision());
+        for (int i = 0; i < flat.timesLength(); ++i)
+        {
+            vector.times[i] = flat.times(i);
+        }
+        vector.scratchTime.setTime(flat.scratchTime());
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

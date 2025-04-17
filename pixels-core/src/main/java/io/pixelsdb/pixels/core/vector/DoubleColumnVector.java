@@ -317,4 +317,15 @@ public class DoubleColumnVector extends ColumnVector
         DoubleColumnVectorFlat.addVector(builder, DoubleColumnVectorFlat.createVectorVector(builder, vector));
         return DoubleColumnVectorFlat.endDoubleColumnVectorFlat(builder);
     }
+
+    public static DoubleColumnVector deserialize(DoubleColumnVectorFlat flat)
+    {
+        DoubleColumnVector vector = new DoubleColumnVector(flat.base().length());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

@@ -20,7 +20,9 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
+import com.google.flatbuffers.Table;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.flat.VectorizedRowBatchFlat;
 
 import java.nio.ByteBuffer;
@@ -343,7 +345,7 @@ public class VectorizedRowBatch implements AutoCloseable
 
         VectorizedRowBatchFlat.startVectorizedRowBatchFlat(builder);
         VectorizedRowBatchFlat.addNumCols(builder, numCols);
-        VectorizedRowBatchFlat.addNumCols(builder, colsOffset);
+        VectorizedRowBatchFlat.addCols(builder, colsOffset);
         VectorizedRowBatchFlat.addSize(builder, size);
         VectorizedRowBatchFlat.addProjectionSize(builder, projectionSize);
         VectorizedRowBatchFlat.addMaxSize(builder, maxSize);
@@ -359,5 +361,21 @@ public class VectorizedRowBatch implements AutoCloseable
     {
         ByteBuffer buffer = ByteBuffer.wrap(data);
         VectorizedRowBatchFlat batchFlat = VectorizedRowBatchFlat.getRootAsVectorizedRowBatchFlat(buffer);
+
+        VectorizedRowBatch batch = new VectorizedRowBatch(batchFlat.numCols());
+        batch.size = batchFlat.size();
+        batch.projectionSize = batchFlat.projectionSize();
+        batch.maxSize = batchFlat.maxSize();
+        batch.memoryUsage = batchFlat.memoryUsage();
+        batch.endOfFile = batchFlat.endOfFile();
+
+        for (int i = 0; i < batchFlat.numCols(); ++i)
+        {
+            byte colType = batchFlat.colsType(i);
+            Table colTable = new Table();
+            batchFlat.cols(colTable, i);
+            batch.cols[i] = ColumnVector.deserialize(colType, colTable);
+        }
+        return batch;
     }
 }

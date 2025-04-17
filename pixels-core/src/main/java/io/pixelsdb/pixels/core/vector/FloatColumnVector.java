@@ -328,4 +328,15 @@ public class FloatColumnVector extends ColumnVector
         FloatColumnVectorFlat.addVector(builder, FloatColumnVectorFlat.createVectorVector(builder, vector));
         return FloatColumnVectorFlat.endFloatColumnVectorFlat(builder);
     }
+
+    public static FloatColumnVector deserialize(FloatColumnVectorFlat flat)
+    {
+        FloatColumnVector vector = new FloatColumnVector(flat.base().length());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

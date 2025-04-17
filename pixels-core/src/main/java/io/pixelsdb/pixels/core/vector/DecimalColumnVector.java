@@ -403,4 +403,15 @@ public class DecimalColumnVector extends ColumnVector
         DecimalColumnVectorFlat.addScale(builder, scale);
         return DecimalColumnVectorFlat.endDecimalColumnVectorFlat(builder);
     }
+
+    public static DecimalColumnVector deserialize(DecimalColumnVectorFlat flat)
+    {
+        DecimalColumnVector vector = new DecimalColumnVector(flat.base().length(), flat.precision(), flat.scale());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

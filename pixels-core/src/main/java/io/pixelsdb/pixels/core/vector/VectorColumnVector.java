@@ -274,4 +274,16 @@ public class VectorColumnVector extends ColumnVector
         VectorColumnVectorFlat.addDimension(builder, dimension);
         return VectorColumnVectorFlat.endVectorColumnVectorFlat(builder);
     }
+
+    public static VectorColumnVector deserialize(VectorColumnVectorFlat flat)
+    {
+        VectorColumnVector vector = new VectorColumnVector(flat.base().length(), flat.dimension());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            DoubleArray doubleArray = flat.vector(i);
+            vector.vector[i] = doubleArray != null ? doubleArray.doublesAsByteBuffer().asDoubleBuffer().array() : null;
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

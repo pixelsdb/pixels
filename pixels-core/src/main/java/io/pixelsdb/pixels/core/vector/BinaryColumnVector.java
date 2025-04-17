@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
+import com.google.flatbuffers.Table;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.flat.BinaryColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.flat.ByteArray;
@@ -833,5 +834,46 @@ public class BinaryColumnVector extends ColumnVector
         BinaryColumnVectorFlat.addSmallBufferNextFree(builder, smallBufferNextFree);
         BinaryColumnVectorFlat.addBufferAllocationCount(builder, bufferAllocationCount);
         return BinaryColumnVectorFlat.endBinaryColumnVectorFlat(builder);
+    }
+
+    public static BinaryColumnVector deserialize(BinaryColumnVectorFlat flat)
+    {
+        BinaryColumnVector vector = new BinaryColumnVector(flat.base().length());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            ByteArray byteArray = flat.vector(i);
+            vector.vector[i] = byteArray != null ? byteArray.bytesAsByteBuffer().array() : null;
+        }
+        for (int i = 0;i < flat.startLength(); ++i)
+        {
+            vector.start[i] = flat.start(i);
+        }
+        for (int i = 0; i < flat.lensLength(); ++i)
+        {
+            vector.lens[i] = flat.lens(i);
+        }
+        int bufferLength = flat.bufferLength();
+        if (bufferLength > 0)
+        {
+            vector.buffer = new byte[bufferLength];
+            for (int i = 0;i < bufferLength; ++i)
+            {
+                vector.buffer[i] = flat.buffer(i);
+            }
+        }
+        vector.nextFree = flat.nextFree();
+        int smallBufferLength = flat.smallBufferLength();
+        if (smallBufferLength > 0)
+        {
+            vector.smallBuffer = new byte[smallBufferLength];
+            for (int i = 0; i < smallBufferLength; ++i)
+            {
+                vector.smallBuffer[i] = flat.smallBuffer(i);
+            }
+        }
+        vector.smallBufferNextFree = flat.smallBufferNextFree();
+        vector.bufferAllocationCount = flat.bufferAllocationCount();
+        vector.deserializeBase(flat.base());
+        return vector;
     }
 }

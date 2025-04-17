@@ -20,9 +20,10 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
+import com.google.flatbuffers.Table;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Integer128;
-import io.pixelsdb.pixels.core.utils.flat.ColumnVectorBaseFlat;
+import io.pixelsdb.pixels.core.utils.flat.*;
 
 import java.sql.Date;
 import java.sql.Time;
@@ -471,5 +472,57 @@ public abstract class ColumnVector implements AutoCloseable
         ColumnVectorBaseFlat.addPreFlattenIsRepeating(builder, preFlattenIsRepeating);
         ColumnVectorBaseFlat.addPreFlattenNoNulls(builder, preFlattenNoNulls);
         return ColumnVectorBaseFlat.endColumnVectorBaseFlat(builder);
+    }
+
+    protected void deserializeBase(ColumnVectorBaseFlat base)
+    {
+        this.length = base.length();
+        this.writeIndex = base.writeIndex();
+        this.memoryUsage = base.memoryUsage();
+        this.isRepeating = base.isRepeating();
+        this.duplicated = base.duplicated();
+        this.originVecId = base.originVecId();
+        for (int i = 0; i < base.isNullLength(); ++i)
+        {
+            this.isNull[i] = base.isNull(i);
+        }
+        this.noNulls = base.noNulls();
+        this.preFlattenIsRepeating = base.preFlattenIsRepeating();
+        this.preFlattenNoNulls = base.preFlattenNoNulls();
+    }
+
+    public static ColumnVector deserialize(byte type, Table table)
+    {
+        switch (type)
+        {
+            case ColumnVectorFlat.BinaryColumnVectorFlat:
+                return BinaryColumnVector.deserialize((BinaryColumnVectorFlat) table);
+            case ColumnVectorFlat.ByteColumnVectorFlat:
+                return ByteColumnVector.deserialize((ByteColumnVectorFlat) table);
+            case ColumnVectorFlat.DateColumnVectorFlat:
+                return DateColumnVector.deserialize((DateColumnVectorFlat) table);
+            case ColumnVectorFlat.DecimalColumnVectorFlat:
+                return DecimalColumnVector.deserialize((DecimalColumnVectorFlat) table);
+            case ColumnVectorFlat.DictionaryColumnVectorFlat:
+                return DictionaryColumnVector.deserialize((DictionaryColumnVectorFlat) table);
+            case ColumnVectorFlat.DoubleColumnVectorFlat:
+                return DoubleColumnVector.deserialize((DoubleColumnVectorFlat) table);
+            case ColumnVectorFlat.FloatColumnVectorFlat:
+                return FloatColumnVector.deserialize((FloatColumnVectorFlat) table);
+            case ColumnVectorFlat.IntColumnVectorFlat:
+                return IntColumnVector.deserialize((IntColumnVectorFlat) table);
+            case ColumnVectorFlat.LongColumnVectorFlat:
+                return LongColumnVector.deserialize((LongDecimalColumnVectorFlat) table);
+            case ColumnVectorFlat.LongDecimalColumnVectorFlat:
+                return LongDecimalColumnVector.deserialize((LongDecimalColumnVectorFlat) table);
+            case ColumnVectorFlat.StructColumnVectorFlat:
+                return StructColumnVector.deserialize((StructColumnVectorFlat) table);
+            case ColumnVectorFlat.TimeColumnVectorFlat:
+                return TimeColumnVector.deserialize((TimeColumnVectorFlat) table);
+            case ColumnVectorFlat.TimestampColumnVectorFlat:
+                return TimestampColumnVector.deserialize((TimestampColumnVectorFlat) table);
+            default:
+                throw new UnsupportedOperationException("Unsupported column vector type: " + vectorFlat.columnVectorType());
+        }
     }
 }
