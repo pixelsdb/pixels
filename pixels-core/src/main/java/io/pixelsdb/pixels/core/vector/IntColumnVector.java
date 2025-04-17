@@ -316,4 +316,15 @@ public class IntColumnVector extends ColumnVector
         IntColumnVectorFlat.addVector(builder, IntColumnVectorFlat.createVectorVector(builder, vector));
         return IntColumnVectorFlat.endIntColumnVectorFlat(builder);
     }
+
+    public static IntColumnVector deserialize(IntColumnVectorFlat flat)
+    {
+        IntColumnVector vector = new IntColumnVector(flat.base().length());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

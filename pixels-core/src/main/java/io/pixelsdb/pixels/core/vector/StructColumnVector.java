@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
+import com.google.flatbuffers.Table;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.flat.StructColumnVectorFlat;
 
@@ -269,5 +270,10 @@ public class StructColumnVector extends ColumnVector
         StructColumnVectorFlat.addBase(builder, baseOffset);
         StructColumnVectorFlat.addFields(builder, fieldsOffset);
         return StructColumnVectorFlat.endStructColumnVectorFlat(builder);
+    }
+
+    public static StructColumnVector deserialize(StructColumnVectorFlat flat)
+    {
+        throw new UnsupportedOperationException();
     }
 }

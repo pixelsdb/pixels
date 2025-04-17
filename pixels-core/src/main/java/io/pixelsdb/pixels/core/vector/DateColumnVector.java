@@ -478,4 +478,16 @@ public class DateColumnVector extends ColumnVector
         DateColumnVectorFlat.addScratchDate(builder, scratchDate.getTime());
         return DateColumnVectorFlat.endDateColumnVectorFlat(builder);
     }
+
+    public static DateColumnVector deserialize(DateColumnVectorFlat flat)
+    {
+        DateColumnVector vector = new DateColumnVector(flat.base().length());
+        for (int i = 0; i < flat.datesLength(); ++i)
+        {
+            vector.dates[i] = flat.dates(i);
+        }
+        vector.scratchDate.setTime(flat.scratchDate());
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

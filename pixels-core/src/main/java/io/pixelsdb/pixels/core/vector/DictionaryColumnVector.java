@@ -389,4 +389,25 @@ public class DictionaryColumnVector extends ColumnVector
         DictionaryColumnVectorFlat.addIds(builder, DictionaryColumnVectorFlat.createIdsVector(builder, ids));
         return DictionaryColumnVectorFlat.endDictionaryColumnVectorFlat(builder);
     }
+
+    public static DictionaryColumnVector deserialize(DictionaryColumnVectorFlat flat)
+    {
+        DictionaryColumnVector vector = new DictionaryColumnVector(flat.base().length());
+        vector.dictArray = new byte[flat.dictArrayLength()];
+        for (int i = 0; i < flat.dictArrayLength(); ++i)
+        {
+            vector.dictArray[i] = flat.dictArray(i);
+        }
+        vector.dictOffsets = new int[flat.dictOffsetsLength()];
+        for (int i = 0;i < flat.dictOffsetsLength(); ++i)
+        {
+            vector.dictOffsets[i] = flat.dictOffsets(i);
+        }
+        for (int i = 0; i < flat.idsLength(); ++i)
+        {
+            vector.ids[i] = flat.ids(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

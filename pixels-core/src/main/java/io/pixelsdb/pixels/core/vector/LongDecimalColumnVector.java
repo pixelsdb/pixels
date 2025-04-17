@@ -460,4 +460,15 @@ public class LongDecimalColumnVector extends ColumnVector
         LongDecimalColumnVectorFlat.addScale(builder, scale);
         return LongDecimalColumnVectorFlat.endLongDecimalColumnVectorFlat(builder);
     }
+
+    public static LongDecimalColumnVector deserialize(LongDecimalColumnVectorFlat flat)
+    {
+        LongDecimalColumnVector vector = new LongDecimalColumnVector(flat.base().length(), flat.precision(), flat.scale());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }

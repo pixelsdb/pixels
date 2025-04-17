@@ -291,4 +291,15 @@ public class ByteColumnVector extends ColumnVector
         ByteColumnVectorFlat.addVector(builder, ByteColumnVectorFlat.createVectorVector(builder, vector));
         return ByteColumnVectorFlat.endByteColumnVectorFlat(builder);
     }
+
+    public static ByteColumnVector deserialize(ByteColumnVectorFlat flat)
+    {
+        ByteColumnVector vector = new ByteColumnVector(flat.base().length());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
+    }
 }
