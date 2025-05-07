@@ -155,7 +155,7 @@ TEST_F(PIXELS_WRITER_TEST, DISABLED_WRITE_AND_READ)
         option.setRGRange(0,1);
         auto recordReader = pixels_reader->read(option);
         auto rowBatch = recordReader->readBatch(true);
-        auto vector = std::static_pointer_cast<LongColumnVector>(rowBatch->cols[0]);
+        auto vector = std::static_pointer_cast<IntColumnVector>(rowBatch->cols[0]);
         {
             // check read result
             for(int i = 0; i < row_num; i++) {

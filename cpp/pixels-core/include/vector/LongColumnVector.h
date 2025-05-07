@@ -32,8 +32,6 @@ class LongColumnVector : public ColumnVector
 {
 public:
     long *longVector;
-    long *intVector;
-
     /**
     * Use this constructor by default. All column vectors
     * should normally be the default size.
@@ -59,9 +57,5 @@ public:
 
     void ensureSize(uint64_t size, bool preserveData) override;
 
-    bool isLongVector();
-
-private:
-    bool isLong;
 };
 #endif //PIXELS_LONGCOLUMNVECTOR_H

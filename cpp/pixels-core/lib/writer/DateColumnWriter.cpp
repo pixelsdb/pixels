@@ -17,3 +17,59 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
+#include "writer/DateColumnWriter.h"
+#include "utils/BitUtils.h"
+
+DateColumnWriter::DateColumnWriter(std::shared_ptr<TypeDescription> type,
+                                   std::shared_ptr<PixelsWriterOption> writerOption) :
+        ColumnWriter(type, writerOption)
+{
+
+}
+
+int DateColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
+{
+    auto columnVector = std::static_pointer_cast<DateColumnVector>(vector);
+
+    if (!columnVector)
+    {
+        throw std::invalid_argument("Invalid vector type");
+    }
+
+    int *values = columnVector->dates;
+    EncodingUtils encodingUtils;
+
+    for (int i = 0; i < size; i++)
+    {
+        isNull[curPixelIsNullIndex] = columnVector->isNull[i];
+        curPixelEleIndex++;
+
+        if (columnVector->isNull[i])
+        {
+            hasNull = true;
+            encodingUtils.writeIntLE(outputStream, 0);
+        } else
+        {
+            if (byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN)
+            {
+                encodingUtils.writeIntLE(outputStream, values[i]);
+            } else
+            {
+                encodingUtils.writeIntBE(outputStream, values[i]);
+            }
+        }
+
+        if (curPixelEleIndex >= pixelStride)
+        {
+            newPixel();
+        }
+    }
+    return outputStream->getWritePos();
+}
+
+bool DateColumnWriter::decideNullsPadding(std::shared_ptr<PixelsWriterOption> writerOption)
+{
+    return writerOption->isNullsPadding();
+}
+
