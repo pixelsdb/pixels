@@ -143,7 +143,7 @@ public abstract class AggregationOperator extends Operator
                     tasks.add(new Task(taskId++, JSON.toJSONString(scanInput)));
                 }
             }
-            StageCoordinator scanStageCoordinator = new StageCoordinator(scanStageId, tasks);
+            StageCoordinator scanStageCoordinator = new StageCoordinator(scanStageId, tasks, 0);
             planCoordinator.addStageCoordinator(scanStageCoordinator, scanStageDependency);
         }
         else

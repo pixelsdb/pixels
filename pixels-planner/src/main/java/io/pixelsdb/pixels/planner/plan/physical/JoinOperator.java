@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.planner.plan.physical;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 
 import java.util.List;
@@ -72,6 +73,29 @@ public abstract class JoinOperator extends Operator
     public abstract JoinOperator getSmallChild();
 
     public abstract JoinOperator getLargeChild();
+
+    protected StageCoordinator createJoinStageCoordinator(StageCoordinator parentStageCoordinator, int joinStageId, int workerNum)
+    {
+        StageCoordinator joinStageCoordinator;
+        if (parentStageCoordinator != null)
+        {
+            if (parentStageCoordinator.leftChildWorkerIsEmpty())
+            {
+                joinStageCoordinator = new StageCoordinator(joinStageId, workerNum);
+                parentStageCoordinator.setLeftChildWorkerNum(workerNum);
+            } else
+            {
+                joinStageCoordinator = new StageCoordinator(joinStageId, workerNum,
+                        parentStageCoordinator.getLeftChildWorkerNum());
+                parentStageCoordinator.setRightChildWorkerNum(workerNum);
+            }
+            joinStageCoordinator.setDownStreamWorkerNum(parentStageCoordinator.getFixedWorkerNum());
+        } else
+        {
+            joinStageCoordinator = new StageCoordinator(joinStageId, workerNum);
+        }
+        return joinStageCoordinator;
+    }
 
     /**
      * This method collects the outputs of the join operator. It may block until the join

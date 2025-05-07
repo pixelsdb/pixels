@@ -304,10 +304,6 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             checkArgument(this.builderPartitioned ==
                             (this.builderPartKeyColumnIds.isPresent() && !this.builderPartKeyColumnIds.get().isEmpty()),
                     "partition column ids are present while partitioned is false, or vice versa");
-            checkArgument(!this.builderPartitioned || this.builderPartitionId >= 0,
-                    "partition id is not set while partitioned is true");
-            checkArgument(!this.builderPartitioned || this.builderFileNames != null,
-                    "file names are not set (partitioned: true)");
 
             PhysicalWriter fsWriter;
             try

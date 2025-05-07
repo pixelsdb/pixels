@@ -41,6 +41,8 @@ public final class Constants
     public static final int MAX_SHORT_REPEAT_LENGTH = 10;
     public static final float DICT_KEY_SIZE_THRESHOLD = 0.1F;
     public static final int INIT_DICT_SIZE = 4096;
+    public static final int MAX_STREAM_RETRY_COUNT = 100;
+    public static final long STREAM_DELAY_MS = 1000;
 
     public static final String LAYOUT_VERSION_LITERAL = "layout_version";
     public static final String CACHE_VERSION_LITERAL = "cache_version";
@@ -48,6 +50,10 @@ public final class Constants
     public static final int HOSTNAME_INDEX_IN_CACHE_LOCATION_LITERAL = 3;
     public static final String HEARTBEAT_COORDINATOR_LITERAL = "heartbeat_coordinator_";
     public static final String HEARTBEAT_WORKER_LITERAL = "heartbeat_worker_";
+
+    public static final String PARTITION_OPERATOR_NAME = "partition";
+    public static final String PARTITION_JOIN_OPERATOR_NAME = "partition_join";
+    public static final String BROADCAST_OPERATOR_NAME = "broadcast_join";
 
     /*
      * Issue #649:
