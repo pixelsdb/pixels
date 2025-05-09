@@ -73,6 +73,7 @@ public class DaemonMain
             ConfigFactory config = ConfigFactory.Instance();
             boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
             boolean autoScalingEnabled = Boolean.parseBoolean(config.getProperty("vm.auto.scaling.enabled"));
+            boolean sinkEnabled = Boolean.parseBoolean(config.getProperty("sink.enabled"));
 
             if (role.equalsIgnoreCase("coordinator"))
             {
@@ -95,9 +96,12 @@ public class DaemonMain
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
-                    // start sink server
-                    SinkServer sinkServer = new SinkServer();
-                    container.addServer("sink", sinkServer);
+
+                    if(sinkEnabled) {
+                        // start sink server
+                        SinkServer sinkServer = new SinkServer();
+                        container.addServer("sink", sinkServer);
+                    }
 
                     if (autoScalingEnabled) {
                         // start monitor server
