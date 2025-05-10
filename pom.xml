@@ -62,6 +62,8 @@
         <module>pixels-turbo/pixels-scaling-general</module>
         <module>pixels-index/pixels-index-rocksdb</module>
         <module>pixels-index/pixels-index-rockset</module>
+        <module>pixels-turbo/pixels-invoker-spike</module>
+        <module>pixels-turbo/pixels-worker-spike</module>
     </modules>
 
     <properties>
@@ -210,6 +212,11 @@
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-invoker-vhive</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-invoker-spike</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
