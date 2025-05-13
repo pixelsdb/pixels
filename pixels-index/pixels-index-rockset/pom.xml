@@ -29,6 +29,19 @@
             <artifactId>guava</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <dependency>
+            <groupId>org.rocksdb</groupId>
+            <artifactId>rocksdbjni-cloud</artifactId>
+            <version>9.1.1</version>
+            <classifier>linux64</classifier>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.rocksdb</groupId>
+                    <artifactId>rocksdbjni</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 
     <build>

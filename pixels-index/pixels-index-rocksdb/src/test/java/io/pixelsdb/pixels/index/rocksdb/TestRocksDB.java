@@ -344,4 +344,7 @@ public class TestRocksDB
             }
         }
     }
+
+    public static class TestRocksDBIndex {
+    }
 }

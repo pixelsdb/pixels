@@ -45,11 +45,11 @@ public class RocksetIndex implements SecondaryIndex
         return new long[0];
     }
 
-    @Override
-    public boolean putEntry(IndexProto.IndexKey key, long rowId)
-    {
-        return false;
-    }
+//    @Override
+//    public boolean putEntry(IndexProto.IndexKey key, long rowId)
+//    {
+//        return false;
+//    }
 
     @Override
     public boolean putEntry(Entry entry)

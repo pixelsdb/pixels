@@ -26,7 +26,7 @@ package io.pixelsdb.pixels.common.index;
  * @author hank
  * @create 2025-02-19
  */
-class RowIdRange
+public class RowIdRange
 {
     private final long startRowId;
     private final long endRowId;

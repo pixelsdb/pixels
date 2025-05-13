@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,32 +17,30 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.rocksdb;
-
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
-import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
-
-import javax.annotation.Nonnull;
-import java.io.IOException;
+package io.pixelsdb.pixels.common.exception;
 
 /**
- * @author hank
- * @create 2025-02-19
+ * @author lihaoyue
+ * @create 2025-03-01
  */
-public class RocksetIndexProvider implements SecondaryIndexProvider
-{
-    // TODO: implement
-
-    @Override
-    public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
+public class IndexException extends Exception {
+    public IndexException()
     {
-        return null;
+        super();
     }
 
-    @Override
-    public boolean compatibleWith(@Nonnull SecondaryIndex.Scheme scheme)
+    public IndexException(String message)
     {
-        return false;
+        super(message);
+    }
+
+    public IndexException(Throwable cause)
+    {
+        super(cause);
+    }
+
+    public IndexException(String message, Throwable cause)
+    {
+        super(message, cause);
     }
 }
