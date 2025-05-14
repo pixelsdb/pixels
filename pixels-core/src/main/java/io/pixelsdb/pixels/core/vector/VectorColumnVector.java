@@ -2,9 +2,11 @@ package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.flat.DoubleArray;
 import io.pixelsdb.pixels.core.utils.flat.VectorColumnVectorFlat;
 
+import java.nio.DoubleBuffer;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -256,34 +258,48 @@ public class VectorColumnVector extends ColumnVector
     }
 
     @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.VectorColumnVectorFlat;
+    }
+
+    @Override
     public int serialize(FlatBufferBuilder builder)
     {
         int baseOffset = super.serialize(builder);
-        int[] doubleArrayOffsets = new int[vector.length];
-        for (int i = 0; i < vector.length; ++i)
+        int[] doubleArrayOffsets = new int[writeIndex];
+        for (int i = 0; i < writeIndex; ++i)
         {
-            int doublesOffset = DoubleArray.createDoublesVector(builder, vector[i]);
+            int doublesOffset = DoubleArray.createDoublesVector(builder, (vector[i] == null) ? new double[0] : vector[i]);
             DoubleArray.startDoubleArray(builder);
             DoubleArray.addDoubles(builder, doublesOffset);
             doubleArrayOffsets[i] = DoubleArray.endDoubleArray(builder);
         }
-
+        int vectorVectorOffset = VectorColumnVectorFlat.createVectorVector(builder, doubleArrayOffsets);
         VectorColumnVectorFlat.startVectorColumnVectorFlat(builder);
         VectorColumnVectorFlat.addBase(builder, baseOffset);
-        VectorColumnVectorFlat.addVector(builder, VectorColumnVectorFlat.createVectorVector(builder, doubleArrayOffsets));
+        VectorColumnVectorFlat.addVector(builder, vectorVectorOffset);
         VectorColumnVectorFlat.addDimension(builder, dimension);
         return VectorColumnVectorFlat.endVectorColumnVectorFlat(builder);
+    }
+
+    public static double[] getDoublesFromFlatArray(DoubleArray doubleArray)
+    {
+        DoubleBuffer dbuf = doubleArray.doublesAsByteBuffer().asDoubleBuffer();
+        double[] result = new double[dbuf.remaining()];
+        dbuf.get(result);
+        return result;
     }
 
     public static VectorColumnVector deserialize(VectorColumnVectorFlat flat)
     {
         VectorColumnVector vector = new VectorColumnVector(flat.base().length(), flat.dimension());
-        for (int i = 0; i < flat.vectorLength(); ++i)
+        vector.deserializeBase(flat.base());
+        for (int i = 0; i < vector.writeIndex; ++i)
         {
             DoubleArray doubleArray = flat.vector(i);
-            vector.vector[i] = doubleArray != null ? doubleArray.doublesAsByteBuffer().asDoubleBuffer().array() : null;
+            vector.vector[i] = vector.isNull[i] ? null : getDoublesFromFlatArray(doubleArray);
         }
-        vector.deserializeBase(flat.base());
         return vector;
     }
 }

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.flat.DictionaryColumnVectorFlat;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -378,15 +379,23 @@ public class DictionaryColumnVector extends ColumnVector
     }
 
     @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.DictionaryColumnVectorFlat;
+    }
+
+    @Override
     public int serialize(FlatBufferBuilder builder)
     {
         int baseOffset = super.serialize(builder);
-
+        int dictArrayVectorOffset = DictionaryColumnVectorFlat.createDictArrayVector(builder, dictArray);
+        int dictOffsetsVectorOffset = DictionaryColumnVectorFlat.createDictOffsetsVector(builder, dictOffsets);
+        int idsVectorOffset = DictionaryColumnVectorFlat.createIdsVector(builder, ids);
         DictionaryColumnVectorFlat.startDictionaryColumnVectorFlat(builder);
         DictionaryColumnVectorFlat.addBase(builder, baseOffset);
-        DictionaryColumnVectorFlat.addDictArray(builder, DictionaryColumnVectorFlat.createDictArrayVector(builder, dictArray));
-        DictionaryColumnVectorFlat.addDictOffsets(builder, DictionaryColumnVectorFlat.createDictOffsetsVector(builder, dictOffsets));
-        DictionaryColumnVectorFlat.addIds(builder, DictionaryColumnVectorFlat.createIdsVector(builder, ids));
+        DictionaryColumnVectorFlat.addDictArray(builder, dictArrayVectorOffset);
+        DictionaryColumnVectorFlat.addDictOffsets(builder, dictOffsetsVectorOffset);
+        DictionaryColumnVectorFlat.addIds(builder, idsVectorOffset);
         return DictionaryColumnVectorFlat.endDictionaryColumnVectorFlat(builder);
     }
 

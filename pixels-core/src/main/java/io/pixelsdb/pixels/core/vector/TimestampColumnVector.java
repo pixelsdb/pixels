@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.flat.TimestampColumnVectorFlat;
 
 import java.sql.Timestamp;
@@ -527,14 +528,20 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.TimestampColumnVectorFlat;
+    }
+
+    @Override
     public int serialize(FlatBufferBuilder builder)
     {
         int baseOffset = super.serialize(builder);
-
+        int timesVectorOffset = TimestampColumnVectorFlat.createTimesVector(builder, times);
         TimestampColumnVectorFlat.startTimestampColumnVectorFlat(builder);
         TimestampColumnVectorFlat.addBase(builder, baseOffset);
         TimestampColumnVectorFlat.addPrecision(builder, precision);
-        TimestampColumnVectorFlat.addTimes(builder, TimestampColumnVectorFlat.createTimesVector(builder, times));
+        TimestampColumnVectorFlat.addTimes(builder, timesVectorOffset);
         TimestampColumnVectorFlat.addScratchTimestamp(builder, scratchTimestamp.getTime());
         return TimestampColumnVectorFlat.endTimestampColumnVectorFlat(builder);
     }

@@ -458,8 +458,11 @@ public abstract class ColumnVector implements AutoCloseable
         writeIndex = 0;
     }
 
+    public abstract byte getFlatBufferType();
+
     public int serialize(FlatBufferBuilder builder)
     {
+        int isNullVectorOffset = ColumnVectorBaseFlat.createIsNullVector(builder, isNull);
         ColumnVectorBaseFlat.startColumnVectorBaseFlat(builder);
         ColumnVectorBaseFlat.addLength(builder, length);
         ColumnVectorBaseFlat.addWriteIndex(builder, writeIndex);
@@ -467,7 +470,7 @@ public abstract class ColumnVector implements AutoCloseable
         ColumnVectorBaseFlat.addIsRepeating(builder, isRepeating);
         ColumnVectorBaseFlat.addDuplicated(builder, duplicated);
         ColumnVectorBaseFlat.addOriginVecId(builder, originVecId);
-        ColumnVectorBaseFlat.addIsNull(builder, ColumnVectorBaseFlat.createIsNullVector(builder, isNull));
+        ColumnVectorBaseFlat.addIsNull(builder, isNullVectorOffset);
         ColumnVectorBaseFlat.addNoNulls(builder, noNulls);
         ColumnVectorBaseFlat.addPreFlattenIsRepeating(builder, preFlattenIsRepeating);
         ColumnVectorBaseFlat.addPreFlattenNoNulls(builder, preFlattenNoNulls);
@@ -489,40 +492,5 @@ public abstract class ColumnVector implements AutoCloseable
         this.noNulls = base.noNulls();
         this.preFlattenIsRepeating = base.preFlattenIsRepeating();
         this.preFlattenNoNulls = base.preFlattenNoNulls();
-    }
-
-    public static ColumnVector deserialize(byte type, Table table)
-    {
-        switch (type)
-        {
-            case ColumnVectorFlat.BinaryColumnVectorFlat:
-                return BinaryColumnVector.deserialize((BinaryColumnVectorFlat) table);
-            case ColumnVectorFlat.ByteColumnVectorFlat:
-                return ByteColumnVector.deserialize((ByteColumnVectorFlat) table);
-            case ColumnVectorFlat.DateColumnVectorFlat:
-                return DateColumnVector.deserialize((DateColumnVectorFlat) table);
-            case ColumnVectorFlat.DecimalColumnVectorFlat:
-                return DecimalColumnVector.deserialize((DecimalColumnVectorFlat) table);
-            case ColumnVectorFlat.DictionaryColumnVectorFlat:
-                return DictionaryColumnVector.deserialize((DictionaryColumnVectorFlat) table);
-            case ColumnVectorFlat.DoubleColumnVectorFlat:
-                return DoubleColumnVector.deserialize((DoubleColumnVectorFlat) table);
-            case ColumnVectorFlat.FloatColumnVectorFlat:
-                return FloatColumnVector.deserialize((FloatColumnVectorFlat) table);
-            case ColumnVectorFlat.IntColumnVectorFlat:
-                return IntColumnVector.deserialize((IntColumnVectorFlat) table);
-            case ColumnVectorFlat.LongColumnVectorFlat:
-                return LongColumnVector.deserialize((LongDecimalColumnVectorFlat) table);
-            case ColumnVectorFlat.LongDecimalColumnVectorFlat:
-                return LongDecimalColumnVector.deserialize((LongDecimalColumnVectorFlat) table);
-            case ColumnVectorFlat.StructColumnVectorFlat:
-                return StructColumnVector.deserialize((StructColumnVectorFlat) table);
-            case ColumnVectorFlat.TimeColumnVectorFlat:
-                return TimeColumnVector.deserialize((TimeColumnVectorFlat) table);
-            case ColumnVectorFlat.TimestampColumnVectorFlat:
-                return TimestampColumnVector.deserialize((TimestampColumnVectorFlat) table);
-            default:
-                throw new UnsupportedOperationException("Unsupported column vector type: " + type);
-        }
     }
 }
