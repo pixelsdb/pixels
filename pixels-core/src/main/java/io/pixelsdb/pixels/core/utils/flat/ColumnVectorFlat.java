@@ -16,11 +16,11 @@ public final class ColumnVectorFlat {
   public static final byte IntColumnVectorFlat = 8;
   public static final byte LongColumnVectorFlat = 9;
   public static final byte LongDecimalColumnVectorFlat = 10;
-  public static final byte StructColumnVectorFlat = 11;
-  public static final byte TimeColumnVectorFlat = 12;
-  public static final byte TimestampColumnVectorFlat = 13;
+  public static final byte TimeColumnVectorFlat = 11;
+  public static final byte TimestampColumnVectorFlat = 12;
+  public static final byte VectorColumnVectorFlat = 13;
 
-  public static final String[] names = { "NONE", "BinaryColumnVectorFlat", "ByteColumnVectorFlat", "DateColumnVectorFlat", "DecimalColumnVectorFlat", "DictionaryColumnVectorFlat", "DoubleColumnVectorFlat", "FloatColumnVectorFlat", "IntColumnVectorFlat", "LongColumnVectorFlat", "LongDecimalColumnVectorFlat", "StructColumnVectorFlat", "TimeColumnVectorFlat", "TimestampColumnVectorFlat", };
+  public static final String[] names = { "NONE", "BinaryColumnVectorFlat", "ByteColumnVectorFlat", "DateColumnVectorFlat", "DecimalColumnVectorFlat", "DictionaryColumnVectorFlat", "DoubleColumnVectorFlat", "FloatColumnVectorFlat", "IntColumnVectorFlat", "LongColumnVectorFlat", "LongDecimalColumnVectorFlat", "TimeColumnVectorFlat", "TimestampColumnVectorFlat", "VectorColumnVectorFlat", };
 
   public static String name(int e) { return names[e]; }
 }

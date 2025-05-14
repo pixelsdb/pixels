@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.flat.DateColumnVectorFlat;
 
 import java.sql.Date;
@@ -468,13 +469,20 @@ public class DateColumnVector extends ColumnVector
     }
 
     @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.DateColumnVectorFlat;
+    }
+
+    @Override
     public int serialize(FlatBufferBuilder builder)
     {
         int baseOffset = super.serialize(builder);
+        int datesVectorOffset = DateColumnVectorFlat.createDatesVector(builder, dates);
 
         DateColumnVectorFlat.startDateColumnVectorFlat(builder);
         DateColumnVectorFlat.addBase(builder, baseOffset);
-        DateColumnVectorFlat.addDates(builder, DateColumnVectorFlat.createDatesVector(builder, dates));
+        DateColumnVectorFlat.addDates(builder, datesVectorOffset);
         DateColumnVectorFlat.addScratchDate(builder, scratchDate.getTime());
         return DateColumnVectorFlat.endDateColumnVectorFlat(builder);
     }

@@ -22,8 +22,7 @@ package io.pixelsdb.pixels.core.vector;
 import com.google.flatbuffers.FlatBufferBuilder;
 import com.google.flatbuffers.Table;
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
-import io.pixelsdb.pixels.core.utils.flat.VectorizedRowBatchFlat;
+import io.pixelsdb.pixels.core.utils.flat.*;
 
 import java.nio.ByteBuffer;
 
@@ -337,15 +336,19 @@ public class VectorizedRowBatch implements AutoCloseable
     public byte[] serialize(FlatBufferBuilder builder)
     {
         int[] columnVectorOffsets = new int[numCols];
+        byte[] columnTypeOffsets = new byte[numCols];
         for (int i = 0; i < numCols; ++i)
         {
             columnVectorOffsets[i] = cols[i].serialize(builder);
+            columnTypeOffsets[i] = cols[i].getFlatBufferType();
         }
         int colsOffset = VectorizedRowBatchFlat.createColsVector(builder, columnVectorOffsets);
+        int colsTypeOffset = VectorizedRowBatchFlat.createColsTypeVector(builder, columnTypeOffsets);
 
         VectorizedRowBatchFlat.startVectorizedRowBatchFlat(builder);
         VectorizedRowBatchFlat.addNumCols(builder, numCols);
         VectorizedRowBatchFlat.addCols(builder, colsOffset);
+        VectorizedRowBatchFlat.addColsType(builder, colsTypeOffset);
         VectorizedRowBatchFlat.addSize(builder, size);
         VectorizedRowBatchFlat.addProjectionSize(builder, projectionSize);
         VectorizedRowBatchFlat.addMaxSize(builder, maxSize);
@@ -371,10 +374,51 @@ public class VectorizedRowBatch implements AutoCloseable
 
         for (int i = 0; i < batchFlat.numCols(); ++i)
         {
-            byte colType = batchFlat.colsType(i);
-            Table colTable = new Table();
-            batchFlat.cols(colTable, i);
-            batch.cols[i] = ColumnVector.deserialize(colType, colTable);
+            Table colTable;
+            switch (batchFlat.colsType(i))
+            {
+                case ColumnVectorFlat.BinaryColumnVectorFlat:
+                    batch.cols[i] = BinaryColumnVector.deserialize((BinaryColumnVectorFlat) batchFlat.cols(new BinaryColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.ByteColumnVectorFlat:
+                    batch.cols[i] = ByteColumnVector.deserialize((ByteColumnVectorFlat) batchFlat.cols(new ByteColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.DateColumnVectorFlat:
+                    batch.cols[i] = DateColumnVector.deserialize((DateColumnVectorFlat) batchFlat.cols(new DateColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.DecimalColumnVectorFlat:
+                    batch.cols[i] = DecimalColumnVector.deserialize((DecimalColumnVectorFlat) batchFlat.cols(new DecimalColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.DictionaryColumnVectorFlat:
+                    batch.cols[i] = DictionaryColumnVector.deserialize((DictionaryColumnVectorFlat) batchFlat.cols(new DictionaryColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.DoubleColumnVectorFlat:
+                    batch.cols[i] = DoubleColumnVector.deserialize((DoubleColumnVectorFlat) batchFlat.cols(new DoubleColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.FloatColumnVectorFlat:
+                    batch.cols[i] = FloatColumnVector.deserialize((FloatColumnVectorFlat) batchFlat.cols(new FloatColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.IntColumnVectorFlat:
+                    batch.cols[i] = IntColumnVector.deserialize((IntColumnVectorFlat) batchFlat.cols(new IntColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.LongColumnVectorFlat:
+                    batch.cols[i] = LongColumnVector.deserialize((LongColumnVectorFlat) batchFlat.cols(new LongColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.LongDecimalColumnVectorFlat:
+                    batch.cols[i] = LongDecimalColumnVector.deserialize((LongDecimalColumnVectorFlat) batchFlat.cols(new LongDecimalColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.TimeColumnVectorFlat:
+                    batch.cols[i] = TimeColumnVector.deserialize((TimeColumnVectorFlat) batchFlat.cols(new TimeColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.TimestampColumnVectorFlat:
+                    batch.cols[i] = TimestampColumnVector.deserialize((TimestampColumnVectorFlat) batchFlat.cols(new TimestampColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.VectorColumnVectorFlat:
+                    batch.cols[i] = VectorColumnVector.deserialize((VectorColumnVectorFlat) batchFlat.cols(new VectorColumnVectorFlat(), i));
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Unsupported column vector type: " + batchFlat.colsType(i));
+            }
         }
         return batch;
     }
