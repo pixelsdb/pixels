@@ -79,22 +79,22 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif ()
 
-include(CheckCXXCompilerFlag)
 
-check_cxx_compiler_flag("-mavx" COMPILER_SUPPORTS_AVX512F)
 
-if (COMPILER_SUPPORTS_AVX)
-    message(STATUS "AVX supported: enabling AVX code path")
-    add_compile_definitions(RETINA_SIMD=1)
-    target_compile_options(pixels-retina PRIVATE
-            -mavx      # 支持 256-bit AVX
-            -mavx2     # 支持 AVX2（FMA、更多整数指令等）
-            -O3
-    )
-else()
-    message(STATUS "AVX not supported: falling back to scalar code path")
+if (RETINA_SIMD)
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("-mavx" COMPILER_SUPPORTS_AVX)
+    if(COMPILER_SUPPORTS_AVX)
+        message(STATUS "AVX supported: enabling AVX code path")
+        target_compile_options(pixels-retina PRIVATE
+                -mavx
+                -mavx2
+        )
+    else()
+        message(STATUS "AVX not supported: falling back to scalar code path")
+    endif ()
 endif()
 
 
 # Add debug flags
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -mavx2")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")

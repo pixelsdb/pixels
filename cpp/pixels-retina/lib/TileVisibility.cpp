@@ -105,18 +105,26 @@ void TileVisibility::deleteTileRecord(uint8_t rowId, uint64_t ts) {
 
 
 inline void process_bitmap_block_256(const DeleteIndexBlock *blk,
-    uint32_t offset,
-    uint64_t outBitmap[4],
-     const __m256i& vThr, const __m256i& tsMask) {
-    __m256i vItems = _mm256_loadu_si256((const __m256i*)blk->items[offset]);
-    __m256i vTs    = _mm256_and_si256(vItems, tsMask);
-    __mmask8 mask    = _mm256_cmplt_epi64_mask(vTs, vThr);
+                                     uint32_t offset,
+                                     uint64_t outBitmap[4],
+                                     const __m256i &vThr,
+                                     const __m256i &tsMask) {
+    __m256i vItems = _mm256_loadu_si256((const __m256i *)&blk->items[offset]);
+    __m256i vTs = _mm256_and_si256(vItems, tsMask);
 
-    if (!mask) return;
+    __m256i cmp = _mm256_or_si256(
+        _mm256_cmpgt_epi64(vThr, vTs),
+        _mm256_cmpeq_epi64(vThr, vTs)
+        );
+
+    uint8_t mask = _mm256_movemask_pd(_mm256_castsi256_pd(cmp));
+
+    if (!mask)
+        return;
 
     __m256i vRow = _mm256_srli_epi64(vItems, 56); // extract rowid
     alignas(32) uint64_t rowTmp[8];
-    _mm256_storeu_si256((__m256i*)rowTmp, vRow);
+    _mm256_storeu_si256((__m256i *)rowTmp, vRow);
     for (int i = 0; i < 4; i++) {
         if (mask & (1 << i)) {
             auto rowId = static_cast<uint8_t>(rowTmp[i]);
@@ -135,38 +143,40 @@ void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4])
     }
 
     DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
-
+#ifdef RETINA_SIMD
     const __m256i vThr = _mm256_set1_epi64x(ts);
     const __m256i tsMask = _mm256_set1_epi64x(0x00FFFFFFFFFFFFFFULL);
+#endif
+
     while (blk) {
         DeleteIndexBlock *currentTail = tail.load(std::memory_order_acquire);
         size_t currentTailUsed = tailUsed.load(std::memory_order_acquire);
-        size_t count = (blk == currentTail) 
-                        ? currentTailUsed
-                        : DeleteIndexBlock::BLOCK_CAPACITY;
+        size_t count = (blk == currentTail)
+                           ? currentTailUsed
+                           : DeleteIndexBlock::BLOCK_CAPACITY;
         if (count > DeleteIndexBlock::BLOCK_CAPACITY) {
             continue; // retry get count
         }
-#define RETINA_SIMD
+        uint64_t start_blk_offset = 0;
 #ifdef RETINA_SIMD
         if (count == DeleteIndexBlock::BLOCK_CAPACITY) {
             process_bitmap_block_256(blk, 0, outBitmap, vThr, tsMask);
             process_bitmap_block_256(blk, 4, outBitmap, vThr, tsMask);
-        } else {
-#endif
-            for (uint64_t i = 0; i < count; i++) {
-                uint64_t item = blk->items[i];
-                uint64_t delTs = extractTimestamp(item);
-                if (delTs <= ts) {
-                    SET_BITMAP_BIT(outBitmap, extractRowId(item));
-                } else {
-                    // delTs is increasing, so no need to check further
-                    return;
-                }
-            }
-#ifdef RETINA_SIMD
+        } else if (count > 4) {
+            start_blk_offset = 4;
+            process_bitmap_block_256(blk, 0, outBitmap, vThr, tsMask);
         }
 #endif
+        for (uint64_t i = start_blk_offset; i < count; i++) {
+            uint64_t item = blk->items[i];
+            uint64_t delTs = extractTimestamp(item);
+            if (delTs <= ts) {
+                SET_BITMAP_BIT(outBitmap, extractRowId(item));
+            } else {
+                // delTs is increasing, so no need to check further
+                return;
+            }
+        }
 
         if (blk == currentTail) {
             if (currentTail != tail.load(std::memory_order_acquire) ||
