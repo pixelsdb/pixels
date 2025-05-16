@@ -1,0 +1,145 @@
+/*
+ * Copyright 2024 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+syntax = "proto3";
+
+package spike;
+
+option java_package = "io.pixelsdb.pixels.invoker.spike";
+option java_outer_classname = "SpikeServiceProto";
+option go_package = "github.com/AgentGuo/spike/api";
+
+// The spike service definition.
+service SpikeService {
+  // Calls a function.
+  rpc CallFunction(CallFunctionRequest) returns (CallFunctionResponse);
+
+  // Adds a new function.
+  rpc CreateFunction(CreateFunctionRequest) returns (CreateFunctionResponse);
+
+  // Deletes an existing function.
+  rpc DeleteFunction(DeleteFunctionRequest) returns (DeleteFunctionResponse);
+
+  rpc GetAllFunctions(Empty) returns (GetAllFunctionsResponse);
+
+  rpc GetFunctionResources(GetFunctionResourcesRequest) returns (GetFunctionResourcesResponse);
+}
+
+message Empty {}
+
+message FunctionMetaData{
+  string function_name = 1;
+  string image_url = 2;
+  repeated ResourceSpec resources = 3;
+}
+
+message GetAllFunctionsResponse{
+  repeated FunctionMetaData functions = 1;
+}
+
+// The request message containing the function name and input.
+message CallFunctionRequest {
+  string function_name = 1;
+  string payload = 2;
+  int32 cpu = 3;
+  int32 memory = 4;
+}
+
+// The response message containing the function output.
+message CallFunctionResponse {
+  string payload = 1;
+  int32 error_code = 2;
+}
+
+message ResourceSpec{
+  int32 cpu = 1;
+  int32 memory = 2;
+  int32 min_replica = 3;
+  int32 max_replica = 4;
+  bool enable_auto_scaling = 5;
+}
+
+// The request message for adding a new function.
+message CreateFunctionRequest {
+  string function_name = 1;
+  string image_url = 2;
+  repeated ResourceSpec resources = 3;
+}
+
+// The response message for adding a new function.
+message CreateFunctionResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// The request message for deleting a function.
+message DeleteFunctionRequest {
+  string function_name = 1;
+}
+
+// The response message for deleting a function.
+message DeleteFunctionResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// The request message for updating a new function.
+message UpdateFunctionRequest {
+  string function_name = 1;
+  string task_name = 2;
+  string task_version = 3;
+  bool enable_auto_scaling = 4;
+}
+
+// The response message for updating a new function.
+message UpdateFunctionResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+message UpdateFuncInstanceRequest {
+  string function_name = 1;
+  int32 cpu_num = 2;
+  int32 memory_size = 3;
+  int32 instance_num = 4;
+}
+
+message UpdateFuncInstanceResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+message GetFunctionResourcesRequest{
+  string function_name = 1;
+}
+
+message ResourceStatus{
+  string public_ipv4 = 1;
+  string private_ipv4 = 2;
+  int32 cpu = 3;
+  int32 memory = 4;
+  string launch_type = 5;
+  string last_status = 6;
+  string desired_status = 7;
+}
+
+message GetFunctionResourcesResponse{
+  string function_name = 1;
+  repeated ResourceStatus resources = 2;
+}

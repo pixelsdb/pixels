@@ -1,0 +1,1 @@
+docker buildx build --build-arg HANDLER_JAR_FILE=target/spike-java-handler-1.0-SNAPSHOT.jar --build-arg IMPL_JAR_FILE=target/pixels-worker-spike-0.2.0-SNAPSHOT.jar --platform linux/amd64,linux/arm64 -t 013072238852.dkr.ecr.cn-north-1.amazonaws.com.cn/agentguo/spike-java-worker:1.6 --push .
