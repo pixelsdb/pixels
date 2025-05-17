@@ -79,6 +79,11 @@ message InsertData {
     RowValue row = 3;
 }
 
+message TransInfo {
+    uint64 transId = 1;
+    int64 order = 2;
+}
+
 // insert
 message InsertRecordRequest {
     RequestHeader header = 1;
@@ -86,6 +91,7 @@ message InsertRecordRequest {
     string table = 3;
     RowValue row = 4;
     uint64 timestamp = 5;
+    TransInfo transInfo = 6;
 }
 
 message InsertRecordResponse {
@@ -96,6 +102,7 @@ message InsertRecordsRequest {
     RequestHeader header = 1;
     repeated InsertData data = 2;
     uint64 timestamp = 3;
+    TransInfo transInfo = 6;
 }
 
 message InsertRecordsResponse {
@@ -109,6 +116,7 @@ message DeleteRecordRequest {
     uint32 rgId = 3;
     uint32 rgRowId = 4;
     uint64 timestamp = 5;
+    TransInfo transInfo = 6;
 }
 
 message DeleteRecordResponse {
@@ -119,6 +127,7 @@ message DeleteRecordsRequest {
     RequestHeader header = 1;
     repeated RowLocation rows = 2;
     uint64 timestamp = 3;
+    TransInfo transInfo = 6;
 }
 
 message DeleteRecordsResponse {
