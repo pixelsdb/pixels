@@ -39,8 +39,9 @@ service IndexService {
 }
 
 message IndexKey {
-  bytes key = 1; // index key
-  uint64 timestamp = 2; // transaction timestamp
+  uint64 indexId = 1; // index id
+  bytes key = 2; // index key
+  uint64 timestamp = 3; // transaction timestamp
 }
 
 message RowLocation {
@@ -52,6 +53,7 @@ message RowLocation {
 message IndexEntry {
   IndexKey indexKey = 1;
   RowLocation rowLocation = 2;
+  bool unique = 3;
 }
 
 message LookupUniqueIndexRequest {

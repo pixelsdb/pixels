@@ -22,8 +22,13 @@ package io.pixelsdb.pixels.index.rocksdb;
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
 import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
 
+import io.pixelsdb.pixels.common.index.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import javax.annotation.Nonnull;
 import java.io.IOException;
+
+import org.rocksdb.*;
 
 /**
  * @author hank
@@ -32,16 +37,26 @@ import java.io.IOException;
 public class RocksetIndexProvider implements SecondaryIndexProvider
 {
     // TODO: implement
-
+    private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
+    private final MainIndex mainIndex = new MainIndexImpl();
+    private final String RocksdbPath = "tmp/rocksdb-cloud";
     @Override
     public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
     {
-        return null;
+        if (scheme == SecondaryIndex.Scheme.rockset) {
+             try {
+                 return new RocksetIndex(mainIndex);//初始化 RocksDBIndex
+             } catch (Exception e) {
+                 logger.error("Failed to create RocksDB instance", e);
+                 return null;
+             }
+        }
+        throw new IllegalArgumentException("Unsupported scheme: " + scheme);
     }
 
     @Override
     public boolean compatibleWith(@Nonnull SecondaryIndex.Scheme scheme)
     {
-        return false;
+        return scheme == SecondaryIndex.Scheme.rockset; // 仅支持 rockset
     }
 }

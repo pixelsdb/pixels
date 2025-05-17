@@ -82,7 +82,7 @@ public interface SecondaryIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-    boolean putEntry(IndexProto.IndexKey key, long rowId);
+//    boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique);
 
     boolean putEntry(Entry entry);
 
@@ -104,12 +104,14 @@ public interface SecondaryIndex extends Closeable
     class Entry
     {
         private final IndexProto.IndexKey key;
-        private final long rowId;
+        private long rowId;
+        private final boolean unique;
 
-        public Entry(IndexProto.IndexKey key, long rowId)
+        public Entry(IndexProto.IndexKey key, long rowId, boolean unique)
         {
             this.key = key;
             this.rowId = rowId;
+            this.unique = unique;
         }
 
         public IndexProto.IndexKey getKey()
@@ -120,6 +122,12 @@ public interface SecondaryIndex extends Closeable
         public long getRowId()
         {
             return rowId;
+        }
+
+        public boolean getIsUnique() { return unique; }
+
+        public void setRowId(long rowId) {
+            this.rowId = rowId;
         }
 
         @Override

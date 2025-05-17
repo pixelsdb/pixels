@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * The main index of a table is the mapping from row id to data file.
@@ -59,6 +60,22 @@ public interface MainIndex extends Closeable
     boolean deleteRowIdRange(RowIdRange rowIdRange);
 
     /**
+     * Distribute row id for the secondary index. 
+     * If there isn't any row id in cache, get a range of row ids at once and put them into cache.
+     * @param entry the rowLocation of secondary index
+     * @return true on success
+     */
+    boolean getRowId(SecondaryIndex.Entry entry);
+
+    /**
+     * Distribute row ids for the secondary index.
+     * If there isn't enough row ids in cache, get a range of row ids at once and put them into cache.
+     * @param entries the rowLocation of secondary index
+     * @return true on success
+     */
+    boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries);
+
+    /**
      * Persist the main index into persistent storage.
      * @return
      */
@@ -83,9 +100,9 @@ public interface MainIndex extends Closeable
         /**
          * The row group id inside the file, starts from 0.
          */
-        private final long rowGroupId;
+        private final int rowGroupId;
 
-        public RgLocation(long fileId, long rowGroupId)
+        public RgLocation(long fileId, int rowGroupId)
         {
             this.fileId = fileId;
             this.rowGroupId = rowGroupId;
@@ -96,7 +113,7 @@ public interface MainIndex extends Closeable
             return fileId;
         }
 
-        public long getRowGroupId()
+        public int getRowGroupId()
         {
             return rowGroupId;
         }

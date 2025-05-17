@@ -20,6 +20,9 @@
 package io.pixelsdb.pixels.daemon.index;
 
 import io.grpc.ServerBuilder;
+import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.SecondaryIndex;
+import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
 import io.pixelsdb.pixels.common.server.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -36,15 +39,13 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class IndexServer implements Server
 {
     private static final Logger log = LogManager.getLogger(IndexServer.class);
-
     private boolean running = false;
     private final io.grpc.Server rpcServer;
-
-    public IndexServer(int port)
+    public IndexServer(int port, SecondaryIndex secondaryIndex, MainIndex mainIndex)
     {
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
         this.rpcServer = ServerBuilder.forPort(port)
-                .addService(new IndexServiceImpl()).build();
+                .addService(new IndexServiceImpl(secondaryIndex, mainIndex)).build();
     }
 
     @Override
