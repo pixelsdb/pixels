@@ -1,3 +1,22 @@
+/*
+ * Copyright 2025 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 package io.pixelsdb.pixels.index.rocksdb;
 
 import com.google.protobuf.ByteString;
@@ -8,89 +27,90 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-public class TestRocksDBIndex {
-
+public class TestRocksDBIndex
+{
     @Mock
-    private RocksDB rocksDB = mock(RocksDB.class);  // 模拟 RocksDB 实例
+    private RocksDB rocksDB = mock(RocksDB.class);  // Mock RocksDB instance
     private String rocksDBpath = "tmp/rocksdb_test";
-    private SecondaryIndex rocksDBIndex; // 被测试的类
+    private SecondaryIndex rocksDBIndex; // Class under test
     private final MainIndex mainIndex = new MainIndexImpl();
+
     @BeforeEach
-    public void setUp() throws RocksDBException, IOException {
+    public void setUp() throws RocksDBException, IOException
+    {
         MockitoAnnotations.openMocks(this);
-        System.out.println("Debug: Creating RocksDBIndex.."); // 调试日志
+        System.out.println("Debug: Creating RocksDBIndex.."); // Debug log
         rocksDBIndex = new RocksDBIndex(rocksDBpath, mainIndex);
-        System.out.println("Debug: RocksDBIndex instance: " + rocksDBIndex); // 检查是否为 null
+        System.out.println("Debug: RocksDBIndex instance: " + rocksDBIndex); // Check for null
         assertNotNull(rocksDBIndex);
     }
 
     @Test
-    public void testGetUniqueRowId() throws RocksDBException {
-        // 模拟 RocksDB 的 get 方法
-        long indexId = 1L; // 假设的 indexId
-        byte[] key = "exampleKey".getBytes(); // 假设的索引键
-        long timestamp = System.currentTimeMillis(); // 当前时间戳
+    public void testGetUniqueRowId() throws RocksDBException
+    {
+        // Mock RocksDB's get method
+        long indexId = 1L; // Sample indexId
+        byte[] key = "exampleKey".getBytes(); // Sample index key
+        long timestamp = System.currentTimeMillis(); // Current timestamp
 
-        // 构造 keyBytes，与 IndexKey 一致
+        // Construct keyBytes matching IndexKey format
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId); // 放入 indexId
+        buffer.putLong(indexId); // Add indexId
         buffer.put((byte) ':');
-        buffer.put(key);          // 放入 key
+        buffer.put(key);          // Add key
         buffer.put((byte) ':');
-        buffer.putLong(timestamp); // 放入 timestamp
-        byte[] keyBytes = buffer.array(); // 生成最终的 keyBytes
+        buffer.putLong(timestamp); // Add timestamp
+        byte[] keyBytes = buffer.array(); // Final keyBytes
 
-        byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(1001L).array(); // 假设的值
+        byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(1001L).array(); // Sample value
         when(rocksDB.get(keyBytes)).thenReturn(valueBytes);
 
-        // 调用 getUniqueRowId
-        // 创建 IndexKey 对象，确保与 keyBytes 一致
+        // Call getUniqueRowId
+        // Create IndexKey object matching keyBytes
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key))
                 .setTimestamp(timestamp)
                 .build();
         long rowId = rocksDBIndex.getUniqueRowId(keyProto);
-        // 验证返回值
+        // Verify return value
         assertEquals(1001L, rowId);
     }
 
     @Test
-    public void testGetRowIds() {
-        // 模拟 RocksDB 的迭代器
+    public void testGetRowIds()
+    {
+        // Mock RocksDB iterator
         RocksIterator iterator = mock(RocksIterator.class);
         when(rocksDB.newIterator()).thenReturn(iterator);
 
-        // 模拟输入参数
-        long indexId = 1L; // 假设的 indexId
-        byte[] key = "exampleKey".getBytes(); // 假设的索引键
-        long timestamp = System.currentTimeMillis(); // 当前时间戳
+        // Mock input parameters
+        long indexId = 1L; // Sample indexId
+        byte[] key = "exampleKey".getBytes(); // Sample index key
+        long timestamp = System.currentTimeMillis(); // Current timestamp
 
-        // 构造 prefixBytes，与 IndexKey 一致
+        // Construct prefixBytes matching IndexKey format
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId); // 放入 indexId
+        buffer.putLong(indexId); // Add indexId
         buffer.put((byte) ':');
-        buffer.put(key);          // 放入 key
+        buffer.put(key);          // Add key
         buffer.put((byte) ':');
-        buffer.putLong(timestamp); // 放入 timestamp
-        byte[] prefixBytes = buffer.array(); // 生成最终的 prefixBytes
+        buffer.putLong(timestamp); // Add timestamp
+        byte[] prefixBytes = buffer.array(); // Final prefixBytes
 
-        // 模拟 rowId 键（包含前缀和 rowId）
+        // Mock rowId keys (containing prefix and rowId)
         long rowId1 = 1001L;
         long rowId2 = 1002L;
 
@@ -100,109 +120,112 @@ public class TestRocksDBIndex {
         ByteBuffer keyBuffer2 = ByteBuffer.allocate(prefixBytes.length + Long.BYTES);
         keyBuffer2.put(prefixBytes).putLong(rowId2);
 
-        byte[] combinedKey1 = keyBuffer1.array(); // 第一个完整键
-        byte[] combinedKey2 = keyBuffer2.array(); // 第二个完整键
+        byte[] combinedKey1 = keyBuffer1.array(); // First complete key
+        byte[] combinedKey2 = keyBuffer2.array(); // Second complete key
 
-        when(iterator.isValid()).thenReturn(true, true, false); // 模拟两次有效迭代
-        when(iterator.key()).thenReturn(combinedKey1, combinedKey2); // 模拟返回完整键
-        when(iterator.value()).thenReturn(null, null); // 模拟值（未使用）
+        when(iterator.isValid()).thenReturn(true, true, false); // Mock two valid iterations
+        when(iterator.key()).thenReturn(combinedKey1, combinedKey2); // Mock returning keys
+        when(iterator.value()).thenReturn(null, null); // Mock values (unused)
 
-        // 创建 IndexKey 对象，确保与 prefixBytes 一致
+        // Create IndexKey object matching prefixBytes
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key))
                 .setTimestamp(timestamp)
                 .build();
 
-        // 调用 getRowIds
+        // Call getRowIds
         long[] rowIds = rocksDBIndex.getRowIds(keyProto);
 
-        // 验证返回值是否符合预期（应为 {1001L, 1002L}）
+        // Verify return value matches expected ({1001L, 1002L})
         assertArrayEquals(new long[]{1001L, 1002L}, rowIds);
     }
 
     @Test
-    public void testPutEntry() throws RocksDBException {
-        // 模拟 RocksDB 的 put 方法
-        long indexId = 1L; // 假设的 indexId
-        byte[] key = "exampleKey".getBytes(); // 假设的索引键
-        long timestamp = System.currentTimeMillis(); // 当前时间戳
+    public void testPutEntry() throws RocksDBException
+    {
+        // Mock RocksDB's put method
+        long indexId = 1L; // Sample indexId
+        byte[] key = "exampleKey".getBytes(); // Sample index key
+        long timestamp = System.currentTimeMillis(); // Current timestamp
 
-        // 构造 keyBytes，与 IndexKey 一致
+        // Construct keyBytes matching IndexKey format
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId); // 放入 indexId
+        buffer.putLong(indexId); // Add indexId
         buffer.put((byte) ':');
-        buffer.put(key);          // 放入 key
+        buffer.put(key);          // Add key
         buffer.put((byte) ':');
-        buffer.putLong(timestamp); // 放入 timestamp
-        byte[] keyBytes = buffer.array(); // 生成最终的 keyBytes
-        byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(1001L).array(); // 假设的值
+        buffer.putLong(timestamp); // Add timestamp
+        byte[] keyBytes = buffer.array(); // Final keyBytes
+        byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(1001L).array(); // Sample value
         doNothing().when(rocksDB).put(keyBytes, valueBytes);
 
-        // 调用 putEntry
+        // Call putEntry
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key))
                 .setTimestamp(timestamp)
                 .build();
-        SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0, true); // 假设的 Entry
+        SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0, true); // Sample Entry
         boolean success = rocksDBIndex.putEntry(entry);
 
-        // 验证返回值
+        // Verify return value
         assertTrue(success);
     }
 
     @Test
-    public void testPutEntries() throws RocksDBException {
-        // 模拟 RocksDB 的 put 方法
-        long indexId = 1L; // 假设的 indexId
-        byte[] key = "exampleKey".getBytes(); // 假设的索引键
-        long timestamp = System.currentTimeMillis(); // 当前时间戳
+    public void testPutEntries() throws RocksDBException
+    {
+        // Mock RocksDB's put method
+        long indexId = 1L; // Sample indexId
+        byte[] key = "exampleKey".getBytes(); // Sample index key
+        long timestamp = System.currentTimeMillis(); // Current timestamp
 
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId); // 放入 indexId
+        buffer.putLong(indexId); // Add indexId
         buffer.put((byte) ':');
-        buffer.put(key);          // 放入 key
+        buffer.put(key);          // Add key
         buffer.put((byte) ':');
-        buffer.putLong(timestamp); // 放入 timestamp
-        byte[] keyBytes = buffer.array(); // 生成最终的 keyBytes
-        byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(1001L).array(); // 假设的值
+        buffer.putLong(timestamp); // Add timestamp
+        byte[] keyBytes = buffer.array(); // Final keyBytes
+        byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(1001L).array(); // Sample value
         doNothing().when(rocksDB).put(keyBytes, valueBytes);
 
-        // 调用 putEntries
+        // Call putEntries
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key))
                 .setTimestamp(timestamp)
                 .build();
         List<SecondaryIndex.Entry> entries = new ArrayList<>();
-        entries.add(new SecondaryIndex.Entry(keyProto, 1001L, true)); // 假设的 Entry
+        entries.add(new SecondaryIndex.Entry(keyProto, 1001L, true)); // Sample Entry
         boolean success = rocksDBIndex.putEntries(entries);
 
-        // 验证返回值
+        // Verify return value
         assertTrue(success);
-        verify(rocksDB, times(1)).put(keyBytes, valueBytes); // 验证 put 方法被调用
+        verify(rocksDB, times(1)).put(keyBytes, valueBytes); // Verify put was called
     }
 
     @Test
-    public void testDeleteEntry() throws RocksDBException {
-        // 模拟 RocksDB 的 delete 方法
-        long indexId = 1L; // 假设的 indexId
-        byte[] key = "exampleKey".getBytes(); // 假设的索引键
-        long timestamp = System.currentTimeMillis(); // 当前时间戳
+    public void testDeleteEntry() throws RocksDBException
+    {
+        // Mock RocksDB's delete method
+        long indexId = 1L; // Sample indexId
+        byte[] key = "exampleKey".getBytes(); // Sample index key
+        long timestamp = System.currentTimeMillis(); // Current timestamp
 
-        // 构造 keyBytes，与 IndexKey 一致
+        // Construct keyBytes matching IndexKey format
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId); // 放入 indexId
+        buffer.putLong(indexId); // Add indexId
         buffer.put((byte) ':');
-        buffer.put(key);          // 放入 key
+        buffer.put(key);          // Add key
         buffer.put((byte) ':');
-        buffer.putLong(timestamp); // 放入 timestamp
-        byte[] keyBytes = buffer.array(); // 生成最终的 keyBytes
+        buffer.putLong(timestamp); // Add timestamp
+        byte[] keyBytes = buffer.array(); // Final keyBytes
 
         doNothing().when(rocksDB).delete(keyBytes);
 
-        // 创建 IndexKey 对象，确保与 keyBytes 一致
+        // Create IndexKey object matching keyBytes
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key))
@@ -210,40 +233,41 @@ public class TestRocksDBIndex {
                 .build();
         boolean success = rocksDBIndex.deleteEntry(keyProto);
 
-        // 验证返回值
+        // Verify return value
         assertTrue(success);
-        verify(rocksDB, times(1)).delete(keyBytes); // 验证 delete 方法被调用
+        verify(rocksDB, times(1)).delete(keyBytes); // Verify delete was called
     }
 
     @Test
-    public void testDeleteEntries() throws RocksDBException {
-        // 模拟 RocksDB 的 delete 方法
-        long indexId = 1L; // 假设的 indexId
-        byte[] key = "exampleKey".getBytes(); // 假设的索引键
-        long timestamp = System.currentTimeMillis(); // 当前时间戳
+    public void testDeleteEntries() throws RocksDBException
+    {
+        // Mock RocksDB's delete method
+        long indexId = 1L; // Sample indexId
+        byte[] key = "exampleKey".getBytes(); // Sample index key
+        long timestamp = System.currentTimeMillis(); // Current timestamp
 
-        // 构造 keyBytes，与 IndexKey 一致
+        // Construct keyBytes matching IndexKey format
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId); // 放入 indexId
+        buffer.putLong(indexId); // Add indexId
         buffer.put((byte) ':');
-        buffer.put(key);          // 放入 key
+        buffer.put(key);          // Add key
         buffer.put((byte) ':');
-        buffer.putLong(timestamp); // 放入 timestamp
-        byte[] keyBytes = buffer.array(); // 生成最终的 keyBytes
+        buffer.putLong(timestamp); // Add timestamp
+        byte[] keyBytes = buffer.array(); // Final keyBytes
         doNothing().when(rocksDB).delete(keyBytes);
 
-        // 调用 deleteEntries
+        // Call deleteEntries
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key))
                 .setTimestamp(timestamp)
                 .build();
         List<IndexProto.IndexKey> keys = new ArrayList<>();
-        keys.add(keyProto); // 假设的 IndexKey 列表
+        keys.add(keyProto); // Sample IndexKey list
         boolean success = rocksDBIndex.deleteEntries(keys);
 
-        // 验证返回值
+        // Verify return value
         assertTrue(success);
-        verify(rocksDB, times(1)).delete(keyBytes); // 验证 delete 方法被调用
+        verify(rocksDB, times(1)).delete(keyBytes); // Verify delete was called
     }
 }

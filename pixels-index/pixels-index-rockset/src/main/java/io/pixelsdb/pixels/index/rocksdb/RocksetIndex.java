@@ -37,8 +37,7 @@ import java.util.stream.Collectors;
  * @author hank
  * @create 2025-02-19
  */
-public class RocksetIndex implements SecondaryIndex
-{
+public class RocksetIndex implements SecondaryIndex {
     // load RocksetJni
     static {
         System.loadLibrary("RocksetJni");
@@ -49,15 +48,20 @@ public class RocksetIndex implements SecondaryIndex
             String bucketName,
             String s3Prefix,
             long[] baseEnvPtrOut);
+
     private native long OpenDBCloud0(
             long cloudEnvPtr,
             String localDbPath,
             String persistentCachePath,
             long persistentCacheSizeGB,
             boolean readOnly);
+
     private native void DBput0(long dbHandle, byte[] key, byte[] value);
+
     private native byte[] DBget0(long dbHandle, byte[] key);
+
     private native void DBdelete0(long dbHandle, byte[] key);
+
     private native void CloseDB0(long dbHandle, long baseEnvPtr, long cloudEnvPtr);
 
     // 包装native方法的public方法
@@ -85,15 +89,19 @@ public class RocksetIndex implements SecondaryIndex
 
         return dbHandle;
     }
+
     private void DBput(long dbHandle, byte[] key, byte[] value) {
         DBput0(dbHandle, key, value);
     }
+
     private byte[] DBget(long dbHandle, byte[] key) {
         return DBget0(dbHandle, key);
     }
+
     private void DBdelete(long dbHandle, byte[] key) {
         DBdelete0(dbHandle, key);
     }
+
     private void CloseDB(long dbHandle, long baseEnvPtr, long cloudEnvPtr) {
         if (dbHandle != 0) {
             CloseDB0(dbHandle, baseEnvPtr, cloudEnvPtr);
@@ -115,7 +123,7 @@ public class RocksetIndex implements SecondaryIndex
     private static long[] baseEnvPtrOut = new long[1];
     private static long cloudEnvPtr = 0;
 
-    public RocksetIndex(MainIndex mainIndex){
+    public RocksetIndex(MainIndex mainIndex) {
         this.dbHandle = CreateDBCloud(bucketName, s3Prefix, localDbPath,
                 persistentCachePath, persistentCacheSizeGB, readOnly, baseEnvPtrOut, cloudEnvPtr);
         this.mainIndex = mainIndex;
@@ -124,10 +132,10 @@ public class RocksetIndex implements SecondaryIndex
     @Override
     public long getUniqueRowId(IndexProto.IndexKey key) {
         try {
-            // 生成复合键
+            // Generate composite key
             byte[] compositeKey = toByteArray(key);
 
-            // 从 RocksDB 中获取值
+            // Get value from RocksDB
             byte[] valueBytes = DBget(this.dbHandle, compositeKey);
 
             if (valueBytes != null) {
@@ -138,58 +146,29 @@ public class RocksetIndex implements SecondaryIndex
         } catch (RuntimeException e) {
             LOGGER.error("Failed to get unique row ID for key: {}", key, e);
         }
-        // 如果键不存在或发生异常，返回默认值（如 0）
+        // Return default value (0) if key doesn't exist or exception occurs
         return 0;
     }
 
     @Override
-    public long[] getRowIds(IndexProto.IndexKey key)
-    {
-        // List<Long> rowIdList = new ArrayList<>();
-
-        // try {
-        //     // 将 IndexKey 转换为字节数组（不包含 rowId）
-        //     byte[] prefixBytes = toByteArray(key);
-
-        //     // 使用 RocksDB 的迭代器进行前缀查找
-        //     try (RocksIterator iterator = rocksDB.newIterator()) {
-        //         for (iterator.seek(prefixBytes); iterator.isValid(); iterator.next()) {
-        //             byte[] currentKeyBytes = iterator.key();
-
-        //             // 检查当前键是否以 prefixBytes 开头
-        //             if (startsWith(currentKeyBytes, prefixBytes)) {
-        //                 // 从键中提取 rowId
-        //                 long rowId = extractRowIdFromKey(currentKeyBytes, prefixBytes.length);
-        //                 rowIdList.add(rowId);
-        //             } else {
-        //                 break; // 如果不再匹配前缀，结束查找
-        //             }
-        //         }
-        //     }
-        //     // 将 List<Long> 转换为 long[]
-        //     return parseRowIds(rowIdList);
-        // } catch (Exception e) {
-        //     LOGGER.error("Failed to get row IDs for key: {}", key, e);
-        // }
-        // 如果键不存在或发生异常，返回空数组
+    public long[] getRowIds(IndexProto.IndexKey key) {
         return new long[0];
     }
 
     @Override
-    public boolean putEntry(Entry entry)
-    {
+    public boolean putEntry(Entry entry) {
         try {
-            // 为 Entry 获取 rowId
+            // Get rowId for Entry
             mainIndex.getRowId(entry);
-            // 从 Entry 对象中提取 key 和 rowId
+            // Extract key and rowId from Entry object
             IndexProto.IndexKey key = entry.getKey();
             long rowId = entry.getRowId();
             boolean unique = entry.getIsUnique();
-            // 将 IndexKey 转换为字节数组
+            // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
-            // 将 rowId 转换为字节数组
+            // Convert rowId to byte array
             byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
-            // 检查 dbHandle 是否有效
+            // Check if dbHandle is valid
             if (this.dbHandle == 0) {
                 throw new IllegalStateException("RocksDB not initialized");
             }
@@ -197,12 +176,12 @@ public class RocksetIndex implements SecondaryIndex
                 throw new IllegalArgumentException("Key/Value cannot be empty");
             }
             if (unique) {
-                // 写入 RocksDB
+                // Write to RocksDB
                 DBput(this.dbHandle, keyBytes, valueBytes);
             } else {
-                // 复合键值
+                // Create composite key
                 byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
-                //存储到 RocksDB
+                // Store in RocksDB
                 DBput(this.dbHandle, nonUniqueKey, null);
             }
             return true;
@@ -213,44 +192,42 @@ public class RocksetIndex implements SecondaryIndex
     }
 
     @Override
-    public boolean putEntries(List<Entry> entries)
-    {
-        // 为 Entry 获取 rowId
+    public boolean putEntries(List<Entry> entries) {
+        // Get rowIds for Entries
         mainIndex.getRgOfRowIds(entries);
         try {
-            // 遍历每个 Entry 对象
+            // Process each Entry object
             for (Entry entry : entries) {
-                // 从 Entry 对象中提取 key 和 rowId
+                // Extract key and rowId from Entry object
                 IndexProto.IndexKey key = entry.getKey();
                 long rowId = entry.getRowId();
                 boolean unique = entry.getIsUnique();
-                // 将 IndexKey 转换为字节数组
+                // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
-                // 将 rowId 转换为字节数组
+                // Convert rowId to byte array
                 byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
-                if(unique) {
-                    // 写入 RocksDB
+                if (unique) {
+                    // Write to RocksDB
                     DBput(this.dbHandle, keyBytes, valueBytes);
                 } else {
                     byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
                     DBput(this.dbHandle, nonUniqueKey, null);
                 }
             }
-            return true; // 所有条目成功写入
+            return true; // All entries written successfully
         } catch (RuntimeException e) {
             LOGGER.error("Failed to put Entries: {} by entries", entries, e);
-            return false; // 返回失败状态
+            return false; // Operation failed
         }
     }
 
     @Override
-    public boolean deleteEntry(IndexProto.IndexKey key)
-    {
+    public boolean deleteEntry(IndexProto.IndexKey key) {
         try {
-            // 将 IndexKey 转换为字节数组
+            // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
 
-            // 从 RocksDB 中删除对应的键值对
+            // Delete key-value pair from RocksDB
             DBdelete(this.dbHandle, keyBytes);
             return true;
         } catch (RuntimeException e) {
@@ -260,14 +237,13 @@ public class RocksetIndex implements SecondaryIndex
     }
 
     @Override
-    public boolean deleteEntries(List<IndexProto.IndexKey> keys)
-    {
+    public boolean deleteEntries(List<IndexProto.IndexKey> keys) {
         try {
-            for(IndexProto.IndexKey key : keys) {
-                // 将 IndexKey 转换为字节数组
+            for (IndexProto.IndexKey key : keys) {
+                // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
 
-                // 从 RocksDB 中删除对应的键值对
+                // Delete key-value pair from RocksDB
                 DBdelete(this.dbHandle, keyBytes);
             }
             return true;
@@ -278,30 +254,31 @@ public class RocksetIndex implements SecondaryIndex
     }
 
     @Override
-    public void close() throws IOException
-    {
-        CloseDB(this.dbHandle, this.baseEnvPtrOut[0], this.cloudEnvPtr); // 关闭 RocksDB 实例
+    public void close() throws IOException {
+        CloseDB(this.dbHandle, this.baseEnvPtrOut[0], this.cloudEnvPtr); // Close RocksDB instance
     }
+
     private static byte[] toByteArray(IndexProto.IndexKey key) {
-        byte[] indexIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getIndexId()).array(); // 获取 indexId 的二进制数据
-        byte[] keyBytes = key.getKey().toByteArray(); // 获取 key 的二进制数据
-        byte[] timestampBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getTimestamp()).array(); // 获取 timestamp 的二进制数据
-        // 组合 indexId、key 和 timestamp
+        byte[] indexIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getIndexId()).array(); // Get indexId bytes
+        byte[] keyBytes = key.getKey().toByteArray(); // Get key bytes
+        byte[] timestampBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getTimestamp()).array(); // Get timestamp bytes
+        // Combine indexId, key and timestamp
         byte[] compositeKey = new byte[indexIdBytes.length + 1 + keyBytes.length + 1 + timestampBytes.length];
-        // 复制 indexId
+        // Copy indexId
         System.arraycopy(indexIdBytes, 0, compositeKey, 0, indexIdBytes.length);
-        // 添加分隔符
+        // Add separator
         compositeKey[indexIdBytes.length] = ':';
-        // 复制 key
+        // Copy key
         System.arraycopy(keyBytes, 0, compositeKey, indexIdBytes.length + 1, keyBytes.length);
-        // 添加分隔符
+        // Add separator
         compositeKey[indexIdBytes.length + 1 + keyBytes.length] = ':';
-        // 复制 timestamp
+        // Copy timestamp
         System.arraycopy(timestampBytes, 0, compositeKey, indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
 
         return compositeKey;
     }
-    // 复合键和rowId
+
+    // Create composite key with rowId
     private static byte[] toNonUniqueKey(byte[] keyBytes, byte[] valueBytes) {
         byte[] nonUniqueKey = new byte[keyBytes.length + 1 + valueBytes.length];
         System.arraycopy(keyBytes, 0, nonUniqueKey, 0, keyBytes.length);
@@ -309,7 +286,8 @@ public class RocksetIndex implements SecondaryIndex
         System.arraycopy(valueBytes, 0, nonUniqueKey, keyBytes.length + 1, valueBytes.length);
         return nonUniqueKey;
     }
-    // 检查字节数组是否以指定前缀开头
+
+    // Check if byte array starts with specified prefix
     private boolean startsWith(byte[] array, byte[] prefix) {
         if (array.length < prefix.length) {
             return false;
@@ -321,16 +299,18 @@ public class RocksetIndex implements SecondaryIndex
         }
         return true;
     }
-    // 从键中提取 rowId
+
+    // Extract rowId from key
     private long extractRowIdFromKey(byte[] keyBytes, int prefixLength) {
-        // 提取 rowId 部分（键的最后 8 个字节）
+        // Extract rowId portion (last 8 bytes of key)
         byte[] rowIdBytes = new byte[Long.BYTES];
         System.arraycopy(keyBytes, keyBytes.length - Long.BYTES, rowIdBytes, 0, Long.BYTES);
 
-        // 将 rowId 转换为 long
+        // Convert rowId to long
         return ByteBuffer.wrap(rowIdBytes).getLong();
     }
-    // 解析多个 rowId 的辅助方法
+
+    // Helper method to parse multiple rowIds
     private long[] parseRowIds(List<Long> rowIdList) {
         long[] rowIds = new long[rowIdList.size()];
         for (int i = 0; i < rowIdList.size(); i++) {

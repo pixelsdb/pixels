@@ -37,43 +37,46 @@ import java.util.stream.Collectors;
  */
 public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
 {
-    // TODO: implement
     private static final Logger logger = LogManager.getLogger(IndexServiceImpl.class);
     private final SecondaryIndex secondaryIndex;
     private final MainIndex mainIndex;
 
-//    public IndexServiceImpl() {}
-    public IndexServiceImpl(SecondaryIndex secondaryIndex, MainIndex mainIndex) {
+    public IndexServiceImpl(SecondaryIndex secondaryIndex, MainIndex mainIndex)
+    {
         this.secondaryIndex = secondaryIndex;
         this.mainIndex = mainIndex;
     }
+
     @Override
     public void lookupUniqueIndex(IndexProto.LookupUniqueIndexRequest request,
                                   StreamObserver<IndexProto.LookupUniqueIndexResponse> responseObserver)
     {
-        // 从请求中获取 IndexKey
+        // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
 
-        // 调用 SecondaryIndex 的 getUniqueRowId 方法
+        // Call SecondaryIndex's getUniqueRowId method
         long rowId = secondaryIndex.getUniqueRowId(key);
 
-        // 调用 MainIndex 的 getLocation 方法，将 rowId 转换为 RowLocation
+        // Call MainIndex's getLocation method to convert rowId to RowLocation
         IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
 
-        // 创建 gRPC 响应
+        // Create gRPC response
         IndexProto.LookupUniqueIndexResponse response;
-        if (rowLocation != null) {
+        if (rowLocation != null)
+        {
             response = IndexProto.LookupUniqueIndexResponse.newBuilder()
                     .setRowLocation(rowLocation)
                     .build();
-        } else {
-            // 如果未找到，返回空的 RowLocation
+        }
+        else
+        {
+            // If not found, return empty RowLocation
             response = IndexProto.LookupUniqueIndexResponse.newBuilder()
                     .setRowLocation(IndexProto.RowLocation.getDefaultInstance())
                     .build();
         }
 
-        // 发送响应
+        // Send response
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -82,27 +85,29 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void lookupNonUniqueIndex(IndexProto.LookupNonUniqueIndexRequest request,
                                      StreamObserver<IndexProto.LookupNonUniqueIndexResponse> responseObserver)
     {
-        // 从请求中获取 IndexKey
+        // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
 
-        // 调用 SecondaryIndex 的 getRowIds 方法
+        // Call SecondaryIndex's getRowIds method
         long[] rowIds = secondaryIndex.getRowIds(key);
 
-        // 将 rowIds 转换为 RowLocation 列表
+        // Convert rowIds to list of RowLocations
         List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
-        for (long rowId : rowIds) {
+        for (long rowId : rowIds)
+        {
             IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
-            if (rowLocation != null) {
+            if (rowLocation != null)
+            {
                 rowLocations.add(rowLocation);
             }
         }
 
-        // 创建 gRPC 响应
+        // Create gRPC response
         IndexProto.LookupNonUniqueIndexResponse response = IndexProto.LookupNonUniqueIndexResponse.newBuilder()
                 .addAllRowLocation(rowLocations)
                 .build();
 
-        // 发送响应
+        // Send response
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -111,18 +116,18 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void putIndexEntry(IndexProto.PutIndexEntryRequest request,
                               StreamObserver<IndexProto.PutIndexEntryResponse> responseObserver)
     {
-        // 从请求中获取 IndexEntry
+        // Get IndexEntry from request
         IndexProto.IndexEntry entry = request.getIndexEntry();
 
-        // 调用 SecondaryIndex 的 putEntry 方法
+        // Call SecondaryIndex's putEntry method
         boolean success = secondaryIndex.putEntry(new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique()));
 
-        // 创建 gRPC 响应
+        // Create gRPC response
         IndexProto.PutIndexEntryResponse response = IndexProto.PutIndexEntryResponse.newBuilder()
                 .setErrorCode(success ? 0 : 1)
                 .build();
 
-        // 发送响应
+        // Send response
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -131,18 +136,18 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void deleteIndexEntry(IndexProto.DeleteIndexEntryRequest request,
                                  StreamObserver<IndexProto.DeleteIndexEntryResponse> responseObserver)
     {
-        // 从请求中获取 IndexKey
+        // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
 
-        // 调用 SecondaryIndex 的 deleteEntry 方法
+        // Call SecondaryIndex's deleteEntry method
         boolean success = secondaryIndex.deleteEntry(key);
 
-        // 创建 gRPC 响应
+        // Create gRPC response
         IndexProto.DeleteIndexEntryResponse response = IndexProto.DeleteIndexEntryResponse.newBuilder()
                 .setErrorCode(success ? 0 : 1)
                 .build();
 
-        // 发送响应
+        // Send response
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -151,20 +156,20 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void putIndexEntries(IndexProto.PutIndexEntriesRequest request,
                                 StreamObserver<IndexProto.PutIndexEntriesResponse> responseObserver)
     {
-        // 从请求中获取 IndexEntry 列表
+        // Get list of IndexEntries from request
         List<SecondaryIndex.Entry> entries = request.getIndexEntriesList().stream()
                 .map(entry -> new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique()))
                 .collect(Collectors.toList());
 
-        // 调用 SecondaryIndex 的 putEntries 方法
+        // Call SecondaryIndex's putEntries method
         boolean success = secondaryIndex.putEntries(entries);
 
-        // 创建 gRPC 响应
+        // Create gRPC response
         IndexProto.PutIndexEntriesResponse response = IndexProto.PutIndexEntriesResponse.newBuilder()
                 .setErrorCode(success ? 0 : 1)
                 .build();
 
-        // 发送响应
+        // Send response
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -173,18 +178,18 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void deleteIndexEntries(IndexProto.DeleteIndexEntriesRequest request,
                                    StreamObserver<IndexProto.DeleteIndexEntriesResponse> responseObserver)
     {
-        // 从请求中获取 IndexKey 列表
+        // Get list of IndexKeys from request
         List<IndexProto.IndexKey> keys = request.getIndexKeysList();
 
-        // 调用 SecondaryIndex 的 deleteEntries 方法
+        // Call SecondaryIndex's deleteEntries method
         boolean success = secondaryIndex.deleteEntries(keys);
 
-        // 创建 gRPC 响应
+        // Create gRPC response
         IndexProto.DeleteIndexEntriesResponse response = IndexProto.DeleteIndexEntriesResponse.newBuilder()
                 .setErrorCode(success ? 0 : 1)
                 .build();
 
-        // 发送响应
+        // Send response
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

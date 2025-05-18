@@ -205,8 +205,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven.plugin.compile.version}</version>
                 <configuration>
-                    <source>16</source>
-                    <target>16</target>
+                    <source>8</source>
+                    <target>8</target>
                 </configuration>
             </plugin>
         </plugins>

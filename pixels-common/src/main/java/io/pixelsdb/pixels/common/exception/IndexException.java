@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *

@@ -36,30 +36,35 @@ import java.util.List;
  * @author hank
  * @create 2025-02-19
  */
-public class MainIndexImpl implements MainIndex {
+public class MainIndexImpl implements MainIndex
+{
     private static final Logger logger = LogManager.getLogger(MainIndexImpl.class);
-    // 缓存，用于存放生成的 rowId
+    // Cache for storing generated rowIds
     private final List<Long> rowIdCache = new ArrayList<>();
-    // 假设每次生成的 rowId 数量
+    // Assumed batch size for generating rowIds
     private static final int BATCH_SIZE = 100000;
-    // 获取 EtcdUtil 单例
+    // Get the singleton instance of EtcdUtil
     EtcdUtil etcdUtil = EtcdUtil.Instance();
-    private boolean dirty = false; // 脏标记
+    private boolean dirty = false; // Dirty flag
 
-    public static class Entry {
+    public static class Entry
+    {
         private final RowIdRange rowIdRange;
         private final RgLocation rgLocation;
 
-        public Entry(RowIdRange rowIdRange, RgLocation rgLocation) {
+        public Entry(RowIdRange rowIdRange, RgLocation rgLocation)
+        {
             this.rowIdRange = rowIdRange;
             this.rgLocation = rgLocation;
         }
 
-        public RowIdRange getRowIdRange() {
+        public RowIdRange getRowIdRange()
+        {
             return rowIdRange;
         }
 
-        public RgLocation getRgLocation() {
+        public RgLocation getRgLocation()
+        {
             return rgLocation;
         }
     }
@@ -67,8 +72,9 @@ public class MainIndexImpl implements MainIndex {
     private final List<Entry> entries = new ArrayList<>();
 
     @Override
-    public IndexProto.RowLocation getLocation(long rowId) {
-        // 使用二分查找确定 rowId 所属的 Entry
+    public IndexProto.RowLocation getLocation(long rowId)
+    {
+        // Use binary search to find the Entry containing the rowId
         int index = binarySearch(rowId);
         if (index >= 0) {
             Entry entry = entries.get(index);
@@ -76,38 +82,40 @@ public class MainIndexImpl implements MainIndex {
             return IndexProto.RowLocation.newBuilder()
                     .setFileId(rgLocation.getFileId())
                     .setRgId(rgLocation.getRowGroupId())
-                    .setRgRowId((int) (rowId - entry.getRowIdRange().getStartRowId())) // 计算行在行组中的偏移量
+                    .setRgRowId((int) (rowId - entry.getRowIdRange().getStartRowId())) // Calculate the offset within the row group
                     .build();
         }
-        return null; // 如果未找到，返回 null
+        return null; // Return null if not found
     }
 
     @Override
-    public boolean putRowIdsOfRg(RowIdRange rowIdRangeOfRg, RgLocation rgLocation) {
-        // 检查 rowIdRangeOfRg 是否与现有范围重叠
+    public boolean putRowIdsOfRg(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
+    {
+        // Check if rowIdRangeOfRg overlaps with existing ranges
         if (isOverlapping(rowIdRangeOfRg)) {
-            return false; // 如果重叠，插入失败
+            return false; // Insertion fails if overlapping
         }
 
-        // 创建新的 Entry 并插入到 entries 中
+        // Create new Entry and add to entries
         Entry newEntry = new Entry(rowIdRangeOfRg, rgLocation);
         entries.add(newEntry);
 
-        // 按 startRowId 排序，确保 entries 有序
+        // Sort entries by startRowId to maintain order
         entries.sort((e1, e2) -> Long.compare(e1.getRowIdRange().getStartRowId(), e2.getRowIdRange().getStartRowId()));
 
-        // 设置脏标记
+        // Set dirty flag
         dirty = true;
 
         return true;
     }
 
     @Override
-    public boolean deleteRowIdRange(RowIdRange rowIdRange) {
-        // 查找并删除与 rowIdRange 重叠的 Entry
+    public boolean deleteRowIdRange(RowIdRange rowIdRange)
+    {
+        // Find and remove Entries overlapping with rowIdRange
         boolean removed = entries.removeIf(entry -> isOverlapping(entry.getRowIdRange(), rowIdRange));
 
-        // 设置脏标记
+        // Set dirty flag
         if (removed) {
             dirty = true;
         }
@@ -116,10 +124,11 @@ public class MainIndexImpl implements MainIndex {
     }
 
     @Override
-    public boolean getRowId(SecondaryIndex.Entry entry) {
-        // 检查缓存是否为空
+    public boolean getRowId(SecondaryIndex.Entry entry)
+    {
+        // Check if cache is empty
         if (rowIdCache.isEmpty()) {
-            // 生成一批新的 rowId 到缓存
+            // Generate a new batch of rowIds into cache
             List<Long> newRowIds = loadRowIdsFromEtcd(BATCH_SIZE);
             if (newRowIds.isEmpty()) {
                 logger.error("Failed to generate row ids");
@@ -127,18 +136,19 @@ public class MainIndexImpl implements MainIndex {
             }
             rowIdCache.addAll(newRowIds);
         }
-        // 从缓存中取出第一个 rowId
+        // Get the first rowId from cache
         long rowId = rowIdCache.remove(0);
-        // 将 rowId 设置到 IndexEntry 中
+        // Set the rowId in IndexEntry
         entry.setRowId(rowId);
         return true;
     }
 
     @Override
-    public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries) {
-        // 检查缓存中剩余的 rowId 数量是否足够分配
+    public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries)
+    {
+        // Check if remaining rowIds in cache are sufficient
         if (rowIdCache.size() < entries.size()) {
-            // 如果缓存中的 rowId 数量不足，生成一批新的 rowId
+            // If cache is insufficient, generate a new batch of rowIds
             int requiredCount = entries.size() - rowIdCache.size();
             List<Long> newRowIds = loadRowIdsFromEtcd(Math.max(requiredCount, BATCH_SIZE));
             if (newRowIds.isEmpty()) {
@@ -147,10 +157,10 @@ public class MainIndexImpl implements MainIndex {
             }
             rowIdCache.addAll(newRowIds);
         }
-        // 为每个 IndexEntry 分配一个 rowId
+        // Assign a rowId to each IndexEntry
         for (SecondaryIndex.Entry entry : entries) {
-            long rowId = rowIdCache.remove(0); // 从缓存中取出一个 rowId
-            entry.setRowId(rowId);  // 设置 rowId
+            long rowId = rowIdCache.remove(0); // Get a rowId from cache
+            entry.setRowId(rowId);  // Set the rowId
         }
         return true;
     }
@@ -159,10 +169,10 @@ public class MainIndexImpl implements MainIndex {
     public boolean persist()
     {
         try {
-            // 遍历 entries，将每个 Entry 持久化到 etcd
+            // Iterate through entries and persist each to etcd
             for (Entry entry : entries) {
                 String key = "/mainindex/" + entry.getRowIdRange().getStartRowId();
-                String value = serializeEntry(entry); // 将 Entry 序列化为字符串
+                String value = serializeEntry(entry); // Serialize Entry to string
                 etcdUtil.putKeyValue(key, value);
             }
             logger.info("Persisted {} entries to etcd", entries.size());
@@ -173,21 +183,23 @@ public class MainIndexImpl implements MainIndex {
         }
     }
 
-    public boolean persistIfDirty() {
+    public boolean persistIfDirty()
+    {
         if (dirty) {
             if (persist()) {
-                dirty = false; // 重置脏标记
+                dirty = false; // Reset dirty flag
                 return true;
             }
             return false;
         }
-        return true; // 数据未变化，无需持久化
+        return true; // No changes, no need to persist
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() throws IOException
+    {
         try {
-            // 检查脏标记，如果为 true，则持久化数据到 etcd
+            // Check dirty flag and persist to etcd if true
             if (!persistIfDirty()) {
                 logger.error("Failed to persist data to etcd before closing");
                 throw new IOException("Failed to persist data to etcd before closing");
@@ -199,7 +211,8 @@ public class MainIndexImpl implements MainIndex {
         }
     }
 
-    private int binarySearch(long rowId) {
+    private int binarySearch(long rowId)
+    {
         int low = 0;
         int high = entries.size() - 1;
 
@@ -209,7 +222,7 @@ public class MainIndexImpl implements MainIndex {
             RowIdRange range = entry.getRowIdRange();
 
             if (rowId >= range.getStartRowId() && rowId <= range.getEndRowId()) {
-                return mid; // 找到所属的 Entry
+                return mid; // Found the containing Entry
             } else if (rowId < range.getStartRowId()) {
                 high = mid - 1;
             } else {
@@ -217,16 +230,18 @@ public class MainIndexImpl implements MainIndex {
             }
         }
 
-        return -1; // 未找到
+        return -1; // Not found
     }
 
-    // 检查两个 RowIdRange 是否重叠
-    private boolean isOverlapping(RowIdRange range1, RowIdRange range2) {
+    // Check if two RowIdRanges overlap
+    private boolean isOverlapping(RowIdRange range1, RowIdRange range2)
+    {
         return range1.getStartRowId() <= range2.getEndRowId() && range1.getEndRowId() >= range2.getStartRowId();
     }
 
-    // 检查 RowIdRange 是否与现有范围重叠
-    private boolean isOverlapping(RowIdRange newRange) {
+    // Check if RowIdRange overlaps with existing ranges
+    private boolean isOverlapping(RowIdRange newRange)
+    {
         for (Entry entry : entries) {
             if (isOverlapping(entry.getRowIdRange(), newRange)) {
                 return true;
@@ -235,28 +250,29 @@ public class MainIndexImpl implements MainIndex {
         return false;
     }
 
-    // 从etcd中加载一批rowId
-    private List<Long> loadRowIdsFromEtcd(int count) {
+    // Load a batch of rowIds from etcd
+    private List<Long> loadRowIdsFromEtcd(int count)
+    {
         List<Long> rowIds = new ArrayList<>();
-        // 从 etcd 中读取前缀为 /rowId/ 的所有键值对
+        // Read all key-values with prefix /rowId/ from etcd
         List<KeyValue> keyValues = etcdUtil.getKeyValuesByPrefix("/rowId/");
 
-        // 遍历键值对，提取 rowId
+        // Iterate through key-values to extract rowIds
         for (KeyValue kv : keyValues) {
             String key = kv.getKey().toString(StandardCharsets.UTF_8);
-            // 假设 key 的格式为 /rowId/{rowId}
+            // Assume key format is /rowId/{rowId}
             try {
                 long rowId = Long.parseLong(key.substring("/rowId/".length()));
                 rowIds.add(rowId);
                 if (rowIds.size() >= count) {
-                    break; // 达到需要的数量后停止
+                    break; // Stop when required count is reached
                 }
             } catch (NumberFormatException e) {
-                // 如果 key 的格式不符合预期，跳过
+                // Skip if key format is invalid
                 logger.error("Invalid rowId format in etcd key: {}", key, e);
             }
         }
-        // 批量删除这些 rowId
+        // Batch delete these rowIds
         if (!rowIds.isEmpty()) {
             for (long rowId : rowIds) {
                 etcdUtil.delete("/rowId/" + rowId);
@@ -265,8 +281,9 @@ public class MainIndexImpl implements MainIndex {
         return rowIds;
     }
 
-    // 序列化Entry
-    private String serializeEntry(Entry entry) {
+    // Serialize Entry
+    private String serializeEntry(Entry entry)
+    {
         return String.format("{\"startRowId\": %d, \"endRowId\": %d, \"fieldId\": %d, \"rowGroupId\": %d}",
                 entry.getRowIdRange().getStartRowId(),
                 entry.getRowIdRange().getEndRowId(),

@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.common.index;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import org.rocksdb.RocksDBException;
 
 /**
  * @author hank

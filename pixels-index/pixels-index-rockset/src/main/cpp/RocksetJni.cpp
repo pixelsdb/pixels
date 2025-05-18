@@ -75,35 +75,6 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_Creat
 
     // 创建基础环境
     Env* base_env = Env::Default();
-
-    // // 6. 尝试创建CloudFileSystem
-    // std::cout << "开始创建CloudFileSystem"<< std::endl;
-    // std::shared_ptr<FileSystem> base_fs = base_env->GetFileSystem();
-    // CloudFileSystem* cfs = nullptr;
-    // Status s = CloudFileSystemEnv::NewAwsFileSystem(
-    //     base_fs,
-    //     cloud_fs_options,
-    //     nullptr,
-    //     &cfs
-    // );
-
-    // // 7. 检查结果
-    // if (!s.ok()) {
-    //     std::cout << "S3初始化失败: " << s.ToString() << std::endl;
-        
-    //     // 输出详细错误信息
-    //     if (s.IsIOError()) {
-    //         std::cout << "IO错误,请检查网络连接或终端节点配置 " << std::endl;
-    //     } else if (s.IsInvalidArgument()) {
-    //         std::cout << "参数错误，请检查Bucket名称/区域设置 " << std::endl;
-    //     } else {
-    //         std::cout << "Other Error " << std::endl;
-    //     }
-    // } else {
-    //     std::cout << "S3连接测试成功！" << std::endl;
-    //     // 清理资源
-    //     delete cfs;
-    // }
     
     // 创建 CloudFileSystem
     std::shared_ptr<FileSystem> base_fs = base_env->GetFileSystem();
@@ -152,32 +123,6 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_OpenD
     options.create_if_missing = true;
     options.best_efforts_recovery = true;  // 忽略缺失文件
     options.paranoid_checks = false;       // 关闭严格校验
-    // options.wal_dir = "/tmp/rocksdb_cloud_test";
-
-    // // 在设置 options.env 后添加验证代码
-    // if (options.env == nullptr) {
-    //     std::cerr << "ERROR: Env is nullptr!" << std::endl;
-    //     env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), 
-    //                 "CloudEnv cannot be null");
-    //     return 0;
-    // }
-    // // 进一步验证 Env 是否能正常访问文件系统
-    // std::string test_path = "/tmp/rocksdb_cloud_test/env_test";
-    // Status test_status = options.env->CreateDir(test_path);
-    // if (!test_status.ok()) {
-    //     std::cerr << "ERROR: Env is invalid! Cannot create dir: " 
-    //             << test_status.ToString() << std::endl;
-    //     env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
-    //                 "CloudEnv filesystem access failed");
-    //     return 0;
-    // }
-    // options.env->DeleteDir(test_path); // 清理测试目录
-    // // 检查目录是否存在且可访问
-    // Status wal_status = options.env->FileExists(options.wal_dir);
-    // if (!wal_status.ok()) {
-    //     std::cerr << "WAL dir check failed: " << wal_status.ToString() << std::endl;
-    // }
-    // std::cout << "Env测试结束"<< std::endl;
 
     // Open DBCloud
     DBCloud* dbcloud = nullptr;

@@ -82,8 +82,6 @@ public interface SecondaryIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-//    boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique);
-
     boolean putEntry(Entry entry);
 
     boolean putEntries(List<Entry> entries);

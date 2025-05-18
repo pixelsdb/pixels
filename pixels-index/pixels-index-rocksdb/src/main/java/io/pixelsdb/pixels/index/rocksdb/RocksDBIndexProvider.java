@@ -35,7 +35,6 @@ import org.rocksdb.RocksDBException;
  */
 public class RocksDBIndexProvider implements SecondaryIndexProvider
 {
-    // TODO: implement
     private static final Logger logger = LogManager.getLogger(RocksDBIndexProvider.class);
     private final MainIndex mainIndex = new MainIndexImpl();
     private final String RocksdbPath = "tmp/rocksdb";

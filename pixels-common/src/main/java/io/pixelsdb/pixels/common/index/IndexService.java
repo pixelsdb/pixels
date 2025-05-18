@@ -43,7 +43,6 @@ import static io.pixelsdb.pixels.common.error.ErrorCode.*;
  */
 public class IndexService
 {
-    // TODO: implement
     private static final Logger logger = LogManager.getLogger(IndexService.class);
     private static final IndexService defaultInstance;
     private static final Map<HostAddress, IndexService> otherInstances = new HashMap<>();
