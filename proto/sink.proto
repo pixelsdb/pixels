@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package sink.proto;
+
+
+import "retina.proto";
+import "pixels.proto";
+
+option java_multiple_files = false;
+option java_package = "io.pixelsdb.pixels.sink";
+option java_outer_classname = "SinkProto";
+
+enum TransactionStatus {
+    BEGIN = 0;
+    END = 1;
+}
+
+message DataCollection {
+    string data_collection = 1;
+    int64 event_count = 2; 
+}
+
+message TransactionMetadata {
+  TransactionStatus status = 1;
+  string id = 2;
+  int64 event_count = 3;
+  repeated DataCollection data_collections = 4;  
+  int64 timestamp = 5;              
+}
+
+message ColumnValue {
+    retina.proto.Value value = 1;
+    pixels.proto.Type type = 2;
+    string name = 3;
+}
+    
+
+message RowValue {
+    repeated ColumnValue values = 1;
+}
+
+enum OperationType {
+    INSERT = 0;
+    UPDATE = 1;
+    DELETE = 2;
+    SNAPSHOT = 3;
+}
+message RowRecord {
+  RowValue before = 1;
+  RowValue after = 2;
+  SourceInfo source = 3;
+  TransactionInfo transaction = 4;
+  OperationType op = 5;
+  int64 ts_ms = 6;
+  int64 ts_us = 7;
+  int64 ts_ns = 8;
+  ErrorInfo error = 9;
+}
+
+message SourceInfo {
+  string version = 1;
+  string connector = 2;
+  string name = 3;
+  int64 ts_ms = 4;
+  string snapshot = 5;
+  string db = 6;
+  string sequence = 7;
+  int64 ts_us = 8;
+  int64 ts_ns = 9;
+  string schema = 10;
+  string table = 11;
+  int64 tx_id = 12;
+  int64 lsn = 13;
+  int64 xmin = 14;
+}
+
+message TransactionInfo {
+  string id = 1;
+  int64 total_order = 2;
+  int64 data_collection_order = 3;
+}
+
+message ErrorInfo {
+  string message = 1;
+  string stack_trace = 2;
+  bytes original_data = 3;
+}
