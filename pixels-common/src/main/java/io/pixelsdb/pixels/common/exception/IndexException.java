@@ -17,18 +17,30 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.rocksdb;
-
-import org.junit.Test;
+package io.pixelsdb.pixels.common.exception;
 
 /**
- * @author hank
- * @create 2025-02-19
+ * @author lihaoyue
+ * @create 2025-03-01
  */
-public class TestRockset
-{
-    @Test
-    public void testBasic()
+public class IndexException extends Exception {
+    public IndexException()
     {
+        super();
+    }
+
+    public IndexException(String message)
+    {
+        super(message);
+    }
+
+    public IndexException(Throwable cause)
+    {
+        super(cause);
+    }
+
+    public IndexException(String message, Throwable cause)
+    {
+        super(message, cause);
     }
 }
