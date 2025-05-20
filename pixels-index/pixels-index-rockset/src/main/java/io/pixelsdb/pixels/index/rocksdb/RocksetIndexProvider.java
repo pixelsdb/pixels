@@ -19,16 +19,15 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.MainIndexImpl;
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
 import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
-
-import io.pixelsdb.pixels.common.index.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
 import javax.annotation.Nonnull;
 import java.io.IOException;
-
-import org.rocksdb.*;
 
 /**
  * @author hank
@@ -36,7 +35,6 @@ import org.rocksdb.*;
  */
 public class RocksetIndexProvider implements SecondaryIndexProvider
 {
-    // TODO: implement
     private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
     private final MainIndex mainIndex = new MainIndexImpl();
     private final String RocksdbPath = "tmp/rocksdb-cloud";
@@ -45,7 +43,7 @@ public class RocksetIndexProvider implements SecondaryIndexProvider
     {
         if (scheme == SecondaryIndex.Scheme.rockset) {
              try {
-                 return new RocksetIndex(mainIndex);//初始化 RocksDBIndex
+                 return new RocksetIndex(mainIndex); //初始化 RocksDBIndex
              } catch (Exception e) {
                  logger.error("Failed to create RocksDB instance", e);
                  return null;
