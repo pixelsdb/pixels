@@ -333,8 +333,12 @@ public class VectorizedRowBatch implements AutoCloseable
      * Serialize VectorizedRowBatch to byte array
      * @return
      */
-    public byte[] serialize(FlatBufferBuilder builder)
+    public byte[] serialize()
     {
+        // The row batch can hold up to 1w records (as specified in the properties file),
+        // and the buffer initialization size is set to 4mb.
+        FlatBufferBuilder builder = new FlatBufferBuilder(4 * 1024 * 1024);
+
         int[] columnVectorOffsets = new int[numCols];
         byte[] columnTypeOffsets = new byte[numCols];
         for (int i = 0; i < numCols; ++i)
