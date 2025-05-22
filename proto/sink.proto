@@ -29,7 +29,7 @@ message TransactionMetadata {
 }
 
 message ColumnValue {
-    retina.proto.Value value = 1;
+    retina.proto.ColumnValue value = 1;
     pixels.proto.Type type = 2;
     string name = 3;
 }
