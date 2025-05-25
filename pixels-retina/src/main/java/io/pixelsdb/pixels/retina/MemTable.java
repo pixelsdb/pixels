@@ -47,7 +47,7 @@ public class MemTable implements Referenceable
      * @return
      * @throws RetinaException
      */
-    public boolean add(byte[][] values, long timestamp) throws RetinaException
+    public synchronized boolean add(byte[][] values, long timestamp) throws RetinaException
     {
         if (isFull())
         {
@@ -71,12 +71,6 @@ public class MemTable implements Referenceable
         return this.rowBatch;
     }
 
-    public ImmutableMemTable markImmutable()
-    {
-        ImmutableMemTable immutableMemTable = new ImmutableMemTable(this.schema, this.rowBatch);
-        return immutableMemTable;
-    }
-
     public boolean isFull()
     {
         return this.rowBatch.isFull();
@@ -85,6 +79,11 @@ public class MemTable implements Referenceable
     public boolean isEmpty()
     {
         return this.rowBatch.isEmpty();
+    }
+
+    public byte[] serialize()
+    {
+        return this.rowBatch.serialize();
     }
 
     @Override

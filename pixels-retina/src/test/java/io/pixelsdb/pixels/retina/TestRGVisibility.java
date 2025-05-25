@@ -25,7 +25,6 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,7 +32,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 
-public class RGVisibilityTest {
+public class TestRGVisibility
+{
     private static final int ROW_COUNT = 25600;
     private static final boolean DEBUG = true;
     private RGVisibility rgVisibility;

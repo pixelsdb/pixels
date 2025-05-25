@@ -70,10 +70,10 @@ public class PixelsWriterBuffer
     private final Storage targetCompactStorage;
 
     // Active memTable
-    private MemTable memTable;
+    private MemTable activeMemTable;
 
     // Wait to refresh to etcd
-    private final List<ImmutableMemTable> immutableMemTables;
+    private final List<MemTable> immutableMemTables;
 
     // Etcd key id counter
     private final AtomicInteger etcdKeyIdCounter = new AtomicInteger(0);
@@ -90,9 +90,6 @@ public class PixelsWriterBuffer
 
     // Lock for SuperVersion switch
     private final ReadWriteLock versionLock = new ReentrantReadWriteLock();
-
-    // ETCD
-    private static final long BUFFER_EXPIRY_TIME = 3600;
 
     public PixelsWriterBuffer(TypeDescription schema, String schemaName, String tableName,
                               String targetOrderedDirPath, String targetCompactDirPath) throws RetinaException
@@ -120,14 +117,14 @@ public class PixelsWriterBuffer
         this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
         this.maxBufferSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
 
-        this.memTable = new MemTable(schema, pixelStride, TypeDescription.Mode.NONE);
+        this.activeMemTable = new MemTable(schema, pixelStride, TypeDescription.Mode.NONE);
         this.immutableMemTables = new ArrayList<>();
         this.etcdEntries = new ArrayList<>();
-        this.currentVersion = new SuperVersion(memTable, immutableMemTables, etcdEntries);
+        // Initialization adds reference counts to all data
+        this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, etcdEntries);
 
         this.flushExecutor = Executors.newFixedThreadPool(2);
         startEtcdFlushScheduler();
-        startDiskFlushScheduler();
     }
 
     /**
@@ -143,137 +140,17 @@ public class PixelsWriterBuffer
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
-        this.versionLock.readLock().lock();
-        try
-        {
-           // add into memTable
-            boolean added = this.memTable.add(values, timestamp);
-            if (!added || this.memTable.isFull())
+        boolean added = false;
+        while (!added) {
+            this.versionLock.readLock().lock();
+            added = this.activeMemTable.add(values, timestamp);
+            this.versionLock.readLock().unlock();
+            if (!added)
             {
                 switchMemTable();
-                if (!added) // recursive call
-                {
-                    addRow(values, timestamp);
-                }
             }
-        } finally
-        {
-            this.versionLock.readLock().unlock();
         }
-
-//        // activeBuffer is full, switch to immutable and flush it into etcd
-//        if (activeBufferRowCount.get() >= pixelStride)
-//        {
-//            if (isWritingImmutableBufferToEtcd())
-//            {
-//                throw new RetinaException("Adding elements too quickly, before having time to save the last immutable buffer");
-//            }
-//
-//            // switch active buffer to immutable buffer
-//            setSwitchingActiveToImmutable();
-//            immutableBuffer = activeBuffer;
-//            activeBuffer = this.schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
-//            activeBufferRowCount.set(0);
-//            clearSwitchingActiveToImmutable();
-//
-//            etcdFlushExecutor.submit(() ->
-//            {
-//                setWritingImmutableBufferToEtcd();
-//                String bufferKey = bufferKeyPrefix + "buffer_" + getEtcdEndIndex();
-//                byte[] serializedBuffer = null; // = serializeBuffer(buffer);
-//                totalBytesWritten += serializedBuffer.length;
-//                etcdUtil.putKeyValue(bufferKey, new String(serializedBuffer));
-//                long newState = finishPutBufferToEtcd();
-//
-//                // check weather need to write buffers in etcd into disk file
-//                if (totalBytesWritten >= maxBufferSize)
-//                {
-//                    fileWriteExecutor.submit(() ->{
-//                        if (writer == null)
-//                        {
-//                            try
-//                            {
-//                                createNewWriter();
-//                            } catch (RetinaException e)
-//                            {
-//                                logger.error("Failed to create pixels writer", e);
-//                            }
-//                        }
-//
-//                        int startIndex = (int) ((newState & ETCD_START_INDEX_MASK) >> 24);
-//                        int endIndex = (int) (newState & ETCD_END_INDEX_MASK);
-//                        try
-//                        {
-//                            for (int i = startIndex; i < endIndex; ++i)
-//                            {
-//                                String curBufferKey = bufferKeyPrefix + "buffer_" + i;
-//                                KeyValue value = etcdUtil.getKeyValue(curBufferKey);
-//                                if (value != null)
-//                                {
-//                                    VectorizedRowBatch batch = null; //deserializeBuffer(value.getValue().toString());
-//                                    if (batch != null)
-//                                    {
-//                                        writer.addRowBatch(batch);
-//                                    }
-//                                }
-//                            }
-//                            writer.close();
-//                        } catch (IOException e)
-//                        {
-//                            logger.error("Failed to write buffer from etcd to disk file", e);
-//                        }
-//
-//                        // TODO: atomicity switching metadata, update state and update totalBytesWritten
-//                        setEtcdStartIndex(endIndex);
-//                        for (int i = startIndex; i < endIndex; ++i)
-//                        {
-//                            String curBufferKey = bufferKeyPrefix + "buffer_" + i;
-//                            etcdUtil.delete(bufferKey);
-//                        }
-//                        totalBytesWritten = 0;
-//                    });
-//                }
-//            });
-//        }
-//
-//        // TODO: ensure multi thread safe
-//        for (int i = 0; i < values.length; ++i)
-//        {
-//            this.activeBuffer.cols[i].add(new String(values[i]));
-//        }
-//        this.activeBuffer.cols[columnCount].add(timestamp);
-//        activeBuffer.size = activeBufferRowCount.incrementAndGet();
         return true;
-    }
-
-    private void createNewWriter() throws RetinaException
-    {
-        if (this.writer != null)
-        {
-            throw new RetinaException("Writer already exists");
-        }
-        try
-        {
-            String targetFileName = DateUtil.getCurTime() + ".pxl";
-            String targetFilePath = this.targetOrderedDirPath + targetFileName;
-            this.writer = PixelsWriterImpl.newBuilder()
-                    .setSchema(this.schema)
-                    .setHasHiddenColumn(true)
-                    .setPixelStride(this.pixelStride)
-                    .setRowGroupSize(this.rowGroupSize)
-                    .setStorage(this.targetOrderedStorage)
-                    .setPath(targetFilePath)
-                    .setBlockSize(this.blockSize)
-                    .setReplication(this.replication)
-                    .setBlockPadding(true)
-                    .setEncodingLevel(this.encodingLevel)
-                    .setNullsPadding(this.nullsPadding)
-                    .setCompressionBlockSize(1)
-                    .build();
-        } catch (Exception e)
-        {
-            throw new RetinaException("Failed to create new writer", e);
-        }
     }
 
     private void switchMemTable()
@@ -281,42 +158,40 @@ public class PixelsWriterBuffer
         this.versionLock.writeLock().lock();
         try
         {
-            if (this.memTable.isEmpty())
+            if (this.activeMemTable.isEmpty())
             {
                 return;
             }
 
-            ImmutableMemTable immutableMemTable = this.memTable.markImmutable();
-            this.immutableMemTables.add(immutableMemTable);
+            /**
+             * For activeMemTable, at initialization the reference count is 2 because of *this and superVersion
+             * Here only currentVersion is destroyed, *this is still in use, so only one call to unref() is needed.
+             */
+            MemTable oldMemTable = this.activeMemTable;
+            this.immutableMemTables.add(this.activeMemTable);
+            this.activeMemTable = new MemTable(this.schema, this.pixelStride, TypeDescription.Mode.NONE);
 
-            MemTable newMemTable = new MemTable(this.schema, this.pixelStride, TypeDescription.Mode.NONE);
-            SuperVersion newVersion = new SuperVersion(newMemTable, this.immutableMemTables, this.etcdEntries);
-
+            SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.etcdEntries);
             SuperVersion oldVersion = this.currentVersion;
             this.currentVersion = newVersion;
             oldVersion.unref();
 
-            MemTable oldMemTable = this.memTable;
-            this.memTable = newMemTable;
-            oldMemTable.unref();
-
-            triggerFlushToEtcd(immutableMemTable);
+            triggerFlushToEtcd(oldMemTable);
         } finally
         {
             this.versionLock.writeLock().unlock();
         }
     }
 
-    private void triggerFlushToEtcd(ImmutableMemTable immutableMemTable)
+    private void triggerFlushToEtcd(MemTable flushToEtcdMemTable)
     {
-        immutableMemTable.ref();
         flushExecutor.submit(() -> {
             try
             {
                 // put etcd entry
                 long id = this.etcdKeyIdCounter.getAndIncrement();
                 String etcdEntryKey = this.schemaName + '_' + tableName + '_' + id;
-                etcdUtil.putKeyValue(etcdEntryKey, new String(immutableMemTable.serialize())); // synchronous operation
+                etcdUtil.putKeyValue(etcdEntryKey, new String(flushToEtcdMemTable.serialize())); // synchronous operation
                 EtcdEntry etcdEntry = new EtcdEntry(id);
                 etcdEntry.ref();
 
@@ -324,11 +199,10 @@ public class PixelsWriterBuffer
                 versionLock.writeLock().lock();
                 try
                 {
-                    List<ImmutableMemTable> newImmutableMemTables = new ArrayList<>(currentVersion.getImmutableMemTables());
-                    newImmutableMemTables.remove(immutableMemTable);
-                    List<EtcdEntry> newEtcdEntries = new ArrayList<>(this.currentVersion.getEtcdEntries());
-                    newEtcdEntries.add(etcdEntry);
-                    SuperVersion newVersion = new SuperVersion(this.currentVersion.getMemTable(), newImmutableMemTables, newEtcdEntries);
+                    this.immutableMemTables.remove(flushToEtcdMemTable);
+                    this.etcdEntries.add(etcdEntry);
+
+                    SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.etcdEntries);
 
                     SuperVersion oldVersion = this.currentVersion;
                     this.currentVersion = newVersion;
@@ -342,9 +216,27 @@ public class PixelsWriterBuffer
                 throw new RuntimeException("Failed to flush to etcd ", e);
             } finally
             {
-                immutableMemTable.unref();
+                flushToEtcdMemTable.unref();  // unref in the end
             }
         });
+    }
+
+    /**
+     * get current version
+     * caller must call unref()
+     * @return
+     */
+    public SuperVersion getCurrentVersion()
+    {
+        versionLock.readLock().lock();
+        try
+        {
+            currentVersion.ref();
+            return currentVersion;
+        } finally
+        {
+            versionLock.readLock().unlock();
+        }
     }
 
     private void startEtcdFlushScheduler()
@@ -381,11 +273,6 @@ public class PixelsWriterBuffer
         scheduler.start();
     }
 
-    private void startDiskFlushScheduler()
-    {
-
-    }
-
     private void flushEtcdToDisk(List<EtcdEntry> flushEtcdEntries)
     {
         this.flushExecutor.submit(() -> {
@@ -407,12 +294,10 @@ public class PixelsWriterBuffer
                 this.versionLock.writeLock().lock();
                 try
                 {
-                    List<EtcdEntry> newEtcdEntries = new ArrayList<>(this.currentVersion.getEtcdEntries());
-                    newEtcdEntries.removeAll(flushEtcdEntries);
+                    this.etcdEntries.removeAll(flushEtcdEntries);
 
-                    SuperVersion newVersion = new SuperVersion(this.currentVersion.getMemTable(), this.currentVersion.getImmutableMemTables(), newEtcdEntries);
                     SuperVersion oldVersion = this.currentVersion;
-                    this.currentVersion = newVersion;
+                    this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.etcdEntries);
                     oldVersion.unref();
                 } finally
                 {
@@ -423,32 +308,41 @@ public class PixelsWriterBuffer
                 logger.error("Error in flushEtcdToDisk: ", e);
             } finally
             {
-                for(EtcdEntry etcdEntry: flushEtcdEntries)
+                for (EtcdEntry etcdEntry: flushEtcdEntries)
                 {
-                    etcdEntry.unref();
+                    etcdEntry.unref(); // unref in the end
                 }
             }
         });
     }
 
-    /**
-     * get current version
-     * caller must call unref()
-     * @return
-     */
-    public SuperVersion getCurrentVersion()
+    private void createNewWriter() throws RetinaException
     {
-        versionLock.readLock().lock();
-        try
-        {
-            currentVersion.ref();
-            return currentVersion;
-        } finally
-        {
-            versionLock.readLock().unlock();
+        if (this.writer != null) {
+            throw new RetinaException("Writer already exists");
+        }
+        try {
+            String targetFileName = DateUtil.getCurTime() + ".pxl";
+            String targetFilePath = this.targetOrderedDirPath + targetFileName;
+            this.writer = PixelsWriterImpl.newBuilder()
+                    .setSchema(this.schema)
+                    .setHasHiddenColumn(true)
+                    .setPixelStride(this.pixelStride)
+                    .setRowGroupSize(this.rowGroupSize)
+                    .setStorage(this.targetOrderedStorage)
+                    .setPath(targetFilePath)
+                    .setBlockSize(this.blockSize)
+                    .setReplication(this.replication)
+                    .setBlockPadding(true)
+                    .setEncodingLevel(this.encodingLevel)
+                    .setNullsPadding(this.nullsPadding)
+                    .setCompressionBlockSize(1)
+                    .build();
+        } catch (Exception e) {
+            throw new RetinaException("Failed to create new writer", e);
         }
     }
-
+    
     /**
      * collect resouces
      *
@@ -468,7 +362,7 @@ public class PixelsWriterBuffer
             this.writer.addRowBatch(sv.getMemTable().getRowBatch());
 
             // add immutable memtable to writer
-            for (ImmutableMemTable immutableMemTable: sv.getImmutableMemTables())
+            for (MemTable immutableMemTable: sv.getImmutableMemTables())
             {
                 this.writer.addRowBatch(immutableMemTable.getRowBatch());
             }
@@ -488,8 +382,8 @@ public class PixelsWriterBuffer
         } finally
         {
             sv.unref();
-            memTable.unref();
-            for (ImmutableMemTable immutableMemTable: sv.getImmutableMemTables())
+            activeMemTable.unref();
+            for (MemTable immutableMemTable: sv.getImmutableMemTables())
             {
                 immutableMemTable.unref();
             }

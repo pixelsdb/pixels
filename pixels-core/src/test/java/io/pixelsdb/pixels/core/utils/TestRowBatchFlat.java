@@ -142,8 +142,7 @@ public class TestRowBatchFlat
         System.out.println(rowBatch.toString());
 
         // serialize
-        FlatBufferBuilder builder = new FlatBufferBuilder(1024);
-        byte[] bytes = rowBatch.serialize(builder);
+        byte[] bytes = rowBatch.serialize();
 
         // deserialize
         VectorizedRowBatch desRowBatch = VectorizedRowBatch.deserialize(bytes);
