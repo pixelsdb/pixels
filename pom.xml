@@ -90,6 +90,7 @@
         <dep.rocksdb.version>9.10.0</dep.rocksdb.version>
 
         <!-- common libraries -->
+        <dep.spike.java.version>0.1.0</dep.spike.java.version>
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
         <dep.netty.version>4.1.77.Final</dep.netty.version>
         <dep.asynchttpclient.version>2.12.3</dep.asynchttpclient.version>
@@ -243,6 +244,35 @@
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-amphi</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>spike-java-handler</artifactId>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.grpc</groupId>
+                        <artifactId>grpc-netty-shaded</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.grpc</groupId>
+                        <artifactId>grpc-protobuf</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.grpc</groupId>
+                        <artifactId>grpc-stub</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.google.protobuf</groupId>
+                        <artifactId>protobuf-java</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>javax.annotation</groupId>
+                        <artifactId>javax.annotation-api</artifactId>
+                    </exclusion>
+                </exclusions>
+                <!-- this is available in the maven central repo -->
+                <version>0.1.0</version>
             </dependency>
 
             <!-- presto-jdbc -->
