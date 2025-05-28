@@ -78,8 +78,8 @@ message BeginTransBatchRequest {
 
 message BeginTransBatchResponse {
     int32 errorCode = 1;
-    uint64 transIdBegin = 2;
-    uint64 timestampBegin = 3;
+    repeated uint64 transIds = 2;
+    repeated uint64 timestamps = 3;
     uint32 exactNumTrans = 4;
 }
 
