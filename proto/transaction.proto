@@ -31,6 +31,7 @@ package transaction.proto;
 // The transaction services definition.
 service TransService {
     rpc BeginTrans (BeginTransRequest) returns (BeginTransResponse);
+    rpc BeginTransBatch (BeginTransBatchRequest) returns (BeginTransBatchResponse);
     rpc CommitTrans (CommitTransRequest) returns (CommitTransResponse);
     rpc RollbackTrans (RollbackTransRequest) returns (RollbackTransResponse);
     rpc GetTransContext (GetTransContextRequest) returns (GetTransContextResponse);
@@ -68,6 +69,18 @@ message BeginTransResponse {
     int32 errorCode = 1;
     uint64 transId = 2;
     uint64 timestamp = 3;
+}
+
+message BeginTransBatchRequest {
+    bool readOnly = 1;
+    uint32 expectNumTrans = 2;
+}
+
+message BeginTransBatchResponse {
+    int32 errorCode = 1;
+    uint64 transIdBegin = 2;
+    uint64 timestampBegin = 3;
+    uint32 exactNumTrans = 4;
 }
 
 message CommitTransRequest {
