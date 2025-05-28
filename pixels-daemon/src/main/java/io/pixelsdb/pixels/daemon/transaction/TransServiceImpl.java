@@ -25,7 +25,6 @@ import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
 import io.pixelsdb.pixels.common.transaction.TransContext;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.daemon.TransProto;
@@ -48,6 +47,10 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {
     private static final Logger logger = LogManager.getLogger(TransServiceImpl.class);
 
+    /**
+     * transId and transTimestamp are monotonically increasing.
+     * However, we do not ensure a transaction with larger transId must have a larger transTimestamp.
+     */
     public static final PersistentAutoIncrement transId;
     public static final PersistentAutoIncrement transTimestamp;
     /**
@@ -110,10 +113,6 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         {
             long id = TransServiceImpl.transId.getAndIncrement();
             long timestamp = request.getReadOnly() ? highWatermark.get() : transTimestamp.getAndIncrement();
-            boolean enableTimestamp = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("experimental.timestamp.enabled"));
-            if (!enableTimestamp) {
-                timestamp = -1;
-            }
             response = TransProto.BeginTransResponse.newBuilder()
                     .setErrorCode(ErrorCode.SUCCESS)
                     .setTransId(id).setTimestamp(timestamp).build();
@@ -127,6 +126,33 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             logger.error("failed to generate transaction id or timestamp", e);
         }
         responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void beginTransBatch(TransProto.BeginTransBatchRequest request,
+                                StreamObserver<TransProto.BeginTransBatchResponse> responseObserver)
+    {
+        TransProto.BeginTransBatchResponse.Builder response = TransProto.BeginTransBatchResponse.newBuilder();
+        try
+        {
+            int numTrans = request.getExpectNumTrans();
+            while (numTrans-- > 0)
+            {
+                long transId = TransServiceImpl.transId.getAndIncrement();
+                long timestamp = request.getReadOnly() ? highWatermark.get() : transTimestamp.getAndIncrement();
+                response.addTransIds(transId).addTimestamps(timestamp);
+                TransContext context = new TransContext(transId, timestamp, request.getReadOnly());
+                TransContextManager.Instance().addTransContext(context);
+            }
+            response.setExactNumTrans(request.getExpectNumTrans());
+            response.setErrorCode(ErrorCode.SUCCESS);
+        } catch (EtcdException e)
+        {
+            response.setErrorCode(ErrorCode.TRANS_GENERATE_ID_OR_TS_FAILED);
+            logger.error("failed to generate transaction id or timestamp", e);
+        }
+        responseObserver.onNext(response.build());
         responseObserver.onCompleted();
     }
 

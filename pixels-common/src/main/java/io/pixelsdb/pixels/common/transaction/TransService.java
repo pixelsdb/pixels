@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.transaction;
 
+import com.google.common.collect.ImmutableList;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
@@ -32,6 +33,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -143,6 +145,34 @@ public class TransService
         TransContextCache.Instance().addTransContext(context);
         MetadataCache.Instance().initCache(context.getTransId());
         return context;
+    }
+
+    /**
+     * @param numTrans the number of transaction to begin as a batch
+     * @param readOnly true if the transaction is determined to be read only, false otherwise.
+     * @return the initialized contexts of the transactions in the batch.
+     * @throws TransException
+     */
+    public List<TransContext> beginTransBatch(int numTrans, boolean readOnly) throws TransException
+    {
+        TransProto.BeginTransBatchRequest request = TransProto.BeginTransBatchRequest.newBuilder()
+                .setReadOnly(readOnly).setExpectNumTrans(numTrans).build();
+        TransProto.BeginTransBatchResponse response = this.stub.beginTransBatch(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to begin the batch of transactions, error code=" + response.getErrorCode());
+        }
+        ImmutableList.Builder<TransContext> contexts = ImmutableList.builder();
+        for (int i = 0; i < response.getExactNumTrans(); i++)
+        {
+            long transId = response.getTransIds(0);
+            long timestamp = response.getTimestamps(0);
+            TransContext context = new TransContext(transId, timestamp, readOnly);
+            TransContextCache.Instance().addTransContext(context);
+            MetadataCache.Instance().initCache(context.getTransId());
+            contexts.add(context);
+        }
+        return contexts.build();
     }
 
     public boolean commitTrans(long transId, long timestamp) throws TransException
