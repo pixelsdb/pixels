@@ -28,22 +28,28 @@ import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
- * @author hank
+ * @author hank, Rolland1944
  * @create 2025-02-19
  */
 public class RocksetIndexProvider implements SecondaryIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
     private final MainIndex mainIndex = new MainIndexImpl();
-    private final String RocksdbPath = "tmp/rocksdb-cloud";
+    private final String bucketName = ConfigFactory.Instance().getProperty("bucketName");
+    private final String s3Prefix = ConfigFactory.Instance().getProperty("s3Prefix");
+    private final String localDbPath = ConfigFactory.Instance().getProperty("localDbPath");
+    private final String persistentCachePath = ConfigFactory.Instance().getProperty("persistentCachePath");
+    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("persistentCacheSizeGB"));
+    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("readOnly"));
     @Override
     public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
     {
         if (scheme == SecondaryIndex.Scheme.rockset) {
              try {
-                 return new RocksetIndex(mainIndex); //初始化 RocksDBIndex
+                 return new RocksetIndex(mainIndex, bucketName, s3Prefix, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
              } catch (Exception e) {
                  logger.error("Failed to create RocksDB instance", e);
                  return null;
@@ -55,6 +61,6 @@ public class RocksetIndexProvider implements SecondaryIndexProvider
     @Override
     public boolean compatibleWith(@Nonnull SecondaryIndex.Scheme scheme)
     {
-        return scheme == SecondaryIndex.Scheme.rockset; // 仅支持 rockset
+        return scheme == SecondaryIndex.Scheme.rockset;
     }
 }
