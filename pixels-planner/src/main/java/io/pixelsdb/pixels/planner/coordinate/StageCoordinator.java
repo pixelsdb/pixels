@@ -120,6 +120,14 @@ public class StageCoordinator
         this.rightChildWorkerNum = 0;
     }
 
+    public StageCoordinator(int stageId, List<Task> pendingTasks)
+    {
+        this.stageId = stageId;
+        this.isQueued = true;
+        this.fixedWorkerNum = 0;
+        this.taskQueue = new TaskQueue<>(pendingTasks);
+    }
+
     /**
      * Add (register) a worker into this stage coordinator.
      * @param worker the worker to be added

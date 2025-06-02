@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.executor.join.HashJoiner;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
@@ -201,7 +202,7 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
                     WorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
                     WorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
                     leftSchema, rightSchema, leftInputs, rightInputs);
-            Joiner joiner = new Joiner(joinType,
+            HashJoiner joiner = new HashJoiner(joinType,
                     WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead),
                     leftColAlias, leftProjection, leftKeyColumnIds,
                     WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead),

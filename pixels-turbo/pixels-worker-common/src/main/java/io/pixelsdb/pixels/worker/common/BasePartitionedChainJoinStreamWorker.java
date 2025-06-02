@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.executor.join.HashJoiner;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
@@ -182,7 +183,7 @@ public class BasePartitionedChainJoinStreamWorker extends Worker<PartitionedChai
              * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
              * However, it is safer to turn file schema into result schema here.
              */
-            Joiner partitionJoiner = new Joiner(joinType,
+            HashJoiner partitionJoiner = new HashJoiner(joinType,
                     WorkerCommon.getResultSchema(leftSchema.get(), leftColumnsToRead), leftColAlias, leftProjection, leftKeyColumnIds,
                     WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead), rightColAlias, rightProjection, rightKeyColumnIds);
             // build the chain joiner.
