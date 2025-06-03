@@ -55,14 +55,12 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-index-rocksdb</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
-            <scope>compile</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-index-rockset</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
-            <scope>compile</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.alibaba</groupId>

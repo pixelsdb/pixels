@@ -61,7 +61,6 @@ public class RocksetIndex implements SecondaryIndex
 
     private native void CloseDB0(long dbHandle);
 
-    // 包装native方法的public方法
     private long CreateDBCloud(
             String bucketName,
             String s3Prefix,
@@ -79,7 +78,7 @@ public class RocksetIndex implements SecondaryIndex
         long dbHandle = OpenDBCloud0(cloudEnvPtr, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
         if (dbHandle == 0)
         {
-            CloseDB0(0); // 清理 base_env
+            CloseDB0(0);
             throw new RuntimeException("Failed to open DBCloud");
         }
 
