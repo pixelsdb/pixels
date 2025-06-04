@@ -165,8 +165,8 @@ public class TransService
         ImmutableList.Builder<TransContext> contexts = ImmutableList.builder();
         for (int i = 0; i < response.getExactNumTrans(); i++)
         {
-            long transId = response.getTransIds(0);
-            long timestamp = response.getTimestamps(0);
+            long transId = response.getTransIds(i);
+            long timestamp = response.getTimestamps(i);
             TransContext context = new TransContext(transId, timestamp, readOnly);
             TransContextCache.Instance().addTransContext(context);
             MetadataCache.Instance().initCache(context.getTransId());
