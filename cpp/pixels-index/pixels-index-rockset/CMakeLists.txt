@@ -27,7 +27,6 @@ set(ROCKSDB_CMAKE_ARGS
     -DWITH_CORE_TOOLS=OFF
     -DFAIL_ON_WARNINGS=OFF
     -DUSE_RTTI=1
-    -DUSE_AWS=1
     -DCMAKE_CXX_FLAGS=-frtti
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/deps/rocksdb_cloud-install
     -DWITH_JNI=OFF
@@ -36,6 +35,8 @@ set(ROCKSDB_CMAKE_ARGS
     -DWITH_BZ2=OFF
     -DWITH_LZ4=OFF
     -DWITH_ZSTD=OFF
+    -DWITH_LIBURING=ON
+    -DWITH_AWS=ON
 )
 
 # 4. Download and build rocksdb-cloud
