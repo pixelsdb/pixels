@@ -18,6 +18,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 package io.pixelsdb.pixels.index.rocksdb;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 public class RocksetTest
 {
@@ -35,7 +36,7 @@ public class RocksetTest
     private native void DBput0(long dbHandle, byte[] key, byte[] value);
     private native byte[] DBget0(long dbHandle, byte[] key);
     private native void DBdelete0(long dbHandle, byte[] key);
-    private native void CloseDB0(long dbHandle, long baseEnvPtr, long cloudEnvPtr);  // 新增的关闭方法
+    private native void CloseDB0(long dbHandle);
 
     // load JNI library
     static {
@@ -61,29 +62,32 @@ public class RocksetTest
         long dbHandle = OpenDBCloud0(
             cloudEnvPtr, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
         if (dbHandle == 0) {
-            CloseDB0(0, baseEnvPtrOut[0], cloudEnvPtr); // 清理 base_env
+            CloseDB0(0);
             throw new RuntimeException("Failed to open DBCloud");
         }
 
         return dbHandle;
     }
 
-    public void DBput(long dbHandle, byte[] key, byte[] value) {
+    public void DBput(long dbHandle, byte[] key, byte[] value) 
+    {
         DBput0(dbHandle, key, value);
     }
 
-    public byte[] DBget(long dbHandle, byte[] key) {
+    public byte[] DBget(long dbHandle, byte[] key) 
+    {
         return DBget0(dbHandle, key);
     }
 
-    public void DBdelete(long dbHandle, byte[] key) {
+    public void DBdelete(long dbHandle, byte[] key) 
+    {
         DBdelete0(dbHandle, key);
     }
 
-    public void CloseDB(long dbHandle, long baseEnvPtr, long cloudEnvPtr)
+    public void CloseDB(long dbHandle)
     {
         if (dbHandle != 0) {
-            CloseDB0(dbHandle, baseEnvPtr, cloudEnvPtr);
+            CloseDB0(dbHandle);
         }
     }
 
@@ -96,12 +100,12 @@ public class RocksetTest
 
         try {
             // 1. create database
-            String bucketName = "pixels-turbo-public";
-            String s3Prefix = "test/rocksdb-cloud/";
-            String localDbPath = "/tmp/rocksdb_cloud_test";
-            String persistentCachePath = "/tmp/cache";
-            long persistentCacheSizeGB = 1L;
-            boolean readOnly = false;
+            String bucketName = ConfigFactory.Instance().getProperty("rockset.s3.bucket");
+            String s3Prefix = ConfigFactory.Instance().getProperty("rockset.s3.prefix");
+            String localDbPath = ConfigFactory.Instance().getProperty("rockset.local.data.path");
+            String persistentCachePath = ConfigFactory.Instance().getProperty("rockset.persistent.cache.path");
+            long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("rockset.persistent.cache.size.gb"));
+            boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("rockset.read.only"));
 
             System.out.println("Creating RocksDB-Cloud instance...");
             dbHandle = test.CreateDBCloud(bucketName, s3Prefix, localDbPath, 
@@ -118,9 +122,12 @@ public class RocksetTest
             // 3. test read
             System.out.println("Getting value...");
             byte[] retrievedValue = test.DBget(dbHandle, testKey);
-            if (retrievedValue != null) {
+            if (retrievedValue != null) 
+            {
                 System.out.println("Retrieved value: " + new String(retrievedValue));
-            } else {
+            } 
+            else 
+            {
                 System.out.println("Key not found");
             }
 
@@ -128,14 +135,16 @@ public class RocksetTest
             System.out.println("Deleting key...");
             test.DBdelete(dbHandle, testKey);
             byte[] deletedValue = test.DBget(dbHandle, testKey);
-            if (deletedValue == null) {
+            if (deletedValue == null) 
+            {
                 System.out.println("Key successfully deleted");
             }
         } finally {
             // 5. confirm close
-            if (dbHandle != 0) {
+            if (dbHandle != 0) 
+            {
                 System.out.println("Closing DB...");
-                test.CloseDB(dbHandle, baseEnvPtrOut[0], cloudEnvPtr);
+                test.CloseDB(dbHandle);
             }
         }
     }
