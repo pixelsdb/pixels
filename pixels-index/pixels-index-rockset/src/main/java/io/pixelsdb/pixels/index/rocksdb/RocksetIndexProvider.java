@@ -40,10 +40,10 @@ public class RocksetIndexProvider implements SecondaryIndexProvider
     private final MainIndex mainIndex = new MainIndexImpl();
     private final String bucketName = ConfigFactory.Instance().getProperty("rockset.s3.bucket");
     private final String s3Prefix = ConfigFactory.Instance().getProperty("rockset.s3.prefix");
-    private final String localDbPath = ConfigFactory.Instance().getProperty("rockset.s3.local.db.path");
-    private final String persistentCachePath = ConfigFactory.Instance().getProperty("rockset.s3.persistent.cache.path");
-    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("rockset.s3.persistent.cache.size.gb"));
-    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("rockset.s3.read.only"));
+    private final String localDbPath = ConfigFactory.Instance().getProperty("rockset.local.data.path");
+    private final String persistentCachePath = ConfigFactory.Instance().getProperty("rockset.persistent.cache.path");
+    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("rockset.persistent.cache.size.gb"));
+    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("rockset.read.only"));
 
     @Override
     public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException

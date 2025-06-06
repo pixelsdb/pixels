@@ -112,7 +112,8 @@ public class RocksetIndex implements SecondaryIndex
     public static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
     private final MainIndex mainIndex;
 
-    public RocksetIndex(MainIndex mainIndex, String bucketName, String s3Prefix, String localDbPath, String persistentCachePath, long persistentCacheSizeGB, boolean readOnly)
+    public RocksetIndex(MainIndex mainIndex, String bucketName, String s3Prefix, String localDbPath,
+                        String persistentCachePath, long persistentCacheSizeGB, boolean readOnly)
     {
         this.dbHandle = CreateDBCloud(bucketName, s3Prefix, localDbPath,
                 persistentCachePath, persistentCacheSizeGB, readOnly);

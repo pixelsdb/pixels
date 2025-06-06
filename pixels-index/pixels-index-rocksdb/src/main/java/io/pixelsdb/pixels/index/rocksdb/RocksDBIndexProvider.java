@@ -39,7 +39,7 @@ public class RocksDBIndexProvider implements SecondaryIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksDBIndexProvider.class);
     private final MainIndex mainIndex = new MainIndexImpl();
-    private final String RocksdbPath = ConfigFactory.Instance().getProperty("rocksdb.db.path");
+    private final String RocksdbPath = ConfigFactory.Instance().getProperty("rocksdb.data.path");
 
     @Override
     public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
