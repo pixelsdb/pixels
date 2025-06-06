@@ -1,8 +1,16 @@
 cmake_minimum_required(VERSION 3.10)
 project(pixels_rockset_jni)
-include(ExternalProject)
 
-# 1. set PIXELS_HOME
+include(ExternalProject)
+include(ProcessorCount)
+
+# 0. Get core count
+ProcessorCount(CORES)
+if(CORES EQUAL 0)
+    set(CORES 1)
+endif()
+
+# 1. Check and set PIXELS_HOME
 set(PIXELS_HOME $ENV{PIXELS_HOME})
 if(NOT PIXELS_HOME)
     message(FATAL_ERROR "PIXELS_HOME environment variable not set")
@@ -11,7 +19,7 @@ endif()
 # 2. Find JNI dependency (automatically locates JAVA_HOME/include and platform-specific headers)
 find_package(JNI REQUIRED)
 if (NOT JNI_FOUND)
-    message(FATAL_ERROR "JNI not found! Please ensure JAVA_HOME is set.")
+    message(FATAL_ERROR "JNI not found! Please ensure JAVA_HOME is set")
 else()
     message(STATUS "Found JNI: ${JNI_INCLUDE_DIRS}")
 endif()
@@ -50,7 +58,7 @@ ExternalProject_Add(rocksdb_cloud
     BUILD_BYPRODUCTS
         ${CMAKE_CURRENT_BINARY_DIR}/deps/rocksdb_cloud-install/lib/librocksdb${CMAKE_SHARED_LIBRARY_SUFFIX}
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/deps/rocksdb_cloud-install
-    BUILD_COMMAND make -j2
+    BUILD_COMMAND make -j${CORES}
 )
 
 # 5. Get the installation directory
