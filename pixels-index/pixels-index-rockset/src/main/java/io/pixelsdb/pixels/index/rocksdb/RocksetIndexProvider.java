@@ -23,12 +23,12 @@ import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexImpl;
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
 import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
  * @author hank, Rolland1944
@@ -38,19 +38,23 @@ public class RocksetIndexProvider implements SecondaryIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
     private final MainIndex mainIndex = new MainIndexImpl();
-    private final String bucketName = ConfigFactory.Instance().getProperty("bucketName");
-    private final String s3Prefix = ConfigFactory.Instance().getProperty("s3Prefix");
-    private final String localDbPath = ConfigFactory.Instance().getProperty("localDbPath");
-    private final String persistentCachePath = ConfigFactory.Instance().getProperty("persistentCachePath");
-    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("persistentCacheSizeGB"));
-    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("readOnly"));
+    private final String bucketName = ConfigFactory.Instance().getProperty("rockset.s3.bucket");
+    private final String s3Prefix = ConfigFactory.Instance().getProperty("rockset.s3.prefix");
+    private final String localDbPath = ConfigFactory.Instance().getProperty("rockset.s3.local.db.path");
+    private final String persistentCachePath = ConfigFactory.Instance().getProperty("rockset.s3.persistent.cache.path");
+    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("rockset.s3.persistent.cache.size.gb"));
+    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("rockset.s3.read.only"));
+
     @Override
     public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
     {
-        if (scheme == SecondaryIndex.Scheme.rockset) {
-             try {
+        if (scheme == SecondaryIndex.Scheme.rockset)
+        {
+             try
+             {
                  return new RocksetIndex(mainIndex, bucketName, s3Prefix, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
-             } catch (Exception e) {
+             }
+             catch (Exception e) {
                  logger.error("Failed to create RocksDB instance", e);
                  return null;
              }
