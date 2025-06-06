@@ -52,7 +52,16 @@
             <artifactId>pixels-storage-s3</artifactId>
             <optional>true</optional>
         </dependency>
-
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-rocksdb</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-rockset</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
