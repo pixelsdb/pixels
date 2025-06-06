@@ -30,7 +30,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
- * @author hank
+ * @author hank, Rolland1944
  * @create 2025-02-19
  */
 public class RocksetIndex implements SecondaryIndex
@@ -44,8 +44,7 @@ public class RocksetIndex implements SecondaryIndex
     // Native method
     private native long CreateCloudFileSystem0(
             String bucketName,
-            String s3Prefix,
-            long[] baseEnvPtrOut);
+            String s3Prefix);
 
     private native long OpenDBCloud0(
             long cloudEnvPtr,
@@ -60,20 +59,17 @@ public class RocksetIndex implements SecondaryIndex
 
     private native void DBdelete0(long dbHandle, byte[] key);
 
-    private native void CloseDB0(long dbHandle, long baseEnvPtr, long cloudEnvPtr);
+    private native void CloseDB0(long dbHandle);
 
-    // 包装native方法的public方法
     private long CreateDBCloud(
             String bucketName,
             String s3Prefix,
             String localDbPath,
             String persistentCachePath,
             long persistentCacheSizeGB,
-            boolean readOnly,
-            long[] baseEnvPtrOut,
-            long cloudEnvPtr)
+            boolean readOnly)
     {
-        cloudEnvPtr = CreateCloudFileSystem0(bucketName, s3Prefix, baseEnvPtrOut);
+        long cloudEnvPtr = CreateCloudFileSystem0(bucketName, s3Prefix);
         if (cloudEnvPtr == 0)
         {
             throw new RuntimeException("Failed to create CloudFileSystem");
@@ -82,7 +78,7 @@ public class RocksetIndex implements SecondaryIndex
         long dbHandle = OpenDBCloud0(cloudEnvPtr, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
         if (dbHandle == 0)
         {
-            CloseDB0(0, baseEnvPtrOut[0], cloudEnvPtr); // 清理 base_env
+            CloseDB0(0);
             throw new RuntimeException("Failed to open DBCloud");
         }
 
@@ -104,30 +100,23 @@ public class RocksetIndex implements SecondaryIndex
         DBdelete0(dbHandle, key);
     }
 
-    private void CloseDB(long dbHandle, long baseEnvPtr, long cloudEnvPtr)
+    private void CloseDB(long dbHandle)
     {
         if (dbHandle != 0)
         {
-            CloseDB0(dbHandle, baseEnvPtr, cloudEnvPtr);
+            CloseDB0(dbHandle);
         }
     }
 
     private long dbHandle = 0;
     public static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
     private final MainIndex mainIndex;
-    private static final String bucketName = "pixels-turbo-public";
-    private static final String s3Prefix = "test/rocksdb-cloud/";
-    private static final String localDbPath = "/tmp/rocksdb_cloud_test";
-    private static final String persistentCachePath = "/tmp/cache";
-    private static final long persistentCacheSizeGB = 1L;
-    private static final boolean readOnly = false;
-    private static final long[] baseEnvPtrOut = new long[1];
-    private static final long cloudEnvPtr = 0;
 
-    public RocksetIndex(MainIndex mainIndex)
+    public RocksetIndex(MainIndex mainIndex, String bucketName, String s3Prefix, String localDbPath,
+                        String persistentCachePath, long persistentCacheSizeGB, boolean readOnly)
     {
         this.dbHandle = CreateDBCloud(bucketName, s3Prefix, localDbPath,
-                persistentCachePath, persistentCacheSizeGB, readOnly, baseEnvPtrOut, cloudEnvPtr);
+                persistentCachePath, persistentCacheSizeGB, readOnly);
         this.mainIndex = mainIndex;
     }
 
@@ -287,7 +276,7 @@ public class RocksetIndex implements SecondaryIndex
     @Override
     public void close() throws IOException
     {
-        CloseDB(this.dbHandle, baseEnvPtrOut[0], cloudEnvPtr); // Close RocksDB instance
+        CloseDB(this.dbHandle); // Close RocksDB instance
     }
 
     private static byte[] toByteArray(IndexProto.IndexKey key)

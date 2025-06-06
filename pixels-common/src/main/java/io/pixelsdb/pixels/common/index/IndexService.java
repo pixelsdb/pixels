@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
 /**
- * @author hank
+ * @author hank, Rolland1944
  * @create 2025-02-16
  */
 public class IndexService
@@ -111,50 +111,41 @@ public class IndexService
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
-        // 创建 gRPC 通道
+        // Create gRPC channel
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
-        // 创建 gRPC 客户端存根
+        // Create gRPC client stub
         this.stub = IndexServiceGrpc.newBlockingStub(channel);
         this.isShutDown = false;
     }
 
-    private synchronized void shutdown() throws InterruptedException
-    {
-        if (!this.isShutDown)
-        {
-            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
-            this.isShutDown = true;
-        }
-    }
-
     public IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key)
     {
-        // 创建 gRPC 请求
+        // Create gRPC request
         IndexProto.LookupUniqueIndexRequest request = IndexProto.LookupUniqueIndexRequest.newBuilder()
                 .setIndexKey(key).build();
-        // 发送请求并获取响应
+        // Send request and get response
         IndexProto.LookupUniqueIndexResponse response = stub.lookupUniqueIndex(request);
-        // 返回 RowLocation
+        // Return RowLocation
         return response.getRowLocation();
     }
 
     public List<IndexProto.RowLocation> lookupNonUniqueIndex(IndexProto.IndexKey key)
     {
-        // 创建 gRPC 请求
+        // Create gRPC request
         IndexProto.LookupNonUniqueIndexRequest request = IndexProto.LookupNonUniqueIndexRequest.newBuilder()
                 .setIndexKey(key).build();
-        // 发送请求并获取响应
+        // Send request and get response
         IndexProto.LookupNonUniqueIndexResponse response = stub.lookupNonUniqueIndex(request);
-        // 返回 RowLocation
+        // Return RowLocation list
         return response.getRowLocationList();
     }
 
     public boolean putIndexEntry(IndexProto.IndexEntry entry) throws IndexException {
-        // 创建 gRPC 请求
+        // Create gRPC request
         IndexProto.PutIndexEntryRequest request = IndexProto.PutIndexEntryRequest.newBuilder()
                 .setIndexEntry(entry).build();
-        // 发送请求并获取响应
+        // Send request and get response
         IndexProto.PutIndexEntryResponse response = stub.putIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
@@ -164,10 +155,10 @@ public class IndexService
     }
 
     public boolean deleteIndexEntry(IndexProto.IndexKey key) throws IndexException {
-        // 创建 gRPC 请求
+        // Create gRPC request
         IndexProto.DeleteIndexEntryRequest request = IndexProto.DeleteIndexEntryRequest.newBuilder()
                 .setIndexKey(key).build();
-        // 发送请求并获取响应
+        // Send request and get response
         IndexProto.DeleteIndexEntryResponse response = stub.deleteIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
@@ -177,12 +168,12 @@ public class IndexService
     }
 
     public boolean putIndexEntries(List<IndexProto.IndexEntry> entries) throws IndexException {
-        // 创建 gRPC 请求
+        // Create gRPC request
         IndexProto.PutIndexEntriesRequest request = IndexProto.PutIndexEntriesRequest.newBuilder()
                 .addAllIndexEntries(entries).build();
-        // 发送请求并获取响应
+        // Send request and get response
         IndexProto.PutIndexEntriesResponse response = stub.putIndexEntries(request);
-        // 返回操作是否成功
+        // Return operation success status
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to put index entries, error code=" + response.getErrorCode());
@@ -191,12 +182,12 @@ public class IndexService
     }
 
     public boolean deleteIndexEntries(List<IndexProto.IndexKey> keys) throws IndexException {
-        // 创建 gRPC 请求
+        // Create gRPC request
         IndexProto.DeleteIndexEntriesRequest request = IndexProto.DeleteIndexEntriesRequest.newBuilder()
                 .addAllIndexKeys(keys).build();
-        // 发送请求并获取响应
+        // Send request and get response
         IndexProto.DeleteIndexEntriesResponse response = stub.deleteIndexEntries(request);
-        // 返回操作是否成功
+        // Return operation success status
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to delete index entries, error code=" + response.getErrorCode());
