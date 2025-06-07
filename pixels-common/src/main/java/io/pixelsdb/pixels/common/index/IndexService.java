@@ -119,6 +119,15 @@ public class IndexService
         this.isShutDown = false;
     }
 
+    private synchronized void shutdown() throws InterruptedException
+    {
+        if (!this.isShutDown)
+        {
+            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            this.isShutDown = true;
+        }
+    }
+
     public IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key)
     {
         // Create gRPC request
