@@ -100,6 +100,7 @@ public class TestPixelsWriterBuffer
         try
         {
             completionLatch.await();
+            Thread.sleep(10000);
             buffer.close();
         } catch (Exception e)
         {

@@ -191,7 +191,7 @@ public class PixelsWriterBuffer
                 // put etcd entry
                 long id = this.etcdKeyIdCounter.getAndIncrement();
                 String etcdEntryKey = this.schemaName + '_' + tableName + '_' + id;
-                etcdUtil.putKeyValue(etcdEntryKey, new String(flushToEtcdMemTable.serialize())); // synchronous operation
+                etcdUtil.putKeyValue(etcdEntryKey, flushToEtcdMemTable.serialize()); // synchronous operation
                 EtcdEntry etcdEntry = new EtcdEntry(id);
                 etcdEntry.ref();
 
@@ -311,6 +311,8 @@ public class PixelsWriterBuffer
                 for (EtcdEntry etcdEntry: flushEtcdEntries)
                 {
                     etcdEntry.unref(); // unref in the end
+                    String etcdEntryKey = this.schemaName + '_' + tableName + '_' + etcdEntry.getId();
+                    this.etcdUtil.delete(etcdEntryKey);
                 }
             }
         });
@@ -350,6 +352,9 @@ public class PixelsWriterBuffer
      */
     public void close() throws IOException
     {
+        // First, shut down the flush process to prevent changes to the data view.
+        this.flushExecutor.shutdown();
+
         SuperVersion sv = getCurrentVersion();
         try
         {
@@ -390,8 +395,9 @@ public class PixelsWriterBuffer
             for (EtcdEntry etcdEntry: sv.getEtcdEntries())
             {
                 etcdEntry.unref();
+                String etcdEntryKey = this.schemaName + '_' + tableName + '_' + etcdEntry.getId();
+                this.etcdUtil.delete(etcdEntryKey);
             }
-            this.flushExecutor.shutdown();
         }
     }
 }
