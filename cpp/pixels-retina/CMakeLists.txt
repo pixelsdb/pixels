@@ -79,5 +79,19 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif ()
 
+if (RETINA_SIMD)
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("-mavx" COMPILER_SUPPORTS_AVX)
+    if(COMPILER_SUPPORTS_AVX)
+        message(STATUS "AVX supported: enabling AVX code path")
+        target_compile_options(pixels-retina PRIVATE
+                -mavx
+                -mavx2
+        )
+    else()
+        message(STATUS "AVX not supported: falling back to scalar code path")
+    endif ()
+endif()
+
 # Add debug flags
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")

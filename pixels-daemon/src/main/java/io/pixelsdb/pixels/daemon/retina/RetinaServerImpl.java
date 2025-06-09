@@ -190,7 +190,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             throw new RetinaException("Error while garbage collecting", e);
         }
     }
-
+    
     public void addWriterBuffer(String schemaName, String tableName, String orderedDirPath, String compactDirPath) throws RetinaException
     {
         try
