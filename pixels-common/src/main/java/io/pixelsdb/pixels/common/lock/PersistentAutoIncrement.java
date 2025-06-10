@@ -22,43 +22,50 @@ package io.pixelsdb.pixels.common.lock;
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.utils.Constants;
 
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * The auto increment id that is backed by etcd auto increment.
  * It acquires a segment of auto increment ids from etcd auto increment each time and allocates
  * auto increment ids to clients from the segment using atomics. Thus, it is fast and persistent.
+ *
  * @author hank
  * @create 2024-09-27
  */
 public class PersistentAutoIncrement
 {
     private final String idKey;
-    private final AtomicLong id;
-    private final AtomicLong count;
+    private final Lock lock = new ReentrantLock();
+    private volatile long id;
+    private volatile long count;
 
     public PersistentAutoIncrement(String idKey) throws EtcdException
     {
         this.idKey = idKey;
         EtcdAutoIncrement.InitId(idKey);
         EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP);
-        this.id = new AtomicLong(segment.getStart());
-        this.count = new AtomicLong(segment.getLength());
+        this.id = segment.getStart();
+        this.count = segment.getLength();
     }
 
     public long getAndIncrement() throws EtcdException
     {
-        long value = this.id.getAndIncrement();
-        if (this.count.getAndDecrement() > 0 && value < this.id.get())
+        this.lock.lock();
+        if (this.count > 0)
         {
+            long value = this.id++;
+            this.count--;
+            this.lock.unlock();
             return value;
         }
         else
         {
             EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP, segment -> {
-                this.id.set(segment.getStart());
-                this.count.set(segment.getLength());
+                this.id = segment.getStart();
+                this.count = segment.getLength();
             });
+            // no need to release the reentrant lock
             return this.getAndIncrement();
         }
     }

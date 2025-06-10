@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,18 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.rocksdb;
+package io.pixelsdb.pixels.worker.spike;
 
-import org.junit.Test;
+import io.pixelsdb.pixels.common.turbo.WorkerType;
 
-/**
- * @author hank
- * @create 2025-02-19
- */
-public class TestRockset
+public interface WorkerInterface<I, O>
 {
-    @Test
-    public void testBasic()
-    {
-    }
+    O handleRequest(I input);
+
+    String getRequestId();
+
+    WorkerType getWorkerType();
 }

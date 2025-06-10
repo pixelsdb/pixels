@@ -10,6 +10,7 @@ import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
 import io.pixelsdb.pixels.daemon.scaling.ScalingMetricsServer;
+import io.pixelsdb.pixels.daemon.sink.SinkServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
 import io.pixelsdb.pixels.daemon.turbo.QueryScheduleServer;
 import org.apache.logging.log4j.LogManager;
@@ -73,6 +74,7 @@ public class DaemonMain
             ConfigFactory config = ConfigFactory.Instance();
             boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
             boolean autoScalingEnabled = Boolean.parseBoolean(config.getProperty("vm.auto.scaling.enabled"));
+            boolean sinkEnabled = Boolean.parseBoolean(config.getProperty("sink.enabled"));
 
             if (role.equalsIgnoreCase("coordinator"))
             {
@@ -95,6 +97,13 @@ public class DaemonMain
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
+
+                    if(sinkEnabled) {
+                        // start sink server
+                        SinkServer sinkServer = new SinkServer();
+                        container.addServer("sink", sinkServer);
+                    }
+
                     if (autoScalingEnabled) {
                         // start monitor server
                         ScalingMetricsServer scalingMetricsServer = new ScalingMetricsServer(scalingMetricsServerPort);

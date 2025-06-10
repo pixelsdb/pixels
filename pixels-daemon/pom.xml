@@ -59,6 +59,16 @@
         </dependency>
 
         <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-rocksdb</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-rockset</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
             <optional>true</optional>
@@ -123,6 +133,12 @@
             <artifactId>log4j-slf4j-impl</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-rocksdb</artifactId>
+            <version>0.2.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -161,8 +177,7 @@
                             <transformers>
                                 <!-- ServicesResourceTransformer merges the resources in META-INF/services -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>${mainClass}</mainClass>
                                     <manifestEntries>
                                         <Add-Opens>java.base/sun.nio.ch java.base/java.nio</Add-Opens>

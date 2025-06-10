@@ -590,7 +590,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         PixelsProto.RowGroupEncoding firstRgEncoding = rowGroupFooters[0].getRowGroupEncoding();
         for (int i = 0; i < resultColumns.length; i++)
         {
-            this.resultColumnsEncoded[i] = firstRgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
+            this.resultColumnsEncoded[i] = firstRgEncoding.getColumnChunkEncodings(resultColumns[i]).getKind() !=
                     PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
         }
 

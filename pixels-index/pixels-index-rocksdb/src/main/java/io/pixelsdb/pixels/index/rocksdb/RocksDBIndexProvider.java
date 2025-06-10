@@ -19,29 +19,49 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.MainIndexImpl;
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
 import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.rocksdb.RocksDBException;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
 /**
- * @author hank
+ * @author hank, Rolland1944
  * @create 2025-02-09
  */
 public class RocksDBIndexProvider implements SecondaryIndexProvider
 {
-    // TODO: implement
+    private static final Logger logger = LogManager.getLogger(RocksDBIndexProvider.class);
+    private final MainIndex mainIndex = new MainIndexImpl();
+    private final String RocksdbPath = ConfigFactory.Instance().getProperty("rocksdb.data.path");
 
     @Override
     public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
     {
-        return null;
+        if (scheme == SecondaryIndex.Scheme.rocksdb)
+        {
+            try
+            {
+                return new RocksDBIndex(RocksdbPath,mainIndex);
+            }
+            catch (RocksDBException e)
+            {
+                logger.error("Failed to create RocksDB instance", e);
+                return null;
+            }
+        }
+        throw new IllegalArgumentException("Unsupported scheme: " + scheme);
     }
 
     @Override
     public boolean compatibleWith(@Nonnull SecondaryIndex.Scheme scheme)
     {
-        return false;
+        return scheme == SecondaryIndex.Scheme.rocksdb;
     }
 }

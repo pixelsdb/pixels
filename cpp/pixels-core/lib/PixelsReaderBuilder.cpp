@@ -23,6 +23,7 @@
  * @create 2023-03-06
  */
 #include "PixelsReaderBuilder.h"
+#include "utils/Endianness.h"
 
 PixelsReaderBuilder::PixelsReaderBuilder()
 {
@@ -30,7 +31,7 @@ PixelsReaderBuilder::PixelsReaderBuilder()
     builderPixelsFooterCache = nullptr;
 }
 
-PixelsReaderBuilder *PixelsReaderBuilder::setStorage(std::shared_ptr <Storage> storage)
+PixelsReaderBuilder *PixelsReaderBuilder::setStorage(std::shared_ptr<Storage> storage)
 {
     builderStorage = storage;
     return this;
@@ -42,92 +43,84 @@ PixelsReaderBuilder *PixelsReaderBuilder::setPath(const std::string &path)
     return this;
 }
 
-
-PixelsReaderBuilder *PixelsReaderBuilder::setPixelsFooterCache(std::shared_ptr <PixelsFooterCache> pixelsFooterCache)
+PixelsReaderBuilder *PixelsReaderBuilder::setPixelsFooterCache(std::shared_ptr<PixelsFooterCache> pixelsFooterCache)
 {
     builderPixelsFooterCache = pixelsFooterCache;
     return this;
 }
 
-std::shared_ptr <PixelsReader> PixelsReaderBuilder::build()
+std::shared_ptr<PixelsReader> PixelsReaderBuilder::build()
 {
-    if (builderStorage.get() == nullptr || builderPath.empty())
+    if (builderStorage.get () == nullptr || builderPath.empty ())
     {
-        throw std::runtime_error("Missing argument to build PixelsReader");
+        throw std::runtime_error ("Missing argument to build PixelsReader");
     }
     // get PhysicalReader
-    std::shared_ptr <PhysicalReader> fsReader =
-            PhysicalReaderUtil::newPhysicalReader(builderStorage, builderPath);
+    std::shared_ptr<PhysicalReader> fsReader =
+            PhysicalReaderUtil::newPhysicalReader (builderStorage, builderPath);
     // try to get file tail from cache
-    std::string fileName = fsReader->getName();
-    std::shared_ptr <pixels::proto::FileTail> fileTail;
-    if (builderPixelsFooterCache != nullptr && builderPixelsFooterCache->containsFileTail(fileName))
+    std::string fileName = fsReader->getName ();
+    std::shared_ptr<pixels::proto::FileTail> fileTail;
+    if (builderPixelsFooterCache != nullptr && builderPixelsFooterCache->containsFileTail (fileName))
     {
-        fileTail = builderPixelsFooterCache->getFileTail(fileName);
-    }
-    else
+        fileTail = builderPixelsFooterCache->getFileTail (fileName);
+    } else
     {
-        if (fsReader.get() == nullptr)
+        if (fsReader.get () == nullptr)
         {
-            throw PixelsReaderException(
+            throw PixelsReaderException (
                     "Failed to create PixelsReader due to error of creating PhysicalReader");
         }
         // get FileTail
-        long fileLen = fsReader->getFileLength();
-        std::cout << "filelen: " << fsReader->getFileLength() << std::endl;
-        fsReader->seek(fileLen - (long) sizeof(long));
-        long SmallEndianFileTailOffset = fsReader->readLong();
-        long BigEndianFileTailOffset = (long) __builtin_bswap64(SmallEndianFileTailOffset);
-        long fileTailOffset = 0;
-        if (SmallEndianFileTailOffset < 0)
+        long fileLen = fsReader->getFileLength ();
+        fsReader->seek (fileLen - (long) sizeof (long));
+        // get FileTailOffset
+
+        long fileTailOffset = fsReader->readLong ();
+        if (Endianness::isLittleEndian ())
         {
-            fileTailOffset = BigEndianFileTailOffset;
+            fileTailOffset = (long) __builtin_bswap64 (fileTailOffset);
         }
-        else
+
+        int fileTailLength = (int) (fileLen - fileTailOffset - sizeof (long));
+        fsReader->seek (fileTailOffset);
+        std::shared_ptr<ByteBuffer> fileTailBuffer = fsReader->readFully (fileTailLength);
+        fileTail = std::make_shared<pixels::proto::FileTail> ();
+        if (!fileTail->ParseFromArray (fileTailBuffer->getPointer (),
+                                       fileTailLength))
         {
-            fileTailOffset = SmallEndianFileTailOffset;
-        }
-        std::cout << "fileTailOffset: " << fileTailOffset << std::endl;
-        int fileTailLength = (int) (fileLen - fileTailOffset - sizeof(long));
-        fsReader->seek(fileTailOffset);
-        std::shared_ptr <ByteBuffer> fileTailBuffer = fsReader->readFully(fileTailLength);
-        fileTail = std::make_shared<pixels::proto::FileTail>();
-        if (!fileTail->ParseFromArray(fileTailBuffer->getPointer(),
-                                      fileTailLength))
-        {
-            throw InvalidArgumentException("PixelsReaderBuilder::build: paring FileTail error!");
+            throw InvalidArgumentException ("PixelsReaderBuilder::build: paring FileTail error!");
         }
         if (builderPixelsFooterCache != nullptr)
         {
-            builderPixelsFooterCache->putFileTail(fileName, fileTail);
+            builderPixelsFooterCache->putFileTail (fileName, fileTail);
         }
     }
 
     // check file MAGIC and file version
-    pixels::proto::PostScript postScript = fileTail->postscript();
-    uint32_t fileVersion = postScript.version();
-    const std::string &fileMagic = postScript.magic();
-    if (PixelsVersion::currentVersion() != fileVersion)
+    pixels::proto::PostScript postScript = fileTail->postscript ();
+    uint32_t fileVersion = postScript.version ();
+    const std::string &fileMagic = postScript.magic ();
+    if (PixelsVersion::currentVersion () != fileVersion)
     {
-        throw PixelsFileVersionInvalidException(fileVersion);
+        throw PixelsFileVersionInvalidException (fileVersion);
     }
     if (fileMagic != Constants::MAGIC)
     {
-        throw PixelsFileMagicInvalidException(fileMagic);
+        throw PixelsFileMagicInvalidException (fileMagic);
     }
 
-
-    auto fileColTypes = std::vector < std::shared_ptr < pixels::proto::Type >> {};
-    for (const auto &type: fileTail->footer().types())
+    auto fileColTypes = std::vector<std::shared_ptr<pixels::proto::Type >>{};
+    for (const auto &type: fileTail->footer ().types ())
     {
-        fileColTypes.emplace_back(std::make_shared<pixels::proto::Type>(type));
+        fileColTypes.emplace_back (std::make_shared<pixels::proto::Type> (type));
     }
-    builderSchema = TypeDescription::createSchema(fileColTypes);
+    builderSchema = TypeDescription::createSchema (fileColTypes);
 
     // TODO: the remaining things, such as builderSchema, coreCOnfig, metric
 
-    return std::make_shared<PixelsReaderImpl>(builderSchema, fsReader, fileTail,
-                                              builderPixelsFooterCache);
+    return std::make_shared<PixelsReaderImpl> (builderSchema, fsReader, fileTail,
+                                               builderPixelsFooterCache);
 }
 
 

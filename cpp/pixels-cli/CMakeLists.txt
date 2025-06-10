@@ -38,6 +38,7 @@ ExternalProject_Add(boost
         GIT_TAG ${BOOST_GIT_TAG}
         GIT_SUBMODULES ${BOOST_GIT_SUBMODULES}
         GIT_SUBMODULES_RECURSE true
+        GIT_SHALLOW true
         SOURCE_DIR "boost"
         BUILD_IN_SOURCE true
         UPDATE_COMMAND ${BOOST_BOOTSTRAP_COMMAND}

@@ -49,36 +49,35 @@
  */
 class BinaryColumnVector : public ColumnVector
 {
-public:
-    duckdb::string_t *vector;
+ public:
+  duckdb::string_t *vector;
 
-    /**
-    * Use this constructor by default. All column vectors
-    * should normally be the default size.
-    */
-    explicit BinaryColumnVector(uint64_t len = VectorizedRowBatch::DEFAULT_SIZE, bool encoding = false);
+  std::vector<std::string> str_vec;
 
-    ~BinaryColumnVector();
+  /**
+  * Use this constructor by default. All column vectors
+  * should normally be the default size.
+  */
+  explicit BinaryColumnVector(uint64_t len = VectorizedRowBatch::DEFAULT_SIZE, bool encoding = false);
 
-    /**
-     * Set a field by reference.
-     *
-     * @param elementNum index within column vector to set
-     * @param sourceBuf  container of source data
-     * @param start      start byte position within source
-     * @param length     length of source byte sequence
-     */
-    void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
+  ~BinaryColumnVector();
+  /**
+   * Set a field by reference.
+   *
+   * @param elementNum index within column vector to set
+   * @param sourceBuf  container of source data
+   * @param start      start byte position within source
+   * @param length     length of source byte sequence
+   */
+  void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
+  void *current() override;
+  void close() override;
+  void print(int rowCount) override;
 
-    void add(std::string &value) override;
-    void add(uint8_t* v,int length);
-    void setVal(int elemnetNum,uint8_t* sourceBuf);
-    void setVal(int elementNum, uint8_t* sourceBuf, int start, int length);
-
-    void *current() override;
-
-    void close() override;
-
-    void print(int rowCount) override;
+  void add(std::string &value) override;
+  void add(uint8_t *v, int length);
+  //void setVal(int elemnetNum,uint8_t* sourceBuf);
+  void setVal(int elementNum, uint8_t *sourceBuf, int start, int length);
+  void ensureSize(uint64_t size, bool preserveData) override;
 };
 #endif //PIXELS_BINARYCOLUMNVECTOR_H

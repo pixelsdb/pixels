@@ -62,6 +62,8 @@
         <module>pixels-turbo/pixels-scaling-general</module>
         <module>pixels-index/pixels-index-rocksdb</module>
         <module>pixels-index/pixels-index-rockset</module>
+        <module>pixels-turbo/pixels-invoker-spike</module>
+        <module>pixels-turbo/pixels-worker-spike</module>
     </modules>
 
     <properties>
@@ -89,6 +91,7 @@
         <dep.rocksdb.version>9.10.0</dep.rocksdb.version>
 
         <!-- common libraries -->
+        <dep.spike.java.version>0.1.0</dep.spike.java.version>
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
         <dep.netty.version>4.1.77.Final</dep.netty.version>
         <dep.asynchttpclient.version>2.12.3</dep.asynchttpclient.version>
@@ -215,6 +218,11 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-invoker-spike</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-worker-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -242,6 +250,45 @@
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-retina</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-index-rocksdb</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-index-rockset</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>spike-java-handler</artifactId>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.grpc</groupId>
+                        <artifactId>grpc-netty-shaded</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.grpc</groupId>
+                        <artifactId>grpc-protobuf</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.grpc</groupId>
+                        <artifactId>grpc-stub</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.google.protobuf</groupId>
+                        <artifactId>protobuf-java</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>javax.annotation</groupId>
+                        <artifactId>javax.annotation-api</artifactId>
+                    </exclusion>
+                </exclusions>
+                <!-- this is available in the maven central repo -->
+                <version>0.1.0</version>
             </dependency>
 
             <!-- presto-jdbc -->
