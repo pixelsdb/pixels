@@ -21,16 +21,20 @@ package io.pixelsdb.pixels.retina;
 
 public class RecordLocation 
 {
-    private final LocationIdentifier locationIdentifier;
+    /**
+     * Use the id of MemTable or EtcdEntry as location identifier
+     */
+    private final long locationIdentifier;
+
     private final int recordIndex;
 
-    public RecordLocation(LocationIdentifier locationIdentifier, int recordIndex)
+    public RecordLocation(long locationIdentifier, int recordIndex)
     {
         this.locationIdentifier = locationIdentifier;
         this.recordIndex = recordIndex;
     }
 
-    public LocationIdentifier getLocationIdentifier()
+    public long getLocationIdentifier()
     {
         return locationIdentifier;
     }

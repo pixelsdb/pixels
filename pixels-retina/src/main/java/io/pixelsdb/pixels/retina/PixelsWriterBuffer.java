@@ -23,7 +23,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -69,6 +71,13 @@ public class PixelsWriterBuffer
     private final Storage targetOrderedStorage;
     private final Storage targetCompactStorage;
 
+    /**
+     * Allocate unique identifier for data (MemTable/EtcdEntry)
+     * There is no need to use atomic variables because
+     * there are write locks in all concurrent situations.
+     */
+    private long idCounter = 0L;
+
     // Active memTable
     private MemTable activeMemTable;
 
@@ -90,6 +99,17 @@ public class PixelsWriterBuffer
 
     // Lock for SuperVersion switch
     private final ReadWriteLock versionLock = new ReentrantReadWriteLock();
+
+    /**
+     * The mapping from rowId to record position
+     */
+    private final Map<Integer, RecordLocation> recordLocationMap;
+
+    /**
+     * The mapping from rowBatch location to rowBatch visibility
+     */
+    private final Map<Long, RGVisibility> visibilityMap;
+
 
     public PixelsWriterBuffer(TypeDescription schema, String schemaName, String tableName,
                               String targetOrderedDirPath, String targetCompactDirPath) throws RetinaException
@@ -117,7 +137,7 @@ public class PixelsWriterBuffer
         this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
         this.maxBufferSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
 
-        this.activeMemTable = new MemTable(schema, pixelStride, TypeDescription.Mode.NONE);
+        this.activeMemTable = new MemTable(this.idCounter, schema, pixelStride, TypeDescription.Mode.NONE);
         this.immutableMemTables = new ArrayList<>();
         this.etcdEntries = new ArrayList<>();
         // Initialization adds reference counts to all data
@@ -125,6 +145,14 @@ public class PixelsWriterBuffer
 
         this.flushExecutor = Executors.newFixedThreadPool(2);
         startEtcdFlushScheduler();
+
+        this.recordLocationMap = new HashMap<>();
+        this.visibilityMap = new HashMap<>();
+
+        // init first visibility for active memTable
+        RGVisibility visibility = new RGVisibility(pixelStride);
+        this.visibilityMap.put(this.idCounter, visibility);
+        this.idCounter++;
     }
 
     /**
@@ -169,7 +197,7 @@ public class PixelsWriterBuffer
              */
             MemTable oldMemTable = this.activeMemTable;
             this.immutableMemTables.add(this.activeMemTable);
-            this.activeMemTable = new MemTable(this.schema, this.pixelStride, TypeDescription.Mode.NONE);
+            this.activeMemTable = new MemTable(this.idCounter++, this.schema, this.pixelStride, TypeDescription.Mode.NONE);
 
             SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.etcdEntries);
             SuperVersion oldVersion = this.currentVersion;

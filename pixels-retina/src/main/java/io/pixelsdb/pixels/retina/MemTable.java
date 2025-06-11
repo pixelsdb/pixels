@@ -28,16 +28,23 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 public class MemTable implements Referenceable
 {
     private final ReferenceCounter refCounter = new ReferenceCounter();
+    private final long id;  // unique identifier
     private final TypeDescription schema;
     private final VectorizedRowBatch rowBatch;
 
-    public MemTable(TypeDescription schema, int pixelStride, int mode)
+    public MemTable(long id, TypeDescription schema, int pixelStride, int mode)
     {
+        this.id = id;
         this.schema = schema;
         this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, mode);
 
         // init reference count
         this.refCounter.ref();
+    }
+
+    public long getId()
+    {
+        return id;
     }
 
     /**
