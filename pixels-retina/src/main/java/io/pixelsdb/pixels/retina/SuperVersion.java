@@ -27,25 +27,25 @@ public class SuperVersion implements Referenceable
 
     private final MemTable memTable;
     private final List<MemTable> immutableMemTables;
-    private final List<EtcdEntry> etcdEntries;
+    private final List<ObjectEntry> objectEntries;
 
     public SuperVersion(
             MemTable memTable,
             List<MemTable> immutableMemTables,
-            List<EtcdEntry> etcdEntries)
+            List<ObjectEntry> objectEntries)
     {
         this.memTable = memTable;
         this.immutableMemTables  = immutableMemTables;
-        this.etcdEntries = etcdEntries;
+        this.objectEntries = objectEntries;
 
         this.memTable.ref();
         for (MemTable immutableMemTable : this.immutableMemTables)
         {
             immutableMemTable.ref();
         }
-        for (EtcdEntry etcdEntry : this.etcdEntries)
+        for (ObjectEntry objectEntry : this.objectEntries)
         {
-            etcdEntry.ref();
+            objectEntry.ref();
         }
         this.refCounter.ref();
     }
@@ -60,9 +60,9 @@ public class SuperVersion implements Referenceable
         return this.immutableMemTables;
     }
 
-    public List<EtcdEntry> getEtcdEntries()
+    public List<ObjectEntry> getObjectEntries()
     {
-        return this.etcdEntries;
+        return this.objectEntries;
     }
 
     @Override
@@ -82,9 +82,9 @@ public class SuperVersion implements Referenceable
             {
                 immutableMemTable.unref();
             }
-            for (EtcdEntry etcdEntry : this.etcdEntries)
+            for (ObjectEntry objectEntry : this.objectEntries)
             {
-                etcdEntry.unref();
+                objectEntry.unref();
             }
         }
         return shouldDelete;

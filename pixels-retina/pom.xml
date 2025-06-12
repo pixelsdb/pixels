@@ -75,10 +75,10 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- etcd -->
+        <!-- minio -->
         <dependency>
-            <groupId>io.etcd</groupId>
-            <artifactId>jetcd-core</artifactId>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-s3</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>

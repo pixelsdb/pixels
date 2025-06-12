@@ -19,12 +19,12 @@
  */
 package io.pixelsdb.pixels.retina;
 
-public class EtcdEntry implements Referenceable
+public class ObjectEntry implements Referenceable
 {
     private final ReferenceCounter refCounter = new ReferenceCounter();
     private final long id;
 
-    public EtcdEntry(long id)
+    public ObjectEntry(long id)
     {
         this.id = id;
     }

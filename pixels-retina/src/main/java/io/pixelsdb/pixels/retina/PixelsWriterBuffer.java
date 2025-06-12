@@ -28,25 +28,36 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
+import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
+
+/**
+ * Data flows from the CDC into pixels, where it is first written to
+ * the writer buffer and becomes visible externally. Each logical table
+ * corresponds to a writer buffer, which contains only one memTable responsible
+ * for writing data. Once the memTable is full, data is written to an immutable
+ * memTable, and multiple immutable memTables can exist. Currently, to simplify
+ * the distributed design, the immutable memTable is first written to the shared
+ * storage minio, and then the data in minio is dumped to a disk file.
+ *  -----        --------------------------------      -------      -----------
+ * | CDC | ===> | memTable -> immutable memTable | -> | minio | -> | disk file |
+ *  -----        --------------------------------      -------      -----------
+ */
 public class PixelsWriterBuffer
 {
     private static final Logger logger = LogManager.getLogger(PixelsWriterBuffer.class);
@@ -72,7 +83,7 @@ public class PixelsWriterBuffer
     private final Storage targetCompactStorage;
 
     /**
-     * Allocate unique identifier for data (MemTable/EtcdEntry)
+     * Allocate unique identifier for data (MemTable/MinioEntry)
      * There is no need to use atomic variables because
      * there are write locks in all concurrent situations.
      */
@@ -81,15 +92,12 @@ public class PixelsWriterBuffer
     // Active memTable
     private MemTable activeMemTable;
 
-    // Wait to refresh to etcd
+    // Wait to refresh to shared storage
     private final List<MemTable> immutableMemTables;
 
-    // Etcd key id counter
-    private final AtomicInteger etcdKeyIdCounter = new AtomicInteger(0);
-
-    // Etcd
-    private final List<EtcdEntry> etcdEntries;
-    private final EtcdUtil etcdUtil = EtcdUtil.Instance();
+    // minio
+    private final Storage minio;
+    private final List<ObjectEntry> objectEntries;
 
     // Current data view
     private volatile SuperVersion currentVersion;
@@ -103,13 +111,20 @@ public class PixelsWriterBuffer
     /**
      * The mapping from rowId to record position
      */
-    private final Map<Integer, RecordLocation> recordLocationMap;
+    private final Map<Long, RecordLocation> recordLocationMap;
 
     /**
      * The mapping from rowBatch location to rowBatch visibility
      */
     private final Map<Long, RGVisibility> visibilityMap;
 
+    /**
+     * Write several data blocks to the same file and determine this when adding data.
+     * At the same time, record the ID of the last data block in each file and determine
+     * whether to trigger writing to the disk file when writing to distributed storage.
+     */
+    private long fileId;                        // current fileId
+    private final List<Integer> fileSplitIds;   // The ID is for the data block.
 
     public PixelsWriterBuffer(TypeDescription schema, String schemaName, String tableName,
                               String targetOrderedDirPath, String targetCompactDirPath) throws RetinaException
@@ -139,12 +154,12 @@ public class PixelsWriterBuffer
 
         this.activeMemTable = new MemTable(this.idCounter, schema, pixelStride, TypeDescription.Mode.NONE);
         this.immutableMemTables = new ArrayList<>();
-        this.etcdEntries = new ArrayList<>();
+        this.objectEntries = new ArrayList<>();
         // Initialization adds reference counts to all data
-        this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, etcdEntries);
+        this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
 
         this.flushExecutor = Executors.newFixedThreadPool(2);
-        startEtcdFlushScheduler();
+        startMinioFlushScheduler();
 
         this.recordLocationMap = new HashMap<>();
         this.visibilityMap = new HashMap<>();
@@ -153,6 +168,22 @@ public class PixelsWriterBuffer
         RGVisibility visibility = new RGVisibility(pixelStride);
         this.visibilityMap.put(this.idCounter, visibility);
         this.idCounter++;
+
+        this.fileSplitIds = new ArrayList<>();
+
+        // minio
+        try
+        {
+            ConfigMinio(configFactory.getProperty("minio.region"),
+                    configFactory.getProperty("minio.endpoint"),
+                    configFactory.getProperty("minio.access.key"),
+                    configFactory.getProperty("minio.secret.key"));
+            this.minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+        } catch (IOException e)
+        {
+            logger.error("error when config minio ", e);
+            throw new RetinaException("error when config minio ", e);
+        }
     }
 
     /**
@@ -172,6 +203,8 @@ public class PixelsWriterBuffer
         while (!added) {
             this.versionLock.readLock().lock();
             added = this.activeMemTable.add(values, timestamp);
+
+            //
             this.versionLock.readLock().unlock();
             if (!added)
             {
@@ -199,38 +232,39 @@ public class PixelsWriterBuffer
             this.immutableMemTables.add(this.activeMemTable);
             this.activeMemTable = new MemTable(this.idCounter++, this.schema, this.pixelStride, TypeDescription.Mode.NONE);
 
-            SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.etcdEntries);
+            SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
             SuperVersion oldVersion = this.currentVersion;
             this.currentVersion = newVersion;
             oldVersion.unref();
 
-            triggerFlushToEtcd(oldMemTable);
+            triggerFlushToMinio(oldMemTable);
         } finally
         {
             this.versionLock.writeLock().unlock();
         }
     }
 
-    private void triggerFlushToEtcd(MemTable flushToEtcdMemTable)
+    private void triggerFlushToMinio(MemTable flushMemTable)
     {
         flushExecutor.submit(() -> {
             try
             {
-                // put etcd entry
-                long id = this.etcdKeyIdCounter.getAndIncrement();
-                String etcdEntryKey = this.schemaName + '_' + tableName + '_' + id;
-                etcdUtil.putKeyValue(etcdEntryKey, flushToEtcdMemTable.serialize()); // synchronous operation
-                EtcdEntry etcdEntry = new EtcdEntry(id);
-                etcdEntry.ref();
+                // put into minio
+                long id = flushMemTable.getId();
+                writeIntoMinio(this.schemaName + '/' + this.tableName + '/' + id,
+                        flushMemTable.serialize());
+
+                ObjectEntry objectEntry = new ObjectEntry(id);
+                objectEntry.ref();
 
                 // update SuperVersion
                 versionLock.writeLock().lock();
                 try
                 {
-                    this.immutableMemTables.remove(flushToEtcdMemTable);
-                    this.etcdEntries.add(etcdEntry);
+                    this.immutableMemTables.remove(flushMemTable);
+                    this.objectEntries.add(objectEntry);
 
-                    SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.etcdEntries);
+                    SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
 
                     SuperVersion oldVersion = this.currentVersion;
                     this.currentVersion = newVersion;
@@ -241,10 +275,10 @@ public class PixelsWriterBuffer
                 }
             } catch (Exception e)
             {
-                throw new RuntimeException("Failed to flush to etcd ", e);
+                throw new RuntimeException("Failed to flush to minio ", e);
             } finally
             {
-                flushToEtcdMemTable.unref();  // unref in the end
+                flushMemTable.unref();  // unref in the end
             }
         });
     }
@@ -267,7 +301,7 @@ public class PixelsWriterBuffer
         }
     }
 
-    private void startEtcdFlushScheduler()
+    private void startMinioFlushScheduler()
     {
         Thread scheduler = new Thread(() -> {
             while(!Thread.currentThread().isInterrupted())
@@ -278,10 +312,10 @@ public class PixelsWriterBuffer
                     SuperVersion sv = getCurrentVersion();
                     try
                     {
-                        List<EtcdEntry> etcdEntries = sv.getEtcdEntries();
-                        if (etcdEntries.size() >= 100)
+                        List<ObjectEntry> objectEntries = sv.getObjectEntries();
+                        if (objectEntries.size() >= 100)
                         {
-                            flushEtcdToDisk(etcdEntries);
+                            flushMinioToDisk(objectEntries);
                         }
                     } finally
                     {
@@ -293,7 +327,7 @@ public class PixelsWriterBuffer
                     break;
                 } catch (Exception e)
                 {
-                    logger.error("Error in Etcd flush scheduler: ", e);
+                    logger.error("Error in Minio flush scheduler: ", e);
                 }
             }
         });
@@ -301,7 +335,7 @@ public class PixelsWriterBuffer
         scheduler.start();
     }
 
-    private void flushEtcdToDisk(List<EtcdEntry> flushEtcdEntries)
+    private void flushMinioToDisk(List<ObjectEntry> flushEntries)
     {
         this.flushExecutor.submit(() -> {
             try
@@ -310,10 +344,13 @@ public class PixelsWriterBuffer
                 {
                     createNewWriter();
                 }
-                for (EtcdEntry etcdEntry: flushEtcdEntries)
+                for (ObjectEntry objectEntry : flushEntries)
                 {
-                    String etcdEntryKey = this.schemaName + '_' + tableName + '_' + etcdEntry.getId();
-                    byte[] data = this.etcdUtil.getKeyValue(etcdEntryKey).getValue().getBytes();
+                    String minioEntryKey = this.schemaName + '/' + tableName + '/' + objectEntry.getId();
+                    PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.minio, minioEntryKey);
+                    int length = (int) reader.getFileLength();
+                    byte[] data = new byte[length];
+                    reader.readFully(data, 0, length);
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();
@@ -322,10 +359,10 @@ public class PixelsWriterBuffer
                 this.versionLock.writeLock().lock();
                 try
                 {
-                    this.etcdEntries.removeAll(flushEtcdEntries);
+                    this.objectEntries.removeAll(flushEntries);
 
                     SuperVersion oldVersion = this.currentVersion;
-                    this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.etcdEntries);
+                    this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
                     oldVersion.unref();
                 } finally
                 {
@@ -333,14 +370,21 @@ public class PixelsWriterBuffer
                 }
             } catch (Exception e)
             {
-                logger.error("Error in flushEtcdToDisk: ", e);
+                logger.error("Error in flushMinioToDisk: ", e);
             } finally
             {
-                for (EtcdEntry etcdEntry: flushEtcdEntries)
+                for (ObjectEntry objectEntry : flushEntries)
                 {
-                    etcdEntry.unref(); // unref in the end
-                    String etcdEntryKey = this.schemaName + '_' + tableName + '_' + etcdEntry.getId();
-                    this.etcdUtil.delete(etcdEntryKey);
+                    objectEntry.unref(); // unref in the end
+                    String objectKey = this.schemaName + '/' + tableName + '/' + objectEntry.getId();
+                    try
+                    {
+                        this.minio.delete(objectKey, false);
+                    } catch (IOException e)
+                    {
+                        logger.error("fail to delete " + objectKey + " in minio", e);
+                        throw new RuntimeException("fail to delete " + objectKey + " in minio", e);
+                    }
                 }
             }
         });
@@ -372,6 +416,37 @@ public class PixelsWriterBuffer
             throw new RetinaException("Failed to create new writer", e);
         }
     }
+
+    private void writeIntoMinio(String filePath, byte[] data)
+    {
+        try
+        {
+            PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(
+                    this.minio, filePath, true);
+            writer.append(data, 0, data.length);
+            writer.close();
+        } catch (IOException e)
+        {
+            logger.error("failed to write data into minio: ", e);
+        }
+    }
+
+    private void addRowBatchFromMinio(ObjectEntry objectEntry) throws RetinaException
+    {
+        try
+        {
+            String objectKey = this.schemaName + '/' + tableName + '/' + objectEntry.getId();
+            PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.minio, objectKey);
+            int length = (int) reader.getFileLength();
+            byte[] data = new byte[length];
+            reader.readFully(data, 0, length);
+            this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
+        } catch (IOException e)
+        {
+            logger.error("Failed to load rowBatch from minio", e);
+            throw new RetinaException("Failed to load rowBatch from minio", e);
+        }
+    }
     
     /**
      * collect resouces
@@ -400,12 +475,10 @@ public class PixelsWriterBuffer
                 this.writer.addRowBatch(immutableMemTable.getRowBatch());
             }
 
-            // add etcd entries to writer
-            for (EtcdEntry etcdEntry: sv.getEtcdEntries())
+            // add minio object to writer
+            for (ObjectEntry objectEntry : sv.getObjectEntries())
             {
-                String etcdEntryKey = this.schemaName + '_' + tableName + '_' + etcdEntry.getId();
-                byte[] data = this.etcdUtil.getKeyValue(etcdEntryKey).getValue().getBytes();
-                this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
+                addRowBatchFromMinio(objectEntry);
             }
 
             this.writer.close();
@@ -420,11 +493,10 @@ public class PixelsWriterBuffer
             {
                 immutableMemTable.unref();
             }
-            for (EtcdEntry etcdEntry: sv.getEtcdEntries())
+            for (ObjectEntry objectEntry : sv.getObjectEntries())
             {
-                etcdEntry.unref();
-                String etcdEntryKey = this.schemaName + '_' + tableName + '_' + etcdEntry.getId();
-                this.etcdUtil.delete(etcdEntryKey);
+                objectEntry.unref();
+                this.minio.delete(this.schemaName + '/' + this.tableName + '/' + objectEntry.getId(), false);
             }
         }
     }
