@@ -62,6 +62,7 @@ public class PixelsPlanner
     private static final Logger logger = LogManager.getLogger(PixelsPlanner.class);
     private static final StorageInfo InputStorageInfo;
     private static final StorageInfo IntermediateStorageInfo;
+    private static final StorageInfo StreamStorageInfo;
     private static final String IntermediateFolder;
     private static final int IntraWorkerParallelism;
     private static final ExchangeMethod EnabledExchangeMethod;
@@ -103,6 +104,8 @@ public class PixelsPlanner
         IntermediateFolder = interStorageFolder;
         IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance()
                 .getProperty("executor.intra.worker.parallelism"));
+
+        StreamStorageInfo = StorageInfoBuilder.BuildFromConfig(Storage.Scheme.httpstream);
     }
 
     /**
@@ -1345,7 +1348,12 @@ public class PixelsPlanner
         int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
         String[] newColumnsToRead = rewriteColumnsToReadForPartitionedJoin(table.getColumnNames(), partitionProjection);
 
-        if (table.getTableType() == Table.TableType.BASE)
+        if (config.getProperty("executor.exchange.method").equals(ExchangeMethod.stream.name()))
+        {
+          return new PartitionedTableInfo(table.getTableName(), true,
+                  newColumnsToRead, StreamStorageInfo, rightPartitionedFiles.build(),
+                  IntraWorkerParallelism, newKeyColumnIds);
+        } else if (table.getTableType() == Table.TableType.BASE)
         {
             return new PartitionedTableInfo(table.getTableName(), true,
                     newColumnsToRead, InputStorageInfo, rightPartitionedFiles.build(),
@@ -1419,7 +1427,13 @@ public class PixelsPlanner
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setProjection(partitionProjection);
-            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
+            if (config.getProperty("executor.exchange.method").equals(ExchangeMethod.stream.name()))
+            {
+                partitionInput.setOutput(new OutputInfo("", StreamStorageInfo, true));
+            } else
+            {
+                partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
+            }
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);

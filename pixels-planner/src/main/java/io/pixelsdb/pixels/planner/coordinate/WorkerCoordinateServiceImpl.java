@@ -57,7 +57,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         CFWorkerInfo workerInfo = new CFWorkerInfo(request.getWorkerInfo());
         Lease lease = new Lease(WorkerLeasePeriodMs, System.currentTimeMillis());
         long workerId = CFWorkerManager.Instance().createWorkerId();
-        Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, workerInfo);
+        Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, 0, workerInfo);
         CFWorkerManager.Instance().registerCFWorker(worker);
         log.debug("register worker, local address: " + workerInfo.getIp() + ", transId: " + workerInfo.getTransId()
                 + ", stageId: " + workerInfo.getStageId() + ", workerId: " + workerId);
@@ -67,7 +67,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         requireNonNull(stageCoordinator, "stage coordinator is not found");
         stageCoordinator.addWorker(worker);
         TurboProto.RegisterWorkerResponse response = TurboProto.RegisterWorkerResponse.newBuilder()
-                .setErrorCode(SUCCESS).setWorkerId(workerId).setLeasePeriodMs(lease.getPeriodMs())
+                .setErrorCode(SUCCESS).setWorkerId(workerId).setWorkerPortIndex(worker.getWorkerPortIndex()).setLeasePeriodMs(lease.getPeriodMs())
                 .setLeaseStartTimeMs(lease.getStartTimeMs()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
@@ -99,22 +99,21 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
             }
             else
             {
-                int workerIndex = planCoordinator.getStageCoordinator(workerInfo.getStageId()).getWorkerIndex(workerId);
-                if (workerIndex < 0)
+                List<Integer> workerIndex = planCoordinator.getStageCoordinator(workerInfo.getStageId()).getWorkerIndex(workerId);
+                if (workerIndex == null)
                 {
                     builder.setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND);
                 }
                 else
                 {
-                    if (workerIndex >= downStreamWorkers.size())
-                    {
-                        builder.setErrorCode(ErrorCode.WORKER_COORDINATE_NO_DOWNSTREAM);
-                    }
-                    else
+                    for (Integer index : workerIndex)
                     {
                         // get the worker with the same index in the downstream stage as the downstream worker
                         builder.setErrorCode(SUCCESS);
-                        builder.addDownstreamWorkers(downStreamWorkers.get(workerIndex).getWorkerInfo().toProto());
+                        if (index < downStreamWorkers.size())
+                        {
+                            builder.addDownstreamWorkers(downStreamWorkers.get(index).getWorkerInfo().toProto());
+                        }
                     }
                 }
             }
