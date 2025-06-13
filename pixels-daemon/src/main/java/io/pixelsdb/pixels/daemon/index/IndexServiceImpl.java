@@ -120,11 +120,11 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.IndexEntry entry = request.getIndexEntry();
 
         // Call SecondaryIndex's putEntry method
-        boolean success = secondaryIndex.putEntry(new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique()));
+        long rowId = secondaryIndex.putEntry(new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()));
 
         // Create gRPC response
         IndexProto.PutIndexEntryResponse response = IndexProto.PutIndexEntryResponse.newBuilder()
-                .setErrorCode(success ? 0 : 1)
+                .setRowId(rowId)
                 .build();
 
         // Send response
@@ -158,15 +158,15 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     {
         // Get list of IndexEntries from request
         List<SecondaryIndex.Entry> entries = request.getIndexEntriesList().stream()
-                .map(entry -> new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique()))
+                .map(entry -> new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()))
                 .collect(Collectors.toList());
 
         // Call SecondaryIndex's putEntries method
-        boolean success = secondaryIndex.putEntries(entries);
+        List<Long> rowIds = secondaryIndex.putEntries(entries);
 
         // Create gRPC response
         IndexProto.PutIndexEntriesResponse response = IndexProto.PutIndexEntriesResponse.newBuilder()
-                .setErrorCode(success ? 0 : 1)
+                .addAllRowIds(rowIds)
                 .build();
 
         // Send response
