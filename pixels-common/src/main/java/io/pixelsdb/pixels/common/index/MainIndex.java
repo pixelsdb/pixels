@@ -43,6 +43,23 @@ public interface MainIndex extends Closeable
     IndexProto.RowLocation getLocation(long rowId);
 
     /**
+     * Put a single row id into the main index, in order to enable simultaneous insert into the main index while
+     * inserting a single secondary index.
+     * @param rowId the row id
+     * @param rowLocation the location of the row id
+     * @return true on success
+     */
+    boolean putRowId(long rowId, IndexProto.RowLocation rowLocation);
+
+    /**
+     * Delete a single row id from the main index. {@link #getLocation(long)} of a row id within a deleted range
+     * should return null.
+     * @param rowId the row id range to be deleted
+     * @return true on success
+     */
+    boolean deleteRowId(long rowId);
+
+    /**
      * Put the row ids from a row group into the main index. In pixels, we allocate the row ids in batches (ranges)
      * and put the row id range of a row group into the main index at once.
      * @param rowIdRangeOfRg the row id range of the row group
@@ -60,24 +77,24 @@ public interface MainIndex extends Closeable
     boolean deleteRowIdRange(RowIdRange rowIdRange);
 
     /**
-     * Distribute row id for the secondary index. 
+     * Distribute row id for the secondary index.
      * If there isn't any row id in cache, get a range of row ids at once and put them into cache.
+     *
      * @param entry the rowLocation of secondary index
-     * @return true on success
      */
     boolean getRowId(SecondaryIndex.Entry entry);
 
     /**
      * Distribute row ids for the secondary index.
      * If there isn't enough row ids in cache, get a range of row ids at once and put them into cache.
+     *
      * @param entries the rowLocation of secondary index
-     * @return true on success
      */
     boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries);
 
     /**
      * Persist the main index into persistent storage.
-     * @return
+     * @return true on success
      */
     boolean persist();
 
