@@ -84,6 +84,15 @@ public class WorkerAsyncClient
         return this.stub.process(request);
     }
 
+    public ListenableFuture<TurboProto.WorkerResponse> broadcastChainJoinStream(BroadcastChainJoinInput input)
+    {
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.BROADCAST_CHAIN_JOIN_STREAMING))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
+                .build();
+        return this.stub.process(request);
+    }
+
     public ListenableFuture<TurboProto.WorkerResponse> broadcastJoin(BroadcastJoinInput input)
     {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
@@ -93,10 +102,28 @@ public class WorkerAsyncClient
         return this.stub.process(request);
     }
 
+    public ListenableFuture<TurboProto.WorkerResponse> broadcastJoinStream(BroadcastJoinInput input)
+    {
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.BROADCAST_JOIN_STREAMING))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
+                .build();
+        return this.stub.process(request);
+    }
+
     public ListenableFuture<TurboProto.WorkerResponse> partitionChainJoin(PartitionedChainJoinInput input)
     {
         TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.PARTITIONED_CHAIN_JOIN))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
+                .build();
+        return this.stub.process(request);
+    }
+
+    public ListenableFuture<TurboProto.WorkerResponse> partitionChainJoinStreaming(PartitionedChainJoinInput input)
+    {
+        TurboProto.WorkerRequest request = TurboProto.WorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.PARTITIONED_CHAIN_JOIN_STREAMING))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.process(request);

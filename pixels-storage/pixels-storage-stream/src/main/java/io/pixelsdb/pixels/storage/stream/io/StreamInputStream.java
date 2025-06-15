@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.storage.stream.io;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
 import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 import org.apache.logging.log4j.LogManager;
@@ -71,12 +72,12 @@ public class StreamInputStream extends InputStream
     /**
      * The maximum tries to get data.
      */
-    private final int MAX_TRIES = 10;
+    private final int MAX_TRIES = Constants.MAX_STREAM_RETRY_COUNT;
 
     /**
      * The milliseconds to sleep.
      */
-    private final int DELAY_MS = 2000;
+    private final long DELAY_MS = Constants.STREAM_DELAY_MS;
 
     /**
      * The http server for receiving input stream.
@@ -99,7 +100,7 @@ public class StreamInputStream extends InputStream
         this.host = host;
         this.port = port;
         this.uri = this.schema + "://" + host + ":" + port;
-        this.httpServer = new HttpServer(new StreamHttpServerHandler(this));
+        this.httpServer = new HttpServer(new StreamHttpServerHandler(this.contentQueue));
         this.executorService = Executors.newFixedThreadPool(1);
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
             try
@@ -163,14 +164,28 @@ public class StreamInputStream extends InputStream
                 return readBytes > 0 ? readBytes : -1;
             }
             content = this.contentQueue.peek();
-
-            int readLen = Math.min(len - readBytes, content.readableBytes());
-            content.readBytes(buf, off + readBytes, readLen);
-            readBytes += readLen;
-            if (!content.isReadable())
+            if (content == null)
             {
-                content.release();
-                contentQueue.poll();
+                return readBytes > 0 ? readBytes : -1;
+            }
+
+            try
+            {
+                int readLen = Math.min(len - readBytes, content.readableBytes());
+                content.readBytes(buf, off + readBytes, readLen);
+                readBytes += readLen;
+                if (!content.isReadable())
+                {
+                    contentQueue.poll();
+                    content.release();
+                }
+            } catch (Exception e) {
+                if (!content.isReadable())
+                {
+                    contentQueue.poll();
+                    content.release();
+                }
+                throw e;
             }
         }
 
@@ -202,6 +217,11 @@ public class StreamInputStream extends InputStream
                 throw new IOException(e);
             }
         }
+        if (tries == this.MAX_TRIES)
+        {
+            logger.error("retry count {}, httpServerFuture {}, " +
+                    "exception cause: StreamInputStream failed to receive data", tries, this.httpServerFuture.isDone());
+        }
 
         return this.contentQueue.isEmpty();
     }
@@ -217,11 +237,11 @@ public class StreamInputStream extends InputStream
     public static class StreamHttpServerHandler extends HttpServerHandler
     {
         private static final Logger logger = LogManager.getLogger(StreamHttpServerHandler.class);
-        private StreamInputStream inputStream;
+        private final BlockingQueue<ByteBuf> contenQueue;
 
-        public StreamHttpServerHandler(StreamInputStream inputStream)
+        public StreamHttpServerHandler(BlockingQueue<ByteBuf> contenQueue)
         {
-            this.inputStream = inputStream;
+            this.contenQueue = contenQueue;
         }
 
         @Override
@@ -234,8 +254,8 @@ public class StreamInputStream extends InputStream
             FullHttpRequest req = (FullHttpRequest) msg;
             if (req.method() != HttpMethod.POST)
             {
-                req.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                sendResponse(ctx, req, HttpResponseStatus.BAD_REQUEST);
+                sendResponse(ctx, req, HttpResponseStatus.OK);
+                return;
             }
 
             if (!req.headers().get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-protobuf"))
@@ -246,7 +266,7 @@ public class StreamInputStream extends InputStream
             if (content.isReadable())
             {
                 content.retain();
-                this.inputStream.contentQueue.add(content);
+                this.contenQueue.add(content);
             }
             sendResponse(ctx, req, HttpResponseStatus.OK);
         }
@@ -267,6 +287,7 @@ public class StreamInputStream extends InputStream
             } else
             {
                 response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                response.setStatus(status);
                 ctx.writeAndFlush(response);
             }
         }
