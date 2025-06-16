@@ -19,6 +19,7 @@
 // */
 package io.pixelsdb.pixels.retina;
 
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.core.TypeDescription;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,13 +38,19 @@ public class TestPixelsWriterBuffer
     private List<String> columnNames = new ArrayList<>();
     private List<String> columnTypes = new ArrayList<>();
     private TypeDescription schema;
-    String targetOrderDirPath = "file:///home/gengdy/data/test/ordered/";
-    String targetCompactDirPath = "file:///home/gengdy/data/test/compact/";
+    Path targetOrderDirPath;
+    Path targetCompactDirPath;
     PixelsWriterBuffer buffer;
 
     @Before
     public void setup()
     {
+        targetOrderDirPath = new Path();
+        targetOrderDirPath.setUri("file:///home/gengdy/data/test/ordered/");
+        targetOrderDirPath.setId(33);
+        targetCompactDirPath = new Path();
+        targetCompactDirPath.setUri("file:///home/gengdy/data/test/compact/");
+        targetCompactDirPath.setId(33);
         try
         {
             columnNames.add("id");

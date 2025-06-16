@@ -22,15 +22,17 @@ package io.pixelsdb.pixels.retina;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.File;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -71,14 +73,13 @@ public class PixelsWriterBuffer
     // PixelsWriter and its configuration information
     private PixelsWriter writer;
     private final int pixelStride;
-    private final int rowGroupSize;
     private final long blockSize;
     private final short replication;
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
     private final int maxBufferSize;
-    private final String targetOrderedDirPath;
-    private final String targetCompactDirPath;
+    private final Path targetOrderedDirPath;
+    private final Path targetCompactDirPath;
     private final Storage targetOrderedStorage;
     private final Storage targetCompactStorage;
 
@@ -123,11 +124,12 @@ public class PixelsWriterBuffer
      * At the same time, record the ID of the last data block in each file and determine
      * whether to trigger writing to the disk file when writing to distributed storage.
      */
-    private long fileId;                        // current fileId
-    private final List<Integer> fileSplitIds;   // The ID is for the data block.
+    private long fileId;                                    // current fileId
+    private final CopyOnWriteArrayList<Long> fileSplitIds;  // The ID is for the data block.
+    private AtomicInteger currentBufferSize;                // current size of data written to the buffer
 
     public PixelsWriterBuffer(TypeDescription schema, String schemaName, String tableName,
-                              String targetOrderedDirPath, String targetCompactDirPath) throws RetinaException
+                              Path targetOrderedDirPath, Path targetCompactDirPath) throws RetinaException
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
@@ -135,13 +137,12 @@ public class PixelsWriterBuffer
 
         ConfigFactory configFactory = ConfigFactory.Instance();
         this.pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
-        this.rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
         this.targetOrderedDirPath = targetOrderedDirPath;
         this.targetCompactDirPath = targetCompactDirPath;
         try
         {
-            this.targetOrderedStorage = StorageFactory.Instance().getStorage(targetOrderedDirPath);
-            this.targetCompactStorage = StorageFactory.Instance().getStorage(targetCompactDirPath);
+            this.targetOrderedStorage = StorageFactory.Instance().getStorage(targetOrderedDirPath.getUri());
+            this.targetCompactStorage = StorageFactory.Instance().getStorage(targetCompactDirPath.getUri());
         } catch (Exception e)
         {
             throw new RetinaException("Failed to get storage" + e);
@@ -169,7 +170,8 @@ public class PixelsWriterBuffer
         this.visibilityMap.put(this.idCounter, visibility);
         this.idCounter++;
 
-        this.fileSplitIds = new ArrayList<>();
+        this.fileSplitIds = new CopyOnWriteArrayList<>();
+        this.currentBufferSize = new AtomicInteger(0);
 
         // minio
         try
@@ -203,14 +205,27 @@ public class PixelsWriterBuffer
         while (!added) {
             this.versionLock.readLock().lock();
             added = this.activeMemTable.add(values, timestamp);
-
-            //
             this.versionLock.readLock().unlock();
-            if (!added)
+
+            if (!added)  // active memTable is full
             {
+                if (this.currentBufferSize.get() >= this.maxBufferSize)
+                {
+                    this.fileSplitIds.add(this.activeMemTable.getId());
+                }
                 switchMemTable();
             }
         }
+
+        // Calculate the size of the added data
+        int dataSize = 0;
+        for (byte[] value : values)
+        {
+            dataSize += value.length;
+        }
+        dataSize += 8; // Add size of timestamp (long = 8 bytes)
+
+        this.currentBufferSize.addAndGet(dataSize);
         return true;
     }
 
@@ -390,19 +405,37 @@ public class PixelsWriterBuffer
         });
     }
 
+    /**
+     * When creating a writer, add the file information to the metadata and obtain a fileId.
+     * The fileId is used to insert indexes for the data written to this file.
+     */
     private void createNewWriter() throws RetinaException
     {
-        if (this.writer != null) {
+        if (this.writer != null)
+        {
             throw new RetinaException("Writer already exists");
         }
-        try {
+        try
+        {
             String targetFileName = DateUtil.getCurTime() + ".pxl";
-            String targetFilePath = this.targetOrderedDirPath + targetFileName;
+            String targetFilePath = this.targetOrderedDirPath.getUri() + targetFileName;
+
+            // add file information to the metadata
+            MetadataService metadataService = MetadataService.Instance();
+            File addedFile = new File();
+            addedFile.setName(targetFileName);
+            addedFile.setNumRowGroup(1);
+            addedFile.setPathId(this.targetOrderedDirPath.getId());
+            metadataService.addFiles(Collections.singletonList(addedFile));
+
+            // this.fileId = metadataService.getFileId(targetFilePath);
+            this.fileId = 0;
+
             this.writer = PixelsWriterImpl.newBuilder()
                     .setSchema(this.schema)
                     .setHasHiddenColumn(true)
                     .setPixelStride(this.pixelStride)
-                    .setRowGroupSize(this.rowGroupSize)
+                    .setRowGroupSize(Integer.MAX_VALUE)  // ensure only one row group finally
                     .setStorage(this.targetOrderedStorage)
                     .setPath(targetFilePath)
                     .setBlockSize(this.blockSize)
@@ -412,7 +445,8 @@ public class PixelsWriterBuffer
                     .setNullsPadding(this.nullsPadding)
                     .setCompressionBlockSize(1)
                     .build();
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             throw new RetinaException("Failed to create new writer", e);
         }
     }

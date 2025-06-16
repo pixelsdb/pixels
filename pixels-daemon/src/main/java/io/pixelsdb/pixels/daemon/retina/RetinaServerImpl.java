@@ -114,7 +114,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     validateOrderedOrCompactPaths(orderedPaths);
                     List<Path> compactPaths = latestLayout.getCompactPaths();
                     validateOrderedOrCompactPaths(compactPaths);
-                    addWriterBuffer(schema.getName(), table.getName(), orderedPaths.get(0).getUri(), compactPaths.get(0).getUri());
+                    addWriterBuffer(schema.getName(), table.getName(), orderedPaths.get(0), compactPaths.get(0));
                 }
             }
         } catch (Exception e)
@@ -191,7 +191,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void addWriterBuffer(String schemaName, String tableName, String orderedDirPath, String compactDirPath) throws RetinaException
+    public void addWriterBuffer(String schemaName, String tableName, Path orderedDirPath, Path compactDirPath) throws RetinaException
     {
         try
         {
