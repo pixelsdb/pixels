@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
@@ -82,7 +83,7 @@ public interface MainIndex extends Closeable
      *
      * @param entry the rowLocation of secondary index
      */
-    boolean getRowId(SecondaryIndex.Entry entry);
+    boolean getRowId(SecondaryIndex.Entry entry) throws RowIdException;
 
     /**
      * Distribute row ids for the secondary index.
@@ -90,7 +91,7 @@ public interface MainIndex extends Closeable
      *
      * @param entries the rowLocation of secondary index
      */
-    boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries);
+    boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries) throws RowIdException;
 
     /**
      * Persist the main index into persistent storage.

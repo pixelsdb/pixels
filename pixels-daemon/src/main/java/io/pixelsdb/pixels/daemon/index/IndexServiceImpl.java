@@ -20,6 +20,10 @@
 package io.pixelsdb.pixels.daemon.index;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.exception.MainIndexException;
+import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.index.IndexProto;
@@ -118,17 +122,29 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     {
         // Get IndexEntry from request
         IndexProto.IndexEntry entry = request.getIndexEntry();
-
-        // Call SecondaryIndex's putEntry method
-        long rowId = secondaryIndex.putEntry(new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()));
-
-        // Create gRPC response
-        IndexProto.PutIndexEntryResponse response = IndexProto.PutIndexEntryResponse.newBuilder()
-                .setRowId(rowId)
-                .build();
-
+        // Create gRPC builder
+        IndexProto.PutIndexEntryResponse.Builder builder = IndexProto.PutIndexEntryResponse.newBuilder();
+        try
+        {
+            // Call SecondaryIndex's putEntry method
+            long rowId = secondaryIndex.putEntry(new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()));
+            // Create gRPC response
+            builder.setRowId(rowId).setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (RowIdException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
+        }
+        catch (SecondaryIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_SECONDARY_INDEX_FAIL);
+        }
         // Send response
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
@@ -138,17 +154,24 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     {
         // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
-
-        // Call SecondaryIndex's deleteEntry method
-        boolean success = secondaryIndex.deleteEntry(key);
-
-        // Create gRPC response
-        IndexProto.DeleteIndexEntryResponse response = IndexProto.DeleteIndexEntryResponse.newBuilder()
-                .setErrorCode(success ? 0 : 1)
-                .build();
-
+        // Create gRPC builder
+        IndexProto.DeleteIndexEntryResponse.Builder builder = IndexProto.DeleteIndexEntryResponse.newBuilder();
+        try
+        {
+            // Call SecondaryIndex's deleteEntry method
+            boolean success = secondaryIndex.deleteEntry(key);
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
+        }
+        catch (SecondaryIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_SECONDARY_INDEX_FAIL);
+        }
         // Send response
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
@@ -160,17 +183,28 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         List<SecondaryIndex.Entry> entries = request.getIndexEntriesList().stream()
                 .map(entry -> new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()))
                 .collect(Collectors.toList());
-
-        // Call SecondaryIndex's putEntries method
-        List<Long> rowIds = secondaryIndex.putEntries(entries);
-
-        // Create gRPC response
-        IndexProto.PutIndexEntriesResponse response = IndexProto.PutIndexEntriesResponse.newBuilder()
-                .addAllRowIds(rowIds)
-                .build();
-
+        // Create gRPC builder
+        IndexProto.PutIndexEntriesResponse.Builder builder  = IndexProto.PutIndexEntriesResponse.newBuilder();
+        try
+        {
+            // Call SecondaryIndex's putEntries method
+            List<Long> rowIds = secondaryIndex.putEntries(entries);
+            builder.addAllRowIds(rowIds).setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (RowIdException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
+        }
+        catch (SecondaryIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_SECONDARY_INDEX_FAIL);
+        }
         // Send response
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
@@ -180,17 +214,24 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     {
         // Get list of IndexKeys from request
         List<IndexProto.IndexKey> keys = request.getIndexKeysList();
-
-        // Call SecondaryIndex's deleteEntries method
-        boolean success = secondaryIndex.deleteEntries(keys);
-
-        // Create gRPC response
-        IndexProto.DeleteIndexEntriesResponse response = IndexProto.DeleteIndexEntriesResponse.newBuilder()
-                .setErrorCode(success ? 0 : 1)
-                .build();
-
+        // Create gRPC builder
+        IndexProto.DeleteIndexEntriesResponse.Builder builder = IndexProto.DeleteIndexEntriesResponse.newBuilder();
+        try
+        {
+            // Call SecondaryIndex's deleteEntries method
+            boolean success = secondaryIndex.deleteEntries(keys);
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
+        }
+        catch (SecondaryIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_SECONDARY_INDEX_FAIL);
+        }
         // Send response
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 }

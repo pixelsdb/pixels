@@ -121,4 +121,12 @@ public class ErrorCode
     public static final int WORKER_COORDINATE_LEASE_EXPIRED = ERROR_WORKER_COORDINATE + 4;
 
     // end error code for transactions
+
+    // error code for index service
+    private static final int ERROR_INDEX_SERVER = ERROR_BASE + 600;
+    public static final int INDEX_PUT_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 1;
+    public static final int INDEX_PUT_SECONDARY_INDEX_FAIL = ERROR_INDEX_SERVER + 2;
+    public static final int INDEX_DELETE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 3;
+    public static final int INDEX_DELETE_SECONDARY_INDEX_FAIL = ERROR_INDEX_SERVER + 4;
+    public static final int INDEX_GET_ROW_ID_FAIL = ERROR_INDEX_SERVER +5;
 }

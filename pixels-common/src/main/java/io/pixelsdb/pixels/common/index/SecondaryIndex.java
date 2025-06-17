@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
+import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
@@ -82,13 +85,13 @@ public interface SecondaryIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-    long putEntry(Entry entry);
+    long putEntry(Entry entry) throws RowIdException, MainIndexException, SecondaryIndexException;
 
-    List<Long> putEntries(List<Entry> entries);
+    List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SecondaryIndexException;
 
-    boolean deleteEntry(IndexProto.IndexKey key);
+    boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SecondaryIndexException;
 
-    boolean deleteEntries(List<IndexProto.IndexKey> keys);
+    boolean deleteEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SecondaryIndexException;
 
     /**
      * Close the secondary index. This method is to be used by the secondary index factory to close the

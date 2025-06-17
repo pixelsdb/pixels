@@ -78,6 +78,7 @@ message PutIndexEntryRequest {
 
 message PutIndexEntryResponse {
   int64 rowId = 1;
+  int32 errorCode = 2;
 }
 
 message DeleteIndexEntryRequest {
@@ -94,6 +95,7 @@ message PutIndexEntriesRequest {
 
 message PutIndexEntriesResponse {
   repeated int64 rowIds = 1;
+  int32 errorCode = 2;
 }
 
 message DeleteIndexEntriesRequest {

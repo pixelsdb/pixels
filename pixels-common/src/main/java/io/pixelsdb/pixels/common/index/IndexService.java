@@ -156,6 +156,10 @@ public class IndexService
                 .setIndexEntry(entry).build();
         // Send request and get response
         IndexProto.PutIndexEntryResponse response = stub.putIndexEntry(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to put index entry, error code=" + response.getErrorCode());
+        }
         return response.getRowId();
     }
 
@@ -178,6 +182,10 @@ public class IndexService
                 .addAllIndexEntries(entries).build();
         // Send request and get response
         IndexProto.PutIndexEntriesResponse response = stub.putIndexEntries(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to put index entries, error code=" + response.getErrorCode());
+        }
         // Return operation success status
         return response.getRowIdsList();
     }

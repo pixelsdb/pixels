@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
+import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
@@ -154,16 +157,20 @@ public class RocksetIndex implements SecondaryIndex
     }
 
     @Override
-    public long putEntry(Entry entry)
+    public long putEntry(Entry entry) throws RowIdException, MainIndexException, SecondaryIndexException
     {
+        // Get rowId for Entry
         try
         {
-            // Get rowId for Entry
-            if(!mainIndex.getRowId(entry))
-            {
-                LOGGER.error("Failed to get rowId for entry {}", entry);
-                return 0;
-            }
+            mainIndex.getRowId(entry);
+        }
+        catch (RowIdException e)
+        {
+            LOGGER.error("Failed to get rowId for entry {}", entry);
+            throw new RowIdException("Failed to get rowId for entry",e);
+        }
+        try
+        {
             // Extract key and rowId from Entry object
             IndexProto.IndexKey key = entry.getKey();
             long rowId = entry.getRowId();
@@ -198,28 +205,31 @@ public class RocksetIndex implements SecondaryIndex
             boolean success = mainIndex.putRowId(rowId, rowLocation);
             if (!success) {
                 LOGGER.error("Failed to put Entry into main index for rowId {}", rowId);
-                return 0;
+                throw new MainIndexException("Failed to put Entry into main index for rowId");
             }
             return rowId;
         }
         catch (RuntimeException e)
         {
             LOGGER.error("Failed to put Entry: {} by entry", entry, e);
-            return 0;
+            throw new SecondaryIndexException("Failed to put Entry",e);
         }
     }
 
     @Override
-    public List<Long> putEntries(List<Entry> entries)
+    public List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SecondaryIndexException
     {
         // Get rowIds for Entries
         List<Long> rowIds = new ArrayList<>();
-        List<Long> empty = new ArrayList<>();
         // Get rowIds for Entries
-        if(!mainIndex.getRgOfRowIds(entries))
+        try
+        {
+            mainIndex.getRgOfRowIds(entries);
+        }
+        catch (RowIdException e)
         {
             LOGGER.error("Failed to get rowId for entries {}", entries);
-            return empty;
+            throw new RowIdException("Failed to get rowId for entries",e);
         }
         try
         {
@@ -259,14 +269,14 @@ public class RocksetIndex implements SecondaryIndex
             boolean success = mainIndex.putRowIdsOfRg(newRange, rgLocation);
             if (!success) {
                 LOGGER.error("Failed to put Entry into main index for rowId RowIdRange [{}-{}]", start, end);
-                return empty;
+                throw new MainIndexException("Failed to put Entry into main index for rowId RowIdRange");
             }
             return rowIds; // All entries written successfully
         }
         catch (RuntimeException e)
         {
             LOGGER.error("Failed to put Entries: {} by entries", entries, e);
-            return empty; // Operation failed
+            throw new SecondaryIndexException("Failed to put Entries",e);
         }
     }
 

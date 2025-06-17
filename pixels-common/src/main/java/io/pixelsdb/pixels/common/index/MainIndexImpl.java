@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.exception.EtcdException;
@@ -161,12 +162,12 @@ public class MainIndexImpl implements MainIndex
         Entry entry = entries.get(index);
         RowIdRange existingRange = entry.getRowIdRange();
 
-        if (existingRange.getStartRowId() == targetRange.getStartRowId()
-                && existingRange.getEndRowId() == targetRange.getEndRowId()) {
+        if (existingRange.getStartRowId() == targetRange.getStartRowId() && existingRange.getEndRowId() == targetRange.getEndRowId()) {
             entries.remove(index);
             dirty = true;
             return true;
-        } else {
+        }
+        else {
             logger.error("Delete failure: RowIdRange [{}-{}] does not exactly match existing range [{}-{}]",
                     targetRange.getStartRowId(), targetRange.getEndRowId(),
                     existingRange.getStartRowId(), existingRange.getEndRowId());
@@ -175,15 +176,14 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean getRowId(SecondaryIndex.Entry entry)
-    {
+    public boolean getRowId(SecondaryIndex.Entry entry) throws RowIdException {
         // Check if cache is empty
         if (rowIdCache.isEmpty()) {
             // Generate a new batch of rowIds into cache
             List<Long> newRowIds = loadRowIdsFromEtcd(BATCH_SIZE);
             if (newRowIds.isEmpty()) {
                 logger.error("Failed to generate single row id");
-                return false;
+                throw new RowIdException("Failed to generate single row id");
             }
             rowIdCache.addAll(newRowIds);
         }
@@ -195,8 +195,7 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries)
-    {
+    public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries) throws RowIdException {
         // Check if remaining rowIds in cache are sufficient
         if (rowIdCache.size() < entries.size()) {
             // If cache is insufficient, generate a new batch of rowIds
@@ -204,7 +203,7 @@ public class MainIndexImpl implements MainIndex
             List<Long> newRowIds = loadRowIdsFromEtcd(Math.max(requiredCount, BATCH_SIZE));
             if (newRowIds.isEmpty()) {
                 logger.error("Failed to generate row ids");
-                return false;
+                throw new RowIdException("Failed to generate single row ids");
             }
             rowIdCache.addAll(newRowIds);
         }
