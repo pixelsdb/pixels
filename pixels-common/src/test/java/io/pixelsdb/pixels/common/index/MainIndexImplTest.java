@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.index;
 import com.google.protobuf.ByteString;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.Assertions;
@@ -180,8 +181,7 @@ public class MainIndexImplTest
     }
 
     @Test
-    public void testGetRowId_NoDataInEtcd()
-    {
+    public void testGetRowId_NoDataInEtcd() throws RowIdException {
         Mockito.when(mockedEtcdUtil.getKeyValuesByPrefix("/rowId/")).thenReturn(new ArrayList<>());
 
         SecondaryIndex.Entry mockEntry = Mockito.mock(SecondaryIndex.Entry.class);

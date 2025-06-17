@@ -19,9 +19,14 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
+import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
 import io.pixelsdb.pixels.index.IndexProto;
+import jdk.tools.jmod.Main;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.rocksdb.*;
@@ -29,6 +34,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -168,12 +174,20 @@ public class RocksDBIndex implements SecondaryIndex
     }
 
     @Override
-    public boolean putEntry(Entry entry)
+    public long putEntry(Entry entry) throws RowIdException, MainIndexException, SecondaryIndexException
     {
+        // Get rowId for Entry
         try
         {
-            // Get rowId for Entry
             mainIndex.getRowId(entry);
+        }
+        catch (RowIdException e)
+        {
+            LOGGER.error("Failed to get rowId for entry {}", entry);
+            throw new RowIdException("Failed to get rowId for entry",e);
+        }
+        try(WriteBatch writeBatch = new WriteBatch())
+        {
             // Extract key and rowId from Entry object
             IndexProto.IndexKey key = entry.getKey();
             long rowId = entry.getRowId();
@@ -185,30 +199,47 @@ public class RocksDBIndex implements SecondaryIndex
             if (unique)
             {
                 // Write to RocksDB
-                rocksDB.put(keyBytes, valueBytes);
+                writeBatch.put(keyBytes, valueBytes);
             }
             else
             {
                 // Create composite key
                 byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
                 // Store in RocksDB
-                rocksDB.put(nonUniqueKey, null);
+                writeBatch.put(nonUniqueKey, null);
             }
-            return true;
+            // Put rowId into MainIndex
+            IndexProto.RowLocation rowLocation = entry.getRowLocation();
+            boolean success = mainIndex.putRowId(rowId, rowLocation);
+            if (!success) {
+                LOGGER.error("Failed to put Entry into main index for rowId {}", rowId);
+                throw new MainIndexException("Failed to put Entry into main index for rowId");
+            }
+            rocksDB.write(new WriteOptions(), writeBatch);
+            return rowId;
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("Failed to put Entry: {} by entry", entry, e);
-            return false;
+            LOGGER.error("Failed to put Entry: {} by entry", entry);
+            throw new SecondaryIndexException("Failed to put Entry",e);
         }
     }
 
     @Override
-    public boolean putEntries(List<Entry> entries)
+    public List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SecondaryIndexException
     {
+        List<Long> rowIds = new ArrayList<>();
         // Get rowIds for Entries
-        mainIndex.getRgOfRowIds(entries);
         try
+        {
+            mainIndex.getRgOfRowIds(entries);
+        }
+        catch (RowIdException e)
+        {
+            LOGGER.error("Failed to get rowId for entries {}", entries);
+            throw new RowIdException("Failed to get rowId for entries",e);
+        }
+        try(WriteBatch writeBatch = new WriteBatch())
         {
             // Process each Entry object
             for (Entry entry : entries)
@@ -216,6 +247,7 @@ public class RocksDBIndex implements SecondaryIndex
                 // Extract key and rowId from Entry object
                 IndexProto.IndexKey key = entry.getKey();
                 long rowId = entry.getRowId();
+                rowIds.add(rowId);
                 boolean unique = entry.getIsUnique();
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
@@ -224,61 +256,104 @@ public class RocksDBIndex implements SecondaryIndex
                 if(unique)
                 {
                     // Write to RocksDB
-                    rocksDB.put(keyBytes, valueBytes);
+                    writeBatch.put(keyBytes, valueBytes);
                 }
                 else
                 {
                     byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
-                    rocksDB.put(nonUniqueKey, null);
+                    writeBatch.put(nonUniqueKey, null);
                 }
             }
-            return true; // All entries written successfully
+            // Select start rowId and end rowId
+            Entry entryStart = entries.get(0);
+            Entry entryEnd = entries.get(entries.size() - 1);
+            long start = entryStart.getRowId();
+            long end = entryEnd.getRowId();
+            // Create new RowIdRange and RgLocation
+            RowIdRange newRange = new RowIdRange(start, end);
+            IndexProto.RowLocation rowLocation = entryStart.getRowLocation();
+            MainIndex.RgLocation rgLocation = new MainIndex.RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
+            // Put RowIds to MainIndex
+            boolean success = mainIndex.putRowIdsOfRg(newRange, rgLocation);
+            if (!success) {
+                LOGGER.error("Failed to put Entry into main index for rowId RowIdRange [{}-{}]", start, end);
+                throw new MainIndexException("Failed to put Entry into main index for rowId RowIdRange");
+            }
+            rocksDB.write(new WriteOptions(), writeBatch);
+            return rowIds;
         }
         catch (RocksDBException e)
         {
             LOGGER.error("Failed to put Entries: {} by entries", entries, e);
-            return false; // Operation failed
+            throw new SecondaryIndexException("Failed to put Entries",e);
         }
     }
 
     @Override
-    public boolean deleteEntry(IndexProto.IndexKey key)
+    public boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SecondaryIndexException
     {
-        try
+        try(WriteBatch writeBatch = new WriteBatch())
         {
             // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
-
+            // Get RowId in order to delete MainIndex
+            long rowId = getUniqueRowId(key);
             // Delete key-value pair from RocksDB
-            rocksDB.delete(keyBytes);
+            writeBatch.delete(keyBytes);
+            // Delete MainIndex
+            boolean success = mainIndex.deleteRowId(rowId);
+            if (!success) {
+                LOGGER.error("Failed to delete Entry of main index for rowId {}", rowId);
+                throw new MainIndexException("Failed to delete Entry of main index for rowId");
+            }
+            rocksDB.write(new WriteOptions(), writeBatch);
             return true;
         }
         catch (RocksDBException e)
         {
             LOGGER.error("Failed to delete Entry: {}", key, e);
-            return false;
+            throw new SecondaryIndexException("Failed to delete Entry",e);
         }
     }
 
     @Override
-    public boolean deleteEntries(List<IndexProto.IndexKey> keys)
+    public boolean deleteEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SecondaryIndexException
     {
-        try
+        try(WriteBatch writeBatch = new WriteBatch())
         {
+            List<Long> rowIds = new ArrayList<>();
+            // Delete Secondary Index
             for(IndexProto.IndexKey key : keys)
             {
+                // Get rowId
+                long rowId = getUniqueRowId(key);
+                rowIds.add(rowId);
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
-
                 // Delete key-value pair from RocksDB
-                rocksDB.delete(keyBytes);
+                writeBatch.delete(keyBytes);
             }
+            if (rowIds.isEmpty()) {
+                LOGGER.warn("No rowIds found for keys: {}", keys);
+                throw new MainIndexException("No rowIds found for keys");
+            }
+            // Found start rowId and end rowId
+            long start = Collections.min(rowIds);
+            long end = Collections.max(rowIds);
+            RowIdRange newRange = new RowIdRange(start, end);
+            // Delete MainIndex
+            boolean success = mainIndex.deleteRowIdRange(newRange);
+            if (!success) {
+                LOGGER.error("Failed to delete Entry of main index for rowId RowIdRange [{}-{}]", start, end);
+                throw new MainIndexException("Failed to delete Entry of main index for rowId RowIdRange");
+            }
+            rocksDB.write(new WriteOptions(), writeBatch);
             return true;
         }
         catch (RocksDBException e)
         {
             LOGGER.error("Failed to delete Entries: {}", keys, e);
-            return false;
+            throw new SecondaryIndexException("Failed to delete Entries",e);
         }
     }
 

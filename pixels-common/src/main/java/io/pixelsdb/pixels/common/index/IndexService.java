@@ -150,7 +150,7 @@ public class IndexService
         return response.getRowLocationList();
     }
 
-    public boolean putIndexEntry(IndexProto.IndexEntry entry) throws IndexException {
+    public long putIndexEntry(IndexProto.IndexEntry entry) throws IndexException {
         // Create gRPC request
         IndexProto.PutIndexEntryRequest request = IndexProto.PutIndexEntryRequest.newBuilder()
                 .setIndexEntry(entry).build();
@@ -160,7 +160,7 @@ public class IndexService
         {
             throw new IndexException("failed to put index entry, error code=" + response.getErrorCode());
         }
-        return true;
+        return response.getRowId();
     }
 
     public boolean deleteIndexEntry(IndexProto.IndexKey key) throws IndexException {
@@ -176,18 +176,18 @@ public class IndexService
         return true;
     }
 
-    public boolean putIndexEntries(List<IndexProto.IndexEntry> entries) throws IndexException {
+    public List<Long> putIndexEntries(List<IndexProto.IndexEntry> entries) throws IndexException {
         // Create gRPC request
         IndexProto.PutIndexEntriesRequest request = IndexProto.PutIndexEntriesRequest.newBuilder()
                 .addAllIndexEntries(entries).build();
         // Send request and get response
         IndexProto.PutIndexEntriesResponse response = stub.putIndexEntries(request);
-        // Return operation success status
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to put index entries, error code=" + response.getErrorCode());
         }
-        return true;
+        // Return operation success status
+        return response.getRowIdsList();
     }
 
     public boolean deleteIndexEntries(List<IndexProto.IndexKey> keys) throws IndexException {

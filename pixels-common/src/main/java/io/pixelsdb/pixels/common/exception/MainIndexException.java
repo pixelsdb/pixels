@@ -19,27 +19,23 @@
  */
 package io.pixelsdb.pixels.common.exception;
 
-/**
- * @author Rolland1944
- * @create 2025-03-01
- */
-public class IndexException extends Exception {
-    public IndexException()
+public class MainIndexException extends IndexException {
+    public MainIndexException()
     {
         super();
     }
 
-    public IndexException(String message)
+    public MainIndexException(String message)
     {
         super(message);
     }
 
-    public IndexException(Throwable cause)
+    public MainIndexException(Throwable cause)
     {
         super(cause);
     }
 
-    public IndexException(String message, Throwable cause)
+    public MainIndexException(String message, Throwable cause)
     {
         super(message, cause);
     }

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.exception.EtcdException;
@@ -89,50 +90,100 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
+    public boolean putRowId(long rowId, IndexProto.RowLocation rowLocation)
+    {
+        RowIdRange newRange = new RowIdRange(rowId, rowId);
+        RgLocation rgLocation = new RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
+        return putRowIdsOfRg(newRange, rgLocation);
+    }
+
+    @Override
+    public  boolean deleteRowId(long rowId)
+    {
+        int index = binarySearch(rowId);
+        if (index < 0) {
+            logger.error("Delete failure: RowId {} not found", rowId);
+            return false;
+        }
+
+        Entry entry = entries.get(index);
+        RowIdRange original = entry.getRowIdRange();
+
+        long start = original.getStartRowId();
+        long end = original.getEndRowId();
+
+        entries.remove(index);
+        // In-place insert the remaining entries
+        if (rowId > start) {
+            entries.add(index, new Entry(new RowIdRange(start, rowId - 1), entry.getRgLocation()));
+            index++;
+        }
+        if (rowId < end) {
+            entries.add(index, new Entry(new RowIdRange(rowId + 1, end), entry.getRgLocation()));
+        }
+
+        dirty = true;
+        return true;
+    }
+
+    @Override
     public boolean putRowIdsOfRg(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
     {
-        // Check if rowIdRangeOfRg overlaps with existing ranges
-        if (isOverlapping(rowIdRangeOfRg)) {
-            return false; // Insertion fails if overlapping
+        long start = rowIdRangeOfRg.getStartRowId();
+        long end = rowIdRangeOfRg.getEndRowId();
+        if (start > end) {
+            logger.error("Invalid RowIdRange: startRowId {} > endRowId {}", start, end);
+            return false;
         }
 
-        // Create new Entry and add to entries
-        Entry newEntry = new Entry(rowIdRangeOfRg, rgLocation);
-        entries.add(newEntry);
+        // Check whether it conflicts with the last entry.
+        if (!entries.isEmpty()) {
+            RowIdRange lastRange = entries.get(entries.size() - 1).getRowIdRange();
+            if (start <= lastRange.getEndRowId()) {
+                logger.error("Insert failure: RowIdRange [{}-{}] overlaps with previous [{}-{}]",
+                        start, end, lastRange.getStartRowId(), lastRange.getEndRowId());
+                return false;
+            }
+        }
 
-        // Sort entries by startRowId to maintain order
-        entries.sort((e1, e2) -> Long.compare(e1.getRowIdRange().getStartRowId(), e2.getRowIdRange().getStartRowId()));
-
-        // Set dirty flag
+        entries.add(new Entry(rowIdRangeOfRg, rgLocation));
         dirty = true;
-
         return true;
     }
 
     @Override
-    public boolean deleteRowIdRange(RowIdRange rowIdRange)
-    {
-        // Find and remove Entries overlapping with rowIdRange
-        boolean removed = entries.removeIf(entry -> isOverlapping(entry.getRowIdRange(), rowIdRange));
-
-        // Set dirty flag
-        if (removed) {
-            dirty = true;
+    public boolean deleteRowIdRange(RowIdRange targetRange) {
+        int index = binarySearch(targetRange.getStartRowId());
+        if (index < 0) {
+            logger.error("Delete failure: RowIdRange [{}-{}] not found", targetRange.getStartRowId(), targetRange.getEndRowId());
+            return false;
         }
 
-        return true;
+        Entry entry = entries.get(index);
+        RowIdRange existingRange = entry.getRowIdRange();
+
+        if (existingRange.getStartRowId() == targetRange.getStartRowId() && existingRange.getEndRowId() == targetRange.getEndRowId()) {
+            entries.remove(index);
+            dirty = true;
+            return true;
+        }
+        else {
+            logger.error("Delete failure: RowIdRange [{}-{}] does not exactly match existing range [{}-{}]",
+                    targetRange.getStartRowId(), targetRange.getEndRowId(),
+                    existingRange.getStartRowId(), existingRange.getEndRowId());
+            return false;
+        }
     }
 
     @Override
-    public boolean getRowId(SecondaryIndex.Entry entry)
-    {
+    public boolean getRowId(SecondaryIndex.Entry entry) throws RowIdException {
         // Check if cache is empty
         if (rowIdCache.isEmpty()) {
             // Generate a new batch of rowIds into cache
             List<Long> newRowIds = loadRowIdsFromEtcd(BATCH_SIZE);
             if (newRowIds.isEmpty()) {
-                logger.error("Failed to generate row ids");
-                return false;
+                logger.error("Failed to generate single row id");
+                throw new RowIdException("Failed to generate single row id");
             }
             rowIdCache.addAll(newRowIds);
         }
@@ -144,8 +195,7 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries)
-    {
+    public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries) throws RowIdException {
         // Check if remaining rowIds in cache are sufficient
         if (rowIdCache.size() < entries.size()) {
             // If cache is insufficient, generate a new batch of rowIds
@@ -153,7 +203,7 @@ public class MainIndexImpl implements MainIndex
             List<Long> newRowIds = loadRowIdsFromEtcd(Math.max(requiredCount, BATCH_SIZE));
             if (newRowIds.isEmpty()) {
                 logger.error("Failed to generate row ids");
-                return false;
+                throw new RowIdException("Failed to generate single row ids");
             }
             rowIdCache.addAll(newRowIds);
         }
