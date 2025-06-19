@@ -20,18 +20,19 @@
 package io.pixelsdb.pixels.common.index;
 
 import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.lock.EtcdAutoIncrement;
 import io.pixelsdb.pixels.index.IndexProto;
-import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author hank, Rolland1944
@@ -41,12 +42,25 @@ public class MainIndexImpl implements MainIndex
 {
     private static final Logger logger = LogManager.getLogger(MainIndexImpl.class);
     // Cache for storing generated rowIds
-    private final List<Long> rowIdCache = new ArrayList<>();
+    private final Queue<Long> rowIdCache = new ConcurrentLinkedQueue<>();
     // Assumed batch size for generating rowIds
-    private static final int BATCH_SIZE = 100000;
+    private static final int BATCH_SIZE = 1;
+    // The etcd auto-increment key
+    private static final String ROW_ID_KEY = "rowId/auto";
     // Get the singleton instance of EtcdUtil
     EtcdUtil etcdUtil = EtcdUtil.Instance();
-    private boolean dirty = false; // Dirty flag
+    // Read-Write lock
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+    // Dirty flag
+    private boolean dirty = false;
+
+    public MainIndexImpl() {
+        try {
+            EtcdAutoIncrement.InitId(ROW_ID_KEY);  // 初始化 auto-increment ID
+        } catch (EtcdException e) {
+            throw new RuntimeException("Failed to initialize auto-increment ID in etcd", e);
+        }
+    }
 
     public static class Entry
     {
@@ -111,7 +125,8 @@ public class MainIndexImpl implements MainIndex
 
         long start = original.getStartRowId();
         long end = original.getEndRowId();
-
+        // lock
+        rwLock.writeLock().lock();
         entries.remove(index);
         // In-place insert the remaining entries
         if (rowId > start) {
@@ -121,7 +136,7 @@ public class MainIndexImpl implements MainIndex
         if (rowId < end) {
             entries.add(index, new Entry(new RowIdRange(rowId + 1, end), entry.getRgLocation()));
         }
-
+        rwLock.writeLock().unlock();
         dirty = true;
         return true;
     }
@@ -145,8 +160,9 @@ public class MainIndexImpl implements MainIndex
                 return false;
             }
         }
-
+        rwLock.writeLock().lock();
         entries.add(new Entry(rowIdRangeOfRg, rgLocation));
+        rwLock.writeLock().unlock();
         dirty = true;
         return true;
     }
@@ -163,7 +179,9 @@ public class MainIndexImpl implements MainIndex
         RowIdRange existingRange = entry.getRowIdRange();
 
         if (existingRange.getStartRowId() == targetRange.getStartRowId() && existingRange.getEndRowId() == targetRange.getEndRowId()) {
+            rwLock.writeLock().lock();
             entries.remove(index);
+            rwLock.writeLock().unlock();
             dirty = true;
             return true;
         }
@@ -173,44 +191,33 @@ public class MainIndexImpl implements MainIndex
                     existingRange.getStartRowId(), existingRange.getEndRowId());
             return false;
         }
+
     }
 
     @Override
     public boolean getRowId(SecondaryIndex.Entry entry) throws RowIdException {
-        // Check if cache is empty
-        if (rowIdCache.isEmpty()) {
-            // Generate a new batch of rowIds into cache
-            List<Long> newRowIds = loadRowIdsFromEtcd(BATCH_SIZE);
-            if (newRowIds.isEmpty()) {
-                logger.error("Failed to generate single row id");
-                throw new RowIdException("Failed to generate single row id");
-            }
-            rowIdCache.addAll(newRowIds);
+        ensureRowIdsAvailable(1);
+        Long rowId = rowIdCache.poll();
+        if (rowId == null) {
+            logger.error("Failed to generate rowId");
+            throw new RowIdException("Failed to generate single row id");
         }
-        // Get the first rowId from cache
-        long rowId = rowIdCache.remove(0);
-        // Set the rowId in IndexEntry
         entry.setRowId(rowId);
         return true;
     }
 
     @Override
     public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries) throws RowIdException {
-        // Check if remaining rowIds in cache are sufficient
-        if (rowIdCache.size() < entries.size()) {
-            // If cache is insufficient, generate a new batch of rowIds
-            int requiredCount = entries.size() - rowIdCache.size();
-            List<Long> newRowIds = loadRowIdsFromEtcd(Math.max(requiredCount, BATCH_SIZE));
-            if (newRowIds.isEmpty()) {
-                logger.error("Failed to generate row ids");
-                throw new RowIdException("Failed to generate single row ids");
-            }
-            rowIdCache.addAll(newRowIds);
-        }
-        // Assign a rowId to each IndexEntry
+        int needed = entries.size();
+        ensureRowIdsAvailable(needed);
+
         for (SecondaryIndex.Entry entry : entries) {
-            long rowId = rowIdCache.remove(0); // Get a rowId from cache
-            entry.setRowId(rowId);  // Set the rowId
+            Long rowId = rowIdCache.poll();
+            if (rowId == null) {
+                logger.error("Insufficient rowIds available in cache");
+                throw new RowIdException("Failed to generate single row id");
+            }
+            entry.setRowId(rowId);
         }
         return true;
     }
@@ -300,36 +307,36 @@ public class MainIndexImpl implements MainIndex
         return false;
     }
 
-    // Load a batch of rowIds from etcd
-    private List<Long> loadRowIdsFromEtcd(int count)
-    {
-        List<Long> rowIds = new ArrayList<>();
-        // Read all key-values with prefix /rowId/ from etcd
-        List<KeyValue> keyValues = etcdUtil.getKeyValuesByPrefix("/rowId/");
-
-        // Iterate through key-values to extract rowIds
-        for (KeyValue kv : keyValues) {
-            String key = kv.getKey().toString(StandardCharsets.UTF_8);
-            // Assume key format is /rowId/{rowId}
+    // Ensures the rowId cache contains at least `requiredCount` IDs
+    // If not, load BATCH_SIZE number of rowIds from etcd
+    private void ensureRowIdsAvailable(int requiredCount) throws RowIdException {
+        if (rowIdCache.size() >= requiredCount) {
+            return;
+        }
+        // Lock
+        synchronized (this) {
+            // Double-check locking
+            if (rowIdCache.size() >= requiredCount) {
+                return;
+            }
             try {
-                long rowId = Long.parseLong(key.substring("/rowId/".length()));
-                rowIds.add(rowId);
-                if (rowIds.size() >= count) {
-                    break; // Stop when required count is reached
+                long step = Math.max(BATCH_SIZE, requiredCount);
+                EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(ROW_ID_KEY, step);
+                long start = segment.getStart();
+                long end = start + segment.getLength();
+
+                for (long i = start; i < end; i++) {
+                    rowIdCache.add(i);
                 }
-            } catch (NumberFormatException e) {
-                // Skip if key format is invalid
-                logger.error("Invalid rowId format in etcd key: {}", key, e);
+
+                logger.info("Generated {} new rowIds ({} ~ {})", segment.getLength(), start, end - 1);
+            } catch (EtcdException e) {
+                logger.error("Failed to generate rowIds from EtcdAutoIncrement", e);
+                throw new RowIdException("Failed to generate rowIds from EtcdAutoIncrement", e);
             }
         }
-        // Batch delete these rowIds
-        if (!rowIds.isEmpty()) {
-            for (long rowId : rowIds) {
-                etcdUtil.delete("/rowId/" + rowId);
-            }
-        }
-        return rowIds;
     }
+
 
     // Serialize Entry
     private String serializeEntry(Entry entry)

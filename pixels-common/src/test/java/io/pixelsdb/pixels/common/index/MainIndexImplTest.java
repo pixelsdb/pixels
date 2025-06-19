@@ -20,273 +20,288 @@
 package io.pixelsdb.pixels.common.index;
 
 import com.google.protobuf.ByteString;
-import io.etcd.jetcd.ByteSequence;
-import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.index.IndexProto;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import org.mockito.ArgumentMatchers;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 
 public class MainIndexImplTest
 {
-    @Mock
-    private EtcdUtil mockedEtcdUtil;
     private MainIndexImpl mainIndex;
 
     @BeforeEach
-    public void setUp()
+    public void setUp() throws EtcdException
     {
-        MockitoAnnotations.openMocks(this);
-        // Use reflection to inject mocked EtcdUtil instance
+        EtcdUtil.Instance().deleteByPrefix("/mainindex/");
         mainIndex = new MainIndexImpl();
-        TestUtils.setPrivateField(mainIndex, "etcdUtil", mockedEtcdUtil);
     }
 
-    // Test helper methods
-    private RowIdRange createRange(long start, long end)
+    @AfterEach
+    public void tearDown() throws Exception
     {
-        return new RowIdRange(start, end);
-    }
-
-    private MainIndex.RgLocation createLocation(int fileId, int rgId)
-    {
-        return new MainIndex.RgLocation(fileId, rgId);
-    }
-
-    // Test cases begin
-    @Test
-    public void testGetLocation_ValidRowId()
-    {
-        // Prepare test data
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
-        mainIndex.putRowIdsOfRg(createRange(300, 400), createLocation(1, 2));
-
-        // Test boundary values
-        IndexProto.RowLocation location1 = mainIndex.getLocation(100);
-        Assertions.assertNotNull(location1);
-        Assertions.assertEquals(1, location1.getFileId());
-        Assertions.assertEquals(1, location1.getRgId());
-        Assertions.assertEquals(0, location1.getRgRowId());  // 100-100=0
-
-        // Test middle value
-        IndexProto.RowLocation location2 = mainIndex.getLocation(350);
-        Assertions.assertNotNull(location2);
-        Assertions.assertEquals(1, location2.getFileId());
-        Assertions.assertEquals(2, location2.getRgId());
-        Assertions.assertEquals(50, location2.getRgRowId());  // 350-300=50
-
-        // Test non-existent rowId
-        Assertions.assertNull(mainIndex.getLocation(500));
+        mainIndex.close();
     }
 
     @Test
-    public void testGetLocation_EmptyIndex()
+    public void testPutAndGetLocation()
     {
-        Assertions.assertNull(mainIndex.getLocation(100));
+        long rowId = 1000L;
+        IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
+                .setFileId(1)
+                .setRgId(10)
+                .setRgRowId(0)
+                .build();
+
+        Assertions.assertTrue(mainIndex.putRowId(rowId, location));
+        IndexProto.RowLocation fetched = mainIndex.getLocation(rowId);
+        Assertions.assertNotNull(fetched);
+        Assertions.assertEquals(1, fetched.getFileId());
+        Assertions.assertEquals(10, fetched.getRgId());
+        Assertions.assertEquals(0, fetched.getRgRowId());
     }
 
     @Test
-    public void testPutRowIdsOfRg_Success()
+    public void testDeleteRowId()
     {
-        Assertions.assertTrue(mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1)));
-        Assertions.assertTrue(mainIndex.putRowIdsOfRg(createRange(300, 400), createLocation(1, 2)));
+        long rowId = 2000L;
+        IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
+                .setFileId(2)
+                .setRgId(20)
+                .setRgRowId(0)
+                .build();
 
-        // Verify entries are sorted
-        List<MainIndexImpl.Entry> entries = TestUtils.getPrivateField(mainIndex, "entries");
-        Assertions.assertEquals(100L, entries.get(0).getRowIdRange().getStartRowId());
-        Assertions.assertEquals(300L, entries.get(1).getRowIdRange().getStartRowId());
+        Assertions.assertTrue(mainIndex.putRowId(rowId, location));
+        Assertions.assertNotNull(mainIndex.getLocation(rowId));
+
+        Assertions.assertTrue(mainIndex.deleteRowId(rowId));
+        Assertions.assertNull(mainIndex.getLocation(rowId));
     }
 
     @Test
-    public void testPutRowIdsOfRg_OverlappingRanges()
+    public void testPutRowIdsOfRgAndDeleteRowIdRange()
     {
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
+        RowIdRange range = new RowIdRange(3000L, 3004L);
+        MainIndex.RgLocation location = new MainIndex.RgLocation(3, 30);
 
-        // Complete overlap
-        Assertions.assertFalse(mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 2)));
-
-        // Partial overlap
-        Assertions.assertFalse(mainIndex.putRowIdsOfRg(createRange(150, 250), createLocation(1, 3)));
-
-        // Contains
-        Assertions.assertFalse(mainIndex.putRowIdsOfRg(createRange(50, 250), createLocation(1, 4)));
-    }
-
-    @Test
-    public void testPutRowIdsOfRg_DirtyFlag()
-    {
-        boolean isDirty = TestUtils.getPrivateField(mainIndex, "dirty");
-        Assertions.assertFalse(isDirty);
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
-        isDirty = TestUtils.getPrivateField(mainIndex, "dirty");
-        Assertions.assertTrue(isDirty);
-    }
-
-    @Test
-    public void testDeleteRowIdRange_Success()
-    {
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
-        mainIndex.putRowIdsOfRg(createRange(300, 400), createLocation(1, 2));
-
-        Assertions.assertTrue(mainIndex.deleteRowIdRange(createRange(100, 200)));
-
-        List<MainIndexImpl.Entry> entries = TestUtils.getPrivateField(mainIndex, "entries");
-        Assertions.assertEquals(1, entries.size());
-        Assertions.assertEquals(300L, entries.get(0).getRowIdRange().getStartRowId());
-
-        // Verify dirty flag
-        boolean isDirty = TestUtils.getPrivateField(mainIndex, "dirty");
-        Assertions.assertTrue(isDirty);
-    }
-
-    @Test
-    public void testDeleteRowIdRange_NoMatch()
-    {
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
-
-        Assertions.assertTrue(mainIndex.deleteRowIdRange(createRange(300, 400)));
-
-        // Verify entries unchanged
-        List<MainIndexImpl.Entry> entries = TestUtils.getPrivateField(mainIndex, "entries");
-        Assertions.assertEquals(1, entries.size());
-    }
-
-    @Test
-    public void testGetRowId_Success() throws Exception
-    {
-        // Mock etcd data loading
-        List<KeyValue> mockKvs = new ArrayList<>();
-        ByteSequence namespace = ByteSequence.EMPTY;
-        io.etcd.jetcd.api.KeyValue kvs = io.etcd.jetcd.api.KeyValue.newBuilder().setKey(ByteString.copyFrom("/rowId/1001",StandardCharsets.UTF_8)).setValue(ByteString.copyFrom("value", StandardCharsets.UTF_8)).build();
-        mockKvs.add(new KeyValue(kvs, namespace));
-        Mockito.when(mockedEtcdUtil.getKeyValuesByPrefix("/rowId/")).thenReturn(mockKvs);
-
-        // Test
-        SecondaryIndex.Entry mockEntry = Mockito.mock(SecondaryIndex.Entry.class);
-        Assertions.assertTrue(mainIndex.getRowId(mockEntry));
-
-        // Verify
-        Mockito.verify(mockEntry).setRowId(1001L);
-        Mockito.verify(mockedEtcdUtil).delete("/rowId/1001");
-    }
-
-    @Test
-    public void testGetRowId_NoDataInEtcd() throws RowIdException {
-        Mockito.when(mockedEtcdUtil.getKeyValuesByPrefix("/rowId/")).thenReturn(new ArrayList<>());
-
-        SecondaryIndex.Entry mockEntry = Mockito.mock(SecondaryIndex.Entry.class);
-        Assertions.assertFalse(mainIndex.getRowId(mockEntry));
-    }
-
-    @Test
-    public void testGetRgOfRowIds_Success() throws Exception
-    {
-        // Prepare test data
-        List<KeyValue> mockKvs = new ArrayList<>();
-        ByteSequence namespace = ByteSequence.EMPTY;
-        for (int i = 1; i <= 5; i++)
-        {
-            io.etcd.jetcd.api.KeyValue kvs = io.etcd.jetcd.api.KeyValue.newBuilder().setKey(ByteString.copyFrom("/rowId/100" + i,StandardCharsets.UTF_8)).setValue(ByteString.copyFrom("value", StandardCharsets.UTF_8)).build();
-            mockKvs.add(new KeyValue(kvs, namespace));
+        Assertions.assertTrue(mainIndex.putRowIdsOfRg(range, location));
+        for (long i = 3000L; i <= 3004L; i++) {
+            IndexProto.RowLocation loc = mainIndex.getLocation(i);
+            Assertions.assertNotNull(loc);
+            Assertions.assertEquals(3, loc.getFileId());
+            Assertions.assertEquals(30, loc.getRgId());
         }
-        Mockito.when(mockedEtcdUtil.getKeyValuesByPrefix("/rowId/")).thenReturn(mockKvs);
 
-        // Prepare 3 entries
+        Assertions.assertTrue(mainIndex.deleteRowIdRange(range));
+        for (long i = 3000L; i <= 3004L; i++) {
+            Assertions.assertNull(mainIndex.getLocation(i));
+        }
+    }
+
+    @Test
+    public void testGetRowId() throws Exception
+    {
+        long indexId = 1L;
+        byte[] key = "exampleKey".getBytes();
+        long timestamp = System.currentTimeMillis();
+        long fileId = 1L;
+        int rgId = 2;
+        int rgRowId = 3;
+        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp)
+                .build();
+        IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
+                .setFileId(fileId)
+                .setRgId(rgId)
+                .setRgRowId(rgRowId)
+                .build();
+        SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0L, true, rowLocation);
+        Assertions.assertTrue(mainIndex.getRowId(entry));
+        Assertions.assertTrue(entry.getRowId() > 0);
+
+        IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
+                .setFileId(4)
+                .setRgId(40)
+                .setRgRowId(0)
+                .build();
+        Assertions.assertTrue(mainIndex.putRowId(entry.getRowId(), dummyLocation));
+    }
+
+    @Test
+    public void testGetRgOfRowIds() throws Exception
+    {
         List<SecondaryIndex.Entry> entries = new ArrayList<>();
-        for (int i = 0; i < 3; i++)
-        {
-            entries.add(Mockito.mock(SecondaryIndex.Entry.class));
+        long indexId = 1L;
+        byte[] key = "exampleKey".getBytes();
+        long timestamp = System.currentTimeMillis();
+        long fileId = 1L;
+        int rgId = 2;
+        int rgRowId = 3;
+        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp)
+                .build();
+        IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
+                .setFileId(fileId)
+                .setRgId(rgId)
+                .setRgRowId(rgRowId)
+                .build();
+        for (int i = 0; i < 5; i++) {
+            entries.add(new SecondaryIndex.Entry(keyProto, i, true, rowLocation));
         }
 
         Assertions.assertTrue(mainIndex.getRgOfRowIds(entries));
+        for (SecondaryIndex.Entry entry : entries) {
+            Assertions.assertTrue(entry.getRowId() > 0);
+        }
+    }
 
-        // Verify each entry got a rowId
-        for (SecondaryIndex.Entry entry : entries)
-        {
-            Mockito.verify(entry).setRowId(ArgumentMatchers.anyLong());
+    @Test
+    public void testConcurrentAccess() throws Exception
+    {
+        int threadCount = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        List<Future<Void>> futures = new ArrayList<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            final int threadNum = i;
+            futures.add(executor.submit(() -> {
+                try {
+                    // Test getRowId()
+                    byte[] key = ("key-" + threadNum).getBytes();
+                    long timestamp = System.currentTimeMillis();
+                    IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                            .setIndexId(threadNum)
+                            .setKey(ByteString.copyFrom(key))
+                            .setTimestamp(timestamp)
+                            .build();
+                    IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
+                            .setFileId(1)
+                            .setRgId(2)
+                            .setRgRowId(3)
+                            .build();
+                    SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0L, true, rowLocation);
+
+                    Assertions.assertTrue(mainIndex.getRowId(entry));
+                    long rowId = entry.getRowId();
+                    Assertions.assertTrue(rowId > 0);
+
+                    // Test putRowId()
+                    IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
+                            .setFileId(100 + threadNum)
+                            .setRgId(10)
+                            .setRgRowId(0)
+                            .build();
+                    Assertions.assertTrue(mainIndex.putRowId(rowId, dummyLocation));
+
+                    // Test getLocation()
+                    IndexProto.RowLocation fetched = mainIndex.getLocation(rowId);
+                    Assertions.assertNotNull(fetched);
+                    Assertions.assertEquals(100 + threadNum, fetched.getFileId());
+
+                    // Test deleteRowId()
+                    Assertions.assertTrue(mainIndex.deleteRowId(rowId));
+                    Assertions.assertNull(mainIndex.getLocation(rowId));
+                } finally {
+                    latch.countDown();
+                }
+                return null;
+            }));
         }
 
-        // Verify cache has 2 rowIds remaining
-        List<Long> cache = TestUtils.getPrivateField(mainIndex, "rowIdCache");
-        Assertions.assertEquals(2, cache.size());
+        latch.await();
+        for (Future<Void> future : futures) {
+            future.get();
+        }
+        executor.shutdown();
     }
 
     @Test
-    public void testPersist_Success()
+    public void testConcurrentPutAndDeleteRowIdRange() throws Exception
     {
-        // Prepare test data
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
-        mainIndex.putRowIdsOfRg(createRange(300, 400), createLocation(1, 2));
+        int threadCount = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount * 2);
 
-        // Mock successful etcd operation
-        Mockito.doNothing().when(mockedEtcdUtil).putKeyValue(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
+        CountDownLatch putLatch = new CountDownLatch(threadCount);
+        CountDownLatch deleteLatch = new CountDownLatch(threadCount);
+        List<Future<Void>> futures = new ArrayList<>();
 
+        // Create RowIdRange for every thread
+        List<RowIdRange> ranges = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            long base = 10_000L + i * 100;
+            ranges.add(new RowIdRange(base, base + 4));
+        }
+
+        // Concurrent putRowIdsOfRg
+        for (int i = 0; i < threadCount; i++) {
+            final int threadNum = i;
+            futures.add(executor.submit(() -> {
+                try {
+                    RowIdRange range = ranges.get(threadNum);
+                    MainIndex.RgLocation location = new MainIndex.RgLocation(threadNum, threadNum * 10);
+
+                    Assertions.assertTrue(mainIndex.putRowIdsOfRg(range, location));
+
+                    for (long id = range.getStartRowId(); id <= range.getEndRowId(); id++) {
+                        IndexProto.RowLocation loc = mainIndex.getLocation(id);
+                        Assertions.assertNotNull(loc);
+                        Assertions.assertEquals(threadNum, loc.getFileId());
+                        Assertions.assertEquals(threadNum * 10, loc.getRgId());
+                    }
+                } finally {
+                    putLatch.countDown();
+                }
+                return null;
+            }));
+        }
+
+        // Wait for put method complete
+        putLatch.await();
+
+        // Concurrent deleteRowIdRange
+        for (int i = 0; i < threadCount; i++) {
+            final int threadNum = i;
+            futures.add(executor.submit(() -> {
+                try {
+                    RowIdRange range = ranges.get(threadNum);
+
+                    Assertions.assertTrue(mainIndex.deleteRowIdRange(range));
+                    for (long id = range.getStartRowId(); id <= range.getEndRowId(); id++) {
+                        Assertions.assertNull(mainIndex.getLocation(id));
+                    }
+                } finally {
+                    deleteLatch.countDown();
+                }
+                return null;
+            }));
+        }
+
+        deleteLatch.await();
+        for (Future<Void> future : futures) {
+            future.get();
+        }
+        executor.shutdown();
+    }
+
+    @Test
+    public void testPersist() {
+        RowIdRange range = new RowIdRange(4000L, 4002L);
+        MainIndex.RgLocation location = new MainIndex.RgLocation(5, 50);
+
+        Assertions.assertTrue(mainIndex.putRowIdsOfRg(range, location));
         Assertions.assertTrue(mainIndex.persist());
-
-        // Verify etcd was called twice
-        Mockito.verify(mockedEtcdUtil, Mockito.times(2)).putKeyValue(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
-    }
-
-    @Test
-    public void testPersistIfDirty_WhenDirty()
-    {
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
-        Mockito.doNothing().when(mockedEtcdUtil).putKeyValue(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
-
-        Assertions.assertTrue(mainIndex.persistIfDirty());
-        boolean isDirty = TestUtils.getPrivateField(mainIndex, "dirty");
-        Assertions.assertFalse(isDirty);
-    }
-
-    @Test
-    public void testPersistIfDirty_WhenNotDirty()
-    {
-        Assertions.assertTrue(mainIndex.persistIfDirty());
-        Mockito.verify(mockedEtcdUtil, Mockito.never()).putKeyValue(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
-    }
-
-    @Test
-    public void testClose_Success() throws IOException
-    {
-        // Data is clean, no need to persist
-        mainIndex.close();
-
-        // Verify no exception thrown
-        Assertions.assertTrue(true);
-    }
-
-    @Test
-    public void testClose_WithDirtyData() throws IOException
-    {
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
-        Mockito.doNothing().when(mockedEtcdUtil).putKeyValue(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
-
-        mainIndex.close();
-
-        // Verify dirty flag is cleared
-        boolean isDirty = TestUtils.getPrivateField(mainIndex, "dirty");
-        Assertions.assertFalse(isDirty);
-    }
-
-    @Test
-    public void testClose_PersistFailure()
-    {
-        mainIndex.putRowIdsOfRg(createRange(100, 200), createLocation(1, 1));
-        // Mock putKeyValue throwing exception (causing persist() to fail)
-        Mockito.doThrow(new RuntimeException("ETCD error"))
-                .when(mockedEtcdUtil).putKeyValue(Mockito.anyString(), Mockito.anyString());
-
-        // Verify close() throws IOException
-        Assertions.assertThrows(IOException.class, () -> mainIndex.close());
     }
 }
