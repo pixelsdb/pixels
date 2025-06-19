@@ -23,15 +23,22 @@ public class ObjectEntry implements Referenceable
 {
     private final ReferenceCounter refCounter = new ReferenceCounter();
     private final long id;
+    private long size;
 
-    public ObjectEntry(long id)
+    public ObjectEntry(long id, long size)
     {
         this.id = id;
+        this.size = size;
     }
 
     public long getId()
     {
         return id;
+    }
+
+    public long getSize()
+    {
+        return this.size;
     }
 
     @Override

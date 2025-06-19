@@ -31,15 +31,53 @@ public class MemTable implements Referenceable
     private final long id;  // unique identifier
     private final TypeDescription schema;
     private final VectorizedRowBatch rowBatch;
+    private long size;
 
     public MemTable(long id, TypeDescription schema, int pixelStride, int mode)
     {
         this.id = id;
         this.schema = schema;
         this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, mode);
+        this.size = 0L;
 
         // init reference count
         this.refCounter.ref();
+    }
+
+    /**
+     * values is one record with all column values and timestamp.
+     * return the rowId after successfully inserting data into the index;
+     * return -1 on failure.
+     * @param values
+     * @param timestamp
+     * @return
+     * @throws RetinaException
+     */
+    public synchronized long add(byte[][] values, long timestamp, RecordLocation recordLocation) throws RetinaException
+    {
+        if (isFull())
+        {
+            return -1L;
+        }
+        int columnCount = schema.getChildren().size();
+        checkArgument(values.length == columnCount,
+                "Column values count does not match schema column count");
+
+        recordLocation.setLocationIdentifier(this.id);
+        recordLocation.setRecordIndex(this.rowBatch.size);
+
+        for (int i = 0; i < values.length; ++i)
+        {
+            this.rowBatch.cols[i].add(new String(values[i]));
+            this.size += values[i].length;
+        }
+        this.rowBatch.cols[columnCount].add(timestamp);
+        this.size += 8;
+        this.rowBatch.size++;
+
+        // insert the record into index
+        long rowId = 0L;
+        return rowId;
     }
 
     public long getId()
@@ -47,35 +85,14 @@ public class MemTable implements Referenceable
         return id;
     }
 
-    /**
-     * values is one record with all column values and timestamp.
-     * @param values
-     * @param timestamp
-     * @return
-     * @throws RetinaException
-     */
-    public synchronized boolean add(byte[][] values, long timestamp) throws RetinaException
-    {
-        if (isFull())
-        {
-            return false;
-        }
-        int columnCount = schema.getChildren().size();
-        checkArgument(values.length == columnCount,
-                "Column values count does not match schema column count");
-
-        for (int i = 0; i < values.length; ++i)
-        {
-            this.rowBatch.cols[i].add(new String(values[i]));
-        }
-        this.rowBatch.cols[columnCount].add(timestamp);
-        this.rowBatch.size++;
-        return true;
-    }
-
     public VectorizedRowBatch getRowBatch()
     {
         return this.rowBatch;
+    }
+
+    public long getSize()
+    {
+        return this.size;
     }
 
     public boolean isFull()

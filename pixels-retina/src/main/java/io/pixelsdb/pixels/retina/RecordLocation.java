@@ -24,9 +24,11 @@ public class RecordLocation
     /**
      * Use the id of MemTable or EtcdEntry as location identifier
      */
-    private final long locationIdentifier;
+    private long locationIdentifier;
 
-    private final int recordIndex;
+    private int recordIndex;
+
+    public RecordLocation() {}
 
     public RecordLocation(long locationIdentifier, int recordIndex)
     {
@@ -34,13 +36,23 @@ public class RecordLocation
         this.recordIndex = recordIndex;
     }
 
+    public void setLocationIdentifier(long locationIdentifier)
+    {
+        this.locationIdentifier = locationIdentifier;
+    }
+
     public long getLocationIdentifier()
     {
-        return locationIdentifier;
+        return this.locationIdentifier;
+    }
+
+    public void setRecordIndex(int recordIndex)
+    {
+        this.recordIndex = recordIndex;
     }
 
     public int getRecordIndex()
     {
-        return recordIndex;
+        return this.recordIndex;
     }
 }

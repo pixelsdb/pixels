@@ -23,12 +23,14 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
@@ -70,8 +72,7 @@ public class PixelsWriterBuffer
     // Column information is recorded to create rowBatch.
     private final TypeDescription schema;
 
-    // PixelsWriter and its configuration information
-    private PixelsWriter writer;
+    // Configuration information of PixelsWriter
     private final int pixelStride;
     private final long blockSize;
     private final short replication;
@@ -104,7 +105,8 @@ public class PixelsWriterBuffer
     private volatile SuperVersion currentVersion;
 
     // Backend flush thread
-    private final ExecutorService flushExecutor;
+    private final ExecutorService flushMinioExecutor;
+    private final ExecutorService flushDiskExecutor;
 
     // Lock for SuperVersion switch
     private final ReadWriteLock versionLock = new ReentrantReadWriteLock();
@@ -119,14 +121,11 @@ public class PixelsWriterBuffer
      */
     private final Map<Long, RGVisibility> visibilityMap;
 
-    /**
-     * Write several data blocks to the same file and determine this when adding data.
-     * At the same time, record the ID of the last data block in each file and determine
-     * whether to trigger writing to the disk file when writing to distributed storage.
-     */
-    private long fileId;                                    // current fileId
-    private final CopyOnWriteArrayList<Long> fileSplitIds;  // The ID is for the data block.
-    private AtomicInteger currentBufferSize;                // current size of data written to the buffer
+    private long fileId;   // current fileId
+    private long currentBufferSize;
+    private final List<FileWriterManager> fileWriterManagers;
+    private FileWriterManager currentFileWriterManager;
+    private ReentrantLock bufferSizeLock;
 
     public PixelsWriterBuffer(TypeDescription schema, String schemaName, String tableName,
                               Path targetOrderedDirPath, Path targetCompactDirPath) throws RetinaException
@@ -145,7 +144,8 @@ public class PixelsWriterBuffer
             this.targetCompactStorage = StorageFactory.Instance().getStorage(targetCompactDirPath.getUri());
         } catch (Exception e)
         {
-            throw new RetinaException("Failed to get storage" + e);
+            logger.error("Failed to get storage", e);
+            throw new RetinaException("Failed to get storage", e);
         }
         this.blockSize = Long.parseLong(configFactory.getProperty("block.size"));
         this.replication = Short.parseShort(configFactory.getProperty("block.replication"));
@@ -156,22 +156,24 @@ public class PixelsWriterBuffer
         this.activeMemTable = new MemTable(this.idCounter, schema, pixelStride, TypeDescription.Mode.NONE);
         this.immutableMemTables = new ArrayList<>();
         this.objectEntries = new ArrayList<>();
+
         // Initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
 
-        this.flushExecutor = Executors.newFixedThreadPool(2);
-        startMinioFlushScheduler();
+        this.flushMinioExecutor = Executors.newFixedThreadPool(1);
+        this.flushDiskExecutor = Executors.newFixedThreadPool(1);
 
-        this.recordLocationMap = new HashMap<>();
-        this.visibilityMap = new HashMap<>();
+        this.recordLocationMap = new ConcurrentHashMap<>();
+        this.visibilityMap = new ConcurrentHashMap<>();
 
         // init first visibility for active memTable
         RGVisibility visibility = new RGVisibility(pixelStride);
         this.visibilityMap.put(this.idCounter, visibility);
         this.idCounter++;
 
-        this.fileSplitIds = new CopyOnWriteArrayList<>();
-        this.currentBufferSize = new AtomicInteger(0);
+        this.currentBufferSize = 0;
+        this.bufferSizeLock = new ReentrantLock();
+        this.fileWriterManagers = new ArrayList<>();
 
         // minio
         try
@@ -186,6 +188,14 @@ public class PixelsWriterBuffer
             logger.error("error when config minio ", e);
             throw new RetinaException("error when config minio ", e);
         }
+
+        this.currentFileWriterManager = new FileWriterManager(this.minio,
+                this.schemaName, this.tableName, this.schema,
+                this.targetOrderedDirPath, this.targetOrderedStorage,
+                this.pixelStride, this.blockSize, this.replication,
+                this.encodingLevel, this.nullsPadding, 0);
+
+        startFlushMinioToDiskScheduler();
     }
 
     /**
@@ -201,31 +211,20 @@ public class PixelsWriterBuffer
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
-        boolean added = false;
-        while (!added) {
+        long rowId = -1;
+        while (rowId < 0) {
+            RecordLocation recordLocation = new RecordLocation();
             this.versionLock.readLock().lock();
-            added = this.activeMemTable.add(values, timestamp);
+            rowId = this.activeMemTable.add(values, timestamp, recordLocation);
+            // add block id, need read activeMemTable.id
             this.versionLock.readLock().unlock();
+            recordLocationMap.put(rowId, recordLocation);
 
-            if (!added)  // active memTable is full
+            if (rowId == -1)  // active memTable is full
             {
-                if (this.currentBufferSize.get() >= this.maxBufferSize)
-                {
-                    this.fileSplitIds.add(this.activeMemTable.getId());
-                }
                 switchMemTable();
             }
         }
-
-        // Calculate the size of the added data
-        int dataSize = 0;
-        for (byte[] value : values)
-        {
-            dataSize += value.length;
-        }
-        dataSize += 8; // Add size of timestamp (long = 8 bytes)
-
-        this.currentBufferSize.addAndGet(dataSize);
         return true;
     }
 
@@ -234,10 +233,26 @@ public class PixelsWriterBuffer
         this.versionLock.writeLock().lock();
         try
         {
-            if (this.activeMemTable.isEmpty())
+            if (!this.activeMemTable.isFull())
             {
                 return;
             }
+
+            this.bufferSizeLock.lock();
+            this.currentBufferSize += this.activeMemTable.getSize();
+            if (this.currentBufferSize >= this.maxBufferSize)
+            {
+                long id = this.activeMemTable.getId();
+                this.currentBufferSize = 0;
+                this.currentFileWriterManager.setLastBlockId(id);
+                this.fileWriterManagers.add(this.currentFileWriterManager);
+                this.currentFileWriterManager = new FileWriterManager(this.minio,
+                        this.schemaName, this.tableName, this.schema,
+                        this.targetOrderedDirPath, this.targetOrderedStorage,
+                        this.pixelStride, this.blockSize, this.replication,
+                        this.encodingLevel, this.nullsPadding, this.idCounter);
+            }
+            this.bufferSizeLock.unlock();
 
             /**
              * For activeMemTable, at initialization the reference count is 2 because of *this and superVersion
@@ -245,7 +260,10 @@ public class PixelsWriterBuffer
              */
             MemTable oldMemTable = this.activeMemTable;
             this.immutableMemTables.add(this.activeMemTable);
-            this.activeMemTable = new MemTable(this.idCounter++, this.schema, this.pixelStride, TypeDescription.Mode.NONE);
+            this.activeMemTable = new MemTable(this.idCounter, this.schema, this.pixelStride, TypeDescription.Mode.NONE);
+            RGVisibility visibility = new RGVisibility(pixelStride);
+            this.visibilityMap.put(this.idCounter, visibility);
+            this.idCounter++;
 
             SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
             SuperVersion oldVersion = this.currentVersion;
@@ -253,6 +271,10 @@ public class PixelsWriterBuffer
             oldVersion.unref();
 
             triggerFlushToMinio(oldMemTable);
+        } catch (Exception e)
+        {
+            logger.error("Failed to create switch memTable", e);
+            throw new RuntimeException("Failed to create switch memTable", e);
         } finally
         {
             this.versionLock.writeLock().unlock();
@@ -261,7 +283,7 @@ public class PixelsWriterBuffer
 
     private void triggerFlushToMinio(MemTable flushMemTable)
     {
-        flushExecutor.submit(() -> {
+        flushMinioExecutor.submit(() -> {
             try
             {
                 // put into minio
@@ -269,7 +291,7 @@ public class PixelsWriterBuffer
                 writeIntoMinio(this.schemaName + '/' + this.tableName + '/' + id,
                         flushMemTable.serialize());
 
-                ObjectEntry objectEntry = new ObjectEntry(id);
+                ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getSize());
                 objectEntry.ref();
 
                 // update SuperVersion
@@ -316,139 +338,51 @@ public class PixelsWriterBuffer
         }
     }
 
-    private void startMinioFlushScheduler()
+    /**
+     * Determine whether the last data block managed by fileWriterManager has
+     * been written to minio. If it has been written, execute the file write
+     * operation and delete the corresponding ObjectEntry in the unified view.
+     */
+    private void startFlushMinioToDiskScheduler()
     {
         Thread scheduler = new Thread(() -> {
-            while(!Thread.currentThread().isInterrupted())
+            try
             {
-                try
+                for (FileWriterManager fileWriterManager : this.fileWriterManagers)
                 {
-                    Thread.sleep(3600);
-                    SuperVersion sv = getCurrentVersion();
-                    try
+                    String lastMinioEntry = this.schemaName + '/' + this.tableName + '/' + fileWriterManager.getLastBlockId();
+                    if (this.minio.exists(lastMinioEntry))
                     {
-                        List<ObjectEntry> objectEntries = sv.getObjectEntries();
-                        if (objectEntries.size() >= 100)
+                        fileWriterManager.finish();
+
+                        // update super version
+                        this.versionLock.writeLock().lock();
+                        Set<Long> idsToRemove = LongStream.rangeClosed(fileWriterManager.getFirstBlockId(),
+                                fileWriterManager.getLastBlockId()).boxed().collect(Collectors.toSet());
+                        List<ObjectEntry> toRemove = this.objectEntries.stream()
+                                .filter(objectEntry -> idsToRemove.contains(objectEntry.getId()))
+                                .collect(Collectors.toList());
+
+                        this.objectEntries.removeAll(toRemove);
+
+                        SuperVersion oldVersion = this.currentVersion;
+                        this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
+                        oldVersion.unref();
+                        this.versionLock.writeLock().unlock();
+
+                        for (ObjectEntry objectEntry : toRemove)
                         {
-                            flushMinioToDisk(objectEntries);
+                            objectEntry.unref();
                         }
-                    } finally
-                    {
-                        sv.unref();
                     }
-                } catch (InterruptedException e)
-                {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e)
-                {
-                    logger.error("Error in Minio flush scheduler: ", e);
                 }
+            } catch (Exception e)
+            {
+                throw new RuntimeException(e);
             }
         });
         scheduler.setDaemon(true);
         scheduler.start();
-    }
-
-    private void flushMinioToDisk(List<ObjectEntry> flushEntries)
-    {
-        this.flushExecutor.submit(() -> {
-            try
-            {
-                if (this.writer == null)
-                {
-                    createNewWriter();
-                }
-                for (ObjectEntry objectEntry : flushEntries)
-                {
-                    String minioEntryKey = this.schemaName + '/' + tableName + '/' + objectEntry.getId();
-                    PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.minio, minioEntryKey);
-                    int length = (int) reader.getFileLength();
-                    byte[] data = new byte[length];
-                    reader.readFully(data, 0, length);
-                    this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
-                }
-                this.writer.close();
-
-                // update super version
-                this.versionLock.writeLock().lock();
-                try
-                {
-                    this.objectEntries.removeAll(flushEntries);
-
-                    SuperVersion oldVersion = this.currentVersion;
-                    this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
-                    oldVersion.unref();
-                } finally
-                {
-                    this.versionLock.writeLock().unlock();
-                }
-            } catch (Exception e)
-            {
-                logger.error("Error in flushMinioToDisk: ", e);
-            } finally
-            {
-                for (ObjectEntry objectEntry : flushEntries)
-                {
-                    objectEntry.unref(); // unref in the end
-                    String objectKey = this.schemaName + '/' + tableName + '/' + objectEntry.getId();
-                    try
-                    {
-                        this.minio.delete(objectKey, false);
-                    } catch (IOException e)
-                    {
-                        logger.error("fail to delete " + objectKey + " in minio", e);
-                        throw new RuntimeException("fail to delete " + objectKey + " in minio", e);
-                    }
-                }
-            }
-        });
-    }
-
-    /**
-     * When creating a writer, add the file information to the metadata and obtain a fileId.
-     * The fileId is used to insert indexes for the data written to this file.
-     */
-    private void createNewWriter() throws RetinaException
-    {
-        if (this.writer != null)
-        {
-            throw new RetinaException("Writer already exists");
-        }
-        try
-        {
-            String targetFileName = DateUtil.getCurTime() + ".pxl";
-            String targetFilePath = this.targetOrderedDirPath.getUri() + targetFileName;
-
-            // add file information to the metadata
-            MetadataService metadataService = MetadataService.Instance();
-            File addedFile = new File();
-            addedFile.setName(targetFileName);
-            addedFile.setNumRowGroup(1);
-            addedFile.setPathId(this.targetOrderedDirPath.getId());
-            metadataService.addFiles(Collections.singletonList(addedFile));
-
-            // this.fileId = metadataService.getFileId(targetFilePath);
-            this.fileId = 0;
-
-            this.writer = PixelsWriterImpl.newBuilder()
-                    .setSchema(this.schema)
-                    .setHasHiddenColumn(true)
-                    .setPixelStride(this.pixelStride)
-                    .setRowGroupSize(Integer.MAX_VALUE)  // ensure only one row group finally
-                    .setStorage(this.targetOrderedStorage)
-                    .setPath(targetFilePath)
-                    .setBlockSize(this.blockSize)
-                    .setReplication(this.replication)
-                    .setBlockPadding(true)
-                    .setEncodingLevel(this.encodingLevel)
-                    .setNullsPadding(this.nullsPadding)
-                    .setCompressionBlockSize(1)
-                    .build();
-        } catch (Exception e)
-        {
-            throw new RetinaException("Failed to create new writer", e);
-        }
     }
 
     private void writeIntoMinio(String filePath, byte[] data)
@@ -465,23 +399,6 @@ public class PixelsWriterBuffer
         }
     }
 
-    private void addRowBatchFromMinio(ObjectEntry objectEntry) throws RetinaException
-    {
-        try
-        {
-            String objectKey = this.schemaName + '/' + tableName + '/' + objectEntry.getId();
-            PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.minio, objectKey);
-            int length = (int) reader.getFileLength();
-            byte[] data = new byte[length];
-            reader.readFully(data, 0, length);
-            this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
-        } catch (IOException e)
-        {
-            logger.error("Failed to load rowBatch from minio", e);
-            throw new RetinaException("Failed to load rowBatch from minio", e);
-        }
-    }
-    
     /**
      * collect resouces
      *
@@ -490,32 +407,28 @@ public class PixelsWriterBuffer
     public void close() throws IOException
     {
         // First, shut down the flush process to prevent changes to the data view.
-        this.flushExecutor.shutdown();
+        this.flushMinioExecutor.shutdown();
+        this.flushDiskExecutor.shutdown();
 
         SuperVersion sv = getCurrentVersion();
         try
         {
-            if (this.writer == null)
-            {
-                createNewWriter();
-            }
-
             // add memtable to writer
-            this.writer.addRowBatch(sv.getMemTable().getRowBatch());
+            this.currentFileWriterManager.addRowBatch(sv.getMemTable().getRowBatch());
 
             // add immutable memtable to writer
             for (MemTable immutableMemTable: sv.getImmutableMemTables())
             {
-                this.writer.addRowBatch(immutableMemTable.getRowBatch());
+                this.currentFileWriterManager.addRowBatch(immutableMemTable.getRowBatch());
             }
 
-            // add minio object to writer
-            for (ObjectEntry objectEntry : sv.getObjectEntries())
+            this.currentFileWriterManager.finish();
+
+            // handle fileWriterManager that has not yet been written to the file
+            for (FileWriterManager fileWriterManager : this.fileWriterManagers)
             {
-                addRowBatchFromMinio(objectEntry);
+                fileWriterManager.finish();
             }
-
-            this.writer.close();
         } catch (Exception e)
         {
             logger.error("Error in close: ", e);
