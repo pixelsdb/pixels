@@ -24,7 +24,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -32,19 +31,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
-import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.common.utils.DateUtil;
-import io.pixelsdb.pixels.core.PixelsWriter;
-import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 
@@ -106,7 +99,8 @@ public class PixelsWriterBuffer
 
     // Backend flush thread
     private final ExecutorService flushMinioExecutor;
-    private final ExecutorService flushDiskExecutor;
+    private final ScheduledExecutorService flushDiskExecutor;
+    private ScheduledFuture<?> flushDiskFuture;
 
     // Lock for SuperVersion switch
     private final ReadWriteLock versionLock = new ReentrantReadWriteLock();
@@ -126,6 +120,7 @@ public class PixelsWriterBuffer
     private final List<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
     private ReentrantLock bufferSizeLock;
+    private AtomicLong maxObjectKey;
 
     public PixelsWriterBuffer(TypeDescription schema, String schemaName, String tableName,
                               Path targetOrderedDirPath, Path targetCompactDirPath) throws RetinaException
@@ -160,8 +155,8 @@ public class PixelsWriterBuffer
         // Initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
 
-        this.flushMinioExecutor = Executors.newFixedThreadPool(1);
-        this.flushDiskExecutor = Executors.newFixedThreadPool(1);
+        this.flushMinioExecutor = Executors.newSingleThreadExecutor();
+        this.flushDiskExecutor = Executors.newSingleThreadScheduledExecutor();
 
         this.recordLocationMap = new ConcurrentHashMap<>();
         this.visibilityMap = new ConcurrentHashMap<>();
@@ -174,6 +169,7 @@ public class PixelsWriterBuffer
         this.currentBufferSize = 0;
         this.bufferSizeLock = new ReentrantLock();
         this.fileWriterManagers = new ArrayList<>();
+        this.maxObjectKey = new AtomicLong(0);
 
         // minio
         try
@@ -194,6 +190,7 @@ public class PixelsWriterBuffer
                 this.targetOrderedDirPath, this.targetOrderedStorage,
                 this.pixelStride, this.blockSize, this.replication,
                 this.encodingLevel, this.nullsPadding, 0);
+        this.fileId = this.currentFileWriterManager.getFileId();
 
         startFlushMinioToDiskScheduler();
     }
@@ -251,6 +248,7 @@ public class PixelsWriterBuffer
                         this.targetOrderedDirPath, this.targetOrderedStorage,
                         this.pixelStride, this.blockSize, this.replication,
                         this.encodingLevel, this.nullsPadding, this.idCounter);
+                this.fileId = this.currentFileWriterManager.getFileId();
             }
             this.bufferSizeLock.unlock();
 
@@ -293,6 +291,8 @@ public class PixelsWriterBuffer
 
                 ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getSize());
                 objectEntry.ref();
+
+                this.maxObjectKey.updateAndGet(current -> Math.max(current, id));
 
                 // update SuperVersion
                 versionLock.writeLock().lock();
@@ -345,15 +345,18 @@ public class PixelsWriterBuffer
      */
     private void startFlushMinioToDiskScheduler()
     {
-        Thread scheduler = new Thread(() -> {
+        this.flushDiskFuture = this.flushDiskExecutor.scheduleWithFixedDelay(() -> {
             try
             {
-                for (FileWriterManager fileWriterManager : this.fileWriterManagers)
+                Iterator<FileWriterManager> iterator = this.fileWriterManagers.iterator();
+                while (iterator.hasNext())
                 {
+                    FileWriterManager fileWriterManager = iterator.next();
                     String lastMinioEntry = this.schemaName + '/' + this.tableName + '/' + fileWriterManager.getLastBlockId();
                     if (this.minio.exists(lastMinioEntry))
                     {
                         fileWriterManager.finish();
+                        iterator.remove();
 
                         // update super version
                         this.versionLock.writeLock().lock();
@@ -380,9 +383,7 @@ public class PixelsWriterBuffer
             {
                 throw new RuntimeException(e);
             }
-        });
-        scheduler.setDaemon(true);
-        scheduler.start();
+        }, 0, 5, TimeUnit.SECONDS);
     }
 
     private void writeIntoMinio(String filePath, byte[] data)
@@ -408,7 +409,28 @@ public class PixelsWriterBuffer
     {
         // First, shut down the flush process to prevent changes to the data view.
         this.flushMinioExecutor.shutdown();
+        try
+        {
+            this.flushMinioExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e)
+        {
+            logger.error("Failed to shutdown flushMinioExecutor", e);
+            Thread.currentThread().interrupt();
+        }
+        if (this.flushDiskFuture != null)
+        {
+            this.flushDiskFuture.cancel(false);
+        }
         this.flushDiskExecutor.shutdown();
+        try
+        {
+            this.flushDiskExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e)
+        {
+            logger.error("Failed to shutdown flushDiskExecutor", e);
+            Thread.currentThread().interrupt();
+        }
+
 
         SuperVersion sv = getCurrentVersion();
         try
@@ -422,6 +444,7 @@ public class PixelsWriterBuffer
                 this.currentFileWriterManager.addRowBatch(immutableMemTable.getRowBatch());
             }
 
+            this.currentFileWriterManager.setLastBlockId(this.maxObjectKey.get());
             this.currentFileWriterManager.finish();
 
             // handle fileWriterManager that has not yet been written to the file

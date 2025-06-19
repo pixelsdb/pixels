@@ -94,7 +94,8 @@ public class FileWriterManager
             addedFile.setNumRowGroup(1);
             addedFile.setPathId(targetOrderedDirPath.getId());
             metadataService.addFiles(Collections.singletonList(addedFile));
-            this.fileId = metadataService.getFileId(targetFilePath);
+            // this.fileId = metadataService.getFileId(targetFilePath);
+            this.fileId = 0;
         } catch (MetadataException e)
         {
             logger.error("Failed to add file into metadata", e);
