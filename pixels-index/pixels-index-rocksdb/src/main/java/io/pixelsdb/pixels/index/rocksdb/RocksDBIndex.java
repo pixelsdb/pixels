@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.index.SecondaryIndex;
 import io.pixelsdb.pixels.index.IndexProto;
-import jdk.tools.jmod.Main;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.rocksdb.*;
