@@ -26,7 +26,7 @@ import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexImpl;
 import java.io.File;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -44,7 +44,7 @@ public class TestRocksDBIndex
 {
     private RocksDB rocksDB;
     private final String rocksDBpath = "/tmp/rocksdb";
-    private SecondaryIndex rocksDBIndex; // Class under test
+    private SinglePointIndex rocksDBIndex; // Class under test
     private final MainIndex mainIndex = new MainIndexImpl();
     @BeforeEach
     public void setUp() throws RocksDBException, IOException
@@ -82,7 +82,7 @@ public class TestRocksDBIndex
                 .setRgRowId(rgRowId)
                 .build();
 
-        SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0L, true, rowLocation);
+        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
 
         long rowId = rocksDBIndex.putEntry(entry);
 
@@ -101,7 +101,7 @@ public class TestRocksDBIndex
         long fileId = 1L;
         int rgId = 2;
 
-        List<SecondaryIndex.Entry> entries = new ArrayList<>();
+        List<SinglePointIndex.Entry> entries = new ArrayList<>();
 
         // Create two entries
         for (int i = 0; i < 2; i++) {
@@ -121,7 +121,7 @@ public class TestRocksDBIndex
                     .setRgRowId(i)
                     .build();
 
-            SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0L, true, rowLocation);
+            SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
             entries.add(entry);
         }
 
@@ -132,7 +132,7 @@ public class TestRocksDBIndex
 
         // Assert every index has been written to rocksDB
         for (int i = 0; i < entries.size(); i++) {
-            SecondaryIndex.Entry entry = entries.get(i);
+            SinglePointIndex.Entry entry = entries.get(i);
             byte[] keyBytes = toByteArray(entry.getKey());
             byte[] storedValue = rocksDB.get(keyBytes);
             assertNotNull(storedValue);
@@ -165,7 +165,7 @@ public class TestRocksDBIndex
                 .setRgRowId(rgRowId)
                 .build();
 
-        SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0L, true, rowLocation);
+        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
 
         rocksDBIndex.putEntry(entry);
 
@@ -187,7 +187,7 @@ public class TestRocksDBIndex
         long fileId = 1L;
         int rgId = 2;
 
-        List<SecondaryIndex.Entry> entries = new ArrayList<>();
+        List<SinglePointIndex.Entry> entries = new ArrayList<>();
         List<byte[]> keyBytesList = new ArrayList<>();
         List<IndexProto.IndexKey> keyList = new ArrayList<>();
 
@@ -211,7 +211,7 @@ public class TestRocksDBIndex
                     .setRgRowId(i)
                     .build();
 
-            SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0L, true, rowLocation);
+            SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
             entries.add(entry);
         }
 

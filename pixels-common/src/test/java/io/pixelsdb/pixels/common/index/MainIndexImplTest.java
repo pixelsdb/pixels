@@ -125,7 +125,7 @@ public class MainIndexImplTest
                 .setRgId(rgId)
                 .setRgRowId(rgRowId)
                 .build();
-        SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0L, true, rowLocation);
+        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
         Assertions.assertTrue(mainIndex.getRowId(entry));
         Assertions.assertTrue(entry.getRowId() > 0);
 
@@ -140,7 +140,7 @@ public class MainIndexImplTest
     @Test
     public void testGetRgOfRowIds() throws Exception
     {
-        List<SecondaryIndex.Entry> entries = new ArrayList<>();
+        List<SinglePointIndex.Entry> entries = new ArrayList<>();
         long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
@@ -158,11 +158,11 @@ public class MainIndexImplTest
                 .setRgRowId(rgRowId)
                 .build();
         for (int i = 0; i < 5; i++) {
-            entries.add(new SecondaryIndex.Entry(keyProto, i, true, rowLocation));
+            entries.add(new SinglePointIndex.Entry(keyProto, i, true, rowLocation));
         }
 
         Assertions.assertTrue(mainIndex.getRgOfRowIds(entries));
-        for (SecondaryIndex.Entry entry : entries) {
+        for (SinglePointIndex.Entry entry : entries) {
             Assertions.assertTrue(entry.getRowId() > 0);
         }
     }
@@ -192,7 +192,7 @@ public class MainIndexImplTest
                             .setRgId(2)
                             .setRgRowId(3)
                             .build();
-                    SecondaryIndex.Entry entry = new SecondaryIndex.Entry(keyProto, 0L, true, rowLocation);
+                    SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
 
                     Assertions.assertTrue(mainIndex.getRowId(entry));
                     long rowId = entry.getRowId();

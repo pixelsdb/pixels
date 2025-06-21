@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.RowIdRange;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -39,7 +39,7 @@ import java.util.List;
  * @author hank, Rolland1944
  * @create 2025-02-19
  */
-public class RocksetIndex implements SecondaryIndex
+public class RocksetIndex implements SinglePointIndex
 {
     // load RocksetJni
     static

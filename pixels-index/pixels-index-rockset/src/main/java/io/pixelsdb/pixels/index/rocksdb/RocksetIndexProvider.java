@@ -21,8 +21,8 @@ package io.pixelsdb.pixels.index.rocksdb;
 
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexImpl;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
-import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -34,7 +34,7 @@ import java.io.IOException;
  * @author hank, Rolland1944
  * @create 2025-02-19
  */
-public class RocksetIndexProvider implements SecondaryIndexProvider
+public class RocksetIndexProvider implements SinglePointIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
     private final MainIndex mainIndex = new MainIndexImpl();
@@ -46,9 +46,9 @@ public class RocksetIndexProvider implements SecondaryIndexProvider
     private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("rockset.read.only"));
 
     @Override
-    public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
+    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme) throws IOException
     {
-        if (scheme == SecondaryIndex.Scheme.rockset)
+        if (scheme == SinglePointIndex.Scheme.rockset)
         {
              try
              {
@@ -63,8 +63,8 @@ public class RocksetIndexProvider implements SecondaryIndexProvider
     }
 
     @Override
-    public boolean compatibleWith(@Nonnull SecondaryIndex.Scheme scheme)
+    public boolean compatibleWith(@Nonnull SinglePointIndex.Scheme scheme)
     {
-        return scheme == SecondaryIndex.Scheme.rockset;
+        return scheme == SinglePointIndex.Scheme.rockset;
     }
 }

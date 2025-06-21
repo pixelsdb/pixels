@@ -31,16 +31,17 @@ import java.util.List;
 /**
  * @author hank
  * @create 2025-02-07
+ * @update 2025-06-22 hank: rename from SecondaryIndex to SinglePointIndex
  */
-public interface SecondaryIndex extends Closeable
+public interface SinglePointIndex extends Closeable
 {
     /**
-     * If we want to add more secondary index schemes here, modify this enum.
+     * If we want to add more single point index schemes here, modify this enum.
      */
     enum Scheme
     {
-        rocksdb,  // secondary index stored in rocksdb
-        rockset;  // secondary index stored in rockset (rocksdb-cloud)
+        rocksdb,  // single point index stored in rocksdb
+        rockset;  // single point index stored in rockset (rocksdb-cloud)
 
         /**
          * Case-insensitive parsing from String name to enum value.

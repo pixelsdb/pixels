@@ -83,7 +83,7 @@ public interface MainIndex extends Closeable
      *
      * @param entry the rowLocation of secondary index
      */
-    boolean getRowId(SecondaryIndex.Entry entry) throws RowIdException;
+    boolean getRowId(SinglePointIndex.Entry entry) throws RowIdException;
 
     /**
      * Distribute row ids for the secondary index.
@@ -91,7 +91,7 @@ public interface MainIndex extends Closeable
      *
      * @param entries the rowLocation of secondary index
      */
-    boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries) throws RowIdException;
+    boolean getRgOfRowIds(List<SinglePointIndex.Entry> entries) throws RowIdException;
 
     /**
      * Persist the main index into persistent storage.

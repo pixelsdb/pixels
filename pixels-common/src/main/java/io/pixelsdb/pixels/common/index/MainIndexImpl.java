@@ -195,7 +195,7 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean getRowId(SecondaryIndex.Entry entry) throws RowIdException {
+    public boolean getRowId(SinglePointIndex.Entry entry) throws RowIdException {
         ensureRowIdsAvailable(1);
         Long rowId = rowIdCache.poll();
         if (rowId == null) {
@@ -207,11 +207,11 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries) throws RowIdException {
+    public boolean getRgOfRowIds(List<SinglePointIndex.Entry> entries) throws RowIdException {
         int needed = entries.size();
         ensureRowIdsAvailable(needed);
 
-        for (SecondaryIndex.Entry entry : entries) {
+        for (SinglePointIndex.Entry entry : entries) {
             Long rowId = rowIdCache.poll();
             if (rowId == null) {
                 logger.error("Insufficient rowIds available in cache");

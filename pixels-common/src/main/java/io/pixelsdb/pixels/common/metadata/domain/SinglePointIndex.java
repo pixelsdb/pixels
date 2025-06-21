@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.common.index.SecondaryIndex.Scheme;
+import io.pixelsdb.pixels.common.index.SinglePointIndex.Scheme;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 /**

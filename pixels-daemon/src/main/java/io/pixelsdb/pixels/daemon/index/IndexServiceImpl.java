@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.index.IndexServiceGrpc;
@@ -42,12 +42,12 @@ import java.util.stream.Collectors;
 public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
 {
     private static final Logger logger = LogManager.getLogger(IndexServiceImpl.class);
-    private final SecondaryIndex secondaryIndex;
+    private final SinglePointIndex singlePointIndex;
     private final MainIndex mainIndex;
 
-    public IndexServiceImpl(SecondaryIndex secondaryIndex, MainIndex mainIndex)
+    public IndexServiceImpl(SinglePointIndex singlePointIndex, MainIndex mainIndex)
     {
-        this.secondaryIndex = secondaryIndex;
+        this.singlePointIndex = singlePointIndex;
         this.mainIndex = mainIndex;
     }
 
@@ -59,7 +59,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.IndexKey key = request.getIndexKey();
 
         // Call SinglePointIndex's getUniqueRowId method
-        long rowId = secondaryIndex.getUniqueRowId(key);
+        long rowId = singlePointIndex.getUniqueRowId(key);
 
         // Call MainIndex's getLocation method to convert rowId to RowLocation
         IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
@@ -93,7 +93,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.IndexKey key = request.getIndexKey();
 
         // Call SinglePointIndex's getRowIds method
-        long[] rowIds = secondaryIndex.getRowIds(key);
+        long[] rowIds = singlePointIndex.getRowIds(key);
 
         // Convert rowIds to list of RowLocations
         List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
@@ -127,7 +127,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         try
         {
             // Call SinglePointIndex's putEntry method
-            long rowId = secondaryIndex.putEntry(new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()));
+            long rowId = singlePointIndex.putEntry(new SinglePointIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()));
             // Create gRPC response
             builder.setRowId(rowId).setErrorCode(ErrorCode.SUCCESS);
         }
@@ -159,7 +159,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         try
         {
             // Call SinglePointIndex's deleteEntry method
-            boolean success = secondaryIndex.deleteEntry(key);
+            boolean success = singlePointIndex.deleteEntry(key);
             builder.setErrorCode(ErrorCode.SUCCESS);
         }
         catch (MainIndexException e)
@@ -180,15 +180,15 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                                 StreamObserver<IndexProto.PutIndexEntriesResponse> responseObserver)
     {
         // Get list of IndexEntries from request
-        List<SecondaryIndex.Entry> entries = request.getIndexEntriesList().stream()
-                .map(entry -> new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()))
+        List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream()
+                .map(entry -> new SinglePointIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()))
                 .collect(Collectors.toList());
         // Create gRPC builder
         IndexProto.PutIndexEntriesResponse.Builder builder  = IndexProto.PutIndexEntriesResponse.newBuilder();
         try
         {
             // Call SinglePointIndex's putEntries method
-            List<Long> rowIds = secondaryIndex.putEntries(entries);
+            List<Long> rowIds = singlePointIndex.putEntries(entries);
             builder.addAllRowIds(rowIds).setErrorCode(ErrorCode.SUCCESS);
         }
         catch (RowIdException e)
@@ -219,7 +219,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         try
         {
             // Call SinglePointIndex's deleteEntries method
-            boolean success = secondaryIndex.deleteEntries(keys);
+            boolean success = singlePointIndex.deleteEntries(keys);
             builder.setErrorCode(ErrorCode.SUCCESS);
         }
         catch (MainIndexException e)
