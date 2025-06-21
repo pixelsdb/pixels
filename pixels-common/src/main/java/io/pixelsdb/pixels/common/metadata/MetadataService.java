@@ -986,15 +986,15 @@ public class MetadataService
         return true;
     }
 
-    public boolean createSecondaryIndex(SecondaryIndex secondaryIndex) throws MetadataException
+    public boolean createSinglePointIndex(SinglePointIndex singlePointIndex) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.CreateSecondaryIndexRequest request = MetadataProto.CreateSecondaryIndexRequest.newBuilder()
+        MetadataProto.CreateSinglePointIndexRequest request = MetadataProto.CreateSinglePointIndexRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSecondaryIndex(secondaryIndex.toProto()).build();
+                .setSinglePointIndex(singlePointIndex.toProto()).build();
         try
         {
-            MetadataProto.CreateSecondaryIndexResponse response = this.stub.createSecondaryIndex(request);
+            MetadataProto.CreateSinglePointIndexResponse response = this.stub.createSinglePointIndex(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
@@ -1013,20 +1013,20 @@ public class MetadataService
     }
 
     /**
-     * Get secondary index by table id.
+     * Get the single point index by table id.
      * @param tableId the table id
      * @return null if secondary index is not found for the table id
      * @throws MetadataException
      */
-    public SecondaryIndex getSecondaryIndex(long tableId) throws MetadataException
+    public List<SinglePointIndex> getSinglePointIndices(long tableId) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.GetSecondaryIndexRequest request = MetadataProto.GetSecondaryIndexRequest.newBuilder()
+        MetadataProto.GetSinglePointIndicesRequest request = MetadataProto.GetSinglePointIndicesRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setTableId(tableId).build();
         try
         {
-            MetadataProto.GetSecondaryIndexResponse response = this.stub.getSecondaryIndex(request);
+            MetadataProto.GetSinglePointIndicesResponse response = this.stub.getSinglePointIndices(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 if (response.getHeader().getErrorCode() == METADATA_RANGE_INDEX_NOT_FOUND)
@@ -1044,7 +1044,9 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            return new SecondaryIndex(response.getSecondaryIndex());
+            ImmutableList.Builder<SinglePointIndex> builder = ImmutableList.builder();
+            response.getSinglePointIndicesList().forEach(proto -> builder.add(new SinglePointIndex(proto)));
+            return builder.build();
         }
         catch (Exception e)
         {
@@ -1052,15 +1054,15 @@ public class MetadataService
         }
     }
 
-    public boolean updateSecondaryIndex(SecondaryIndex secondaryIndex) throws MetadataException
+    public boolean updateSinglePointIndex(SinglePointIndex singlePointIndex) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.UpdateSecondaryIndexRequest request = MetadataProto.UpdateSecondaryIndexRequest.newBuilder()
+        MetadataProto.UpdateSinglePointIndexRequest request = MetadataProto.UpdateSinglePointIndexRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSecondaryIndex(secondaryIndex.toProto()).build();
+                .setSinglePointIndex(singlePointIndex.toProto()).build();
         try
         {
-            MetadataProto.UpdateSecondaryIndexResponse response = this.stub.updateSecondaryIndex(request);
+            MetadataProto.UpdateSinglePointIndexResponse response = this.stub.updateSinglePointIndex(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
@@ -1078,15 +1080,15 @@ public class MetadataService
         return true;
     }
 
-    public boolean dropSecondaryIndex(long tableId) throws MetadataException
+    public boolean dropSinglePointIndex(SinglePointIndex singlePointIndex) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
-        MetadataProto.DropSecondaryIndexRequest request = MetadataProto.DropSecondaryIndexRequest.newBuilder()
+        MetadataProto.DropSinglePointIndexRequest request = MetadataProto.DropSinglePointIndexRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setTableId(tableId).build();
+                .setSinglePointIndex(singlePointIndex.toProto()).build();
         try
         {
-            MetadataProto.DropSecondaryIndexResponse response = this.stub.dropSecondaryIndex(request);
+            MetadataProto.DropSinglePointIndexResponse response = this.stub.dropSinglePointIndex(request);
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()

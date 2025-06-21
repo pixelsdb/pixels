@@ -58,7 +58,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
 
-        // Call SecondaryIndex's getUniqueRowId method
+        // Call SinglePointIndex's getUniqueRowId method
         long rowId = secondaryIndex.getUniqueRowId(key);
 
         // Call MainIndex's getLocation method to convert rowId to RowLocation
@@ -92,7 +92,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
 
-        // Call SecondaryIndex's getRowIds method
+        // Call SinglePointIndex's getRowIds method
         long[] rowIds = secondaryIndex.getRowIds(key);
 
         // Convert rowIds to list of RowLocations
@@ -126,7 +126,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutIndexEntryResponse.Builder builder = IndexProto.PutIndexEntryResponse.newBuilder();
         try
         {
-            // Call SecondaryIndex's putEntry method
+            // Call SinglePointIndex's putEntry method
             long rowId = secondaryIndex.putEntry(new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()));
             // Create gRPC response
             builder.setRowId(rowId).setErrorCode(ErrorCode.SUCCESS);
@@ -158,7 +158,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeleteIndexEntryResponse.Builder builder = IndexProto.DeleteIndexEntryResponse.newBuilder();
         try
         {
-            // Call SecondaryIndex's deleteEntry method
+            // Call SinglePointIndex's deleteEntry method
             boolean success = secondaryIndex.deleteEntry(key);
             builder.setErrorCode(ErrorCode.SUCCESS);
         }
@@ -187,7 +187,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutIndexEntriesResponse.Builder builder  = IndexProto.PutIndexEntriesResponse.newBuilder();
         try
         {
-            // Call SecondaryIndex's putEntries method
+            // Call SinglePointIndex's putEntries method
             List<Long> rowIds = secondaryIndex.putEntries(entries);
             builder.addAllRowIds(rowIds).setErrorCode(ErrorCode.SUCCESS);
         }
@@ -218,7 +218,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeleteIndexEntriesResponse.Builder builder = IndexProto.DeleteIndexEntriesResponse.newBuilder();
         try
         {
-            // Call SecondaryIndex's deleteEntries method
+            // Call SinglePointIndex's deleteEntries method
             boolean success = secondaryIndex.deleteEntries(keys);
             builder.setErrorCode(ErrorCode.SUCCESS);
         }

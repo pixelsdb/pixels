@@ -337,18 +337,19 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
 
 
 -- -----------------------------------------------------
--- Table `pixels_metadata`.`SECONDARY_INDEXES`
+-- Table `pixels_metadata`.`SINGLE_POINT_INDEXES`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SECONDARY_INDEXES` (
-    `SI_ID` BIGINT NOT NULL,
-    `SI_KEY_COLUMNS` TEXT NOT NULL,
-    `SI_UNIQUE` TINYINT NOT NULL COMMENT 'True if this secondary index is an unique index.',
-    `SI_INDEX_SCHEME` VARCHAR(32) NOT NULL COMMENT 'The index scheme, e.g., rocksdb or rockset, of this secondary index.',
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SINGLE_POINT_INDEXES` (
+    `SPI_ID` BIGINT NOT NULL,
+    `SPI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns of this index, stored in json format.',
+    `SPI_PRIMARY` TINYINT NOT NULL COMMENT 'True (1) if this single point index is the primary index. There can be only one primary index on a table.',
+    `SPI_UNIQUE` TINYINT NOT NULL COMMENT 'True (1) if this single point index is an unique index.',
+    `SPI_INDEX_SCHEME` VARCHAR(32) NOT NULL COMMENT 'The index scheme, e.g., rocksdb or rockset, of this single pint index.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
-    PRIMARY KEY (`SI_ID`),
-    INDEX `fk_SECONDARY_INDEXES_TBLS_idx` (`TBLS_TBL_ID` ASC),
-    INDEX `fk_SECONDARY_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    PRIMARY KEY (`SPI_ID`),
+    INDEX `fk_SECONDARY_INDEXES_TBLS_idx` (`TBLS_TBL_ID` ASC) VISIBLE,
+    INDEX `fk_SECONDARY_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC) VISIBLE,
     CONSTRAINT `fk_SECONDARY_INDEXES_TBLS`
         FOREIGN KEY (`TBLS_TBL_ID`)
             REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)

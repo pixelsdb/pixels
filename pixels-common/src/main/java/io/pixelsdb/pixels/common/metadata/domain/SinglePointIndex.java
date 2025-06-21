@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.daemon.MetadataProto;
  * @author hank
  * @create 2025-02-07
  */
-public class SecondaryIndex extends Base
+public class SinglePointIndex extends Base
 {
     private KeyColumns keyColumns;
     private String keyColumnsJson;
@@ -35,18 +35,18 @@ public class SecondaryIndex extends Base
     private Scheme indexScheme;
     private long tableId;
 
-    public SecondaryIndex()
+    public SinglePointIndex()
     {
     }
 
-    public SecondaryIndex(MetadataProto.SecondaryIndex secondaryIndex)
+    public SinglePointIndex(MetadataProto.SinglePointIndex singlePointIndex)
     {
-        this.setId(secondaryIndex.getId());
-        this.keyColumnsJson = secondaryIndex.getKeyColumns();
+        this.setId(singlePointIndex.getId());
+        this.keyColumnsJson = singlePointIndex.getKeyColumns();
         this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
-        this.unique = secondaryIndex.getUnique();
-        this.indexScheme = Scheme.from(secondaryIndex.getIndexScheme());
-        this.tableId = secondaryIndex.getTableId();
+        this.unique = singlePointIndex.getUnique();
+        this.indexScheme = Scheme.from(singlePointIndex.getIndexScheme());
+        this.tableId = singlePointIndex.getTableId();
     }
 
     public KeyColumns getKeyColumns()
@@ -100,9 +100,9 @@ public class SecondaryIndex extends Base
     }
 
     @Override
-    public MetadataProto.SecondaryIndex toProto()
+    public MetadataProto.SinglePointIndex toProto()
     {
-        return MetadataProto.SecondaryIndex.newBuilder().setId(this.getId()).setKeyColumns(this.keyColumnsJson)
+        return MetadataProto.SinglePointIndex.newBuilder().setId(this.getId()).setKeyColumns(this.keyColumnsJson)
                 .setUnique(this.unique).setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();
     }
 }
