@@ -1007,15 +1007,49 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to create secondary index", e);
+            throw new MetadataException("failed to create single point index", e);
         }
         return true;
+    }
+
+    public SinglePointIndex getPrimaryIndex(long tableId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetPrimaryIndexRequest request = MetadataProto.GetPrimaryIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTableId(tableId).build();
+        try
+        {
+            MetadataProto.GetPrimaryIndexResponse response = this.stub.getPrimaryIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                if (response.getHeader().getErrorCode() == METADATA_SINGLE_POINT_INDEX_NOT_FOUND)
+                {
+                    /**
+                     * return null if the primary single point index is not found, this is useful for clients
+                     * as they can hardly deal with error code.
+                     */
+                    return null;
+                }
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return new SinglePointIndex(response.getPrimaryIndex());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get primary index", e);
+        }
     }
 
     /**
      * Get the single point index by table id.
      * @param tableId the table id
-     * @return null if secondary index is not found for the table id
+     * @return null if single point indices are not found for the table id
      * @throws MetadataException
      */
     public List<SinglePointIndex> getSinglePointIndices(long tableId) throws MetadataException
@@ -1029,10 +1063,10 @@ public class MetadataService
             MetadataProto.GetSinglePointIndicesResponse response = this.stub.getSinglePointIndices(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                if (response.getHeader().getErrorCode() == METADATA_RANGE_INDEX_NOT_FOUND)
+                if (response.getHeader().getErrorCode() == METADATA_SINGLE_POINT_INDEX_NOT_FOUND)
                 {
                     /**
-                     * return null if secondary index is not found, this is useful for clients
+                     * return null if single point indices are not found, this is useful for clients
                      * as they can hardly deal with error code.
                      */
                     return null;
@@ -1050,7 +1084,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to get secondary index", e);
+            throw new MetadataException("failed to get single point indices", e);
         }
     }
 
@@ -1075,7 +1109,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to update secondary index", e);
+            throw new MetadataException("failed to update single point index", e);
         }
         return true;
     }
@@ -1101,7 +1135,7 @@ public class MetadataService
         }
         catch (Exception e)
         {
-            throw new MetadataException("failed to drop secondary index", e);
+            throw new MetadataException("failed to drop single point index", e);
         }
         return true;
     }

@@ -146,10 +146,11 @@ message Range {
 message SinglePointIndex {
     uint64 id = 1;
     string keyColumns = 2;
-    bool unique = 3;
-    string indexScheme = 4;
-    uint64 tableId = 5;
-    uint64 schemaVersionId = 6;
+    bool primary = 3;
+    bool unique = 4;
+    string indexScheme = 5;
+    uint64 tableId = 6;
+    uint64 schemaVersionId = 7;
 }
 
 message Path {

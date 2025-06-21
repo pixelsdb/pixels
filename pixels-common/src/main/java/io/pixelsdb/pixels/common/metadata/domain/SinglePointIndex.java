@@ -31,6 +31,7 @@ public class SinglePointIndex extends Base
 {
     private KeyColumns keyColumns;
     private String keyColumnsJson;
+    private boolean primary;
     private boolean unique;
     private Scheme indexScheme;
     private long tableId;
@@ -44,6 +45,7 @@ public class SinglePointIndex extends Base
         this.setId(singlePointIndex.getId());
         this.keyColumnsJson = singlePointIndex.getKeyColumns();
         this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
+        this.primary = singlePointIndex.getPrimary();
         this.unique = singlePointIndex.getUnique();
         this.indexScheme = Scheme.from(singlePointIndex.getIndexScheme());
         this.tableId = singlePointIndex.getTableId();
@@ -67,6 +69,16 @@ public class SinglePointIndex extends Base
     public void setKeyColumnsJson(String keyColumnsJson)
     {
         this.keyColumnsJson = keyColumnsJson;
+    }
+
+    public boolean isPrimary()
+    {
+        return primary;
+    }
+
+    public void setPrimary(boolean primary)
+    {
+        this.primary = primary;
     }
 
     public boolean isUnique()
@@ -102,7 +114,8 @@ public class SinglePointIndex extends Base
     @Override
     public MetadataProto.SinglePointIndex toProto()
     {
-        return MetadataProto.SinglePointIndex.newBuilder().setId(this.getId()).setKeyColumns(this.keyColumnsJson)
-                .setUnique(this.unique).setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();
+        return MetadataProto.SinglePointIndex.newBuilder().setId(this.getId())
+                .setKeyColumns(this.keyColumnsJson).setPrimary(this.primary).setUnique(this.unique)
+                .setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();
     }
 }

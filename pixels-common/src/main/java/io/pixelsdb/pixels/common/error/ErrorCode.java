@@ -77,6 +77,10 @@ public class ErrorCode
     public static final int METADATA_GET_FILE_ID_FAILED = (ERROR_BASE_METADATA + 45);
     public static final int METADATA_UPDATE_FILE_FAILED = (ERROR_BASE_METADATA + 46);
     public static final int METADATA_DELETE_FILES_FAILED = (ERROR_BASE_METADATA + 47);
+    public static final int METADATA_ADD_SINGLE_POINT_INDEX_FAILED = (ERROR_BASE_METADATA + 48);
+    public static final int METADATA_SINGLE_POINT_INDEX_NOT_FOUND = (ERROR_BASE_METADATA + 49);
+    public static final int METADATA_UPDATE_SINGLE_POINT_INDEX_FAILED = (ERROR_BASE_METADATA + 50);
+    public static final int METADATA_DELETE_SINGLE_POINT_INDEX_FAILED = (ERROR_BASE_METADATA + 51);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue
