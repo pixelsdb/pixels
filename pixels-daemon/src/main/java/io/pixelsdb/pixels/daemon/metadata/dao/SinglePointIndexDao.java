@@ -38,7 +38,7 @@ public abstract class SinglePointIndexDao implements Dao<MetadataProto.SinglePoi
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public abstract MetadataProto.SinglePointIndex getByTableId(long tableId);
+    public abstract MetadataProto.SinglePointIndex getPrimaryByTableId(long tableId);
 
     public abstract List<MetadataProto.SinglePointIndex> getAllByTableId(long tableId);
 
@@ -65,5 +65,5 @@ public abstract class SinglePointIndexDao implements Dao<MetadataProto.SinglePoi
 
     abstract public boolean update (MetadataProto.SinglePointIndex singlePointIndex);
 
-    abstract public boolean deleteByTableId(long tableId);
+    abstract public boolean deleteById(long id);
 }

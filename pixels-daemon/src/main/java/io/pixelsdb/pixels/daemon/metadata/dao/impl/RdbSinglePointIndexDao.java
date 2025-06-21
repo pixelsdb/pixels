@@ -98,10 +98,10 @@ public class RdbSinglePointIndexDao extends SinglePointIndexDao
     }
 
     @Override
-    public MetadataProto.SinglePointIndex getByTableId(long tableId)
+    public MetadataProto.SinglePointIndex getPrimaryByTableId(long tableId)
     {
         Connection conn = db.getConnection();
-        String sql = "SELECT * FROM SINGLE_POINT_INDICES WHERE TBLS_TBL_ID=?";
+        String sql = "SELECT * FROM SINGLE_POINT_INDICES WHERE TBLS_TBL_ID=? AND SPI_PRIMARY=TRUE";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setLong(1, tableId);
@@ -111,7 +111,7 @@ public class RdbSinglePointIndexDao extends SinglePointIndexDao
                 MetadataProto.SinglePointIndex singlePointIndex = MetadataProto.SinglePointIndex.newBuilder()
                         .setId(rs.getLong("SPI_ID"))
                         .setKeyColumns(rs.getString("SPI_KEY_COLUMNS"))
-                        .setPrimary(rs.getBoolean("SPI_PRIMARY"))
+                        .setPrimary(true)
                         .setUnique(rs.getBoolean("SPI_UNIQUE"))
                         .setIndexScheme(rs.getString("SPI_INDEX_SCHEME"))
                         .setTableId(tableId)
@@ -219,13 +219,13 @@ public class RdbSinglePointIndexDao extends SinglePointIndexDao
     }
 
     @Override
-    public boolean deleteByTableId(long tableId)
+    public boolean deleteById(long id)
     {
         Connection conn = db.getConnection();
-        String sql = "DELETE FROM SINGLE_POINT_INDICES WHERE TBLS_TBL_ID=?";
+        String sql = "DELETE FROM SINGLE_POINT_INDICES WHERE SPI_ID=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setLong(1, tableId);
+            pst.setLong(1, id);
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {

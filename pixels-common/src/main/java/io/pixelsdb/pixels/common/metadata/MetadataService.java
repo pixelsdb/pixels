@@ -1114,12 +1114,12 @@ public class MetadataService
         return true;
     }
 
-    public boolean dropSinglePointIndex(SinglePointIndex singlePointIndex) throws MetadataException
+    public boolean dropSinglePointIndex(long indexId) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.DropSinglePointIndexRequest request = MetadataProto.DropSinglePointIndexRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSinglePointIndex(singlePointIndex.toProto()).build();
+                .setIndexId(indexId).build();
         try
         {
             MetadataProto.DropSinglePointIndexResponse response = this.stub.dropSinglePointIndex(request);

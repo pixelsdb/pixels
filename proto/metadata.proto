@@ -429,7 +429,7 @@ message CreateRangeIndexResponse {
 
 message GetRangeIndexRequest {
     RequestHeader header = 1;
-    int64 tableId = 2;
+    uint64 tableId = 2;
 }
 
 message GetRangeIndexResponse {
@@ -448,7 +448,7 @@ message UpdateRangeIndexResponse {
 
 message DropRangeIndexRequest {
     RequestHeader header = 1;
-    int64 tableId = 2;
+    uint64 tableId = 2;
 }
 
 message DropRangeIndexResponse {
@@ -467,7 +467,7 @@ message AddRangeResponse {
 
 message GetRangeRequest {
     RequestHeader header = 1;
-    int64 rangeId = 2;
+    uint64 rangeId = 2;
 }
 
 message GetRangeResponse {
@@ -477,7 +477,7 @@ message GetRangeResponse {
 
 message GetRangesRequest {
     RequestHeader header = 1;
-    int64 rangeIndexId = 2;
+    uint64 rangeIndexId = 2;
 }
 
 message GetRangesResponse {
@@ -487,7 +487,7 @@ message GetRangesResponse {
 
 message DeleteRangeRequest {
     RequestHeader header = 1;
-    int64 rangeId = 2;
+    uint64 rangeId = 2;
 }
 
 message DeleteRangeResponse {
@@ -507,7 +507,7 @@ message CreateSinglePointIndexResponse {
 // primary index in pixels is an unique single point index
 message GetPrimaryIndexRequest {
     RequestHeader header = 1;
-    int64 tableId = 2; // there is at most one primary index on each table
+    uint64 tableId = 2; // there is at most one primary index on each table
 }
 
 message GetPrimaryIndexResponse {
@@ -517,7 +517,7 @@ message GetPrimaryIndexResponse {
 
 message GetSinglePointIndicesRequest {
     RequestHeader header = 1;
-    int64 tableId = 2;
+    uint64 tableId = 2;
 }
 
 message GetSinglePointIndicesResponse {
@@ -536,7 +536,7 @@ message UpdateSinglePointIndexResponse {
 
 message DropSinglePointIndexRequest {
     RequestHeader header = 1;
-    SinglePointIndex singlePointIndex = 2;
+    uint64 indexId = 2;
 }
 
 message DropSinglePointIndexResponse {
