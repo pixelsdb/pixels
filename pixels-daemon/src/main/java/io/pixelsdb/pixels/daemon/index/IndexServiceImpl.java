@@ -52,6 +52,14 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     }
 
     @Override
+    public void allocateRowIdBatch(IndexProto.AllocateRowIdBatchRequest request,
+                                   StreamObserver<IndexProto.AllocateRowIdBatchResponse> responseObserver)
+    {
+        // TODO: implement
+        super.allocateRowIdBatch(request, responseObserver);
+    }
+
+    @Override
     public void lookupUniqueIndex(IndexProto.LookupUniqueIndexRequest request,
                                   StreamObserver<IndexProto.LookupUniqueIndexResponse> responseObserver)
     {
@@ -117,19 +125,20 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     }
 
     @Override
-    public void putIndexEntry(IndexProto.PutIndexEntryRequest request,
-                              StreamObserver<IndexProto.PutIndexEntryResponse> responseObserver)
+    public void putPrimaryIndexEntry(IndexProto.PutPrimaryIndexEntryRequest request,
+                              StreamObserver<IndexProto.PutPrimaryIndexEntryResponse> responseObserver)
     {
         // Get IndexEntry from request
-        IndexProto.IndexEntry entry = request.getIndexEntry();
+        IndexProto.PrimaryIndexEntry entry = request.getIndexEntry();
         // Create gRPC builder
-        IndexProto.PutIndexEntryResponse.Builder builder = IndexProto.PutIndexEntryResponse.newBuilder();
+        IndexProto.PutPrimaryIndexEntryResponse.Builder builder = IndexProto.PutPrimaryIndexEntryResponse.newBuilder();
         try
         {
             // Call SinglePointIndex's putEntry method
-            long rowId = singlePointIndex.putEntry(new SinglePointIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()));
+            long rowId = singlePointIndex.putEntry(
+                    new SinglePointIndex.Entry(entry.getIndexKey(), 0, true, entry.getRowLocation()));
             // Create gRPC response
-            builder.setRowId(rowId).setErrorCode(ErrorCode.SUCCESS);
+            builder.setErrorCode(ErrorCode.SUCCESS);
         }
         catch (RowIdException e)
         {
@@ -146,6 +155,14 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         // Send response
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void putSecondaryIndexEntry(IndexProto.PutSecondaryIndexEntryRequest request,
+                                       StreamObserver<IndexProto.PutSecondaryIndexEntryResponse> responseObserver)
+    {
+        // TODO: implement
+        super.putSecondaryIndexEntry(request, responseObserver);
     }
 
     @Override
@@ -176,20 +193,21 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     }
 
     @Override
-    public void putIndexEntries(IndexProto.PutIndexEntriesRequest request,
-                                StreamObserver<IndexProto.PutIndexEntriesResponse> responseObserver)
+    public void putPrimaryIndexEntries(IndexProto.PutPrimaryIndexEntriesRequest request,
+                                StreamObserver<IndexProto.PutPrimaryIndexEntriesResponse> responseObserver)
     {
         // Get list of IndexEntries from request
         List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream()
-                .map(entry -> new SinglePointIndex.Entry(entry.getIndexKey(), 0, entry.getUnique(), entry.getRowLocation()))
+                .map(entry -> new SinglePointIndex.Entry(
+                        entry.getIndexKey(), 0, true, entry.getRowLocation()))
                 .collect(Collectors.toList());
         // Create gRPC builder
-        IndexProto.PutIndexEntriesResponse.Builder builder  = IndexProto.PutIndexEntriesResponse.newBuilder();
+        IndexProto.PutPrimaryIndexEntriesResponse.Builder builder  = IndexProto.PutPrimaryIndexEntriesResponse.newBuilder();
         try
         {
             // Call SinglePointIndex's putEntries method
             List<Long> rowIds = singlePointIndex.putEntries(entries);
-            builder.addAllRowIds(rowIds).setErrorCode(ErrorCode.SUCCESS);
+            builder.setErrorCode(ErrorCode.SUCCESS);
         }
         catch (RowIdException e)
         {
@@ -206,6 +224,14 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         // Send response
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void putSecondaryIndexEntries(IndexProto.PutSecondaryIndexEntriesRequest request,
+                                         StreamObserver<IndexProto.PutSecondaryIndexEntriesResponse> responseObserver)
+    {
+        // TODO: implement
+        super.putSecondaryIndexEntries(request, responseObserver);
     }
 
     @Override
