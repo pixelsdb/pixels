@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.index.rocksdb;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
-import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexImpl;
 import java.io.File;
@@ -58,7 +58,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testPutEntry() throws RocksDBException, MainIndexException, SecondaryIndexException, RowIdException {
+    public void testPutEntry() throws RocksDBException, MainIndexException, SinglePointIndexException, RowIdException {
         // Create Entry
         long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
@@ -95,7 +95,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testPutEntries() throws RocksDBException, MainIndexException, SecondaryIndexException, RowIdException {
+    public void testPutEntries() throws RocksDBException, MainIndexException, SinglePointIndexException, RowIdException {
         long indexId = 1L;
         long timestamp = System.currentTimeMillis();
         long fileId = 1L;
@@ -142,7 +142,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntry() throws RocksDBException, MainIndexException, SecondaryIndexException, RowIdException {
+    public void testDeleteEntry() throws RocksDBException, MainIndexException, SinglePointIndexException, RowIdException {
         long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
@@ -181,7 +181,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntries() throws RocksDBException, MainIndexException, SecondaryIndexException, RowIdException {
+    public void testDeleteEntries() throws RocksDBException, MainIndexException, SinglePointIndexException, RowIdException {
         long indexId = 1L;
         long timestamp = System.currentTimeMillis();
         long fileId = 1L;

@@ -38,20 +38,20 @@ import static java.util.Objects.requireNonNull;
 public class SinglePointIndexFactory
 {
     private static final Logger logger = LogManager.getLogger(SinglePointIndexFactory.class);
-    private final Map<SinglePointIndex.Scheme, SinglePointIndex> secondaryIndexImpls = new HashMap<>();
+    private final Map<SinglePointIndex.Scheme, SinglePointIndex> singlePointIndexImpls = new HashMap<>();
     private final Set<SinglePointIndex.Scheme> enabledSchemes = new TreeSet<>();
     /**
-     * The providers of the enabled secondary index schemes.
+     * The providers of the enabled single point index schemes.
      */
-    private final ImmutableMap<SinglePointIndex.Scheme, SinglePointIndexProvider> secondaryIndexProviders;
+    private final ImmutableMap<SinglePointIndex.Scheme, SinglePointIndexProvider> singlePointIndexProviders;
 
     private SinglePointIndexFactory()
     {
-        String value = ConfigFactory.Instance().getProperty("enabled.secondary.index.schemes");
-        requireNonNull(value, "enabled.secondary.index.schemes is not configured");
+        String value = ConfigFactory.Instance().getProperty("enabled.single.point.index.schemes");
+        requireNonNull(value, "enabled.single.point.index.schemes is not configured");
         String[] schemeNames = value.trim().split(",");
         checkArgument(schemeNames.length > 0,
-                "at lease one secondary index scheme must be enabled");
+                "at lease one single point index scheme must be enabled");
         ImmutableMap.Builder<SinglePointIndex.Scheme, SinglePointIndexProvider> providersBuilder = ImmutableMap.builder();
         ServiceLoader<SinglePointIndexProvider> providerLoader = ServiceLoader.load(SinglePointIndexProvider.class);
         for (String name : schemeNames)
@@ -71,11 +71,10 @@ public class SinglePointIndexFactory
             if (!providerExists)
             {
                 // only log a warning, do not throw exception.
-                logger.warn(String.format(
-                        "no secondary index provider exists for scheme: %s", scheme.name()));
+                logger.warn("no single point index provider exists for scheme: {}", scheme.name());
             }
         }
-        this.secondaryIndexProviders = providersBuilder.build();
+        this.singlePointIndexProviders = providersBuilder.build();
     }
 
     private static SinglePointIndexFactory instance = null;
@@ -92,7 +91,7 @@ public class SinglePointIndexFactory
                     instance.closeAll();
                 } catch (IOException e)
                 {
-                    logger.error("Failed to close all secondary index instances.", e);
+                    logger.error("Failed to close all single point index instances.", e);
                     e.printStackTrace();
                 }
             }));
@@ -135,61 +134,61 @@ public class SinglePointIndexFactory
      */
     public synchronized void reload(SinglePointIndex.Scheme scheme) throws IOException
     {
-        SinglePointIndex singlePointIndex = this.secondaryIndexImpls.remove(scheme);
+        SinglePointIndex singlePointIndex = this.singlePointIndexImpls.remove(scheme);
         if (singlePointIndex != null)
         {
             singlePointIndex.close();
         }
-        singlePointIndex = this.getSecondaryIndex(scheme);
-        requireNonNull(scheme, "failed to create secondary index instance");
-        this.secondaryIndexImpls.put(scheme, singlePointIndex);
+        singlePointIndex = this.getSinglePointIndex(scheme);
+        requireNonNull(scheme, "failed to create the single point index instance");
+        this.singlePointIndexImpls.put(scheme, singlePointIndex);
     }
 
     /**
-     * Get the secondary index instance from a scheme name.
+     * Get the single point index instance from a scheme name.
      * @param scheme
      * @return
      * @throws IOException
      */
-    public synchronized SinglePointIndex getSecondaryIndex(String scheme) throws IOException
+    public synchronized SinglePointIndex getSinglePointIndex(String scheme) throws IOException
     {
         try
         {
             // 'synchronized' in Java is reentrant,
-            // it is fine to call the other getSecondaryIndex() from here.
-            return getSecondaryIndex(SinglePointIndex.Scheme.from(scheme));
+            // it is fine to call the other getSinglePointIndex() from here.
+            return getSinglePointIndex(SinglePointIndex.Scheme.from(scheme));
         }
         catch (RuntimeException re)
         {
-            throw new IOException("Invalid secondary index scheme: " + scheme, re);
+            throw new IOException("Invalid single point index scheme: " + scheme, re);
         }
     }
 
-    public synchronized SinglePointIndex getSecondaryIndex(SinglePointIndex.Scheme scheme) throws IOException
+    public synchronized SinglePointIndex getSinglePointIndex(SinglePointIndex.Scheme scheme) throws IOException
     {
-        checkArgument(this.enabledSchemes.contains(scheme), "secondary index scheme '" +
+        checkArgument(this.enabledSchemes.contains(scheme), "single point index scheme '" +
                 scheme.toString() + "' is not enabled.");
-        if (secondaryIndexImpls.containsKey(scheme))
+        if (singlePointIndexImpls.containsKey(scheme))
         {
-            return secondaryIndexImpls.get(scheme);
+            return singlePointIndexImpls.get(scheme);
         }
 
-        SinglePointIndex singlePointIndex = this.secondaryIndexProviders.get(scheme).createInstance(scheme);
-        secondaryIndexImpls.put(scheme, singlePointIndex);
+        SinglePointIndex singlePointIndex = this.singlePointIndexProviders.get(scheme).createInstance(scheme);
+        singlePointIndexImpls.put(scheme, singlePointIndex);
 
         return singlePointIndex;
     }
 
     public ImmutableMap<SinglePointIndex.Scheme, SinglePointIndexProvider> getStorageProviders()
     {
-        return secondaryIndexProviders;
+        return singlePointIndexProviders;
     }
 
     public synchronized void closeAll() throws IOException
     {
-        for (SinglePointIndex.Scheme scheme : secondaryIndexImpls.keySet())
+        for (SinglePointIndex.Scheme scheme : singlePointIndexImpls.keySet())
         {
-            secondaryIndexImpls.get(scheme).close();
+            singlePointIndexImpls.get(scheme).close();
         }
     }
 }

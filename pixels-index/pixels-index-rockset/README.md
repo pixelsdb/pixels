@@ -1,7 +1,7 @@
 # Pixels Index Rockset
 
 ### Main Features
-This is a secondary index implementation based on Rockset. It is the cloud version of RocksDBIndex and is used to add indexes for data stored in S3 buckets on AWS EC2 instances.
+This is a single point index implementation based on Rockset. It is the cloud version of RocksDBIndex and is used to add indexes for data stored in S3 buckets on AWS EC2 instances.
 
 ### Build Instructions
 1. Configure the bucketName, s3Prefix, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly in `pixels-common/src/main/resources/pixels.properties`.
@@ -10,7 +10,7 @@ This is a secondary index implementation based on Rockset. It is the cloud versi
 
 3. Compile the project using `mvn clean install`.
 
-4. Use `RocksetIndexProvider.createInstance(SecondaryIndex.Scheme.rockset)` to create a `RocksetIndex`.
+4. Use `RocksetIndexProvider.createInstance(SinglePointIndex.Scheme.rockset)` to create a `RocksetIndex`.
 
 5. The indexing service must be called through `IndexServer`. It is important to note that when compiling, you need to use `-Djava.library.path` to include the `libRocksetJni.so` file. Below is an example of a script to start the service:
 ```cpp

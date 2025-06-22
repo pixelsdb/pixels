@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.index.rocksdb;
 
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
-import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
@@ -173,7 +173,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long putEntry(Entry entry) throws RowIdException, MainIndexException, SecondaryIndexException
+    public long putEntry(Entry entry) throws RowIdException, MainIndexException, SinglePointIndexException
     {
         // Get rowId for Entry
         try
@@ -220,12 +220,12 @@ public class RocksDBIndex implements SinglePointIndex
         catch (RocksDBException e)
         {
             LOGGER.error("Failed to put Entry: {} by entry", entry);
-            throw new SecondaryIndexException("Failed to put Entry",e);
+            throw new SinglePointIndexException("Failed to put Entry",e);
         }
     }
 
     @Override
-    public List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SecondaryIndexException
+    public List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SinglePointIndexException
     {
         List<Long> rowIds = new ArrayList<>();
         // Get rowIds for Entries
@@ -284,12 +284,12 @@ public class RocksDBIndex implements SinglePointIndex
         catch (RocksDBException e)
         {
             LOGGER.error("Failed to put Entries: {} by entries", entries, e);
-            throw new SecondaryIndexException("Failed to put Entries",e);
+            throw new SinglePointIndexException("Failed to put Entries",e);
         }
     }
 
     @Override
-    public boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SecondaryIndexException
+    public boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -311,17 +311,17 @@ public class RocksDBIndex implements SinglePointIndex
         catch (RocksDBException e)
         {
             LOGGER.error("Failed to delete Entry: {}", key, e);
-            throw new SecondaryIndexException("Failed to delete Entry",e);
+            throw new SinglePointIndexException("Failed to delete Entry",e);
         }
     }
 
     @Override
-    public boolean deleteEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SecondaryIndexException
+    public boolean deleteEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
             List<Long> rowIds = new ArrayList<>();
-            // Delete Secondary Index
+            // Delete single point index
             for(IndexProto.IndexKey key : keys)
             {
                 // Get rowId
@@ -352,7 +352,7 @@ public class RocksDBIndex implements SinglePointIndex
         catch (RocksDBException e)
         {
             LOGGER.error("Failed to delete Entries: {}", keys, e);
-            throw new SecondaryIndexException("Failed to delete Entries",e);
+            throw new SinglePointIndexException("Failed to delete Entries",e);
         }
     }
 

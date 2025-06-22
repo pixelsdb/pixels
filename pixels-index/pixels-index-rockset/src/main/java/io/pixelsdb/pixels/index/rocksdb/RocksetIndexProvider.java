@@ -38,12 +38,12 @@ public class RocksetIndexProvider implements SinglePointIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
     private final MainIndex mainIndex = new MainIndexImpl();
-    private final String bucketName = ConfigFactory.Instance().getProperty("rockset.s3.bucket");
-    private final String s3Prefix = ConfigFactory.Instance().getProperty("rockset.s3.prefix");
-    private final String localDbPath = ConfigFactory.Instance().getProperty("rockset.local.data.path");
-    private final String persistentCachePath = ConfigFactory.Instance().getProperty("rockset.persistent.cache.path");
-    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("rockset.persistent.cache.size.gb"));
-    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("rockset.read.only"));
+    private final String bucketName = ConfigFactory.Instance().getProperty("index.rockset.s3.bucket");
+    private final String s3Prefix = ConfigFactory.Instance().getProperty("index.rockset.s3.prefix");
+    private final String localDbPath = ConfigFactory.Instance().getProperty("index.rockset.local.data.path");
+    private final String persistentCachePath = ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.path");
+    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.size.gb"));
+    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
 
     @Override
     public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme) throws IOException

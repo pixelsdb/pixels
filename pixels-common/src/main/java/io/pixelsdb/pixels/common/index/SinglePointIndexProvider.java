@@ -29,13 +29,13 @@ import java.io.IOException;
 public interface SinglePointIndexProvider
 {
     /**
-     * Create an instance of the secondary index.
+     * Create an instance of the single point index.
      */
     SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme) throws IOException;
 
     /**
-     * @param scheme the given secondary index scheme.
-     * @return true if this secondary index provider is compatible with the given scheme.
+     * @param scheme the given single point index scheme.
+     * @return true if this single point index provider is compatible with the given scheme.
      */
     boolean compatibleWith(@Nonnull SinglePointIndex.Scheme scheme);
 }

@@ -45,7 +45,7 @@ public interface MainIndex extends Closeable
 
     /**
      * Put a single row id into the main index, in order to enable simultaneous insert into the main index while
-     * inserting a single secondary index.
+     * inserting a single point index.
      * @param rowId the row id
      * @param rowLocation the location of the row id
      * @return true on success
@@ -78,18 +78,18 @@ public interface MainIndex extends Closeable
     boolean deleteRowIdRange(RowIdRange rowIdRange);
 
     /**
-     * Distribute row id for the secondary index.
+     * Distribute row id for the single point index.
      * If there isn't any row id in cache, get a range of row ids at once and put them into cache.
      *
-     * @param entry the rowLocation of secondary index
+     * @param entry the rowLocation of single point index
      */
     boolean getRowId(SinglePointIndex.Entry entry) throws RowIdException;
 
     /**
-     * Distribute row ids for the secondary index.
+     * Distribute row ids for the single point index.
      * If there isn't enough row ids in cache, get a range of row ids at once and put them into cache.
      *
-     * @param entries the rowLocation of secondary index
+     * @param entries the rowLocation of single point index
      */
     boolean getRgOfRowIds(List<SinglePointIndex.Entry> entries) throws RowIdException;
 

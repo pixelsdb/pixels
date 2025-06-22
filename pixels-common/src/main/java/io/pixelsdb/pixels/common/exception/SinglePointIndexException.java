@@ -19,24 +19,24 @@
  */
 package io.pixelsdb.pixels.common.exception;
 
-public class SecondaryIndexException extends IndexException
+public class SinglePointIndexException extends IndexException
 {
-    public SecondaryIndexException()
+    public SinglePointIndexException()
     {
         super();
     }
 
-    public SecondaryIndexException(String message)
+    public SinglePointIndexException(String message)
     {
         super(message);
     }
 
-    public SecondaryIndexException(Throwable cause)
+    public SinglePointIndexException(Throwable cause)
     {
         super(cause);
     }
 
-    public SecondaryIndexException(String message, Throwable cause)
+    public SinglePointIndexException(String message, Throwable cause)
     {
         super(message, cause);
     }

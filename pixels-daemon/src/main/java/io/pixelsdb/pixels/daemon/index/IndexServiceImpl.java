@@ -23,7 +23,7 @@ import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
-import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.index.IndexProto;
@@ -139,9 +139,9 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         {
             builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
         }
-        catch (SecondaryIndexException e)
+        catch (SinglePointIndexException e)
         {
-            builder.setErrorCode(ErrorCode.INDEX_PUT_SECONDARY_INDEX_FAIL);
+            builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
         }
         // Send response
         responseObserver.onNext(builder.build());
@@ -166,9 +166,9 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         {
             builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
         }
-        catch (SecondaryIndexException e)
+        catch (SinglePointIndexException e)
         {
-            builder.setErrorCode(ErrorCode.INDEX_DELETE_SECONDARY_INDEX_FAIL);
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
         }
         // Send response
         responseObserver.onNext(builder.build());
@@ -199,9 +199,9 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         {
             builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
         }
-        catch (SecondaryIndexException e)
+        catch (SinglePointIndexException e)
         {
-            builder.setErrorCode(ErrorCode.INDEX_PUT_SECONDARY_INDEX_FAIL);
+            builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
         }
         // Send response
         responseObserver.onNext(builder.build());
@@ -226,9 +226,9 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         {
             builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
         }
-        catch (SecondaryIndexException e)
+        catch (SinglePointIndexException e)
         {
-            builder.setErrorCode(ErrorCode.INDEX_DELETE_SECONDARY_INDEX_FAIL);
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
         }
         // Send response
         responseObserver.onNext(builder.build());

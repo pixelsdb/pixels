@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.common.index;
 
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
-import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
@@ -86,18 +86,18 @@ public interface SinglePointIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-    long putEntry(Entry entry) throws RowIdException, MainIndexException, SecondaryIndexException;
+    long putEntry(Entry entry) throws RowIdException, MainIndexException, SinglePointIndexException;
 
-    List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SecondaryIndexException;
+    List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SinglePointIndexException;
 
-    boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SecondaryIndexException;
+    boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException;
 
-    boolean deleteEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SecondaryIndexException;
+    boolean deleteEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException;
 
     /**
-     * Close the secondary index. This method is to be used by the secondary index factory to close the
-     * managed secondary index instances when the process is shutting down.
-     * Users do not need to close the managed secondary index instances by themselves.
+     * Close the single point index. This method is to be used by the single point index factory to close the
+     * managed single point index instances when the process is shutting down.
+     * Users do not need to close the managed single point index instances by themselves.
      * @throws IOException
      */
     @Override

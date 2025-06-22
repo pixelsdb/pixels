@@ -39,7 +39,7 @@ public class RocksDBIndexProvider implements SinglePointIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksDBIndexProvider.class);
     private final MainIndex mainIndex = new MainIndexImpl();
-    private final String RocksdbPath = ConfigFactory.Instance().getProperty("rocksdb.data.path");
+    private final String RocksdbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
 
     @Override
     public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme) throws IOException
