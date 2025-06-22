@@ -45,7 +45,8 @@ using ROCKSDB_NAMESPACE::FlushOptions;
  * @create 2025-05-01
  */
 // Helper function to convert jstring to std::string
-std::string jstring_to_string(JNIEnv* env, jstring jstr) {
+std::string jstring_to_string(JNIEnv* env, jstring jstr)
+{
     const char* cstr = env->GetStringUTFChars(jstr, nullptr);
     std::string str(cstr);
     env->ReleaseStringUTFChars(jstr, cstr);
@@ -53,8 +54,10 @@ std::string jstring_to_string(JNIEnv* env, jstring jstr) {
 }
 
 // Test if set the environment
-bool check_env_vars(JNIEnv* env) {
-    if (!getenv("AWS_ACCESS_KEY_ID") || !getenv("AWS_SECRET_ACCESS_KEY") || !getenv("AWS_DEFAULT_REGION")) {
+bool check_env_vars(JNIEnv* env)
+{
+    if (!getenv("AWS_ACCESS_KEY_ID") || !getenv("AWS_SECRET_ACCESS_KEY") || !getenv("AWS_DEFAULT_REGION"))
+    {
         env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
             "Missing required environment variables: "
             "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION");
@@ -70,9 +73,12 @@ bool check_env_vars(JNIEnv* env) {
  */
 JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_CreateCloudFileSystem0(
     JNIEnv* env, jobject obj, 
-    jstring bucket_name, jstring s3_prefix) {
-
-    if (!check_env_vars(env)) return 0;
+    jstring bucket_name, jstring s3_prefix)
+{
+    if (!check_env_vars(env))
+    {
+        return 0;
+    }
 
     Aws::SDKOptions options;
     Aws::InitAPI(options);
@@ -83,7 +89,8 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_Creat
         getenv("AWS_ACCESS_KEY_ID"),
         getenv("AWS_SECRET_ACCESS_KEY"));
 
-    if (!cloud_fs_options.credentials.HasValid().ok()) {
+    if (!cloud_fs_options.credentials.HasValid().ok())
+    {
         env->ThrowNew(env->FindClass("java/lang/SecurityException"),
             "Invalid AWS credentials in environment variables");
         return 0;
@@ -104,7 +111,8 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_Creat
     CloudFileSystem* cfs;
     std::cout << "Start to Create CloudFileSystem"<< std::endl;
     Status s = CloudFileSystemEnv::NewAwsFileSystem(base_fs, cloud_fs_options, nullptr, &cfs);
-    if (!s.ok()) {
+    if (!s.ok())
+    {
         env->ThrowNew(env->FindClass("java/io/IOException"),
             "Failed to create CloudFileSystem. Check S3 permissions and bucket name.");
         return 0;
