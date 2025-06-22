@@ -9,7 +9,7 @@
     </parent>
 
     <artifactId>pixels-index-rocksdb</artifactId>
-    <description>Pixels secondary index backed by RocksDB-compatible storage.</description>
+    <description>Pixels single point index backed by RocksDB-compatible storage.</description>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>

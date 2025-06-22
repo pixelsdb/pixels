@@ -77,6 +77,10 @@ public class ErrorCode
     public static final int METADATA_GET_FILE_ID_FAILED = (ERROR_BASE_METADATA + 45);
     public static final int METADATA_UPDATE_FILE_FAILED = (ERROR_BASE_METADATA + 46);
     public static final int METADATA_DELETE_FILES_FAILED = (ERROR_BASE_METADATA + 47);
+    public static final int METADATA_ADD_SINGLE_POINT_INDEX_FAILED = (ERROR_BASE_METADATA + 48);
+    public static final int METADATA_SINGLE_POINT_INDEX_NOT_FOUND = (ERROR_BASE_METADATA + 49);
+    public static final int METADATA_UPDATE_SINGLE_POINT_INDEX_FAILED = (ERROR_BASE_METADATA + 50);
+    public static final int METADATA_DELETE_SINGLE_POINT_INDEX_FAILED = (ERROR_BASE_METADATA + 51);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue
@@ -125,8 +129,8 @@ public class ErrorCode
     // error code for index service
     private static final int ERROR_INDEX_SERVER = ERROR_BASE + 600;
     public static final int INDEX_PUT_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 1;
-    public static final int INDEX_PUT_SECONDARY_INDEX_FAIL = ERROR_INDEX_SERVER + 2;
+    public static final int INDEX_PUT_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 2;
     public static final int INDEX_DELETE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 3;
-    public static final int INDEX_DELETE_SECONDARY_INDEX_FAIL = ERROR_INDEX_SERVER + 4;
+    public static final int INDEX_DELETE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 4;
     public static final int INDEX_GET_ROW_ID_FAIL = ERROR_INDEX_SERVER +5;
 }

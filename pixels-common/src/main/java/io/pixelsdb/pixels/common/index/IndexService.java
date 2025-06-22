@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static io.pixelsdb.pixels.common.error.ErrorCode.*;
-
 /**
  * @author hank, Rolland1944
  * @create 2025-02-16
@@ -150,7 +148,8 @@ public class IndexService
         return response.getRowLocationList();
     }
 
-    public long putIndexEntry(IndexProto.IndexEntry entry) throws IndexException {
+    public long putIndexEntry(IndexProto.IndexEntry entry) throws IndexException
+    {
         // Create gRPC request
         IndexProto.PutIndexEntryRequest request = IndexProto.PutIndexEntryRequest.newBuilder()
                 .setIndexEntry(entry).build();
@@ -163,7 +162,8 @@ public class IndexService
         return response.getRowId();
     }
 
-    public boolean deleteIndexEntry(IndexProto.IndexKey key) throws IndexException {
+    public boolean deleteIndexEntry(IndexProto.IndexKey key) throws IndexException
+    {
         // Create gRPC request
         IndexProto.DeleteIndexEntryRequest request = IndexProto.DeleteIndexEntryRequest.newBuilder()
                 .setIndexKey(key).build();
@@ -176,7 +176,8 @@ public class IndexService
         return true;
     }
 
-    public List<Long> putIndexEntries(List<IndexProto.IndexEntry> entries) throws IndexException {
+    public List<Long> putIndexEntries(List<IndexProto.IndexEntry> entries) throws IndexException
+    {
         // Create gRPC request
         IndexProto.PutIndexEntriesRequest request = IndexProto.PutIndexEntriesRequest.newBuilder()
                 .addAllIndexEntries(entries).build();
@@ -190,7 +191,8 @@ public class IndexService
         return response.getRowIdsList();
     }
 
-    public boolean deleteIndexEntries(List<IndexProto.IndexKey> keys) throws IndexException {
+    public boolean deleteIndexEntries(List<IndexProto.IndexKey> keys) throws IndexException
+    {
         // Create gRPC request
         IndexProto.DeleteIndexEntriesRequest request = IndexProto.DeleteIndexEntriesRequest.newBuilder()
                 .addAllIndexKeys(keys).build();

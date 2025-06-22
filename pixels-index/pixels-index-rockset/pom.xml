@@ -9,7 +9,7 @@
     </parent>
 
     <artifactId>pixels-index-rockset</artifactId>
-    <description>Pixels secondary index backed by Rockset (RocksDB-Cloud) storage.</description>
+    <description>Pixels single point index backed by Rockset (RocksDB-Cloud) storage.</description>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>

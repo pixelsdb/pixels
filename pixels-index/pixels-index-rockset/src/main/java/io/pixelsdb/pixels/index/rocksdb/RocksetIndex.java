@@ -21,10 +21,10 @@ package io.pixelsdb.pixels.index.rocksdb;
 
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
-import io.pixelsdb.pixels.common.exception.SecondaryIndexException;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.RowIdRange;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -39,7 +39,7 @@ import java.util.List;
  * @author hank, Rolland1944
  * @create 2025-02-19
  */
-public class RocksetIndex implements SecondaryIndex
+public class RocksetIndex implements SinglePointIndex
 {
     // load RocksetJni
     static
@@ -157,7 +157,7 @@ public class RocksetIndex implements SecondaryIndex
     }
 
     @Override
-    public long putEntry(Entry entry) throws RowIdException, MainIndexException, SecondaryIndexException
+    public long putEntry(Entry entry) throws RowIdException, MainIndexException, SinglePointIndexException
     {
         // Get rowId for Entry
         try
@@ -212,12 +212,12 @@ public class RocksetIndex implements SecondaryIndex
         catch (RuntimeException e)
         {
             LOGGER.error("Failed to put Entry: {} by entry", entry, e);
-            throw new SecondaryIndexException("Failed to put Entry",e);
+            throw new SinglePointIndexException("Failed to put Entry",e);
         }
     }
 
     @Override
-    public List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SecondaryIndexException
+    public List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SinglePointIndexException
     {
         // Get rowIds for Entries
         List<Long> rowIds = new ArrayList<>();
@@ -276,7 +276,7 @@ public class RocksetIndex implements SecondaryIndex
         catch (RuntimeException e)
         {
             LOGGER.error("Failed to put Entries: {} by entries", entries, e);
-            throw new SecondaryIndexException("Failed to put Entries",e);
+            throw new SinglePointIndexException("Failed to put Entries",e);
         }
     }
 
