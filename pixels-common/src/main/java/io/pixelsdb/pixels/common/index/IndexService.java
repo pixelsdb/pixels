@@ -126,7 +126,18 @@ public class IndexService
         }
     }
 
-    public IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key)
+    public IndexProto.RowIdBatch allocateRowIdBatch (long tableId, int numRowIds)
+    {
+        // Create gRPC request
+        IndexProto.AllocateRowIdBatchRequest request = IndexProto.AllocateRowIdBatchRequest.newBuilder()
+                .setTableId(tableId).setNumRowIds(numRowIds).build();
+        // Send request and get response
+        IndexProto.AllocateRowIdBatchResponse response = stub.allocateRowIdBatch(request);
+        // Return RowLocation
+        return response.getRowIdBatch();
+    }
+
+    public IndexProto.RowLocation lookupUniqueIndex (IndexProto.IndexKey key)
     {
         // Create gRPC request
         IndexProto.LookupUniqueIndexRequest request = IndexProto.LookupUniqueIndexRequest.newBuilder()
@@ -137,7 +148,7 @@ public class IndexService
         return response.getRowLocation();
     }
 
-    public List<IndexProto.RowLocation> lookupNonUniqueIndex(IndexProto.IndexKey key)
+    public List<IndexProto.RowLocation> lookupNonUniqueIndex (IndexProto.IndexKey key)
     {
         // Create gRPC request
         IndexProto.LookupNonUniqueIndexRequest request = IndexProto.LookupNonUniqueIndexRequest.newBuilder()
@@ -148,21 +159,35 @@ public class IndexService
         return response.getRowLocationList();
     }
 
-    public long putIndexEntry(IndexProto.IndexEntry entry) throws IndexException
+    public boolean putPrimaryIndexEntry (IndexProto.PrimaryIndexEntry entry) throws IndexException
     {
         // Create gRPC request
-        IndexProto.PutIndexEntryRequest request = IndexProto.PutIndexEntryRequest.newBuilder()
+        IndexProto.PutPrimaryIndexEntryRequest request = IndexProto.PutPrimaryIndexEntryRequest.newBuilder()
                 .setIndexEntry(entry).build();
         // Send request and get response
-        IndexProto.PutIndexEntryResponse response = stub.putIndexEntry(request);
+        IndexProto.PutPrimaryIndexEntryResponse response = stub.putPrimaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to put index entry, error code=" + response.getErrorCode());
+            throw new IndexException("failed to put primary index entry, error code=" + response.getErrorCode());
         }
-        return response.getRowId();
+        return true;
     }
 
-    public boolean deleteIndexEntry(IndexProto.IndexKey key) throws IndexException
+    public boolean putSecondaryIndexEntry (IndexProto.SecondaryIndexEntry entry) throws IndexException
+    {
+        // Create gRPC request
+        IndexProto.PutSecondaryIndexEntryRequest request = IndexProto.PutSecondaryIndexEntryRequest.newBuilder()
+                .setIndexEntry(entry).build();
+        // Send request and get response
+        IndexProto.PutSecondaryIndexEntryResponse response = stub.putSecondaryIndexEntry(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to put secondary index entry, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean deleteIndexEntry (IndexProto.IndexKey key) throws IndexException
     {
         // Create gRPC request
         IndexProto.DeleteIndexEntryRequest request = IndexProto.DeleteIndexEntryRequest.newBuilder()
@@ -176,22 +201,37 @@ public class IndexService
         return true;
     }
 
-    public List<Long> putIndexEntries(List<IndexProto.IndexEntry> entries) throws IndexException
+    public boolean putPrimaryIndexEntries (List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
     {
         // Create gRPC request
-        IndexProto.PutIndexEntriesRequest request = IndexProto.PutIndexEntriesRequest.newBuilder()
+        IndexProto.PutPrimaryIndexEntriesRequest request = IndexProto.PutPrimaryIndexEntriesRequest.newBuilder()
                 .addAllIndexEntries(entries).build();
         // Send request and get response
-        IndexProto.PutIndexEntriesResponse response = stub.putIndexEntries(request);
+        IndexProto.PutPrimaryIndexEntriesResponse response = stub.putPrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to put index entries, error code=" + response.getErrorCode());
+            throw new IndexException("failed to put primary index entries, error code=" + response.getErrorCode());
         }
         // Return operation success status
-        return response.getRowIdsList();
+        return true;
     }
 
-    public boolean deleteIndexEntries(List<IndexProto.IndexKey> keys) throws IndexException
+    public boolean putSecondaryIndexEntries (List<IndexProto.SecondaryIndexEntry> entries) throws IndexException
+    {
+        // Create gRPC request
+        IndexProto.PutSecondaryIndexEntriesRequest request = IndexProto.PutSecondaryIndexEntriesRequest.newBuilder()
+                .addAllIndexEntries(entries).build();
+        // Send request and get response
+        IndexProto.PutSecondaryIndexEntriesResponse response = stub.putSecondaryIndexEntries(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to put secondary index entries, error code=" + response.getErrorCode());
+        }
+        // Return operation success status
+        return true;
+    }
+
+    public boolean deleteIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
     {
         // Create gRPC request
         IndexProto.DeleteIndexEntriesRequest request = IndexProto.DeleteIndexEntriesRequest.newBuilder()

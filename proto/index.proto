@@ -30,18 +30,22 @@ package index.proto;
 
 // The index services definition.
 service IndexService {
+  rpc AllocateRowIdBatch (AllocateRowIdBatchRequest) returns (AllocateRowIdBatchResponse);
   rpc LookupUniqueIndex (LookupUniqueIndexRequest) returns (LookupUniqueIndexResponse);
   rpc LookupNonUniqueIndex (LookupNonUniqueIndexRequest) returns (LookupNonUniqueIndexResponse);
-  rpc PutIndexEntry (PutIndexEntryRequest) returns (PutIndexEntryResponse);
+  rpc PutPrimaryIndexEntry (PutPrimaryIndexEntryRequest) returns (PutPrimaryIndexEntryResponse);
+  rpc PutSecondaryIndexEntry (PutSecondaryIndexEntryRequest) returns (PutSecondaryIndexEntryResponse);
   rpc DeleteIndexEntry (DeleteIndexEntryRequest) returns (DeleteIndexEntryResponse);
-  rpc PutIndexEntries (PutIndexEntriesRequest) returns (PutIndexEntriesResponse);
+  rpc PutPrimaryIndexEntries (PutPrimaryIndexEntriesRequest) returns (PutPrimaryIndexEntriesResponse);
+  rpc PutSecondaryIndexEntries (PutSecondaryIndexEntriesRequest) returns (PutSecondaryIndexEntriesResponse);
   rpc DeleteIndexEntries (DeleteIndexEntriesRequest) returns (DeleteIndexEntriesResponse);
 }
 
 message IndexKey {
-  uint64 indexId = 1; // index id
-  bytes key = 2; // index key
-  uint64 timestamp = 3; // transaction timestamp
+  uint64 tableId = 1; // table id
+  uint64 indexId = 2; // index id
+  bytes key = 3; // index key
+  uint64 timestamp = 4; // transaction timestamp
 }
 
 message RowLocation {
@@ -50,10 +54,31 @@ message RowLocation {
   uint32 rgRowId = 3; // the index of the row index the row group, starts from 0
 }
 
-message IndexEntry {
+message RowIdBatch {
+  uint64 rowIdStart = 1; // inclusive
+  uint32 length = 2; // the number of row ids allocated
+}
+
+message PrimaryIndexEntry {
   IndexKey indexKey = 1;
-  RowLocation rowLocation = 2;
-  bool unique = 3;
+  uint64 tableRowId = 2; // the rowId in this table
+  RowLocation rowLocation = 3;
+}
+
+message SecondaryIndexEntry {
+  IndexKey indexKey = 1;
+  uint64 tableRowId = 2; // the rowId in this table
+  // secondary index entry does not have associated row location
+}
+
+message AllocateRowIdBatchRequest {
+  uint64 tableId = 1;
+  uint32 numRowIds = 2; // the number of row ids to allocate
+}
+
+message AllocateRowIdBatchResponse {
+  int32 errorCode = 1;
+  RowIdBatch rowIdBatch = 2;
 }
 
 message LookupUniqueIndexRequest {
@@ -61,7 +86,8 @@ message LookupUniqueIndexRequest {
 }
 
 message LookupUniqueIndexResponse {
-  RowLocation rowLocation = 1;
+  int32 errorCode = 1;
+  RowLocation rowLocation = 2;
 }
 
 message LookupNonUniqueIndexRequest {
@@ -69,16 +95,24 @@ message LookupNonUniqueIndexRequest {
 }
 
 message LookupNonUniqueIndexResponse {
-  repeated RowLocation rowLocation = 1;
+  int32 errorCode = 1;
+  repeated RowLocation rowLocation = 2;
 }
 
-message PutIndexEntryRequest {
-  IndexEntry indexEntry = 1;
+message PutPrimaryIndexEntryRequest {
+  PrimaryIndexEntry indexEntry = 1;
 }
 
-message PutIndexEntryResponse {
-  int64 rowId = 1;
-  int32 errorCode = 2;
+message PutPrimaryIndexEntryResponse {
+  int32 errorCode = 1;
+}
+
+message PutSecondaryIndexEntryRequest {
+  SecondaryIndexEntry indexEntry = 1;
+}
+
+message PutSecondaryIndexEntryResponse {
+  int32 errorCode = 1;
 }
 
 message DeleteIndexEntryRequest {
@@ -89,13 +123,20 @@ message DeleteIndexEntryResponse {
   int32 errorCode = 1;
 }
 
-message PutIndexEntriesRequest {
-  repeated IndexEntry indexEntries = 1;
+message PutPrimaryIndexEntriesRequest {
+  repeated PrimaryIndexEntry indexEntries = 1;
 }
 
-message PutIndexEntriesResponse {
-  repeated int64 rowIds = 1;
-  int32 errorCode = 2;
+message PutPrimaryIndexEntriesResponse {
+  int32 errorCode = 1;
+}
+
+message PutSecondaryIndexEntriesRequest {
+  repeated SecondaryIndexEntry indexEntries = 1;
+}
+
+message PutSecondaryIndexEntriesResponse {
+  int32 errorCode = 1;
 }
 
 message DeleteIndexEntriesRequest {
