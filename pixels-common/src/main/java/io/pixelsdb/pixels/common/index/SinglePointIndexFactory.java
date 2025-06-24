@@ -40,6 +40,7 @@ public class SinglePointIndexFactory
     private static final Logger logger = LogManager.getLogger(SinglePointIndexFactory.class);
     private final Map<SinglePointIndex.Scheme, SinglePointIndex> singlePointIndexImpls = new HashMap<>();
     private final Set<SinglePointIndex.Scheme> enabledSchemes = new TreeSet<>();
+    private final Set<Long> tableIds = new TreeSet<>();
     /**
      * The providers of the enabled single point index schemes.
      */
@@ -112,7 +113,7 @@ public class SinglePointIndexFactory
     /**
      * Recreate all the enabled {@link SinglePointIndex} instances.
      * <b>Be careful:</b> all the Storage enabled Storage must be configured well before
-     * calling this method. It is better to call {@link #reload(SinglePointIndex.Scheme)} to reload
+     * calling this method. It is better to call {@link #reload(SinglePointIndex.Scheme,long tableId)} to reload
      * the Storage that you are sure it is configured or does not need any dynamic configuration.
      *
      * @throws IOException
@@ -122,7 +123,9 @@ public class SinglePointIndexFactory
     {
         for (SinglePointIndex.Scheme scheme : enabledSchemes)
         {
-            reload(scheme);
+            for(long tableId : tableIds) {
+                reload(scheme,tableId);
+            }
         }
     }
 
@@ -132,14 +135,14 @@ public class SinglePointIndexFactory
      * @param scheme the given storage scheme
      * @throws IOException
      */
-    public synchronized void reload(SinglePointIndex.Scheme scheme) throws IOException
+    public synchronized void reload(SinglePointIndex.Scheme scheme, long tableId) throws IOException
     {
         SinglePointIndex singlePointIndex = this.singlePointIndexImpls.remove(scheme);
         if (singlePointIndex != null)
         {
             singlePointIndex.close();
         }
-        singlePointIndex = this.getSinglePointIndex(scheme);
+        singlePointIndex = this.getSinglePointIndex(scheme, tableId);
         requireNonNull(scheme, "failed to create the single point index instance");
         this.singlePointIndexImpls.put(scheme, singlePointIndex);
     }
@@ -150,13 +153,13 @@ public class SinglePointIndexFactory
      * @return
      * @throws IOException
      */
-    public synchronized SinglePointIndex getSinglePointIndex(String scheme) throws IOException
+    public synchronized SinglePointIndex getSinglePointIndex(String scheme, long tableId) throws IOException
     {
         try
         {
             // 'synchronized' in Java is reentrant,
             // it is fine to call the other getSinglePointIndex() from here.
-            return getSinglePointIndex(SinglePointIndex.Scheme.from(scheme));
+            return getSinglePointIndex(SinglePointIndex.Scheme.from(scheme),tableId);
         }
         catch (RuntimeException re)
         {
@@ -164,7 +167,7 @@ public class SinglePointIndexFactory
         }
     }
 
-    public synchronized SinglePointIndex getSinglePointIndex(SinglePointIndex.Scheme scheme) throws IOException
+    public synchronized SinglePointIndex getSinglePointIndex(SinglePointIndex.Scheme scheme, long tableId) throws IOException
     {
         checkArgument(this.enabledSchemes.contains(scheme), "single point index scheme '" +
                 scheme.toString() + "' is not enabled.");
@@ -173,8 +176,9 @@ public class SinglePointIndexFactory
             return singlePointIndexImpls.get(scheme);
         }
 
-        SinglePointIndex singlePointIndex = this.singlePointIndexProviders.get(scheme).createInstance(scheme);
+        SinglePointIndex singlePointIndex = this.singlePointIndexProviders.get(scheme).createInstance(scheme, tableId);
         singlePointIndexImpls.put(scheme, singlePointIndex);
+        tableIds.add(tableId);
 
         return singlePointIndex;
     }

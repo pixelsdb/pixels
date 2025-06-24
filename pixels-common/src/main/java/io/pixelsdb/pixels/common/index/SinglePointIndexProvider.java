@@ -31,7 +31,7 @@ public interface SinglePointIndexProvider
     /**
      * Create an instance of the single point index.
      */
-    SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme) throws IOException;
+    SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId) throws IOException;
 
     /**
      * @param scheme the given single point index scheme.
