@@ -19,10 +19,7 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexImpl;
-import io.pixelsdb.pixels.common.index.SinglePointIndex;
-import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
+import io.pixelsdb.pixels.common.index.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -37,7 +34,7 @@ import java.io.IOException;
 public class RocksetIndexProvider implements SinglePointIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
-    private final MainIndex mainIndex = new MainIndexImpl();
+    private final MainIndexManager manager = new MainIndexManager(MainIndexImpl::new);
     private final String bucketName = ConfigFactory.Instance().getProperty("index.rockset.s3.bucket");
     private final String s3Prefix = ConfigFactory.Instance().getProperty("index.rockset.s3.prefix");
     private final String localDbPath = ConfigFactory.Instance().getProperty("index.rockset.local.data.path");
@@ -46,12 +43,13 @@ public class RocksetIndexProvider implements SinglePointIndexProvider
     private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
 
     @Override
-    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme) throws IOException
+    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId) throws IOException
     {
         if (scheme == SinglePointIndex.Scheme.rockset)
         {
              try
              {
+                 MainIndex mainIndex = manager.getOrCreate(tableId);
                  return new RocksetIndex(mainIndex, bucketName, s3Prefix, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
              }
              catch (Exception e) {

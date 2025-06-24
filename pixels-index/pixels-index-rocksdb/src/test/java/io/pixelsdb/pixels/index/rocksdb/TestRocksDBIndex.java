@@ -44,8 +44,9 @@ public class TestRocksDBIndex
 {
     private RocksDB rocksDB;
     private final String rocksDBpath = "/tmp/rocksdb";
+    private final long tableId = 100L;
     private SinglePointIndex rocksDBIndex; // Class under test
-    private final MainIndex mainIndex = new MainIndexImpl();
+    private final MainIndex mainIndex = new MainIndexImpl(tableId);
     @BeforeEach
     public void setUp() throws RocksDBException, IOException
     {
@@ -66,6 +67,7 @@ public class TestRocksDBIndex
         long fileId = 1L;
         int rgId = 2;
         int rgRowId = 3;
+        long rowId = 100L;
 
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
         buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
@@ -82,9 +84,10 @@ public class TestRocksDBIndex
                 .setRgRowId(rgRowId)
                 .build();
 
-        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
+        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, rowId, true, rowLocation);
 
-        long rowId = rocksDBIndex.putEntry(entry);
+        boolean success = rocksDBIndex.putEntry(entry);
+        assertTrue(success, "putEntry should return true");
 
         // Assert index has been written to rocksDB
         byte[] storedValue = rocksDB.get(keyBytes);
@@ -109,6 +112,8 @@ public class TestRocksDBIndex
             ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
             buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
 
+            long rowId = i*1000L;
+
             IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                     .setIndexId(indexId)
                     .setKey(ByteString.copyFrom(key))
@@ -121,14 +126,12 @@ public class TestRocksDBIndex
                     .setRgRowId(i)
                     .build();
 
-            SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
+            SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, rowId, true, rowLocation);
             entries.add(entry);
         }
 
-        List<Long> rowIds = rocksDBIndex.putEntries(entries);
-
-        // Assert rowId num is correct
-        assertEquals(2, rowIds.size());
+        boolean success = rocksDBIndex.putEntries(entries);
+        assertTrue(success, "putEntries should return true");
 
         // Assert every index has been written to rocksDB
         for (int i = 0; i < entries.size(); i++) {
@@ -137,7 +140,7 @@ public class TestRocksDBIndex
             byte[] storedValue = rocksDB.get(keyBytes);
             assertNotNull(storedValue);
             long storedRowId = ByteBuffer.wrap(storedValue).getLong();
-            assertEquals(rowIds.get(i).longValue(), storedRowId);
+            assertEquals(i* 1000L, storedRowId);
         }
     }
 
@@ -215,7 +218,7 @@ public class TestRocksDBIndex
             entries.add(entry);
         }
 
-        List<Long> rowIds = rocksDBIndex.putEntries(entries);
+        rocksDBIndex.putEntries(entries);
 
         // delete Indexes
         boolean success = rocksDBIndex.deleteEntries(keyList);
