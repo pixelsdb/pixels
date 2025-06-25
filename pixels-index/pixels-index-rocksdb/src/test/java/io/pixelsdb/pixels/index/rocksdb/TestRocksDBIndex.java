@@ -21,18 +21,20 @@ package io.pixelsdb.pixels.index.rocksdb;
 
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
-import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexImpl;
-import java.io.File;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.rocksdb.*;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
+
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -59,7 +61,8 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testPutEntry() throws RocksDBException, MainIndexException, SinglePointIndexException, RowIdException {
+    public void testPutEntry() throws RocksDBException, MainIndexException, SinglePointIndexException
+    {
         // Create Entry
         long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
@@ -98,7 +101,8 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testPutEntries() throws RocksDBException, MainIndexException, SinglePointIndexException, RowIdException {
+    public void testPutEntries() throws RocksDBException, MainIndexException, SinglePointIndexException
+    {
         long indexId = 1L;
         long timestamp = System.currentTimeMillis();
         long fileId = 1L;
@@ -107,7 +111,8 @@ public class TestRocksDBIndex
         List<SinglePointIndex.Entry> entries = new ArrayList<>();
 
         // Create two entries
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 2; i++)
+        {
             byte[] key = ("exampleKey" + i).getBytes(); // 不同 key
             ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
             buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
@@ -134,7 +139,8 @@ public class TestRocksDBIndex
         assertTrue(success, "putEntries should return true");
 
         // Assert every index has been written to rocksDB
-        for (int i = 0; i < entries.size(); i++) {
+        for (int i = 0; i < entries.size(); i++)
+        {
             SinglePointIndex.Entry entry = entries.get(i);
             byte[] keyBytes = toByteArray(entry.getKey());
             byte[] storedValue = rocksDB.get(keyBytes);
@@ -145,7 +151,8 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntry() throws RocksDBException, MainIndexException, SinglePointIndexException, RowIdException {
+    public void testDeleteEntry() throws RocksDBException, MainIndexException, SinglePointIndexException
+    {
         long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
@@ -184,7 +191,8 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntries() throws RocksDBException, MainIndexException, SinglePointIndexException, RowIdException {
+    public void testDeleteEntries() throws RocksDBException, MainIndexException, SinglePointIndexException
+    {
         long indexId = 1L;
         long timestamp = System.currentTimeMillis();
         long fileId = 1L;
@@ -194,7 +202,8 @@ public class TestRocksDBIndex
         List<byte[]> keyBytesList = new ArrayList<>();
         List<IndexProto.IndexKey> keyList = new ArrayList<>();
 
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 2; i++)
+        {
             byte[] key = ("exampleKey" + i).getBytes(); // 不同 key
             keyBytesList.add(key);
             ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
@@ -225,22 +234,28 @@ public class TestRocksDBIndex
         assertTrue(success, "deleteEntries should return true");
 
         // Assert all indexes have been deleted
-        for (byte[] keyBytes : keyBytesList) {
+        for (byte[] keyBytes : keyBytesList)
+        {
             byte[] storedValue = rocksDB.get(keyBytes);
             assertNull(storedValue, "Key should be deleted from RocksDB");
         }
     }
 
     @AfterEach
-    public void tearDown() {
-        if (rocksDB != null) {
+    public void tearDown()
+    {
+        if (rocksDB != null)
+        {
             rocksDB.close();
         }
 
         // Clear RocksDB Directory
-        try {
+        try
+        {
             FileUtils.deleteDirectory(new File(rocksDBpath));
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             System.err.println("Failed to clean up RocksDB test directory: " + e.getMessage());
         }
     }

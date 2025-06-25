@@ -18,6 +18,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 package io.pixelsdb.pixels.index.rocksdb;
+
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 public class RocksetTest
