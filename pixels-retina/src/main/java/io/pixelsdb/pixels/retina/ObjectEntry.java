@@ -19,6 +19,11 @@
  */
 package io.pixelsdb.pixels.retina;
 
+/**
+ * Data information in the object store, including unique identifiers and data size.
+ * The data can be found in the object store by schema+ ‘/’ +table+ ‘/’ +id.
+ * The data block will be deleted from the object store when the reference count is 0.
+ */
 public class ObjectEntry implements Referenceable
 {
     private final ReferenceCounter refCounter = new ReferenceCounter();

@@ -458,8 +458,17 @@ public abstract class ColumnVector implements AutoCloseable
         writeIndex = 0;
     }
 
+    /**
+     * Get the flatBuffer type for this column vector
+     * @return
+     */
     public abstract byte getFlatBufferType();
 
+    /**
+     * Serialize this column vector
+     * @param builder
+     * @return
+     */
     public int serialize(FlatBufferBuilder builder)
     {
         int isNullVectorOffset = ColumnVectorBaseFlat.createIsNullVector(builder, isNull);
@@ -477,6 +486,10 @@ public abstract class ColumnVector implements AutoCloseable
         return ColumnVectorBaseFlat.endColumnVectorBaseFlat(builder);
     }
 
+    /**
+     * Deserialize the base column vector
+     * @param base
+     */
     protected void deserializeBase(ColumnVectorBaseFlat base)
     {
         this.length = base.length();
