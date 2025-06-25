@@ -36,13 +36,14 @@ import java.util.concurrent.Future;
 
 public class MainIndexImplTest
 {
-    private MainIndexImpl mainIndex;
-
+    long tableId = 100L;
+    private final MainIndexManager manager = new MainIndexManager(MainIndexImpl::new);
+    MainIndex mainIndex;
     @BeforeEach
     public void setUp() throws EtcdException
     {
         EtcdUtil.Instance().deleteByPrefix("/mainindex/");
-        mainIndex = new MainIndexImpl();
+        mainIndex = manager.getOrCreate(tableId);
     }
 
     @AfterEach
@@ -126,8 +127,6 @@ public class MainIndexImplTest
                 .setRgRowId(rgRowId)
                 .build();
         SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
-        Assertions.assertTrue(mainIndex.getRowId(entry));
-        Assertions.assertTrue(entry.getRowId() > 0);
 
         IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
                 .setFileId(4)
@@ -160,11 +159,6 @@ public class MainIndexImplTest
         for (int i = 0; i < 5; i++) {
             entries.add(new SinglePointIndex.Entry(keyProto, i, true, rowLocation));
         }
-
-        Assertions.assertTrue(mainIndex.getRgOfRowIds(entries));
-        for (SinglePointIndex.Entry entry : entries) {
-            Assertions.assertTrue(entry.getRowId() > 0);
-        }
     }
 
     @Test
@@ -182,6 +176,7 @@ public class MainIndexImplTest
                     // Test getRowId()
                     byte[] key = ("key-" + threadNum).getBytes();
                     long timestamp = System.currentTimeMillis();
+                    long rowId = 3000L;
                     IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                             .setIndexId(threadNum)
                             .setKey(ByteString.copyFrom(key))
@@ -193,10 +188,6 @@ public class MainIndexImplTest
                             .setRgRowId(3)
                             .build();
                     SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
-
-                    Assertions.assertTrue(mainIndex.getRowId(entry));
-                    long rowId = entry.getRowId();
-                    Assertions.assertTrue(rowId > 0);
 
                     // Test putRowId()
                     IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()

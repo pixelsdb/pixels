@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.index.rocksdb;
 
 import io.pixelsdb.pixels.common.exception.MainIndexException;
-import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.RowIdRange;
@@ -173,18 +172,8 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long putEntry(Entry entry) throws RowIdException, MainIndexException, SinglePointIndexException
+    public boolean putEntry(Entry entry) throws MainIndexException, SinglePointIndexException
     {
-        // Get rowId for Entry
-        try
-        {
-            mainIndex.getRowId(entry);
-        }
-        catch (RowIdException e)
-        {
-            LOGGER.error("Failed to get rowId for entry {}", entry);
-            throw new RowIdException("Failed to get rowId for entry",e);
-        }
         try(WriteBatch writeBatch = new WriteBatch())
         {
             // Extract key and rowId from Entry object
@@ -215,7 +204,7 @@ public class RocksDBIndex implements SinglePointIndex
                 throw new MainIndexException("Failed to put Entry into main index for rowId");
             }
             rocksDB.write(new WriteOptions(), writeBatch);
-            return rowId;
+            return true;
         }
         catch (RocksDBException e)
         {
@@ -225,19 +214,8 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SinglePointIndexException
+    public boolean putEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException
     {
-        List<Long> rowIds = new ArrayList<>();
-        // Get rowIds for Entries
-        try
-        {
-            mainIndex.getRgOfRowIds(entries);
-        }
-        catch (RowIdException e)
-        {
-            LOGGER.error("Failed to get rowId for entries {}", entries);
-            throw new RowIdException("Failed to get rowId for entries",e);
-        }
         try(WriteBatch writeBatch = new WriteBatch())
         {
             // Process each Entry object
@@ -246,7 +224,6 @@ public class RocksDBIndex implements SinglePointIndex
                 // Extract key and rowId from Entry object
                 IndexProto.IndexKey key = entry.getKey();
                 long rowId = entry.getRowId();
-                rowIds.add(rowId);
                 boolean unique = entry.getIsUnique();
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
@@ -279,7 +256,7 @@ public class RocksDBIndex implements SinglePointIndex
                 throw new MainIndexException("Failed to put Entry into main index for rowId RowIdRange");
             }
             rocksDB.write(new WriteOptions(), writeBatch);
-            return rowIds;
+            return true;
         }
         catch (RocksDBException e)
         {
@@ -359,6 +336,7 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public void close() throws IOException
     {
+        mainIndex.close();
         if (rocksDB != null)
         {
             rocksDB.close(); // Close RocksDB instance

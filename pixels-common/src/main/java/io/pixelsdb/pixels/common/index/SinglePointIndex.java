@@ -86,9 +86,9 @@ public interface SinglePointIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-    long putEntry(Entry entry) throws RowIdException, MainIndexException, SinglePointIndexException;
+    boolean putEntry(Entry entry) throws MainIndexException, SinglePointIndexException;
 
-    List<Long> putEntries(List<Entry> entries) throws RowIdException, MainIndexException, SinglePointIndexException;
+    boolean putEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException;
 
     boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException;
 

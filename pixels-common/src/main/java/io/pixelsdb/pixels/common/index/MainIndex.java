@@ -37,6 +37,11 @@ import java.util.List;
 public interface MainIndex extends Closeable
 {
     /**
+     * Get the tableId of this mainIndex
+     * @return the tableId
+     */
+    long getTableId();
+    /**
      * Get the physical location of a row given the row id
      * @param rowId the row id
      * @return the row location
@@ -76,22 +81,6 @@ public interface MainIndex extends Closeable
      * @return true on success
      */
     boolean deleteRowIdRange(RowIdRange rowIdRange);
-
-    /**
-     * Distribute row id for the single point index.
-     * If there isn't any row id in cache, get a range of row ids at once and put them into cache.
-     *
-     * @param entry the rowLocation of single point index
-     */
-    boolean getRowId(SinglePointIndex.Entry entry) throws RowIdException;
-
-    /**
-     * Distribute row ids for the single point index.
-     * If there isn't enough row ids in cache, get a range of row ids at once and put them into cache.
-     *
-     * @param entries the rowLocation of single point index
-     */
-    boolean getRgOfRowIds(List<SinglePointIndex.Entry> entries) throws RowIdException;
 
     /**
      * Persist the main index into persistent storage.

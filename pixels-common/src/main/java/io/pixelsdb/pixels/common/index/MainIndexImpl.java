@@ -41,12 +41,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class MainIndexImpl implements MainIndex
 {
     private static final Logger logger = LogManager.getLogger(MainIndexImpl.class);
+    // Get the tableId of this mainIndex
+    private final long tableId;
     // Cache for storing generated rowIds
     private final Queue<Long> rowIdCache = new ConcurrentLinkedQueue<>();
-    // Assumed batch size for generating rowIds
-    private static final int BATCH_SIZE = 1;
-    // The etcd auto-increment key
-    private static final String ROW_ID_KEY = "rowId/auto";
     // Get the singleton instance of EtcdUtil
     EtcdUtil etcdUtil = EtcdUtil.Instance();
     // Read-Write lock
@@ -54,16 +52,9 @@ public class MainIndexImpl implements MainIndex
     // Dirty flag
     private boolean dirty = false;
 
-    public MainIndexImpl()
+    public MainIndexImpl(long tableId)
     {
-        try
-        {
-            EtcdAutoIncrement.InitId(ROW_ID_KEY);  // 初始化 auto-increment ID
-        }
-        catch (EtcdException e)
-        {
-            throw new RuntimeException("Failed to initialize auto-increment ID in etcd", e);
-        }
+        this.tableId = tableId;
     }
 
     public static class Entry
@@ -90,6 +81,11 @@ public class MainIndexImpl implements MainIndex
 
     private final List<Entry> entries = new ArrayList<>();
 
+    @Override
+    public long getTableId()
+    {
+        return tableId;
+    }
     @Override
     public IndexProto.RowLocation getLocation(long rowId)
     {
@@ -208,39 +204,6 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean getRowId(SinglePointIndex.Entry entry) throws RowIdException
-    {
-        ensureRowIdsAvailable(1);
-        Long rowId = rowIdCache.poll();
-        if (rowId == null)
-        {
-            logger.error("Failed to generate rowId");
-            throw new RowIdException("Failed to generate single row id");
-        }
-        entry.setRowId(rowId);
-        return true;
-    }
-
-    @Override
-    public boolean getRgOfRowIds(List<SinglePointIndex.Entry> entries) throws RowIdException
-    {
-        int needed = entries.size();
-        ensureRowIdsAvailable(needed);
-
-        for (SinglePointIndex.Entry entry : entries)
-        {
-            Long rowId = rowIdCache.poll();
-            if (rowId == null)
-            {
-                logger.error("Insufficient rowIds available in cache");
-                throw new RowIdException("Failed to generate single row id");
-            }
-            entry.setRowId(rowId);
-        }
-        return true;
-    }
-
-    @Override
     public boolean persist()
     {
         try
@@ -323,64 +286,6 @@ public class MainIndexImpl implements MainIndex
 
         return -1; // Not found
     }
-
-    // Check if two RowIdRanges overlap
-    private boolean isOverlapping(RowIdRange range1, RowIdRange range2)
-    {
-        return range1.getStartRowId() <= range2.getEndRowId() && range1.getEndRowId() >= range2.getStartRowId();
-    }
-
-    // Check if RowIdRange overlaps with existing ranges
-    private boolean isOverlapping(RowIdRange newRange)
-    {
-        for (Entry entry : entries)
-        {
-            if (isOverlapping(entry.getRowIdRange(), newRange))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Ensures the rowId cache contains at least `requiredCount` IDs
-    // If not, load BATCH_SIZE number of rowIds from etcd
-    private void ensureRowIdsAvailable(int requiredCount) throws RowIdException
-    {
-        if (rowIdCache.size() >= requiredCount)
-        {
-            return;
-        }
-        // Lock
-        synchronized (this)
-        {
-            // Double-check locking
-            if (rowIdCache.size() >= requiredCount)
-            {
-                return;
-            }
-            try
-            {
-                long step = Math.max(BATCH_SIZE, requiredCount);
-                EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(ROW_ID_KEY, step);
-                long start = segment.getStart();
-                long end = start + segment.getLength();
-
-                for (long i = start; i < end; i++)
-                {
-                    rowIdCache.add(i);
-                }
-
-                logger.info("Generated {} new rowIds ({} ~ {})", segment.getLength(), start, end - 1);
-            }
-            catch (EtcdException e)
-            {
-                logger.error("Failed to generate rowIds from EtcdAutoIncrement", e);
-                throw new RowIdException("Failed to generate rowIds from EtcdAutoIncrement", e);
-            }
-        }
-    }
-
 
     // Serialize Entry
     private String serializeEntry(Entry entry)

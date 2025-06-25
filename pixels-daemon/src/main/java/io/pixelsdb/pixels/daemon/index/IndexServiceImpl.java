@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.daemon.index;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
-import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.MainIndex;
@@ -135,14 +134,10 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         try
         {
             // Call SinglePointIndex's putEntry method
-            long rowId = singlePointIndex.putEntry(
-                    new SinglePointIndex.Entry(entry.getIndexKey(), 0, true, entry.getRowLocation()));
+            boolean success = singlePointIndex.putEntry(
+                    new SinglePointIndex.Entry(entry.getIndexKey(), entry.getTableRowId(), true, entry.getRowLocation()));
             // Create gRPC response
             builder.setErrorCode(ErrorCode.SUCCESS);
-        }
-        catch (RowIdException e)
-        {
-            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
         }
         catch (MainIndexException e)
         {
@@ -199,19 +194,15 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         // Get list of IndexEntries from request
         List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream()
                 .map(entry -> new SinglePointIndex.Entry(
-                        entry.getIndexKey(), 0, true, entry.getRowLocation()))
+                        entry.getIndexKey(), entry.getTableRowId(), true, entry.getRowLocation()))
                 .collect(Collectors.toList());
         // Create gRPC builder
         IndexProto.PutPrimaryIndexEntriesResponse.Builder builder  = IndexProto.PutPrimaryIndexEntriesResponse.newBuilder();
         try
         {
             // Call SinglePointIndex's putEntries method
-            List<Long> rowIds = singlePointIndex.putEntries(entries);
+            boolean success = singlePointIndex.putEntries(entries);
             builder.setErrorCode(ErrorCode.SUCCESS);
-        }
-        catch (RowIdException e)
-        {
-            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
         }
         catch (MainIndexException e)
         {
