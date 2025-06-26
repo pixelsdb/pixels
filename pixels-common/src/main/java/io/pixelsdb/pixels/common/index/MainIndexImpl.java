@@ -86,6 +86,29 @@ public class MainIndexImpl implements MainIndex
     {
         return tableId;
     }
+
+    @Override
+    public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds)
+    {
+        // 1. get or create the persistent auto increment
+        PersistentAutoIncrement autoIncrement = aiMap.computeIfAbsent(
+            tableId,
+            id -> {
+                try {
+                    return new PersistentAutoIncrement("rowid-" + id); // key in etcd
+                } catch (EtcdException e) {
+                    throw new RuntimeException(e); // wrap to unchecked, will rethrow below
+                }
+            }
+        );
+        // 2. allocate numRowIds
+        long start = autoIncrement.getAndIncrement(numRowIds);
+        return IndexProto.RowIdBatch.newBuilder()
+            .setRowIdStart(start)
+            .setLength(numRowIds)
+            .build();
+    }
+
     @Override
     public IndexProto.RowLocation getLocation(long rowId)
     {
@@ -112,7 +135,7 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public  boolean deleteRowId(long rowId)
+    public boolean deleteRowId(long rowId)
     {
         int index = binarySearch(rowId);
         if (index < 0) {

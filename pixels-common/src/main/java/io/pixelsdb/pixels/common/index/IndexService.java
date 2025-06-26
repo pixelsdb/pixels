@@ -187,16 +187,30 @@ public class IndexService
         return true;
     }
 
-    public boolean deleteIndexEntry (IndexProto.IndexKey key) throws IndexException
+    public boolean deletePrimaryIndexEntry (IndexProto.IndexKey key) throws IndexException
     {
         // Create gRPC request
-        IndexProto.DeleteIndexEntryRequest request = IndexProto.DeleteIndexEntryRequest.newBuilder()
+        IndexProto.DeletePrimaryIndexEntryRequest request = IndexProto.DeletePrimaryIndexEntryRequest.newBuilder()
                 .setIndexKey(key).build();
         // Send request and get response
-        IndexProto.DeleteIndexEntryResponse response = stub.deleteIndexEntry(request);
+        IndexProto.DeletePrimaryIndexEntryResponse response = stub.deletePrimaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete index entry, error code=" + response.getErrorCode());
+            throw new IndexException("failed to delete primary index entry, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean deleteSecondaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    {
+        // Create gRPC request
+        IndexProto.DeleteSecondaryIndexEntryRequest request = IndexProto.DeleteSecondaryIndexEntryRequest.newBuilder()
+                .setIndexKey(key).build();
+        // Send request and get response
+        IndexProto.DeleteSecondaryIndexEntryResponse response = stub.deleteSecondaryIndexEntry(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to delete secondary index entry, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -231,17 +245,32 @@ public class IndexService
         return true;
     }
 
-    public boolean deleteIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
+    public boolean deletePrimaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
     {
         // Create gRPC request
-        IndexProto.DeleteIndexEntriesRequest request = IndexProto.DeleteIndexEntriesRequest.newBuilder()
+        IndexProto.DeletePrimaryIndexEntriesRequest request = IndexProto.DeletePrimaryIndexEntriesRequest.newBuilder()
                 .addAllIndexKeys(keys).build();
         // Send request and get response
-        IndexProto.DeleteIndexEntriesResponse response = stub.deleteIndexEntries(request);
+        IndexProto.DeletePrimaryIndexEntriesResponse response = stub.deletePrimaryIndexEntries(request);
         // Return operation success status
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete index entries, error code=" + response.getErrorCode());
+            throw new IndexException("failed to delete index primary entries, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean deleteSecondaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
+    {
+        // Create gRPC request
+        IndexProto.DeleteSecondaryIndexEntriesRequest request = IndexProto.DeleteSecondaryIndexEntriesRequest.newBuilder()
+                .addAllIndexKeys(keys).build();
+        // Send request and get response
+        IndexProto.DeleteSecondaryIndexEntriesResponse response = stub.deleteSecondaryIndexEntries(request);
+        // Return operation success status
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to delete index secondary entries, error code=" + response.getErrorCode());
         }
         return true;
     }

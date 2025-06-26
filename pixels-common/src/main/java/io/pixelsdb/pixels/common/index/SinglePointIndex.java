@@ -86,13 +86,21 @@ public interface SinglePointIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-    boolean putEntry(Entry entry) throws MainIndexException, SinglePointIndexException;
+    boolean putPrimaryEntry(Entry entry) throws MainIndexException, SinglePointIndexException;
 
-    boolean putEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException;
+    boolean putPrimaryEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException;
 
-    boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException;
+    boolean putSecondaryEntry(Entry entry) throws SinglePointIndexException;
 
-    boolean deleteEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException;
+    boolean putSecondaryEntries(List<Entry> entries) throws SinglePointIndexException;
+
+    boolean deletePrimaryEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException;
+
+    boolean deletePrimaryEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException;
+
+    boolean deleteSecondaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException;
+
+    boolean deleteSecondaryEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException;
 
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the
