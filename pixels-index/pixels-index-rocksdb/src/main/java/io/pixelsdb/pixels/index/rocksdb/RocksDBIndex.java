@@ -172,7 +172,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putEntry(Entry entry) throws MainIndexException, SinglePointIndexException
+    public boolean putPrimaryEntry(Entry entry) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -208,13 +208,13 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("Failed to put Entry: {} by entry", entry);
-            throw new SinglePointIndexException("Failed to put Entry",e);
+            LOGGER.error("Failed to put Primary Entry: {} by entry", entry);
+            throw new SinglePointIndexException("Failed to put Primary Entry",e);
         }
     }
 
     @Override
-    public boolean putEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException
+    public boolean putPrimaryEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -260,13 +260,85 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("Failed to put Entries: {} by entries", entries, e);
-            throw new SinglePointIndexException("Failed to put Entries",e);
+            LOGGER.error("Failed to put Primary Entries: {} by entries", entries, e);
+            throw new SinglePointIndexException("Failed to put Primary Entries",e);
         }
     }
 
     @Override
-    public boolean deleteEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException
+    public boolean putSecondaryEntry(Entry entry) throws SinglePointIndexException
+    {
+        try(WriteBatch writeBatch = new WriteBatch())
+        {
+            // Extract key and rowId from Entry object
+            IndexProto.IndexKey key = entry.getKey();
+            long rowId = entry.getRowId();
+            boolean unique = entry.getIsUnique();
+            // Convert IndexKey to byte array
+            byte[] keyBytes = toByteArray(key);
+            // Convert rowId to byte array
+            byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
+            if (unique)
+            {
+                // Write to RocksDB
+                writeBatch.put(keyBytes, valueBytes);
+            }
+            else
+            {
+                // Create composite key
+                byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
+                // Store in RocksDB
+                writeBatch.put(nonUniqueKey, null);
+            } 
+            rocksDB.write(new WriteOptions(), writeBatch);
+            return true;
+        }
+        catch (RocksDBException e)
+        {
+            LOGGER.error("Failed to put Secondary Entry: {} by entry", entry);
+            throw new SinglePointIndexException("Failed to put Secondary Entry",e);
+        }
+    }
+
+    @Override
+    public boolean putSecondaryEntries(List<Entry> entries) throws SinglePointIndexException
+    {
+        try(WriteBatch writeBatch = new WriteBatch())
+        {
+            // Process each Entry object
+            for (Entry entry : entries)
+            {
+                // Extract key and rowId from Entry object
+                IndexProto.IndexKey key = entry.getKey();
+                long rowId = entry.getRowId();
+                boolean unique = entry.getIsUnique();
+                // Convert IndexKey to byte array
+                byte[] keyBytes = toByteArray(key);
+                // Convert rowId to byte array
+                byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
+                if(unique)
+                {
+                    // Write to RocksDB
+                    writeBatch.put(keyBytes, valueBytes);
+                }
+                else
+                {
+                    byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
+                    writeBatch.put(nonUniqueKey, null);
+                }
+            }
+            rocksDB.write(new WriteOptions(), writeBatch);
+            return true;
+        }
+        catch (RocksDBException e)
+        {
+            LOGGER.error("Failed to put Secondary Entries: {} by entries", entries, e);
+            throw new SinglePointIndexException("Failed to put Secondary Entries",e);
+        }
+    }
+
+    @Override
+    public boolean deletePrimaryEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -287,13 +359,13 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("Failed to delete Entry: {}", key, e);
-            throw new SinglePointIndexException("Failed to delete Entry",e);
+            LOGGER.error("Failed to delete Primary Entry: {}", key, e);
+            throw new SinglePointIndexException("Failed to delete Primary Entry",e);
         }
     }
 
     @Override
-    public boolean deleteEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException
+    public boolean deletePrimaryEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -330,6 +402,48 @@ public class RocksDBIndex implements SinglePointIndex
         {
             LOGGER.error("Failed to delete Entries: {}", keys, e);
             throw new SinglePointIndexException("Failed to delete Entries",e);
+        }
+    }
+
+    @Override
+    public boolean deleteSecondaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    {
+        try(WriteBatch writeBatch = new WriteBatch())
+        {
+            // Convert IndexKey to byte array
+            byte[] keyBytes = toByteArray(key);
+            // Delete key-value pair from RocksDB
+            writeBatch.delete(keyBytes);
+            rocksDB.write(new WriteOptions(), writeBatch);
+            return true;
+        }
+        catch (RocksDBException e)
+        {
+            LOGGER.error("Failed to delete Secondary Entry: {}", key, e);
+            throw new SinglePointIndexException("Failed to delete Secondary Entry",e);
+        }
+    }
+
+    @Override
+    public boolean deleteSecondaryEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
+    {
+        try(WriteBatch writeBatch = new WriteBatch())
+        {
+            // Delete single point index
+            for(IndexProto.IndexKey key : keys)
+            {
+                // Convert IndexKey to byte array
+                byte[] keyBytes = toByteArray(key);
+                // Delete key-value pair from RocksDB
+                writeBatch.delete(keyBytes);
+            }
+            rocksDB.write(new WriteOptions(), writeBatch);
+            return true;
+        }
+        catch (RocksDBException e)
+        {
+            LOGGER.error("Failed to delete Secondary Entries: {}", keys, e);
+            throw new SinglePointIndexException("Failed to delete Secondary Entries",e);
         }
     }
 
