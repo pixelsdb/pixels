@@ -35,10 +35,12 @@ service IndexService {
   rpc LookupNonUniqueIndex (LookupNonUniqueIndexRequest) returns (LookupNonUniqueIndexResponse);
   rpc PutPrimaryIndexEntry (PutPrimaryIndexEntryRequest) returns (PutPrimaryIndexEntryResponse);
   rpc PutSecondaryIndexEntry (PutSecondaryIndexEntryRequest) returns (PutSecondaryIndexEntryResponse);
-  rpc DeleteIndexEntry (DeleteIndexEntryRequest) returns (DeleteIndexEntryResponse);
+  rpc DeletePrimaryIndexEntry (DeletePrimaryIndexEntryRequest) returns (DeletePrimaryIndexEntryResponse);
+  rpc DeleteSecondaryIndexEntry (DeleteSecondaryIndexEntryRequest) returns (DeleteSecondaryIndexEntryResponse);
   rpc PutPrimaryIndexEntries (PutPrimaryIndexEntriesRequest) returns (PutPrimaryIndexEntriesResponse);
   rpc PutSecondaryIndexEntries (PutSecondaryIndexEntriesRequest) returns (PutSecondaryIndexEntriesResponse);
-  rpc DeleteIndexEntries (DeleteIndexEntriesRequest) returns (DeleteIndexEntriesResponse);
+  rpc DeletePrimaryIndexEntries (DeletePrimaryIndexEntriesRequest) returns (DeletePrimaryIndexEntriesResponse);
+  rpc DeleteSecondaryIndexEntries (DeleteSecondaryIndexEntriesRequest) returns (DeleteSecondaryIndexEntriesResponse);
 }
 
 message IndexKey {
@@ -115,11 +117,19 @@ message PutSecondaryIndexEntryResponse {
   int32 errorCode = 1;
 }
 
-message DeleteIndexEntryRequest {
+message DeletePrimaryIndexEntryRequest {
   IndexKey indexKey = 1;
 }
 
-message DeleteIndexEntryResponse {
+message DeletePrimaryIndexEntryResponse {
+  int32 errorCode = 1;
+}
+
+message DeleteSecondaryIndexEntryRequest {
+  IndexKey indexKey = 1;
+}
+
+message DeleteSecondaryIndexEntryResponse {
   int32 errorCode = 1;
 }
 
@@ -139,10 +149,18 @@ message PutSecondaryIndexEntriesResponse {
   int32 errorCode = 1;
 }
 
-message DeleteIndexEntriesRequest {
+message DeletePrimaryIndexEntriesRequest {
   repeated IndexKey indexKeys = 1;
 }
 
-message DeleteIndexEntriesResponse {
+message DeletePrimaryIndexEntriesResponse {
+  int32 errorCode = 1;
+}
+
+message DeleteSecondaryIndexEntriesRequest {
+  repeated IndexKey indexKeys = 1;
+}
+
+message DeleteSecondaryIndexEntriesResponse {
   int32 errorCode = 1;
 }

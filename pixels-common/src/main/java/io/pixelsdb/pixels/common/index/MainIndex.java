@@ -41,6 +41,15 @@ public interface MainIndex extends Closeable
      * @return the tableId
      */
     long getTableId();
+
+    /**
+     * Allocate rowId batch for single point index
+     * @param tableId the table id of single point index
+     * @param numRowIds the rowId nums need to allocate
+     * @return the RowIdBatch
+     */
+    IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds);
+
     /**
      * Get the physical location of a row given the row id
      * @param rowId the row id

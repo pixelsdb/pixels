@@ -69,4 +69,29 @@ public class PersistentAutoIncrement
             return this.getAndIncrement();
         }
     }
+
+    public long getAndIncrement(int batchSize) throws EtcdException
+    {
+        this.lock.lock();
+        try {
+            if (this.count >= batchSize)
+            {
+                long value = this.id;
+                this.id += batchSize;
+                this.count -= batchSize;
+                return value;
+            }
+            else
+            {
+                EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP, segment -> {
+                    this.id = segment.getStart();
+                    this.count = segment.getLength();
+                });
+                return this.getAndIncrement(batchSize);
+            }
+        }
+        finally {
+            this.lock.unlock();
+        }
+    }
 }
