@@ -35,7 +35,7 @@ public class RequestHandlerImpl implements RequestHandler
     {
         try
         {
-            // 获取请求的有效负载
+            // get the request payload
             request.getRequestId();
             String payload = request.getPayload();
             WorkerRequest workerRequest = JSON.parseObject(payload, WorkerRequest.class);
@@ -94,7 +94,8 @@ public class RequestHandlerImpl implements RequestHandler
                 default:
                     throw new RuntimeException("Receive invalid worker type");
             }
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             System.out.println("Error: " + e.getMessage());
             throw new RuntimeException(e);

@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.domain.BroadcastTableInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.input.BroadcastChainJoinInput;
-import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 
 import java.util.List;

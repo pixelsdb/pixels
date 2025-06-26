@@ -33,9 +33,7 @@ public class WorkerRequest
 
     private String workerPayload;
 
-    public WorkerRequest()
-    {
-    }
+    public WorkerRequest() { }
 
     public WorkerRequest(WorkerType workerType, String workerPayload)
     {

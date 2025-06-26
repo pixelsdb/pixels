@@ -23,7 +23,7 @@ package spike;
 
 option java_package = "io.pixelsdb.pixels.invoker.spike";
 option java_outer_classname = "SpikeServiceProto";
-option go_package = "github.com/AgentGuo/spike/api";
+option go_package = "github.com/pixelsdb/spike/api";
 
 // The spike service definition.
 service SpikeService {

@@ -49,17 +49,6 @@
             <artifactId>pixels-common</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>RELEASE</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-cache</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-planner</artifactId>
             <optional>true</optional>
@@ -68,6 +57,13 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-executor</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>RELEASE</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 
@@ -101,7 +97,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.4</version>
+                <version>${maven.plugin.shade.version}</version>
                 <executions>
                     <execution>
                         <phase>package</phase>

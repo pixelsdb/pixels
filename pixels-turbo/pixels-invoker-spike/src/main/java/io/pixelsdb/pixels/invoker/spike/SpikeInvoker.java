@@ -58,7 +58,8 @@ public abstract class SpikeInvoker implements Invoker
             if (response == null)
             {
                 throw new RuntimeException("failed to execute the request, response is null");
-            } else if (response.getErrorCode() == 0)
+            }
+            else if (response.getErrorCode() == 0)
             {
                 String outputJson = response.getPayload();
                 Output output = this.parseOutput(outputJson);
@@ -68,7 +69,8 @@ public abstract class SpikeInvoker implements Invoker
                 }
                 output.setMemoryMB(this.memoryMB);
                 return output;
-            } else
+            }
+            else
             {
                 throw new RuntimeException("failed to execute the request, function error (" +
                         response.getErrorCode() + ")");
