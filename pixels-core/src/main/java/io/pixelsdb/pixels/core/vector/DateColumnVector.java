@@ -19,7 +19,10 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
+import io.pixelsdb.pixels.core.utils.flat.DateColumnVectorFlat;
 
 import java.sql.Date;
 import java.util.Arrays;
@@ -463,5 +466,36 @@ public class DateColumnVector extends ColumnVector
     {
         super.close();
         this.dates = null;
+    }
+
+    @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.DateColumnVectorFlat;
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int datesVectorOffset = DateColumnVectorFlat.createDatesVector(builder, dates);
+
+        DateColumnVectorFlat.startDateColumnVectorFlat(builder);
+        DateColumnVectorFlat.addBase(builder, baseOffset);
+        DateColumnVectorFlat.addDates(builder, datesVectorOffset);
+        DateColumnVectorFlat.addScratchDate(builder, scratchDate.getTime());
+        return DateColumnVectorFlat.endDateColumnVectorFlat(builder);
+    }
+
+    public static DateColumnVector deserialize(DateColumnVectorFlat flat)
+    {
+        DateColumnVector vector = new DateColumnVector(flat.base().length());
+        for (int i = 0; i < flat.datesLength(); ++i)
+        {
+            vector.dates[i] = flat.dates(i);
+        }
+        vector.scratchDate.setTime(flat.scratchDate());
+        vector.deserializeBase(flat.base());
+        return vector;
     }
 }
