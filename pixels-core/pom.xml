@@ -141,6 +141,78 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- flatBuffer -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>2.10</version>
+                <executions>
+                    <execution>
+                        <id>unpack</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.github.davidmoten</groupId>
+                                    <artifactId>flatbuffers-compiler</artifactId>
+                                    <version>2.0.8</version>
+                                    <type>tar.gz</type>
+                                    <classifier>distribution-linux</classifier>
+                                    <overWrite>true</overWrite>
+                                    <outputDirectory>${project.build.directory}</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <phase>generate-sources</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <executable>${project.build.directory}/bin/flatc</executable>
+                    <workingDirectory>${project.build.sourceDirectory}/io/pixelsdb/pixels/core/utils/flat</workingDirectory>
+                    <arguments>
+                        <argument>--java</argument>
+                        <argument>--gen-mutable</argument>
+                        <argument>-o</argument>
+                        <argument>${project.build.sourceDirectory}</argument>
+                        <argument>rowBatch.fbs</argument>
+                    </arguments>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>add-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.sourceDirectory}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>
