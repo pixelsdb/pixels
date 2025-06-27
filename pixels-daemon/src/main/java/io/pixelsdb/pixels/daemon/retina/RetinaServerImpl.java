@@ -29,6 +29,8 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
+import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.retina.PixelsWriterBuffer;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import io.pixelsdb.pixels.retina.RGVisibility;
 import io.pixelsdb.pixels.retina.RetinaProto;
@@ -56,6 +58,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
+    private final Map<String, PixelsWriterBuffer> pixelsWriterBufferMap;
 
     /**
      * Initialize the visibility management for all the records.
@@ -64,6 +67,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         this.metadataService = MetadataService.Instance();
         this.rgVisibilityMap = new ConcurrentHashMap<>();
+        this.pixelsWriterBufferMap = new ConcurrentHashMap<>();
         try
         {
             boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
@@ -82,17 +86,21 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         {
                             if (orderedEnabled)
                             {
-                                String[] orderedPaths = layout.getOrderedPathUris();
+                                List<Path> orderedPaths = layout.getOrderedPaths();
                                 validateOrderedOrCompactPaths(orderedPaths);
-                                Storage storage = StorageFactory.Instance().getStorage(orderedPaths[0]);
-                                files.addAll(storage.listPaths(orderedPaths));
+                                List<File> orderedFiles = this.metadataService.getFiles(orderedPaths.get(0).getId());
+                                files.addAll(orderedFiles.stream()
+                                        .map(file -> orderedPaths.get(0).getUri() + "/" + file.getName())
+                                        .collect(Collectors.toList()));
                             }
                             if (compactEnabled)
                             {
-                                String[] compactPaths = layout.getCompactPathUris();
+                                List<Path> compactPaths = layout.getCompactPaths();
                                 validateOrderedOrCompactPaths(compactPaths);
-                                Storage storage = StorageFactory.Instance().getStorage(compactPaths[0]);
-                                files.addAll(storage.listPaths(compactPaths));
+                                List<File> compactFiles = this.metadataService.getFiles(compactPaths.get(0).getId());
+                                files.addAll(compactFiles.stream()
+                                        .map(file -> compactPaths.get(0).getUri() + "/" + file.getName())
+                                        .collect(Collectors.toList()));
                             }
                         }
                     }
@@ -100,6 +108,13 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     {
                         addVisibility(filePath);
                     }
+
+                    Layout latestLayout = this.metadataService.getLatestLayout(schema.getName(), table.getName());
+                    List<Path> orderedPaths = latestLayout.getOrderedPaths();
+                    validateOrderedOrCompactPaths(orderedPaths);
+                    List<Path> compactPaths = latestLayout.getCompactPaths();
+                    validateOrderedOrCompactPaths(compactPaths);
+                    addWriterBuffer(schema.getName(), table.getName(), orderedPaths.get(0), compactPaths.get(0));
                 }
             }
         } catch (Exception e)
@@ -173,6 +188,23 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             rgVisibility.garbageCollect(timestamp);
         } catch (Exception e) {
             throw new RetinaException("Error while garbage collecting", e);
+        }
+    }
+
+    public void addWriterBuffer(String schemaName, String tableName, Path orderedDirPath, Path compactDirPath) throws RetinaException
+    {
+        try
+        {
+            List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
+            List<String> columnNames = columns.stream().map(Column::getName).collect(Collectors.toList());
+            List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
+            TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
+            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema, schemaName, tableName, orderedDirPath, compactDirPath);
+            String writerBufferKey = schemaName + "_" + tableName;
+            pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while adding writer buffer", e);
         }
     }
     
@@ -334,16 +366,17 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
      *
      * @param paths the order or compact paths from pixels metadata.
      */
-    public static void validateOrderedOrCompactPaths(String[] paths)
+    public static void validateOrderedOrCompactPaths(List<Path> paths)
     {
         requireNonNull(paths, "paths is null");
-        checkArgument(paths.length > 0, "paths must contain at least one valid directory");
-        try 
+        checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
+        try
         {
-            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths[0]);
-            for (int i = 1; i < paths.length; ++i) 
+            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths.get(0).getUri());
+            assert firstScheme != null;
+            for (int i = 1; i < paths.size(); ++i)
             {
-                Storage.Scheme scheme = Storage.Scheme.fromPath(paths[i]);
+                Storage.Scheme scheme = Storage.Scheme.fromPath(paths.get(i).getUri());
                 checkArgument(firstScheme.equals(scheme),
                         "all the directories in the paths must have the same storage scheme");
             }
@@ -351,7 +384,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             throw new RuntimeException("failed to parse storage scheme from paths", e);
         }
     }
-    
+
     /**
      * Check if the retina exists for the given filePath and rgId.
      * 

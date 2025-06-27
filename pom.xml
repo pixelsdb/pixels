@@ -120,6 +120,9 @@
         <!-- testing -->
         <dep.junit.version>4.13.1</dep.junit.version>
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
+
+        <!-- flat buffers -->
+        <dep.google.flatbuffers.version>2.0.8</dep.google.flatbuffers.version>
     </properties>
 
     <repositories>
@@ -711,6 +714,13 @@
                 <artifactId>junit-platform-runner</artifactId>
                 <version>${dep.junit.platform.version}</version>
                 <scope>test</scope>
+            </dependency>
+
+            <!-- flat buffers -->
+            <dependency>
+                <groupId>com.google.flatbuffers</groupId>
+                <artifactId>flatbuffers-java</artifactId>
+                <version>${dep.google.flatbuffers.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

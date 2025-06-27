@@ -19,7 +19,10 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
+import io.pixelsdb.pixels.core.utils.flat.DecimalColumnVectorFlat;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -387,5 +390,36 @@ public class DecimalColumnVector extends ColumnVector
                 }
             }
         }
+    }
+
+    @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.DecimalColumnVectorFlat;
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int vectorVectorOffset = DecimalColumnVectorFlat.createVectorVector(builder, vector);
+
+        DecimalColumnVectorFlat.startDecimalColumnVectorFlat(builder);
+        DecimalColumnVectorFlat.addBase(builder, baseOffset);
+        DecimalColumnVectorFlat.addVector(builder, vectorVectorOffset);
+        DecimalColumnVectorFlat.addPrecision(builder, precision);
+        DecimalColumnVectorFlat.addScale(builder, scale);
+        return DecimalColumnVectorFlat.endDecimalColumnVectorFlat(builder);
+    }
+
+    public static DecimalColumnVector deserialize(DecimalColumnVectorFlat flat)
+    {
+        DecimalColumnVector vector = new DecimalColumnVector(flat.base().length(), flat.precision(), flat.scale());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
     }
 }

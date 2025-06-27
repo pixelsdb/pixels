@@ -1,0 +1,151 @@
+/*
+ * Copyright 2025 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+namespace io.pixelsdb.pixels.core.utils.flat;
+
+table ByteArray {
+    bytes : [ubyte];
+}
+
+table DoubleArray {
+    doubles : [double];
+}
+
+table ColumnVectorBaseFlat {
+    length : int;
+    writeIndex : int;
+    memoryUsage : long;
+    isRepeating : bool;
+    duplicated : bool;
+    originVecId : int;
+    isNull : [bool];
+    noNulls : bool;
+    preFlattenIsRepeating : bool;
+    preFlattenNoNulls : bool;
+}
+
+table BinaryColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [ByteArray];
+    start : [int];
+    lens : [int];
+    buffer : [byte];
+    nextFree : int;
+    smallBuffer : [byte];
+    smallBufferNextFree : int;
+    bufferAllocationCount : int;
+}
+
+table ByteColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [byte];
+}
+
+table DateColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    dates : [int];
+    scratchDate : long;
+}
+
+table DecimalColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [long];
+    precision : int;
+    scale : int;
+}
+
+table DictionaryColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    dictArray : [byte];
+    dictOffsets : [int];
+    ids : [int];
+}
+
+table DoubleColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [long];
+}
+
+table FloatColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [int];
+}
+
+table IntColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [int];
+}
+
+table LongColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [long];
+}
+
+table LongDecimalColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [long];
+    precision : int;
+    scale : int;
+}
+
+table TimeColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    times : [int];
+    precision : int;
+    scratchTime : long;
+}
+
+table TimestampColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    precision : int;
+    times : [long];
+    scratchTimestamp : long;
+}
+
+table VectorColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [DoubleArray];
+    dimension : int;
+}
+
+union ColumnVectorFlat {
+    BinaryColumnVectorFlat,
+    ByteColumnVectorFlat,
+    DateColumnVectorFlat,
+    DecimalColumnVectorFlat,
+    DictionaryColumnVectorFlat,
+    DoubleColumnVectorFlat,
+    FloatColumnVectorFlat,
+    IntColumnVectorFlat,
+    LongColumnVectorFlat,
+    LongDecimalColumnVectorFlat,
+    TimeColumnVectorFlat,
+    TimestampColumnVectorFlat,
+    VectorColumnVectorFlat
+}
+
+table VectorizedRowBatchFlat {
+    numCols : int;
+    cols : [ColumnVectorFlat];
+    size : int;
+    projectionSize : int;
+    maxSize : int;
+    memoryUsage : long;
+    endOfFile : bool;
+}
