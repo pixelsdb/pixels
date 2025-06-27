@@ -19,8 +19,14 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
+import com.google.flatbuffers.Table;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.BinaryColumnVectorFlat;
+import io.pixelsdb.pixels.core.utils.flat.ByteArray;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -804,5 +810,91 @@ public class BinaryColumnVector extends ColumnVector
             }
             this.vector = null;
         }
+    }
+
+    @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.BinaryColumnVectorFlat;
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int[] byteArrayOffsets = new int[writeIndex];
+        for (int i = 0; i < writeIndex; ++i)
+        {
+            int bytesOffset = ByteArray.createBytesVector(builder, (vector[i] == null) ? new byte[0] : vector[i]);
+            ByteArray.startByteArray(builder);
+            ByteArray.addBytes(builder, bytesOffset);
+            byteArrayOffsets[i] = ByteArray.endByteArray(builder);
+        }
+
+        int vectorVectorOffset = BinaryColumnVectorFlat.createVectorVector(builder, byteArrayOffsets);
+        int startVectorOffset = BinaryColumnVectorFlat.createStartVector(builder, start);
+        int lensVectorOffset = BinaryColumnVectorFlat.createLensVector(builder, lens);
+        int bufferOffset = BinaryColumnVectorFlat.createBufferVector(builder, buffer);
+        int smallBufferOffset = BinaryColumnVectorFlat.createSmallBufferVector(builder, smallBuffer);
+        BinaryColumnVectorFlat.startBinaryColumnVectorFlat(builder);
+        BinaryColumnVectorFlat.addBase(builder, baseOffset);
+        BinaryColumnVectorFlat.addVector(builder, vectorVectorOffset);
+        BinaryColumnVectorFlat.addStart(builder, startVectorOffset);
+        BinaryColumnVectorFlat.addLens(builder, lensVectorOffset);
+        BinaryColumnVectorFlat.addBuffer(builder, bufferOffset);
+        BinaryColumnVectorFlat.addNextFree(builder, nextFree);
+        BinaryColumnVectorFlat.addSmallBuffer(builder, smallBufferOffset);
+        BinaryColumnVectorFlat.addSmallBufferNextFree(builder, smallBufferNextFree);
+        BinaryColumnVectorFlat.addBufferAllocationCount(builder, bufferAllocationCount);
+        return BinaryColumnVectorFlat.endBinaryColumnVectorFlat(builder);
+    }
+
+    public static byte[] getBytesFromFlatArray(ByteArray byteArray)
+    {
+        ByteBuffer bbuf = byteArray.bytesAsByteBuffer();
+        byte[] result = new byte[bbuf.remaining()];
+        bbuf.get(result);
+        return result;
+    }
+
+    public static BinaryColumnVector deserialize(BinaryColumnVectorFlat flat)
+    {
+        BinaryColumnVector vector = new BinaryColumnVector(flat.base().length());
+        for (int i = 0;i < flat.startLength(); ++i)
+        {
+            vector.start[i] = flat.start(i);
+        }
+        for (int i = 0; i < flat.lensLength(); ++i)
+        {
+            vector.lens[i] = flat.lens(i);
+        }
+        int bufferLength = flat.bufferLength();
+        if (bufferLength > 0)
+        {
+            vector.buffer = new byte[bufferLength];
+            for (int i = 0;i < bufferLength; ++i)
+            {
+                vector.buffer[i] = flat.buffer(i);
+            }
+        }
+        vector.nextFree = flat.nextFree();
+        int smallBufferLength = flat.smallBufferLength();
+        if (smallBufferLength > 0)
+        {
+            vector.smallBuffer = new byte[smallBufferLength];
+            for (int i = 0; i < smallBufferLength; ++i)
+            {
+                vector.smallBuffer[i] = flat.smallBuffer(i);
+            }
+        }
+        vector.smallBufferNextFree = flat.smallBufferNextFree();
+        vector.bufferAllocationCount = flat.bufferAllocationCount();
+        vector.deserializeBase(flat.base());
+        for (int i = 0; i < vector.writeIndex; ++i)
+        {
+            ByteArray byteArray = flat.vector(i);
+            vector.vector[i] = vector.isNull[i] ? null : getBytesFromFlatArray(byteArray);
+        }
+        return vector;
     }
 }

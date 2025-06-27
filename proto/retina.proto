@@ -37,6 +37,7 @@ service RetinaWorkerService {
     rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
     rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
     rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
+    rpc GetRowBatchBuffer (GetRowBatchBufferRequest) returns (GetRowBatchBufferResponse);
 }
 
 // header
@@ -60,23 +61,38 @@ message RowLocation {
     uint32 rgRowId = 3;  // the index of the row index the row group, starts from 0
 }
 
-message ColumnValue {
-    oneof value {
-        bytes bytesVal = 1;
-        string stringVal = 2;
-        string numberVal = 3;
-        bool boolVal = 4;
-    }
-}
-
-message RowValue {
-    repeated ColumnValue values = 1;
-}
-
 message InsertData {
     string schema = 1;
     string table = 2;
-    RowValue row = 3;
+    repeated bytes colValues = 3;
+}
+
+enum BufferType {
+    ACTIVE_BUFFER = 0;
+    IMMUTABLE_BUFFER = 1;
+}
+
+enum ColumnType {
+    BOOLEAN = 0;
+    BYTE = 1;
+    SHORT = 2;
+    INT = 3;
+    LONG = 4;
+    FLOAT = 5;
+    DOUBLE = 6;
+    STRING = 7;
+    BINARY = 8;
+    TIMESTAMP = 9;
+    ARRAY = 10;
+    MAP = 11;
+    STRUCT = 12;
+    VARBINARY = 13;
+    DECIMAL = 14;
+    DATE = 15;
+    VARCHAR = 16;
+    CHAR = 17;
+    TIME = 18;
+    VECTOR = 19;
 }
 
 // insert
@@ -84,7 +100,7 @@ message InsertRecordRequest {
     RequestHeader header = 1;
     string schema = 2;
     string table = 3;
-    RowValue row = 4;
+    repeated bytes colValues = 4;
     uint64 timestamp = 5;
 }
 
@@ -157,4 +173,20 @@ message GarbageCollectRequest {
 
 message GarbageCollectResponse {
     ResponseHeader header = 1;
+}
+
+// get rowBatch buffer
+message GetRowBatchBufferRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+    BufferType bufferType = 4;
+}
+
+message GetRowBatchBufferResponse {
+    ResponseHeader header = 1;
+    bytes serializedBuffer = 2;
+    int32 rowCount = 3;
+    int32 columnCount = 4;
+    repeated ColumnType columnTypes = 5;
 }

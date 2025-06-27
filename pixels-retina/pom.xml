@@ -26,6 +26,21 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-localfs</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-hdfs</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-s3</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <!-- protobuf -->
         <dependency>
@@ -57,6 +72,19 @@
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- minio -->
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-s3</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <!-- this is only for third-party libs that use slf4j -->
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
             <optional>true</optional>
         </dependency>
     </dependencies>

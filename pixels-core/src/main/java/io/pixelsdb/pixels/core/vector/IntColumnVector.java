@@ -19,7 +19,10 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
+import io.pixelsdb.pixels.core.utils.flat.IntColumnVectorFlat;
 
 import java.util.Arrays;
 
@@ -302,5 +305,33 @@ public class IntColumnVector extends ColumnVector
     {
         super.close();
         this.vector = null;
+    }
+
+    @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.IntColumnVectorFlat;
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int vectorVectorOffset = IntColumnVectorFlat.createVectorVector(builder, vector);
+        IntColumnVectorFlat.startIntColumnVectorFlat(builder);
+        IntColumnVectorFlat.addBase(builder, baseOffset);
+        IntColumnVectorFlat.addVector(builder, vectorVectorOffset);
+        return IntColumnVectorFlat.endIntColumnVectorFlat(builder);
+    }
+
+    public static IntColumnVector deserialize(IntColumnVectorFlat flat)
+    {
+        IntColumnVector vector = new IntColumnVector(flat.base().length());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
     }
 }

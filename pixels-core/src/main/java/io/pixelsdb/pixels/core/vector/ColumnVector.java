@@ -19,8 +19,11 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
+import com.google.flatbuffers.Table;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Integer128;
+import io.pixelsdb.pixels.core.utils.flat.*;
 
 import java.sql.Date;
 import java.sql.Time;
@@ -453,5 +456,54 @@ public abstract class ColumnVector implements AutoCloseable
         preFlattenNoNulls = true;
         preFlattenIsRepeating = false;
         writeIndex = 0;
+    }
+
+    /**
+     * Get the flatBuffer type for this column vector
+     * @return
+     */
+    public abstract byte getFlatBufferType();
+
+    /**
+     * Serialize this column vector
+     * @param builder
+     * @return
+     */
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int isNullVectorOffset = ColumnVectorBaseFlat.createIsNullVector(builder, isNull);
+        ColumnVectorBaseFlat.startColumnVectorBaseFlat(builder);
+        ColumnVectorBaseFlat.addLength(builder, length);
+        ColumnVectorBaseFlat.addWriteIndex(builder, writeIndex);
+        ColumnVectorBaseFlat.addMemoryUsage(builder, memoryUsage);
+        ColumnVectorBaseFlat.addIsRepeating(builder, isRepeating);
+        ColumnVectorBaseFlat.addDuplicated(builder, duplicated);
+        ColumnVectorBaseFlat.addOriginVecId(builder, originVecId);
+        ColumnVectorBaseFlat.addIsNull(builder, isNullVectorOffset);
+        ColumnVectorBaseFlat.addNoNulls(builder, noNulls);
+        ColumnVectorBaseFlat.addPreFlattenIsRepeating(builder, preFlattenIsRepeating);
+        ColumnVectorBaseFlat.addPreFlattenNoNulls(builder, preFlattenNoNulls);
+        return ColumnVectorBaseFlat.endColumnVectorBaseFlat(builder);
+    }
+
+    /**
+     * Deserialize the base column vector
+     * @param base
+     */
+    protected void deserializeBase(ColumnVectorBaseFlat base)
+    {
+        this.length = base.length();
+        this.writeIndex = base.writeIndex();
+        this.memoryUsage = base.memoryUsage();
+        this.isRepeating = base.isRepeating();
+        this.duplicated = base.duplicated();
+        this.originVecId = base.originVecId();
+        for (int i = 0; i < base.isNullLength(); ++i)
+        {
+            this.isNull[i] = base.isNull(i);
+        }
+        this.noNulls = base.noNulls();
+        this.preFlattenIsRepeating = base.preFlattenIsRepeating();
+        this.preFlattenNoNulls = base.preFlattenNoNulls();
     }
 }
