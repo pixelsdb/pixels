@@ -19,8 +19,11 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Integer128;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
+import io.pixelsdb.pixels.core.utils.flat.LongDecimalColumnVectorFlat;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -444,5 +447,35 @@ public class LongDecimalColumnVector extends ColumnVector
                 }
             }
         }
+    }
+
+    @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.LongDecimalColumnVectorFlat;
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int vectorVectorOffset = LongDecimalColumnVectorFlat.createVectorVector(builder, vector);
+        LongDecimalColumnVectorFlat.startLongDecimalColumnVectorFlat(builder);
+        LongDecimalColumnVectorFlat.addBase(builder, baseOffset);
+        LongDecimalColumnVectorFlat.addVector(builder, vectorVectorOffset);
+        LongDecimalColumnVectorFlat.addPrecision(builder, precision);
+        LongDecimalColumnVectorFlat.addScale(builder, scale);
+        return LongDecimalColumnVectorFlat.endLongDecimalColumnVectorFlat(builder);
+    }
+
+    public static LongDecimalColumnVector deserialize(LongDecimalColumnVectorFlat flat)
+    {
+        LongDecimalColumnVector vector = new LongDecimalColumnVector(flat.base().length(), flat.precision(), flat.scale());
+        for (int i = 0; i < flat.vectorLength(); ++i)
+        {
+            vector.vector[i] = flat.vector(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
     }
 }

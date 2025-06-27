@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -250,5 +251,17 @@ public class StructColumnVector extends ColumnVector
         {
             fields[i].unFlatten();
         }
+    }
+
+    @Override
+    public byte getFlatBufferType()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        throw new UnsupportedOperationException();
     }
 }

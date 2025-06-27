@@ -19,7 +19,10 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
+import io.pixelsdb.pixels.core.utils.flat.DictionaryColumnVectorFlat;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
@@ -373,5 +376,47 @@ public class DictionaryColumnVector extends ColumnVector
         this.dictArray = null;
         this.dictOffsets = null;
         this.ids = null;
+    }
+
+    @Override
+    public byte getFlatBufferType()
+    {
+        return ColumnVectorFlat.DictionaryColumnVectorFlat;
+    }
+
+    @Override
+    public int serialize(FlatBufferBuilder builder)
+    {
+        int baseOffset = super.serialize(builder);
+        int dictArrayVectorOffset = DictionaryColumnVectorFlat.createDictArrayVector(builder, dictArray);
+        int dictOffsetsVectorOffset = DictionaryColumnVectorFlat.createDictOffsetsVector(builder, dictOffsets);
+        int idsVectorOffset = DictionaryColumnVectorFlat.createIdsVector(builder, ids);
+        DictionaryColumnVectorFlat.startDictionaryColumnVectorFlat(builder);
+        DictionaryColumnVectorFlat.addBase(builder, baseOffset);
+        DictionaryColumnVectorFlat.addDictArray(builder, dictArrayVectorOffset);
+        DictionaryColumnVectorFlat.addDictOffsets(builder, dictOffsetsVectorOffset);
+        DictionaryColumnVectorFlat.addIds(builder, idsVectorOffset);
+        return DictionaryColumnVectorFlat.endDictionaryColumnVectorFlat(builder);
+    }
+
+    public static DictionaryColumnVector deserialize(DictionaryColumnVectorFlat flat)
+    {
+        DictionaryColumnVector vector = new DictionaryColumnVector(flat.base().length());
+        vector.dictArray = new byte[flat.dictArrayLength()];
+        for (int i = 0; i < flat.dictArrayLength(); ++i)
+        {
+            vector.dictArray[i] = flat.dictArray(i);
+        }
+        vector.dictOffsets = new int[flat.dictOffsetsLength()];
+        for (int i = 0;i < flat.dictOffsetsLength(); ++i)
+        {
+            vector.dictOffsets[i] = flat.dictOffsets(i);
+        }
+        for (int i = 0; i < flat.idsLength(); ++i)
+        {
+            vector.ids[i] = flat.ids(i);
+        }
+        vector.deserializeBase(flat.base());
+        return vector;
     }
 }

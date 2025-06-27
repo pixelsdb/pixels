@@ -113,6 +113,9 @@
         <dep.apache-calcite.version>1.32.0</dep.apache-calcite.version>
         <dep.apache-parquet.version>1.13.0</dep.apache-parquet.version>
 
+        <!-- flat buffers -->
+        <dep.google.flatbuffers.version>2.0.8</dep.google.flatbuffers.version>
+
         <!--profiling-->
         <dep.async-profiler.version>2.9</dep.async-profiler.version>
         <dep.commons-net.version>3.9.0</dep.commons-net.version>
@@ -674,6 +677,13 @@
                 <groupId>javax.annotation</groupId>
                 <artifactId>javax.annotation-api</artifactId>
                 <version>${dep.javax.annotation.version}</version>
+            </dependency>
+
+            <!-- flat buffers -->
+            <dependency>
+                <groupId>com.google.flatbuffers</groupId>
+                <artifactId>flatbuffers-java</artifactId>
+                <version>${dep.google.flatbuffers.version}</version>
             </dependency>
 
             <!-- logging -->
