@@ -362,7 +362,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean deleteEntries(List<IndexProto.IndexKey> keys)
+    public boolean deletePrimaryEntries(List<IndexProto.IndexKey> keys)
     {
         try
         {
@@ -429,10 +429,6 @@ public class RocksetIndex implements SinglePointIndex
                 byte[] keyBytes = toByteArray(key);
                 // Delete key-value pair from RocksDB
                 DBdelete(this.dbHandle, keyBytes);
-            }
-            if (rowIds.isEmpty()) {
-                LOGGER.warn("No rowIds found for keys: {}", keys);
-                return false;
             }
             return true;
         }
