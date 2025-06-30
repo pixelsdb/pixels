@@ -19,16 +19,17 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.common.exception.RowIdException;
-import io.pixelsdb.pixels.common.lock.EtcdAutoIncrement;
-import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.common.exception.EtcdException;
+import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -41,6 +42,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class MainIndexImpl implements MainIndex
 {
     private static final Logger logger = LogManager.getLogger(MainIndexImpl.class);
+    private static final HashMap<Long, PersistentAutoIncrement> persistentAIMap = new HashMap<>();
     // Get the tableId of this mainIndex
     private final long tableId;
     // Cache for storing generated rowIds
@@ -88,10 +90,11 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds)
+    public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws RowIdException
     {
         // 1. get or create the persistent auto increment
-        PersistentAutoIncrement autoIncrement = aiMap.computeIfAbsent(
+
+        PersistentAutoIncrement autoIncrement = persistentAIMap.computeIfAbsent(
             tableId,
             id -> {
                 try {
@@ -102,11 +105,17 @@ public class MainIndexImpl implements MainIndex
             }
         );
         // 2. allocate numRowIds
-        long start = autoIncrement.getAndIncrement(numRowIds);
-        return IndexProto.RowIdBatch.newBuilder()
-            .setRowIdStart(start)
-            .setLength(numRowIds)
-            .build();
+        try
+        {
+            long start = autoIncrement.getAndIncrement(numRowIds);
+            return IndexProto.RowIdBatch.newBuilder()
+                .setRowIdStart(start)
+                .setLength(numRowIds)
+                .build();
+        } catch (EtcdException e)
+        {
+            throw new RowIdException(e);
+        }
     }
 
     @Override
@@ -114,7 +123,8 @@ public class MainIndexImpl implements MainIndex
     {
         // Use binary search to find the Entry containing the rowId
         int index = binarySearch(rowId);
-        if (index >= 0) {
+        if (index >= 0)
+        {
             Entry entry = entries.get(index);
             RgLocation rgLocation = entry.getRgLocation();
             return IndexProto.RowLocation.newBuilder()
@@ -138,7 +148,8 @@ public class MainIndexImpl implements MainIndex
     public boolean deleteRowId(long rowId)
     {
         int index = binarySearch(rowId);
-        if (index < 0) {
+        if (index < 0)
+        {
             logger.error("Delete failure: RowId {} not found", rowId);
             return false;
         }

@@ -22,9 +22,10 @@ package io.pixelsdb.pixels.daemon.index;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
+import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.index.IndexServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -56,16 +57,21 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     {
         long tableId = request.getTableId();
         int numRowIds = request.getNumRowIds();
-        IndexProto.RowIdBatch rowIdBatch = mainIndex.allocateRowIdBatch(tableId, numRowIds);
-        IndexProto.AllocateRowIdBatchResponse;
-        if(RowIdBatch != null)
+        IndexProto.RowIdBatch rowIdBatch = null;
+        IndexProto.AllocateRowIdBatchResponse.Builder response = IndexProto.AllocateRowIdBatchResponse.newBuilder();
+        try
         {
-            response = AllocateRowIdBatchResponse.newBuilder()
-            .setErrorCode(ErrorCode.SUCCESS)
-            .setRowIdBatch(rowIdBatch)
-            .build();
+            rowIdBatch = mainIndex.allocateRowIdBatch(tableId, numRowIds);
+        } catch (RowIdException e)
+        {
+            logger.error("failed to allocate row ids", e);
+            response.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
         }
-        responseObserver.onNext(response);
+        if(rowIdBatch != null)
+        {
+            response.setErrorCode(ErrorCode.SUCCESS).setRowIdBatch(rowIdBatch);
+        }
+        responseObserver.onNext(response.build());
         responseObserver.onCompleted();
     }
 
@@ -175,7 +181,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         {
             // Call SinglePointIndex's putEntry method
             boolean success = singlePointIndex.putSecondaryEntry(
-                    new SinglePointIndex.Entry(entry.getIndexKey(), entry.getTableRowId(), true, entry.getRowLocation()));
+                    new SinglePointIndex.Entry(entry.getIndexKey(), entry.getTableRowId(), true, null));
             // Create gRPC response
             builder.setErrorCode(ErrorCode.SUCCESS);
         }
@@ -275,7 +281,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         // Get list of IndexEntries from request
         List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream()
                 .map(entry -> new SinglePointIndex.Entry(
-                        entry.getIndexKey(), entry.getTableRowId(), true, entry.getRowLocation()))
+                        entry.getIndexKey(), entry.getTableRowId(), true, null))
                 .collect(Collectors.toList());
         // Create gRPC builder
         IndexProto.PutSecondaryIndexEntriesResponse.Builder builder  = IndexProto.PutSecondaryIndexEntriesResponse.newBuilder();

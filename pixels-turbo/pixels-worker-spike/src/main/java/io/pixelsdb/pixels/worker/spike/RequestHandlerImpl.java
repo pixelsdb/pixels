@@ -19,14 +19,14 @@
  */
 package io.pixelsdb.pixels.worker.spike;
 
-import io.pixelsdb.pixels.spike.handler.RequestHandler;
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.planner.plan.physical.input.*;
 import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import io.pixelsdb.pixels.spike.handler.SpikeWorker;
+import io.pixelsdb.spike.handler.RequestHandler;
+import io.pixelsdb.spike.handler.SpikeWorker;
 
 public class RequestHandlerImpl implements RequestHandler
 {

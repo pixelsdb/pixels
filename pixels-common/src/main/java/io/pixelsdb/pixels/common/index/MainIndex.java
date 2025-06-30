@@ -24,7 +24,6 @@ import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.List;
 
 /**
  * The main index of a table is the mapping from row id to data file.
@@ -48,7 +47,7 @@ public interface MainIndex extends Closeable
      * @param numRowIds the rowId nums need to allocate
      * @return the RowIdBatch
      */
-    IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds);
+    IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws RowIdException;
 
     /**
      * Get the physical location of a row given the row id

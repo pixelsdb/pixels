@@ -89,7 +89,7 @@ public class TestRocksDBIndex
 
         SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, rowId, true, rowLocation);
 
-        boolean success = rocksDBIndex.putEntry(entry);
+        boolean success = rocksDBIndex.putPrimaryEntry(entry);
         assertTrue(success, "putEntry should return true");
 
         // Assert index has been written to rocksDB
@@ -135,7 +135,7 @@ public class TestRocksDBIndex
             entries.add(entry);
         }
 
-        boolean success = rocksDBIndex.putEntries(entries);
+        boolean success = rocksDBIndex.putPrimaryEntries(entries);
         assertTrue(success, "putEntries should return true");
 
         // Assert every index has been written to rocksDB
@@ -177,10 +177,10 @@ public class TestRocksDBIndex
 
         SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
 
-        rocksDBIndex.putEntry(entry);
+        rocksDBIndex.putPrimaryEntry(entry);
 
         // Delete index
-        boolean success = rocksDBIndex.deleteEntry(keyProto);
+        boolean success = rocksDBIndex.deletePrimaryEntry(keyProto);
 
         // Assert return value
         assertTrue(success, "deleteEntry should return true");
@@ -227,10 +227,10 @@ public class TestRocksDBIndex
             entries.add(entry);
         }
 
-        rocksDBIndex.putEntries(entries);
+        rocksDBIndex.putPrimaryEntries(entries);
 
         // delete Indexes
-        boolean success = rocksDBIndex.deleteEntries(keyList);
+        boolean success = rocksDBIndex.deletePrimaryEntries(keyList);
         assertTrue(success, "deleteEntries should return true");
 
         // Assert all indexes have been deleted
