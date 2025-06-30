@@ -49,7 +49,7 @@ public class BroadcastJoinStreamInvoker extends VhiveInvoker
     @Override
     public CompletableFuture<Output> invoke(Input input)
     {
-        ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().broadcastJoinStream((BroadcastJoinInput) input);
+        ListenableFuture<TurboProto.vHiveWorkerResponse> future = Vhive.Instance().getAsyncClient().broadcastJoinStream((BroadcastJoinInput) input);
         return genCompletableFuture(future);
     }
 }

@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.invoker.vhive;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.pixelsdb.pixels.common.turbo.Invoker;
 import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.invoker.vhive.utils.ListenableFutureAdapter;
+import io.pixelsdb.pixels.common.utils.ListenableFutureAdapter;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,7 +41,7 @@ public abstract class VhiveInvoker implements Invoker
         int memoryMB = 0;
         try
         {
-            TurboProto.GetMemoryResponse response = Vhive.Instance().getAsyncClient().getMemory().get();
+            TurboProto.vHiveGetMemoryResponse response = Vhive.Instance().getAsyncClient().getMemory().get();
             memoryMB = (int) response.getMemoryMB();
         } catch (Exception e)
         {
@@ -62,9 +62,9 @@ public abstract class VhiveInvoker implements Invoker
         return memoryMB;
     }
 
-    public CompletableFuture<Output> genCompletableFuture(ListenableFuture<TurboProto.WorkerResponse> listenableFuture)
+    public CompletableFuture<Output> genCompletableFuture(ListenableFuture<TurboProto.vHiveWorkerResponse> listenableFuture)
     {
-        CompletableFuture<TurboProto.WorkerResponse> completableFuture = ListenableFutureAdapter.toCompletable(listenableFuture);
+        CompletableFuture<TurboProto.vHiveWorkerResponse> completableFuture = ListenableFutureAdapter.toCompletable(listenableFuture);
         return completableFuture.handle((response, err) -> {
             if (err == null)
             {

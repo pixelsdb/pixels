@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.worker.spike;
 
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.turbo.SpikeWorkerRequest;
 import io.pixelsdb.pixels.planner.plan.physical.input.*;
 import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
@@ -38,7 +39,7 @@ public class RequestHandlerImpl implements RequestHandler
             // get the request payload
             request.getRequestId();
             String payload = request.getPayload();
-            WorkerRequest workerRequest = JSON.parseObject(payload, WorkerRequest.class);
+            SpikeWorkerRequest workerRequest = JSON.parseObject(payload, SpikeWorkerRequest.class);
             switch (workerRequest.getWorkerType())
             {
                 case AGGREGATION:

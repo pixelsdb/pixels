@@ -53,16 +53,6 @@
             <artifactId>pixels-executor</artifactId>
             <optional>true</optional>
         </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-invoker-vhive</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-worker-spike</artifactId>
-            <optional>true</optional>
-        </dependency>
 
         <dependency>
             <groupId>com.alibaba</groupId>

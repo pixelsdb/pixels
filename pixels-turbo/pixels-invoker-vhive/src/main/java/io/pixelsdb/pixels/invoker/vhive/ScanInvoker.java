@@ -50,7 +50,7 @@ public class ScanInvoker extends VhiveInvoker
     public CompletableFuture<Output> invoke(Input input)
     {
 //        log.info(String.format("invoke ScanInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
-        ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().scan((ScanInput) input);
+        ListenableFuture<TurboProto.vHiveWorkerResponse> future = Vhive.Instance().getAsyncClient().scan((ScanInput) input);
         return genCompletableFuture(future);
     }
 }
