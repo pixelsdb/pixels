@@ -24,7 +24,7 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.pixelsdb.pixels.common.turbo.*;
 import io.pixelsdb.pixels.common.utils.ListenableFutureAdapter;
-import io.pixelsdb.pixels.common.turbo.SpikeWorkerRequest;
+import io.pixelsdb.spike.handler.SpikeServiceProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
