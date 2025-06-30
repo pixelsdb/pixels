@@ -168,24 +168,24 @@ message TerminateWorkerResponse {
 
 // the service definitions for the serverless workers in vHive
 service vHiveWorkerService {
-  rpc Process (WorkerRequest) returns (WorkerResponse);
-  rpc GetMemory (GetMemoryRequest) returns (GetMemoryResponse);
+  rpc Process (vHiveWorkerRequest) returns (vHiveWorkerResponse);
+  rpc GetMemory (vHiveGetMemoryRequest) returns (vHiveGetMemoryResponse);
 }
 
 // begin request/response definition for vHive worker services
-message WorkerRequest {
+message vHiveWorkerRequest {
   string workerType = 1;
   string json = 2;
 }
 
-message WorkerResponse {
+message vHiveWorkerResponse {
   string json = 1;
 }
 
-message GetMemoryRequest {
+message vHiveGetMemoryRequest {
 }
 
-message GetMemoryResponse {
+message vHiveGetMemoryResponse {
   uint64 memoryMB = 1;
 }
 

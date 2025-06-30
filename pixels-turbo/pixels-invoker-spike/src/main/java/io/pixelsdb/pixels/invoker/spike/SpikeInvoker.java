@@ -22,12 +22,9 @@ package io.pixelsdb.pixels.invoker.spike;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.google.common.util.concurrent.ListenableFuture;
-import io.pixelsdb.pixels.common.turbo.Input;
-import io.pixelsdb.pixels.common.turbo.Invoker;
-import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.common.turbo.WorkerType;
-import io.pixelsdb.pixels.invoker.vhive.utils.ListenableFutureAdapter;
-import io.pixelsdb.pixels.worker.spike.WorkerRequest;
+import io.pixelsdb.pixels.common.turbo.*;
+import io.pixelsdb.pixels.common.utils.ListenableFutureAdapter;
+import io.pixelsdb.spike.handler.SpikeServiceProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -80,7 +77,7 @@ public abstract class SpikeInvoker implements Invoker
 
     public CompletableFuture<Output> invoke(Input input)
     {
-        WorkerRequest workerRequest = new WorkerRequest(this.workerType, JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect));
+        SpikeWorkerRequest workerRequest = new SpikeWorkerRequest(this.workerType, JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect));
         ListenableFuture<SpikeServiceProto.CallFunctionResponse> future = SpikeAsyncClient.getInstance().invoke(this.functionName,
                 JSON.toJSONString(workerRequest, SerializerFeature.DisableCircularReferenceDetect), input.getRequiredCpu(), input.getRequiredMemory());
         return genCompletableFuture(future);

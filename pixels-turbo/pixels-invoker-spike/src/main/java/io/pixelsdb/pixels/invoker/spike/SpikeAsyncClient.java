@@ -23,6 +23,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.spike.handler.SpikeServiceGrpc;
+import io.pixelsdb.spike.handler.SpikeServiceProto;
 
 import java.util.concurrent.TimeUnit;
 

@@ -17,14 +17,13 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.worker.spike;
+package io.pixelsdb.pixels.common.turbo;
 
 import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
-import io.pixelsdb.pixels.common.turbo.WorkerType;
 
 @JSONType
-public class WorkerRequest
+public class SpikeWorkerRequest
 {
     @JSONField(name = "workerType")
 
@@ -33,9 +32,9 @@ public class WorkerRequest
 
     private String workerPayload;
 
-    public WorkerRequest() { }
+    public SpikeWorkerRequest() { }
 
-    public WorkerRequest(WorkerType workerType, String workerPayload)
+    public SpikeWorkerRequest(WorkerType workerType, String workerPayload)
     {
         this.workerType = workerType;
         this.workerPayload = workerPayload;

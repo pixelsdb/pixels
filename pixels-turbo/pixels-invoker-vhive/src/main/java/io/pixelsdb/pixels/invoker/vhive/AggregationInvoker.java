@@ -50,7 +50,7 @@ public class AggregationInvoker extends VhiveInvoker
     public CompletableFuture<Output> invoke(Input input)
     {
 //        log.info(String.format("invoke AggregationInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
-        ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().aggregation((AggregationInput) input);
+        ListenableFuture<TurboProto.vHiveWorkerResponse> future = Vhive.Instance().getAsyncClient().aggregation((AggregationInput) input);
         return genCompletableFuture(future);
     }
 }

@@ -35,7 +35,7 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
     public WorkerServiceImpl() { }
 
     @Override
-    public void process(TurboProto.WorkerRequest request, StreamObserver<TurboProto.WorkerResponse> responseObserver)
+    public void process(TurboProto.vHiveWorkerRequest request, StreamObserver<TurboProto.vHiveWorkerResponse> responseObserver)
     {
         WorkerType workerType = WorkerType.from(request.getWorkerType());
         switch (workerType)
@@ -124,11 +124,11 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
     }
 
     @Override
-    public void getMemory(TurboProto.GetMemoryRequest request, StreamObserver<TurboProto.GetMemoryResponse> responseObserver)
+    public void getMemory(TurboProto.vHiveGetMemoryRequest request, StreamObserver<TurboProto.vHiveGetMemoryResponse> responseObserver)
     {
         // return the MB(1024 * 1024) size, represent the entire microVM memory size
         int dataSize = 1024 * 1024;
-        TurboProto.GetMemoryResponse response = TurboProto.GetMemoryResponse.newBuilder()
+        TurboProto.vHiveGetMemoryResponse response = TurboProto.vHiveGetMemoryResponse.newBuilder()
                 .setMemoryMB(Runtime.getRuntime().maxMemory() / dataSize)
                 .build();
         responseObserver.onNext(response);

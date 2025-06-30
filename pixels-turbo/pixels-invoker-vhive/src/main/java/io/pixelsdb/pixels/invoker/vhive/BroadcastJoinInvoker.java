@@ -50,7 +50,7 @@ public class BroadcastJoinInvoker extends VhiveInvoker
     public CompletableFuture<Output> invoke(Input input)
     {
 //        log.info(String.format("invoke BroadcastJoinInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
-        ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().broadcastJoin((BroadcastJoinInput) input);
+        ListenableFuture<TurboProto.vHiveWorkerResponse> future = Vhive.Instance().getAsyncClient().broadcastJoin((BroadcastJoinInput) input);
         return genCompletableFuture(future);
     }
 }
