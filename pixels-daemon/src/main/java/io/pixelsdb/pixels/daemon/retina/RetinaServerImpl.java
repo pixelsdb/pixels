@@ -121,6 +121,30 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
+    public SuperVersion getSuperVersion(String schemaName, String tableName) throws RetinaException
+    {
+        try
+        {
+            PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
+            return writerBuffer.getCurrentVersion();
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while getting super version", e);
+        }
+    }
+
+    public void insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
+    {
+        try
+        {
+            PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
+            writerBuffer.addRow(colValues, timestamp);
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while inserting record", e);
+        }
+    }
+
     public void deleteRecord(long fileId, int rgId, int rgRowId, long timestamp) throws RetinaException
     {
         try
@@ -216,16 +240,13 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try
         {
-            String writerBufferKey = request.getSchema() + "_" + request.getTable();
-            PixelsWriterBuffer pixelsWriterBuffer = pixelsWriterBufferMap.get(writerBufferKey);
-
             List<ByteString> colValuesList = request.getColValuesList();
             byte[][] colValuesByteArray = new byte[colValuesList.size()][];
             for (int i = 0; i < colValuesList.size(); ++i)
             {
                 colValuesByteArray[i] = colValuesList.get(i).toByteArray();
             }
-            pixelsWriterBuffer.addRow(colValuesByteArray, request.getTimestamp());
+            insertRecord(request.getSchema(), request.getTable(), colValuesByteArray, request.getTimestamp());
 
             RetinaProto.InsertRecordResponse response = RetinaProto.InsertRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
@@ -248,27 +269,35 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        String writerBufferKey = request.getSchema() + "_" + request.getTable();
-        PixelsWriterBuffer pixelsWriterBuffer = pixelsWriterBufferMap.get(writerBufferKey);
-        SuperVersion currentVersion = pixelsWriterBuffer.getCurrentVersion();
-
-        RetinaProto.GetSuperVersionResponse.Builder responseBuilder = RetinaProto.GetSuperVersionResponse
-                .newBuilder()
-                .setHeader(headerBuilder.build());
-
-        ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
-        responseBuilder.setData(data);
-        for (MemTable immutableMemtable : currentVersion.getImmutableMemTables())
+        try
         {
-            responseBuilder.addIds(immutableMemtable.getId());
-        }
-        for (ObjectEntry objectEntry : currentVersion.getObjectEntries())
-        {
-            responseBuilder.addIds(objectEntry.getId());
-        }
+            SuperVersion currentVersion = getSuperVersion(request.getSchema(), request.getTable());
 
-        responseObserver.onNext(responseBuilder.build());
-        responseObserver.onCompleted();
+            RetinaProto.GetSuperVersionResponse.Builder responseBuilder = RetinaProto.GetSuperVersionResponse
+                    .newBuilder()
+                    .setHeader(headerBuilder.build());
+
+            ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
+            responseBuilder.setData(data);
+            for (MemTable immutableMemtable : currentVersion.getImmutableMemTables())
+            {
+                responseBuilder.addIds(immutableMemtable.getId());
+            }
+            for (ObjectEntry objectEntry : currentVersion.getObjectEntries())
+            {
+                responseBuilder.addIds(objectEntry.getId());
+            }
+
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+        } catch (Exception e)
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.GetSuperVersionResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
     }
 
     @Override
@@ -497,6 +526,26 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         } catch (Exception e)
         {
             throw new RetinaException("Error while checking retina", e);
+        }
+    }
+
+    /**
+     * Check if the writer buffer exists for the given schema and table
+     */
+    private PixelsWriterBuffer checkPixelsWriterBuffer(String schema, String table) throws RetinaException
+    {
+        try
+        {
+            String writerBufferKey = schema + "_" + table;
+            PixelsWriterBuffer writerBuffer = this.pixelsWriterBufferMap.get(writerBufferKey);
+            if (writerBuffer == null)
+            {
+                throw new RetinaException("Writer buffer not found for schema: " + schema + " and table: " + table);
+            }
+            return writerBuffer;
+        } catch (Exception e)
+        {
+            throw new RetinaException("Error while checking writer buffer", e);
         }
     }
 }
