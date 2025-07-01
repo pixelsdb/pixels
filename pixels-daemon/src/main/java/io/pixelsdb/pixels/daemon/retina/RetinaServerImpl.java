@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.retina;
 
+import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
@@ -30,10 +31,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.retina.PixelsWriterBuffer;
-import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
-import io.pixelsdb.pixels.retina.RGVisibility;
-import io.pixelsdb.pixels.retina.RetinaProto;
+import io.pixelsdb.pixels.retina.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -186,7 +184,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         {
             RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
             rgVisibility.garbageCollect(timestamp);
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             throw new RetinaException("Error while garbage collecting", e);
         }
     }
@@ -207,7 +206,71 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             throw new RetinaException("Error while adding writer buffer", e);
         }
     }
-    
+
+    @Override
+    public void insertRecord(RetinaProto.InsertRecordRequest request,
+                             StreamObserver<RetinaProto.InsertRecordResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            String writerBufferKey = request.getSchema() + "_" + request.getTable();
+            PixelsWriterBuffer pixelsWriterBuffer = pixelsWriterBufferMap.get(writerBufferKey);
+
+            List<ByteString> colValuesList = request.getColValuesList();
+            byte[][] colValuesByteArray = new byte[colValuesList.size()][];
+            for (int i = 0; i < colValuesList.size(); ++i)
+            {
+                colValuesByteArray[i] = colValuesList.get(i).toByteArray();
+            }
+            pixelsWriterBuffer.addRow(colValuesByteArray, request.getTimestamp());
+
+            RetinaProto.InsertRecordResponse response = RetinaProto.InsertRecordResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (RetinaException e)
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.InsertRecordResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void getSuperVersion(RetinaProto.GetSuperVersionRequest request,
+                                StreamObserver<RetinaProto.GetSuperVersionResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        String writerBufferKey = request.getSchema() + "_" + request.getTable();
+        PixelsWriterBuffer pixelsWriterBuffer = pixelsWriterBufferMap.get(writerBufferKey);
+        SuperVersion currentVersion = pixelsWriterBuffer.getCurrentVersion();
+
+        RetinaProto.GetSuperVersionResponse.Builder responseBuilder = RetinaProto.GetSuperVersionResponse
+                .newBuilder()
+                .setHeader(headerBuilder.build());
+
+        ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
+        responseBuilder.setData(data);
+        for (MemTable immutableMemtable : currentVersion.getImmutableMemTables())
+        {
+            responseBuilder.addIds(immutableMemtable.getId());
+        }
+        for (ObjectEntry objectEntry : currentVersion.getObjectEntries())
+        {
+            responseBuilder.addIds(objectEntry.getId());
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+    }
+
     @Override
     public void deleteRecord(RetinaProto.DeleteRecordRequest request,
                              StreamObserver<RetinaProto.DeleteRecordResponse> responseObserver)
@@ -215,7 +278,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        try 
+        try
         {
             long fileId = request.getFileId();
             int rgId = request.getRgId();
@@ -227,7 +290,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .setHeader(headerBuilder.build()).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-        } catch (RetinaException e) {
+        } catch (RetinaException e)
+        {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.DeleteRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build())
@@ -258,7 +322,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .setHeader(headerBuilder.build()).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-        } catch (RetinaException e) {
+        } catch (RetinaException e)
+        {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.DeleteRecordsResponse.newBuilder()
                     .setHeader(headerBuilder.build())
@@ -266,14 +331,14 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             responseObserver.onCompleted();
         }
     }
-    
+
     @Override
     public void addVisibility(RetinaProto.AddVisibilityRequest request,
                               StreamObserver<RetinaProto.AddVisibilityResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
-        
+
         try
         {
             String filePath = request.getFilePath();
@@ -283,7 +348,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .setHeader(headerBuilder.build()).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-        } catch (RetinaException e) 
+        } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.AddVisibilityResponse.newBuilder()
@@ -300,7 +365,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        try 
+        try
         {
             String filePath = request.getFilePath();
             int[] rgIds = request.getRgIdsList().stream().mapToInt(Integer::intValue).toArray();
@@ -309,18 +374,18 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             RetinaProto.QueryVisibilityResponse.Builder responseBuilder = RetinaProto.QueryVisibilityResponse
                     .newBuilder()
                     .setHeader(headerBuilder.build());
-            
+
             for (int rgId : rgIds)
             {
                 long[] visibilityBitmap = queryVisibility(filePath, rgId, timestamp);
                 RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
-                    .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
+                        .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
                         .build();
                 responseBuilder.addBitmaps(bitmap);
             }
             responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
-        } catch (RetinaException e) 
+        } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.QueryVisibilityResponse.newBuilder()
@@ -329,10 +394,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             responseObserver.onCompleted();
         }
     }
-    
+
     @Override
     public void garbageCollect(RetinaProto.GarbageCollectRequest request,
-                              StreamObserver<RetinaProto.GarbageCollectResponse> responseObserver)
+                               StreamObserver<RetinaProto.GarbageCollectResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -351,7 +416,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .setHeader(headerBuilder.build()).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-        } catch (RetinaException e) 
+        } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.GarbageCollectResponse.newBuilder()
@@ -380,14 +445,15 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 checkArgument(firstScheme.equals(scheme),
                         "all the directories in the paths must have the same storage scheme");
             }
-        } catch (Throwable e) {
+        } catch (Throwable e)
+        {
             throw new RuntimeException("failed to parse storage scheme from paths", e);
         }
     }
 
     /**
      * Check if the retina exists for the given filePath and rgId.
-     * 
+     *
      * @param filePath the file path.
      * @param rgId the row group id.
      * @throws RetinaException if the retina does not exist.
