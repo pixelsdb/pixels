@@ -37,7 +37,8 @@ service RetinaWorkerService {
     rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
     rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
     rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
-    rpc GetRowBatchBuffer (GetRowBatchBufferRequest) returns (GetRowBatchBufferResponse);
+    // Get a unified view of the data in the writer buffer
+    rpc GetSuperVersion (GetSuperVersionRequest) returns (GetSuperVersionResponse);
 }
 
 // header
@@ -175,18 +176,15 @@ message GarbageCollectResponse {
     ResponseHeader header = 1;
 }
 
-// get rowBatch buffer
-message GetRowBatchBufferRequest {
+// get super version
+message GetSuperVersionRequest {
     RequestHeader header = 1;
-    string schemaName = 2;
-    string tableName = 3;
-    BufferType bufferType = 4;
+    string schema = 2;
+    string table = 3;
 }
 
-message GetRowBatchBufferResponse {
+message GetSuperVersionResponse {
     ResponseHeader header = 1;
-    bytes serializedBuffer = 2;
-    int32 rowCount = 3;
-    int32 columnCount = 4;
-    repeated ColumnType columnTypes = 5;
+    bytes data = 2;
+    repeated int64 ids = 3;
 }
