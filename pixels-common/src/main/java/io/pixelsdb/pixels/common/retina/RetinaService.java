@@ -243,4 +243,24 @@ public class RetinaService
         }
         return true;
     }
+
+    public RetinaProto.GetSuperVersionResponse getSuperVersion(String schemaName, String tableName) throws RetinaException {
+        String token = UUID.randomUUID().toString();
+        RetinaProto.GetSuperVersionRequest request = RetinaProto.GetSuperVersionRequest.newBuilder()
+            .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+            .setSchema(schemaName)
+            .setTable(tableName)
+            .build();
+        RetinaProto.GetSuperVersionResponse response = this.stub.getSuperVersion(request);
+                if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("Schema: " + schemaName + "\tTable: " + tableName + ", failed to get superversion: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("response token does not match.");
+        }
+        return response;
+    }
 }
