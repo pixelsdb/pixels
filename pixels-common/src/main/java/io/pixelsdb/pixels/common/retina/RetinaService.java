@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.retina;
 
+import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.RetinaException;
@@ -262,5 +263,36 @@ public class RetinaService
             throw new RetinaException("response token does not match.");
         }
         return response;
+    }
+
+    public boolean insertRecord(String schemaName, String tableName, List<ByteString> colValues, long timestamp) throws RetinaException {
+        String token = UUID.randomUUID().toString();
+        RetinaProto.InsertRecordRequest request = RetinaProto.InsertRecordRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchema(schemaName)
+                .setTable(tableName)
+                .addAllColValues(colValues)
+                .setTimestamp(timestamp)
+                .build();
+
+        RetinaProto.InsertRecordResponse response = this.stub.insertRecord(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("failed to insert record: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("response token does not match.");
+        }
+        return true;
+    }
+
+    public boolean insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException {
+        List<ByteString> colValueList = new ArrayList<>(colValues.length);
+        for (byte[] col : colValues) {
+            colValueList.add(ByteString.copyFrom(col));
+        }
+        return insertRecord(schemaName, tableName, colValueList, timestamp);
     }
 }
