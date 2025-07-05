@@ -246,7 +246,7 @@ public class RetinaService
     }
 
     public RetinaProto.GetSuperVersionResponse getSuperVersion(String schemaName, String tableName) throws RetinaException 
-{
+    {
         String token = UUID.randomUUID().toString();
         RetinaProto.GetSuperVersionRequest request = RetinaProto.GetSuperVersionRequest.newBuilder()
             .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
@@ -266,7 +266,8 @@ public class RetinaService
         return response;
     }
 
-    public boolean insertRecord(String schemaName, String tableName, List<ByteString> colValues, long timestamp) throws RetinaException {
+    public boolean insertRecord(String schemaName, String tableName, List<ByteString> colValues, long timestamp) throws RetinaException
+    {
         String token = UUID.randomUUID().toString();
         RetinaProto.InsertRecordRequest request = RetinaProto.InsertRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
