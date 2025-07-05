@@ -277,8 +277,13 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .newBuilder()
                     .setHeader(headerBuilder.build());
 
-            ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
-            responseBuilder.setData(data);
+            if(!currentVersion.getMemTable().getRowBatch().isEmpty()) {
+                ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
+                responseBuilder.setData(data);
+            } else {
+                responseBuilder.setData(ByteString.EMPTY);
+            }
+
             for (MemTable immutableMemtable : currentVersion.getImmutableMemTables())
             {
                 responseBuilder.addIds(immutableMemtable.getId());

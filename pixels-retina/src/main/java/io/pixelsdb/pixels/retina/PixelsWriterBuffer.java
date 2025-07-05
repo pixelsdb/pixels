@@ -148,7 +148,7 @@ public class PixelsWriterBuffer
         this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
         this.maxBufferSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
 
-        this.activeMemTable = new MemTable(this.idCounter, schema, pixelStride, TypeDescription.Mode.NONE);
+        this.activeMemTable = new MemTable(this.idCounter, schema, pixelStride, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT);
         this.immutableMemTables = new ArrayList<>();
         this.objectEntries = new ArrayList<>();
 
