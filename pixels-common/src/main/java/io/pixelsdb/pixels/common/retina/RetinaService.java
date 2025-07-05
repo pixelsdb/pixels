@@ -245,7 +245,8 @@ public class RetinaService
         return true;
     }
 
-    public RetinaProto.GetSuperVersionResponse getSuperVersion(String schemaName, String tableName) throws RetinaException {
+    public RetinaProto.GetSuperVersionResponse getSuperVersion(String schemaName, String tableName) throws RetinaException 
+{
         String token = UUID.randomUUID().toString();
         RetinaProto.GetSuperVersionRequest request = RetinaProto.GetSuperVersionRequest.newBuilder()
             .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
