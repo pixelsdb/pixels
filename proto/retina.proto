@@ -28,8 +28,6 @@ option java_outer_classname = "RetinaProto";
 
 package retina.proto;
 
-import "metadata.proto";
-
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
     rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
@@ -196,11 +194,8 @@ message GetSuperVersionResponse {
 // add writer buffer
 message AddWriterBufferRequest {
     RequestHeader header = 1;
-    repeated metadata.proto.Column columns = 2;
-    string schemaName = 3;
-    string tableName = 4;
-    metadata.proto.Path orderedDirPath = 5;
-    metadata.proto.Path compactDirPath = 6;
+    string schemaName = 2;
+    string tableName = 3;
 }
 
 message AddWriterBufferResponse {

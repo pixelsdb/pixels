@@ -104,12 +104,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         addVisibility(filePath);
                     }
 
-                    Layout latestLayout = this.metadataService.getLatestLayout(schema.getName(), table.getName());
-                    List<Path> orderedPaths = latestLayout.getOrderedPaths();
-                    validateOrderedOrCompactPaths(orderedPaths);
-                    List<Path> compactPaths = latestLayout.getCompactPaths();
-                    validateOrderedOrCompactPaths(compactPaths);
-                    addWriterBuffer(schema.getName(), table.getName(), orderedPaths.get(0), compactPaths.get(0));
+                    addWriterBuffer(schema.getName(), table.getName());
                 }
             }
         } catch (Exception e)
@@ -187,35 +182,31 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void addWriterBuffer(List<Column> columns, String schemaName, String tableName,
-                                Path orderedDirPath, Path compactDirPath) throws RetinaException
+    public void addWriterBuffer(String schemaName, String tableName) throws RetinaException
     {
         try
         {
+            // get ordered and compact dir path
+            Layout latestLayout = this.metadataService.getLatestLayout(schemaName, tableName);
+            List<Path> orderedPaths = latestLayout.getOrderedPaths();
+            validateOrderedOrCompactPaths(orderedPaths);
+            List<Path> compactPaths = latestLayout.getCompactPaths();
+            validateOrderedOrCompactPaths(compactPaths);
+
+            // get schema
+            List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
             List<String> columnNames = columns.stream().map(Column::getName).collect(Collectors.toList());
             List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
-            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema, schemaName, tableName, orderedDirPath, compactDirPath);
+
+            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema, schemaName, tableName,
+                    orderedPaths.get(0), compactPaths.get(0));
             String writerBufferKey = schemaName + "_" + tableName;
             pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
         } catch (Exception e)
         {
             throw new RetinaException("Failed to add writer buffer for " + schemaName + "." + tableName, e);
         }
-    }
-
-    public void addWriterBuffer(String schemaName, String tableName, Path orderedDirPath,
-                                Path compactDirPath) throws RetinaException
-    {
-        List<Column> columns;
-        try
-        {
-            columns = this.metadataService.getColumns(schemaName, tableName, false);
-        } catch (Exception e)
-        {
-            throw new RetinaException("Failed to retrieve metadata or create schema for " + schemaName + "." + tableName, e);
-        }
-        addWriterBuffer(columns, schemaName, tableName, orderedDirPath, compactDirPath);
     }
 
     @Override
@@ -226,12 +217,12 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 .setToken(request.getHeader().getToken());
         try
         {
-            List<Column> columns = new ArrayList<>();
-            request.getColumnsList().forEach(column -> columns.add(new Column(column)));
-            Path orderedDirPath = new Path(request.getOrderedDirPath());
-            Path compactDirPath = new Path(request.getCompactDirPath());
-            addWriterBuffer(columns, request.getSchemaName(), request.getTableName(),
-                    orderedDirPath, compactDirPath);
+            addWriterBuffer(request.getSchemaName(), request.getTableName());
+
+            RetinaProto.AddWriterBufferResponse response = RetinaProto.AddWriterBufferResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
         } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());

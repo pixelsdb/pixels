@@ -354,8 +354,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                                         {
                                             // Issue #930: corresponding writerBuffer was not created when creating table
                                             RetinaService retinaService = RetinaService.Instance();
-                                            if (!retinaService.addWriterBuffer(request.getColumnsList(), request.getSchemaName(),
-                                                    request.getTableName(), orderedPaths.get(0), compactPaths.get(0)))
+                                            if (!retinaService.addWriterBuffer(request.getSchemaName(), request.getTableName()))
                                             {
                                                 headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
                                                         .setErrorMsg("failed to add retina's writer buffer for table '" +

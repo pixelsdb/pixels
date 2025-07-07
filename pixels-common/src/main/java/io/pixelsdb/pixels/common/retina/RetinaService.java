@@ -23,16 +23,13 @@ import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -303,8 +300,7 @@ public class RetinaService
         return insertRecord(schemaName, tableName, colValueList, timestamp);
     }
 
-    public boolean addWriterBuffer(List<MetadataProto.Column> columns, String schemaName, String tableName,
-                                   MetadataProto.Path orderedDirPath, MetadataProto.Path compactDirPath) throws RetinaException
+    public boolean addWriterBuffer(String schemaName, String tableName) throws RetinaException
     {
         /**
          * Since pixels-core was not introduced, TypeDescription cannot be used to represent the schema.
@@ -313,11 +309,8 @@ public class RetinaService
         String token = UUID.randomUUID().toString();
         RetinaProto.AddWriterBufferRequest request = RetinaProto.AddWriterBufferRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .addAllColumns(columns)
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
-                .setOrderedDirPath(orderedDirPath)
-                .setCompactDirPath(compactDirPath)
                 .build();
         RetinaProto.AddWriterBufferResponse response = this.stub.addWriterBuffer(request);
         if (response.getHeader().getErrorCode() != 0)
