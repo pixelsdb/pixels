@@ -25,6 +25,7 @@ import com.google.protobuf.ProtocolStringList;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.daemon.MetadataProto;
@@ -351,7 +352,18 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                                         }
                                         if (allSuccess)
                                         {
-                                            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                            // Issue #930: corresponding writerBuffer was not created when creating table
+                                            RetinaService retinaService = RetinaService.Instance();
+                                            if (!retinaService.addWriterBuffer(request.getColumnsList(), request.getSchemaName(),
+                                                    request.getTableName(), orderedPaths.get(0), compactPaths.get(0)))
+                                            {
+                                                headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
+                                                        .setErrorMsg("failed to add retina's writer buffer for table '" +
+                                                                request.getSchemaName() + "." + request.getTableName() + "'");
+                                            } else
+                                            {
+                                                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                            }
                                         } else
                                         {
                                             headerBuilder.setErrorCode(METADATA_ADD_PATH_FAILED)

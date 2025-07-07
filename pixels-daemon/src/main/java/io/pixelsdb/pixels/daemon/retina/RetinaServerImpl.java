@@ -37,10 +37,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -121,30 +118,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public SuperVersion getSuperVersion(String schemaName, String tableName) throws RetinaException
-    {
-        try
-        {
-            PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
-            return writerBuffer.getCurrentVersion();
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while getting super version", e);
-        }
-    }
-
-    public void insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
-    {
-        try
-        {
-            PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
-            writerBuffer.addRow(colValues, timestamp);
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while inserting record", e);
-        }
-    }
-
     public void deleteRecord(long fileId, int rgId, int rgRowId, long timestamp) throws RetinaException
     {
         try
@@ -214,11 +187,11 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void addWriterBuffer(String schemaName, String tableName, Path orderedDirPath, Path compactDirPath) throws RetinaException
+    public void addWriterBuffer(List<Column> columns, String schemaName, String tableName,
+                                Path orderedDirPath, Path compactDirPath) throws RetinaException
     {
         try
         {
-            List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
             List<String> columnNames = columns.stream().map(Column::getName).collect(Collectors.toList());
             List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
@@ -227,7 +200,45 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
         } catch (Exception e)
         {
-            throw new RetinaException("Error while adding writer buffer", e);
+            throw new RetinaException("Failed to add writer buffer for " + schemaName + "." + tableName, e);
+        }
+    }
+
+    public void addWriterBuffer(String schemaName, String tableName, Path orderedDirPath,
+                                Path compactDirPath) throws RetinaException
+    {
+        List<Column> columns;
+        try
+        {
+            columns = this.metadataService.getColumns(schemaName, tableName, false);
+        } catch (Exception e)
+        {
+            throw new RetinaException("Failed to retrieve metadata or create schema for " + schemaName + "." + tableName, e);
+        }
+        addWriterBuffer(columns, schemaName, tableName, orderedDirPath, compactDirPath);
+    }
+
+    @Override
+    public void addWriterBuffer(RetinaProto.AddWriterBufferRequest request,
+                                StreamObserver<RetinaProto.AddWriterBufferResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        try
+        {
+            List<Column> columns = new ArrayList<>();
+            request.getColumnsList().forEach(column -> columns.add(new Column(column)));
+            Path orderedDirPath = new Path(request.getOrderedDirPath());
+            Path compactDirPath = new Path(request.getCompactDirPath());
+            addWriterBuffer(columns, request.getSchemaName(), request.getTableName(),
+                    orderedDirPath, compactDirPath);
+        } catch (RetinaException e)
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.AddWriterBufferResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
         }
     }
 
@@ -240,13 +251,14 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try
         {
+            PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(request.getSchemaName(), request.getTableName());
             List<ByteString> colValuesList = request.getColValuesList();
             byte[][] colValuesByteArray = new byte[colValuesList.size()][];
             for (int i = 0; i < colValuesList.size(); ++i)
             {
                 colValuesByteArray[i] = colValuesList.get(i).toByteArray();
             }
-            insertRecord(request.getSchema(), request.getTable(), colValuesByteArray, request.getTimestamp());
+            writerBuffer.addRow(colValuesByteArray, request.getTimestamp());
 
             RetinaProto.InsertRecordResponse response = RetinaProto.InsertRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
@@ -271,19 +283,18 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try
         {
-            SuperVersion currentVersion = getSuperVersion(request.getSchema(), request.getTable());
-
             RetinaProto.GetSuperVersionResponse.Builder responseBuilder = RetinaProto.GetSuperVersionResponse
                     .newBuilder()
                     .setHeader(headerBuilder.build());
 
-            if(!currentVersion.getMemTable().getRowBatch().isEmpty()) {
+            PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(request.getSchemaName(), request.getTableName());
+            SuperVersion currentVersion = writerBuffer.getCurrentVersion();
+            if (!currentVersion.getMemTable().getRowBatch().isEmpty()) {
                 ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
                 responseBuilder.setData(data);
             } else {
                 responseBuilder.setData(ByteString.EMPTY);
             }
-
             for (MemTable immutableMemtable : currentVersion.getImmutableMemTables())
             {
                 responseBuilder.addIds(immutableMemtable.getId());

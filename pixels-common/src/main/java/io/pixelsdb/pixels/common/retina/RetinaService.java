@@ -23,13 +23,16 @@ import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -245,13 +248,13 @@ public class RetinaService
         return true;
     }
 
-    public RetinaProto.GetSuperVersionResponse getSuperVersion(String schemaName, String tableName) throws RetinaException 
+    public RetinaProto.GetSuperVersionResponse getSuperVersion(String schemaName, String tableName) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.GetSuperVersionRequest request = RetinaProto.GetSuperVersionRequest.newBuilder()
             .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-            .setSchema(schemaName)
-            .setTable(tableName)
+            .setSchemaName(schemaName)
+            .setTableName(tableName)
             .build();
         RetinaProto.GetSuperVersionResponse response = this.stub.getSuperVersion(request);
                 if (response.getHeader().getErrorCode() != 0)
@@ -271,8 +274,8 @@ public class RetinaService
         String token = UUID.randomUUID().toString();
         RetinaProto.InsertRecordRequest request = RetinaProto.InsertRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchema(schemaName)
-                .setTable(tableName)
+                .setSchemaName(schemaName)
+                .setTableName(tableName)
                 .addAllColValues(colValues)
                 .setTimestamp(timestamp)
                 .build();
@@ -290,11 +293,42 @@ public class RetinaService
         return true;
     }
 
-    public boolean insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException {
+    public boolean insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
+    {
         List<ByteString> colValueList = new ArrayList<>(colValues.length);
-        for (byte[] col : colValues) {
+        for (byte[] col : colValues)
+        {
             colValueList.add(ByteString.copyFrom(col));
         }
         return insertRecord(schemaName, tableName, colValueList, timestamp);
+    }
+
+    public boolean addWriterBuffer(List<MetadataProto.Column> columns, String schemaName, String tableName,
+                                   MetadataProto.Path orderedDirPath, MetadataProto.Path compactDirPath) throws RetinaException
+    {
+        /**
+         * Since pixels-core was not introduced, TypeDescription cannot be used to represent the schema.
+         * Ultimately, it is converted to a string and transmitted via bytes, so it does not matter.
+         */
+        String token = UUID.randomUUID().toString();
+        RetinaProto.AddWriterBufferRequest request = RetinaProto.AddWriterBufferRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .addAllColumns(columns)
+                .setSchemaName(schemaName)
+                .setTableName(tableName)
+                .setOrderedDirPath(orderedDirPath)
+                .setCompactDirPath(compactDirPath)
+                .build();
+        RetinaProto.AddWriterBufferResponse response = this.stub.addWriterBuffer(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("failed to add writer: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("response token does not match.");
+        }
+        return true;
     }
 }
