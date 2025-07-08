@@ -84,7 +84,7 @@ public class FileWriterManager
 
         // create pixels writer
         String targetFileName = DateUtil.getCurTime() + ".pxl";
-        String targetFilePath = targetOrderedDirPath.getUri() + targetFileName;
+        String targetFilePath = targetOrderedDirPath.getUri() + "/" + targetFileName;
         try
         {
             // add file information to the metadata
@@ -94,8 +94,7 @@ public class FileWriterManager
             addedFile.setNumRowGroup(1);
             addedFile.setPathId(targetOrderedDirPath.getId());
             metadataService.addFiles(Collections.singletonList(addedFile));
-            // this.fileId = metadataService.getFileId(targetFilePath);
-            this.fileId = 0;
+            this.fileId = metadataService.getFileId(targetFilePath);
         } catch (MetadataException e)
         {
             logger.error("Failed to add file into metadata", e);
