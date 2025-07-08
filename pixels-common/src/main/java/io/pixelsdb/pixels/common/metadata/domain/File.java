@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.util.List;
@@ -32,7 +33,28 @@ import static java.util.Objects.requireNonNull;
  */
 public class File extends Base
 {
+    public enum Type
+    {
+        EMPTY, REGULAR, FLUSHED;
+
+        public static Type valueOf(int number)
+        {
+            switch (number)
+            {
+                case 0:
+                    return EMPTY;
+                case 1:
+                    return REGULAR;
+                case 2:
+                    return FLUSHED;
+                default:
+                    throw new InvalidArgumentException("invalid number for File.Type");
+            }
+        }
+    }
+
     private String name;
+    private Type type;
     private int numRowGroup;
     private long minRowId;
     private long maxRowId;
@@ -46,6 +68,7 @@ public class File extends Base
     {
         this.setId(file.getId());
         this.name = file.getName();
+        this.type = Type.valueOf(file.getType().getNumber());
         this.numRowGroup = file.getNumRowGroup();
         this.minRowId = file.getMinRowId();
         this.maxRowId = file.getMaxRowId();
@@ -60,6 +83,16 @@ public class File extends Base
     public void setName(String name)
     {
         this.name = name;
+    }
+
+    public Type getType()
+    {
+        return type;
+    }
+
+    public void setType(Type type)
+    {
+        this.type = type;
     }
 
     public int getNumRowGroup()
@@ -147,7 +180,8 @@ public class File extends Base
     @Override
     public MetadataProto.File toProto()
     {
-        return MetadataProto.File.newBuilder().setId(this.getId()).setName(this.name).setNumRowGroup(this.numRowGroup)
+        return MetadataProto.File.newBuilder().setId(this.getId()).setName(this.name)
+                .setTypeValue(this.type.ordinal()).setNumRowGroup(this.numRowGroup)
                 .setMinRowId(this.minRowId).setMaxRowId(this.maxRowId).setPathId(this.pathId).build();
     }
 }

@@ -167,12 +167,18 @@ message Path {
 }
 
 message File {
+    enum Type {
+        EMPTY = 0;
+        REGULAR = 1;
+        FLUSHED = 2;
+    }
     uint64 id = 1;
     string name = 2;
-    uint32 numRowGroup = 3;
-    uint64 minRowId = 4;
-    uint64 maxRowId = 5;
-    uint64 pathId = 6;
+    Type type = 3;
+    uint32 numRowGroup = 4;
+    uint64 minRowId = 5;
+    uint64 maxRowId = 6;
+    uint64 pathId = 7;
 }
 
 message SchemaVersion {
