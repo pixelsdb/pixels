@@ -401,7 +401,7 @@ public class PixelsWriterBuffer
     }
 
     /**
-     * collect resouces
+     * collect resources
      *
      * @throws IOException
      */
