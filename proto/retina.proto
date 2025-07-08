@@ -39,6 +39,8 @@ service RetinaWorkerService {
     rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
     // Get a unified view of the data in the writer buffer
     rpc GetSuperVersion (GetSuperVersionRequest) returns (GetSuperVersionResponse);
+    // Add writer buffer for new created table
+    rpc AddWriterBuffer (AddWriterBufferRequest) returns (AddWriterBufferResponse);
 }
 
 // header
@@ -63,8 +65,8 @@ message RowLocation {
 }
 
 message InsertData {
-    string schema = 1;
-    string table = 2;
+    string schemaName = 1;
+    string tableName = 2;
     repeated bytes colValues = 3;
 }
 
@@ -99,8 +101,8 @@ enum ColumnType {
 // insert
 message InsertRecordRequest {
     RequestHeader header = 1;
-    string schema = 2;
-    string table = 3;
+    string schemaName = 2;
+    string tableName = 3;
     repeated bytes colValues = 4;
     uint64 timestamp = 5;
 }
@@ -179,12 +181,23 @@ message GarbageCollectResponse {
 // get super version
 message GetSuperVersionRequest {
     RequestHeader header = 1;
-    string schema = 2;
-    string table = 3;
+    string schemaName = 2;
+    string tableName = 3;
 }
 
 message GetSuperVersionResponse {
     ResponseHeader header = 1;
     bytes data = 2;
     repeated int64 ids = 3;
+}
+
+// add writer buffer
+message AddWriterBufferRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+}
+
+message AddWriterBufferResponse {
+    ResponseHeader header = 1;
 }
