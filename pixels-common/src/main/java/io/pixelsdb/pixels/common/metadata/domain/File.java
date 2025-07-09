@@ -33,6 +33,10 @@ import static java.util.Objects.requireNonNull;
  */
 public class File extends Base
 {
+    /**
+     * Files such as loaded and compacted are marked as REGULAR, while empty file
+     * created by pixelsWriterImpl during build are marked as EMPTY.
+     */
     public enum Type
     {
         EMPTY, REGULAR;
