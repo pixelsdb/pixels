@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
@@ -36,11 +37,42 @@ import java.util.List;
 public interface MainIndex extends Closeable
 {
     /**
+     * Get the tableId of this mainIndex
+     * @return the tableId
+     */
+    long getTableId();
+
+    /**
+     * Allocate rowId batch for single point index
+     * @param tableId the table id of single point index
+     * @param numRowIds the rowId nums need to allocate
+     * @return the RowIdBatch
+     */
+    IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws RowIdException;
+
+    /**
      * Get the physical location of a row given the row id
      * @param rowId the row id
      * @return the row location
      */
     IndexProto.RowLocation getLocation(long rowId);
+
+    /**
+     * Put a single row id into the main index, in order to enable simultaneous insert into the main index while
+     * inserting a single point index.
+     * @param rowId the row id
+     * @param rowLocation the location of the row id
+     * @return true on success
+     */
+    boolean putRowId(long rowId, IndexProto.RowLocation rowLocation);
+
+    /**
+     * Delete a single row id from the main index. {@link #getLocation(long)} of a row id within a deleted range
+     * should return null.
+     * @param rowId the row id range to be deleted
+     * @return true on success
+     */
+    boolean deleteRowId(long rowId);
 
     /**
      * Put the row ids from a row group into the main index. In pixels, we allocate the row ids in batches (ranges)
@@ -77,7 +109,7 @@ public interface MainIndex extends Closeable
 
     /**
      * Persist the main index into persistent storage.
-     * @return
+     * @return true on success
      */
     boolean persist();
 

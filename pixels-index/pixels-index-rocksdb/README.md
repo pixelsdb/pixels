@@ -1,14 +1,14 @@
 # Pixels Index RocksDB
 
 ### Main Features
-This is a secondary index implementation based on RocksDB. The secondary index is used to store the mapping between data and RowId. Combined with the MainIndex, it forms a complete indexing service, which is invoked by gRPC.
+This is a single point index implementation based on RocksDB. The single point index is used to store the mapping between data and RowId. Combined with the MainIndex, it forms a complete indexing service, which is invoked by gRPC.
 
 ### Build Instructions
 1. Configure the RocksDB path in `pixels-common/src/main/resources/pixels.properties`.
 
 2. Compile the project using `mvn clean install`.
 
-3. Use `RocksDBIndexProvider.createInstance(SecondaryIndex.Scheme.rocksdb)` to create a `RocksDBIndex`.
+3. Use `RocksDBIndexProvider.createInstance(SinglePointIndex.Scheme.rocksdb)` to create a `RocksDBIndex`.
 
 4. The indexing service must be called through `IndexServer`. Below is an example of a script to start the service:
 ```cpp

@@ -19,10 +19,7 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexImpl;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
-import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
+import io.pixelsdb.pixels.common.index.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -35,19 +32,20 @@ import java.io.IOException;
  * @author hank, Rolland1944
  * @create 2025-02-09
  */
-public class RocksDBIndexProvider implements SecondaryIndexProvider
+public class RocksDBIndexProvider implements SinglePointIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksDBIndexProvider.class);
-    private final MainIndex mainIndex = new MainIndexImpl();
-    private final String RocksdbPath = ConfigFactory.Instance().getProperty("rocksdb.data.path");
+    private final MainIndexManager manager = new MainIndexManager(MainIndexImpl::new);
+    private final String RocksdbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
 
     @Override
-    public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
+    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId) throws IOException
     {
-        if (scheme == SecondaryIndex.Scheme.rocksdb)
+        if (scheme == SinglePointIndex.Scheme.rocksdb)
         {
             try
             {
+                MainIndex mainIndex = manager.getOrCreate(tableId);
                 return new RocksDBIndex(RocksdbPath,mainIndex);
             }
             catch (RocksDBException e)
@@ -60,8 +58,8 @@ public class RocksDBIndexProvider implements SecondaryIndexProvider
     }
 
     @Override
-    public boolean compatibleWith(@Nonnull SecondaryIndex.Scheme scheme)
+    public boolean compatibleWith(@Nonnull SinglePointIndex.Scheme scheme)
     {
-        return scheme == SecondaryIndex.Scheme.rocksdb;
+        return scheme == SinglePointIndex.Scheme.rocksdb;
     }
 }

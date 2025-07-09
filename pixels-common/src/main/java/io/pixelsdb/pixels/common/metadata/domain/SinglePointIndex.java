@@ -20,33 +20,35 @@
 package io.pixelsdb.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.common.index.SecondaryIndex.Scheme;
+import io.pixelsdb.pixels.common.index.SinglePointIndex.Scheme;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 /**
  * @author hank
  * @create 2025-02-07
  */
-public class SecondaryIndex extends Base
+public class SinglePointIndex extends Base
 {
     private KeyColumns keyColumns;
     private String keyColumnsJson;
+    private boolean primary;
     private boolean unique;
     private Scheme indexScheme;
     private long tableId;
 
-    public SecondaryIndex()
+    public SinglePointIndex()
     {
     }
 
-    public SecondaryIndex(MetadataProto.SecondaryIndex secondaryIndex)
+    public SinglePointIndex(MetadataProto.SinglePointIndex singlePointIndex)
     {
-        this.setId(secondaryIndex.getId());
-        this.keyColumnsJson = secondaryIndex.getKeyColumns();
+        this.setId(singlePointIndex.getId());
+        this.keyColumnsJson = singlePointIndex.getKeyColumns();
         this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
-        this.unique = secondaryIndex.getUnique();
-        this.indexScheme = Scheme.from(secondaryIndex.getIndexScheme());
-        this.tableId = secondaryIndex.getTableId();
+        this.primary = singlePointIndex.getPrimary();
+        this.unique = singlePointIndex.getUnique();
+        this.indexScheme = Scheme.from(singlePointIndex.getIndexScheme());
+        this.tableId = singlePointIndex.getTableId();
     }
 
     public KeyColumns getKeyColumns()
@@ -67,6 +69,16 @@ public class SecondaryIndex extends Base
     public void setKeyColumnsJson(String keyColumnsJson)
     {
         this.keyColumnsJson = keyColumnsJson;
+    }
+
+    public boolean isPrimary()
+    {
+        return primary;
+    }
+
+    public void setPrimary(boolean primary)
+    {
+        this.primary = primary;
     }
 
     public boolean isUnique()
@@ -100,9 +112,10 @@ public class SecondaryIndex extends Base
     }
 
     @Override
-    public MetadataProto.SecondaryIndex toProto()
+    public MetadataProto.SinglePointIndex toProto()
     {
-        return MetadataProto.SecondaryIndex.newBuilder().setId(this.getId()).setKeyColumns(this.keyColumnsJson)
-                .setUnique(this.unique).setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();
+        return MetadataProto.SinglePointIndex.newBuilder().setId(this.getId())
+                .setKeyColumns(this.keyColumnsJson).setPrimary(this.primary).setUnique(this.unique)
+                .setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();
     }
 }

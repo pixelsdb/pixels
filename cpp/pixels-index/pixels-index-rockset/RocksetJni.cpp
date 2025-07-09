@@ -45,7 +45,8 @@ using ROCKSDB_NAMESPACE::FlushOptions;
  * @create 2025-05-01
  */
 // Helper function to convert jstring to std::string
-std::string jstring_to_string(JNIEnv* env, jstring jstr) {
+std::string jstring_to_string(JNIEnv* env, jstring jstr)
+{
     const char* cstr = env->GetStringUTFChars(jstr, nullptr);
     std::string str(cstr);
     env->ReleaseStringUTFChars(jstr, cstr);
@@ -53,8 +54,10 @@ std::string jstring_to_string(JNIEnv* env, jstring jstr) {
 }
 
 // Test if set the environment
-bool check_env_vars(JNIEnv* env) {
-    if (!getenv("AWS_ACCESS_KEY_ID") || !getenv("AWS_SECRET_ACCESS_KEY") || !getenv("AWS_DEFAULT_REGION")) {
+bool check_env_vars(JNIEnv* env)
+{
+    if (!getenv("AWS_ACCESS_KEY_ID") || !getenv("AWS_SECRET_ACCESS_KEY") || !getenv("AWS_DEFAULT_REGION"))
+    {
         env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
             "Missing required environment variables: "
             "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION");
@@ -70,9 +73,12 @@ bool check_env_vars(JNIEnv* env) {
  */
 JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_CreateCloudFileSystem0(
     JNIEnv* env, jobject obj, 
-    jstring bucket_name, jstring s3_prefix) {
-
-    if (!check_env_vars(env)) return 0;
+    jstring bucket_name, jstring s3_prefix)
+{
+    if (!check_env_vars(env))
+    {
+        return 0;
+    }
 
     Aws::SDKOptions options;
     Aws::InitAPI(options);
@@ -83,7 +89,8 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_Creat
         getenv("AWS_ACCESS_KEY_ID"),
         getenv("AWS_SECRET_ACCESS_KEY"));
 
-    if (!cloud_fs_options.credentials.HasValid().ok()) {
+    if (!cloud_fs_options.credentials.HasValid().ok())
+    {
         env->ThrowNew(env->FindClass("java/lang/SecurityException"),
             "Invalid AWS credentials in environment variables");
         return 0;
@@ -104,7 +111,8 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_Creat
     CloudFileSystem* cfs;
     std::cout << "Start to Create CloudFileSystem"<< std::endl;
     Status s = CloudFileSystemEnv::NewAwsFileSystem(base_fs, cloud_fs_options, nullptr, &cfs);
-    if (!s.ok()) {
+    if (!s.ok())
+    {
         env->ThrowNew(env->FindClass("java/io/IOException"),
             "Failed to create CloudFileSystem. Check S3 permissions and bucket name.");
         return 0;
@@ -129,8 +137,8 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_OpenD
     JNIEnv* env, jobject obj,
     jlong cloud_env_ptr, jstring local_db_path,
     jstring persistent_cache_path, jlong persistent_cache_size_gb,
-    jboolean read_only) {
-
+    jboolean read_only)
+{
     // Convert Java strings
     std::string db_path = jstring_to_string(env, local_db_path);
     std::string cache_path = jstring_to_string(env, persistent_cache_path);
@@ -153,10 +161,10 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_OpenD
         static_cast<bool>(read_only)
     );
 
-    if (!s.ok()) {
+    if (!s.ok())
+    {
         std::cout << "Failed to open DBCloud: " << s.ToString() << std::endl;
-        env->ThrowNew(env->FindClass("java/lang/RuntimeException"),
-                     "Failed to open DBCloud");
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Failed to open DBCloud");
         return 0;
     }
 
@@ -170,8 +178,8 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_OpenD
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBput0(
     JNIEnv* env, jobject obj,
-    jlong db_ptr, jbyteArray key, jbyteArray value) {
-
+    jlong db_ptr, jbyteArray key, jbyteArray value)
+{
     DBCloud* db = reinterpret_cast<DBCloud*>(db_ptr);
     jbyte* key_data = env->GetByteArrayElements(key, nullptr);
     jsize key_len = env->GetArrayLength(key);
@@ -186,9 +194,9 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBput0
     env->ReleaseByteArrayElements(key, key_data, JNI_ABORT);
     env->ReleaseByteArrayElements(value, value_data, JNI_ABORT);
 
-    if (!s.ok()) {
-        env->ThrowNew(env->FindClass("java/lang/RuntimeException"),
-                     "Put operation failed");
+    if (!s.ok())
+    {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Put operation failed");
     }
 }
 
@@ -199,8 +207,8 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBput0
  */
 JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBget0(
     JNIEnv* env, jobject obj,
-    jlong db_ptr, jbyteArray key) {
-
+    jlong db_ptr, jbyteArray key)
+{
     DBCloud* db = reinterpret_cast<DBCloud*>(db_ptr);
     jbyte* key_data = env->GetByteArrayElements(key, nullptr);
     jsize key_len = env->GetArrayLength(key);
@@ -211,16 +219,19 @@ JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_
 
     env->ReleaseByteArrayElements(key, key_data, JNI_ABORT);
 
-    if (s.ok()) {
+    if (s.ok())
+    {
         jbyteArray result = env->NewByteArray(value.size());
-        env->SetByteArrayRegion(result, 0, value.size(),
-                               reinterpret_cast<const jbyte*>(value.data()));
+        env->SetByteArrayRegion(result, 0, value.size(), reinterpret_cast<const jbyte*>(value.data()));
         return result;
-    } else if (s.IsNotFound()) {
+    }
+    else if (s.IsNotFound())
+    {
         return nullptr;
-    } else {
-        env->ThrowNew(env->FindClass("java/lang/RuntimeException"),
-                     "Get operation failed");
+    }
+    else
+    {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Get operation failed");
         return nullptr;
     }
 }
@@ -232,8 +243,8 @@ JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBdelete0(
     JNIEnv* env, jobject obj,
-    jlong db_ptr, jbyteArray key) {
-
+    jlong db_ptr, jbyteArray key)
+{
     DBCloud* db = reinterpret_cast<DBCloud*>(db_ptr);
     jbyte* key_data = env->GetByteArrayElements(key, nullptr);
     jsize key_len = env->GetArrayLength(key);
@@ -243,9 +254,9 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBdele
 
     env->ReleaseByteArrayElements(key, key_data, JNI_ABORT);
 
-    if (!s.ok()) {
-        env->ThrowNew(env->FindClass("java/lang/RuntimeException"),
-                     "Delete operation failed");
+    if (!s.ok())
+    {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Delete operation failed");
     }
 }
 
@@ -256,9 +267,11 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBdele
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_CloseDB0(
     JNIEnv* env, jobject obj,
-    jlong db_ptr) {
+    jlong db_ptr)
+{
     DBCloud* db = reinterpret_cast<DBCloud*>(db_ptr);
-    if(db) {
+    if(db)
+    {
         db->Flush(FlushOptions());  // convert pending writes to sst files
         delete db;
         db = nullptr;

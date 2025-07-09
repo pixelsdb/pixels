@@ -49,8 +49,8 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
         this.typeParameterClass = typeParameterClass;
     }
 
-    public void execute(TurboProto.WorkerRequest request,
-                        StreamObserver<TurboProto.WorkerResponse> responseObserver)
+    public void execute(TurboProto.vHiveWorkerRequest request,
+                        StreamObserver<TurboProto.vHiveWorkerResponse> responseObserver)
     {
         I input = JSON.parseObject(request.getJson(), typeParameterClass);
         O output;
@@ -93,7 +93,7 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
         {
             throw new RuntimeException("Exception during process: ", e);
         }
-        TurboProto.WorkerResponse response = TurboProto.WorkerResponse.newBuilder()
+        TurboProto.vHiveWorkerResponse response = TurboProto.vHiveWorkerResponse.newBuilder()
                 .setJson(JSON.toJSONString(output))
                 .build();
         responseObserver.onNext(response);

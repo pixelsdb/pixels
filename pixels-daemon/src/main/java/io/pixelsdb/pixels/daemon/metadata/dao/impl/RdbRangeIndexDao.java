@@ -182,7 +182,7 @@ public class RdbRangeIndexDao extends RangeIndexDao
                 "SET\n" +
                 "`RI_KEY_COLUMNS` = ?," +
                 "`TBLS_TBL_ID` = ?," +
-                "`SCHEMA_VERSION_SV_ID` = ?\n" +
+                "`SCHEMA_VERSIONS_SV_ID` = ?\n" +
                 "WHERE `RI_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {

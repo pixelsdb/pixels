@@ -72,10 +72,15 @@
         <maven.compiler.target>8</maven.compiler.target>
         <maven.compiler.useIncrementalCompilation>true</maven.compiler.useIncrementalCompilation>
         <maven.plugin.source.version>3.1.0</maven.plugin.source.version>
-        <maven.plugin.compile.version>3.8.1</maven.plugin.compile.version>
+        <maven.plugin.compiler.version>3.8.1</maven.plugin.compiler.version>
         <maven.plugin.shade.version>3.2.2</maven.plugin.shade.version>
         <maven.plugin.assembly.version>3.5.0</maven.plugin.assembly.version>
         <maven.plugin.deploy.version>3.1.0</maven.plugin.deploy.version>
+        <maven.plugin.surefire.version>2.22.2</maven.plugin.surefire.version>
+        <maven.plugin.os-maven.version>1.6.2</maven.plugin.os-maven.version>
+        <maven.plugin.protobuf.version>0.6.1</maven.plugin.protobuf.version>
+        <maven.plugin.protoc-jar.version>3.3.0.1</maven.plugin.protoc-jar.version>
+
         <maven.plugin.antrun.version>3.1.0</maven.plugin.antrun.version>
 
         <!-- query engines -->
@@ -91,7 +96,7 @@
         <dep.rocksdb.version>9.10.0</dep.rocksdb.version>
 
         <!-- common libraries -->
-        <dep.spike.java.version>0.1.0</dep.spike.java.version>
+        <dep.spike.java.version>0.1.1</dep.spike.java.version>
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
         <dep.netty.version>4.1.77.Final</dep.netty.version>
         <dep.asynchttpclient.version>2.12.3</dep.asynchttpclient.version>
@@ -120,6 +125,8 @@
         <!-- testing -->
         <dep.junit.version>4.13.1</dep.junit.version>
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
+        <dep.mockito.version>4.5.1</dep.mockito.version>
+        <dep.junit.jupiter.version>5.8.2</dep.junit.jupiter.version>
 
         <!-- flat buffers -->
         <dep.google.flatbuffers.version>2.0.8</dep.google.flatbuffers.version>
@@ -251,11 +258,6 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-retina</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-index-rocksdb</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -291,7 +293,12 @@
                     </exclusion>
                 </exclusions>
                 <!-- this is available in the maven central repo -->
-                <version>0.1.0</version>
+                <version>${dep.spike.java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-retina</artifactId>
+                <version>${project.version}</version>
             </dependency>
 
             <!-- presto-jdbc -->
@@ -573,6 +580,12 @@
                 <artifactId>grpc-stub</artifactId>
                 <version>${dep.grpc.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-testing</artifactId>
+                <version>${dep.grpc.version}</version>
+                <scope>test</scope>
+            </dependency>
 
             <!-- fastjson -->
             <dependency>
@@ -716,6 +729,32 @@
                 <scope>test</scope>
             </dependency>
 
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-api</artifactId>
+                <version>${dep.junit.jupiter.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-engine</artifactId>
+                <version>${dep.junit.jupiter.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${dep.mockito.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-junit-jupiter</artifactId>
+                <version>${dep.mockito.version}</version>
+                <scope>test</scope>
+            </dependency>
+
             <!-- flat buffers -->
             <dependency>
                 <groupId>com.google.flatbuffers</groupId>
@@ -757,6 +796,32 @@
             <scope>test</scope>
             <optional>true</optional>
         </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 
     <build>
@@ -765,7 +830,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.8.1</version>
+                    <version>${maven.plugin.compiler.version}</version>
                     <configuration>
                         <source>1.8</source>
                         <target>1.8</target>
@@ -776,7 +841,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>2.22.2</version>
+                    <version>${maven.plugin.surefire.version}</version>
                     <configuration>
                         <skipTests>true</skipTests>
                     </configuration>
@@ -785,7 +850,7 @@
                 <plugin>
                     <groupId>com.github.os72</groupId>
                     <artifactId>protoc-jar-maven-plugin</artifactId>
-                    <version>3.3.0.1</version>
+                    <version>${maven.plugin.protoc-jar.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

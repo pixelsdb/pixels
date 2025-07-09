@@ -221,7 +221,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         }
 
         resultSchema = TypeDescription.createSchema(includedColumnTypes);
-        resultColumnsEncoded = new boolean[includedColumns.length];
+        // Issue #869: fix resultColumnEncoded should match resultColumns
+        resultColumnsEncoded = new boolean[resultColumns.length];
         checkValid = true;
     }
 

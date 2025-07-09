@@ -57,7 +57,16 @@
             <artifactId>pixels-retina</artifactId>
             <optional>true</optional>
         </dependency>
-
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-rocksdb</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-rockset</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-index-rocksdb</artifactId>
@@ -136,7 +145,6 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-index-rocksdb</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
@@ -217,7 +225,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven.plugin.compile.version}</version>
+                <version>${maven.plugin.compiler.version}</version>
                 <configuration>
                     <source>8</source>
                     <target>8</target>

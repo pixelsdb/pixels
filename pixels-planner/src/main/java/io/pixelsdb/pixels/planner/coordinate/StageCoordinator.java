@@ -24,14 +24,15 @@ import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.task.TaskQueue;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -53,13 +54,16 @@ public class StageCoordinator
 
     private final int stageId;
     private final boolean isQueued;
+    private int downStreamWorkerNum;
     private final int fixedWorkerNum;
     private final TaskQueue<Task> taskQueue;
     private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers = new ConcurrentHashMap<>();
     // this.workers is used for dependency checking, no concurrent reads and writes
     private final List<Worker<CFWorkerInfo>> workers = new ArrayList<>();
-    private final Map<Long, Integer> workerIdToWorkerIndex = new ConcurrentHashMap<>();
-    private final AtomicInteger workerIndexAssigner = new AtomicInteger(0);
+    private final Map<Long, List<Integer>> workerIdToWorkerIndex = new ConcurrentHashMap<>();
+    private int workerIndexAssigner;
+    private int leftChildWorkerNum;
+    private int rightChildWorkerNum;
     private final Object lock = new Object();
 
     /**
@@ -78,6 +82,22 @@ public class StageCoordinator
         this.isQueued = false;
         this.fixedWorkerNum = workerNum;
         this.taskQueue = null;
+        this.downStreamWorkerNum = 0;
+        this.workerIndexAssigner = 0;
+        this.leftChildWorkerNum = 0;
+        this.rightChildWorkerNum = 0;
+    }
+
+    public StageCoordinator(int stageId, int workerNum, int workerIndexAssigner)
+    {
+        this.stageId = stageId;
+        this.isQueued = false;
+        this.fixedWorkerNum = workerNum;
+        this.taskQueue = null;
+        this.downStreamWorkerNum = 0;
+        this.workerIndexAssigner = workerIndexAssigner;
+        this.leftChildWorkerNum = 0;
+        this.rightChildWorkerNum = 0;
     }
 
     /**
@@ -88,6 +108,18 @@ public class StageCoordinator
      * @param stageId
      * @param pendingTasks
      */
+    public StageCoordinator(int stageId, List<Task> pendingTasks, int workerIndex)
+    {
+        this.stageId = stageId;
+        this.isQueued = true;
+        this.fixedWorkerNum = 0;
+        this.taskQueue = new TaskQueue<>(pendingTasks);
+        this.downStreamWorkerNum = 0;
+        this.workerIndexAssigner = workerIndex;
+        this.leftChildWorkerNum = 0;
+        this.rightChildWorkerNum = 0;
+    }
+
     public StageCoordinator(int stageId, List<Task> pendingTasks)
     {
         this.stageId = stageId;
@@ -104,8 +136,24 @@ public class StageCoordinator
     {
         synchronized (this.lock)
         {
-            this.workerIdToWorkers.put(worker.getWorkerId(), worker);
-            this.workerIdToWorkerIndex.put(worker.getWorkerId(), this.workerIndexAssigner.getAndIncrement());
+            workerIdToWorkers.put(worker.getWorkerId(), worker);
+            if (worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_OPERATOR_NAME) ||
+                    worker.getWorkerInfo().getOperatorName().equals(Constants.PARTITION_JOIN_OPERATOR_NAME))
+            {
+                worker.setWorkerPortIndex(workerIndexAssigner);
+                workerIndexAssigner++;
+            } else if (worker.getWorkerInfo().getOperatorName().equals(Constants.BROADCAST_OPERATOR_NAME))
+            {
+                if (downStreamWorkerNum != 0)
+                {
+                    workerIdToWorkerIndex.put(worker.getWorkerId(),
+                            Collections.singletonList(workerIndexAssigner % downStreamWorkerNum) );
+                    // down stage is partitioned join
+                    // so one worker writes to one port of worker in next stage
+                    worker.setWorkerPortIndex(workerIndexAssigner);
+                    workerIndexAssigner++;
+                }
+            }
             this.workers.add(worker);
             if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
             {
@@ -191,14 +239,14 @@ public class StageCoordinator
      * @param workerId the (global) id of the worker
      * @return the index of the worker in this stage, or < 0 if the worker is not found
      */
-    public int getWorkerIndex(long workerId)
+    public List<Integer> getWorkerIndex(long workerId)
     {
-        Integer index = this.workerIdToWorkerIndex.get(workerId);
+        List<Integer> index = this.workerIdToWorkerIndex.get(workerId);
         if (index != null)
         {
             return index;
         }
-        return -1;
+        return null;
     }
 
     /**
@@ -245,5 +293,51 @@ public class StageCoordinator
     public List<Worker<CFWorkerInfo>> getWorkers()
     {
         return this.workers;
+    }
+
+    /**
+     * set down stream workers num
+     */
+    public void setDownStreamWorkerNum(int downStreamWorkerNum)
+    {
+        this.downStreamWorkerNum = downStreamWorkerNum;
+    }
+
+    /**
+     * get worker num of this stage
+     */
+    public int getFixedWorkerNum()
+    {
+        return this.fixedWorkerNum;
+    }
+
+    public void setLeftChildWorkerNum(int num)
+    {
+        leftChildWorkerNum = num;
+    }
+
+    public int getLeftChildWorkerNum()
+    {
+        return leftChildWorkerNum;
+    }
+
+    public boolean leftChildWorkerIsEmpty()
+    {
+        return leftChildWorkerNum == 0;
+    }
+
+    public void setRightChildWorkerNum(int num)
+    {
+        rightChildWorkerNum = num;
+    }
+
+    public int getRightChildWorkerNum()
+    {
+        return rightChildWorkerNum;
+    }
+
+    public boolean rightChildWorkerIsEmpty()
+    {
+        return rightChildWorkerNum == 0;
     }
 }

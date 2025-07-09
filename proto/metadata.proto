@@ -52,10 +52,11 @@ service MetadataService {
     rpc GetRange (GetRangeRequest) returns (GetRangeResponse);
     rpc GetRanges (GetRangesRequest) returns (GetRangesResponse);
     rpc DeleteRange (DeleteRangeRequest) returns (DeleteRangeResponse);
-    rpc CreateSecondaryIndex (CreateSecondaryIndexRequest) returns (CreateSecondaryIndexResponse);
-    rpc GetSecondaryIndex (GetSecondaryIndexRequest) returns (GetSecondaryIndexResponse);
-    rpc UpdateSecondaryIndex (UpdateSecondaryIndexRequest) returns (UpdateSecondaryIndexResponse);
-    rpc DropSecondaryIndex (DropSecondaryIndexRequest) returns (DropSecondaryIndexResponse);
+    rpc CreateSinglePointIndex (CreateSinglePointIndexRequest) returns (CreateSinglePointIndexResponse);
+    rpc GetPrimaryIndex (GetPrimaryIndexRequest) returns (GetPrimaryIndexResponse);
+    rpc GetSinglePointIndices (GetSinglePointIndicesRequest) returns (GetSinglePointIndicesResponse);
+    rpc UpdateSinglePointIndex (UpdateSinglePointIndexRequest) returns (UpdateSinglePointIndexResponse);
+    rpc DropSinglePointIndex (DropSinglePointIndexRequest) returns (DropSinglePointIndexResponse);
     rpc AddPath (AddPathRequest) returns (AddPathResponse);
     rpc GetPaths (GetPathsRequest) returns (GetPathsResponse);
     rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
@@ -142,13 +143,14 @@ message Range {
     uint64 rangeIndexId = 5;
 }
 
-message SecondaryIndex {
+message SinglePointIndex {
     uint64 id = 1;
     string keyColumns = 2;
-    bool unique = 3;
-    string indexScheme = 4;
-    uint64 tableId = 5;
-    uint64 schemaVersionId = 6;
+    bool primary = 3;
+    bool unique = 4;
+    string indexScheme = 5;
+    uint64 tableId = 6;
+    uint64 schemaVersionId = 7;
 }
 
 message Path {
@@ -427,7 +429,7 @@ message CreateRangeIndexResponse {
 
 message GetRangeIndexRequest {
     RequestHeader header = 1;
-    int64 tableId = 2;
+    uint64 tableId = 2;
 }
 
 message GetRangeIndexResponse {
@@ -446,7 +448,7 @@ message UpdateRangeIndexResponse {
 
 message DropRangeIndexRequest {
     RequestHeader header = 1;
-    int64 tableId = 2;
+    uint64 tableId = 2;
 }
 
 message DropRangeIndexResponse {
@@ -465,7 +467,7 @@ message AddRangeResponse {
 
 message GetRangeRequest {
     RequestHeader header = 1;
-    int64 rangeId = 2;
+    uint64 rangeId = 2;
 }
 
 message GetRangeResponse {
@@ -475,7 +477,7 @@ message GetRangeResponse {
 
 message GetRangesRequest {
     RequestHeader header = 1;
-    int64 rangeIndexId = 2;
+    uint64 rangeIndexId = 2;
 }
 
 message GetRangesResponse {
@@ -485,48 +487,59 @@ message GetRangesResponse {
 
 message DeleteRangeRequest {
     RequestHeader header = 1;
-    int64 rangeId = 2;
+    uint64 rangeId = 2;
 }
 
 message DeleteRangeResponse {
     ResponseHeader header = 1;
 };
 
-// secondary index
-message CreateSecondaryIndexRequest {
+// single point index
+message CreateSinglePointIndexRequest {
     RequestHeader header = 1;
-    SecondaryIndex secondaryIndex = 2;
+    SinglePointIndex singlePointIndex = 2;
 }
 
-message CreateSecondaryIndexResponse {
+message CreateSinglePointIndexResponse {
     ResponseHeader header = 1;
 }
 
-message GetSecondaryIndexRequest {
+// primary index in pixels is an unique single point index
+message GetPrimaryIndexRequest {
     RequestHeader header = 1;
-    int64 tableId = 2;
+    uint64 tableId = 2; // there is at most one primary index on each table
 }
 
-message GetSecondaryIndexResponse {
+message GetPrimaryIndexResponse {
     ResponseHeader header = 1;
-    SecondaryIndex secondaryIndex = 2;
+    SinglePointIndex primaryIndex = 2;
 }
 
-message UpdateSecondaryIndexRequest {
+message GetSinglePointIndicesRequest {
     RequestHeader header = 1;
-    SecondaryIndex secondaryIndex = 2;
+    uint64 tableId = 2;
 }
 
-message UpdateSecondaryIndexResponse {
+message GetSinglePointIndicesResponse {
+    ResponseHeader header = 1;
+    repeated SinglePointIndex singlePointIndices = 2;
+}
+
+message UpdateSinglePointIndexRequest {
+    RequestHeader header = 1;
+    SinglePointIndex singlePointIndex = 2;
+}
+
+message UpdateSinglePointIndexResponse {
     ResponseHeader header = 1;
 };
 
-message DropSecondaryIndexRequest {
+message DropSinglePointIndexRequest {
     RequestHeader header = 1;
-    int64 tableId = 2;
+    uint64 indexId = 2;
 }
 
-message DropSecondaryIndexResponse {
+message DropSinglePointIndexResponse {
     ResponseHeader header = 1;
 };
 

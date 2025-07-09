@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
@@ -28,16 +30,17 @@ import java.util.List;
 /**
  * @author hank
  * @create 2025-02-07
+ * @update 2025-06-22 hank: rename from SecondaryIndex to SinglePointIndex
  */
-public interface SecondaryIndex extends Closeable
+public interface SinglePointIndex extends Closeable
 {
     /**
-     * If we want to add more secondary index schemes here, modify this enum.
+     * If we want to add more single point index schemes here, modify this enum.
      */
     enum Scheme
     {
-        rocksdb,  // secondary index stored in rocksdb
-        rockset;  // secondary index stored in rockset (rocksdb-cloud)
+        rocksdb,  // single point index stored in rocksdb
+        rockset;  // single point index stored in rockset (rocksdb-cloud)
 
         /**
          * Case-insensitive parsing from String name to enum value.
@@ -82,18 +85,26 @@ public interface SecondaryIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-    boolean putEntry(Entry entry);
+    boolean putPrimaryEntry(Entry entry) throws MainIndexException, SinglePointIndexException;
 
-    boolean putEntries(List<Entry> entries);
+    boolean putPrimaryEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException;
 
-    boolean deleteEntry(IndexProto.IndexKey key);
+    boolean putSecondaryEntry(Entry entry) throws SinglePointIndexException;
 
-    boolean deleteEntries(List<IndexProto.IndexKey> keys);
+    boolean putSecondaryEntries(List<Entry> entries) throws SinglePointIndexException;
+
+    boolean deletePrimaryEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException;
+
+    boolean deletePrimaryEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException;
+
+    boolean deleteSecondaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException;
+
+    boolean deleteSecondaryEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException;
 
     /**
-     * Close the secondary index. This method is to be used by the secondary index factory to close the
-     * managed secondary index instances when the process is shutting down.
-     * Users do not need to close the managed secondary index instances by themselves.
+     * Close the single point index. This method is to be used by the single point index factory to close the
+     * managed single point index instances when the process is shutting down.
+     * Users do not need to close the managed single point index instances by themselves.
      * @throws IOException
      */
     @Override
@@ -104,12 +115,14 @@ public interface SecondaryIndex extends Closeable
         private final IndexProto.IndexKey key;
         private long rowId;
         private final boolean unique;
+        private final IndexProto.RowLocation rowLocation;
 
-        public Entry(IndexProto.IndexKey key, long rowId, boolean unique)
+        public Entry(IndexProto.IndexKey key, long rowId, boolean unique, IndexProto.RowLocation rowLocation)
         {
             this.key = key;
             this.rowId = rowId;
             this.unique = unique;
+            this.rowLocation = rowLocation;
         }
 
         public IndexProto.IndexKey getKey()
@@ -123,6 +136,11 @@ public interface SecondaryIndex extends Closeable
         }
 
         public boolean getIsUnique() { return unique; }
+
+        public IndexProto.RowLocation getRowLocation()
+        {
+            return rowLocation;
+        }
 
         public void setRowId(long rowId) {
             this.rowId = rowId;

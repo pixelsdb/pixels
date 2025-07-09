@@ -27,43 +27,43 @@ import java.util.List;
  * @author hank
  * @create 2025-02-07
  */
-public abstract class SecondaryIndexDao implements Dao<MetadataProto.SecondaryIndex>
+public abstract class SinglePointIndexDao implements Dao<MetadataProto.SinglePointIndex>
 {
     @Override
-    public abstract MetadataProto.SecondaryIndex getById(long id);
+    public abstract MetadataProto.SinglePointIndex getById(long id);
 
     @Override
-    public List<MetadataProto.SecondaryIndex> getAll()
+    public List<MetadataProto.SinglePointIndex> getAll()
     {
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public abstract MetadataProto.SecondaryIndex getByTableId(long tableId);
+    public abstract MetadataProto.SinglePointIndex getPrimaryByTableId(long tableId);
 
-    public abstract List<MetadataProto.SecondaryIndex> getAllByTableId(long tableId);
+    public abstract List<MetadataProto.SinglePointIndex> getAllByTableId(long tableId);
 
-    public boolean save (MetadataProto.SecondaryIndex secondaryIndex)
+    public boolean save (MetadataProto.SinglePointIndex singlePointIndex)
     {
-        if (exists(secondaryIndex))
+        if (exists(singlePointIndex))
         {
-            return update(secondaryIndex);
+            return update(singlePointIndex);
         }
         else
         {
-            return insert(secondaryIndex) > 0;
+            return insert(singlePointIndex) > 0;
         }
     }
 
-    abstract public boolean exists (MetadataProto.SecondaryIndex secondaryIndex);
+    abstract public boolean exists (MetadataProto.SinglePointIndex singlePointIndex);
 
     /**
      * Insert the secondary index into metadata.
-     * @param secondaryIndex the secondary index
+     * @param singlePointIndex the secondary index
      * @return the auto-increment id of the inserted secondary index, <= 0 if insert is failed
      */
-    abstract public long insert (MetadataProto.SecondaryIndex secondaryIndex);
+    abstract public long insert (MetadataProto.SinglePointIndex singlePointIndex);
 
-    abstract public boolean update (MetadataProto.SecondaryIndex secondaryIndex);
+    abstract public boolean update (MetadataProto.SinglePointIndex singlePointIndex);
 
-    abstract public boolean deleteByTableId(long tableId);
+    abstract public boolean deleteById(long id);
 }

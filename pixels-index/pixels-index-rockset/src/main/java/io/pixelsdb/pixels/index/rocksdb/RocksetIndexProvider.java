@@ -19,10 +19,7 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexImpl;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
-import io.pixelsdb.pixels.common.index.SecondaryIndexProvider;
+import io.pixelsdb.pixels.common.index.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -34,24 +31,25 @@ import java.io.IOException;
  * @author hank, Rolland1944
  * @create 2025-02-19
  */
-public class RocksetIndexProvider implements SecondaryIndexProvider
+public class RocksetIndexProvider implements SinglePointIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
-    private final MainIndex mainIndex = new MainIndexImpl();
-    private final String bucketName = ConfigFactory.Instance().getProperty("rockset.s3.bucket");
-    private final String s3Prefix = ConfigFactory.Instance().getProperty("rockset.s3.prefix");
-    private final String localDbPath = ConfigFactory.Instance().getProperty("rockset.local.data.path");
-    private final String persistentCachePath = ConfigFactory.Instance().getProperty("rockset.persistent.cache.path");
-    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("rockset.persistent.cache.size.gb"));
-    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("rockset.read.only"));
+    private final MainIndexManager manager = new MainIndexManager(MainIndexImpl::new);
+    private final String bucketName = ConfigFactory.Instance().getProperty("index.rockset.s3.bucket");
+    private final String s3Prefix = ConfigFactory.Instance().getProperty("index.rockset.s3.prefix");
+    private final String localDbPath = ConfigFactory.Instance().getProperty("index.rockset.local.data.path");
+    private final String persistentCachePath = ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.path");
+    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.size.gb"));
+    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
 
     @Override
-    public SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException
+    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId) throws IOException
     {
-        if (scheme == SecondaryIndex.Scheme.rockset)
+        if (scheme == SinglePointIndex.Scheme.rockset)
         {
              try
              {
+                 MainIndex mainIndex = manager.getOrCreate(tableId);
                  return new RocksetIndex(mainIndex, bucketName, s3Prefix, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
              }
              catch (Exception e) {
@@ -63,8 +61,8 @@ public class RocksetIndexProvider implements SecondaryIndexProvider
     }
 
     @Override
-    public boolean compatibleWith(@Nonnull SecondaryIndex.Scheme scheme)
+    public boolean compatibleWith(@Nonnull SinglePointIndex.Scheme scheme)
     {
-        return scheme == SecondaryIndex.Scheme.rockset;
+        return scheme == SinglePointIndex.Scheme.rockset;
     }
 }
