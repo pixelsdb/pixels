@@ -170,7 +170,7 @@ public class FileWriterManager
                 this.writer.close();
 
                 // update file's type
-                this.file.setType(File.Type.FLUSHED);
+                this.file.setType(File.Type.REGULAR);
                 MetadataService metadataService = MetadataService.Instance();
                 metadataService.updateFile(this.file);
             } catch (Exception e)

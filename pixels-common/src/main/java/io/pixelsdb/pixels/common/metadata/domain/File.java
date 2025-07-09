@@ -35,7 +35,7 @@ public class File extends Base
 {
     public enum Type
     {
-        EMPTY, REGULAR, FLUSHED;
+        EMPTY, REGULAR;
 
         public static Type valueOf(int number)
         {
@@ -45,8 +45,6 @@ public class File extends Base
                     return EMPTY;
                 case 1:
                     return REGULAR;
-                case 2:
-                    return FLUSHED;
                 default:
                     throw new InvalidArgumentException("invalid number for File.Type");
             }

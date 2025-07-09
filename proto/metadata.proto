@@ -170,7 +170,6 @@ message File {
     enum Type {
         EMPTY = 0;
         REGULAR = 1;
-        FLUSHED = 2;
     }
     uint64 id = 1;
     string name = 2;
