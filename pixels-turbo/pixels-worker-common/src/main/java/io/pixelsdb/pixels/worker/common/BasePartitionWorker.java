@@ -203,11 +203,11 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
      * @param partitionResult the partition result
      * @param writerSchema the schema to be used for the partition result writer
      */
-    private void partitionFile(long transId, long timestamp, List<InputInfo> scanInputs,
-                               String[] columnsToRead, Storage.Scheme inputScheme,
-                               TableScanFilter filter, int[] keyColumnIds, boolean[] projection,
-                               List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
-                               AtomicReference<TypeDescription> writerSchema)
+    protected void partitionFile(long transId, long timestamp, List<InputInfo> scanInputs,
+                                 String[] columnsToRead, Storage.Scheme inputScheme,
+                                 TableScanFilter filter, int[] keyColumnIds, boolean[] projection,
+                                 List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
+                                 AtomicReference<TypeDescription> writerSchema)
     {
         Scanner scanner = null;
         Partitioner partitioner = null;

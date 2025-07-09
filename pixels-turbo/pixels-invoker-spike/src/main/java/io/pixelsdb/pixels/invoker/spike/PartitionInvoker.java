@@ -23,15 +23,10 @@ import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
-import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
-import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 public class PartitionInvoker extends SpikeInvoker
 {

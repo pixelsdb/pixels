@@ -19,18 +19,21 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.index.IndexProto;
-import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.exception.EtcdException;
+import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author hank, Rolland1944
@@ -39,13 +42,22 @@ import java.util.List;
 public class MainIndexImpl implements MainIndex
 {
     private static final Logger logger = LogManager.getLogger(MainIndexImpl.class);
+    private static final HashMap<Long, PersistentAutoIncrement> persistentAIMap = new HashMap<>();
+    // Get the tableId of this mainIndex
+    private final long tableId;
     // Cache for storing generated rowIds
-    private final List<Long> rowIdCache = new ArrayList<>();
-    // Assumed batch size for generating rowIds
-    private static final int BATCH_SIZE = 100000;
+    private final Queue<Long> rowIdCache = new ConcurrentLinkedQueue<>();
     // Get the singleton instance of EtcdUtil
     EtcdUtil etcdUtil = EtcdUtil.Instance();
-    private boolean dirty = false; // Dirty flag
+    // Read-Write lock
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+    // Dirty flag
+    private boolean dirty = false;
+
+    public MainIndexImpl(long tableId)
+    {
+        this.tableId = tableId;
+    }
 
     public static class Entry
     {
@@ -72,11 +84,47 @@ public class MainIndexImpl implements MainIndex
     private final List<Entry> entries = new ArrayList<>();
 
     @Override
+    public long getTableId()
+    {
+        return tableId;
+    }
+
+    @Override
+    public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws RowIdException
+    {
+        // 1. get or create the persistent auto increment
+
+        PersistentAutoIncrement autoIncrement = persistentAIMap.computeIfAbsent(
+            tableId,
+            id -> {
+                try {
+                    return new PersistentAutoIncrement("rowid-" + id); // key in etcd
+                } catch (EtcdException e) {
+                    throw new RuntimeException(e); // wrap to unchecked, will rethrow below
+                }
+            }
+        );
+        // 2. allocate numRowIds
+        try
+        {
+            long start = autoIncrement.getAndIncrement(numRowIds);
+            return IndexProto.RowIdBatch.newBuilder()
+                .setRowIdStart(start)
+                .setLength(numRowIds)
+                .build();
+        } catch (EtcdException e)
+        {
+            throw new RowIdException(e);
+        }
+    }
+
+    @Override
     public IndexProto.RowLocation getLocation(long rowId)
     {
         // Use binary search to find the Entry containing the rowId
         int index = binarySearch(rowId);
-        if (index >= 0) {
+        if (index >= 0)
+        {
             Entry entry = entries.get(index);
             RgLocation rgLocation = entry.getRgLocation();
             return IndexProto.RowLocation.newBuilder()
@@ -89,95 +137,123 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
+    public boolean putRowId(long rowId, IndexProto.RowLocation rowLocation)
+    {
+        RowIdRange newRange = new RowIdRange(rowId, rowId);
+        RgLocation rgLocation = new RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
+        return putRowIdsOfRg(newRange, rgLocation);
+    }
+
+    @Override
+    public boolean deleteRowId(long rowId)
+    {
+        int index = binarySearch(rowId);
+        if (index < 0)
+        {
+            logger.error("Delete failure: RowId {} not found", rowId);
+            return false;
+        }
+
+        Entry entry = entries.get(index);
+        RowIdRange original = entry.getRowIdRange();
+
+        long start = original.getStartRowId();
+        long end = original.getEndRowId();
+        // lock
+        rwLock.writeLock().lock();
+        entries.remove(index);
+        // In-place insert the remaining entries
+        if (rowId > start)
+        {
+            entries.add(index, new Entry(new RowIdRange(start, rowId - 1), entry.getRgLocation()));
+            index++;
+        }
+        if (rowId < end)
+        {
+            entries.add(index, new Entry(new RowIdRange(rowId + 1, end), entry.getRgLocation()));
+        }
+        rwLock.writeLock().unlock();
+        dirty = true;
+        return true;
+    }
+
+    @Override
     public boolean putRowIdsOfRg(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
     {
-        // Check if rowIdRangeOfRg overlaps with existing ranges
-        if (isOverlapping(rowIdRangeOfRg)) {
-            return false; // Insertion fails if overlapping
+        long start = rowIdRangeOfRg.getStartRowId();
+        long end = rowIdRangeOfRg.getEndRowId();
+        if (start > end)
+        {
+            logger.error("Invalid RowIdRange: startRowId {} > endRowId {}", start, end);
+            return false;
         }
 
-        // Create new Entry and add to entries
-        Entry newEntry = new Entry(rowIdRangeOfRg, rgLocation);
-        entries.add(newEntry);
-
-        // Sort entries by startRowId to maintain order
-        entries.sort((e1, e2) -> Long.compare(e1.getRowIdRange().getStartRowId(), e2.getRowIdRange().getStartRowId()));
-
-        // Set dirty flag
+        // Check whether it conflicts with the last entry.
+        if (!entries.isEmpty())
+        {
+            RowIdRange lastRange = entries.get(entries.size() - 1).getRowIdRange();
+            if (start <= lastRange.getEndRowId())
+            {
+                logger.error("Insert failure: RowIdRange [{}-{}] overlaps with previous [{}-{}]",
+                        start, end, lastRange.getStartRowId(), lastRange.getEndRowId());
+                return false;
+            }
+        }
+        rwLock.writeLock().lock();
+        entries.add(new Entry(rowIdRangeOfRg, rgLocation));
+        rwLock.writeLock().unlock();
         dirty = true;
-
         return true;
     }
 
     @Override
-    public boolean deleteRowIdRange(RowIdRange rowIdRange)
+    public boolean deleteRowIdRange(RowIdRange targetRange)
     {
-        // Find and remove Entries overlapping with rowIdRange
-        boolean removed = entries.removeIf(entry -> isOverlapping(entry.getRowIdRange(), rowIdRange));
+        int index = binarySearch(targetRange.getStartRowId());
+        if (index < 0)
+        {
+            logger.error("Delete failure: RowIdRange [{}-{}] not found", targetRange.getStartRowId(), targetRange.getEndRowId());
+            return false;
+        }
 
-        // Set dirty flag
-        if (removed) {
+        Entry entry = entries.get(index);
+        RowIdRange existingRange = entry.getRowIdRange();
+
+        if (existingRange.getStartRowId() == targetRange.getStartRowId() && existingRange.getEndRowId() == targetRange.getEndRowId())
+        {
+            rwLock.writeLock().lock();
+            entries.remove(index);
+            rwLock.writeLock().unlock();
             dirty = true;
+            return true;
+        }
+        else
+        {
+            logger.error("Delete failure: RowIdRange [{}-{}] does not exactly match existing range [{}-{}]",
+                    targetRange.getStartRowId(), targetRange.getEndRowId(),
+                    existingRange.getStartRowId(), existingRange.getEndRowId());
+            return false;
         }
 
-        return true;
-    }
-
-    @Override
-    public boolean getRowId(SecondaryIndex.Entry entry)
-    {
-        // Check if cache is empty
-        if (rowIdCache.isEmpty()) {
-            // Generate a new batch of rowIds into cache
-            List<Long> newRowIds = loadRowIdsFromEtcd(BATCH_SIZE);
-            if (newRowIds.isEmpty()) {
-                logger.error("Failed to generate row ids");
-                return false;
-            }
-            rowIdCache.addAll(newRowIds);
-        }
-        // Get the first rowId from cache
-        long rowId = rowIdCache.remove(0);
-        // Set the rowId in IndexEntry
-        entry.setRowId(rowId);
-        return true;
-    }
-
-    @Override
-    public boolean getRgOfRowIds(List<SecondaryIndex.Entry> entries)
-    {
-        // Check if remaining rowIds in cache are sufficient
-        if (rowIdCache.size() < entries.size()) {
-            // If cache is insufficient, generate a new batch of rowIds
-            int requiredCount = entries.size() - rowIdCache.size();
-            List<Long> newRowIds = loadRowIdsFromEtcd(Math.max(requiredCount, BATCH_SIZE));
-            if (newRowIds.isEmpty()) {
-                logger.error("Failed to generate row ids");
-                return false;
-            }
-            rowIdCache.addAll(newRowIds);
-        }
-        // Assign a rowId to each IndexEntry
-        for (SecondaryIndex.Entry entry : entries) {
-            long rowId = rowIdCache.remove(0); // Get a rowId from cache
-            entry.setRowId(rowId);  // Set the rowId
-        }
-        return true;
     }
 
     @Override
     public boolean persist()
     {
-        try {
+        try
+        {
             // Iterate through entries and persist each to etcd
-            for (Entry entry : entries) {
+            for (Entry entry : entries)
+            {
                 String key = "/mainindex/" + entry.getRowIdRange().getStartRowId();
                 String value = serializeEntry(entry); // Serialize Entry to string
                 etcdUtil.putKeyValue(key, value);
             }
             logger.info("Persisted {} entries to etcd", entries.size());
             return true;
-        } catch (Exception e) {
+        }
+        catch (Exception e)
+        {
             logger.error("Failed to persist entries to etcd", e);
             return false;
         }
@@ -185,8 +261,10 @@ public class MainIndexImpl implements MainIndex
 
     public boolean persistIfDirty()
     {
-        if (dirty) {
-            if (persist()) {
+        if (dirty)
+        {
+            if (persist())
+            {
                 dirty = false; // Reset dirty flag
                 return true;
             }
@@ -198,14 +276,18 @@ public class MainIndexImpl implements MainIndex
     @Override
     public void close() throws IOException
     {
-        try {
+        try
+        {
             // Check dirty flag and persist to etcd if true
-            if (!persistIfDirty()) {
+            if (!persistIfDirty())
+            {
                 logger.error("Failed to persist data to etcd before closing");
                 throw new IOException("Failed to persist data to etcd before closing");
             }
             logger.info("Data persisted to etcd successfully before closing");
-        } catch (Exception e) {
+        }
+        catch (Exception e)
+        {
             logger.error("Error occurred while closing MainIndexImpl", e);
             throw new IOException("Error occurred while closing MainIndexImpl", e);
         }
@@ -216,69 +298,27 @@ public class MainIndexImpl implements MainIndex
         int low = 0;
         int high = entries.size() - 1;
 
-        while (low <= high) {
+        while (low <= high)
+        {
             int mid = (low + high) >>> 1;
             Entry entry = entries.get(mid);
             RowIdRange range = entry.getRowIdRange();
 
-            if (rowId >= range.getStartRowId() && rowId <= range.getEndRowId()) {
+            if (rowId >= range.getStartRowId() && rowId <= range.getEndRowId())
+            {
                 return mid; // Found the containing Entry
-            } else if (rowId < range.getStartRowId()) {
+            }
+            else if (rowId < range.getStartRowId())
+            {
                 high = mid - 1;
-            } else {
+            }
+            else
+            {
                 low = mid + 1;
             }
         }
 
         return -1; // Not found
-    }
-
-    // Check if two RowIdRanges overlap
-    private boolean isOverlapping(RowIdRange range1, RowIdRange range2)
-    {
-        return range1.getStartRowId() <= range2.getEndRowId() && range1.getEndRowId() >= range2.getStartRowId();
-    }
-
-    // Check if RowIdRange overlaps with existing ranges
-    private boolean isOverlapping(RowIdRange newRange)
-    {
-        for (Entry entry : entries) {
-            if (isOverlapping(entry.getRowIdRange(), newRange)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Load a batch of rowIds from etcd
-    private List<Long> loadRowIdsFromEtcd(int count)
-    {
-        List<Long> rowIds = new ArrayList<>();
-        // Read all key-values with prefix /rowId/ from etcd
-        List<KeyValue> keyValues = etcdUtil.getKeyValuesByPrefix("/rowId/");
-
-        // Iterate through key-values to extract rowIds
-        for (KeyValue kv : keyValues) {
-            String key = kv.getKey().toString(StandardCharsets.UTF_8);
-            // Assume key format is /rowId/{rowId}
-            try {
-                long rowId = Long.parseLong(key.substring("/rowId/".length()));
-                rowIds.add(rowId);
-                if (rowIds.size() >= count) {
-                    break; // Stop when required count is reached
-                }
-            } catch (NumberFormatException e) {
-                // Skip if key format is invalid
-                logger.error("Invalid rowId format in etcd key: {}", key, e);
-            }
-        }
-        // Batch delete these rowIds
-        if (!rowIds.isEmpty()) {
-            for (long rowId : rowIds) {
-                etcdUtil.delete("/rowId/" + rowId);
-            }
-        }
-        return rowIds;
     }
 
     // Serialize Entry

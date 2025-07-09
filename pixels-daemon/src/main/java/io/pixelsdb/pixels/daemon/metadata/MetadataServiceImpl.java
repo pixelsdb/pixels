@@ -53,6 +53,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     private final LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao();
     private final RangeDao rangeDao = DaoFactory.Instance().getRangeDao();
     private final RangeIndexDao rangeIndexDao = DaoFactory.Instance().getRangeIndexDao();
+    private final SinglePointIndexDao singlePointIndexDao = DaoFactory.Instance().getSinglePointIndexDao();
     private final ViewDao viewDao = DaoFactory.Instance().getViewDao();
     private final PathDao pathDao = DaoFactory.Instance().getPathDao();
     private final FileDao fileDao = DaoFactory.Instance().getFileDao();
@@ -803,6 +804,114 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
 
         MetadataProto.UpdateLayoutResponse response = MetadataProto.UpdateLayoutResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void createSinglePointIndex(MetadataProto.CreateSinglePointIndexRequest request,
+                                       StreamObserver<MetadataProto.CreateSinglePointIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (singlePointIndexDao.insert(request.getSinglePointIndex()) > 0)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_SINGLE_POINT_INDEX_FAILED).setErrorMsg("add single point index failed");
+        }
+
+        MetadataProto.CreateSinglePointIndexResponse response = MetadataProto.CreateSinglePointIndexResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getPrimaryIndex(MetadataProto.GetPrimaryIndexRequest request,
+                                StreamObserver<MetadataProto.GetPrimaryIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.GetPrimaryIndexResponse response;
+        MetadataProto.SinglePointIndex primaryIndex = singlePointIndexDao.getPrimaryByTableId(request.getTableId());
+        if (primaryIndex != null)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.GetPrimaryIndexResponse.newBuilder().setPrimaryIndex(primaryIndex).setHeader(headerBuilder).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_SINGLE_POINT_INDEX_NOT_FOUND).setErrorMsg("primary single point index with table id '" +
+                    request.getTableId() + "' is not found");
+            response = MetadataProto.GetPrimaryIndexResponse.newBuilder().setHeader(headerBuilder).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getSinglePointIndices(MetadataProto.GetSinglePointIndicesRequest request,
+                                      StreamObserver<MetadataProto.GetSinglePointIndicesResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.GetSinglePointIndicesResponse response;
+        List<MetadataProto.SinglePointIndex> singlePointIndices = singlePointIndexDao.getAllByTableId(request.getTableId());
+        if (singlePointIndices != null && !singlePointIndices.isEmpty())
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.GetSinglePointIndicesResponse.newBuilder().addAllSinglePointIndices(singlePointIndices).setHeader(headerBuilder).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_SINGLE_POINT_INDEX_NOT_FOUND).setErrorMsg("single point indices with table id '" +
+                    request.getTableId() + "' are not found");
+            response = MetadataProto.GetSinglePointIndicesResponse.newBuilder().setHeader(headerBuilder).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updateSinglePointIndex(MetadataProto.UpdateSinglePointIndexRequest request,
+                                       StreamObserver<MetadataProto.UpdateSinglePointIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        if (singlePointIndexDao.update(request.getSinglePointIndex()))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_SINGLE_POINT_INDEX_FAILED).setErrorMsg("make sure the single point index exists");
+        }
+        MetadataProto.UpdateSinglePointIndexResponse response = MetadataProto.UpdateSinglePointIndexResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void dropSinglePointIndex(MetadataProto.DropSinglePointIndexRequest request,
+                                     StreamObserver<MetadataProto.DropSinglePointIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        if (singlePointIndexDao.deleteById(request.getIndexId()))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_SINGLE_POINT_INDEX_FAILED).setErrorMsg("delete single point index failed");
+        }
+        MetadataProto.DropSinglePointIndexResponse response = MetadataProto.DropSinglePointIndexResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();

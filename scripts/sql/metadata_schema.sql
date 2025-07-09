@@ -147,23 +147,23 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`VIEWS` (
 
 
 -- -----------------------------------------------------
--- Table `pixels_metadata`.`RANGE_INDEXES`
+-- Table `pixels_metadata`.`RANGE_INDICES`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDEXES` (
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGE_INDICES` (
     `RI_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `RI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns, stored in csv format.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RI_ID`),
-    INDEX `fk_RANGE_INDEX_TBLS_idx` (`TBLS_TBL_ID` ASC),
-    INDEX `fk_RANGE_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    INDEX `fk_RANGE_INDICES_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_RANGE_INDICES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
     UNIQUE INDEX `TBL_ID_SV_ID_UNIQUE` (`TBLS_TBL_ID` ASC, `SCHEMA_VERSIONS_SV_ID` ASC) COMMENT 'We ensure every (table, schema_version) has only one range index.',
-    CONSTRAINT `fk_RANGE_INDEX_TBLS`
+    CONSTRAINT `fk_RANGE_INDICES_TBLS`
         FOREIGN KEY (`TBLS_TBL_ID`)
             REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
             ON DELETE CASCADE
             ON UPDATE CASCADE,
-    CONSTRAINT `fk_RANGE_INDEXES_SCHEMA_VERSIONS`
+    CONSTRAINT `fk_RANGE_INDICES_SCHEMA_VERSIONS`
         FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
             REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
             ON DELETE CASCADE
@@ -181,13 +181,13 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`RANGES` (
     `RANGE_MIN` BLOB NOT NULL COMMENT 'The min value of the key column(s).',
     `RANGE_MAX` BLOB NOT NULL COMMENT 'The max value of the key column(s).',
     `RANGE_PARENT_ID` BIGINT NULL,
-    `RANGE_INDEXES_RI_ID` BIGINT NOT NULL,
+    `RANGE_INDICES_RI_ID` BIGINT NOT NULL,
     PRIMARY KEY (`RANGE_ID`),
-    INDEX `fk_RANGES_RANGE_INDEXES_idx` (`RANGE_INDEXES_RI_ID` ASC),
+    INDEX `fk_RANGES_RANGE_INDICES_idx` (`RANGE_INDICES_RI_ID` ASC),
     INDEX `fk_RANGES_RANGES_idx` (`RANGE_PARENT_ID` ASC),
-    CONSTRAINT `fk_RANGES_RANGE_INDEXES`
-        FOREIGN KEY (`RANGE_INDEXES_RI_ID`)
-            REFERENCES `pixels_metadata`.`RANGE_INDEXES` (`RI_ID`)
+    CONSTRAINT `fk_RANGES_RANGE_INDICES`
+        FOREIGN KEY (`RANGE_INDICES_RI_ID`)
+            REFERENCES `pixels_metadata`.`RANGE_INDICES` (`RI_ID`)
             ON DELETE CASCADE
             ON UPDATE CASCADE,
     CONSTRAINT `fk_RANGES_RANGES`
@@ -337,24 +337,25 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
 
 
 -- -----------------------------------------------------
--- Table `pixels_metadata`.`SECONDARY_INDEXES`
+-- Table `pixels_metadata`.`SINGLE_POINT_INDICES`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SECONDARY_INDEXES` (
-    `SI_ID` BIGINT NOT NULL,
-    `SI_KEY_COLUMNS` TEXT NOT NULL,
-    `SI_UNIQUE` TINYINT NOT NULL COMMENT 'True if this secondary index is an unique index.',
-    `SI_INDEX_SCHEME` VARCHAR(32) NOT NULL COMMENT 'The index scheme, e.g., rocksdb or rockset, of this secondary index.',
+CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SINGLE_POINT_INDICES` (
+    `SPI_ID` BIGINT NOT NULL,
+    `SPI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns of this index, stored in json format.',
+    `SPI_PRIMARY` TINYINT NOT NULL COMMENT 'True (1) if this single point index is the primary index. There can be only one primary index on a table.',
+    `SPI_UNIQUE` TINYINT NOT NULL COMMENT 'True (1) if this single point index is an unique index.',
+    `SPI_INDEX_SCHEME` VARCHAR(32) NOT NULL COMMENT 'The index scheme, e.g., rocksdb or rockset, of this single pint index.',
     `TBLS_TBL_ID` BIGINT NOT NULL,
     `SCHEMA_VERSIONS_SV_ID` BIGINT NOT NULL,
-    PRIMARY KEY (`SI_ID`),
-    INDEX `fk_SECONDARY_INDEXES_TBLS_idx` (`TBLS_TBL_ID` ASC),
-    INDEX `fk_SECONDARY_INDEXES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
-    CONSTRAINT `fk_SECONDARY_INDEXES_TBLS`
+    PRIMARY KEY (`SPI_ID`),
+    INDEX `fk_SINGLE_POINT_INDICES_TBLS_idx` (`TBLS_TBL_ID` ASC),
+    INDEX `fk_SINGLE_POINT_INDICES_SCHEMA_VERSIONS_idx` (`SCHEMA_VERSIONS_SV_ID` ASC),
+    CONSTRAINT `fk_SINGLE_POINT_INDICES_TBLS`
         FOREIGN KEY (`TBLS_TBL_ID`)
             REFERENCES `pixels_metadata`.`TBLS` (`TBL_ID`)
             ON DELETE CASCADE
             ON UPDATE CASCADE,
-    CONSTRAINT `fk_SECONDARY_INDEXES_SCHEMA_VERSIONS`
+    CONSTRAINT `fk_SINGLE_POINT_INDICES_SCHEMA_VERSIONS`
         FOREIGN KEY (`SCHEMA_VERSIONS_SV_ID`)
             REFERENCES `pixels_metadata`.`SCHEMA_VERSIONS` (`SV_ID`)
             ON DELETE CASCADE

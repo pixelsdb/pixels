@@ -19,14 +19,15 @@
  */
 package io.pixelsdb.pixels.worker.spike;
 
-import io.pixelsdb.pixels.spike.handler.RequestHandler;
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.turbo.SpikeWorkerRequest;
 import io.pixelsdb.pixels.planner.plan.physical.input.*;
 import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import io.pixelsdb.pixels.spike.handler.SpikeWorker;
+import io.pixelsdb.spike.handler.RequestHandler;
+import io.pixelsdb.spike.handler.SpikeWorker;
 
 public class RequestHandlerImpl implements RequestHandler
 {
@@ -35,10 +36,10 @@ public class RequestHandlerImpl implements RequestHandler
     {
         try
         {
-            // 获取请求的有效负载
+            // get the request payload
             request.getRequestId();
             String payload = request.getPayload();
-            WorkerRequest workerRequest = JSON.parseObject(payload, WorkerRequest.class);
+            SpikeWorkerRequest workerRequest = JSON.parseObject(payload, SpikeWorkerRequest.class);
             switch (workerRequest.getWorkerType())
             {
                 case AGGREGATION:
@@ -94,7 +95,8 @@ public class RequestHandlerImpl implements RequestHandler
                 default:
                     throw new RuntimeException("Receive invalid worker type");
             }
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             System.out.println("Error: " + e.getMessage());
             throw new RuntimeException(e);

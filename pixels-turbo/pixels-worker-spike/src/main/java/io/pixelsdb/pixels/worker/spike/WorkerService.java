@@ -24,9 +24,9 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import io.pixelsdb.pixels.common.physical.StorageProvider;
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.spike.handler.SpikeWorker;
 import io.pixelsdb.pixels.worker.common.WorkerContext;
 import io.pixelsdb.pixels.worker.common.WorkerMetrics;
+import io.pixelsdb.spike.handler.SpikeWorker;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

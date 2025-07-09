@@ -50,7 +50,7 @@ public class PartitionChainJoinInvoker extends VhiveInvoker
     public CompletableFuture<Output> invoke(Input input)
     {
 //        log.info(String.format("invoke PartitionedChainJoinInput: %s", JSON.toJSONString(input, SerializerFeature.PrettyFormat, SerializerFeature.DisableCircularReferenceDetect)));
-        ListenableFuture<TurboProto.WorkerResponse> future = Vhive.Instance().getAsyncClient().partitionChainJoin((PartitionedChainJoinInput) input);
+        ListenableFuture<TurboProto.vHiveWorkerResponse> future = Vhive.Instance().getAsyncClient().partitionChainJoin((PartitionedChainJoinInput) input);
         return genCompletableFuture(future);
     }
 }

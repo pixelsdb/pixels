@@ -35,7 +35,7 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
     public WorkerServiceImpl() { }
 
     @Override
-    public void process(TurboProto.WorkerRequest request, StreamObserver<TurboProto.WorkerResponse> responseObserver)
+    public void process(TurboProto.vHiveWorkerRequest request, StreamObserver<TurboProto.vHiveWorkerResponse> responseObserver)
     {
         WorkerType workerType = WorkerType.from(request.getWorkerType());
         switch (workerType)
@@ -52,15 +52,33 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
                 service.execute(request, responseObserver);
                 break;
             }
+            case BROADCAST_CHAIN_JOIN_STREAMING:
+            {
+                ServiceImpl<BroadcastChainJoinStreamWorker, BroadcastChainJoinInput, JoinOutput> service = new ServiceImpl<>(BroadcastChainJoinStreamWorker.class, BroadcastChainJoinInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
             case BROADCAST_JOIN:
             {
                 ServiceImpl<BroadcastJoinWorker, BroadcastJoinInput, JoinOutput> service = new ServiceImpl<>(BroadcastJoinWorker.class, BroadcastJoinInput.class);
                 service.execute(request, responseObserver);
                 break;
             }
+            case BROADCAST_JOIN_STREAMING:
+            {
+                ServiceImpl<BroadcastJoinStreamWorker, BroadcastJoinInput, JoinOutput> service = new ServiceImpl<>(BroadcastJoinStreamWorker.class, BroadcastJoinInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
             case PARTITIONED_CHAIN_JOIN:
             {
                 ServiceImpl<PartitionedChainJoinWorker, PartitionedChainJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedChainJoinWorker.class, PartitionedChainJoinInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
+            case PARTITIONED_CHAIN_JOIN_STREAMING:
+            {
+                ServiceImpl<PartitionedChainJoinStreamWorker, PartitionedChainJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedChainJoinStreamWorker.class, PartitionedChainJoinInput.class);
                 service.execute(request, responseObserver);
                 break;
             }
@@ -106,11 +124,11 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
     }
 
     @Override
-    public void getMemory(TurboProto.GetMemoryRequest request, StreamObserver<TurboProto.GetMemoryResponse> responseObserver)
+    public void getMemory(TurboProto.vHiveGetMemoryRequest request, StreamObserver<TurboProto.vHiveGetMemoryResponse> responseObserver)
     {
         // return the MB(1024 * 1024) size, represent the entire microVM memory size
         int dataSize = 1024 * 1024;
-        TurboProto.GetMemoryResponse response = TurboProto.GetMemoryResponse.newBuilder()
+        TurboProto.vHiveGetMemoryResponse response = TurboProto.vHiveGetMemoryResponse.newBuilder()
                 .setMemoryMB(Runtime.getRuntime().maxMemory() / dataSize)
                 .build();
         responseObserver.onNext(response);

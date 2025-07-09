@@ -9,7 +9,7 @@
     </parent>
 
     <artifactId>pixels-index-rockset</artifactId>
-    <description>Pixels secondary index backed by Rockset (RocksDB-Cloud) storage.</description>
+    <description>Pixels single point index backed by Rockset (RocksDB-Cloud) storage.</description>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -50,7 +50,7 @@
             <artifactId>grpc-stub</artifactId>
         </dependency>
 
-        <dependency>
+        <!--<dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>2.0.7</version>
@@ -60,19 +60,12 @@
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>1.4.8</version>
-        </dependency>
+        </dependency>-->
 
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-testing</artifactId>
             <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>annotations</artifactId>
-            <version>2.0.3</version>
-            <scope>compile</scope>
         </dependency>
     </dependencies>
 

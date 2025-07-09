@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.invoker.vhive.utils;
+package io.pixelsdb.pixels.common.utils;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -71,5 +71,4 @@ public class ListenableFutureAdapter<T>
     {
         return completableFuture;
     }
-
 }

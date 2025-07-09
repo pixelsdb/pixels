@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.common.exception;
 
 /**
- * @author lihaoyue
+ * @author Rolland1944
  * @create 2025-03-01
  */
 public class IndexException extends Exception {

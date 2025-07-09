@@ -248,7 +248,7 @@ public class StarlingAggregationOperator extends Operator
                     tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
                 }
             }
-            StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks);
+            StageCoordinator partitionStageCoordinator = new StageCoordinator(partitionStageId, tasks, 0);
             planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
         }
         else

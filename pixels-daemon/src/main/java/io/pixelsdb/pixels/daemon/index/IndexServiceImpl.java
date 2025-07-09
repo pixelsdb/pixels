@@ -20,8 +20,12 @@
 package io.pixelsdb.pixels.daemon.index;
 
 import io.grpc.stub.StreamObserver;
-import io.pixelsdb.pixels.common.index.SecondaryIndex;
+import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.exception.MainIndexException;
+import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.index.IndexServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -38,13 +42,37 @@ import java.util.stream.Collectors;
 public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
 {
     private static final Logger logger = LogManager.getLogger(IndexServiceImpl.class);
-    private final SecondaryIndex secondaryIndex;
+    private final SinglePointIndex singlePointIndex;
     private final MainIndex mainIndex;
 
-    public IndexServiceImpl(SecondaryIndex secondaryIndex, MainIndex mainIndex)
+    public IndexServiceImpl(SinglePointIndex singlePointIndex, MainIndex mainIndex)
     {
-        this.secondaryIndex = secondaryIndex;
+        this.singlePointIndex = singlePointIndex;
         this.mainIndex = mainIndex;
+    }
+
+    @Override
+    public void allocateRowIdBatch(IndexProto.AllocateRowIdBatchRequest request,
+                                   StreamObserver<IndexProto.AllocateRowIdBatchResponse> responseObserver)
+    {
+        long tableId = request.getTableId();
+        int numRowIds = request.getNumRowIds();
+        IndexProto.RowIdBatch rowIdBatch = null;
+        IndexProto.AllocateRowIdBatchResponse.Builder response = IndexProto.AllocateRowIdBatchResponse.newBuilder();
+        try
+        {
+            rowIdBatch = mainIndex.allocateRowIdBatch(tableId, numRowIds);
+        } catch (RowIdException e)
+        {
+            logger.error("failed to allocate row ids", e);
+            response.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
+        }
+        if(rowIdBatch != null)
+        {
+            response.setErrorCode(ErrorCode.SUCCESS).setRowIdBatch(rowIdBatch);
+        }
+        responseObserver.onNext(response.build());
+        responseObserver.onCompleted();
     }
 
     @Override
@@ -54,8 +82,8 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
 
-        // Call SecondaryIndex's getUniqueRowId method
-        long rowId = secondaryIndex.getUniqueRowId(key);
+        // Call SinglePointIndex's getUniqueRowId method
+        long rowId = singlePointIndex.getUniqueRowId(key);
 
         // Call MainIndex's getLocation method to convert rowId to RowLocation
         IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
@@ -88,8 +116,8 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
 
-        // Call SecondaryIndex's getRowIds method
-        long[] rowIds = secondaryIndex.getRowIds(key);
+        // Call SinglePointIndex's getRowIds method
+        long[] rowIds = singlePointIndex.getRowIds(key);
 
         // Convert rowIds to list of RowLocations
         List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
@@ -113,84 +141,212 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     }
 
     @Override
-    public void putIndexEntry(IndexProto.PutIndexEntryRequest request,
-                              StreamObserver<IndexProto.PutIndexEntryResponse> responseObserver)
+    public void putPrimaryIndexEntry(IndexProto.PutPrimaryIndexEntryRequest request,
+                              StreamObserver<IndexProto.PutPrimaryIndexEntryResponse> responseObserver)
     {
         // Get IndexEntry from request
-        IndexProto.IndexEntry entry = request.getIndexEntry();
-
-        // Call SecondaryIndex's putEntry method
-        boolean success = secondaryIndex.putEntry(new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique()));
-
-        // Create gRPC response
-        IndexProto.PutIndexEntryResponse response = IndexProto.PutIndexEntryResponse.newBuilder()
-                .setErrorCode(success ? 0 : 1)
-                .build();
-
+        IndexProto.PrimaryIndexEntry entry = request.getIndexEntry();
+        // Create gRPC builder
+        IndexProto.PutPrimaryIndexEntryResponse.Builder builder = IndexProto.PutPrimaryIndexEntryResponse.newBuilder();
+        try
+        {
+            // Call SinglePointIndex's putEntry method
+            boolean success = singlePointIndex.putPrimaryEntry(
+                    new SinglePointIndex.Entry(entry.getIndexKey(), entry.getTableRowId(), true, entry.getRowLocation()));
+            // Create gRPC response
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
+        }
         // Send response
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
     @Override
-    public void deleteIndexEntry(IndexProto.DeleteIndexEntryRequest request,
-                                 StreamObserver<IndexProto.DeleteIndexEntryResponse> responseObserver)
+    public void putSecondaryIndexEntry(IndexProto.PutSecondaryIndexEntryRequest request,
+                                       StreamObserver<IndexProto.PutSecondaryIndexEntryResponse> responseObserver)
+    {
+        // Get IndexEntry from request
+        IndexProto.SecondaryIndexEntry entry = request.getIndexEntry();
+        // Create gRPC builder
+        IndexProto.PutSecondaryIndexEntryResponse.Builder builder = IndexProto.PutSecondaryIndexEntryResponse.newBuilder();
+        try
+        {
+            // Call SinglePointIndex's putEntry method
+            boolean success = singlePointIndex.putSecondaryEntry(
+                    new SinglePointIndex.Entry(entry.getIndexKey(), entry.getTableRowId(), true, null));
+            // Create gRPC response
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
+        }
+        // Send response
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deletePrimaryIndexEntry(IndexProto.DeletePrimaryIndexEntryRequest request,
+                                 StreamObserver<IndexProto.DeletePrimaryIndexEntryResponse> responseObserver)
     {
         // Get IndexKey from request
         IndexProto.IndexKey key = request.getIndexKey();
-
-        // Call SecondaryIndex's deleteEntry method
-        boolean success = secondaryIndex.deleteEntry(key);
-
-        // Create gRPC response
-        IndexProto.DeleteIndexEntryResponse response = IndexProto.DeleteIndexEntryResponse.newBuilder()
-                .setErrorCode(success ? 0 : 1)
-                .build();
-
+        // Create gRPC builder
+        IndexProto.DeletePrimaryIndexEntryResponse.Builder builder = IndexProto.DeletePrimaryIndexEntryResponse.newBuilder();
+        try
+        {
+            // Call SinglePointIndex's deleteEntry method
+            boolean success = singlePointIndex.deletePrimaryEntry(key);
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
+        }
         // Send response
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
+        @Override
+    public void deleteSecondaryIndexEntry(IndexProto.DeleteSecondaryIndexEntryRequest request,
+                                 StreamObserver<IndexProto.DeleteSecondaryIndexEntryResponse> responseObserver)
+    {
+        // Get IndexKey from request
+        IndexProto.IndexKey key = request.getIndexKey();
+        // Create gRPC builder
+        IndexProto.DeleteSecondaryIndexEntryResponse.Builder builder = IndexProto.DeleteSecondaryIndexEntryResponse.newBuilder();
+        try
+        {
+            // Call SinglePointIndex's deleteEntry method
+            boolean success = singlePointIndex.deleteSecondaryEntry(key);
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
+        }
+        // Send response
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
     @Override
-    public void putIndexEntries(IndexProto.PutIndexEntriesRequest request,
-                                StreamObserver<IndexProto.PutIndexEntriesResponse> responseObserver)
+    public void putPrimaryIndexEntries(IndexProto.PutPrimaryIndexEntriesRequest request,
+                                StreamObserver<IndexProto.PutPrimaryIndexEntriesResponse> responseObserver)
     {
         // Get list of IndexEntries from request
-        List<SecondaryIndex.Entry> entries = request.getIndexEntriesList().stream()
-                .map(entry -> new SecondaryIndex.Entry(entry.getIndexKey(), 0, entry.getUnique()))
+        List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream()
+                .map(entry -> new SinglePointIndex.Entry(
+                        entry.getIndexKey(), entry.getTableRowId(), true, entry.getRowLocation()))
                 .collect(Collectors.toList());
-
-        // Call SecondaryIndex's putEntries method
-        boolean success = secondaryIndex.putEntries(entries);
-
-        // Create gRPC response
-        IndexProto.PutIndexEntriesResponse response = IndexProto.PutIndexEntriesResponse.newBuilder()
-                .setErrorCode(success ? 0 : 1)
-                .build();
-
+        // Create gRPC builder
+        IndexProto.PutPrimaryIndexEntriesResponse.Builder builder  = IndexProto.PutPrimaryIndexEntriesResponse.newBuilder();
+        try
+        {
+            // Call SinglePointIndex's putEntries method
+            boolean success = singlePointIndex.putPrimaryEntries(entries);
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
+        }
         // Send response
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
     @Override
-    public void deleteIndexEntries(IndexProto.DeleteIndexEntriesRequest request,
-                                   StreamObserver<IndexProto.DeleteIndexEntriesResponse> responseObserver)
+    public void putSecondaryIndexEntries(IndexProto.PutSecondaryIndexEntriesRequest request,
+                                         StreamObserver<IndexProto.PutSecondaryIndexEntriesResponse> responseObserver)
+    {
+        // Get list of IndexEntries from request
+        List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream()
+                .map(entry -> new SinglePointIndex.Entry(
+                        entry.getIndexKey(), entry.getTableRowId(), true, null))
+                .collect(Collectors.toList());
+        // Create gRPC builder
+        IndexProto.PutSecondaryIndexEntriesResponse.Builder builder  = IndexProto.PutSecondaryIndexEntriesResponse.newBuilder();
+        try
+        {
+            // Call SinglePointIndex's putEntries method
+            boolean success = singlePointIndex.putSecondaryEntries(entries);
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
+        }
+        // Send response
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deletePrimaryIndexEntries(IndexProto.DeletePrimaryIndexEntriesRequest request,
+                                   StreamObserver<IndexProto.DeletePrimaryIndexEntriesResponse> responseObserver)
     {
         // Get list of IndexKeys from request
         List<IndexProto.IndexKey> keys = request.getIndexKeysList();
-
-        // Call SecondaryIndex's deleteEntries method
-        boolean success = secondaryIndex.deleteEntries(keys);
-
-        // Create gRPC response
-        IndexProto.DeleteIndexEntriesResponse response = IndexProto.DeleteIndexEntriesResponse.newBuilder()
-                .setErrorCode(success ? 0 : 1)
-                .build();
-
+        // Create gRPC builder
+        IndexProto.DeletePrimaryIndexEntriesResponse.Builder builder = IndexProto.DeletePrimaryIndexEntriesResponse.newBuilder();
+        try
+        {
+            // Call SinglePointIndex's deleteEntries method
+            boolean success = singlePointIndex.deletePrimaryEntries(keys);
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
+        }
         // Send response
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
+        @Override
+    public void deleteSecondaryIndexEntries(IndexProto.DeleteSecondaryIndexEntriesRequest request,
+                                   StreamObserver<IndexProto.DeleteSecondaryIndexEntriesResponse> responseObserver)
+    {
+        // Get list of IndexKeys from request
+        List<IndexProto.IndexKey> keys = request.getIndexKeysList();
+        // Create gRPC builder
+        IndexProto.DeleteSecondaryIndexEntriesResponse.Builder builder = IndexProto.DeleteSecondaryIndexEntriesResponse.newBuilder();
+        try
+        {
+            // Call SinglePointIndex's deleteEntries method
+            boolean success = singlePointIndex.deleteSecondaryEntries(keys);
+            builder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
+        }
+        // Send response
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 }

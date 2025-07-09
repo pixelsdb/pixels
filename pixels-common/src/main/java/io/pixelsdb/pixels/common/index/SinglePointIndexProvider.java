@@ -26,16 +26,16 @@ import java.io.IOException;
  * @author hank
  * @create 2025-02-08
  */
-public interface SecondaryIndexProvider
+public interface SinglePointIndexProvider
 {
     /**
-     * Create an instance of the secondary index.
+     * Create an instance of the single point index.
      */
-    SecondaryIndex createInstance(@Nonnull SecondaryIndex.Scheme scheme) throws IOException;
+    SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId) throws IOException;
 
     /**
-     * @param scheme the given secondary index scheme.
-     * @return true if this secondary index provider is compatible with the given scheme.
+     * @param scheme the given single point index scheme.
+     * @return true if this single point index provider is compatible with the given scheme.
      */
-    boolean compatibleWith(@Nonnull SecondaryIndex.Scheme scheme);
+    boolean compatibleWith(@Nonnull SinglePointIndex.Scheme scheme);
 }
