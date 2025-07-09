@@ -258,7 +258,7 @@ public class PixelsWriterBuffer
              */
             MemTable oldMemTable = this.activeMemTable;
             this.immutableMemTables.add(this.activeMemTable);
-            this.activeMemTable = new MemTable(this.idCounter, this.schema, this.pixelStride, TypeDescription.Mode.NONE);
+            this.activeMemTable = new MemTable(this.idCounter, this.schema, this.pixelStride, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT);
             RGVisibility visibility = new RGVisibility(pixelStride);
             this.visibilityMap.put(this.idCounter, visibility);
             this.idCounter++;
