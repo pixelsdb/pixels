@@ -156,7 +156,7 @@ public class IndexService
         // Send request and get response
         IndexProto.LookupNonUniqueIndexResponse response = stub.lookupNonUniqueIndex(request);
         // Return RowLocation list
-        return response.getRowLocationList();
+        return response.getRowLocationsList();
     }
 
     public boolean putPrimaryIndexEntry (IndexProto.PrimaryIndexEntry entry) throws IndexException

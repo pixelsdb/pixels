@@ -242,7 +242,7 @@ public class RocksetIndex implements SinglePointIndex
             IndexProto.RowLocation rowLocation = entryStart.getRowLocation();
             MainIndex.RgLocation rgLocation = new MainIndex.RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
             // Put RowIds to MainIndex
-            boolean success = mainIndex.putRowIdsOfRg(newRange, rgLocation);
+            boolean success = mainIndex.putRowIds(newRange, rgLocation);
             if (!success) {
                 LOGGER.error("Failed to put Entry into main index for rowId RowIdRange [{}-{}]", start, end);
                 throw new MainIndexException("Failed to put Entry into main index for rowId RowIdRange");
@@ -386,7 +386,7 @@ public class RocksetIndex implements SinglePointIndex
             long end = Collections.max(rowIds);
             RowIdRange newRange = new RowIdRange(start, end);
             // Delete MainIndex
-            boolean success = mainIndex.deleteRowIdRange(newRange);
+            boolean success = mainIndex.deleteRowIds(newRange);
             if (!success) {
                 LOGGER.error("Failed to delete Entry of main index for rowId RowIdRange [{}-{}]", start, end);
                 return false;

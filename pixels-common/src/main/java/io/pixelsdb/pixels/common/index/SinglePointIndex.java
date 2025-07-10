@@ -93,13 +93,41 @@ public interface SinglePointIndex extends Closeable
 
     boolean putSecondaryEntries(List<Entry> entries) throws SinglePointIndexException;
 
-    boolean deletePrimaryEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException;
+    /**
+     * Delete the primary index entry of the index key
+     * @param indexKey the index key
+     * @return the row location of the deleted index entry
+     * @throws MainIndexException
+     * @throws SinglePointIndexException
+     */
+    IndexProto.RowLocation deletePrimaryEntry(IndexProto.IndexKey indexKey) throws MainIndexException, SinglePointIndexException;
 
-    boolean deletePrimaryEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException;
+    /**
+     * Delete the primary index entries of the index keys
+     * @param indexKeys the index keys
+     * @return the row locations of the deleted index entries
+     * @throws MainIndexException
+     * @throws SinglePointIndexException
+     */
+    List<IndexProto.RowLocation> deletePrimaryEntries(List<IndexProto.IndexKey> indexKeys) throws MainIndexException, SinglePointIndexException;
 
-    boolean deleteSecondaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException;
+    /**
+     * Delete the secondary index entry of the index key
+     * @param indexKey the index key
+     * @return the row id of the deleted index entry
+     * @throws MainIndexException
+     * @throws SinglePointIndexException
+     */
+    long deleteSecondaryEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
 
-    boolean deleteSecondaryEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException;
+    /**
+     * Delete the secondary index entries of the index keys
+     * @param indexKeys the index keys
+     * @return the row ids of the deleted index entries
+     * @throws MainIndexException
+     * @throws SinglePointIndexException
+     */
+    List<Long> deleteSecondaryEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException;
 
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the

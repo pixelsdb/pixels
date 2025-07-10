@@ -34,13 +34,16 @@ service IndexService {
   rpc LookupUniqueIndex (LookupUniqueIndexRequest) returns (LookupUniqueIndexResponse);
   rpc LookupNonUniqueIndex (LookupNonUniqueIndexRequest) returns (LookupNonUniqueIndexResponse);
   rpc PutPrimaryIndexEntry (PutPrimaryIndexEntryRequest) returns (PutPrimaryIndexEntryResponse);
-  rpc PutSecondaryIndexEntry (PutSecondaryIndexEntryRequest) returns (PutSecondaryIndexEntryResponse);
-  rpc DeletePrimaryIndexEntry (DeletePrimaryIndexEntryRequest) returns (DeletePrimaryIndexEntryResponse);
-  rpc DeleteSecondaryIndexEntry (DeleteSecondaryIndexEntryRequest) returns (DeleteSecondaryIndexEntryResponse);
   rpc PutPrimaryIndexEntries (PutPrimaryIndexEntriesRequest) returns (PutPrimaryIndexEntriesResponse);
+  rpc PutSecondaryIndexEntry (PutSecondaryIndexEntryRequest) returns (PutSecondaryIndexEntryResponse);
   rpc PutSecondaryIndexEntries (PutSecondaryIndexEntriesRequest) returns (PutSecondaryIndexEntriesResponse);
+  rpc DeletePrimaryIndexEntry (DeletePrimaryIndexEntryRequest) returns (DeletePrimaryIndexEntryResponse);
   rpc DeletePrimaryIndexEntries (DeletePrimaryIndexEntriesRequest) returns (DeletePrimaryIndexEntriesResponse);
+  rpc DeleteSecondaryIndexEntry (DeleteSecondaryIndexEntryRequest) returns (DeleteSecondaryIndexEntryResponse);
   rpc DeleteSecondaryIndexEntries (DeleteSecondaryIndexEntriesRequest) returns (DeleteSecondaryIndexEntriesResponse);
+  rpc OpenIndex (OpenIndexRequest) returns (OpenIndexResponse);
+  rpc CloseIndex (CloseIndexRequest) returns (CloseIndexResponse);
+  rpc RemoveIndex (RemoveIndexRequest) returns (RemoveIndexResponse);
 }
 
 message IndexKey {
@@ -98,7 +101,7 @@ message LookupNonUniqueIndexRequest {
 
 message LookupNonUniqueIndexResponse {
   int32 errorCode = 1;
-  repeated RowLocation rowLocation = 2;
+  repeated RowLocation rowLocations = 2;
 }
 
 message PutPrimaryIndexEntryRequest {
@@ -106,30 +109,6 @@ message PutPrimaryIndexEntryRequest {
 }
 
 message PutPrimaryIndexEntryResponse {
-  int32 errorCode = 1;
-}
-
-message PutSecondaryIndexEntryRequest {
-  SecondaryIndexEntry indexEntry = 1;
-}
-
-message PutSecondaryIndexEntryResponse {
-  int32 errorCode = 1;
-}
-
-message DeletePrimaryIndexEntryRequest {
-  IndexKey indexKey = 1;
-}
-
-message DeletePrimaryIndexEntryResponse {
-  int32 errorCode = 1;
-}
-
-message DeleteSecondaryIndexEntryRequest {
-  IndexKey indexKey = 1;
-}
-
-message DeleteSecondaryIndexEntryResponse {
   int32 errorCode = 1;
 }
 
@@ -141,6 +120,14 @@ message PutPrimaryIndexEntriesResponse {
   int32 errorCode = 1;
 }
 
+message PutSecondaryIndexEntryRequest {
+  SecondaryIndexEntry indexEntry = 1;
+}
+
+message PutSecondaryIndexEntryResponse {
+  int32 errorCode = 1;
+}
+
 message PutSecondaryIndexEntriesRequest {
   repeated SecondaryIndexEntry indexEntries = 1;
 }
@@ -149,12 +136,31 @@ message PutSecondaryIndexEntriesResponse {
   int32 errorCode = 1;
 }
 
+message DeletePrimaryIndexEntryRequest {
+  IndexKey indexKey = 1;
+}
+
+message DeletePrimaryIndexEntryResponse {
+  int32 errorCode = 1;
+  RowLocation rowLocation = 2;
+}
+
 message DeletePrimaryIndexEntriesRequest {
   repeated IndexKey indexKeys = 1;
 }
 
 message DeletePrimaryIndexEntriesResponse {
   int32 errorCode = 1;
+  repeated RowLocation rowLocations = 2;
+}
+
+message DeleteSecondaryIndexEntryRequest {
+  IndexKey indexKey = 1;
+}
+
+message DeleteSecondaryIndexEntryResponse {
+  int32 errorCode = 1;
+  uint64 tableRowId = 2;
 }
 
 message DeleteSecondaryIndexEntriesRequest {
@@ -162,5 +168,33 @@ message DeleteSecondaryIndexEntriesRequest {
 }
 
 message DeleteSecondaryIndexEntriesResponse {
+  int32 errorCode = 1;
+  repeated uint64 tableRowIds = 2;
+}
+
+message OpenIndexRequest {
+  uint64 tableId = 1; // table id
+  uint64 indexId = 2; // index id
+}
+
+message OpenIndexResponse {
+  int32 errorCode = 1;
+}
+
+message CloseIndexRequest {
+  uint64 tableId = 1; // table id
+  uint64 indexId = 2; // index id
+}
+
+message CloseIndexResponse {
+  int32 errorCode = 1;
+}
+
+message RemoveIndexRequest {
+  uint64 tableId = 1; // table id
+  uint64 indexId = 2; // index id
+}
+
+message RemoveIndexResponse {
   int32 errorCode = 1;
 }

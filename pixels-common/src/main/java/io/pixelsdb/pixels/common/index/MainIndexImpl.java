@@ -141,7 +141,7 @@ public class MainIndexImpl implements MainIndex
     {
         RowIdRange newRange = new RowIdRange(rowId, rowId);
         RgLocation rgLocation = new RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
-        return putRowIdsOfRg(newRange, rgLocation);
+        return putRowIds(newRange, rgLocation);
     }
 
     @Override
@@ -178,7 +178,7 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean putRowIdsOfRg(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
+    public boolean putRowIds(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
     {
         long start = rowIdRangeOfRg.getStartRowId();
         long end = rowIdRangeOfRg.getEndRowId();
@@ -207,7 +207,7 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean deleteRowIdRange(RowIdRange targetRange)
+    public boolean deleteRowIds(RowIdRange targetRange)
     {
         int index = binarySearch(targetRange.getStartRowId());
         if (index < 0)
