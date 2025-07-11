@@ -105,6 +105,7 @@ public class ImportExecutor implements CommandExecutor
                     File importFile = new File();
                     // do not contain '/' at the beginning of the file name
                     importFile.setName(filePath.substring(filePath.lastIndexOf("/") + 1));
+                    importFile.setType(File.Type.REGULAR);
                     importFile.setNumRowGroup(numRowGroup);
                     importFile.setPathId(dirPath.getId());
                     importFiles.add(importFile);
