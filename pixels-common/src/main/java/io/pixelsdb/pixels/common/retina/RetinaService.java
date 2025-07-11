@@ -25,6 +25,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -154,7 +155,7 @@ public class RetinaService
 
         for (int i = 0; i < fileIds.length; i++)
         {
-            RetinaProto.RowLocation row = RetinaProto.RowLocation.newBuilder()
+            IndexProto.RowLocation row = IndexProto.RowLocation.newBuilder()
                     .setFileId(fileIds[i])
                     .setRgId(rgIds[i])
                     .setRgRowId(rgRowIds[i])

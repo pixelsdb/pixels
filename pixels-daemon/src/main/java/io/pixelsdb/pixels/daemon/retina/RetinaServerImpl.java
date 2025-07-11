@@ -31,6 +31,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -346,7 +347,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         try
         {
             long timestamp = request.getTimestamp();
-            for (RetinaProto.RowLocation row : request.getRowsList())
+            for (IndexProto.RowLocation row : request.getRowsList())
             {
                 long fileId = row.getFileId();
                 int rgId = row.getRgId();
