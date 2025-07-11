@@ -19,8 +19,15 @@
  */
 package io.pixelsdb.pixels.daemon.retina;
 
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.ServerBuilder;
+import io.grpc.StatusRuntimeException;
+import io.grpc.health.v1.HealthCheckRequest;
+import io.grpc.health.v1.HealthCheckResponse;
+import io.grpc.health.v1.HealthGrpc;
 import io.pixelsdb.pixels.common.server.Server;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -43,6 +50,8 @@ public class RetinaServer implements Server
     public RetinaServer(int port)
     {
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
+        // Issue #935: ensure metadata server has been already started
+        waitForMetadataServer();
         this.rpcServer = ServerBuilder.forPort(port)
                 .addService(new RetinaServerImpl()).build();
     }
@@ -84,5 +93,46 @@ public class RetinaServer implements Server
         {
             this.shutdown();
         }
+    }
+
+    private void waitForMetadataServer()
+    {
+        ConfigFactory config = ConfigFactory.Instance();
+        String metadataHost = config.getProperty("metadata.server.host");
+        int metadataPort = Integer.parseInt(config.getProperty("metadata.server.port"));
+        ManagedChannel channel = ManagedChannelBuilder.forAddress(metadataHost, metadataPort)
+                .usePlaintext().build();
+
+        HealthGrpc.HealthBlockingStub stub = HealthGrpc.newBlockingStub(channel);
+        int retry = 0;
+        int maxRetry = 30;
+
+        while (retry < maxRetry)
+        {
+            try
+            {
+                HealthCheckResponse response = stub.check(HealthCheckRequest.newBuilder().setService("metadata").build());
+                if (response.getStatus() == HealthCheckResponse.ServingStatus.SERVING)
+                {
+                    log.info("metadata server if ready.");
+                    channel.shutdown();
+                    return;
+                }
+            } catch (StatusRuntimeException e)
+            {
+                log.info("metadata health check failed, sleep one second and retry ...");
+            }
+
+            retry++;
+            try
+            {
+                Thread.sleep(1000);
+            } catch (InterruptedException e)
+            {
+                throw new RuntimeException("failed to sleep for retry to check metadata server status", e);
+            }
+        }
+        channel.shutdown();
+        throw new RuntimeException("timeout waiting for metadata server to be ready");
     }
 }
