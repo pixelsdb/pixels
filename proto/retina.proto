@@ -28,6 +28,8 @@ option java_outer_classname = "RetinaProto";
 
 package retina.proto;
 
+import "index.proto";
+
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
     rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
@@ -56,12 +58,6 @@ message ResponseHeader {
 
 message VisibilityBitmap {
     repeated uint64 bitmap = 1;
-}
-
-message RowLocation {
-    uint64 fileId = 1;   // the id of the file in pixels metadata, starts from 1
-    uint32 rgId = 2;     // the index of the row group inside the file, starts from 0
-    uint32 rgRowId = 3;  // the index of the row index the row group, starts from 0
 }
 
 message InsertData {
@@ -136,7 +132,7 @@ message DeleteRecordResponse {
 
 message DeleteRecordsRequest {
     RequestHeader header = 1;
-    repeated RowLocation rows = 2;
+    repeated index.proto.RowLocation rows = 2;
     uint64 timestamp = 3;
 }
 
