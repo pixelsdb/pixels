@@ -182,6 +182,7 @@ public class CompactExecutor implements CommandExecutor
                     pixelsCompactor.close();
                     File compactFile = new File();
                     compactFile.setName(targetFileName);
+                    compactFile.setType(File.Type.REGULAR);
                     compactFile.setNumRowGroup(pixelsCompactor.getNumRowGroup());
                     compactFile.setPathId(targetPath.getId());
                     compactFiles.offer(compactFile);

@@ -50,7 +50,7 @@ public class FileWriterManager
     private final String schemaName;
     private final String tableName;
     private final PixelsWriter writer;
-    private final long fileId;
+    private final File file;
 
     // [firstBlockId, lastBlockId]
     private final long firstBlockId;
@@ -89,12 +89,13 @@ public class FileWriterManager
         {
             // add file information to the metadata
             MetadataService metadataService = MetadataService.Instance();
-            File addedFile = new File();
-            addedFile.setName(targetFileName);
-            addedFile.setNumRowGroup(1);
-            addedFile.setPathId(targetOrderedDirPath.getId());
-            metadataService.addFiles(Collections.singletonList(addedFile));
-            this.fileId = metadataService.getFileId(targetFilePath);
+            file = new File();
+            this.file.setName(targetFileName);
+            this.file.setType(File.Type.EMPTY);
+            this.file.setNumRowGroup(1);
+            this.file.setPathId(targetOrderedDirPath.getId());
+            metadataService.addFiles(Collections.singletonList(file));
+            this.file.setId(metadataService.getFileId(targetFilePath));
         } catch (MetadataException e)
         {
             logger.error("Failed to add file into metadata", e);
@@ -126,7 +127,7 @@ public class FileWriterManager
 
     public long getFileId()
     {
-        return this.fileId;
+        return this.file.getId();
     }
 
     public void setLastBlockId(long lastBlockId)
@@ -167,6 +168,11 @@ public class FileWriterManager
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();
+
+                // update file's type
+                this.file.setType(File.Type.REGULAR);
+                MetadataService metadataService = MetadataService.Instance();
+                metadataService.updateFile(this.file);
             } catch (Exception e)
             {
                 logger.error("Failed to flush to disk file", e);
