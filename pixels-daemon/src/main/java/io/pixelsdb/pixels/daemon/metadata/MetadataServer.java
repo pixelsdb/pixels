@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.daemon.metadata;
 
 import io.grpc.ServerBuilder;
+import io.grpc.health.v1.HealthCheckResponse;
+import io.grpc.protobuf.services.HealthStatusManager;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.common.server.Server;
 import org.apache.logging.log4j.LogManager;
@@ -40,12 +42,15 @@ public class MetadataServer implements Server
 
     private boolean running = false;
     private final io.grpc.Server rpcServer;
+    private final HealthStatusManager health = new HealthStatusManager();
 
     public MetadataServer(int port)
     {
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
         this.rpcServer = ServerBuilder.forPort(port)
-                .addService(new MetadataServiceImpl()).build();
+                .addService(new MetadataServiceImpl())
+                .addService(health.getHealthService())
+                .build();
     }
 
     @Override
@@ -60,6 +65,7 @@ public class MetadataServer implements Server
         this.running = false;
         try
         {
+            this.health.enterTerminalState();
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e)
         {
@@ -75,6 +81,7 @@ public class MetadataServer implements Server
         {
             this.rpcServer.start();
             this.running = true;
+            this.health.setStatus("metadata", HealthCheckResponse.ServingStatus.SERVING);
             this.rpcServer.awaitTermination();
         } catch (IOException e)
         {

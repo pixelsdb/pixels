@@ -118,6 +118,11 @@
             <artifactId>grpc-stub</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-services</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
