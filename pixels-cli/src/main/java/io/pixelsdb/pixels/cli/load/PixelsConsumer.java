@@ -255,6 +255,7 @@ public class PixelsConsumer extends Consumer
         pixelsWriter.close();
         File loadedFile = new File();
         loadedFile.setName(fileName);
+        loadedFile.setType(File.Type.REGULAR);
         loadedFile.setNumRowGroup(pixelsWriter.getNumRowGroup());
         loadedFile.setPathId(filePath.getId());
         this.loadedFiles.offer(loadedFile);
