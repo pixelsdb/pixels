@@ -77,11 +77,14 @@
         <maven.plugin.shade.version>3.2.2</maven.plugin.shade.version>
         <maven.plugin.assembly.version>3.5.0</maven.plugin.assembly.version>
         <maven.plugin.deploy.version>3.1.0</maven.plugin.deploy.version>
+        <maven.plugin.dependency.version>2.10</maven.plugin.dependency.version>
         <maven.plugin.antrun.version>3.1.0</maven.plugin.antrun.version>
         <maven.plugin.surefire.version>2.22.2</maven.plugin.surefire.version>
         <maven.plugin.os-maven.version>1.6.2</maven.plugin.os-maven.version>
         <maven.plugin.protobuf.version>0.6.1</maven.plugin.protobuf.version>
         <maven.plugin.protoc-jar.version>3.3.0.1</maven.plugin.protoc-jar.version>
+        <maven.plugin.build-helper.version>3.1.0</maven.plugin.build-helper.version>
+        <maven.plugin.codehaus-exec.version>1.6.0</maven.plugin.codehaus-exec.version>
 
 
         <!-- query engines -->
@@ -108,6 +111,7 @@
         <dep.guava.version>29.0-jre</dep.guava.version>
         <dep.protobuf.version>3.21.7</dep.protobuf.version>
         <dep.grpc.version>1.49.1</dep.grpc.version>
+        <dep.flatbuffers.version>2.0.8</dep.flatbuffers.version>
         <dep.jetcd.version>0.5.0</dep.jetcd.version>
         <dep.jna.version>5.13.0</dep.jna.version>
         <dep.javax.annotation.version>1.3.2</dep.javax.annotation.version>
@@ -115,9 +119,6 @@
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
         <dep.apache-calcite.version>1.32.0</dep.apache-calcite.version>
         <dep.apache-parquet.version>1.13.0</dep.apache-parquet.version>
-
-        <!-- flat buffers -->
-        <dep.google.flatbuffers.version>2.0.8</dep.google.flatbuffers.version>
 
         <!--profiling-->
         <dep.async-profiler.version>2.9</dep.async-profiler.version>
@@ -757,7 +758,7 @@
             <dependency>
                 <groupId>com.google.flatbuffers</groupId>
                 <artifactId>flatbuffers-java</artifactId>
-                <version>${dep.google.flatbuffers.version}</version>
+                <version>${dep.flatbuffers.version}</version>
             </dependency>
 
             <!-- logging -->

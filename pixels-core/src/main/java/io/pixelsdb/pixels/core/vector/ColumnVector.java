@@ -20,10 +20,9 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
-import com.google.flatbuffers.Table;
+import io.pixelsdb.pixels.core.flat.ColumnVectorBaseFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Integer128;
-import io.pixelsdb.pixels.core.utils.flat.*;
 
 import java.sql.Date;
 import java.sql.Time;
