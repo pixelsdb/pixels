@@ -542,6 +542,10 @@ public class MemoryMappedFile
         return size;
     }
 
+    public String getName() {
+        return loc;
+    }
+
     public long getAddress() { return addr; }
 
 }

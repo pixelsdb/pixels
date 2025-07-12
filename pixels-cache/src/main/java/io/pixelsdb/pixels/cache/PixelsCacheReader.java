@@ -96,6 +96,41 @@ public class PixelsCacheReader implements AutoCloseable {
     }
 
     public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct) {
+        // update the hashcycle in locator in the PixelsCacheReader
+        int hashNodeNum = bucketToZoneMap.getHashNodeNum();
+        int originalNodeNum = locator.getNodeNum();
+        if(hashNodeNum != originalNodeNum){
+            if(hashNodeNum > originalNodeNum){
+                // expand
+                String originZoneName  = zones.get(0).getZoneFile().getName();
+                String baseZoneName    = originZoneName.substring(0, originZoneName.lastIndexOf('.'));
+                String originIndexName  = zones.get(0).getIndexFile().getName();
+                String baseIndexName    = originIndexName.substring(0, originIndexName.lastIndexOf('.'));
+                long zoneSize = zones.get(0).getZoneFile().getSize();
+                long indexSize = zones.get(0).getIndexFile().getSize();
+                
+                for(int i = originalNodeNum; i < hashNodeNum; i++){
+                    int newZoneId = zones.size();// the new physical zone id is the size of the zone list
+                    String newZoneLocation = baseZoneName + "." + newZoneId;
+                    String newIndexLocation = baseIndexName + "." + newZoneId;
+                    try{
+                        zones.add(new PixelsZoneReader(newZoneLocation, newIndexLocation, zoneSize, indexSize));
+                    }catch(Exception e){
+                        logger.warn("Failed to synchronize with writer expansion: could not create zone reader", e);
+                        return null;
+                    }
+                    locator.addNode();
+                }
+                logger.info("CacheReader detected cache expansion: zoneNum from {} to {}", originalNodeNum, hashNodeNum);
+            }else if(hashNodeNum < originalNodeNum){
+                // shrink
+                int lastLazyZoneId = originalNodeNum - 1;
+                locator.removeNode();
+                zones.get(lastLazyZoneId).close();
+                zones.remove(lastLazyZoneId);
+                logger.info("CacheReader detected cache shrink: zoneNum from {} to {}", originalNodeNum, hashNodeNum);
+            }
+        }
         long bucketId = locator.getLocation(new PixelsCacheKey(blockId, rowGroupId, columnId));
         int zoneId = bucketToZoneMap.getBucketToZone(bucketId);
         if (zoneId < 0 || zoneId >= zones.size()) {

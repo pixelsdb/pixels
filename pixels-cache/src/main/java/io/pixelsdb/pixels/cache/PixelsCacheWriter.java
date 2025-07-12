@@ -57,6 +57,8 @@ public class PixelsCacheWriter
     private final MemoryMappedFile globalIndexFile;
     private final Storage storage;
     private final EtcdUtil etcdUtil;
+    private int zoneNum;
+    private List<String> files;
     /**
      * The host name of the node where this cache writer is running.
      */
@@ -71,7 +73,8 @@ public class PixelsCacheWriter
                               Storage storage,
                               Set<String> cachedColumnChunks,
                               EtcdUtil etcdUtil,
-                              String host)
+                              String host,
+                              int zoneNum)
     {
         this.locator = locator;
         this.zones = zones;
@@ -81,10 +84,12 @@ public class PixelsCacheWriter
         this.globalIndexFile = globalIndexFile;
         this.bucketTypeInfo = bucketTypeInfo;
         this.bucketToZoneMap = bucketToZoneMap;
+        this.zoneNum = zoneNum;
         if (cachedColumnChunks != null && cachedColumnChunks.isEmpty() == false)
         {
             this.cachedColumnChunks.addAll(cachedColumnChunks);
         }
+        this.bucketToZoneMap.setHashNodeNum(this.locator.getNodeNum());// it is used when scaling cache size.
     }
 
     public static class Builder
@@ -264,7 +269,7 @@ public class PixelsCacheWriter
             Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
 
             return new PixelsCacheWriter(locator, zones, bucketTypeInfo, bucketToZoneMap, globalIndexFile, storage,
-                    cachedColumnChunks, etcdUtil, builderHostName);
+                    cachedColumnChunks, etcdUtil, builderHostName, zoneNum);
         }
     }
 
@@ -309,6 +314,7 @@ public class PixelsCacheWriter
             }
             String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
             String[] files = fileStr.split(";");
+            this.files = Arrays.asList(files);
             return internalUpdateAll(version, layout, files);
         }
         catch (IOException e)
@@ -376,6 +382,7 @@ public class PixelsCacheWriter
             }
             String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
             String[] files = fileStr.split(";");
+            this.files = Arrays.asList(files);
             return internalUpdateIncremental(version, layout, files);
         }
         catch (IOException | InterruptedException e)
@@ -752,6 +759,172 @@ public class PixelsCacheWriter
         PixelsZoneUtil.setIndexVersion(globalIndexFile, version);
         logger.info("finish internalUpdateIncremental");
         return status;
+    }
+
+    /**
+     * NOTE:
+     * 1. The expand operation does not change the cache size or zone num in the config file, once the PixelsWorker restarts, the expansion is no longer in effect.
+     * 2. Now Cache can automatically build the new physical zone file, but it needs to be pinned manually.
+     */
+    public void expand() throws Exception
+    {
+        if(bucketTypeInfo.getSwapBucketNum() == 0){
+            logger.warn("No swap zone, can not expand!");
+            return;
+        }
+        if(bucketToZoneMap.isMapFull(zoneNum + 1)){
+            logger.warn("routing table is full, can not expand!");
+            return;
+        }
+        // build new physical zone, insert it into the end of the physical zone list
+        int newZoneId = zoneNum;
+        String originZoneName  = zones.get(0).getZoneFile().getName();
+        String baseZoneName    = originZoneName.substring(0, originZoneName.lastIndexOf('.'));
+        String newZoneLocation = baseZoneName + "." + newZoneId;
+        String originIndexName  = zones.get(0).getIndexFile().getName();
+        String baseIndexName    = originIndexName.substring(0, originIndexName.lastIndexOf('.'));
+        String newIndexLocation = baseIndexName + "." + newZoneId;
+        long zoneSize = zones.get(0).getZoneFile().getSize();
+        long indexSize = zones.get(0).getIndexFile().getSize();
+        PixelsZoneWriter newZone = new PixelsZoneWriter(newZoneLocation, newIndexLocation, zoneSize, indexSize, newZoneId);
+        newZone.buildLazy();
+        newZone.getRadix().removeAll();
+        zones.add(newZone);
+        zoneNum++;
+        // update logical bucket info and bucketToZoneMap, insert the new bucket into the first swap bucket position and move the other swap buckets backward
+        int firstSwapZoneId = bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(0));
+        int newBucketId = bucketTypeInfo.getSwapBucketIds().get(0);
+        bucketTypeInfo.getLazyBucketIds().add(newBucketId);
+        bucketTypeInfo.incrementLazyBucketNum();
+        for(int i = 0; i < bucketTypeInfo.getSwapBucketNum() - 1; i++){
+            bucketTypeInfo.getSwapBucketIds().set(i, bucketTypeInfo.getSwapBucketIds().get(i+1));
+        }
+        bucketTypeInfo.getSwapBucketIds().set(bucketTypeInfo.getSwapBucketNum() - 1, newZoneId);
+        for(int i = bucketTypeInfo.getSwapBucketNum() - 1; i > 0; i--){
+            bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(i), bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(i-1)));
+        }
+        bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(0), firstSwapZoneId);
+        // there is no data in the cache, just build a empty zone
+        if(this.files == null || this.files.size() == 0){
+            PixelsZoneUtil.setIndexVersion(newZone.getIndexFile(), PixelsZoneUtil.getIndexVersion(zones.get(bucketTypeInfo.getLazyBucketIds().get(0)).getIndexFile()));
+            PixelsZoneUtil.setStatus(newZone.getZoneFile(), PixelsZoneUtil.ZoneStatus.OK.getId());
+            bucketToZoneMap.updateBucketZoneMap(newBucketId, newZoneId);
+            locator.addNode();
+            bucketToZoneMap.setHashNodeNum(locator.getNodeNum());
+            return;
+        }
+
+        long newZoneOffset = PixelsZoneUtil.ZONE_DATA_OFFSET;
+        PixelsLocator pseudoLocator = new PixelsLocator(locator.getNodeNum());
+        pseudoLocator.addNode();
+        for(int i = 0; i < pseudoLocator.getReplicaNum(); i++){
+            // Phase 1: find the next bucket by hashcycle
+            long nextBucketId = pseudoLocator.findNextBucket(newBucketId, i);
+            int nextZoneId = bucketToZoneMap.getBucketToZone(nextBucketId);
+            PixelsZoneWriter nextZone = zones.get(nextZoneId);
+            // Phase 2: copy data
+            for (String file : this.files)
+            {
+                try(PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
+                {
+                    for (String cacheColumnChunkOrder : this.cachedColumnChunks)
+                    {
+                        String[] columnChunkIdStr = cacheColumnChunkOrder.split(":");
+                        short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
+                        short columnId = Short.parseShort(columnChunkIdStr[1]);
+                        long blockId = pixelsPhysicalReader.getCurrentBlockId();
+                        PixelsCacheKey key = new PixelsCacheKey(blockId, rowGroupId, columnId);
+                        if(!pseudoLocator.isDataInReplica(key, newBucketId, i)){
+                            continue;
+                        }
+                        PixelsCacheIdx curIdx = nextZone.getRadix().get(blockId, rowGroupId, columnId);
+                        if(curIdx != null){
+                            if(newZoneOffset + curIdx.length < newZone.getZoneFile().getSize()){
+                                long srcAddr = nextZone.getZoneFile().getAddress() + curIdx.offset;
+                                long destAddr = newZone.getZoneFile().getAddress() + newZoneOffset;
+                                // direct memory copy, avoid intermediate byte array
+                                newZone.getZoneFile().copyMemory(srcAddr, destAddr, curIdx.length);
+                                newZone.getRadix().put(key, new PixelsCacheIdx(newZoneOffset, curIdx.length));
+                                newZoneOffset += curIdx.length;
+                            }else{
+                                logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newZoneOffset + "current bucketId: " + newBucketId);
+                            }
+                        }else{
+                            // Phase 3: load new hot data from the bottom storage, now just read the uncached hot data according to the last cache version.
+                            PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
+                            PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+                            int physicalLen = (int) chunkIndex.getChunkLength();
+                            long physicalOffset = chunkIndex.getChunkOffset();
+                            if(newZoneOffset + physicalLen < newZone.getZoneFile().getSize()){
+                                byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
+                                newZone.getZoneFile().setBytes(newZoneOffset, columnChunk);
+                                newZone.getRadix().put(key, new PixelsCacheIdx(newZoneOffset, physicalLen));
+                                newZoneOffset += physicalLen;
+                            }else{
+                                logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newZoneOffset + "current bucketId: " + newBucketId);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        newZone.flushIndex();
+        PixelsZoneUtil.setIndexVersion(newZone.getIndexFile(), PixelsZoneUtil.getIndexVersion(zones.get(bucketTypeInfo.getLazyBucketIds().get(0)).getIndexFile()));
+        PixelsZoneUtil.setStatus(newZone.getZoneFile(), PixelsZoneUtil.ZoneStatus.OK.getId());
+        PixelsZoneUtil.setSize(newZone.getZoneFile(), newZoneOffset);
+        // Phase 4: update routing table (bucketToZoneMap)
+        bucketToZoneMap.updateBucketZoneMap(newBucketId, newZoneId);
+        // Phase 5: update hashcycle in locator
+        locator.addNode();
+        bucketToZoneMap.setHashNodeNum(locator.getNodeNum());// trigger the readers to update their locator, the new zone will be served after the locator is updated
+        // Phase 6: compact the next zone of the new zone, now it will be completed in the next updateIncremental.
+        logger.info("finish expand operation");
+    }
+
+    /**
+     * NOTE:
+     * 1. Shrink can not be used together with expand in the same PixelsWorker life cycle, for 2 reasons:
+     *   1.1 PixelsCacheReader cannot accurately determine the precise number of expand and shrink operations when both expand and shrink are used together.
+     *   1.2 if expand is called after shrink, PixelsCacheReader cannot know the correct last lazy zone id.
+     * 2. The shrink operation does not change the cache size or zone num in the config file, once the PixelsWorker restarts, the shrink is no longer in effect.
+     * 3. Now the deleted physical zone file needs to be unpinned and removed manually.
+     */
+    public void shrink() throws Exception
+    {
+        if (bucketTypeInfo.getLazyBucketNum() <= 0) {
+            logger.warn("No zone to shrink");
+            return;
+        }
+        // Phase 1: find the next bucket by hashcycle
+        // Phase 2: merge the data in the deleting zone to the next zone
+        // Now just uncache the data in the deleting zone, the data belong to the next zone will be merged in the next updateIncremental.
+        // Phase 3: update hashcycle in locator
+        locator.removeNode();
+        bucketToZoneMap.setHashNodeNum(locator.getNodeNum());
+        // Phase 4: update routing table (bucketToZoneMap)
+        Thread.sleep(5);// Wait for readers that are still using the old locator to finish their routing-table lookups. This is only a temporary solution and needs to be improved later.
+        int lastLazyBucketId = bucketTypeInfo.getLazyBucketIds().get(bucketTypeInfo.getLazyBucketNum() - 1);
+        int lastLazyZoneId = bucketToZoneMap.getBucketToZone(lastLazyBucketId);
+        bucketToZoneMap.updateBucketZoneMap(lastLazyBucketId, -1);
+        
+        
+        // delete the physical zoneWriter
+        zones.get(lastLazyZoneId).close();
+        zones.remove(lastLazyZoneId);
+        zoneNum--;
+        // update logical bucket info and bucketToZoneMap, delete the last lazy bucket and move the other swap buckets forward
+        bucketTypeInfo.getLazyBucketIds().remove(bucketTypeInfo.getLazyBucketNum() - 1);
+        bucketTypeInfo.decrementLazyBucketNum();
+        int lastSwapZoneId = bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(bucketTypeInfo.getSwapBucketNum() - 1));
+        for(int i = bucketTypeInfo.getSwapBucketNum() - 1; i > 0; i--){
+            bucketTypeInfo.getSwapBucketIds().set(i, bucketTypeInfo.getSwapBucketIds().get(i-1));
+        }
+        bucketTypeInfo.getSwapBucketIds().set(0, lastLazyBucketId);
+        for(int i = 0; i < bucketTypeInfo.getSwapBucketNum()-1; i++){
+            bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(i), bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(i+1)-1));
+        }
+        bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(bucketTypeInfo.getSwapBucketNum() - 1), lastSwapZoneId-1);
+        logger.info("finish shrink operation");
     }
 
     /**

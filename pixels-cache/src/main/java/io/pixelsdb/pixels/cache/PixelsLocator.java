@@ -122,7 +122,85 @@ class PixelsLocator {
         return replicaNum;
     }
 
-    
+    // used in cache scaling
+    public boolean isDataInReplica(PixelsCacheKey key, long bucketId, int replicaId) {
+        if (key == null) {
+            throw new IllegalArgumentException("key cannot be null");
+        }
+        String keyStr = String.format("%d:%d:%d", 
+            key.blockId,
+            key.rowGroupId,
+            key.columnId);
+        long hash = hasher.getHashCode(keyStr) % NUM_HASH_SLOTS;
+        String vnode = VNODE_SUFFIX + replicaId;
+        String nodeName = NODE_PREFIX + bucketId + "-" + vnode;
+        Long bucketHashValue = slotMap.get(nodeName);
+        Long prevHashValue = hashCycle.lowerKey(bucketHashValue);
+        if (prevHashValue == null) {
+            Long lastHashValue = hashCycle.lastKey();
+            return hash > lastHashValue || hash <= bucketHashValue;
+        } else {
+            return hash > prevHashValue && hash <= bucketHashValue;
+        }
+    }
+
+    // used in cache scaling
+    public long findNextBucket(long bucketId, int replicaId) {
+        String vnode = VNODE_SUFFIX + replicaId;
+        String nodeName = NODE_PREFIX + bucketId + "-" + vnode;
+        Long hash = slotMap.get(nodeName);
+        Long nextBucketHash = hashCycle.higherKey(hash);
+        if(nextBucketHash == null){
+            nextBucketHash = hashCycle.firstKey();
+        }
+        Long nextBucketId = hashCycle.get(nextBucketHash);
+        int cnt = 0;
+        while(nextBucketId == bucketId){
+            nextBucketHash = hashCycle.higherKey(nextBucketHash);
+            if(nextBucketHash == null){
+                nextBucketHash = hashCycle.firstKey();
+            }
+            nextBucketId = hashCycle.get(nextBucketHash);
+            cnt++;
+            if(cnt > NUM_HASH_SLOTS){
+                logger.error("findNextBucket failed, bucketId: " + bucketId + " replicaId: " + replicaId);
+                break;
+            }
+        }
+        return nextBucketId;
+    }
+
+    public void addNode() {
+        long bucketId = nodeNum;
+        for (int j = 0; j < replicaNum; j++) {
+            String vnode = VNODE_SUFFIX + j;
+            String nodeName = NODE_PREFIX + bucketId + "-" + vnode;
+            long hash = hasher.getHashCode(nodeName) % NUM_HASH_SLOTS;
+            int cnt = 0;
+            while(hashCycle.containsKey(hash)){
+                hash = (hash + 1) % NUM_HASH_SLOTS;
+                cnt++;
+                if(cnt > NUM_HASH_SLOTS){
+                    logger.error("addNode failed, bucketId: " + bucketId + " replicaId: " + j);
+                    break;
+                }
+            }
+            hashCycle.put(hash, bucketId);
+            slotMap.put(nodeName, hash);
+        }
+        nodeNum++;
+    }
+
+    public void removeNode() {
+        long bucketId = nodeNum - 1;
+        for (int j = 0; j < replicaNum; j++) {
+            String vnode = VNODE_SUFFIX + j;
+            String nodeName = NODE_PREFIX + bucketId + "-" + vnode;
+            Long actualHash = slotMap.remove(nodeName);
+            hashCycle.remove(actualHash);
+        }
+        nodeNum--;
+    }
 
     public void close() {
         hashCycle.clear();
