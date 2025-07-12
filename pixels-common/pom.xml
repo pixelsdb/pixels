@@ -202,12 +202,12 @@
                 </executions>
                 <configuration>
                     <executable>${project.build.directory}/bin/flatc</executable>
-                    <workingDirectory>${project.parent.basedir}/flat</workingDirectory>
+                    <workingDirectory>${project.parent.basedir}/flatbuffers</workingDirectory>
                     <arguments>
                         <argument>--java</argument>
                         <argument>--gen-mutable</argument>
                         <argument>-o</argument>
-                        <argument>${project.build.directory}/generated-sources/flatbuf/java</argument>
+                        <argument>${project.build.directory}/generated-sources/flatbuffers/java</argument>
                         <argument>rowBatch.fbs</argument>
                     </arguments>
                 </configuration>
@@ -225,7 +225,7 @@
                         </goals>
                         <configuration>
                             <sources>
-                                <source>${project.build.directory}/generated-sources/flatbuf/java</source>
+                                <source>${project.build.directory}/generated-sources/flatbuffers/java</source>
                             </sources>
                         </configuration>
                     </execution>
