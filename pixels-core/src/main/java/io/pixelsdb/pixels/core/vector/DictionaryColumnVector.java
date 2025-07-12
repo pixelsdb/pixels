@@ -20,9 +20,9 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
+import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
+import io.pixelsdb.pixels.core.flat.DictionaryColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
-import io.pixelsdb.pixels.core.utils.flat.DictionaryColumnVectorFlat;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;

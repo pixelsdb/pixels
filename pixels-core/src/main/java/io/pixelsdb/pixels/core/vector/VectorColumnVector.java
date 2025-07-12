@@ -1,10 +1,10 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
+import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
+import io.pixelsdb.pixels.core.flat.DoubleArray;
+import io.pixelsdb.pixels.core.flat.VectorColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
-import io.pixelsdb.pixels.core.utils.flat.DoubleArray;
-import io.pixelsdb.pixels.core.utils.flat.VectorColumnVectorFlat;
 
 import java.nio.DoubleBuffer;
 import java.util.Arrays;
