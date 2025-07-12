@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-namespace io.pixelsdb.pixels.core.utils.flat;
+namespace io.pixelsdb.pixels.core.flat;
 
 table ByteArray {
     bytes : [ubyte];

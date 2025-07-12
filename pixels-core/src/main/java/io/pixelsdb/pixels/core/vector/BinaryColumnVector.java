@@ -20,11 +20,10 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
-import com.google.flatbuffers.Table;
+import io.pixelsdb.pixels.core.flat.BinaryColumnVectorFlat;
+import io.pixelsdb.pixels.core.flat.ByteArray;
+import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import io.pixelsdb.pixels.core.utils.flat.BinaryColumnVectorFlat;
-import io.pixelsdb.pixels.core.utils.flat.ByteArray;
-import io.pixelsdb.pixels.core.utils.flat.ColumnVectorFlat;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

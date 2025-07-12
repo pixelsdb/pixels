@@ -21,8 +21,8 @@ package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 import com.google.flatbuffers.Table;
+import io.pixelsdb.pixels.core.flat.*;
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import io.pixelsdb.pixels.core.utils.flat.*;
 
 import java.nio.ByteBuffer;
 
