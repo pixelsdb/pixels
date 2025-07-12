@@ -91,7 +91,7 @@
         <!-- storage systems -->
         <dep.hadoop.version>3.3.1</dep.hadoop.version>
         <dep.ozone.version>0.5.0-beta</dep.ozone.version>
-        <dep.awssdk.version>2.29.31</dep.awssdk.version>
+        <dep.awssdk.version>2.30.17</dep.awssdk.version>
         <dep.jedis.version>4.2.0</dep.jedis.version>
         <dep.gcp.version>26.1.2</dep.gcp.version>
         <dep.rocksdb.version>9.10.0</dep.rocksdb.version>
@@ -100,7 +100,7 @@
         <!-- common libraries -->
         <dep.spike.java.version>0.1.1</dep.spike.java.version>
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
-        <dep.netty.version>4.1.77.Final</dep.netty.version>
+        <dep.netty.version>4.1.118.Final</dep.netty.version>
         <dep.asynchttpclient.version>2.12.3</dep.asynchttpclient.version>
         <dep.fastjson.version>1.2.83</dep.fastjson.version>
         <dep.commons-cli.version>1.5.0</dep.commons-cli.version>
@@ -359,6 +359,18 @@
                         <groupId>org.slf4j</groupId>
                         <artifactId>slf4j-api</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-codec-http2</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-transport-native-unix-common</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-handler-proxy</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
 
@@ -510,6 +522,16 @@
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
                 <version>${dep.hadoop.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-handler</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-transport-native-epoll</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
@@ -640,6 +662,36 @@
                 <groupId>org.asynchttpclient</groupId>
                 <artifactId>async-http-client</artifactId>
                 <version>${dep.asynchttpclient.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-codec-http</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-codec-socks</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-handler-proxy</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-handler</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-transport-native-epoll</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-transport-native-kqueue</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-codec-http2</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>
