@@ -173,6 +173,7 @@ public class DynamicArray<T>
         this.size = 0;
         this.chunkNum = DEFAULT_CHUNK_NUM;
         this.content = new Object[chunkNum][];
+        this.initializedChunkNum = 0;
     }
 
     /**
