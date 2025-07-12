@@ -240,7 +240,7 @@ public class PixelsCacheWriter
                             schemaTableName.getSchemaName(), schemaTableName.getSchemaName(), cachedVersion);
                     Compact compact = cachedLayout.getCompact();
                     int cacheBorder = compact.getCacheBorder();
-                    cachedColumnChunks.addAll(compact.getColumnChunkOrder().subList(0, cacheBorder));
+                    cachedColumnChunks.addAll(compact.getColumnChunkOrder());//.subList(0, cacheBorder));
                 }
             }
             else
@@ -421,7 +421,7 @@ public class PixelsCacheWriter
         // get the new caching layout
         Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
-        List<String> cacheColumnChunkOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
+        List<String> cacheColumnChunkOrders = compact.getColumnChunkOrder();//.subList(0, cacheBorder);
 
 
         // update cache content
@@ -544,7 +544,7 @@ public class PixelsCacheWriter
          */
         Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
-        List<String> nextVersionCached = compact.getColumnChunkOrder().subList(0, cacheBorder);
+        List<String> nextVersionCached = compact.getColumnChunkOrder();//.subList(0, cacheBorder);
         /**
          * Prepare structures for the survived and new coming cache elements.
          */
