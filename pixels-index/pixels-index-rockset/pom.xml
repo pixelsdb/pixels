@@ -34,24 +34,6 @@
             <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-http2</artifactId>
-            <version>${dep.netty.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-transport-native-unix-common</artifactId>
-            <version>${dep.netty.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-handler-proxy</artifactId>
-            <version>${dep.netty.version}</version>
-            <optional>true</optional>
-        </dependency>
 
         <dependency>
             <groupId>io.grpc</groupId>
