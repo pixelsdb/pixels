@@ -28,8 +28,10 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -40,10 +42,26 @@ import java.util.List;
  */
 public class RocksetIndex implements SinglePointIndex
 {
-    // load RocksetJni
+    // load pixels-index-rockset
     static
     {
-        System.loadLibrary("RocksetJni");
+        String pixelsHome = System.getenv("PIXELS_HOME");
+        if (pixelsHome == null || pixelsHome.isEmpty())
+        {
+            throw new IllegalStateException("Environment variable PIXELS_HOME is not set");
+        }
+
+        String libPath = Paths.get(pixelsHome, "lib/libpixels-index-rockset.so").toString();
+        File libFile = new File(libPath);
+        if (!libFile.exists())
+        {
+            throw new IllegalStateException("libpixels-index-rockset.so not found at " + libPath);
+        }
+        if (!libFile.canRead())
+        {
+            throw new IllegalStateException("libpixels-index-rockset.so is not readable at " + libPath);
+        }
+        System.load(libPath);
     }
 
     // Native method
@@ -66,7 +84,7 @@ public class RocksetIndex implements SinglePointIndex
 
     private native void CloseDB0(long dbHandle);
 
-    private long CreateDBCloud(
+    protected long CreateDBCloud(
             String bucketName,
             String s3Prefix,
             String localDbPath,
@@ -90,22 +108,22 @@ public class RocksetIndex implements SinglePointIndex
         return dbHandle;
     }
 
-    private void DBput(long dbHandle, byte[] key, byte[] value)
+    protected void DBput(long dbHandle, byte[] key, byte[] value)
     {
         DBput0(dbHandle, key, value);
     }
 
-    private byte[] DBget(long dbHandle, byte[] key)
+    protected byte[] DBget(long dbHandle, byte[] key)
     {
         return DBget0(dbHandle, key);
     }
 
-    private void DBdelete(long dbHandle, byte[] key)
+    protected void DBdelete(long dbHandle, byte[] key)
     {
         DBdelete0(dbHandle, key);
     }
 
-    private void CloseDB(long dbHandle)
+    protected void CloseDB(long dbHandle)
     {
         if (dbHandle != 0)
         {
@@ -114,15 +132,20 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     private long dbHandle = 0;
-    public static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
+    private static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
     private final MainIndex mainIndex;
 
-    public RocksetIndex(MainIndex mainIndex, String bucketName, String s3Prefix, String localDbPath,
+    protected RocksetIndex(MainIndex mainIndex, String bucketName, String s3Prefix, String localDbPath,
                         String persistentCachePath, long persistentCacheSizeGB, boolean readOnly)
     {
         this.dbHandle = CreateDBCloud(bucketName, s3Prefix, localDbPath,
                 persistentCachePath, persistentCacheSizeGB, readOnly);
         this.mainIndex = mainIndex;
+    }
+
+    protected long getDbHandle()
+    {
+        return dbHandle;
     }
 
     @Override
