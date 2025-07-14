@@ -32,6 +32,7 @@ import "index.proto";
 
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
+    rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordRequest);
     rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
     rpc InsertRecords (InsertRecordsRequest) returns (InsertRecordsResponse);
     rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
@@ -61,9 +62,11 @@ message VisibilityBitmap {
 }
 
 message InsertData {
-    string schemaName = 1;
-    string tableName = 2;
-    repeated bytes colValues = 3;
+    repeated bytes colValues = 1;
+}
+
+message DeleteData {
+    repeated index.proto.IndexKey indexKeys = 1;
 }
 
 enum BufferType {
@@ -92,6 +95,20 @@ enum ColumnType {
     CHAR = 17;
     TIME = 18;
     VECTOR = 19;
+}
+
+// update
+message UpdateRecordRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+    repeated InsertData insertData = 4;
+    repeated DeleteData deleteData = 5;
+    uint64 timestamp = 6;
+}
+
+message UpdateRecordResponse {
+    ResponseHeader header = 1;
 }
 
 // insert
