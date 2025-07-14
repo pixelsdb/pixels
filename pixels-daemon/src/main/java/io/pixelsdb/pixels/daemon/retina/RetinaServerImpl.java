@@ -66,8 +66,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         this.pixelsWriterBufferMap = new ConcurrentHashMap<>();
         try
         {
-            boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
-            boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
             List<Schema> schemas = this.metadataService.getSchemas();
             for (Schema schema : schemas)
             {
@@ -80,24 +78,24 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     {
                         if (layout.isReadable())
                         {
-                            if (orderedEnabled)
-                            {
-                                List<Path> orderedPaths = layout.getOrderedPaths();
-                                validateOrderedOrCompactPaths(orderedPaths);
-                                List<File> orderedFiles = this.metadataService.getFiles(orderedPaths.get(0).getId());
-                                files.addAll(orderedFiles.stream()
-                                        .map(file -> orderedPaths.get(0).getUri() + "/" + file.getName())
-                                        .collect(Collectors.toList()));
-                            }
-                            if (compactEnabled)
-                            {
-                                List<Path> compactPaths = layout.getCompactPaths();
-                                validateOrderedOrCompactPaths(compactPaths);
-                                List<File> compactFiles = this.metadataService.getFiles(compactPaths.get(0).getId());
-                                files.addAll(compactFiles.stream()
-                                        .map(file -> compactPaths.get(0).getUri() + "/" + file.getName())
-                                        .collect(Collectors.toList()));
-                            }
+                            /**
+                             * Issue #946: always add visibility to all files
+                             */
+                            // add visibility for ordered files
+                            List<Path> orderedPaths = layout.getOrderedPaths();
+                            validateOrderedOrCompactPaths(orderedPaths);
+                            List<File> orderedFiles = this.metadataService.getFiles(orderedPaths.get(0).getId());
+                            files.addAll(orderedFiles.stream()
+                                    .map(file -> orderedPaths.get(0).getUri() + "/" + file.getName())
+                                    .collect(Collectors.toList()));
+
+                            // add visibility for compact files
+                            List<Path> compactPaths = layout.getCompactPaths();
+                            validateOrderedOrCompactPaths(compactPaths);
+                            List<File> compactFiles = this.metadataService.getFiles(compactPaths.get(0).getId());
+                            files.addAll(compactFiles.stream()
+                                    .map(file -> compactPaths.get(0).getUri() + "/" + file.getName())
+                                    .collect(Collectors.toList()));
                         }
                     }
                     for (String filePath : files)
