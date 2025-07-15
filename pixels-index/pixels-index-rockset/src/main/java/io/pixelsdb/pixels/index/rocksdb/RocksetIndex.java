@@ -159,12 +159,16 @@ public class RocksetIndex implements SinglePointIndex
             // Get value from RocksDB
             byte[] valueBytes = DBget(this.dbHandle, compositeKey);
 
-            if (valueBytes != null) {
+            if (valueBytes != null)
+            {
                 return ByteBuffer.wrap(valueBytes).getLong();
-            } else {
+            }
+            else
+            {
                 System.out.println("No value found for composite key: " + key);
             }
-        } catch (RuntimeException e)
+        }
+        catch (RuntimeException e)
         {
             LOGGER.error("Failed to get unique row ID for key: {}", key, e);
         }
@@ -215,7 +219,8 @@ public class RocksetIndex implements SinglePointIndex
             // Put rowId into MainIndex
             IndexProto.RowLocation rowLocation = entry.getRowLocation();
             boolean success = mainIndex.putRowId(rowId, rowLocation);
-            if (!success) {
+            if (!success)
+            {
                 LOGGER.error("Failed to put Entry into main index for rowId {}", rowId);
                 throw new MainIndexException("Failed to put Entry into main index for rowId");
             }
@@ -266,7 +271,8 @@ public class RocksetIndex implements SinglePointIndex
             MainIndex.RgLocation rgLocation = new MainIndex.RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
             // Put RowIds to MainIndex
             boolean success = mainIndex.putRowIds(newRange, rgLocation);
-            if (!success) {
+            if (!success)
+            {
                 LOGGER.error("Failed to put Entry into main index for rowId RowIdRange [{}-{}]", start, end);
                 throw new MainIndexException("Failed to put Entry into main index for rowId RowIdRange");
             }
@@ -359,7 +365,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean deletePrimaryEntry(IndexProto.IndexKey key)
+    public IndexProto.RowLocation deletePrimaryEntry(IndexProto.IndexKey key)
     {
         try
         {
@@ -371,21 +377,22 @@ public class RocksetIndex implements SinglePointIndex
             DBdelete(this.dbHandle, keyBytes);
             // Delete MainIndex
             boolean success = mainIndex.deleteRowId(rowId);
-            if (!success) {
+            if (!success)
+            {
                 LOGGER.error("Failed to delete Entry of main index for rowId {}", rowId);
-                return false;
+                return null; // TODO: implement
             }
-            return true;
+            return null; // TODO: implement
         }
         catch (RuntimeException e)
         {
             LOGGER.error("Failed to delete Primary Entry: {}", key, e);
-            return false;
+            return null; // TODO: implement
         }
     }
 
     @Override
-    public boolean deletePrimaryEntries(List<IndexProto.IndexKey> keys)
+    public List<IndexProto.RowLocation> deletePrimaryEntries(List<IndexProto.IndexKey> keys)
     {
         try
         {
@@ -400,9 +407,10 @@ public class RocksetIndex implements SinglePointIndex
                 // Delete key-value pair from RocksDB
                 DBdelete(this.dbHandle, keyBytes);
             }
-            if (rowIds.isEmpty()) {
+            if (rowIds.isEmpty())
+            {
                 LOGGER.warn("No rowIds found for keys: {}", keys);
-                return false;
+                return null; // TODO: implement
             }
             // Found start rowId and end rowId
             long start = Collections.min(rowIds);
@@ -410,21 +418,22 @@ public class RocksetIndex implements SinglePointIndex
             RowIdRange newRange = new RowIdRange(start, end);
             // Delete MainIndex
             boolean success = mainIndex.deleteRowIds(newRange);
-            if (!success) {
+            if (!success)
+            {
                 LOGGER.error("Failed to delete Entry of main index for rowId RowIdRange [{}-{}]", start, end);
-                return false;
+                return null; // TODO: implement
             }
-            return true;
+            return null; // TODO: implement
         }
         catch (RuntimeException e)
         {
             LOGGER.error("Failed to delete Primary Entries: {}", keys, e);
-            return false;
+            return null; // TODO: implement
         }
     }
 
     @Override
-    public boolean deleteSecondaryEntry(IndexProto.IndexKey key)
+    public long deleteSecondaryEntry(IndexProto.IndexKey key)
     {
         try
         {
@@ -432,17 +441,17 @@ public class RocksetIndex implements SinglePointIndex
             byte[] keyBytes = toByteArray(key);
             // Delete key-value pair from RocksDB
             DBdelete(this.dbHandle, keyBytes);
-            return true;
+            return 0; // TODO: implement
         }
         catch (RuntimeException e)
         {
             LOGGER.error("Failed to delete Secondary Entry: {}", key, e);
-            return false;
+            return 0; // TODO: implement
         }
     }
 
     @Override
-    public boolean deleteSecondaryEntries(List<IndexProto.IndexKey> keys)
+    public List<Long> deleteSecondaryEntries(List<IndexProto.IndexKey> keys)
     {
         try
         {
@@ -453,12 +462,12 @@ public class RocksetIndex implements SinglePointIndex
                 // Delete key-value pair from RocksDB
                 DBdelete(this.dbHandle, keyBytes);
             }
-            return true;
+            return null; // TODO: implement
         }
         catch (RuntimeException e)
         {
             LOGGER.error("Failed to delete Secondary Entries: {}", keys, e);
-            return false;
+            return null; // TODO: implement
         }
     }
 
