@@ -32,7 +32,7 @@ import "index.proto";
 
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
-    rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordRequest);
+    rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
     rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
     rpc InsertRecords (InsertRecordsRequest) returns (InsertRecordsResponse);
     rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
