@@ -33,7 +33,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * @author hank, Rolland1944
@@ -127,8 +126,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutPrimaryIndexEntryResponse.Builder builder = IndexProto.PutPrimaryIndexEntryResponse.newBuilder();
         try
         {
-            boolean success = singlePointIndex.putPrimaryEntry(new SinglePointIndex.Entry(entry.getIndexKey(),
-                    entry.getTableRowId(), true, entry.getRowLocation()));
+            boolean success = singlePointIndex.putPrimaryEntry(entry);
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -154,11 +152,8 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void putPrimaryIndexEntries(IndexProto.PutPrimaryIndexEntriesRequest request,
                                        StreamObserver<IndexProto.PutPrimaryIndexEntriesResponse> responseObserver)
     {
-        List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream()
-                .map(entry -> new SinglePointIndex.Entry(
-                        entry.getIndexKey(), entry.getTableRowId(), true, entry.getRowLocation()))
-                .collect(Collectors.toList());
-        IndexProto.PutPrimaryIndexEntriesResponse.Builder builder  = IndexProto.PutPrimaryIndexEntriesResponse.newBuilder();
+        List<IndexProto.PrimaryIndexEntry> entries = request.getIndexEntriesList();
+        IndexProto.PutPrimaryIndexEntriesResponse.Builder builder = IndexProto.PutPrimaryIndexEntriesResponse.newBuilder();
         try
         {
             boolean success = singlePointIndex.putPrimaryEntries(entries);
@@ -191,8 +186,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutSecondaryIndexEntryResponse.Builder builder = IndexProto.PutSecondaryIndexEntryResponse.newBuilder();
         try
         {
-            boolean success = singlePointIndex.putSecondaryEntry(new SinglePointIndex.Entry(entry.getIndexKey(),
-                    entry.getTableRowId(), true, null));
+            boolean success = singlePointIndex.putSecondaryEntry(entry);
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -214,11 +208,8 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void putSecondaryIndexEntries(IndexProto.PutSecondaryIndexEntriesRequest request,
                                          StreamObserver<IndexProto.PutSecondaryIndexEntriesResponse> responseObserver)
     {
-        List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream().map(
-                entry -> new SinglePointIndex.Entry(
-                        entry.getIndexKey(), entry.getTableRowId(), true, null))
-                .collect(Collectors.toList());
-        IndexProto.PutSecondaryIndexEntriesResponse.Builder builder  = IndexProto.PutSecondaryIndexEntriesResponse.newBuilder();
+        List<IndexProto.SecondaryIndexEntry> entries = request.getIndexEntriesList();
+        IndexProto.PutSecondaryIndexEntriesResponse.Builder builder = IndexProto.PutSecondaryIndexEntriesResponse.newBuilder();
         try
         {
             boolean success = singlePointIndex.putSecondaryEntries(entries);

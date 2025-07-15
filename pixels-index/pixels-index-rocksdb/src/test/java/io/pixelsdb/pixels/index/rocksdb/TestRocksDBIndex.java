@@ -87,7 +87,8 @@ public class TestRocksDBIndex
                 .setRgRowId(rgRowId)
                 .build();
 
-        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, rowId, true, rowLocation);
+        IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
+                .setIndexKey(keyProto).setTableRowId(rowId).setRowLocation(rowLocation).build();
 
         boolean success = rocksDBIndex.putPrimaryEntry(entry);
         assertTrue(success, "putEntry should return true");
@@ -108,7 +109,7 @@ public class TestRocksDBIndex
         long fileId = 1L;
         int rgId = 2;
 
-        List<SinglePointIndex.Entry> entries = new ArrayList<>();
+        List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>();
 
         // Create two entries
         for (int i = 0; i < 2; i++)
@@ -131,7 +132,8 @@ public class TestRocksDBIndex
                     .setRgRowId(i)
                     .build();
 
-            SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, rowId, true, rowLocation);
+            IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
+                    .setIndexKey(keyProto).setTableRowId(rowId).setRowLocation(rowLocation).build();
             entries.add(entry);
         }
 
@@ -141,8 +143,8 @@ public class TestRocksDBIndex
         // Assert every index has been written to rocksDB
         for (int i = 0; i < entries.size(); i++)
         {
-            SinglePointIndex.Entry entry = entries.get(i);
-            byte[] keyBytes = toByteArray(entry.getKey());
+            IndexProto.PrimaryIndexEntry entry = entries.get(i);
+            byte[] keyBytes = toByteArray(entry.getIndexKey());
             byte[] storedValue = rocksDB.get(keyBytes);
             assertNotNull(storedValue);
             long storedRowId = ByteBuffer.wrap(storedValue).getLong();
@@ -175,7 +177,8 @@ public class TestRocksDBIndex
                 .setRgRowId(rgRowId)
                 .build();
 
-        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
+        IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
+                .setIndexKey(keyProto).setTableRowId(0L).setRowLocation(rowLocation).build();
 
         rocksDBIndex.putPrimaryEntry(entry);
 
@@ -198,13 +201,13 @@ public class TestRocksDBIndex
         long fileId = 1L;
         int rgId = 2;
 
-        List<SinglePointIndex.Entry> entries = new ArrayList<>();
+        List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>();
         List<byte[]> keyBytesList = new ArrayList<>();
         List<IndexProto.IndexKey> keyList = new ArrayList<>();
 
         for (int i = 0; i < 2; i++)
         {
-            byte[] key = ("exampleKey" + i).getBytes(); // 不同 key
+            byte[] key = ("exampleKey" + i).getBytes();
             keyBytesList.add(key);
             ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
             buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
@@ -223,7 +226,8 @@ public class TestRocksDBIndex
                     .setRgRowId(i)
                     .build();
 
-            SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
+            IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
+                    .setIndexKey(keyProto).setTableRowId(0L).setRowLocation(rowLocation).build();
             entries.add(entry);
         }
 

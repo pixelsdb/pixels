@@ -85,13 +85,17 @@ public interface SinglePointIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-    boolean putPrimaryEntry(Entry entry) throws MainIndexException, SinglePointIndexException;
+    boolean putPrimaryEntry(IndexProto.PrimaryIndexEntry entry)
+            throws MainIndexException, SinglePointIndexException;
 
-    boolean putPrimaryEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException;
+    boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
+            throws MainIndexException, SinglePointIndexException;
 
-    boolean putSecondaryEntry(Entry entry) throws SinglePointIndexException;
+    boolean putSecondaryEntry(IndexProto.SecondaryIndexEntry entry)
+            throws SinglePointIndexException;
 
-    boolean putSecondaryEntries(List<Entry> entries) throws SinglePointIndexException;
+    boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries)
+            throws SinglePointIndexException;
 
     /**
      * Delete the primary index entry of the index key
@@ -100,7 +104,8 @@ public interface SinglePointIndex extends Closeable
      * @throws MainIndexException
      * @throws SinglePointIndexException
      */
-    IndexProto.RowLocation deletePrimaryEntry(IndexProto.IndexKey indexKey) throws MainIndexException, SinglePointIndexException;
+    IndexProto.RowLocation deletePrimaryEntry(IndexProto.IndexKey indexKey)
+            throws MainIndexException, SinglePointIndexException;
 
     /**
      * Delete the primary index entries of the index keys
@@ -109,7 +114,8 @@ public interface SinglePointIndex extends Closeable
      * @throws MainIndexException
      * @throws SinglePointIndexException
      */
-    List<IndexProto.RowLocation> deletePrimaryEntries(List<IndexProto.IndexKey> indexKeys) throws MainIndexException, SinglePointIndexException;
+    List<IndexProto.RowLocation> deletePrimaryEntries(List<IndexProto.IndexKey> indexKeys)
+            throws MainIndexException, SinglePointIndexException;
 
     /**
      * Delete the secondary index entry of the index key
@@ -118,7 +124,8 @@ public interface SinglePointIndex extends Closeable
      * @throws MainIndexException
      * @throws SinglePointIndexException
      */
-    long deleteSecondaryEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
+    long deleteSecondaryEntry(IndexProto.IndexKey indexKey)
+            throws SinglePointIndexException;
 
     /**
      * Delete the secondary index entries of the index keys
@@ -127,7 +134,8 @@ public interface SinglePointIndex extends Closeable
      * @throws MainIndexException
      * @throws SinglePointIndexException
      */
-    List<Long> deleteSecondaryEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException;
+    List<Long> deleteSecondaryEntries(List<IndexProto.IndexKey> indexKeys)
+            throws SinglePointIndexException;
 
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the
@@ -137,56 +145,4 @@ public interface SinglePointIndex extends Closeable
      */
     @Override
     void close() throws IOException;
-
-    class Entry
-    {
-        private final IndexProto.IndexKey key;
-        private long rowId;
-        private final boolean unique;
-        private final IndexProto.RowLocation rowLocation;
-
-        public Entry(IndexProto.IndexKey key, long rowId, boolean unique, IndexProto.RowLocation rowLocation)
-        {
-            this.key = key;
-            this.rowId = rowId;
-            this.unique = unique;
-            this.rowLocation = rowLocation;
-        }
-
-        public IndexProto.IndexKey getKey()
-        {
-            return key;
-        }
-
-        public long getRowId()
-        {
-            return rowId;
-        }
-
-        public boolean getIsUnique() { return unique; }
-
-        public IndexProto.RowLocation getRowLocation()
-        {
-            return rowLocation;
-        }
-
-        public void setRowId(long rowId) {
-            this.rowId = rowId;
-        }
-
-        @Override
-        public boolean equals(Object other)
-        {
-            if (!(other instanceof Entry))
-            {
-                return false;
-            }
-            Entry that = (Entry) other;
-            if (this.key == null || that.key == null)
-            {
-                return this.key == that.key && this.rowId == that.rowId;
-            }
-            return this.key.equals(that.key) && this.rowId == that.rowId;
-        }
-    }
 }

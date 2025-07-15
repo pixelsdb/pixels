@@ -126,39 +126,12 @@ public class MainIndexImplTest
                 .setRgId(rgId)
                 .setRgRowId(rgRowId)
                 .build();
-        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
-
         IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
                 .setFileId(4)
                 .setRgId(40)
                 .setRgRowId(0)
                 .build();
-        Assertions.assertTrue(mainIndex.putRowId(entry.getRowId(), dummyLocation));
-    }
-
-    @Test
-    public void testGetRgOfRowIds() throws Exception
-    {
-        List<SinglePointIndex.Entry> entries = new ArrayList<>();
-        long indexId = 1L;
-        byte[] key = "exampleKey".getBytes();
-        long timestamp = System.currentTimeMillis();
-        long fileId = 1L;
-        int rgId = 2;
-        int rgRowId = 3;
-        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                .setIndexId(indexId)
-                .setKey(ByteString.copyFrom(key))
-                .setTimestamp(timestamp)
-                .build();
-        IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                .setFileId(fileId)
-                .setRgId(rgId)
-                .setRgRowId(rgRowId)
-                .build();
-        for (int i = 0; i < 5; i++) {
-            entries.add(new SinglePointIndex.Entry(keyProto, i, true, rowLocation));
-        }
+        Assertions.assertTrue(mainIndex.putRowId(0L, dummyLocation));
     }
 
     @Test
@@ -187,7 +160,6 @@ public class MainIndexImplTest
                             .setRgId(2)
                             .setRgRowId(3)
                             .build();
-                    SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
 
                     // Test putRowId()
                     IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()

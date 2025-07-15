@@ -167,30 +167,20 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putPrimaryEntry(Entry entry) throws MainIndexException, SinglePointIndexException
+    public boolean putPrimaryEntry(IndexProto.PrimaryIndexEntry entry) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
             // Extract key and rowId from Entry object
-            IndexProto.IndexKey key = entry.getKey();
-            long rowId = entry.getRowId();
-            boolean unique = entry.getIsUnique();
+            IndexProto.IndexKey key = entry.getIndexKey();
+            long rowId = entry.getTableRowId();
             // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
             // Convert rowId to byte array
             byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
-            if (unique)
-            {
-                // Write to RocksDB
-                writeBatch.put(keyBytes, valueBytes);
-            }
-            else
-            {
-                // Create composite key
-                byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
-                // Store in RocksDB
-                writeBatch.put(nonUniqueKey, null);
-            }
+
+            // Write to RocksDB
+            writeBatch.put(keyBytes, valueBytes);
             // Put rowId into MainIndex
             IndexProto.RowLocation rowLocation = entry.getRowLocation();
             boolean success = mainIndex.putRowId(rowId, rowLocation);
@@ -210,37 +200,29 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putPrimaryEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException
+    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
             // Process each Entry object
-            for (Entry entry : entries)
+            for (IndexProto.PrimaryIndexEntry entry : entries)
             {
                 // Extract key and rowId from Entry object
-                IndexProto.IndexKey key = entry.getKey();
-                long rowId = entry.getRowId();
-                boolean unique = entry.getIsUnique();
+                IndexProto.IndexKey key = entry.getIndexKey();
+                long rowId = entry.getTableRowId();
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
                 // Convert rowId to byte array
                 byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
-                if(unique)
-                {
-                    // Write to RocksDB
-                    writeBatch.put(keyBytes, valueBytes);
-                }
-                else
-                {
-                    byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
-                    writeBatch.put(nonUniqueKey, null);
-                }
+
+                // Write to RocksDB
+                writeBatch.put(keyBytes, valueBytes);
             }
             // Select start rowId and end rowId
-            Entry entryStart = entries.get(0);
-            Entry entryEnd = entries.get(entries.size() - 1);
-            long start = entryStart.getRowId();
-            long end = entryEnd.getRowId();
+            IndexProto.PrimaryIndexEntry entryStart = entries.get(0);
+            IndexProto.PrimaryIndexEntry entryEnd = entries.get(entries.size() - 1);
+            long start = entryStart.getTableRowId();
+            long end = entryEnd.getTableRowId();
             // Create new RowIdRange and RgLocation
             RowIdRange newRange = new RowIdRange(start, end);
             IndexProto.RowLocation rowLocation = entryStart.getRowLocation();
@@ -263,14 +245,14 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putSecondaryEntry(Entry entry) throws SinglePointIndexException
+    public boolean putSecondaryEntry(IndexProto.SecondaryIndexEntry entry) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
             // Extract key and rowId from Entry object
-            IndexProto.IndexKey key = entry.getKey();
-            long rowId = entry.getRowId();
-            boolean unique = entry.getIsUnique();
+            IndexProto.IndexKey key = entry.getIndexKey();
+            long rowId = entry.getTableRowId();
+            boolean unique = entry.getUnique();
             // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
             // Convert rowId to byte array
@@ -298,17 +280,17 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putSecondaryEntries(List<Entry> entries) throws SinglePointIndexException
+    public boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
             // Process each Entry object
-            for (Entry entry : entries)
+            for (IndexProto.SecondaryIndexEntry entry : entries)
             {
                 // Extract key and rowId from Entry object
-                IndexProto.IndexKey key = entry.getKey();
-                long rowId = entry.getRowId();
-                boolean unique = entry.getIsUnique();
+                IndexProto.IndexKey key = entry.getIndexKey();
+                long rowId = entry.getTableRowId();
+                boolean unique = entry.getUnique();
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
                 // Convert rowId to byte array

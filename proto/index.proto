@@ -79,6 +79,7 @@ message SecondaryIndexEntry {
   IndexKey indexKey = 1;
   uint64 tableRowId = 2; // the rowId in this table
   // secondary index entry does not have associated row location
+  bool unique = 3; // whether this secondary index is unique
 }
 
 message AllocateRowIdBatchRequest {
