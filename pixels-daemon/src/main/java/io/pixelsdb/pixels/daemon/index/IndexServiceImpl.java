@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.daemon.index;
 
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
-import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
@@ -126,7 +125,8 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutPrimaryIndexEntryResponse.Builder builder = IndexProto.PutPrimaryIndexEntryResponse.newBuilder();
         try
         {
-            boolean success = singlePointIndex.putPrimaryEntry(entry);
+            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getTableRowId(), true);
+            // TODO: put main index
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -136,10 +136,10 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                 builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
             }
         }
-        catch (MainIndexException e)
-        {
-            builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
-        }
+        //catch (MainIndexException e)
+        //{
+        //    builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
+        //}
         catch (SinglePointIndexException e)
         {
             builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
@@ -157,6 +157,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         try
         {
             boolean success = singlePointIndex.putPrimaryEntries(entries);
+            // TODO: put main index
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -166,10 +167,10 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                 builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
             }
         }
-        catch (MainIndexException e)
-        {
-            builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
-        }
+        //catch (MainIndexException e)
+        //{
+        //    builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
+        //}
         catch (SinglePointIndexException e)
         {
             builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
@@ -186,7 +187,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutSecondaryIndexEntryResponse.Builder builder = IndexProto.PutSecondaryIndexEntryResponse.newBuilder();
         try
         {
-            boolean success = singlePointIndex.putSecondaryEntry(entry);
+            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getTableRowId(), entry.getUnique());
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -238,13 +239,14 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeletePrimaryIndexEntryResponse.Builder builder = IndexProto.DeletePrimaryIndexEntryResponse.newBuilder();
         try
         {
-            IndexProto.RowLocation rowLocation = singlePointIndex.deletePrimaryEntry(key);
-            builder.setErrorCode(ErrorCode.SUCCESS).setRowLocation(rowLocation);
+            long rowId = singlePointIndex.deleteEntry(key);
+            // TODO: delete main index
+            builder.setErrorCode(ErrorCode.SUCCESS);
         }
-        catch (MainIndexException e)
-        {
-            builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
-        }
+        //catch (MainIndexException e)
+        //{
+        //    builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
+        //}
         catch (SinglePointIndexException e)
         {
             builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
@@ -261,13 +263,14 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeletePrimaryIndexEntriesResponse.Builder builder = IndexProto.DeletePrimaryIndexEntriesResponse.newBuilder();
         try
         {
-            List<IndexProto.RowLocation> rowLocations = singlePointIndex.deletePrimaryEntries(keys);
-            builder.setErrorCode(ErrorCode.SUCCESS).addAllRowLocations(rowLocations);
+            List<Long> rowLocations = singlePointIndex.deleteEntries(keys);
+            // TODO: delete main index
+            builder.setErrorCode(ErrorCode.SUCCESS);
         }
-        catch (MainIndexException e)
-        {
-            builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
-        }
+        //catch (MainIndexException e)
+        //{
+        //    builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
+        //}
         catch (SinglePointIndexException e)
         {
             builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
@@ -284,7 +287,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeleteSecondaryIndexEntryResponse.Builder builder = IndexProto.DeleteSecondaryIndexEntryResponse.newBuilder();
         try
         {
-            long rowId = singlePointIndex.deleteSecondaryEntry(key);
+            long rowId = singlePointIndex.deleteEntry(key);
             builder.setErrorCode(ErrorCode.SUCCESS).setTableRowId(rowId);
         }
         catch (SinglePointIndexException e)
@@ -303,7 +306,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeleteSecondaryIndexEntriesResponse.Builder builder = IndexProto.DeleteSecondaryIndexEntriesResponse.newBuilder();
         try
         {
-            List<Long> rowIds = singlePointIndex.deleteSecondaryEntries(keys);
+            List<Long> rowIds = singlePointIndex.deleteEntries(keys);
             builder.setErrorCode(ErrorCode.SUCCESS).addAllTableRowIds(rowIds);
         }
         catch (SinglePointIndexException e)

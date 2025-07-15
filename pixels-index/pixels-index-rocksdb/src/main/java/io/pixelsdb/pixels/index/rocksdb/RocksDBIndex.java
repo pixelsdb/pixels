@@ -19,20 +19,18 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
-import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.rocksdb.*;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -44,20 +42,17 @@ public class RocksDBIndex implements SinglePointIndex
 {
     private final RocksDB rocksDB;
     public static final Logger LOGGER = LogManager.getLogger(RocksDBIndex.class);
-    private final MainIndex mainIndex;
 
-    public RocksDBIndex(String rocksDBPath, MainIndex mainIndex) throws RocksDBException
+    public RocksDBIndex(String rocksDBPath) throws RocksDBException
     {
         // Initialize RocksDB instance
         this.rocksDB = createRocksDB(rocksDBPath);
-        this.mainIndex = mainIndex;
     }
 
     // Constructor for testing (direct RocksDB injection)
     protected RocksDBIndex(RocksDB rocksDB, MainIndex mainIndex)
     {
         this.rocksDB = rocksDB;  // Use injected mock directly
-        this.mainIndex = mainIndex;
     }
 
     protected RocksDB createRocksDB(String path) throws RocksDBException
@@ -192,8 +187,8 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to put single point index entry", e);
-            throw new SinglePointIndexException("failed to put single point index entry",e);
+            LOGGER.error("failed to put rocksdb index entry", e);
+            throw new SinglePointIndexException("failed to put rocksdb index entry", e);
         }
     }
 
@@ -220,12 +215,10 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to put single point index entries", e);
-            throw new SinglePointIndexException("failed to put single point index entries",e);
+            LOGGER.error("failed to put rocksdb index entries", e);
+            throw new SinglePointIndexException("failed to put rocksdb index entries", e);
         }
     }
-
-
 
     @Override
     public boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
@@ -259,55 +252,13 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("Failed to put Secondary Entries: {} by entries", entries, e);
-            throw new SinglePointIndexException("Failed to put Secondary Entries",e);
+            LOGGER.error("failed to put secondary entries", e);
+            throw new SinglePointIndexException("failed to put secondary entries", e);
         }
     }
 
     @Override
-    public IndexProto.RowLocation deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
-    {
-        try(WriteBatch writeBatch = new WriteBatch())
-        {
-            // Convert IndexKey to byte array
-            byte[] keyBytes = toByteArray(key);
-            // Delete key-value pair from RocksDB
-            writeBatch.delete(keyBytes);
-            rocksDB.write(new WriteOptions(), writeBatch);
-            return null; // TODO: implement
-        }
-        catch (RocksDBException e)
-        {
-            LOGGER.error("Failed to delete Primary Entry: {}", key, e);
-            throw new SinglePointIndexException("Failed to delete Primary Entry",e);
-        }
-    }
-
-    @Override
-    public List<IndexProto.RowLocation> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
-    {
-        try(WriteBatch writeBatch = new WriteBatch())
-        {
-            // Delete single point index
-            for(IndexProto.IndexKey key : keys)
-            {
-                // Convert IndexKey to byte array
-                byte[] keyBytes = toByteArray(key);
-                // Delete key-value pair from RocksDB
-                writeBatch.delete(keyBytes);
-            }
-            rocksDB.write(new WriteOptions(), writeBatch);
-            return null; // TODO: implement
-        }
-        catch (RocksDBException e)
-        {
-            LOGGER.error("Failed to delete Entries: {}", keys, e);
-            throw new SinglePointIndexException("Failed to delete Entries",e);
-        }
-    }
-
-    @Override
-    public long deleteSecondaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    public long deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -320,13 +271,13 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("Failed to delete Secondary Entry: {}", key, e);
-            throw new SinglePointIndexException("Failed to delete Secondary Entry",e);
+            LOGGER.error("failed to delete entry", e);
+            throw new SinglePointIndexException("failed to delete entry", e);
         }
     }
 
     @Override
-    public List<Long> deleteSecondaryEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
+    public List<Long> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -343,15 +294,14 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("Failed to delete Secondary Entries: {}", keys, e);
-            throw new SinglePointIndexException("Failed to delete Secondary Entries",e);
+            LOGGER.error("failed to delete entries", e);
+            throw new SinglePointIndexException("failed to delete entries", e);
         }
     }
 
     @Override
     public void close() throws IOException
     {
-        mainIndex.close();
         if (rocksDB != null)
         {
             rocksDB.close(); // Close RocksDB instance

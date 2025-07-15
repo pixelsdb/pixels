@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
@@ -97,21 +96,20 @@ public interface SinglePointIndex extends Closeable
     /**
      * Delete the primary index entry of the index key
      * @param indexKey the index key
-     * @return the row location of the deleted index entry
+     * @return the row id of the deleted index entry
      * @throws SinglePointIndexException
      */
-    IndexProto.RowLocation deleteEntry(IndexProto.IndexKey indexKey)
+    long deleteEntry(IndexProto.IndexKey indexKey)
             throws SinglePointIndexException;
 
     /**
      * Delete the primary index entries of the index keys
      * @param indexKeys the index keys
-     * @return the row locations of the deleted index entries
-     * @throws MainIndexException
+     * @return the row ids of the deleted index entries
      * @throws SinglePointIndexException
      */
-    List<IndexProto.RowLocation> deleteEntries(List<IndexProto.IndexKey> indexKeys)
-            throws MainIndexException, SinglePointIndexException;
+    List<Long> deleteEntries(List<IndexProto.IndexKey> indexKeys)
+            throws SinglePointIndexException;
 
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the

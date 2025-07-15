@@ -87,10 +87,7 @@ public class TestRocksDBIndex
                 .setRgRowId(rgRowId)
                 .build();
 
-        IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
-                .setIndexKey(keyProto).setTableRowId(rowId).setRowLocation(rowLocation).build();
-
-        boolean success = rocksDBIndex.putPrimaryEntry(entry);
+        boolean success = rocksDBIndex.putEntry(keyProto, rowId, true);
         assertTrue(success, "putEntry should return true");
 
         // Assert index has been written to rocksDB
@@ -102,7 +99,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testPutEntries() throws RocksDBException, MainIndexException, SinglePointIndexException
+    public void testPutEntries() throws RocksDBException, SinglePointIndexException
     {
         long indexId = 1L;
         long timestamp = System.currentTimeMillis();
@@ -153,7 +150,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntry() throws RocksDBException, MainIndexException, SinglePointIndexException
+    public void testDeleteEntry() throws RocksDBException, SinglePointIndexException
     {
         long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
@@ -177,16 +174,13 @@ public class TestRocksDBIndex
                 .setRgRowId(rgRowId)
                 .build();
 
-        IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
-                .setIndexKey(keyProto).setTableRowId(0L).setRowLocation(rowLocation).build();
-
-        rocksDBIndex.putPrimaryEntry(entry);
+        rocksDBIndex.putEntry(keyProto, 0L, true);
 
         // Delete index
-        IndexProto.RowLocation ret = rocksDBIndex.deletePrimaryEntry(keyProto);
+        long ret = rocksDBIndex.deleteEntry(keyProto);
 
         // Assert return value
-        assertNotNull(ret, "deleteEntry should return true");
+        assertTrue(ret >= 0, "deleteEntry should return true");
 
         // Assert index has been deleted
         byte[] result = rocksDB.get(keyBytes);
@@ -194,7 +188,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntries() throws RocksDBException, MainIndexException, SinglePointIndexException
+    public void testDeleteEntries() throws RocksDBException, SinglePointIndexException
     {
         long indexId = 1L;
         long timestamp = System.currentTimeMillis();
@@ -234,7 +228,7 @@ public class TestRocksDBIndex
         rocksDBIndex.putPrimaryEntries(entries);
 
         // delete Indexes
-        List<IndexProto.RowLocation> ret = rocksDBIndex.deletePrimaryEntries(keyList);
+        List<Long> ret = rocksDBIndex.deleteEntries(keyList);
         assertNotNull(ret, "deleteEntries should return true");
 
         // Assert all indexes have been deleted
