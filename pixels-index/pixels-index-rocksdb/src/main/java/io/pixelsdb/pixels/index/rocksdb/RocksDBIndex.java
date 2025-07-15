@@ -94,12 +94,7 @@ public class RocksDBIndex implements SinglePointIndex
         DBOptions dbOptions = new DBOptions()
                 .setCreateIfMissing(true);
 
-        return RocksDB.open(
-                dbOptions,
-                path,
-                descriptors,
-                handles
-        );
+        return RocksDB.open(dbOptions, path, descriptors, handles);
     }
 
     @Override
@@ -199,7 +194,8 @@ public class RocksDBIndex implements SinglePointIndex
             // Put rowId into MainIndex
             IndexProto.RowLocation rowLocation = entry.getRowLocation();
             boolean success = mainIndex.putRowId(rowId, rowLocation);
-            if (!success) {
+            if (!success)
+            {
                 LOGGER.error("Failed to put Entry into main index for rowId {}", rowId);
                 throw new MainIndexException("Failed to put Entry into main index for rowId");
             }
@@ -251,7 +247,8 @@ public class RocksDBIndex implements SinglePointIndex
             MainIndex.RgLocation rgLocation = new MainIndex.RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
             // Put RowIds to MainIndex
             boolean success = mainIndex.putRowIds(newRange, rgLocation);
-            if (!success) {
+            if (!success)
+            {
                 LOGGER.error("Failed to put Entry into main index for rowId RowIdRange [{}-{}]", start, end);
                 throw new MainIndexException("Failed to put Entry into main index for rowId RowIdRange");
             }
@@ -338,7 +335,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean deletePrimaryEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException
+    public IndexProto.RowLocation deletePrimaryEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -350,12 +347,13 @@ public class RocksDBIndex implements SinglePointIndex
             writeBatch.delete(keyBytes);
             // Delete MainIndex
             boolean success = mainIndex.deleteRowId(rowId);
-            if (!success) {
+            if (!success)
+            {
                 LOGGER.error("Failed to delete Entry of main index for rowId {}", rowId);
                 throw new MainIndexException("Failed to delete Entry of main index for rowId");
             }
             rocksDB.write(new WriteOptions(), writeBatch);
-            return true;
+            return null; // TODO: implement
         }
         catch (RocksDBException e)
         {
@@ -365,7 +363,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean deletePrimaryEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException
+    public List<IndexProto.RowLocation> deletePrimaryEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -381,7 +379,8 @@ public class RocksDBIndex implements SinglePointIndex
                 // Delete key-value pair from RocksDB
                 writeBatch.delete(keyBytes);
             }
-            if (rowIds.isEmpty()) {
+            if (rowIds.isEmpty())
+            {
                 LOGGER.warn("No rowIds found for keys: {}", keys);
                 throw new MainIndexException("No rowIds found for keys");
             }
@@ -391,12 +390,13 @@ public class RocksDBIndex implements SinglePointIndex
             RowIdRange newRange = new RowIdRange(start, end);
             // Delete MainIndex
             boolean success = mainIndex.deleteRowIds(newRange);
-            if (!success) {
+            if (!success)
+            {
                 LOGGER.error("Failed to delete Entry of main index for rowId RowIdRange [{}-{}]", start, end);
                 throw new MainIndexException("Failed to delete Entry of main index for rowId RowIdRange");
             }
             rocksDB.write(new WriteOptions(), writeBatch);
-            return true;
+            return null; // TODO: implement
         }
         catch (RocksDBException e)
         {
@@ -406,7 +406,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean deleteSecondaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    public long deleteSecondaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -415,7 +415,7 @@ public class RocksDBIndex implements SinglePointIndex
             // Delete key-value pair from RocksDB
             writeBatch.delete(keyBytes);
             rocksDB.write(new WriteOptions(), writeBatch);
-            return true;
+            return 0; // TODO: implement
         }
         catch (RocksDBException e)
         {
@@ -425,7 +425,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean deleteSecondaryEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
+    public List<Long> deleteSecondaryEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -438,7 +438,7 @@ public class RocksDBIndex implements SinglePointIndex
                 writeBatch.delete(keyBytes);
             }
             rocksDB.write(new WriteOptions(), writeBatch);
-            return true;
+            return null; // TODO: implement
         }
         catch (RocksDBException e)
         {
