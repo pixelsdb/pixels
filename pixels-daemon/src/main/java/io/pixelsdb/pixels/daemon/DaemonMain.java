@@ -64,7 +64,8 @@ public class DaemonMain
             {
                 // wait for the daemon thread to start.
                 TimeUnit.SECONDS.sleep(1);
-            } catch (InterruptedException e)
+            }
+            catch (InterruptedException e)
             {
                 log.error("error when waiting for the main daemon thread to start", e);
             }
@@ -73,7 +74,8 @@ public class DaemonMain
             ConfigFactory config = ConfigFactory.Instance();
             boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
             boolean autoScalingEnabled = Boolean.parseBoolean(config.getProperty("vm.auto.scaling.enabled"));
-            boolean sinkEnabled = Boolean.parseBoolean(config.getProperty("sink.enabled"));
+            boolean sinkServerEnabled = Boolean.parseBoolean(config.getProperty("sink.server.enabled"));
+            boolean indexServerEnabled = Boolean.parseBoolean(config.getProperty("index.server.enabled"));
 
             if (role.equalsIgnoreCase("coordinator"))
             {
@@ -97,28 +99,26 @@ public class DaemonMain
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
 
-                    if(sinkEnabled) {
-                        // start sink server
-                        SinkServer sinkServer = new SinkServer();
-                        container.addServer("sink", sinkServer);
-                    }
-
-                    if (autoScalingEnabled) {
+                    if (autoScalingEnabled)
+                    {
                         // start monitor server
                         ScalingMetricsServer scalingMetricsServer = new ScalingMetricsServer(scalingMetricsServerPort);
                         container.addServer("scaling_metrics", scalingMetricsServer);
                     }
+
                     if (cacheEnabled)
                     {
                         // start cache coordinator
                         CacheCoordinator cacheCoordinator = new CacheCoordinator();
                         container.addServer("cache_coordinator", cacheCoordinator);
                     }
-                } catch (Throwable e)
+                }
+                catch (Throwable e)
                 {
                     log.error("failed to start coordinator", e);
                 }
-            } else
+            }
+            else
             {
                 boolean metricsServerEnabled = Boolean.parseBoolean(
                         ConfigFactory.Instance().getProperty("metrics.server.enabled"));
@@ -138,10 +138,24 @@ public class DaemonMain
                         CacheWorker cacheWorker = new CacheWorker();
                         container.addServer("cache_worker", cacheWorker);
                     }
-                } catch (Throwable e)
+                }
+                catch (Throwable e)
                 {
                     log.error("failed to start worker", e);
                 }
+            }
+
+            // start the servers that may run on any node
+            if(sinkServerEnabled)
+            {
+                // start sink server
+                SinkServer sinkServer = new SinkServer();
+                container.addServer("sink", sinkServer);
+            }
+
+            if (indexServerEnabled)
+            {
+                // start index server
             }
 
             // The shutdown hook ensures the servers are shutdown graceful
@@ -177,7 +191,8 @@ public class DaemonMain
                             break;
                         }
                         TimeUnit.SECONDS.sleep(1);
-                    } catch (Throwable e)
+                    }
+                    catch (Throwable e)
                     {
                         log.error("error when waiting server threads shutdown", e);
                     }
@@ -204,9 +219,10 @@ public class DaemonMain
                         }
                     }
                     TimeUnit.SECONDS.sleep(1);
-                } catch (Throwable e)
+                }
+                catch (Throwable e)
                 {
-                    log.error("error in the main loop of pixels daemon of " + role, e);
+                    log.error("error in the main loop of pixels daemon of {}", role, e);
                     break;
                 }
             }
@@ -260,9 +276,10 @@ public class DaemonMain
                 }
                 reader.close();
                 process.destroy();
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
-                log.error("error when stopping pixels daemon of " + role, e);
+                log.error("error when stopping pixels daemon of {}", role, e);
             }
         }
     }
