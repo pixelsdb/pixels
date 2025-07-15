@@ -322,4 +322,60 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
+
+    @Override
+    public void updatePrimaryIndexEntry(IndexProto.UpdatePrimaryIndexEntryRequest request,
+                                        StreamObserver<IndexProto.UpdatePrimaryIndexEntryResponse> responseObserver)
+    {
+        super.updatePrimaryIndexEntry(request, responseObserver);
+    }
+
+    @Override
+    public void updatePrimaryIndexEntries(IndexProto.UpdatePrimaryIndexEntriesRequest request,
+                                          StreamObserver<IndexProto.UpdatePrimaryIndexEntriesResponse> responseObserver)
+    {
+        super.updatePrimaryIndexEntries(request, responseObserver);
+    }
+
+    @Override
+    public void updateSecondaryIndexEntry(IndexProto.UpdateSecondaryIndexEntryRequest request,
+                                          StreamObserver<IndexProto.UpdateSecondaryIndexEntryResponse> responseObserver)
+    {
+        super.updateSecondaryIndexEntry(request, responseObserver);
+    }
+
+    @Override
+    public void updateSecondaryIndexEntries(IndexProto.UpdateSecondaryIndexEntriesRequest request,
+                                            StreamObserver<IndexProto.UpdateSecondaryIndexEntriesResponse> responseObserver)
+    {
+        super.updateSecondaryIndexEntries(request, responseObserver);
+    }
+
+    @Override
+    public void flushIndexEntriesOfFile(IndexProto.FlushIndexEntriesOfFileRequest request,
+                                        StreamObserver<IndexProto.FlushIndexEntriesOfFileResponse> responseObserver)
+    {
+        super.flushIndexEntriesOfFile(request, responseObserver);
+    }
+
+    @Override
+    public void openIndex(IndexProto.OpenIndexRequest request,
+                          StreamObserver<IndexProto.OpenIndexResponse> responseObserver)
+    {
+        super.openIndex(request, responseObserver);
+    }
+
+    @Override
+    public void closeIndex(IndexProto.CloseIndexRequest request,
+                           StreamObserver<IndexProto.CloseIndexResponse> responseObserver)
+    {
+        super.closeIndex(request, responseObserver);
+    }
+
+    @Override
+    public void removeIndex(IndexProto.RemoveIndexRequest request,
+                            StreamObserver<IndexProto.RemoveIndexResponse> responseObserver)
+    {
+        super.removeIndex(request, responseObserver);
+    }
 }
