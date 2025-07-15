@@ -85,13 +85,10 @@ public interface SinglePointIndex extends Closeable
 
     long[] getRowIds(IndexProto.IndexKey key);
 
-    boolean putPrimaryEntry(IndexProto.PrimaryIndexEntry entry)
-            throws MainIndexException, SinglePointIndexException;
+    boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique)
+            throws SinglePointIndexException;
 
     boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
-            throws MainIndexException, SinglePointIndexException;
-
-    boolean putSecondaryEntry(IndexProto.SecondaryIndexEntry entry)
             throws SinglePointIndexException;
 
     boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries)
@@ -101,11 +98,10 @@ public interface SinglePointIndex extends Closeable
      * Delete the primary index entry of the index key
      * @param indexKey the index key
      * @return the row location of the deleted index entry
-     * @throws MainIndexException
      * @throws SinglePointIndexException
      */
-    IndexProto.RowLocation deletePrimaryEntry(IndexProto.IndexKey indexKey)
-            throws MainIndexException, SinglePointIndexException;
+    IndexProto.RowLocation deleteEntry(IndexProto.IndexKey indexKey)
+            throws SinglePointIndexException;
 
     /**
      * Delete the primary index entries of the index keys
@@ -114,28 +110,8 @@ public interface SinglePointIndex extends Closeable
      * @throws MainIndexException
      * @throws SinglePointIndexException
      */
-    List<IndexProto.RowLocation> deletePrimaryEntries(List<IndexProto.IndexKey> indexKeys)
+    List<IndexProto.RowLocation> deleteEntries(List<IndexProto.IndexKey> indexKeys)
             throws MainIndexException, SinglePointIndexException;
-
-    /**
-     * Delete the secondary index entry of the index key
-     * @param indexKey the index key
-     * @return the row id of the deleted index entry
-     * @throws MainIndexException
-     * @throws SinglePointIndexException
-     */
-    long deleteSecondaryEntry(IndexProto.IndexKey indexKey)
-            throws SinglePointIndexException;
-
-    /**
-     * Delete the secondary index entries of the index keys
-     * @param indexKeys the index keys
-     * @return the row ids of the deleted index entries
-     * @throws MainIndexException
-     * @throws SinglePointIndexException
-     */
-    List<Long> deleteSecondaryEntries(List<IndexProto.IndexKey> indexKeys)
-            throws SinglePointIndexException;
 
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the

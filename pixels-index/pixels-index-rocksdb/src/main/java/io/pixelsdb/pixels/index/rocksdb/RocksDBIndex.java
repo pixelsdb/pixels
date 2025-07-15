@@ -167,92 +167,10 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putPrimaryEntry(IndexProto.PrimaryIndexEntry entry) throws MainIndexException, SinglePointIndexException
+    public boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
-            // Extract key and rowId from Entry object
-            IndexProto.IndexKey key = entry.getIndexKey();
-            long rowId = entry.getTableRowId();
-            // Convert IndexKey to byte array
-            byte[] keyBytes = toByteArray(key);
-            // Convert rowId to byte array
-            byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
-
-            // Write to RocksDB
-            writeBatch.put(keyBytes, valueBytes);
-            // Put rowId into MainIndex
-            IndexProto.RowLocation rowLocation = entry.getRowLocation();
-            boolean success = mainIndex.putRowId(rowId, rowLocation);
-            if (!success)
-            {
-                LOGGER.error("Failed to put Entry into main index for rowId {}", rowId);
-                throw new MainIndexException("Failed to put Entry into main index for rowId");
-            }
-            rocksDB.write(new WriteOptions(), writeBatch);
-            return true;
-        }
-        catch (RocksDBException e)
-        {
-            LOGGER.error("Failed to put Primary Entry: {} by entry", entry);
-            throw new SinglePointIndexException("Failed to put Primary Entry",e);
-        }
-    }
-
-    @Override
-    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws MainIndexException, SinglePointIndexException
-    {
-        try(WriteBatch writeBatch = new WriteBatch())
-        {
-            // Process each Entry object
-            for (IndexProto.PrimaryIndexEntry entry : entries)
-            {
-                // Extract key and rowId from Entry object
-                IndexProto.IndexKey key = entry.getIndexKey();
-                long rowId = entry.getTableRowId();
-                // Convert IndexKey to byte array
-                byte[] keyBytes = toByteArray(key);
-                // Convert rowId to byte array
-                byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
-
-                // Write to RocksDB
-                writeBatch.put(keyBytes, valueBytes);
-            }
-            // Select start rowId and end rowId
-            IndexProto.PrimaryIndexEntry entryStart = entries.get(0);
-            IndexProto.PrimaryIndexEntry entryEnd = entries.get(entries.size() - 1);
-            long start = entryStart.getTableRowId();
-            long end = entryEnd.getTableRowId();
-            // Create new RowIdRange and RgLocation
-            RowIdRange newRange = new RowIdRange(start, end);
-            IndexProto.RowLocation rowLocation = entryStart.getRowLocation();
-            MainIndex.RgLocation rgLocation = new MainIndex.RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
-            // Put RowIds to MainIndex
-            boolean success = mainIndex.putRowIds(newRange, rgLocation);
-            if (!success)
-            {
-                LOGGER.error("Failed to put Entry into main index for rowId RowIdRange [{}-{}]", start, end);
-                throw new MainIndexException("Failed to put Entry into main index for rowId RowIdRange");
-            }
-            rocksDB.write(new WriteOptions(), writeBatch);
-            return true;
-        }
-        catch (RocksDBException e)
-        {
-            LOGGER.error("Failed to put Primary Entries: {} by entries", entries, e);
-            throw new SinglePointIndexException("Failed to put Primary Entries",e);
-        }
-    }
-
-    @Override
-    public boolean putSecondaryEntry(IndexProto.SecondaryIndexEntry entry) throws SinglePointIndexException
-    {
-        try(WriteBatch writeBatch = new WriteBatch())
-        {
-            // Extract key and rowId from Entry object
-            IndexProto.IndexKey key = entry.getIndexKey();
-            long rowId = entry.getTableRowId();
-            boolean unique = entry.getUnique();
             // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
             // Convert rowId to byte array
@@ -268,16 +186,46 @@ public class RocksDBIndex implements SinglePointIndex
                 byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
                 // Store in RocksDB
                 writeBatch.put(nonUniqueKey, null);
-            } 
+            }
             rocksDB.write(new WriteOptions(), writeBatch);
             return true;
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("Failed to put Secondary Entry: {} by entry", entry);
-            throw new SinglePointIndexException("Failed to put Secondary Entry",e);
+            LOGGER.error("failed to put single point index entry", e);
+            throw new SinglePointIndexException("failed to put single point index entry",e);
         }
     }
+
+    @Override
+    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
+    {
+        try(WriteBatch writeBatch = new WriteBatch())
+        {
+            // Process each Entry object
+            for (IndexProto.PrimaryIndexEntry entry : entries)
+            {
+                // Extract key and rowId from Entry object
+                IndexProto.IndexKey key = entry.getIndexKey();
+                long rowId = entry.getTableRowId();
+                // Convert IndexKey to byte array
+                byte[] keyBytes = toByteArray(key);
+                // Convert rowId to byte array
+                byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
+                // Write to RocksDB
+                writeBatch.put(keyBytes, valueBytes);
+            }
+            rocksDB.write(new WriteOptions(), writeBatch);
+            return true;
+        }
+        catch (RocksDBException e)
+        {
+            LOGGER.error("failed to put single point index entries", e);
+            throw new SinglePointIndexException("failed to put single point index entries",e);
+        }
+    }
+
+
 
     @Override
     public boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
@@ -317,23 +265,14 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public IndexProto.RowLocation deletePrimaryEntry(IndexProto.IndexKey key) throws MainIndexException, SinglePointIndexException
+    public IndexProto.RowLocation deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
             // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
-            // Get RowId in order to delete MainIndex
-            long rowId = getUniqueRowId(key);
             // Delete key-value pair from RocksDB
             writeBatch.delete(keyBytes);
-            // Delete MainIndex
-            boolean success = mainIndex.deleteRowId(rowId);
-            if (!success)
-            {
-                LOGGER.error("Failed to delete Entry of main index for rowId {}", rowId);
-                throw new MainIndexException("Failed to delete Entry of main index for rowId");
-            }
             rocksDB.write(new WriteOptions(), writeBatch);
             return null; // TODO: implement
         }
@@ -345,37 +284,17 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<IndexProto.RowLocation> deletePrimaryEntries(List<IndexProto.IndexKey> keys) throws MainIndexException, SinglePointIndexException
+    public List<IndexProto.RowLocation> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
-            List<Long> rowIds = new ArrayList<>();
             // Delete single point index
             for(IndexProto.IndexKey key : keys)
             {
-                // Get rowId
-                long rowId = getUniqueRowId(key);
-                rowIds.add(rowId);
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
                 // Delete key-value pair from RocksDB
                 writeBatch.delete(keyBytes);
-            }
-            if (rowIds.isEmpty())
-            {
-                LOGGER.warn("No rowIds found for keys: {}", keys);
-                throw new MainIndexException("No rowIds found for keys");
-            }
-            // Found start rowId and end rowId
-            long start = Collections.min(rowIds);
-            long end = Collections.max(rowIds);
-            RowIdRange newRange = new RowIdRange(start, end);
-            // Delete MainIndex
-            boolean success = mainIndex.deleteRowIds(newRange);
-            if (!success)
-            {
-                LOGGER.error("Failed to delete Entry of main index for rowId RowIdRange [{}-{}]", start, end);
-                throw new MainIndexException("Failed to delete Entry of main index for rowId RowIdRange");
             }
             rocksDB.write(new WriteOptions(), writeBatch);
             return null; // TODO: implement
