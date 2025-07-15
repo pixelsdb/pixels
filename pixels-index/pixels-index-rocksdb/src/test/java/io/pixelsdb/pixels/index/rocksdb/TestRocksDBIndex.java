@@ -180,10 +180,10 @@ public class TestRocksDBIndex
         rocksDBIndex.putPrimaryEntry(entry);
 
         // Delete index
-        boolean success = rocksDBIndex.deletePrimaryEntry(keyProto);
+        IndexProto.RowLocation ret = rocksDBIndex.deletePrimaryEntry(keyProto);
 
         // Assert return value
-        assertTrue(success, "deleteEntry should return true");
+        assertNotNull(ret, "deleteEntry should return true");
 
         // Assert index has been deleted
         byte[] result = rocksDB.get(keyBytes);
@@ -230,8 +230,8 @@ public class TestRocksDBIndex
         rocksDBIndex.putPrimaryEntries(entries);
 
         // delete Indexes
-        boolean success = rocksDBIndex.deletePrimaryEntries(keyList);
-        assertTrue(success, "deleteEntries should return true");
+        List<IndexProto.RowLocation> ret = rocksDBIndex.deletePrimaryEntries(keyList);
+        assertNotNull(ret, "deleteEntries should return true");
 
         // Assert all indexes have been deleted
         for (byte[] keyBytes : keyBytesList)
