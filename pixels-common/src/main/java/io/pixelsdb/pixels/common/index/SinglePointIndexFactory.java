@@ -159,7 +159,7 @@ public class SinglePointIndexFactory
         {
             // 'synchronized' in Java is reentrant,
             // it is fine to call the other getSinglePointIndex() from here.
-            return getSinglePointIndex(SinglePointIndex.Scheme.from(scheme),tableId);
+            return getSinglePointIndex(SinglePointIndex.Scheme.from(scheme), tableId);
         }
         catch (RuntimeException re)
         {

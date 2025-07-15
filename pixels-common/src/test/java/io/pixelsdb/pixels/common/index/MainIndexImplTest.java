@@ -88,12 +88,12 @@ public class MainIndexImplTest
     }
 
     @Test
-    public void testPutRowIdsOfRgAndDeleteRowIdRange()
+    public void testPutRowIdsOfRgAndDeleteRowIds()
     {
         RowIdRange range = new RowIdRange(3000L, 3004L);
         MainIndex.RgLocation location = new MainIndex.RgLocation(3, 30);
 
-        Assertions.assertTrue(mainIndex.putRowIdsOfRg(range, location));
+        Assertions.assertTrue(mainIndex.putRowIds(range, location));
         for (long i = 3000L; i <= 3004L; i++) {
             IndexProto.RowLocation loc = mainIndex.getLocation(i);
             Assertions.assertNotNull(loc);
@@ -101,7 +101,7 @@ public class MainIndexImplTest
             Assertions.assertEquals(30, loc.getRgId());
         }
 
-        Assertions.assertTrue(mainIndex.deleteRowIdRange(range));
+        Assertions.assertTrue(mainIndex.deleteRowIds(range));
         for (long i = 3000L; i <= 3004L; i++) {
             Assertions.assertNull(mainIndex.getLocation(i));
         }
@@ -220,7 +220,7 @@ public class MainIndexImplTest
     }
 
     @Test
-    public void testConcurrentPutAndDeleteRowIdRange() throws Exception
+    public void testConcurrentPutAndDeleteRowIds() throws Exception
     {
         int threadCount = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount * 2);
@@ -244,7 +244,7 @@ public class MainIndexImplTest
                     RowIdRange range = ranges.get(threadNum);
                     MainIndex.RgLocation location = new MainIndex.RgLocation(threadNum, threadNum * 10);
 
-                    Assertions.assertTrue(mainIndex.putRowIdsOfRg(range, location));
+                    Assertions.assertTrue(mainIndex.putRowIds(range, location));
 
                     for (long id = range.getStartRowId(); id <= range.getEndRowId(); id++) {
                         IndexProto.RowLocation loc = mainIndex.getLocation(id);
@@ -269,7 +269,7 @@ public class MainIndexImplTest
                 try {
                     RowIdRange range = ranges.get(threadNum);
 
-                    Assertions.assertTrue(mainIndex.deleteRowIdRange(range));
+                    Assertions.assertTrue(mainIndex.deleteRowIds(range));
                     for (long id = range.getStartRowId(); id <= range.getEndRowId(); id++) {
                         Assertions.assertNull(mainIndex.getLocation(id));
                     }
@@ -292,7 +292,7 @@ public class MainIndexImplTest
         RowIdRange range = new RowIdRange(4000L, 4002L);
         MainIndex.RgLocation location = new MainIndex.RgLocation(5, 50);
 
-        Assertions.assertTrue(mainIndex.putRowIdsOfRg(range, location));
+        Assertions.assertTrue(mainIndex.putRowIds(range, location));
         Assertions.assertTrue(mainIndex.persist());
     }
 }

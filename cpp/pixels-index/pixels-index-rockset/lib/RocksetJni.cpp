@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#include "io_pixelsdb_pixels_index_rocksdb_RocksetIndex.h"
+#include "RocksetJni.h"
 #include "rocksdb/cloud/db_cloud.h"
 #include "rocksdb/options.h"
 #include "rocksdb/status.h"

@@ -74,13 +74,13 @@ public interface MainIndex extends Closeable
     boolean deleteRowId(long rowId);
 
     /**
-     * Put the row ids from a row group into the main index. In pixels, we allocate the row ids in batches (ranges)
-     * and put the row id range of a row group into the main index at once.
-     * @param rowIdRangeOfRg the row id range of the row group
-     * @param rgLocation the location of the row group
+     * Put a range of row ids into the main index. In pixels, we may allocate the row ids in batches (ranges)
+     * and put the row id range into the main index at once.
+     * @param rowIdRange the row id range
+     * @param rgLocation the location
      * @return true on success
      */
-    boolean putRowIdsOfRg(RowIdRange rowIdRangeOfRg, RgLocation rgLocation);
+    boolean putRowIds(RowIdRange rowIdRange, RgLocation rgLocation);
 
     /**
      * Delete a range of row ids from the main index. {@link #getLocation(long)} of a row id within a deleted range
@@ -88,7 +88,7 @@ public interface MainIndex extends Closeable
      * @param rowIdRange the row id range to be deleted
      * @return true on success
      */
-    boolean deleteRowIdRange(RowIdRange rowIdRange);
+    boolean deleteRowIds(RowIdRange rowIdRange);
 
     /**
      * Persist the main index into persistent storage.

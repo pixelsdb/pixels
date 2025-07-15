@@ -26,7 +26,7 @@ cmake .. \
 cmake --build . --config=Release
 sudo cmake --install . --config=Release
 ```
-to install the c++ AWS sdk.
+
 2. Enter the cpp source directory of pixels-index-rockset, 
 ensure the `PIXELS_HOME` and `JAVA_HOME` environment variables are set correctly, then execute:
 ```bash
@@ -34,11 +34,17 @@ mkdir build && cd build
 cmake .. # in the output of this command, check whether the correct JNI version is used
 make
 ```
-3. After completing the above steps, if everything works correctly, you can find the generated `libRocksetJni.so` in the `$PIXELS_HOME/lib` directory.
+
+3. After completing the above steps, if everything works correctly, you can find the generated `libpixels-index-rockset.so` in the `$PIXELS_HOME/lib` directory.
 This shared library is to be loaded and bind to the Java code in `PIXELS_SRC/pixels-index/pixels-index-rockset/src/main/java/io/pixelsdb/pixels/index/rocksdb/RocksetIndex.java`.
 
-If you modified the native methods in `PIXELS_SRC/pixels-index/pixels-index-rockset/src/main/java/io/pixelsdb/pixels/index/rocksdb/RocksetIndex.java`, regenerate the `io_pixelsdb_pixels_index_rocksdb_RocksetIndex.h` file using:
+If you modified the native methods in `PIXELS_SRC/pixels-index/pixels-index-rockset/src/main/java/io/pixelsdb/pixels/index/rocksdb/RocksetIndex.java`, regenerate the `RocksetJni.h` file using:
 ```bash
-javac -cp . -h [path to the cpp source directory of pixels-index-rockset] io/pixelsdb/pixels/index/rocksdb/RocksetIndex.java
+# enter the cpp source path of pixels-index-rockset
+cd cpp/pixels-index/pixels-index-rockset/
+#regenerate the JNI header file
+javac -cp . -h ./include/ io/pixelsdb/pixels/index/rocksdb/RocksetIndex.java
+# rename the header file
+mv ./include/io_pixelsdb_pixels_index_rocksdb_RocksetIndex.h ./include/RocksetJni.h
 ```
-And redo the above steps to build the `libRockssetJni.so` library.
+And redo the above steps to build the `libpixels-index-rockset.so` library.
