@@ -97,9 +97,12 @@ public class MainIndexImpl implements MainIndex
         PersistentAutoIncrement autoIncrement = persistentAIMap.computeIfAbsent(
             tableId,
             id -> {
-                try {
+                try
+                {
                     return new PersistentAutoIncrement("rowid-" + id); // key in etcd
-                } catch (EtcdException e) {
+                }
+                catch (EtcdException e)
+                {
                     throw new RuntimeException(e); // wrap to unchecked, will rethrow below
                 }
             }
@@ -112,7 +115,8 @@ public class MainIndexImpl implements MainIndex
                 .setRowIdStart(start)
                 .setLength(numRowIds)
                 .build();
-        } catch (EtcdException e)
+        }
+        catch (EtcdException e)
         {
             throw new RowIdException(e);
         }

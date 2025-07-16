@@ -64,7 +64,8 @@ public class MainIndexManager implements Closeable
      */
     public void register(long tableId, MainIndex mainIndex)
     {
-        if (indexMap.putIfAbsent(tableId, mainIndex) != null) {
+        if (indexMap.putIfAbsent(tableId, mainIndex) != null)
+        {
             throw new IllegalStateException("MainIndex already registered for tableId: " + tableId);
         }
     }
@@ -77,7 +78,8 @@ public class MainIndexManager implements Closeable
     public void remove(long tableId) throws IOException
     {
         MainIndex removed = indexMap.remove(tableId);
-        if (removed != null) {
+        if (removed != null)
+        {
             removed.close();
         }
     }
@@ -90,20 +92,28 @@ public class MainIndexManager implements Closeable
     public void close() throws IOException
     {
         IOException exception = null;
-        for (MainIndex index : indexMap.values()) {
-            try {
+        for (MainIndex index : indexMap.values())
+        {
+            try
+            {
                 index.close();
-            } catch (IOException e) {
-                if (exception == null) {
+            }
+            catch (IOException e)
+            {
+                if (exception == null)
+                {
                     exception = e;
-                } else {
+                }
+                else
+                {
                     exception.addSuppressed(e);
                 }
             }
         }
         indexMap.clear();
 
-        if (exception != null) {
+        if (exception != null)
+        {
             throw exception;
         }
     }
