@@ -67,11 +67,12 @@ TableFunctionSet PixelsScanFunction::GetFunctionSet()
   //table_function.filter_prune = true;
   enable_filter_pushdown = table_function.filter_pushdown;
   MultiFileReader::AddParameters(table_function);
-  table_function.get_batch_index = PixelsScanGetBatchIndex;
+  // table_function.get_batch_index = PixelsScanGetBatchIndex;
   table_function.cardinality = PixelsCardinality;
   table_function.table_scan_progress = PixelsProgress;
   // TODO: maybe we need other code here later. Refer parquet-extension.cpp
   return MultiFileReader::CreateFunctionSet(table_function);
+
 }
 
 void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
@@ -179,21 +180,25 @@ unique_ptr<FunctionData> PixelsScanFunction::PixelsScanBind(
   auto file_list = multi_file_reader->CreateFileList(context, input.inputs[0],
                                                      duckdb::FileGlobOptions::ALLOW_EMPTY);
 
-  auto files = file_list->GetPaths();
+  auto files = file_list->GetAllFiles();
   // parse *
   if (files.empty())
     {
     throw InvalidArgumentException("The number of pxl file should be positive. ");
     }
+  vector<string> filePaths;
+  for (auto file:files) {
+    filePaths.push_back(file.getPath());
+  }
   // sort the pxl file by file name, so that all SSD arrays can be fully utilized
-  sort(files.begin(), files.end(), compare_file_name());
+  sort(filePaths.begin(), filePaths.end(), compare_file_name());
 
   auto footerCache = std::make_shared<PixelsFooterCache>();
   auto builder = std::make_shared<PixelsReaderBuilder>();
 
   std::shared_ptr<::Storage> storage = StorageFactory::getInstance()->getStorage(::Storage::file);
   std::shared_ptr<PixelsReader> pixelsReader = builder
-      ->setPath(files.at(0))
+      ->setPath(filePaths.at(0))
       ->setStorage(storage)
       ->setPixelsFooterCache(footerCache)
       ->build();
@@ -204,7 +209,9 @@ unique_ptr<FunctionData> PixelsScanFunction::PixelsScanBind(
   auto result = make_uniq<PixelsReadBindData>();
   result->initialPixelsReader = pixelsReader;
   result->fileSchema = fileSchema;
-  result->files = files;
+
+
+  result->files = filePaths;
 
   return std::move(result);
 }
@@ -349,7 +356,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
         {
         auto intCol = std::static_pointer_cast<IntColumnVector>(col);
         Vector vector(LogicalType::INTEGER,
-                      (data_ptr_t) (intCol->current()), col->currentValid());
+                      (data_ptr_t) (intCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<int>(output.data.at(col_id));
 //			    memcpy(result_ptr, intCol->intVector + row_offset, thisOutputChunkRows * sizeof(int));
@@ -363,7 +370,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
         {
         auto longCol = std::static_pointer_cast<LongColumnVector>(col);
         Vector vector(LogicalType::BIGINT,
-                      (data_ptr_t) (longCol->current()), col->currentValid());
+                      (data_ptr_t) (longCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<long>(output.data.at(col_id));
 //			    memcpy(result_ptr, longCol->longVector + row_offset, thisOutputChunkRows * sizeof(long));
@@ -380,7 +387,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
         {
         auto decimalCol = std::static_pointer_cast<DecimalColumnVector>(col);
         Vector vector(LogicalType::DECIMAL(colSchema->getPrecision(), colSchema->getScale()),
-                      (data_ptr_t) (decimalCol->current()), col->currentValid());
+                      (data_ptr_t) (decimalCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<long>(output.data.at(col_id));
 //			    memcpy(result_ptr, decimalCol->vector + row_offset, thisOutputChunkRows * sizeof(long));
@@ -396,7 +403,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
         {
         auto dateCol = std::static_pointer_cast<DateColumnVector>(col);
         Vector vector(LogicalType::DATE,
-                      (data_ptr_t) (dateCol->current()), col->currentValid());
+                      (data_ptr_t) (dateCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<int>(output.data.at(col_id));
 //			    memcpy(result_ptr, dateCol->dates + row_offset, thisOutputChunkRows * sizeof(int));
@@ -412,7 +419,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
         {
         auto tsCol = std::static_pointer_cast<TimestampColumnVector>(col);
         Vector vector(LogicalType::TIMESTAMP,
-                      (data_ptr_t) (tsCol->current()), col->currentValid());
+                      (data_ptr_t) (tsCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
         break;
         }
@@ -427,7 +434,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
         {
         auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
         Vector vector(LogicalType::VARCHAR,
-                      (data_ptr_t) (binaryCol->current()), col->currentValid());
+                      (data_ptr_t) (binaryCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<duckdb::string_t>(output.data.at(col_id));
 //                memcpy(result_ptr, binaryCol->vector + row_offset, thisOutputChunkRows * sizeof(string_t));

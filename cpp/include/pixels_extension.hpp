@@ -32,7 +32,8 @@ namespace duckdb
     class PixelsExtension : public Extension
     {
     public:
-        void Load(DuckDB &db) override;
+        void Load(ExtensionLoader  &loader) override;
+        // void Load(DuckDB &db) override;
 
         std::string Name() override;
 
