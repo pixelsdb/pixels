@@ -33,17 +33,13 @@ import "index.proto";
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
     rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
-    rpc InsertRecord (InsertRecordRequest) returns (InsertRecordResponse);
-    rpc InsertRecords (InsertRecordsRequest) returns (InsertRecordsResponse);
-    rpc DeleteRecord (DeleteRecordRequest) returns (DeleteRecordResponse);
-    rpc DeleteRecords (DeleteRecordsRequest) returns (DeleteRecordsResponse);
     rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
     rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
-    rpc GarbageCollect (GarbageCollectRequest) returns (GarbageCollectResponse);
-    // Get a unified view of the data in the writer buffer
-    rpc GetSuperVersion (GetSuperVersionRequest) returns (GetSuperVersionResponse);
+    rpc ReclaimVisibility (ReclaimVisibilityRequest) returns (ReclaimVisibilityResponse);
     // Add writer buffer for new created table
     rpc AddWriterBuffer (AddWriterBufferRequest) returns (AddWriterBufferResponse);
+    // Get a unified view of the data in the writer buffer
+    rpc GetSuperVersion (GetSuperVersionRequest) returns (GetSuperVersionResponse);
 }
 
 // header
@@ -57,104 +53,32 @@ message ResponseHeader {
     string errorMsg = 3;  // empty if errorCode == 0
 }
 
+// auxiliary structure
 message VisibilityBitmap {
     repeated uint64 bitmap = 1;
 }
 
 message InsertData {
-    repeated index.proto.IndexKey indexKeys = 1;
-    repeated bytes colValues = 2;
+    string tableName = 1;
+    repeated index.proto.IndexKey indexKeys = 2;
+    repeated bytes colValues = 3;
 }
 
 message DeleteData {
-    repeated index.proto.IndexKey indexKeys = 1;
-}
-
-enum BufferType {
-    ACTIVE_BUFFER = 0;
-    IMMUTABLE_BUFFER = 1;
-}
-
-enum ColumnType {
-    BOOLEAN = 0;
-    BYTE = 1;
-    SHORT = 2;
-    INT = 3;
-    LONG = 4;
-    FLOAT = 5;
-    DOUBLE = 6;
-    STRING = 7;
-    BINARY = 8;
-    TIMESTAMP = 9;
-    ARRAY = 10;
-    MAP = 11;
-    STRUCT = 12;
-    VARBINARY = 13;
-    DECIMAL = 14;
-    DATE = 15;
-    VARCHAR = 16;
-    CHAR = 17;
-    TIME = 18;
-    VECTOR = 19;
+    string tableName = 1;
+    repeated index.proto.IndexKey indexKeys = 2;
 }
 
 // update
 message UpdateRecordRequest {
     RequestHeader header = 1;
     string schemaName = 2;
-    string tableName = 3;
-    repeated InsertData insertData = 4;
-    repeated DeleteData deleteData = 5;
-    uint64 timestamp = 6;
+    repeated InsertData insertData = 3;
+    repeated DeleteData deleteData = 4;
+    uint64 timestamp = 5;
 }
 
 message UpdateRecordResponse {
-    ResponseHeader header = 1;
-}
-
-// insert
-message InsertRecordRequest {
-    RequestHeader header = 1;
-    string schemaName = 2;
-    string tableName = 3;
-    repeated bytes colValues = 4;
-    uint64 timestamp = 5;
-}
-
-message InsertRecordResponse {
-    ResponseHeader header = 1;
-}
-
-message InsertRecordsRequest {
-    RequestHeader header = 1;
-    repeated InsertData data = 2;
-    uint64 timestamp = 3;
-}
-
-message InsertRecordsResponse {
-    ResponseHeader header = 1;
-}
-
-// delete
-message DeleteRecordRequest {
-    RequestHeader header = 1;
-    uint64 fileId = 2;
-    uint32 rgId = 3;
-    uint32 rgRowId = 4;
-    uint64 timestamp = 5;
-}
-
-message DeleteRecordResponse {
-    ResponseHeader header = 1;
-}
-
-message DeleteRecordsRequest {
-    RequestHeader header = 1;
-    repeated index.proto.RowLocation rows = 2;
-    uint64 timestamp = 3;
-}
-
-message DeleteRecordsResponse {
     ResponseHeader header = 1;
 }
 
@@ -170,7 +94,7 @@ message AddVisibilityResponse {
 
 message QueryVisibilityRequest {
     RequestHeader header = 1;
-    string filePath = 2;
+    uint64 fileId = 2;
     repeated uint32 rgIds = 3;
     uint64 timestamp = 4;
 }
@@ -180,29 +104,15 @@ message QueryVisibilityResponse {
     repeated VisibilityBitmap bitmaps = 2;
 }
 
-// garbage collection
-message GarbageCollectRequest {
+message ReclaimVisibilityRequest {
     RequestHeader header = 1;
-    string filePath = 2;
+    uint64 fileId = 2;
     repeated uint32 rgIds = 3;
     uint64 timestamp = 4;
 }
 
-message GarbageCollectResponse {
+message ReclaimVisibilityResponse {
     ResponseHeader header = 1;
-}
-
-// get super version
-message GetSuperVersionRequest {
-    RequestHeader header = 1;
-    string schemaName = 2;
-    string tableName = 3;
-}
-
-message GetSuperVersionResponse {
-    ResponseHeader header = 1;
-    bytes data = 2;
-    repeated int64 ids = 3;
 }
 
 // add writer buffer
@@ -214,4 +124,19 @@ message AddWriterBufferRequest {
 
 message AddWriterBufferResponse {
     ResponseHeader header = 1;
+}
+
+// get super version
+message GetSuperVersionRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+    uint64 timestamp = 4;
+}
+
+message GetSuperVersionResponse {
+    ResponseHeader header = 1;
+    bytes data = 2;
+    repeated int64 ids = 3;
+    repeated VisibilityBitmap bitmaps = 4;
 }

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.daemon.retina;
 
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
@@ -53,8 +54,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 {
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
-    private final Map<String, RGVisibility> rgVisibilityMap;
-    private final Map<String, PixelsWriterBuffer> pixelsWriterBufferMap;
+    private final RetinaResourceManager retinaResourceManager;
 
     /**
      * Initialize the visibility management for all the records.
@@ -62,8 +62,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     public RetinaServerImpl()
     {
         this.metadataService = MetadataService.Instance();
-        this.rgVisibilityMap = new ConcurrentHashMap<>();
-        this.pixelsWriterBufferMap = new ConcurrentHashMap<>();
+        this.retinaResourceManager = RetinaResourceManager.Instance();
         try
         {
             List<Schema> schemas = this.metadataService.getSchemas();
@@ -100,10 +99,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     }
                     for (String filePath : files)
                     {
-                        addVisibility(filePath);
+                        this.retinaResourceManager.addVisibility(filePath);
                     }
 
-                    addWriterBuffer(schema.getName(), table.getName());
+                    this.retinaResourceManager.addWriterBuffer(schema.getName(), table.getName());
                 }
             }
         } catch (Exception e)
@@ -112,255 +111,50 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    public void deleteRecord(long fileId, int rgId, int rgRowId, long timestamp) throws RetinaException
-    {
-        try
-        {
-            RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
-            rgVisibility.deleteRecord(rgRowId, timestamp);
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while deleting record", e);
-        }
-    }
-
-    public void addVisibility(String filePath) throws RetinaException
-    {
-        try
-        {
-            Storage storage = StorageFactory.Instance().getStorage(filePath);
-            PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(storage, filePath);
-            long fileLen = fsReader.getFileLength();
-            fsReader.seek(fileLen - Long.BYTES);
-            long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
-            int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
-            fsReader.seek(fileTailOffset);
-            ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
-            PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
-            PixelsProto.Footer footer = fileTail.getFooter();
-            long fileId = this.metadataService.getFileId(filePath);
-            for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
-            {
-                int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
-                RGVisibility rgVisibility = new RGVisibility(recordNum);
-                String rgKey = fileId + "_" + rgId;
-                rgVisibilityMap.put(rgKey, rgVisibility);
-            }
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while adding visibility", e);
-        }
-    }
-
-    public long[] queryVisibility(String filePath, int rgId, long timestamp) throws RetinaException
-    {
-        try
-        {
-            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
-            long[] visibilityBitmap = rgVisibility.getVisibilityBitmap(timestamp);
-            if (visibilityBitmap == null)
-            {
-                throw new RetinaException("Visibility bitmap not found for filePath: " + filePath + " and rgId: " + rgId);
-            }
-            return visibilityBitmap;
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while getting visibility bitmap", e);
-        }
-    }
-
-    public void garbageCollect(String filePath, int rgId, long timestamp) throws RetinaException
-    {
-        try
-        {
-            RGVisibility rgVisibility = checkRGVisibility(filePath, rgId);
-            rgVisibility.garbageCollect(timestamp);
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while garbage collecting", e);
-        }
-    }
-
-    public void addWriterBuffer(String schemaName, String tableName) throws RetinaException
-    {
-        try
-        {
-            // get ordered and compact dir path
-            Layout latestLayout = this.metadataService.getLatestLayout(schemaName, tableName);
-            List<Path> orderedPaths = latestLayout.getOrderedPaths();
-            validateOrderedOrCompactPaths(orderedPaths);
-            List<Path> compactPaths = latestLayout.getCompactPaths();
-            validateOrderedOrCompactPaths(compactPaths);
-
-            // get schema
-            List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
-            List<String> columnNames = columns.stream().map(Column::getName).collect(Collectors.toList());
-            List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
-            TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
-
-            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema, schemaName, tableName,
-                    orderedPaths.get(0), compactPaths.get(0));
-            String writerBufferKey = schemaName + "_" + tableName;
-            pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
-        } catch (Exception e)
-        {
-            throw new RetinaException("Failed to add writer buffer for " + schemaName + "." + tableName, e);
-        }
-    }
-
     @Override
-    public void addWriterBuffer(RetinaProto.AddWriterBufferRequest request,
-                                StreamObserver<RetinaProto.AddWriterBufferResponse> responseObserver)
+    public void updateRecord(RetinaProto.UpdateRecordRequest request,
+                             StreamObserver<RetinaProto.UpdateRecordResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
         try
         {
-            addWriterBuffer(request.getSchemaName(), request.getTableName());
-
-            RetinaProto.AddWriterBufferResponse response = RetinaProto.AddWriterBufferResponse.newBuilder()
-                    .setHeader(headerBuilder.build()).build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (RetinaException e)
-        {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.AddWriterBufferResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .build());
-            responseObserver.onCompleted();
-        }
-    }
-
-    @Override
-    public void insertRecord(RetinaProto.InsertRecordRequest request,
-                             StreamObserver<RetinaProto.InsertRecordResponse> responseObserver)
-    {
-        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        try
-        {
-            PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(request.getSchemaName(), request.getTableName());
-            List<ByteString> colValuesList = request.getColValuesList();
-            byte[][] colValuesByteArray = new byte[colValuesList.size()][];
-            for (int i = 0; i < colValuesList.size(); ++i)
-            {
-                colValuesByteArray[i] = colValuesList.get(i).toByteArray();
-            }
-            writerBuffer.addRow(colValuesByteArray, request.getTimestamp());
-
-            RetinaProto.InsertRecordResponse response = RetinaProto.InsertRecordResponse.newBuilder()
-                    .setHeader(headerBuilder.build()).build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (RetinaException e)
-        {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.InsertRecordResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .build());
-            responseObserver.onCompleted();
-        }
-    }
-
-    @Override
-    public void getSuperVersion(RetinaProto.GetSuperVersionRequest request,
-                                StreamObserver<RetinaProto.GetSuperVersionResponse> responseObserver)
-    {
-        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        try
-        {
-            RetinaProto.GetSuperVersionResponse.Builder responseBuilder = RetinaProto.GetSuperVersionResponse
-                    .newBuilder()
-                    .setHeader(headerBuilder.build());
-
-            PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(request.getSchemaName(), request.getTableName());
-            SuperVersion currentVersion = writerBuffer.getCurrentVersion();
-            if (!currentVersion.getMemTable().getRowBatch().isEmpty()) {
-                ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
-                responseBuilder.setData(data);
-            } else {
-                responseBuilder.setData(ByteString.EMPTY);
-            }
-            for (MemTable immutableMemtable : currentVersion.getImmutableMemTables())
-            {
-                responseBuilder.addIds(immutableMemtable.getId());
-            }
-            for (ObjectEntry objectEntry : currentVersion.getObjectEntries())
-            {
-                responseBuilder.addIds(objectEntry.getId());
-            }
-
-            responseObserver.onNext(responseBuilder.build());
-            responseObserver.onCompleted();
-        } catch (Exception e)
-        {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.GetSuperVersionResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .build());
-            responseObserver.onCompleted();
-        }
-    }
-
-    @Override
-    public void deleteRecord(RetinaProto.DeleteRecordRequest request,
-                             StreamObserver<RetinaProto.DeleteRecordResponse> responseObserver)
-    {
-        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        try
-        {
-            long fileId = request.getFileId();
-            int rgId = request.getRgId();
-            int rgRowId = request.getRgRowId();
+            String schemaName = request.getSchemaName();
             long timestamp = request.getTimestamp();
-            deleteRecord(fileId, rgId, rgRowId, timestamp);
 
-            RetinaProto.DeleteRecordResponse response = RetinaProto.DeleteRecordResponse.newBuilder()
-                    .setHeader(headerBuilder.build()).build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (RetinaException e)
-        {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.DeleteRecordResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .build());
-            responseObserver.onCompleted();
-        }
-    }
-
-    @Override
-    public void deleteRecords(RetinaProto.DeleteRecordsRequest request,
-                              StreamObserver<RetinaProto.DeleteRecordsResponse> responseObserver)
-    {
-        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
-                .setToken(request.getHeader().getToken());
-
-        try
-        {
-            long timestamp = request.getTimestamp();
-            for (IndexProto.RowLocation row : request.getRowsList())
+            // insert record
+            List<RetinaProto.InsertData> insertDataList = request.getInsertDataList();
+            if (!insertDataList.isEmpty())
             {
-                long fileId = row.getFileId();
-                int rgId = row.getRgId();
-                int rgRowId = row.getRgRowId();
-                deleteRecord(fileId, rgId, rgRowId, timestamp);
+                for (RetinaProto.InsertData insertData : insertDataList)
+                {
+                    List<ByteString> colValuesList = insertData.getColValuesList();
+                    byte[][] colValuesByteArray = new byte[colValuesList.size()][];
+                    for (int i = 0; i < colValuesList.size(); ++i)
+                    {
+                        colValuesByteArray[i] = colValuesList.get(i).toByteArray();
+                    }
+                    // TODO: insert index
+                    this.retinaResourceManager.insertData(schemaName, insertData.getTableName(),
+                            colValuesByteArray, timestamp);
+                }
             }
 
-            RetinaProto.DeleteRecordsResponse response = RetinaProto.DeleteRecordsResponse.newBuilder()
-                    .setHeader(headerBuilder.build()).build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
+            // delete record
+            List<RetinaProto.DeleteData> deleteDataList = request.getDeleteDataList();
+            if (!deleteDataList.isEmpty())
+            {
+                for (RetinaProto.DeleteData deleteData : deleteDataList)
+                {
+                    // TODO: delete index
+                    IndexProto.RowLocation rowLocation = null; // returned by deleteIndex
+                    this.retinaResourceManager.deleteRecord(rowLocation, timestamp);
+                }
+            }
         } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.DeleteRecordsResponse.newBuilder()
+            responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
             responseObserver.onCompleted();
@@ -377,7 +171,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         try
         {
             String filePath = request.getFilePath();
-            addVisibility(filePath);
+            this.retinaResourceManager.addVisibility(filePath);
 
             RetinaProto.AddVisibilityResponse response = RetinaProto.AddVisibilityResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
@@ -402,7 +196,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try
         {
-            String filePath = request.getFilePath();
+            long fileId = request.getFileId();
             int[] rgIds = request.getRgIdsList().stream().mapToInt(Integer::intValue).toArray();
             long timestamp = request.getTimestamp();
 
@@ -412,7 +206,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
             for (int rgId : rgIds)
             {
-                long[] visibilityBitmap = queryVisibility(filePath, rgId, timestamp);
+                long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp);
                 RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
                         .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
                         .build();
@@ -431,30 +225,109 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     @Override
-    public void garbageCollect(RetinaProto.GarbageCollectRequest request,
-                               StreamObserver<RetinaProto.GarbageCollectResponse> responseObserver)
+    public void reclaimVisibility(RetinaProto.ReclaimVisibilityRequest request,
+                                     StreamObserver<RetinaProto.ReclaimVisibilityResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
         try
         {
-            String filePath = request.getFilePath();
+            long fileId = request.getFileId();
             int[] rgIds = request.getRgIdsList().stream().mapToInt(Integer::intValue).toArray();
             long timestamp = request.getTimestamp();
             for (int rgId : rgIds)
             {
-                garbageCollect(filePath, rgId, timestamp);
+                this.retinaResourceManager.reclaimVisibility(fileId, rgId, timestamp);
             }
 
-            RetinaProto.GarbageCollectResponse response = RetinaProto.GarbageCollectResponse.newBuilder()
+            RetinaProto.ReclaimVisibilityResponse response = RetinaProto.ReclaimVisibilityResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.GarbageCollectResponse.newBuilder()
+            responseObserver.onNext(RetinaProto.ReclaimVisibilityResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void addWriterBuffer(RetinaProto.AddWriterBufferRequest request,
+                                StreamObserver<RetinaProto.AddWriterBufferResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        try
+        {
+            this.retinaResourceManager.addWriterBuffer(request.getSchemaName(), request.getTableName());
+
+            RetinaProto.AddWriterBufferResponse response = RetinaProto.AddWriterBufferResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (RetinaException e)
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.AddWriterBufferResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void getSuperVersion(RetinaProto.GetSuperVersionRequest request,
+                                StreamObserver<RetinaProto.GetSuperVersionResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            RetinaProto.GetSuperVersionResponse.Builder responseBuilder = RetinaProto.GetSuperVersionResponse
+                    .newBuilder()
+                    .setHeader(headerBuilder.build());
+
+            String schemaName = request.getSchemaName();
+            String tableName = request.getTableName();
+            SuperVersion currentVersion = this.retinaResourceManager.getSuperVersion(schemaName, tableName);
+            if (!currentVersion.getMemTable().getRowBatch().isEmpty()) {
+                ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
+                responseBuilder.setData(data);
+            } else {
+                responseBuilder.setData(ByteString.EMPTY);
+            }
+
+            List<Long> ids = new ArrayList<>();
+            for (MemTable immutableMemtable : currentVersion.getImmutableMemTables())
+            {
+                ids.add(immutableMemtable.getId());
+            }
+            for (ObjectEntry objectEntry : currentVersion.getObjectEntries())
+            {
+                ids.add(objectEntry.getId());
+            }
+            responseBuilder.addAllIds(ids);
+            long[][] visibilityBitmaps = this.retinaResourceManager.getWriterBufferVisibility(
+                    schemaName, tableName, ids, request.getTimestamp());
+            for (long[] visibilityBitmap : visibilityBitmaps)
+            {
+                RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
+                        .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
+                        .build();
+                responseBuilder.addBitmaps(bitmap);
+            }
+
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+        } catch (Exception e)
+        {
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.GetSuperVersionResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
             responseObserver.onCompleted();
@@ -486,72 +359,4 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
-    /**
-     * Check if the retina exists for the given filePath and rgId.
-     *
-     * @param filePath the file path.
-     * @param rgId the row group id.
-     * @throws RetinaException if the retina does not exist.
-     */
-    private RGVisibility checkRGVisibility(String filePath, int rgId) throws RetinaException
-    {
-        try
-        {
-            long fileId = this.metadataService.getFileId(filePath);
-            String retinaKey = fileId + "_" + rgId;
-            RGVisibility rgVisibility = this.rgVisibilityMap.get(retinaKey);
-            if (rgVisibility == null)
-            {
-                throw new RetinaException("Retina not found for filePath: " + filePath + " and rgId: " + rgId);
-            }
-            return rgVisibility;
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while checking retina", e);
-        }
-    }
-
-    /**
-     * Check if the retina exists for the given filePath and rgId.
-     *
-     * @param fileId the file id.
-     * @param rgId the row group id.
-     * @throws RetinaException if the retina does not exist.
-     */
-    private RGVisibility checkRGVisibility(long fileId, int rgId) throws RetinaException
-    {
-        try
-        {
-            String retinaKey = fileId + "_" + rgId;
-            RGVisibility rgVisibility = this.rgVisibilityMap.get(retinaKey);
-            if (rgVisibility == null)
-            {
-                throw new RetinaException("Retina not found for fileId: " + fileId + " and rgId: " + rgId);
-            }
-            return rgVisibility;
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while checking retina", e);
-        }
-    }
-
-    /**
-     * Check if the writer buffer exists for the given schema and table
-     */
-    private PixelsWriterBuffer checkPixelsWriterBuffer(String schema, String table) throws RetinaException
-    {
-        try
-        {
-            String writerBufferKey = schema + "_" + table;
-            PixelsWriterBuffer writerBuffer = this.pixelsWriterBufferMap.get(writerBufferKey);
-            if (writerBuffer == null)
-            {
-                throw new RetinaException("Writer buffer not found for schema: " + schema + " and table: " + table);
-            }
-            return writerBuffer;
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while checking writer buffer", e);
-        }
-    }
 }

@@ -71,7 +71,7 @@ public class PixelsWriterBuffer
     private final short replication;
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
-    private final int maxBufferSize;
+    private final int maxMemTableSize;  // threshold number of memTable to be dumped to file
     private final Path targetOrderedDirPath;
     private final Path targetCompactDirPath;
     private final Storage targetOrderedStorage;
@@ -116,7 +116,7 @@ public class PixelsWriterBuffer
     private final Map<Long, RGVisibility> visibilityMap;
 
     private long fileId;   // current fileId
-    private long currentBufferSize;
+    private long currentMemTableCount;
     private final List<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
     private ReentrantLock bufferSizeLock;
@@ -130,7 +130,7 @@ public class PixelsWriterBuffer
         this.schema = schema;
 
         ConfigFactory configFactory = ConfigFactory.Instance();
-        this.pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
+        this.pixelStride = Integer.parseInt(configFactory.getProperty("retina.buffer.memTable.size"));
         this.targetOrderedDirPath = targetOrderedDirPath;
         this.targetCompactDirPath = targetCompactDirPath;
         try
@@ -146,7 +146,7 @@ public class PixelsWriterBuffer
         this.replication = Short.parseShort(configFactory.getProperty("block.replication"));
         this.encodingLevel = EncodingLevel.from(Integer.parseInt(configFactory.getProperty("retina.buffer.flush.encodingLevel")));
         this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
-        this.maxBufferSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
+        this.maxMemTableSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
 
         this.activeMemTable = new MemTable(this.idCounter, schema, pixelStride, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT);
         this.immutableMemTables = new ArrayList<>();
@@ -166,7 +166,7 @@ public class PixelsWriterBuffer
         this.visibilityMap.put(this.idCounter, visibility);
         this.idCounter++;
 
-        this.currentBufferSize = 0;
+        this.currentMemTableCount = 0;
         this.bufferSizeLock = new ReentrantLock();
         this.fileWriterManagers = new ArrayList<>();
         this.maxObjectKey = new AtomicLong(0);
@@ -236,11 +236,11 @@ public class PixelsWriterBuffer
             }
 
             this.bufferSizeLock.lock();
-            this.currentBufferSize += this.activeMemTable.getSize();
-            if (this.currentBufferSize >= this.maxBufferSize)
+            this.currentMemTableCount += 1;
+            if (this.currentMemTableCount >= this.maxMemTableSize)
             {
                 long id = this.activeMemTable.getId();
-                this.currentBufferSize = 0;
+                this.currentMemTableCount = 0;
                 this.currentFileWriterManager.setLastBlockId(id);
                 this.fileWriterManagers.add(this.currentFileWriterManager);
                 this.currentFileWriterManager = new FileWriterManager(this.minio,
