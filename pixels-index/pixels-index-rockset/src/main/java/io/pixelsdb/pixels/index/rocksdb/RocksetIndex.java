@@ -165,7 +165,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public long[] getRowIds(IndexProto.IndexKey key)
+    public long[] getNonUniqueRowIds(IndexProto.IndexKey key)
     {
         return new long[0];
     }

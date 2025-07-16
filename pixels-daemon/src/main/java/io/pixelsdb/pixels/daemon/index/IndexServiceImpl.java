@@ -78,21 +78,27 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                                   StreamObserver<IndexProto.LookupUniqueIndexResponse> responseObserver)
     {
         IndexProto.IndexKey key = request.getIndexKey();
-        long rowId = singlePointIndex.getUniqueRowId(key);
-        IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
-        IndexProto.LookupUniqueIndexResponse response;
-        if (rowLocation != null)
+        IndexProto.LookupUniqueIndexResponse.Builder builder = IndexProto.LookupUniqueIndexResponse.newBuilder();
+        try
         {
-            response = IndexProto.LookupUniqueIndexResponse.newBuilder()
-                    .setRowLocation(rowLocation).build();
+            long rowId = singlePointIndex.getUniqueRowId(key);
+            IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
+
+            if (rowLocation != null)
+            {
+                builder.setRowLocation(rowLocation);
+            }
+            else
+            {
+                // If not found, return empty RowLocation
+                builder.setErrorCode(ErrorCode.SUCCESS).setRowLocation(IndexProto.RowLocation.getDefaultInstance());
+            }
         }
-        else
+        catch (SinglePointIndexException e)
         {
-            // If not found, return empty RowLocation
-            response = IndexProto.LookupUniqueIndexResponse.newBuilder()
-                    .setRowLocation(IndexProto.RowLocation.getDefaultInstance()).build();
+            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
         }
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
@@ -101,19 +107,26 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                                      StreamObserver<IndexProto.LookupNonUniqueIndexResponse> responseObserver)
     {
         IndexProto.IndexKey key = request.getIndexKey();
-        long[] rowIds = singlePointIndex.getRowIds(key);
-        List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
-        for (long rowId : rowIds)
+        IndexProto.LookupNonUniqueIndexResponse.Builder builder = IndexProto.LookupNonUniqueIndexResponse.newBuilder();
+        try
         {
-            IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
-            if (rowLocation != null)
+            long[] rowIds = singlePointIndex.getNonUniqueRowIds(key);
+            List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
+            for (long rowId : rowIds)
             {
-                rowLocations.add(rowLocation);
+                IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
+                if (rowLocation != null)
+                {
+                    rowLocations.add(rowLocation);
+                }
             }
+            builder.setErrorCode(ErrorCode.SUCCESS).addAllRowLocations(rowLocations);
         }
-        IndexProto.LookupNonUniqueIndexResponse response = IndexProto.LookupNonUniqueIndexResponse.newBuilder()
-                .addAllRowLocations(rowLocations).build();
-        responseObserver.onNext(response);
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
+        }
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 

@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.index.rocksdb;
 
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
@@ -40,18 +39,25 @@ import java.util.stream.Collectors;
  */
 public class RocksDBIndex implements SinglePointIndex
 {
-    private final RocksDB rocksDB;
     public static final Logger LOGGER = LogManager.getLogger(RocksDBIndex.class);
 
-    public RocksDBIndex(String rocksDBPath) throws RocksDBException
+    private final RocksDB rocksDB;
+    private final long tableId;
+    private final long indexId;
+
+    public RocksDBIndex(long tableId, long indexId, String rocksDBPath) throws RocksDBException
     {
+        this.tableId = tableId;
+        this.indexId = indexId;
         // Initialize RocksDB instance
         this.rocksDB = createRocksDB(rocksDBPath);
     }
 
     // Constructor for testing (direct RocksDB injection)
-    protected RocksDBIndex(RocksDB rocksDB, MainIndex mainIndex)
+    protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB)
     {
+        this.tableId = tableId;
+        this.indexId = indexId;
         this.rocksDB = rocksDB;  // Use injected mock directly
     }
 
@@ -93,6 +99,18 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
+    public long getTableId()
+    {
+        return 0;
+    }
+
+    @Override
+    public long getIndexId()
+    {
+        return 0;
+    }
+
+    @Override
     public long getUniqueRowId(IndexProto.IndexKey key)
     {
         try
@@ -121,7 +139,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long[] getRowIds(IndexProto.IndexKey key)
+    public long[] getNonUniqueRowIds(IndexProto.IndexKey key)
     {
         List<Long> rowIdList = new ArrayList<>();
 

@@ -49,6 +49,7 @@ public class TestRocksDBIndex
     private final long tableId = 100L;
     private SinglePointIndex rocksDBIndex; // Class under test
     private final MainIndex mainIndex = new MainIndexImpl(tableId);
+
     @BeforeEach
     public void setUp() throws RocksDBException, IOException
     {

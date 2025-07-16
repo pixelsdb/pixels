@@ -38,9 +38,9 @@ import static java.util.Objects.requireNonNull;
 public class SinglePointIndexFactory
 {
     private static final Logger logger = LogManager.getLogger(SinglePointIndexFactory.class);
-    private final Map<SinglePointIndex.Scheme, SinglePointIndex> singlePointIndexImpls = new HashMap<>();
+    private final Map<TableIndex, SinglePointIndex> singlePointIndexImpls = new HashMap<>();
     private final Set<SinglePointIndex.Scheme> enabledSchemes = new TreeSet<>();
-    private final Set<Long> tableIds = new TreeSet<>();
+    private final Set<TableIndex> tableIndices = new HashSet<>();
     /**
      * The providers of the enabled single point index schemes.
      */
@@ -53,6 +53,7 @@ public class SinglePointIndexFactory
         String[] schemeNames = value.trim().split(",");
         checkArgument(schemeNames.length > 0,
                 "at lease one single point index scheme must be enabled");
+
         ImmutableMap.Builder<SinglePointIndex.Scheme, SinglePointIndexProvider> providersBuilder = ImmutableMap.builder();
         ServiceLoader<SinglePointIndexProvider> providerLoader = ServiceLoader.load(SinglePointIndexProvider.class);
         for (String name : schemeNames)
@@ -105,7 +106,7 @@ public class SinglePointIndexFactory
         return ImmutableList.copyOf(this.enabledSchemes);
     }
 
-    public boolean isEnabled(SinglePointIndex.Scheme scheme)
+    public boolean isSchemeEnabled(SinglePointIndex.Scheme scheme)
     {
         return this.enabledSchemes.contains(scheme);
     }
@@ -115,7 +116,6 @@ public class SinglePointIndexFactory
      * <b>Be careful:</b> all the Storage enabled Storage must be configured well before
      * calling this method. It is better to call {@link #reload(SinglePointIndex.Scheme,long tableId)} to reload
      * the Storage that you are sure it is configured or does not need any dynamic configuration.
-     *
      * @throws IOException
      */
     @Deprecated
@@ -123,15 +123,15 @@ public class SinglePointIndexFactory
     {
         for (SinglePointIndex.Scheme scheme : enabledSchemes)
         {
-            for(long tableId : tableIds) {
-                reload(scheme,tableId);
+            for(long tableId : tableIndices)
+            {
+                reload(scheme, tableId);
             }
         }
     }
 
     /**
      * Recreate the {@link SinglePointIndex} instance for the given storage scheme.
-     *
      * @param scheme the given storage scheme
      * @throws IOException
      */
@@ -178,7 +178,7 @@ public class SinglePointIndexFactory
 
         SinglePointIndex singlePointIndex = this.singlePointIndexProviders.get(scheme).createInstance(scheme, tableId);
         singlePointIndexImpls.put(scheme, singlePointIndex);
-        tableIds.add(tableId);
+        tableIndices.add(tableId);
 
         return singlePointIndex;
     }
@@ -193,6 +193,58 @@ public class SinglePointIndexFactory
         for (SinglePointIndex.Scheme scheme : singlePointIndexImpls.keySet())
         {
             singlePointIndexImpls.get(scheme).close();
+        }
+    }
+
+    public static class TableIndex
+    {
+        private final long tableId;
+        private final long indexId;
+        private final SinglePointIndex.Scheme scheme;
+
+        public TableIndex(long tableId, long indexId, SinglePointIndex.Scheme scheme)
+        {
+            this.tableId = tableId;
+            this.indexId = indexId;
+            this.scheme = scheme;
+        }
+
+        public long getTableId()
+        {
+            return tableId;
+        }
+
+        public long getIndexId()
+        {
+            return indexId;
+        }
+
+        public SinglePointIndex.Scheme getScheme()
+        {
+            return scheme;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(tableId, indexId, scheme);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj)
+            {
+                return true;
+            }
+            if (!(obj instanceof TableIndex))
+            {
+                return false;
+            }
+            TableIndex that = (TableIndex) obj;
+            return this.indexId == that.indexId &&
+                    this.tableId == that.tableId &&
+                    this.scheme == that.scheme;
         }
     }
 }
