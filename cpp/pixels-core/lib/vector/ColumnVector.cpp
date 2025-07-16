@@ -65,6 +65,11 @@ void ColumnVector::print(int rowCount)
     throw InvalidArgumentException("This columnVector doesn't implement this function.");
 }
 
+
+idx_t ColumnVector::getCapacity() const{
+    return length;
+}
+
 void ColumnVector::increment(uint64_t size)
 {
     readIndex += size;
