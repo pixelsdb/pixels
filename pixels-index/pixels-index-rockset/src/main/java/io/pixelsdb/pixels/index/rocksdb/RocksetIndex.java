@@ -121,19 +121,37 @@ public class RocksetIndex implements SinglePointIndex
         }
     }
 
-    private long dbHandle = 0;
     private static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
 
-    protected RocksetIndex(String bucketName, String s3Prefix, String localDbPath,
-                        String persistentCachePath, long persistentCacheSizeGB, boolean readOnly)
+    private long dbHandle = 0;
+    private final long tableId;
+    private final long indexId;
+
+
+    protected RocksetIndex(long tableId, long indexId, String bucketName, String s3Prefix, String localDbPath,
+                           String persistentCachePath, long persistentCacheSizeGB, boolean readOnly)
     {
         this.dbHandle = CreateDBCloud(bucketName, s3Prefix, localDbPath,
                 persistentCachePath, persistentCacheSizeGB, readOnly);
+        this.tableId = tableId;
+        this.indexId = indexId;
     }
 
     protected long getDbHandle()
     {
         return dbHandle;
+    }
+
+    @Override
+    public long getTableId()
+    {
+        return tableId;
+    }
+
+    @Override
+    public long getIndexId()
+    {
+        return indexId;
     }
 
     @Override

@@ -22,8 +22,6 @@ package io.pixelsdb.pixels.index.rocksdb;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexImpl;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
@@ -48,7 +46,6 @@ public class TestRocksDBIndex
     private final String rocksDBpath = "/tmp/rocksdb";
     private final long tableId = 100L;
     private SinglePointIndex rocksDBIndex; // Class under test
-    private final MainIndex mainIndex = new MainIndexImpl(tableId);
 
     @BeforeEach
     public void setUp() throws RocksDBException, IOException
@@ -56,7 +53,7 @@ public class TestRocksDBIndex
         System.out.println("Debug: Creating RocksDBIndex.."); // Debug log
         Options options = new Options().setCreateIfMissing(true);
         rocksDB = RocksDB.open(options, rocksDBpath);
-        rocksDBIndex = new RocksDBIndex(rocksDB,mainIndex);
+        rocksDBIndex = new RocksDBIndex(1L, 1L, rocksDB);
         System.out.println("Debug: RocksDBIndex instance: " + rocksDBIndex); // Check for null
         assertNotNull(rocksDBIndex);
     }

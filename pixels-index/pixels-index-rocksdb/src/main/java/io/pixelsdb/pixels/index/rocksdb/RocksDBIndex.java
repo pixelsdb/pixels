@@ -101,13 +101,13 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public long getTableId()
     {
-        return 0;
+        return tableId;
     }
 
     @Override
     public long getIndexId()
     {
-        return 0;
+        return indexId;
     }
 
     @Override

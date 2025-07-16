@@ -38,13 +38,13 @@ public class RocksDBIndexProvider implements SinglePointIndexProvider
     private final String RocksdbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
 
     @Override
-    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId)
+    public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme)
     {
         if (scheme == SinglePointIndex.Scheme.rocksdb)
         {
             try
             {
-                return new RocksDBIndex(RocksdbPath);
+                return new RocksDBIndex(tableId, indexId, RocksdbPath);
             }
             catch (RocksDBException e)
             {

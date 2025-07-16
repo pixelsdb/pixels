@@ -19,19 +19,18 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.SinglePointIndexFactory;
 import org.junit.Test;
 
-import java.io.IOException;
-
 public class TestRocksetIndex
 {
     @Test
-    public void test() throws IOException
+    public void test() throws SinglePointIndexException
     {
         RocksetIndex rocksetIndex = (RocksetIndex) SinglePointIndexFactory.Instance()
-                .getSinglePointIndex(SinglePointIndex.Scheme.rockset, 1);
+                .getSinglePointIndex(1L, 1L, SinglePointIndex.Scheme.rockset);
         long dbHandle = 0;
 
         try

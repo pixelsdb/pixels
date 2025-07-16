@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.index;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -40,7 +41,6 @@ public class SinglePointIndexFactory
     private static final Logger logger = LogManager.getLogger(SinglePointIndexFactory.class);
     private final Map<TableIndex, SinglePointIndex> singlePointIndexImpls = new HashMap<>();
     private final Set<SinglePointIndex.Scheme> enabledSchemes = new TreeSet<>();
-    private final Set<TableIndex> tableIndices = new HashSet<>();
     /**
      * The providers of the enabled single point index schemes.
      */
@@ -112,87 +112,51 @@ public class SinglePointIndexFactory
     }
 
     /**
-     * Recreate all the enabled {@link SinglePointIndex} instances.
-     * <b>Be careful:</b> all the Storage enabled Storage must be configured well before
-     * calling this method. It is better to call {@link #reload(SinglePointIndex.Scheme,long tableId)} to reload
-     * the Storage that you are sure it is configured or does not need any dynamic configuration.
-     * @throws IOException
+     * Get the single point index instance.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param scheme the scheme of the index
+     * @return the single point index instance
+     * @throws SinglePointIndexException
      */
-    @Deprecated
-    public synchronized void reloadAll() throws IOException
+    public synchronized SinglePointIndex getSinglePointIndex(long tableId, long indexId, SinglePointIndex.Scheme scheme) throws SinglePointIndexException
     {
-        for (SinglePointIndex.Scheme scheme : enabledSchemes)
-        {
-            for(long tableId : tableIndices)
-            {
-                reload(scheme, tableId);
-            }
-        }
+        // 'synchronized' in Java is reentrant,  it is fine to call the other getSinglePointIndex() from here.
+        return getSinglePointIndex(new TableIndex(tableId, indexId, scheme));
     }
 
     /**
-     * Recreate the {@link SinglePointIndex} instance for the given storage scheme.
-     * @param scheme the given storage scheme
-     * @throws IOException
+     * Get the single point index instance.
+     * @param tableIndex the object contains the table id, index id, and index scheme
+     * @return the single point index instance
+     * @throws SinglePointIndexException
      */
-    public synchronized void reload(SinglePointIndex.Scheme scheme, long tableId) throws IOException
+    public synchronized SinglePointIndex getSinglePointIndex(TableIndex tableIndex) throws SinglePointIndexException
     {
-        SinglePointIndex singlePointIndex = this.singlePointIndexImpls.remove(scheme);
-        if (singlePointIndex != null)
+        requireNonNull(tableIndex, "tableIndex is null");
+        checkArgument(this.enabledSchemes.contains(tableIndex.scheme), "single point index scheme '" +
+                tableIndex.scheme.toString() + "' is not enabled.");
+        if (singlePointIndexImpls.containsKey(tableIndex))
         {
-            singlePointIndex.close();
-        }
-        singlePointIndex = this.getSinglePointIndex(scheme, tableId);
-        requireNonNull(scheme, "failed to create the single point index instance");
-        this.singlePointIndexImpls.put(scheme, singlePointIndex);
-    }
-
-    /**
-     * Get the single point index instance from a scheme name.
-     * @param scheme
-     * @return
-     * @throws IOException
-     */
-    public synchronized SinglePointIndex getSinglePointIndex(String scheme, long tableId) throws IOException
-    {
-        try
-        {
-            // 'synchronized' in Java is reentrant,
-            // it is fine to call the other getSinglePointIndex() from here.
-            return getSinglePointIndex(SinglePointIndex.Scheme.from(scheme), tableId);
-        }
-        catch (RuntimeException re)
-        {
-            throw new IOException("Invalid single point index scheme: " + scheme, re);
-        }
-    }
-
-    public synchronized SinglePointIndex getSinglePointIndex(SinglePointIndex.Scheme scheme, long tableId) throws IOException
-    {
-        checkArgument(this.enabledSchemes.contains(scheme), "single point index scheme '" +
-                scheme.toString() + "' is not enabled.");
-        if (singlePointIndexImpls.containsKey(scheme))
-        {
-            return singlePointIndexImpls.get(scheme);
+            return singlePointIndexImpls.get(tableIndex);
         }
 
-        SinglePointIndex singlePointIndex = this.singlePointIndexProviders.get(scheme).createInstance(scheme, tableId);
-        singlePointIndexImpls.put(scheme, singlePointIndex);
-        tableIndices.add(tableId);
+        SinglePointIndex singlePointIndex = this.singlePointIndexProviders.get(tableIndex.getScheme())
+                .createInstance(tableIndex.tableId, tableIndex.indexId, tableIndex.scheme);
+        singlePointIndexImpls.put(tableIndex, singlePointIndex);
 
         return singlePointIndex;
     }
 
-    public ImmutableMap<SinglePointIndex.Scheme, SinglePointIndexProvider> getStorageProviders()
-    {
-        return singlePointIndexProviders;
-    }
-
+    /**
+     * Close all the opened single point index instances.
+     * @throws IOException
+     */
     public synchronized void closeAll() throws IOException
     {
-        for (SinglePointIndex.Scheme scheme : singlePointIndexImpls.keySet())
+        for (TableIndex tableIndex : singlePointIndexImpls.keySet())
         {
-            singlePointIndexImpls.get(scheme).close();
+            singlePointIndexImpls.get(tableIndex).close();
         }
     }
 

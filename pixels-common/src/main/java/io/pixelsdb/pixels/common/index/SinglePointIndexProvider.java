@@ -19,8 +19,9 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+
 import javax.annotation.Nonnull;
-import java.io.IOException;
 
 /**
  * @author hank
@@ -31,7 +32,7 @@ public interface SinglePointIndexProvider
     /**
      * Create an instance of the single point index.
      */
-    SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId, long indexId) throws IOException;
+    SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme) throws SinglePointIndexException;
 
     /**
      * @param scheme the given single point index scheme.

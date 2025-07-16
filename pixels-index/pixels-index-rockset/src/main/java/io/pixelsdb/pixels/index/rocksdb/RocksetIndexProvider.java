@@ -42,13 +42,14 @@ public class RocksetIndexProvider implements SinglePointIndexProvider
     private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
 
     @Override
-    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId)
+    public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme)
     {
         if (scheme == SinglePointIndex.Scheme.rockset)
         {
              try
              {
-                 return new RocksetIndex(bucketName, s3Prefix, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
+                 return new RocksetIndex(tableId, indexId, bucketName, s3Prefix,
+                         localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
              }
              catch (Exception e)
              {
