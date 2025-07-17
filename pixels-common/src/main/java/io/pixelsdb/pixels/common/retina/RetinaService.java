@@ -210,15 +210,15 @@ public class RetinaService
         return true;
     }
 
-    public RetinaProto.GetSuperVersionResponse getSuperVersion(String schemaName, String tableName) throws RetinaException
+    public RetinaProto.GetWriterBufferResponse getSuperVersion(String schemaName, String tableName) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
-        RetinaProto.GetSuperVersionRequest request = RetinaProto.GetSuperVersionRequest.newBuilder()
+        RetinaProto.GetWriterBufferRequest request = RetinaProto.GetWriterBufferRequest.newBuilder()
             .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
             .setSchemaName(schemaName)
             .setTableName(tableName)
             .build();
-        RetinaProto.GetSuperVersionResponse response = this.stub.getSuperVersion(request);
+        RetinaProto.GetWriterBufferResponse response = this.stub.getWriterBuffer(request);
                 if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("Schema: " + schemaName + "\tTable: " + tableName + ", failed to get superversion: " + response.getHeader().getErrorCode()

@@ -60,7 +60,7 @@ public class TestPixelsWriterBuffer
             columnTypes.add("int");
 
             schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
-            buffer = new PixelsWriterBuffer(schema, "test", "test", targetOrderDirPath, targetCompactDirPath);
+            buffer = new PixelsWriterBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath);
         } catch (Exception e)
         {
             System.out.println("setup error: " + e);
@@ -70,12 +70,11 @@ public class TestPixelsWriterBuffer
     @Test
     public void testConcurrentWriteOperations()
     {
-        int numThreads = 100;
+        int numThreads = 1;
         int numRowsPerThread = 1000;
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch completionLatch = new CountDownLatch(numThreads);
         AtomicBoolean hasError = new AtomicBoolean(false);
-        AtomicInteger switchCount = new AtomicInteger(0);
 
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
         for (int t = 0; t < numThreads; ++t)

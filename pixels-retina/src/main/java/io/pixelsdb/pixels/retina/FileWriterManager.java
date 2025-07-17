@@ -46,9 +46,7 @@ public class FileWriterManager
 {
     private static final Logger logger = LogManager.getLogger(FileWriterManager.class);
 
-    private final Storage minio;
-    private final String schemaName;
-    private final String tableName;
+    private final long tableId;
     private final PixelsWriter writer;
     private final File file;
 
@@ -59,8 +57,7 @@ public class FileWriterManager
     /**
      * Creating pixelsWriter by passing in parameters avoids the need to read
      * the configuration file for each call.
-     * @param schemaName
-     * @param tableName
+     * @param tableId
      * @param schema
      * @param targetOrderedDirPath
      * @param pixelsStride
@@ -71,15 +68,13 @@ public class FileWriterManager
      * @param nullsPadding
      * @throws RetinaException
      */
-    public FileWriterManager(Storage minio, String schemaName, String tableName,
-                             TypeDescription schema, Path targetOrderedDirPath,
-                             Storage targetOrderedStorage, int pixelsStride,
-                             long blockSize, short replication, EncodingLevel encodingLevel,
-                             boolean nullsPadding, long firstBlockId) throws RetinaException
+    public FileWriterManager(long tableId, TypeDescription schema,
+                             Path targetOrderedDirPath, Storage targetOrderedStorage,
+                             int pixelsStride, long blockSize, short replication,
+                             EncodingLevel encodingLevel, boolean nullsPadding,
+                             long firstBlockId, int recordNum) throws RetinaException
     {
-        this.minio = minio;
-        this.schemaName = schemaName;
-        this.tableName = tableName;
+        this.tableId = tableId;
         this.firstBlockId = firstBlockId;
 
         // create pixels writer
@@ -101,6 +96,10 @@ public class FileWriterManager
             logger.error("Failed to add file into metadata", e);
             throw new RetinaException("Failed to add file into metadata", e);
         }
+
+        // add the file's visibility
+        RetinaResourceManager retinaResourceManager = RetinaResourceManager.Instance();
+        retinaResourceManager.addVisibility(this.file.getId(), 0, recordNum);
 
         try
         {
@@ -160,11 +159,8 @@ public class FileWriterManager
             {
                 for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId)
                 {
-                    String minioEntry = this.schemaName + '/' + this.tableName + '/' + blockId;
-                    PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.minio, minioEntry);
-                    int length = (int) reader.getFileLength();
-                    byte[] data = new byte[length];
-                    reader.readFully(data, 0, length);
+                    MinioManager minioManager = MinioManager.Instance();
+                    byte[] data = minioManager.read(this.tableId, blockId);
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();

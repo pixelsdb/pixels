@@ -280,54 +280,27 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     @Override
-    public void getSuperVersion(RetinaProto.GetSuperVersionRequest request,
-                                StreamObserver<RetinaProto.GetSuperVersionResponse> responseObserver)
+    public void getWriterBuffer(RetinaProto.GetWriterBufferRequest request,
+                                StreamObserver<RetinaProto.GetWriterBufferResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
         try
         {
-            RetinaProto.GetSuperVersionResponse.Builder responseBuilder = RetinaProto.GetSuperVersionResponse
+            RetinaProto.GetWriterBufferResponse.Builder responseBuilder = RetinaProto.GetWriterBufferResponse
                     .newBuilder()
                     .setHeader(headerBuilder.build());
 
-            String schemaName = request.getSchemaName();
-            String tableName = request.getTableName();
-            SuperVersion currentVersion = this.retinaResourceManager.getSuperVersion(schemaName, tableName);
-            if (!currentVersion.getMemTable().getRowBatch().isEmpty()) {
-                ByteString data = ByteString.copyFrom(currentVersion.getMemTable().getRowBatch().serialize());
-                responseBuilder.setData(data);
-            } else {
-                responseBuilder.setData(ByteString.EMPTY);
-            }
-
-            List<Long> ids = new ArrayList<>();
-            for (MemTable immutableMemtable : currentVersion.getImmutableMemTables())
-            {
-                ids.add(immutableMemtable.getId());
-            }
-            for (ObjectEntry objectEntry : currentVersion.getObjectEntries())
-            {
-                ids.add(objectEntry.getId());
-            }
-            responseBuilder.addAllIds(ids);
-            long[][] visibilityBitmaps = this.retinaResourceManager.getWriterBufferVisibility(
-                    schemaName, tableName, ids, request.getTimestamp());
-            for (long[] visibilityBitmap : visibilityBitmaps)
-            {
-                RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
-                        .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
-                        .build();
-                responseBuilder.addBitmaps(bitmap);
-            }
+            RetinaProto.GetWriterBufferResponse response = this.retinaResourceManager.getWriterBuffer(
+                    request.getSchemaName(), request.getTableName(), request.getTimestamp());
 
             responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
-        } catch (Exception e)
+        } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.GetSuperVersionResponse.newBuilder()
+            responseObserver.onNext(RetinaProto.GetWriterBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
             responseObserver.onCompleted();

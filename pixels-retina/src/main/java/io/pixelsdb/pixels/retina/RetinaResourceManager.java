@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.retina;
 
+import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -34,11 +35,9 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -70,6 +69,13 @@ public class RetinaResourceManager
         return instance;
     }
 
+    public void addVisibility(long fileId, int rgId, int recordNum)
+    {
+        RGVisibility rgVisibility = new RGVisibility(recordNum);
+        String rgKey = fileId + "_" + rgId;
+        rgVisibilityMap.put(rgKey, rgVisibility);
+    }
+
     public void addVisibility(String filePath) throws RetinaException
     {
         try
@@ -88,9 +94,7 @@ public class RetinaResourceManager
             for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
             {
                 int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
-                RGVisibility rgVisibility = new RGVisibility(recordNum);
-                String rgKey = fileId + "_" + rgId;
-                rgVisibilityMap.put(rgKey, rgVisibility);
+                addVisibility(fileId, rgId, recordNum);
             }
         } catch (Exception e)
         {
@@ -145,8 +149,8 @@ public class RetinaResourceManager
             List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
 
-            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(schema, schemaName, tableName,
-                    orderedPaths.get(0), compactPaths.get(0));
+            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(latestLayout.getTableId(),
+                    schema, orderedPaths.get(0), compactPaths.get(0));
             String writerBufferKey = schemaName + "_" + tableName;
             pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
         } catch (Exception e)
@@ -161,21 +165,100 @@ public class RetinaResourceManager
         writerBuffer.addRow(colValues, timestamp);
     }
 
-    public SuperVersion getSuperVersion(String schemaName, String tableName) throws RetinaException
+    private RetinaProto.VisibilityBitmap getVisibilityBitmapSlice(long[] visibilityBitmap, long startIndex, int length)
     {
-        PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
-        return writerBuffer.getCurrentVersion();
+        if (startIndex % 64 != 0 || length % 64 != 0)
+        {
+            throw new IllegalArgumentException("startIndex and length must be mulitple of 64.");
+        }
+        if (length == 0)
+        {
+            return RetinaProto.VisibilityBitmap.newBuilder().build();
+        }
+
+        int startLongIndex = (int) (startIndex / 64);
+        int endLongIndex = startLongIndex + (length / 64);
+
+        if (visibilityBitmap == null || endLongIndex > visibilityBitmap.length)
+        {
+            throw new IndexOutOfBoundsException("cropping range exceeds the boundary.");
+        }
+
+        long[] resultBitmap = Arrays.copyOfRange(visibilityBitmap, startLongIndex, endLongIndex);
+        return RetinaProto.VisibilityBitmap.newBuilder()
+                .addAllBitmap(Arrays.stream(resultBitmap).boxed().collect(Collectors.toList()))
+                .build();
     }
 
-    public long[][] getWriterBufferVisibility(String schemaName, String tableName, List<Long> ids, long timestamp) throws RetinaException
+    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName, long timestamp) throws RetinaException
     {
-        /**
-         * TODO: Return the visibility bitmap of a specific data block in writerBuffer.
-         * 1. get writerBuffer from schemaName and tableName
-         * 2. statistics on fileId and get the visibility bitmap of fileIds
-         * 3. returns the corresponding bitmap based on the rowIndex range of each data block
-         */
-        return null;
+        RetinaProto.GetWriterBufferResponse.Builder responseBuilder = RetinaProto.GetWriterBufferResponse.newBuilder();
+
+        // get super version
+        PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
+        SuperVersion superVersion = writerBuffer.getCurrentVersion();
+        MemTable activeMemtable = superVersion.getMemTable();
+        List<MemTable> immutableMemTables = superVersion.getImmutableMemTables();
+        List<ObjectEntry> objectEntries = superVersion.getObjectEntries();
+
+        Set<Long> fileIds = new HashSet<>();
+
+        // active memTable returns directly
+        if (!activeMemtable.getRowBatch().isEmpty())
+        {
+            ByteString data = ByteString.copyFrom(activeMemtable.getRowBatch().serialize());
+            responseBuilder.setData(data);
+
+            fileIds.add(activeMemtable.getFileId());
+        } else
+        {
+            responseBuilder.setData(ByteString.EMPTY);
+        }
+
+        // statistics on id and fileId
+        List<Long> ids = new ArrayList<>();
+        fileIds.add(activeMemtable.getFileId());
+        for (MemTable immutableMemtable : immutableMemTables)
+        {
+            fileIds.add(immutableMemtable.getFileId());
+            ids.add(immutableMemtable.getId());
+        }
+        for (ObjectEntry objectEntry : objectEntries)
+        {
+            fileIds.add(objectEntry.getFileId());
+            ids.add(objectEntry.getId());
+        }
+        responseBuilder.addAllIds(ids);
+
+        // get the visibility bitmap of fileIds
+        Map<Long, long[]> fileIdToVisibility = new HashMap<>();
+        for (Long fileId : fileIds)
+        {
+            long[] visibility = queryVisibility(fileId, 0, timestamp);
+            fileIdToVisibility.put(fileId, visibility);
+        }
+
+        // only return the corresponding part of bitmap
+        if (!activeMemtable.getRowBatch().isEmpty())
+        {
+            responseBuilder.addBitmaps(getVisibilityBitmapSlice(
+                    fileIdToVisibility.get(activeMemtable.getFileId()),
+                    activeMemtable.getStartIndex(), activeMemtable.getLength()));
+        }
+        for (MemTable immutableMemtable : immutableMemTables)
+        {
+            responseBuilder.addBitmaps(getVisibilityBitmapSlice(
+                    fileIdToVisibility.get(immutableMemtable.getFileId()),
+                    immutableMemtable.getStartIndex(), immutableMemtable.getLength()));
+        }
+        for (ObjectEntry objectEntry : objectEntries)
+        {
+            responseBuilder.addBitmaps(getVisibilityBitmapSlice(
+                    fileIdToVisibility.get(objectEntry.getFileId()),
+                    objectEntry.getStartIndex(), objectEntry.getLength()));
+        }
+
+        return responseBuilder.build();
     }
 
     /**

@@ -39,7 +39,7 @@ service RetinaWorkerService {
     // Add writer buffer for new created table
     rpc AddWriterBuffer (AddWriterBufferRequest) returns (AddWriterBufferResponse);
     // Get a unified view of the data in the writer buffer
-    rpc GetSuperVersion (GetSuperVersionRequest) returns (GetSuperVersionResponse);
+    rpc GetWriterBuffer (GetWriterBufferRequest) returns (GetWriterBufferResponse);
 }
 
 // header
@@ -126,15 +126,15 @@ message AddWriterBufferResponse {
     ResponseHeader header = 1;
 }
 
-// get super version
-message GetSuperVersionRequest {
+// get writer buffer
+message GetWriterBufferRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     string tableName = 3;
     uint64 timestamp = 4;
 }
 
-message GetSuperVersionResponse {
+message GetWriterBufferResponse {
     ResponseHeader header = 1;
     bytes data = 2;
     repeated int64 ids = 3;
