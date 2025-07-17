@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,91 +19,89 @@
  */
 package io.pixelsdb.pixels.cache;
 
-import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.List;
+import java.util.*;
 
 /**
  * pixels cache reader.
- * It is not thread safe.
+ * This was moved from the previous non-zoned PixelsCache Reader.
  *
- * @author guodong
- * @author hank
+ * @author alph00
  */
 public class PixelsCacheReader implements AutoCloseable
 {
     private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
-    // private static CacheLogger cacheLogger = new CacheLogger();
+    private final PixelsLocator locator;
+    private final List<PixelsZoneReader> zones;
+    private final PixelsBucketToZoneMap bucketToZoneMap;
 
-    private final MemoryMappedFile cacheFile;
-    private final MemoryMappedFile indexFile;
-
-    /**
-     * <p>
-     *     A node can have at most 256 children, plus an edge (a segment of
-     *     lookup key). Each child is 8 bytes.
-     * </p>
-     * <p>
-     *     In pixels, where will be one PixelsCacheReader on each split. And each
-     *     split is supposed to be processed by one single thread. There are
-     *     typically 10 - 200 concurrent threads (splits) on a machine. So that it
-     *     is not a problem to allocate nodeData in each PixelsCacheReader instance.
-     *     By this, we can avoid frequent memory allocation in the search() method.
-     * </p>
-     * <p>
-     *     For the edge, although PixelsRadix can support 1MB edge length, we only
-     *     use 12 byte path (PixelsCacheKey). That means no edges can exceeds 12 bytes.
-     *     So that 16 bytes is more than enough.
-     * </p>
-     */
-    private final byte[] nodeData = new byte[256 * 8 + 16];
-    private final ByteBuffer childrenBuffer = ByteBuffer.wrap(nodeData);
-
-    private final ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
-
-//    static
-//    {
-//        new Thread(cacheLogger).start();
-//    }
-
-    private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
+    private PixelsCacheReader(PixelsLocator builderLocator, List<PixelsZoneReader> builderZones, PixelsBucketToZoneMap bucketToZoneMap)
     {
-        this.cacheFile = cacheFile;
-        this.indexFile = indexFile;
+        this.zones = builderZones;
+        this.locator = builderLocator;
+        this.bucketToZoneMap = bucketToZoneMap;
     }
 
     public static class Builder
     {
-        private MemoryMappedFile builderCacheFile;
-        private MemoryMappedFile builderIndexFile;
+        private List<MemoryMappedFile> zoneFiles;
+        private List<MemoryMappedFile> indexFiles;
+        private MemoryMappedFile globalIndexFile;
+        private int zoneNum = 0;
+        private int swapZoneNum = 1;
 
         private Builder()
         {
         }
 
-        public PixelsCacheReader.Builder setCacheFile(MemoryMappedFile cacheFile)
+        // we calculate zoneNum from zoneFiles including swap zone
+        public PixelsCacheReader.Builder setCacheFile(List<MemoryMappedFile> zoneFiles)
         {
-//            requireNonNull(cacheFile, "cache file is null");
-            this.builderCacheFile = cacheFile;
-
+            this.zoneFiles = zoneFiles;
+            if (zoneFiles != null)
+            {
+                zoneNum = zoneFiles.size();
+            }
+            else
+            {
+                zoneNum = 0;
+            }
             return this;
         }
 
-        public PixelsCacheReader.Builder setIndexFile(MemoryMappedFile indexFile)
+        public PixelsCacheReader.Builder setIndexFile(List<MemoryMappedFile> indexFiles)
         {
-//            requireNonNull(indexFile, "index file is null");
-            this.builderIndexFile = indexFile;
+            this.indexFiles = indexFiles;
+            return this;
+        }
 
+        public PixelsCacheReader.Builder setGlobalIndexFile(MemoryMappedFile globalIndexFile)
+        {
+            this.globalIndexFile = globalIndexFile;
+            return this;
+        }
+
+        // now this function is not used, swapZoneNum is set to 1 by default
+        public PixelsCacheReader.Builder setSwapZoneNum(int swapZoneNum)
+        {
+            this.swapZoneNum = swapZoneNum;
             return this;
         }
 
         public PixelsCacheReader build()
         {
-            return new PixelsCacheReader(builderCacheFile, builderIndexFile);
+            List<PixelsZoneReader> builderZones = new ArrayList<>();
+            for (int i = 0; i < zoneNum; i++)
+            {
+                builderZones.add(PixelsZoneReader.newBuilder().setZoneFile(zoneFiles.get(i)).setIndexFile(indexFiles.get(i)).build());
+            }
+            PixelsLocator builderLocator = new PixelsLocator(zoneNum - swapZoneNum);
+            PixelsBucketToZoneMap bucketToZoneMap = new PixelsBucketToZoneMap(globalIndexFile, zoneNum);
+            return new PixelsCacheReader(builderLocator, builderZones, bucketToZoneMap);
         }
     }
 
@@ -112,218 +110,85 @@ public class PixelsCacheReader implements AutoCloseable
         return new PixelsCacheReader.Builder();
     }
 
-    public ByteBuffer get(long blockId, short rowGroupId, short columnId)
-    {
-        return this.get(blockId, rowGroupId, columnId, true);
-    }
-
-    /**
-     * Read specified column chunk from cache.
-     * If cache is not hit, empty byte array is returned, and an access message is sent to the mq.
-     * If cache is hit, the column chunk content is returned as byte array.
-     * This method may return NULL value. Be careful dealing with null!!!
-     *
-     * @param blockId    block id
-     * @param rowGroupId row group id
-     * @param columnId   column id
-     * @param direct get direct byte buffer if true
-     * @return the column chunk content, or null if failed to read the cache
-     */
     public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct)
     {
-        // search index file for column chunk id
-        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
-
-        // check the rwFlag and increase readCount.
-        long lease = 0;
-        try
+        // update the hashcycle in locator in the PixelsCacheReader
+        int hashNodeNum = bucketToZoneMap.getHashNodeNum();
+        int originalNodeNum = locator.getNodeNum();
+        if (hashNodeNum != originalNodeNum) 
         {
-            lease = PixelsCacheUtil.beginIndexRead(indexFile);
+            if (hashNodeNum > originalNodeNum) 
+            {
+                // expand
+                String originZoneName  = zones.get(0).getZoneFile().getName();
+                String baseZoneName    = originZoneName.substring(0, originZoneName.lastIndexOf('.'));
+                String originIndexName  = zones.get(0).getIndexFile().getName();
+                String baseIndexName    = originIndexName.substring(0, originIndexName.lastIndexOf('.'));
+                long zoneSize = zones.get(0).getZoneFile().getSize();
+                long indexSize = zones.get(0).getIndexFile().getSize();
+                
+                for (int i = originalNodeNum; i < hashNodeNum; i++) 
+                {
+                    int newZoneId = zones.size();// the new physical zone id is the size of the zone list
+                    String newZoneLocation = baseZoneName + "." + newZoneId;
+                    String newIndexLocation = baseIndexName + "." + newZoneId;
+                    try 
+                    {
+                        zones.add(new PixelsZoneReader(newZoneLocation, newIndexLocation, zoneSize, indexSize));
+                    } 
+                    catch (Exception e) 
+                    {
+                        logger.warn("Failed to synchronize with writer expansion: could not create zone reader", e);
+                        return null;
+                    }
+                    locator.addNode();
+                }
+                logger.info("CacheReader detected cache expansion: zoneNum from {} to {}", originalNodeNum, hashNodeNum);
+            } 
+            else if (hashNodeNum < originalNodeNum) 
+            {
+                // shrink
+                int lastLazyZoneId = originalNodeNum - 1;
+                locator.removeNode();
+                zones.get(lastLazyZoneId).close();
+                zones.remove(lastLazyZoneId);
+                logger.info("CacheReader detected cache shrink: zoneNum from {} to {}", originalNodeNum, hashNodeNum);
+            }
         }
-        catch (InterruptedException e)
+        long bucketId = locator.getLocation(new PixelsCacheKey(blockId, rowGroupId, columnId));
+        int zoneId = bucketToZoneMap.getBucketToZone(bucketId);
+        if (zoneId < 0 || zoneId >= zones.size()) 
         {
-            logger.error("Failed to get read permission on index.", e);
-            /**
-             * Issue #88:
-             * In case of failure (e.g. reaches max cache reader count),
-             * return null here to stop reading cache, then the content
-             * will be read from disk.
-             */
+            logger.warn("Invalid zone id: {}", zoneId);
             return null;
         }
-
-        ByteBuffer content = null;
-        // search cache key
-//        long searchBegin = System.nanoTime();
-        PixelsCacheIdx cacheIdx = search(keyBuffer);
-//        long searchEnd = System.nanoTime();
-//        cacheLogger.addSearchLatency(searchEnd - searchBegin);
-//        logger.debug("[cache search]: " + (searchEnd - searchBegin));
-        // if found, read content from cache
-//        long readBegin = System.nanoTime();
-        if (cacheIdx != null)
+        PixelsZoneReader zone = zones.get(zoneId);
+        if (zone == null) 
         {
-            if (direct)
-            {
-                // read content
-                content = cacheFile.getDirectByteBuffer(cacheIdx.offset, cacheIdx.length);
-            }
-            else
-            {
-                content = ByteBuffer.allocate(cacheIdx.length);
-                // read content
-                cacheFile.getBytes(cacheIdx.offset, content.array(), 0, cacheIdx.length);
-            }
-        }
-
-        boolean cacheReadSuccess = PixelsCacheUtil.endIndexRead(indexFile, lease);
-
-//        long readEnd = System.nanoTime();
-//        cacheLogger.addReadLatency(readEnd - readBegin);
-//        logger.debug("[cache read]: " + (readEnd - readBegin));
-        if (cacheReadSuccess)
-        {
-            return content;
-        }
-        return null;
-    }
-
-    public void batchGet(List<ColumnChunkId> columnChunkIds, byte[][] container)
-    {
-        // TODO batch get cache items. merge cache accesses to reduce the number of jni invocation.
-    }
-
-    /**
-     * This interface is only used by TESTS, DO NOT USE.
-     * It will be removed soon!
-     */
-    public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
-    {
-        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
-
-        return search(keyBuffer);
-    }
-
-    /**
-     * Search key from radix tree.
-     * If found, update counter in cache idx.
-     * Else, return null
-     */
-    private PixelsCacheIdx search(ByteBuffer keyBuffer)
-    {
-        int dramAccessCounter = 0;
-        int radixLevel = 0;
-        final int keyLen = keyBuffer.position();
-        long currentNodeOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
-        int bytesMatched = 0;
-        int bytesMatchedInNodeFound = 0;
-
-        // get root
-        // TODO: root currently does not have edge, which is not efficient in some cases.
-        int currentNodeHeader = indexFile.getInt(currentNodeOffset);
-        dramAccessCounter++;
-        int currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
-        int currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
-        if (currentNodeChildrenNum == 0 && currentNodeEdgeSize == 0)
-        {
+            logger.warn("Zone reader {} not initialized", zoneId);
             return null;
         }
-        indexFile.getBytes(currentNodeOffset + 4, this.nodeData, 0, currentNodeChildrenNum * 8);
-        dramAccessCounter++;
-        radixLevel++;
-
-        // search
-        // it can be more clear with a do while function
-        outer_loop:
-        while (bytesMatched < keyLen)
-        {
-            // search each child for the matching node
-            long matchingChildOffset = 0L;
-            childrenBuffer.position(0);
-            childrenBuffer.limit(currentNodeChildrenNum * 8);
-            // linearly scan all the children
-            for (int i = 0; i < currentNodeChildrenNum; i++)
-            {
-                // long is 8 byte, which is 64 bit
-                long child = childrenBuffer.getLong();
-                // first byte is matching byte
-                byte leader = (byte) ((child >>> 56) & 0xFF);
-                if (leader == keyBuffer.get(bytesMatched))
-                {
-                    // child last 7 bytes is grandson's offset, that is, the address is 7-bytes long
-                    matchingChildOffset = child & 0x00FFFFFFFFFFFFFFL;
-                    break;
-                }
-            }
-            if (matchingChildOffset == 0)
-            {
-                break;
-            }
-
-            currentNodeOffset = matchingChildOffset;
-            bytesMatchedInNodeFound = 0;
-            currentNodeHeader = indexFile.getInt(currentNodeOffset);
-            dramAccessCounter++;
-            currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
-            currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
-            // read the children and edge in one memory access.
-            indexFile.getBytes(currentNodeOffset + 4,
-                    this.nodeData, 0, currentNodeChildrenNum * 8 + currentNodeEdgeSize);
-            dramAccessCounter++;
-            int edgeEndOffset = currentNodeChildrenNum * 8 + currentNodeEdgeSize;
-            /**
-             * The first byte is matched in the child leader of the parent node,
-             * therefore we start the matching from the second byte in edge.
-             * this is useful for below `bytesMatchedInNodeFound == currentNodeEdgeSize`
-             */
-            bytesMatched++;
-            bytesMatchedInNodeFound++;
-            // now we are visiting the edge! rather than children data
-            // it seems between children and edge, there is a one byte gap?
-            // or the first byte of the edge does not matter here anyway
-            for (int i = currentNodeChildrenNum * 8 + 1; i < edgeEndOffset && bytesMatched < keyLen; i++)
-            {
-                // the edge is shared across this node, so the edge should be fully matched
-                if (this.nodeData[i] != keyBuffer.get(bytesMatched))
-                {
-                    break outer_loop;
-                }
-                bytesMatched++;
-                bytesMatchedInNodeFound++;
-            }
-
-            // only increase level when a child is really matched.
-            radixLevel++;
-        }
-
-        // if matches, node found.
-        if (bytesMatched == keyLen && bytesMatchedInNodeFound == currentNodeEdgeSize)
-        {
-            // if the current node is leaf node.
-            if (((currentNodeHeader >>> 31) & 1) > 0)
-            {
-                byte[] idx = new byte[12];
-                indexFile.getBytes(currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize,
-                        idx, 0, 12);
-                dramAccessCounter++;
-                PixelsCacheIdx cacheIdx = new PixelsCacheIdx(idx);
-                cacheIdx.dramAccessCount = dramAccessCounter;
-                cacheIdx.radixLevel = radixLevel;
-                return cacheIdx;
-            }
-        }
-        return null;
+        return zone.get(blockId, rowGroupId, columnId, direct);
     }
 
-    public void close()
+    public void close() 
     {
-        try
+        try 
         {
-//            logger.info("cache reader unmaps cache/index file");
-            cacheFile.unmap();
-            indexFile.unmap();
-        }
-        catch (Exception e)
+            for (PixelsZoneReader zone : zones) 
+            {
+                zone.close();
+            }
+            if (bucketToZoneMap != null) 
+            {
+                bucketToZoneMap.close();
+            }
+            if (locator != null) 
+            {
+                locator.close();
+            }
+        } 
+        catch (Exception e) 
         {
             e.printStackTrace();
         }

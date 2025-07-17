@@ -27,6 +27,7 @@ import io.etcd.jetcd.watch.WatchEvent;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.cache.PixelsCacheUtil;
 import io.pixelsdb.pixels.cache.PixelsCacheWriter;
+import io.pixelsdb.pixels.cache.CacheScalingOperation;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.SchemaTableName;
@@ -108,6 +109,8 @@ public class CacheWorker implements Server
                         .setCacheSize(cacheConfig.getCacheSize())
                         .setIndexLocation(cacheConfig.getIndexLocation())
                         .setIndexSize(cacheConfig.getIndexSize())
+                        .setZoneNum(cacheConfig.getZoneNum())
+                        .setSwapZoneNum(cacheConfig.getSwapZoneNum())
                         .setOverwrite(false)
                         .setHostName(hostName)
                         .setCacheConfig(cacheConfig)
@@ -116,8 +119,7 @@ public class CacheWorker implements Server
 
                 // 2. update cache if necessary.
                 // If the cache is new created using start-vm.sh script, the local cache version would be zero.
-                localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile(), cacheWriter.getCacheFile());
-                logger.debug("Local cache version: " + localCacheVersion);
+                localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile(), cacheWriter);
                 // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
                 KeyValue globalCacheVersionKV = EtcdUtil.Instance().getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if (globalCacheVersionKV != null)
@@ -256,6 +258,44 @@ public class CacheWorker implements Server
                         }
                     }
                 });
+        // watcher for cache expand or shrink.
+        Watch.Watcher cacheScalingWatcher = EtcdUtil.Instance().getClient().getWatchClient().watch(
+                ByteSequence.from(Constants.CACHE_EXPAND_OR_SHRINK_LITERAL, StandardCharsets.UTF_8),
+                WatchOption.DEFAULT, watchResponse ->
+                {
+                    for (WatchEvent event : watchResponse.getEvents())
+                    {
+                        if (event.getEventType() == WatchEvent.EventType.PUT)
+                        {
+                            if (cacheStatus.get() == CacheWorkerStatus.READY.StatusCode)
+                            {
+                                String value = event.getKeyValue().getValue().toString(StandardCharsets.UTF_8);
+                                int cacheScalingOperation = Integer.parseInt(value);
+                                if (cacheScalingOperation == CacheScalingOperation.EXPAND.Operation)
+                                {
+                                    try {
+                                        cacheWriter.expand();
+                                    } catch (Exception e) {
+                                        logger.error("Failed to expand cache.", e);
+                                    }
+                                } else if (cacheScalingOperation == CacheScalingOperation.SHRINK.Operation)
+                                {
+                                    try {
+                                        cacheWriter.shrink();
+                                    } catch (Exception e) {
+                                        logger.error("Failed to shrink cache.", e);
+                                    }
+                                }
+                            } else if (cacheStatus.get() == CacheWorkerStatus.UPDATING.StatusCode)
+                            {
+                                // The local cache is updating, ignore expand or shrink.
+                                logger.warn("The local cache is updating, ignore the expand event.");
+                            } else {
+                                logger.warn("The local cache is not ready, ignore the expand event.");
+                            }
+                        }
+                    }
+                });
         try
         {
             // Wait for this cache worker to be shutdown.
@@ -269,6 +309,10 @@ public class CacheWorker implements Server
             if (watcher != null)
             {
                 watcher.close();
+            }
+            if (cacheScalingWatcher != null)
+            {
+                cacheScalingWatcher.close();
             }
         }
     }

@@ -23,6 +23,8 @@ import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * @author guodong
@@ -37,9 +39,9 @@ public class TestPixelsCacheReader
         PixelsCacheKey key = new PixelsCacheKey(1073747711, (short) 0, (short) 191);
         PixelsCacheReader cacheReader = PixelsCacheReader
                 .newBuilder()
-                .setIndexFile(indexFile)
+                .setIndexFile(new ArrayList<>(Arrays.asList(indexFile)))
                 .build();
-        System.out.println(cacheReader.search(key.blockId, key.rowGroupId, key.columnId));
+        System.out.println(cacheReader.get(key.blockId, key.rowGroupId, key.columnId, false));
     }
 
     @Test
@@ -51,8 +53,8 @@ public class TestPixelsCacheReader
             MemoryMappedFile indexFile = new MemoryMappedFile("/Users/Jelly/Desktop/pixels.index", 64000000L);
             PixelsCacheReader cacheReader = PixelsCacheReader
                     .newBuilder()
-                    .setIndexFile(indexFile)
-                    .setCacheFile(cacheFile)
+                    .setIndexFile(new ArrayList<>(Arrays.asList(indexFile)))
+                    .setCacheFile(new ArrayList<>(Arrays.asList(cacheFile)))
                     .build();
             String path = "/pixels/pixels/test_105/2121211211212.pxl";
             int index = 0;
@@ -60,7 +62,7 @@ public class TestPixelsCacheReader
             {
                 for (short j = 0; j < 64; j++)
                 {
-                    ByteBuffer value = cacheReader.get(-1, i, j);
+                    ByteBuffer value = cacheReader.get(-1, i, j, false);
                     if (value != null)
                     {
                         assert value.getInt() == index;

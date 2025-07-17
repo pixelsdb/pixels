@@ -56,11 +56,15 @@ public class TestPixelsCacheWriter
                 }
             }
             cacheWriter.flush();
-            PixelsRadix radix = cacheWriter.getRadix();
-            radix.printStats();
-
-            PixelsRadix radix1 = PixelsCacheUtil.loadRadixIndex(cacheWriter.getIndexFile());
-            radix1.printStats();
+            for (PixelsZoneWriter zone : cacheWriter.getZones()) {
+                PixelsRadix radix = zone.getRadix();
+                radix.printStats();
+            }
+            
+            for (PixelsZoneWriter zone : cacheWriter.getZones()) {
+                PixelsRadix radix1 = PixelsCacheUtil.loadRadixIndex(zone.getIndexFile());
+                radix1.printStats();
+            }
         }
         catch (Exception e)
         {

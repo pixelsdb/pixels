@@ -50,6 +50,7 @@ public final class Constants
     public static final int HOSTNAME_INDEX_IN_CACHE_LOCATION_LITERAL = 3;
     public static final String HEARTBEAT_COORDINATOR_LITERAL = "heartbeat_coordinator_";
     public static final String HEARTBEAT_WORKER_LITERAL = "heartbeat_worker_";
+    public static final String CACHE_EXPAND_OR_SHRINK_LITERAL = "cache_expand_or_shrink"; // expand or shrink;1:expand, 2:shrink
 
     public static final String PARTITION_OPERATOR_NAME = "partition";
     public static final String PARTITION_JOIN_OPERATOR_NAME = "partition_join";

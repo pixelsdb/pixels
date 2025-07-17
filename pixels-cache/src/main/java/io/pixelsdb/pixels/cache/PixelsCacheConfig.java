@@ -63,6 +63,15 @@ public class PixelsCacheConfig
         return Long.parseLong(configFactory.getProperty("cache.size"));
     }
 
+    public int getZoneNum()
+    {
+        return Integer.parseInt(configFactory.getProperty("cache.zone.num"));
+    }
+    public int getSwapZoneNum()
+    {
+        return Integer.parseInt(configFactory.getProperty("cache.zone.swap.num"));
+    }
+
     public String getStorageScheme()
     {
          return configFactory.getProperty("cache.storage.scheme");
