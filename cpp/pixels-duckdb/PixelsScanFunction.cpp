@@ -188,7 +188,7 @@ unique_ptr<FunctionData> PixelsScanFunction::PixelsScanBind(
     }
   vector<string> filePaths;
   for (auto file:files) {
-    filePaths.push_back(file.getPath());
+    filePaths.push_back(file.path);
   }
   // sort the pxl file by file name, so that all SSD arrays can be fully utilized
   sort(filePaths.begin(), filePaths.end(), compare_file_name());
