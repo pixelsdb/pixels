@@ -28,10 +28,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -45,6 +42,9 @@ public class MainIndexImpl implements MainIndex
     private static final HashMap<Long, PersistentAutoIncrement> persistentAIMap = new HashMap<>();
 
     private final long tableId;
+
+
+
     // Cache for storing generated rowIds
     private final Queue<Long> rowIdCache = new ConcurrentLinkedQueue<>();
     // Get the singleton instance of EtcdUtil
@@ -119,6 +119,11 @@ public class MainIndexImpl implements MainIndex
 
     @Override
     public IndexProto.RowLocation getLocation(long rowId)
+    {
+
+    }
+
+    public IndexProto.RowLocation getLocationOld(long rowId)
     {
         // Use binary search to find the Entry containing the rowId
         int index = binarySearch(rowId);
