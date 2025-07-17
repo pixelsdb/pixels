@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
@@ -183,9 +184,9 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public long[] getNonUniqueRowIds(IndexProto.IndexKey key)
+    public List<Long> getNonUniqueRowIds(IndexProto.IndexKey key)
     {
-        return new long[0];
+        return ImmutableList.of();
     }
 
     @Override

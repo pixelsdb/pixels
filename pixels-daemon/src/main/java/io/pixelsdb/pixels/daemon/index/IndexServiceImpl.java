@@ -110,7 +110,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.LookupNonUniqueIndexResponse.Builder builder = IndexProto.LookupNonUniqueIndexResponse.newBuilder();
         try
         {
-            long[] rowIds = singlePointIndex.getNonUniqueRowIds(key);
+            List<Long> rowIds = singlePointIndex.getNonUniqueRowIds(key);
             List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
             for (long rowId : rowIds)
             {

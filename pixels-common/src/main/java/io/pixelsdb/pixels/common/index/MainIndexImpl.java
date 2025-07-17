@@ -43,12 +43,12 @@ public class MainIndexImpl implements MainIndex
 {
     private static final Logger logger = LogManager.getLogger(MainIndexImpl.class);
     private static final HashMap<Long, PersistentAutoIncrement> persistentAIMap = new HashMap<>();
-    // Get the tableId of this mainIndex
+
     private final long tableId;
     // Cache for storing generated rowIds
     private final Queue<Long> rowIdCache = new ConcurrentLinkedQueue<>();
     // Get the singleton instance of EtcdUtil
-    EtcdUtil etcdUtil = EtcdUtil.Instance();
+    private final EtcdUtil etcdUtil = EtcdUtil.Instance();
     // Read-Write lock
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
     // Dirty flag
@@ -92,31 +92,26 @@ public class MainIndexImpl implements MainIndex
     @Override
     public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws RowIdException
     {
-        // 1. get or create the persistent auto increment
-
-        PersistentAutoIncrement autoIncrement = persistentAIMap.computeIfAbsent(
-            tableId,
-            id -> {
+        try
+        {
+            // 1. get or create the persistent auto increment
+            PersistentAutoIncrement autoIncrement = persistentAIMap.computeIfAbsent(tableId, tblId -> {
                 try
                 {
-                    return new PersistentAutoIncrement("rowid-" + id); // key in etcd
+                    return new PersistentAutoIncrement("rowid-" + tblId); // key in etcd
                 }
                 catch (EtcdException e)
                 {
-                    throw new RuntimeException(e); // wrap to unchecked, will rethrow below
+                    logger.error(e);
+                    throw new RuntimeException(e); // wrap to unchecked, will rethrow
                 }
             }
-        );
-        // 2. allocate numRowIds
-        try
-        {
+            );
+            // 2. allocate numRowIds
             long start = autoIncrement.getAndIncrement(numRowIds);
-            return IndexProto.RowIdBatch.newBuilder()
-                .setRowIdStart(start)
-                .setLength(numRowIds)
-                .build();
+            return IndexProto.RowIdBatch.newBuilder().setRowIdStart(start).setLength(numRowIds).build();
         }
-        catch (EtcdException e)
+        catch (RuntimeException | EtcdException e)
         {
             throw new RowIdException(e);
         }
@@ -141,7 +136,7 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean putRowId(long rowId, IndexProto.RowLocation rowLocation)
+    public boolean putEntry(long rowId, IndexProto.RowLocation rowLocation)
     {
         RowIdRange newRange = new RowIdRange(rowId, rowId);
         RgLocation rgLocation = new RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
@@ -149,7 +144,7 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public boolean deleteRowId(long rowId)
+    public boolean deleteEntry(long rowId)
     {
         int index = binarySearch(rowId);
         if (index < 0)

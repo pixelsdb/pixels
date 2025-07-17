@@ -62,7 +62,7 @@ public class MainIndexImplTest
                 .setRgRowId(0)
                 .build();
 
-        Assertions.assertTrue(mainIndex.putRowId(rowId, location));
+        Assertions.assertTrue(mainIndex.putEntry(rowId, location));
         IndexProto.RowLocation fetched = mainIndex.getLocation(rowId);
         Assertions.assertNotNull(fetched);
         Assertions.assertEquals(1, fetched.getFileId());
@@ -71,7 +71,7 @@ public class MainIndexImplTest
     }
 
     @Test
-    public void testDeleteRowId()
+    public void testDeleteEntry()
     {
         long rowId = 2000L;
         IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
@@ -80,10 +80,10 @@ public class MainIndexImplTest
                 .setRgRowId(0)
                 .build();
 
-        Assertions.assertTrue(mainIndex.putRowId(rowId, location));
+        Assertions.assertTrue(mainIndex.putEntry(rowId, location));
         Assertions.assertNotNull(mainIndex.getLocation(rowId));
 
-        Assertions.assertTrue(mainIndex.deleteRowId(rowId));
+        Assertions.assertTrue(mainIndex.deleteEntry(rowId));
         Assertions.assertNull(mainIndex.getLocation(rowId));
     }
 
@@ -131,7 +131,7 @@ public class MainIndexImplTest
                 .setRgId(40)
                 .setRgRowId(0)
                 .build();
-        Assertions.assertTrue(mainIndex.putRowId(0L, dummyLocation));
+        Assertions.assertTrue(mainIndex.putEntry(0L, dummyLocation));
     }
 
     @Test
@@ -167,7 +167,7 @@ public class MainIndexImplTest
                             .setRgId(10)
                             .setRgRowId(0)
                             .build();
-                    Assertions.assertTrue(mainIndex.putRowId(rowId, dummyLocation));
+                    Assertions.assertTrue(mainIndex.putEntry(rowId, dummyLocation));
 
                     // Test getLocation()
                     IndexProto.RowLocation fetched = mainIndex.getLocation(rowId);
@@ -175,7 +175,7 @@ public class MainIndexImplTest
                     Assertions.assertEquals(100 + threadNum, fetched.getFileId());
 
                     // Test deleteRowId()
-                    Assertions.assertTrue(mainIndex.deleteRowId(rowId));
+                    Assertions.assertTrue(mainIndex.deleteEntry(rowId));
                     Assertions.assertNull(mainIndex.getLocation(rowId));
                 } finally {
                     latch.countDown();

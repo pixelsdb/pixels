@@ -105,7 +105,7 @@ public interface SinglePointIndex extends Closeable
      * @return the row ids
      * @throws SinglePointIndexException
      */
-    long[] getNonUniqueRowIds(IndexProto.IndexKey key) throws SinglePointIndexException;
+    List<Long> getNonUniqueRowIds(IndexProto.IndexKey key) throws SinglePointIndexException;
 
     /**
      * Put an entry into this single point index.

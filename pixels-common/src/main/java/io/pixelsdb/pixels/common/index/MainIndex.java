@@ -63,7 +63,7 @@ public interface MainIndex extends Closeable
      * @param rowLocation the location of the row id
      * @return true on success
      */
-    boolean putRowId(long rowId, IndexProto.RowLocation rowLocation);
+    boolean putEntry(long rowId, IndexProto.RowLocation rowLocation);
 
     /**
      * Delete a single row id from the main index. {@link #getLocation(long)} of a row id within a deleted range
@@ -71,24 +71,7 @@ public interface MainIndex extends Closeable
      * @param rowId the row id range to be deleted
      * @return true on success
      */
-    boolean deleteRowId(long rowId);
-
-    /**
-     * Put a range of row ids into the main index. In pixels, we may allocate the row ids in batches (ranges)
-     * and put the row id range into the main index at once.
-     * @param rowIdRange the row id range
-     * @param rgLocation the location
-     * @return true on success
-     */
-    boolean putRowIds(RowIdRange rowIdRange, RgLocation rgLocation);
-
-    /**
-     * Delete a range of row ids from the main index. {@link #getLocation(long)} of a row id within a deleted range
-     * should return null.
-     * @param rowIdRange the row id range to be deleted
-     * @return true on success
-     */
-    boolean deleteRowIds(RowIdRange rowIdRange);
+    boolean deleteEntry(long rowId);
 
     /**
      * Persist the main index into persistent storage.

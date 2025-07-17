@@ -112,8 +112,8 @@
         </dependency>
 
         <dependency>
-            <groupId>org.rocksdb</groupId>
-            <artifactId>rocksdbjni</artifactId>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
             <optional>true</optional>
         </dependency>
 

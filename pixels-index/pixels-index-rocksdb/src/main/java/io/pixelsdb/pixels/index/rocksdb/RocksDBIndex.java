@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
@@ -139,7 +140,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long[] getNonUniqueRowIds(IndexProto.IndexKey key)
+    public List<Long> getNonUniqueRowIds(IndexProto.IndexKey key)
     {
         List<Long> rowIdList = new ArrayList<>();
 
@@ -169,14 +170,14 @@ public class RocksDBIndex implements SinglePointIndex
                 }
             }
             // Convert List<Long> to long[]
-            return parseRowIds(rowIdList);
+            return rowIdList;
         }
         catch (Exception e)
         {
             LOGGER.error("Failed to get row IDs for key: {}", key, e);
         }
         // Return empty array if key doesn't exist or exception occurs
-        return new long[0];
+        return ImmutableList.of();
     }
 
     @Override
@@ -384,16 +385,5 @@ public class RocksDBIndex implements SinglePointIndex
 
         // Convert rowId to long
         return ByteBuffer.wrap(rowIdBytes).getLong();
-    }
-
-    // Helper method to parse multiple rowIds
-    private long[] parseRowIds(List<Long> rowIdList)
-    {
-        long[] rowIds = new long[rowIdList.size()];
-        for (int i = 0; i < rowIdList.size(); i++)
-        {
-            rowIds[i] = rowIdList.get(i);
-        }
-        return rowIds;
     }
 }
