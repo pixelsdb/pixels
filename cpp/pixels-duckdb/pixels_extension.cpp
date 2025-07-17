@@ -62,23 +62,26 @@ namespace duckdb
         return std::move(table_function);
     }
 
-    void PixelsExtension::Load(DuckDB &db)
-    {
-        Connection con(*db.instance);
+
+    void PixelsExtension::Load(ExtensionLoader &loader) {
+        auto &db_instance=loader.GetDatabaseInstance();
+        Connection con(db_instance);
         con.BeginTransaction();
 
-        auto &context = *con.context;
-        auto &catalog = Catalog::GetSystemCatalog(*con.context);
+        auto &context=*con.context;
+        auto &catalog=Catalog::GetSystemCatalog(*con.context);
 
-        auto scan_fun = PixelsScanFunction::GetFunctionSet();
+        auto scan_fun=PixelsScanFunction::GetFunctionSet();
+
         CreateTableFunctionInfo cinfo(scan_fun);
         cinfo.name = "pixels_scan";
 
         catalog.CreateTableFunction(context, &cinfo);
         con.Commit();
 
-        auto &config = DBConfig::GetConfig(*db.instance);
+        auto &config = DBConfig::GetConfig(db_instance);
         config.replacement_scans.emplace_back(PixelsScanReplacement);
+
     }
 
     std::string PixelsExtension::Name()

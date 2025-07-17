@@ -38,9 +38,11 @@
  * structure that is used in the inner loop of query execution.
  */
 
+#include "duckdb.h"
+
+#include "exception/InvalidArgumentException.h"
 #include <iostream>
 #include <memory>
-#include "exception/InvalidArgumentException.h"
 
 /**
  * ColumnVector derived from org.apache.hadoop.hive.ql.exec.vector.
@@ -83,6 +85,8 @@ public:
     uint64_t *isValid;
 
     explicit ColumnVector(uint64_t len, bool encoding);
+
+    idx_t getCapacity() const;
 
     void increment(uint64_t size);              // increment the readIndex
     bool isFull();                         // if the readIndex reaches length
