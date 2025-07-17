@@ -134,7 +134,7 @@ public class MainIndexImpl implements MainIndex
             return IndexProto.RowLocation.newBuilder()
                     .setFileId(rgLocation.getFileId())
                     .setRgId(rgLocation.getRowGroupId())
-                    .setRgRowId((int) (rowId - entry.getRowIdRange().getStartRowId())) // Calculate the offset within the row group
+                    .setRgRowId((int) (rowId - entry.getRowIdRange().getRowIdStart())) // Calculate the offset within the row group
                     .build();
         }
         return null; // Return null if not found
@@ -143,7 +143,8 @@ public class MainIndexImpl implements MainIndex
     @Override
     public boolean putEntry(long rowId, IndexProto.RowLocation rowLocation)
     {
-        RowIdRange newRange = new RowIdRange(rowId, rowId);
+        RowIdRange newRange = new RowIdRange(rowId, rowId, rowLocation.getFileId(),
+                rowLocation.getRgId(), rowLocation.getRgRowId(), rowLocation.getRgRowId()+1);
         RgLocation rgLocation = new RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
         return putRowIds(newRange, rgLocation);
     }
@@ -161,20 +162,20 @@ public class MainIndexImpl implements MainIndex
         Entry entry = entries.get(index);
         RowIdRange original = entry.getRowIdRange();
 
-        long start = original.getStartRowId();
-        long end = original.getEndRowId();
+        long start = original.getRowIdStart();
+        long end = original.getRowIdEnd();
         // lock
         rwLock.writeLock().lock();
         entries.remove(index);
         // In-place insert the remaining entries
         if (rowId > start)
         {
-            entries.add(index, new Entry(new RowIdRange(start, rowId - 1), entry.getRgLocation()));
+            entries.add(index, new Entry(new RowIdRange(start, rowId - 1, 1L, 0, 0, 0), entry.getRgLocation()));
             index++;
         }
         if (rowId < end)
         {
-            entries.add(index, new Entry(new RowIdRange(rowId + 1, end), entry.getRgLocation()));
+            entries.add(index, new Entry(new RowIdRange(rowId + 1, end, 1L, 0, 0, 0), entry.getRgLocation()));
         }
         rwLock.writeLock().unlock();
         dirty = true;
@@ -184,8 +185,8 @@ public class MainIndexImpl implements MainIndex
     @Override
     public boolean putRowIds(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
     {
-        long start = rowIdRangeOfRg.getStartRowId();
-        long end = rowIdRangeOfRg.getEndRowId();
+        long start = rowIdRangeOfRg.getRowIdStart();
+        long end = rowIdRangeOfRg.getRowIdEnd();
         if (start > end)
         {
             logger.error("Invalid RowIdRange: startRowId {} > endRowId {}", start, end);
@@ -196,10 +197,10 @@ public class MainIndexImpl implements MainIndex
         if (!entries.isEmpty())
         {
             RowIdRange lastRange = entries.get(entries.size() - 1).getRowIdRange();
-            if (start <= lastRange.getEndRowId())
+            if (start <= lastRange.getRowIdEnd())
             {
                 logger.error("Insert failure: RowIdRange [{}-{}] overlaps with previous [{}-{}]",
-                        start, end, lastRange.getStartRowId(), lastRange.getEndRowId());
+                        start, end, lastRange.getRowIdStart(), lastRange.getRowIdEnd());
                 return false;
             }
         }
@@ -213,17 +214,17 @@ public class MainIndexImpl implements MainIndex
     @Override
     public boolean deleteRowIds(RowIdRange targetRange)
     {
-        int index = binarySearch(targetRange.getStartRowId());
+        int index = binarySearch(targetRange.getRowIdStart());
         if (index < 0)
         {
-            logger.error("Delete failure: RowIdRange [{}-{}] not found", targetRange.getStartRowId(), targetRange.getEndRowId());
+            logger.error("Delete failure: RowIdRange [{}-{}] not found", targetRange.getRowIdStart(), targetRange.getRowIdEnd());
             return false;
         }
 
         Entry entry = entries.get(index);
         RowIdRange existingRange = entry.getRowIdRange();
 
-        if (existingRange.getStartRowId() == targetRange.getStartRowId() && existingRange.getEndRowId() == targetRange.getEndRowId())
+        if (existingRange.getRowIdStart() == targetRange.getRowIdStart() && existingRange.getRowIdEnd() == targetRange.getRowIdEnd())
         {
             rwLock.writeLock().lock();
             entries.remove(index);
@@ -234,8 +235,8 @@ public class MainIndexImpl implements MainIndex
         else
         {
             logger.error("Delete failure: RowIdRange [{}-{}] does not exactly match existing range [{}-{}]",
-                    targetRange.getStartRowId(), targetRange.getEndRowId(),
-                    existingRange.getStartRowId(), existingRange.getEndRowId());
+                    targetRange.getRowIdStart(), targetRange.getRowIdEnd(),
+                    existingRange.getRowIdStart(), existingRange.getRowIdEnd());
             return false;
         }
 
@@ -249,7 +250,7 @@ public class MainIndexImpl implements MainIndex
             // Iterate through entries and persist each to etcd
             for (Entry entry : entries)
             {
-                String key = "/mainindex/" + entry.getRowIdRange().getStartRowId();
+                String key = "/mainindex/" + entry.getRowIdRange().getRowIdStart();
                 String value = serializeEntry(entry); // Serialize Entry to string
                 etcdUtil.putKeyValue(key, value);
             }
@@ -308,11 +309,11 @@ public class MainIndexImpl implements MainIndex
             Entry entry = entries.get(mid);
             RowIdRange range = entry.getRowIdRange();
 
-            if (rowId >= range.getStartRowId() && rowId <= range.getEndRowId())
+            if (rowId >= range.getRowIdStart() && rowId <= range.getRowIdEnd())
             {
                 return mid; // Found the containing Entry
             }
-            else if (rowId < range.getStartRowId())
+            else if (rowId < range.getRowIdStart())
             {
                 high = mid - 1;
             }
@@ -329,8 +330,8 @@ public class MainIndexImpl implements MainIndex
     private String serializeEntry(Entry entry)
     {
         return String.format("{\"startRowId\": %d, \"endRowId\": %d, \"fieldId\": %d, \"rowGroupId\": %d}",
-                entry.getRowIdRange().getStartRowId(),
-                entry.getRowIdRange().getEndRowId(),
+                entry.getRowIdRange().getRowIdStart(),
+                entry.getRowIdRange().getRowIdEnd(),
                 entry.getRgLocation().getFileId(),
                 entry.getRgLocation().getRowGroupId());
     }

@@ -90,7 +90,7 @@ public class MainIndexImplTest
     @Test
     public void testPutRowIdsOfRgAndDeleteRowIds()
     {
-        RowIdRange range = new RowIdRange(3000L, 3004L);
+        RowIdRange range = new RowIdRange(3000L, 3004L, 1L, 0, 0, 4);
         MainIndex.RgLocation location = new MainIndex.RgLocation(3, 30);
 
         Assertions.assertTrue(mainIndex.putRowIds(range, location));
@@ -205,7 +205,7 @@ public class MainIndexImplTest
         List<RowIdRange> ranges = new ArrayList<>();
         for (int i = 0; i < threadCount; i++) {
             long base = 10_000L + i * 100;
-            ranges.add(new RowIdRange(base, base + 4));
+            ranges.add(new RowIdRange(base, base + 4, 1L, 0, 0, 4));
         }
 
         // Concurrent putRowIdsOfRg
@@ -218,7 +218,7 @@ public class MainIndexImplTest
 
                     Assertions.assertTrue(mainIndex.putRowIds(range, location));
 
-                    for (long id = range.getStartRowId(); id <= range.getEndRowId(); id++) {
+                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++) {
                         IndexProto.RowLocation loc = mainIndex.getLocation(id);
                         Assertions.assertNotNull(loc);
                         Assertions.assertEquals(threadNum, loc.getFileId());
@@ -242,7 +242,7 @@ public class MainIndexImplTest
                     RowIdRange range = ranges.get(threadNum);
 
                     Assertions.assertTrue(mainIndex.deleteRowIds(range));
-                    for (long id = range.getStartRowId(); id <= range.getEndRowId(); id++) {
+                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++) {
                         Assertions.assertNull(mainIndex.getLocation(id));
                     }
                 } finally {
@@ -261,7 +261,7 @@ public class MainIndexImplTest
 
     @Test
     public void testPersist() {
-        RowIdRange range = new RowIdRange(4000L, 4002L);
+        RowIdRange range = new RowIdRange(4000L, 4002L, 1L, 0, 0, 2);
         MainIndex.RgLocation location = new MainIndex.RgLocation(5, 50);
 
         Assertions.assertTrue(mainIndex.putRowIds(range, location));

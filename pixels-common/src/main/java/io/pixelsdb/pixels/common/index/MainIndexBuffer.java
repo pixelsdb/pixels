@@ -5,6 +5,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * @author hank
@@ -52,5 +53,10 @@ public class MainIndexBuffer
             return null;
         }
         return fileBuffer.get(rowId);
+    }
+
+    protected synchronized TreeSet<RowIdRange> flush (long fileId)
+    {
+
     }
 }
