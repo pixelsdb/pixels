@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -651,7 +652,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             for (int colId : targetColumns)
             {
                 // direct cache read is just for debug, so we just get this parameter here for simplicity.
-                // boolean direct = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.read.direct"));
+                boolean direct = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.read.direct"));
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
                 {
                     /**
@@ -665,7 +666,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier))
                     {
-                        ColumnChunkId chunkId = new ColumnChunkId((short) rgId, (short) colId, true/*direct*/);
+                        ColumnChunkId chunkId = new ColumnChunkId((short) rgId, (short) colId, direct);
                         cacheChunks.add(chunkId);
                     }
                     // if cache miss, add chunkId to be read from disks
@@ -690,6 +691,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             }
             if (shouldReadHiddenColumn)
             {
+                // direct cache read is just for debug, so we just get this parameter here for simplicity.
+                boolean direct = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.read.direct"));
                 // search for column chunk of the hidden timestamp column
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
                 {
@@ -698,7 +701,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     String cacheIdentifier = rgId + ":" + colId;
                     if (cacheOrder.contains(cacheIdentifier))
                     {
-                        ColumnChunkId chunkId = new ColumnChunkId((short) rgId, (short) colId, true/*direct*/);
+                        ColumnChunkId chunkId = new ColumnChunkId((short) rgId, (short) colId, direct);
                         cacheChunks.add(chunkId);
                     }
                     else
@@ -722,8 +725,12 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 short rgId = columnChunkId.rowGroupId;
                 short colId = columnChunkId.columnId;
 //                long getBegin = System.nanoTime();
-                ByteBuffer columnChunk = cacheReader.get(blockId, rgId, colId, columnChunkId.direct);
-                memoryUsage += columnChunkId.direct ? 0 : columnChunk.capacity();
+                ByteBuffer columnChunk = cacheReader.get(blockId, rgId, colId,
+                        columnChunkId.direct);
+                if(columnChunk != null)
+                {
+                    memoryUsage += columnChunkId.direct ? 0 : columnChunk.capacity();
+                }
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnChunk.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumnNum + colId] = columnChunk;
