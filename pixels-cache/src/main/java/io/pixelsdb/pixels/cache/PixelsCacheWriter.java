@@ -44,7 +44,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author guodong
  * @author hank
- * @author qfs
+ * @author alph00
  */
 public class PixelsCacheWriter
 {
@@ -207,7 +207,8 @@ public class PixelsCacheWriter
                 {
                     int zoneId = bucketToZoneMap.getBucketToZone(i);
                     zones.get(zoneId).loadIndex();
-                    switch (zones.get(zoneId).getZoneType()){
+                    switch (zones.get(zoneId).getZoneType())
+                    {
                         case LAZY:
                             bucketTypeInfo.incrementLazyBucketNum();
                             bucketTypeInfo.getLazyBucketIds().add(i);
@@ -397,7 +398,8 @@ public class PixelsCacheWriter
      * Currently, this is an interface for unit tests.
      * This method only updates index content and cache content (without touching headers)
      */
-    public void write(PixelsCacheKey key, byte[] value) throws IOException {
+    public void write(PixelsCacheKey key, byte[] value) throws IOException 
+    {
        int zoneId = bucketToZoneMap.getBucketToZone(locator.getLocation(key));
        PixelsZoneWriter zone = zones.get(zoneId);
        zone.write(key, value);
@@ -466,7 +468,7 @@ public class PixelsCacheWriter
                 }
                 int physicalLen;
                 long physicalOffset;
-                try(PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
+                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
                 {
                     if (pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
                     {
@@ -484,7 +486,8 @@ public class PixelsCacheWriter
                         short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                         short columnId = Short.parseShort(columnChunkIdStr[1]);
                         PixelsCacheKey key = new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId);
-                        if(locator.getLocation(key) != bucketId){
+                        if(locator.getLocation(key) != bucketId)
+                        {
                             continue;
                         }
 
@@ -497,7 +500,8 @@ public class PixelsCacheWriter
                         {
                             logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + currCacheOffset + "current bucketId: " + bucketId);
                             break outer_loop;
-                        } else
+                        } 
+                        else
                         {
                             zone.getRadix().put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
                                     new PixelsCacheIdx(currCacheOffset, physicalLen));
@@ -537,7 +541,8 @@ public class PixelsCacheWriter
      * @throws IOException
      */
     private int internalUpdateIncremental(int version, Layout layout, String[] files)
-            throws IOException, InterruptedException, NullPointerException {
+            throws IOException, InterruptedException, NullPointerException 
+    {
         int status = 0;
         /**
          * Get the new caching layout.
@@ -566,7 +571,7 @@ public class PixelsCacheWriter
         int rowGroupNumInLayout = compact.getNumRowGroupInFile();
         for (String file : files)
         {
-            try(PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file))
+            try (PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file))
             {
                 if(physicalReader.getRowGroupNum() < rowGroupNumInLayout)
                 {
@@ -589,14 +594,20 @@ public class PixelsCacheWriter
                     int zoneId = bucketToZoneMap.getBucketToZone(bucketId);
                     PixelsZoneWriter zone = zones.get(zoneId);
                     PixelsCacheIdx curCacheIdx = zone.getRadix().get(blockId, rowGroupId, columnId);
-                    if(curCacheIdx == null){
-                        if(missSurvivedIdxes.containsKey(blockId)){
+                    if(curCacheIdx == null)
+                    {
+                        if(missSurvivedIdxes.containsKey(blockId))
+                        {
                             missSurvivedIdxes.get(blockId).add(new PixelsCacheKey(blockId, rowGroupId, columnId));
-                        }else{
+                        }
+                        else
+                        {
                             missSurvivedIdxes.put(blockId, new ArrayList<>());
                             missSurvivedIdxes.get(blockId).add(new PixelsCacheKey(blockId, rowGroupId, columnId));
                         }
-                    }else{
+                    }
+                    else
+                    {
                         survivedIdxes.add(new PixelsCacheEntry(new PixelsCacheKey(blockId, rowGroupId, columnId), curCacheIdx));
                     }
                 }
@@ -621,8 +632,10 @@ public class PixelsCacheWriter
             int swapZoneId = bucketToZoneMap.getBucketToZone(swapBucketId);
             PixelsZoneWriter swapZone = zones.get(swapZoneId);
             // copy the survived cache elements from this lazy zone to the swap zone.
-            for (PixelsCacheEntry survivedIdx : survivedIdxes) {
-                if (locator.getLocation(survivedIdx.key) != bucketId) {
+            for (PixelsCacheEntry survivedIdx : survivedIdxes) 
+            {
+                if (locator.getLocation(survivedIdx.key) != bucketId) 
+                {
                     continue;
                 }
                 swapZone.getZoneFile().copyMemory(zone.getZoneFile().getAddress() + survivedIdx.idx.offset, swapZone.getZoneFile().getAddress() + newCacheOffset, survivedIdx.idx.length);
@@ -651,7 +664,7 @@ public class PixelsCacheWriter
                     // may be removed later.
                     file = ensureLocality(file);
                 }
-                try(PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
+                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
                 {
                     if(pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
                     {
@@ -670,7 +683,8 @@ public class PixelsCacheWriter
                         String[] columnChunkIdStr = newCachedColumnChunks.get(i).split(":");
                         short rowGroupId = Short.parseShort(columnChunkIdStr[0]);
                         short columnId = Short.parseShort(columnChunkIdStr[1]);
-                        if(locator.getLocation(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId)) != bucketId) {
+                        if(locator.getLocation(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId)) != bucketId) 
+                        {
                             continue;
                         }
                         PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
@@ -696,19 +710,25 @@ public class PixelsCacheWriter
                         }
                     }
                     // load missSurvivedIdxes from bottom storage
-                    if(missSurvivedIdxes.containsKey(pixelsPhysicalReader.getCurrentBlockId())){
-                        for(PixelsCacheKey key : missSurvivedIdxes.get(pixelsPhysicalReader.getCurrentBlockId())){
-                            if(locator.getLocation(key) != bucketId){
+                    if(missSurvivedIdxes.containsKey(pixelsPhysicalReader.getCurrentBlockId()))
+                    {
+                        for(PixelsCacheKey key : missSurvivedIdxes.get(pixelsPhysicalReader.getCurrentBlockId()))
+                        {
+                            if(locator.getLocation(key) != bucketId)
+                            {
                                 continue;
                             }
                             PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(key.rowGroupId);
                             PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(key.columnId);
                             physicalLen = chunkIndex.getChunkLength();
                             physicalOffset = chunkIndex.getChunkOffset();
-                            if(newCacheOffset + physicalLen >= swapZone.getZoneFile().getSize()){
+                            if(newCacheOffset + physicalLen >= swapZone.getZoneFile().getSize())
+                            {
                                 logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newCacheOffset + "current bucketId: " + bucketId);
                                 break outer_loop;
-                            }else{
+                            }
+                            else
+                            {
                                 byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                                 swapZone.getZoneFile().setBytes(newCacheOffset, columnChunk);
                                 swapZone.getRadix().put(key, new PixelsCacheIdx(newCacheOffset, physicalLen));
@@ -739,9 +759,11 @@ public class PixelsCacheWriter
             bucketToZoneMap.updateBucketZoneMap(bucketId,swapZoneId);
             // change zone type from lazy to swap
             long start = System.currentTimeMillis();
-            while(PixelsZoneUtil.getReaderCount(zone.getIndexFile()) > 0){
+            while(PixelsZoneUtil.getReaderCount(zone.getIndexFile()) > 0)
+            {
                 Thread.sleep(10);
-                if(System.currentTimeMillis() - start > 2*PixelsZoneUtil.ZONE_READ_LEASE_MS){
+                if(System.currentTimeMillis() - start > 2*PixelsZoneUtil.ZONE_READ_LEASE_MS)
+                {
                     PixelsZoneUtil.eliminateReaderCount(zone.getIndexFile());
                     break;
                 }
@@ -768,11 +790,13 @@ public class PixelsCacheWriter
      */
     public void expand() throws Exception
     {
-        if(bucketTypeInfo.getSwapBucketNum() == 0){
+        if(bucketTypeInfo.getSwapBucketNum() == 0)
+        {
             logger.warn("No swap zone, can not expand!");
             return;
         }
-        if(bucketToZoneMap.isMapFull(zoneNum + 1)){
+        if(bucketToZoneMap.isMapFull(zoneNum + 1))
+        {
             logger.warn("routing table is full, can not expand!");
             return;
         }
@@ -796,16 +820,19 @@ public class PixelsCacheWriter
         int newBucketId = bucketTypeInfo.getSwapBucketIds().get(0);
         bucketTypeInfo.getLazyBucketIds().add(newBucketId);
         bucketTypeInfo.incrementLazyBucketNum();
-        for(int i = 0; i < bucketTypeInfo.getSwapBucketNum() - 1; i++){
+        for(int i = 0; i < bucketTypeInfo.getSwapBucketNum() - 1; i++)
+        {
             bucketTypeInfo.getSwapBucketIds().set(i, bucketTypeInfo.getSwapBucketIds().get(i+1));
         }
         bucketTypeInfo.getSwapBucketIds().set(bucketTypeInfo.getSwapBucketNum() - 1, newZoneId);
-        for(int i = bucketTypeInfo.getSwapBucketNum() - 1; i > 0; i--){
+        for(int i = bucketTypeInfo.getSwapBucketNum() - 1; i > 0; i--)
+        {
             bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(i), bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(i-1)));
         }
         bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(0), firstSwapZoneId);
         // there is no data in the cache, just build a empty zone
-        if(this.files == null || this.files.size() == 0){
+        if(this.files == null || this.files.size() == 0)
+        {
             PixelsZoneUtil.setIndexVersion(newZone.getIndexFile(), PixelsZoneUtil.getIndexVersion(zones.get(bucketTypeInfo.getLazyBucketIds().get(0)).getIndexFile()));
             PixelsZoneUtil.setStatus(newZone.getZoneFile(), PixelsZoneUtil.ZoneStatus.OK.getId());
             bucketToZoneMap.updateBucketZoneMap(newBucketId, newZoneId);
@@ -817,7 +844,8 @@ public class PixelsCacheWriter
         long newZoneOffset = PixelsZoneUtil.ZONE_DATA_OFFSET;
         PixelsLocator pseudoLocator = new PixelsLocator(locator.getNodeNum());
         pseudoLocator.addNode();
-        for(int i = 0; i < pseudoLocator.getReplicaNum(); i++){
+        for(int i = 0; i < pseudoLocator.getReplicaNum(); i++)
+        {
             // Phase 1: find the next bucket by hashcycle
             long nextBucketId = pseudoLocator.findNextBucket(newBucketId, i);
             int nextZoneId = bucketToZoneMap.getBucketToZone(nextBucketId);
@@ -825,7 +853,7 @@ public class PixelsCacheWriter
             // Phase 2: copy data
             for (String file : this.files)
             {
-                try(PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
+                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
                 {
                     for (String cacheColumnChunkOrder : this.cachedColumnChunks)
                     {
@@ -834,33 +862,43 @@ public class PixelsCacheWriter
                         short columnId = Short.parseShort(columnChunkIdStr[1]);
                         long blockId = pixelsPhysicalReader.getCurrentBlockId();
                         PixelsCacheKey key = new PixelsCacheKey(blockId, rowGroupId, columnId);
-                        if(!pseudoLocator.isDataInReplica(key, newBucketId, i)){
+                        if(!pseudoLocator.isDataInReplica(key, newBucketId, i))
+                        {
                             continue;
                         }
                         PixelsCacheIdx curIdx = nextZone.getRadix().get(blockId, rowGroupId, columnId);
-                        if(curIdx != null){
-                            if(newZoneOffset + curIdx.length < newZone.getZoneFile().getSize()){
+                        if(curIdx != null)
+                        {
+                            if(newZoneOffset + curIdx.length < newZone.getZoneFile().getSize())
+                            {
                                 long srcAddr = nextZone.getZoneFile().getAddress() + curIdx.offset;
                                 long destAddr = newZone.getZoneFile().getAddress() + newZoneOffset;
                                 // direct memory copy, avoid intermediate byte array
                                 newZone.getZoneFile().copyMemory(srcAddr, destAddr, curIdx.length);
                                 newZone.getRadix().put(key, new PixelsCacheIdx(newZoneOffset, curIdx.length));
                                 newZoneOffset += curIdx.length;
-                            }else{
+                            }
+                            else
+                            {
                                 logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newZoneOffset + "current bucketId: " + newBucketId);
                             }
-                        }else{
+                        }
+                        else
+                        {
                             // Phase 3: load new hot data from the bottom storage, now just read the uncached hot data according to the last cache version.
                             PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                             PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
                             int physicalLen = (int) chunkIndex.getChunkLength();
                             long physicalOffset = chunkIndex.getChunkOffset();
-                            if(newZoneOffset + physicalLen < newZone.getZoneFile().getSize()){
+                            if(newZoneOffset + physicalLen < newZone.getZoneFile().getSize())
+                            {
                                 byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                                 newZone.getZoneFile().setBytes(newZoneOffset, columnChunk);
                                 newZone.getRadix().put(key, new PixelsCacheIdx(newZoneOffset, physicalLen));
                                 newZoneOffset += physicalLen;
-                            }else{
+                            }
+                            else
+                            {
                                 logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newZoneOffset + "current bucketId: " + newBucketId);
                             }
                         }
@@ -891,7 +929,8 @@ public class PixelsCacheWriter
      */
     public void shrink() throws Exception
     {
-        if (bucketTypeInfo.getLazyBucketNum() <= 0) {
+        if (bucketTypeInfo.getLazyBucketNum() <= 0) 
+        {
             logger.warn("No zone to shrink");
             return;
         }
@@ -916,11 +955,13 @@ public class PixelsCacheWriter
         bucketTypeInfo.getLazyBucketIds().remove(bucketTypeInfo.getLazyBucketNum() - 1);
         bucketTypeInfo.decrementLazyBucketNum();
         int lastSwapZoneId = bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(bucketTypeInfo.getSwapBucketNum() - 1));
-        for(int i = bucketTypeInfo.getSwapBucketNum() - 1; i > 0; i--){
+        for(int i = bucketTypeInfo.getSwapBucketNum() - 1; i > 0; i--)
+        {
             bucketTypeInfo.getSwapBucketIds().set(i, bucketTypeInfo.getSwapBucketIds().get(i-1));
         }
         bucketTypeInfo.getSwapBucketIds().set(0, lastLazyBucketId);
-        for(int i = 0; i < bucketTypeInfo.getSwapBucketNum()-1; i++){
+        for(int i = 0; i < bucketTypeInfo.getSwapBucketNum()-1; i++)
+        {
             bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(i), bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(i+1)-1));
         }
         bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(bucketTypeInfo.getSwapBucketNum() - 1), lastSwapZoneId-1);
@@ -1011,13 +1052,15 @@ public class PixelsCacheWriter
     /**
      * Currently, this is an interface for unit tests.
      */
-    public List<PixelsZoneWriter> getZones() {
+    public List<PixelsZoneWriter> getZones() 
+    {
        return zones;
-   }
+    }
 
     public void close() throws Exception
     {
-        for(PixelsZoneWriter zone:zones){
+        for(PixelsZoneWriter zone:zones)
+        {
             zone.close();
         }
         globalIndexFile.unmap();

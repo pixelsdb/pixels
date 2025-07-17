@@ -26,11 +26,11 @@ import org.apache.logging.log4j.Logger;
 import java.util.List;
 
 /**
- * Created at: 2024/2/17
- *
+ * @create 2024-02-17
  * @author alph00
  */
-public class PixelsBucketToZoneMap {
+public class PixelsBucketToZoneMap 
+{
     private static final Logger logger = LogManager.getLogger(PixelsBucketToZoneMap.class);
     MemoryMappedFile indexFile;
     long zoneNum;
@@ -42,51 +42,67 @@ public class PixelsBucketToZoneMap {
     final long sizeOfSlot = sizeOfRwAndCount + sizeOfBucketToZone;
     final long stepOfSlot = 3;
 
-    PixelsBucketToZoneMap(MemoryMappedFile indexFile, long zoneNum) {
+    PixelsBucketToZoneMap(MemoryMappedFile indexFile, long zoneNum) 
+    {
         this.indexFile = indexFile;
         this.zoneNum = zoneNum;
         this.startOfRwAndCounts = this.startOfMap + this.sizeOfBucketToZone;
     }
 
-    public void updateBucketZoneMap(long bucketId, int zoneId) {
+    public void updateBucketZoneMap(long bucketId, int zoneId) 
+    {
         indexFile.setIntVolatile(this.startOfMap + (bucketId << this.stepOfSlot), zoneId);
     }
 
-    public boolean initialize() {
-        if (indexFile.getSize() < this.startOfMap + (this.zoneNum << this.stepOfSlot)) {
+    public boolean initialize() 
+    {
+        if (indexFile.getSize() < this.startOfMap + (this.zoneNum << this.stepOfSlot)) 
+        {
             return false;
         }
-        for (int i = 0; i < this.zoneNum; i++) {
+        for (int i = 0; i < this.zoneNum; i++) 
+        {
             indexFile.setIntVolatile(this.startOfMap + (i << this.stepOfSlot), i);
             indexFile.setIntVolatile(this.startOfRwAndCounts + (i << this.stepOfSlot), 0);
         }
         return true;
     }
-     public boolean isMapFull(long num){
-        if (indexFile.getSize() < this.startOfMap + (num << this.stepOfSlot)) {
+
+    public boolean isMapFull(long num)
+    {
+        if (indexFile.getSize() < this.startOfMap + (num << this.stepOfSlot)) 
+        {
             return true;
         }
         return false;
-     }
+    }
 
-    public int getBucketToZone(long bucketId) {
+    public int getBucketToZone(long bucketId) 
+    {
         return indexFile.getIntVolatile(this.startOfMap + (bucketId << this.stepOfSlot));
     }
 
-    public int getHashNodeNum(){
+    public int getHashNodeNum()
+    {
         return indexFile.getIntVolatile(this.startOfHashNodeNum);
     }
 
-    public void setHashNodeNum(int hashNodeNum){
+    public void setHashNodeNum(int hashNodeNum)
+    {
         indexFile.setIntVolatile(this.startOfHashNodeNum, hashNodeNum);
     }
 
-    public void close() {
-        try {
-            if (indexFile != null) {
+    public void close() 
+    {
+        try 
+        {
+            if (indexFile != null) 
+            {
                 indexFile.unmap();
             }
-        } catch (Exception e) {
+        } 
+        catch (Exception e) 
+        {
             logger.error("Failed to unmap index file", e);
         }
     }

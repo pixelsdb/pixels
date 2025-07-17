@@ -28,11 +28,11 @@ import java.nio.ByteOrder;
 import java.util.List;
 
 /**
- * Created at: 2024/1/17
- *
+ * @create 2024-01-17
  * @author alph00
  */
-public class PixelsZoneWriter {
+public class PixelsZoneWriter 
+{
     private final static Logger logger = LogManager.getLogger(PixelsZoneWriter.class);
     private final MemoryMappedFile zoneFile;
     private final int zoneId;
@@ -44,55 +44,70 @@ public class PixelsZoneWriter {
     private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
 
-    public PixelsZoneWriter(String builderZoneLocation, String builderIndexLocation, long builderZoneSize, long builderIndexSize, int zoneId) throws Exception {
+    public PixelsZoneWriter(String builderZoneLocation, String builderIndexLocation, long builderZoneSize, long builderIndexSize, int zoneId) throws Exception 
+    {
         this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
         this.zoneFile = new MemoryMappedFile(builderZoneLocation, builderZoneSize);
         this.indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
         this.zoneId = zoneId;
     }
 
-    public void buildLazy(PixelsCacheConfig cacheConfig) throws Exception {
+    public void buildLazy(PixelsCacheConfig cacheConfig) throws Exception 
+    {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeLazy(indexFile, zoneFile);
     }
 
-    public void buildLazy() throws Exception {
+    public void buildLazy() throws Exception 
+    {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeLazy(indexFile, zoneFile);
     }
 
-    public void buildSwap(PixelsCacheConfig cacheConfig) throws Exception {
+    public void buildSwap(PixelsCacheConfig cacheConfig) throws Exception 
+    {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeSwap(indexFile, zoneFile);
     }
 
-    public void loadIndex() throws Exception {
+    public void loadIndex() throws Exception 
+    {
         radix = PixelsZoneUtil.loadRadixIndex(indexFile);
     }
 
-    public MemoryMappedFile getIndexFile() {
+    public MemoryMappedFile getIndexFile() 
+    {
         return indexFile;
     }
 
-    public PixelsRadix getRadix() {
+    public PixelsRadix getRadix() 
+    {
         return radix;
     }
 
-    public MemoryMappedFile getZoneFile() {
+    public MemoryMappedFile getZoneFile() 
+    {
         return zoneFile;
     }
 
-    public PixelsZoneUtil.ZoneType getZoneType() {
-        if (PixelsZoneUtil.getType(this.zoneFile) == PixelsZoneUtil.ZoneType.LAZY.getId()) {
+    public PixelsZoneUtil.ZoneType getZoneType() 
+    {
+        if (PixelsZoneUtil.getType(this.zoneFile) == PixelsZoneUtil.ZoneType.LAZY.getId()) 
+        {
             return PixelsZoneUtil.ZoneType.LAZY;
-        } else if (PixelsZoneUtil.getType(this.zoneFile) == PixelsZoneUtil.ZoneType.SWAP.getId()) {
+        } 
+        else if (PixelsZoneUtil.getType(this.zoneFile) == PixelsZoneUtil.ZoneType.SWAP.getId()) 
+        {
             return PixelsZoneUtil.ZoneType.SWAP;
-        } else {
+        } 
+        else 
+        {
             return PixelsZoneUtil.ZoneType.EAGER;
         }
     }
 
-    public boolean isZoneEmpty() {
+    public boolean isZoneEmpty() 
+    {
         return PixelsZoneUtil.getStatus(this.zoneFile) == PixelsZoneUtil.ZoneStatus.EMPTY.getId() &&
                 PixelsZoneUtil.getSize(this.zoneFile) == 0;
     }
@@ -100,12 +115,14 @@ public class PixelsZoneWriter {
     /**
      * Flush out index to index file from start.
      */
-    public void flushIndex() {
+    public void flushIndex() 
+    {
         // set index content offset, skip the index header.
         currentIndexOffset = PixelsZoneUtil.INDEX_RADIX_OFFSET;
         allocatedIndexOffset = PixelsZoneUtil.INDEX_RADIX_OFFSET;
         // if root contains nodes, which means the tree is not empty,then write nodes.
-        if (radix.getRoot().getSize() != 0) {
+        if (radix.getRoot().getSize() != 0) 
+        {
             writeRadix(radix.getRoot());
         }
     }
@@ -113,9 +130,12 @@ public class PixelsZoneWriter {
     /**
      * Write radix tree node.
      */
-    private void writeRadix(RadixNode node) {
-        if (flushNode(node)) {
-            for (RadixNode n : node.getChildren().values()) {
+    private void writeRadix(RadixNode node) 
+    {
+        if (flushNode(node)) 
+        {
+            for (RadixNode n : node.getChildren().values()) 
+            {
                 writeRadix(n);
             }
         }
@@ -127,15 +147,20 @@ public class PixelsZoneWriter {
      * Header: isKey(1 bit) + edgeSize(22 bits) + childrenSize(9 bits)
      * Child: leader(1 byte) + child_offset(7 bytes)
      */
-    private boolean flushNode(RadixNode node) {
+    private boolean flushNode(RadixNode node) 
+    {
         nodeBuffer.clear();
-        if (currentIndexOffset >= indexFile.getSize()) {
+        if (currentIndexOffset >= indexFile.getSize()) 
+        {
             logger.debug("Offset exceeds index size. Break. Current size: " + currentIndexOffset);
             return false;
         }
-        if (node.offset == 0) {
+        if (node.offset == 0) 
+        {
             node.offset = currentIndexOffset;
-        } else {
+        } 
+        else 
+        {
             currentIndexOffset = node.offset;
         }
         allocatedIndexOffset += node.getLengthInBytes();
@@ -143,13 +168,15 @@ public class PixelsZoneWriter {
         int edgeSize = node.getEdge().length;
         header = header | (edgeSize << 9);
         int isKeyMask = 1 << 31;
-        if (node.isKey()) {
+        if (node.isKey()) 
+        {
             header = header | isKeyMask;
         }
         header = header | node.getChildren().size();
         indexFile.setInt(currentIndexOffset, header);  // header
         currentIndexOffset += 4;
-        for (Byte key : node.getChildren().keySet()) {   // children
+        for (Byte key : node.getChildren().keySet()) 
+        {   // children
             RadixNode n = node.getChild(key);
             int len = n.getLengthInBytes();
             n.offset = allocatedIndexOffset;
@@ -158,8 +185,6 @@ public class PixelsZoneWriter {
             childId = childId | ((long) key << 56);  // leader
             childId = childId | n.offset;  // offset
             nodeBuffer.putLong(childId);
-//            indexFile.putLong(currentIndexOffset, childId);
-//            currentIndexOffset += 8;
         }
         byte[] nodeBytes = new byte[node.getChildren().size() * 8];
         nodeBuffer.flip();
@@ -168,7 +193,8 @@ public class PixelsZoneWriter {
         currentIndexOffset += nodeBytes.length;
         indexFile.setBytes(currentIndexOffset, node.getEdge()); // edge
         currentIndexOffset += node.getEdge().length;
-        if (node.isKey()) {  // value
+        if (node.isKey()) 
+        {  // value
             node.getValue().getBytes(cacheIdxBuffer);
             indexFile.setBytes(currentIndexOffset, cacheIdxBuffer.array());
             currentIndexOffset += 12;
@@ -176,7 +202,8 @@ public class PixelsZoneWriter {
         return true;
     }
 
-    public void close() throws Exception {
+    public void close() throws Exception 
+    {
         indexFile.unmap();
         zoneFile.unmap();
     }
@@ -184,9 +211,11 @@ public class PixelsZoneWriter {
     /**
      * Traverse radix to get all cached values, and put them into cachedColumnChunks list.
      */
-    private void traverseRadix(List<PixelsCacheIdx> cacheIdxes) {
+    private void traverseRadix(List<PixelsCacheIdx> cacheIdxes) 
+    {
         RadixNode root = radix.getRoot();
-        if (root.getSize() == 0) {
+        if (root.getSize() == 0) 
+        {
             return;
         }
         visitRadix(cacheIdxes, root);
@@ -197,26 +226,32 @@ public class PixelsZoneWriter {
      * Maybe considering using a stack to store edge values along the visitation path.
      * Push edges in as going deeper, and pop out as going shallower.
      */
-    private void visitRadix(List<PixelsCacheIdx> cacheIdxes, RadixNode node) {
-        if (node.isKey()) {
+    private void visitRadix(List<PixelsCacheIdx> cacheIdxes, RadixNode node) 
+    {
+        if (node.isKey()) 
+        {
             PixelsCacheIdx value = node.getValue();
             PixelsCacheIdx idx = new PixelsCacheIdx(value.offset, value.length);
             cacheIdxes.add(idx);
         }
-        for (RadixNode n : node.getChildren().values()) {
+        for (RadixNode n : node.getChildren().values()) 
+        {
             visitRadix(cacheIdxes, n);
         }
     }
 
-    public int getZoneId() {
+    public int getZoneId() 
+    {
         return zoneId;
     }
 
     /**
      * Change zone type from lazy to swap.
      */
-    public void changeZoneTypeL2S() {
-        if (getZoneType() != PixelsZoneUtil.ZoneType.LAZY) {
+    public void changeZoneTypeL2S() 
+    {
+        if (getZoneType() != PixelsZoneUtil.ZoneType.LAZY) 
+        {
             logger.info("L2S conversion requires LAZY zone, but the zone is not LAZY");
         }
         PixelsZoneUtil.setType(zoneFile, PixelsZoneUtil.ZoneType.SWAP.getId());
@@ -229,8 +264,10 @@ public class PixelsZoneWriter {
     /**
      * Change zone type from swap to lazy.
      */
-    public void changeZoneTypeS2L() {
-        if (getZoneType() != PixelsZoneUtil.ZoneType.SWAP) {
+    public void changeZoneTypeS2L() 
+    {
+        if (getZoneType() != PixelsZoneUtil.ZoneType.SWAP) 
+        {
             logger.info("S2L conversion requires SWAP zone, but the zone is not SWAP");
         }
         PixelsZoneUtil.setType(zoneFile, PixelsZoneUtil.ZoneType.LAZY.getId());

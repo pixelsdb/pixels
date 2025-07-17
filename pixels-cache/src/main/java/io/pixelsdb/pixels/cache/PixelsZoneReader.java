@@ -333,7 +333,8 @@ public class PixelsZoneReader implements AutoCloseable
     {
         try
         {
-            if (zoneFile != null) {
+            if (zoneFile != null) 
+            {
                 zoneFile.unmap();
             }
         }
@@ -343,7 +344,8 @@ public class PixelsZoneReader implements AutoCloseable
         }
         try
         {
-            if (indexFile != null) {
+            if (indexFile != null) 
+            {
                 indexFile.unmap();
             }
         }

@@ -23,14 +23,15 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * Created at: 2024/2/26
- *
+ * @create 2024-02-26
  * @author alph00
  */
 
-public class PixelsMurmurHasher implements PixelsHasher {
+public class PixelsMurmurHasher implements PixelsHasher 
+{
     @Override
-    public long getHashCode(String key) {
+    public long getHashCode(String key) 
+    {
         ByteBuffer buf = ByteBuffer.wrap(key.getBytes());
         int seed = 0x1234ABCD;
 
@@ -43,7 +44,8 @@ public class PixelsMurmurHasher implements PixelsHasher {
         long h = seed ^ (buf.remaining() * m);
 
         long k;
-        while (buf.remaining() >= 8) {
+        while (buf.remaining() >= 8) 
+        {
             k = buf.getLong();
 
             k *= m;
@@ -54,7 +56,8 @@ public class PixelsMurmurHasher implements PixelsHasher {
             h *= m;
         }
 
-        if (buf.remaining() > 0) {
+        if (buf.remaining() > 0) 
+        {
             ByteBuffer finish = ByteBuffer.allocate(8).order(
                     ByteOrder.LITTLE_ENDIAN);
             // for big-endian version, do this first:

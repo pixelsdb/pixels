@@ -21,11 +21,11 @@
 package io.pixelsdb.pixels.cache;
 
 /**
- * Created at: 2024/2/24
- *
+ * @create 2024-02-24
  * @author alph00
  */
 
-public interface PixelsHasher {
+public interface PixelsHasher 
+{
     public long getHashCode(String key);
 }

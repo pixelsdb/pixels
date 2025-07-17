@@ -26,11 +26,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created at: 2024/1/23
- *
+ * @create 2024-01-23
  * @author alph00
  */
-public class PixelsBucketTypeInfo {
+public class PixelsBucketTypeInfo 
+{
     private final static Logger logger = LogManager.getLogger(PixelsBucketTypeInfo.class);
     private int allBucketNum;
     private int swapBucketNum;
@@ -41,7 +41,8 @@ public class PixelsBucketTypeInfo {
     private final List<Integer> swapBucketIds;
     private final List<Integer> eagerBucketIds;
 
-    private PixelsBucketTypeInfo(Builder builder) {
+    private PixelsBucketTypeInfo(Builder builder) 
+    {
         this.allBucketNum = builder.allBucketNum;
         this.swapBucketNum = builder.swapBucketNum;
         this.lazyBucketNum = builder.lazyBucketNum;
@@ -51,7 +52,8 @@ public class PixelsBucketTypeInfo {
         this.eagerBucketIds = builder.eagerBucketIds;
     }
 
-    public static class Builder {
+    public static class Builder 
+    {
         private int allBucketNum = 2;
         private int swapBucketNum = 1;
         private int eagerBucketNum = 0;
@@ -61,8 +63,10 @@ public class PixelsBucketTypeInfo {
         private List<Integer> swapBucketIds = new ArrayList<>();
         private List<Integer> eagerBucketIds = new ArrayList<>();
 
-        public Builder(int allBucketNum) {
-            if (allBucketNum <= 0) {
+        public Builder(int allBucketNum) 
+        {
+            if (allBucketNum <= 0) 
+            {
                 throw new IllegalArgumentException("allBucketNum must be positive");
             }
             this.allBucketNum = allBucketNum;
@@ -70,120 +74,148 @@ public class PixelsBucketTypeInfo {
             validate();
         }
 
-        private void validate() {
-            if (swapBucketNum < 0 || eagerBucketNum < 0 || lazyBucketNum < 0) {
+        private void validate() 
+        {
+            if (swapBucketNum < 0 || eagerBucketNum < 0 || lazyBucketNum < 0) 
+            {
                 throw new IllegalStateException("Bucket counts can't be negative");
             }
-            if (swapBucketNum + eagerBucketNum + lazyBucketNum != allBucketNum) {
-                    throw new IllegalStateException("Sum of buckets must equal allBucketNum");
+            if (swapBucketNum + eagerBucketNum + lazyBucketNum != allBucketNum) 
+            {
+                throw new IllegalStateException("Sum of buckets must equal allBucketNum");
             }
         }
 
-        public Builder setAllBucketNum(int allBucketNum) {
+        public Builder setAllBucketNum(int allBucketNum) 
+        {
             this.allBucketNum = allBucketNum;
             return this;
         }
 
-        public Builder setLazyBucketNum(int lazyBucketNum) {
+        public Builder setLazyBucketNum(int lazyBucketNum) 
+        {
             this.lazyBucketNum = lazyBucketNum;
             return this;
         }
 
-        public Builder setSwapBucketNum(int swapBucketNum) {
+        public Builder setSwapBucketNum(int swapBucketNum) 
+        {
             this.swapBucketNum = swapBucketNum;
             return this;
         }
 
-        public Builder setEagerBucketNum(int eagerBucketNum) {
+        public Builder setEagerBucketNum(int eagerBucketNum) 
+        {
             this.eagerBucketNum = eagerBucketNum;
             return this;
         }
 
-        public Builder setLazyBucketIds(List<Integer> lazyBucketIds) {
+        public Builder setLazyBucketIds(List<Integer> lazyBucketIds) 
+        {
             this.lazyBucketIds = lazyBucketIds;
             return this;
         }
 
-        public Builder setSwapBucketIds(List<Integer> swapBucketIds) {
+        public Builder setSwapBucketIds(List<Integer> swapBucketIds) 
+        {
             this.swapBucketIds = swapBucketIds;
             return this;
         }
 
-        public Builder setEagerBucketIds(List<Integer> eagerBucketIds) {
+        public Builder setEagerBucketIds(List<Integer> eagerBucketIds) 
+        {
             this.eagerBucketIds = eagerBucketIds;
             return this;
         }
 
-        public PixelsBucketTypeInfo build() {
+        public PixelsBucketTypeInfo build() 
+        {
             return new PixelsBucketTypeInfo(this);
         }
     }
 
-    public static Builder newBuilder(int allBucketNum) {
+    public static Builder newBuilder(int allBucketNum) 
+    {
         return new Builder(allBucketNum);
     }
 
-    public int getAllBucketNum() {
+    public int getAllBucketNum() 
+    {
         return allBucketNum;
     }
 
-    public void setAllBucketNum(int allBucketNum) {
+    public void setAllBucketNum(int allBucketNum) 
+    {
         this.allBucketNum = allBucketNum;
     }
 
-    public int getSwapBucketNum() {
+    public int getSwapBucketNum() 
+    {
         return swapBucketNum;
     }
 
-    public void setSwapBucketNum(int swapBucketNum) {
+    public void setSwapBucketNum(int swapBucketNum) 
+    {
         this.swapBucketNum = swapBucketNum;
     }
 
-    public int getLazyBucketNum() {
+    public int getLazyBucketNum() 
+    {
         return lazyBucketNum;
     }
 
-    public void setLazyBucketNum(int lazyBucketNum) {
+    public void setLazyBucketNum(int lazyBucketNum) 
+    {
         this.lazyBucketNum = lazyBucketNum;
     }
 
-    public int getEagerBucketNum() {
+    public int getEagerBucketNum() 
+    {
         return eagerBucketNum;
     }
 
-    public void setEagerBucketNum(int eagerBucketNum) {
+    public void setEagerBucketNum(int eagerBucketNum) 
+    {
         this.eagerBucketNum = eagerBucketNum;
     }
 
-    public void incrementLazyBucketNum() {
+    public void incrementLazyBucketNum() 
+    {
         this.lazyBucketNum++;
     }
 
-    public void incrementSwapBucketNum() {
+    public void incrementSwapBucketNum() 
+    {
         this.swapBucketNum++;
     }
 
-    public void incrementEagerBucketNum() {
+    public void incrementEagerBucketNum() 
+    {
         this.eagerBucketNum++;
     }
 
-    public void decrementLazyBucketNum() {
+    public void decrementLazyBucketNum() 
+    {
         this.lazyBucketNum--;
     }
 
-    public List<Integer> getLazyBucketIds() {
+    public List<Integer> getLazyBucketIds() 
+    {
         return lazyBucketIds;
     }
 
-    public List<Integer> getSwapBucketIds() {
+    public List<Integer> getSwapBucketIds() 
+    {
         return swapBucketIds;
     }
 
-    public List<Integer> getEagerBucketIds() {
+    public List<Integer> getEagerBucketIds() 
+    {
         return eagerBucketIds;
     }
 
-    public void close() {
+    public void close() 
+    {
         lazyBucketIds.clear();
         swapBucketIds.clear();
         eagerBucketIds.clear();

@@ -28,61 +28,75 @@ import java.util.*;
 
 /**
  * pixels cache reader.
+ * This was moved from the previous non-zoned PixelsCache Reader.
  *
  * @author alph00
  */
-public class PixelsCacheReader implements AutoCloseable {
+public class PixelsCacheReader implements AutoCloseable
+{
     private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
     private final PixelsLocator locator;
     private final List<PixelsZoneReader> zones;
     private final PixelsBucketToZoneMap bucketToZoneMap;
 
-    private PixelsCacheReader(PixelsLocator builderLocator, List<PixelsZoneReader> builderZones, PixelsBucketToZoneMap bucketToZoneMap) {
+    private PixelsCacheReader(PixelsLocator builderLocator, List<PixelsZoneReader> builderZones, PixelsBucketToZoneMap bucketToZoneMap)
+    {
         this.zones = builderZones;
         this.locator = builderLocator;
         this.bucketToZoneMap = bucketToZoneMap;
     }
 
-    public static class Builder {
+    public static class Builder
+    {
         private List<MemoryMappedFile> zoneFiles;
         private List<MemoryMappedFile> indexFiles;
         private MemoryMappedFile globalIndexFile;
         private int zoneNum = 0;
         private int swapZoneNum = 1;
 
-        private Builder() {
+        private Builder()
+        {
         }
 
         // we calculate zoneNum from zoneFiles including swap zone
-        public PixelsCacheReader.Builder setCacheFile(List<MemoryMappedFile> zoneFiles) {
+        public PixelsCacheReader.Builder setCacheFile(List<MemoryMappedFile> zoneFiles)
+        {
             this.zoneFiles = zoneFiles;
-            if(zoneFiles != null) {
+            if (zoneFiles != null)
+            {
                 zoneNum = zoneFiles.size();
-            } else {
+            }
+            else
+            {
                 zoneNum = 0;
             }
             return this;
         }
 
-        public PixelsCacheReader.Builder setIndexFile(List<MemoryMappedFile> indexFiles) {
+        public PixelsCacheReader.Builder setIndexFile(List<MemoryMappedFile> indexFiles)
+        {
             this.indexFiles = indexFiles;
             return this;
         }
 
-        public PixelsCacheReader.Builder setGlobalIndexFile(MemoryMappedFile globalIndexFile) {
+        public PixelsCacheReader.Builder setGlobalIndexFile(MemoryMappedFile globalIndexFile)
+        {
             this.globalIndexFile = globalIndexFile;
             return this;
         }
 
         // now this function is not used, swapZoneNum is set to 1 by default
-        public PixelsCacheReader.Builder setSwapZoneNum(int swapZoneNum) {
+        public PixelsCacheReader.Builder setSwapZoneNum(int swapZoneNum)
+        {
             this.swapZoneNum = swapZoneNum;
             return this;
         }
 
-        public PixelsCacheReader build() {
+        public PixelsCacheReader build()
+        {
             List<PixelsZoneReader> builderZones = new ArrayList<>();
-            for (int i = 0; i < zoneNum; i++) {
+            for (int i = 0; i < zoneNum; i++)
+            {
                 builderZones.add(PixelsZoneReader.newBuilder().setZoneFile(zoneFiles.get(i)).setIndexFile(indexFiles.get(i)).build());
             }
             PixelsLocator builderLocator = new PixelsLocator(zoneNum - swapZoneNum);
@@ -91,16 +105,20 @@ public class PixelsCacheReader implements AutoCloseable {
         }
     }
 
-    public static PixelsCacheReader.Builder newBuilder() {
+    public static PixelsCacheReader.Builder newBuilder()
+    {
         return new PixelsCacheReader.Builder();
     }
 
-    public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct) {
+    public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct)
+    {
         // update the hashcycle in locator in the PixelsCacheReader
         int hashNodeNum = bucketToZoneMap.getHashNodeNum();
         int originalNodeNum = locator.getNodeNum();
-        if(hashNodeNum != originalNodeNum){
-            if(hashNodeNum > originalNodeNum){
+        if (hashNodeNum != originalNodeNum) 
+        {
+            if (hashNodeNum > originalNodeNum) 
+            {
                 // expand
                 String originZoneName  = zones.get(0).getZoneFile().getName();
                 String baseZoneName    = originZoneName.substring(0, originZoneName.lastIndexOf('.'));
@@ -109,20 +127,26 @@ public class PixelsCacheReader implements AutoCloseable {
                 long zoneSize = zones.get(0).getZoneFile().getSize();
                 long indexSize = zones.get(0).getIndexFile().getSize();
                 
-                for(int i = originalNodeNum; i < hashNodeNum; i++){
+                for (int i = originalNodeNum; i < hashNodeNum; i++) 
+                {
                     int newZoneId = zones.size();// the new physical zone id is the size of the zone list
                     String newZoneLocation = baseZoneName + "." + newZoneId;
                     String newIndexLocation = baseIndexName + "." + newZoneId;
-                    try{
+                    try 
+                    {
                         zones.add(new PixelsZoneReader(newZoneLocation, newIndexLocation, zoneSize, indexSize));
-                    }catch(Exception e){
+                    } 
+                    catch (Exception e) 
+                    {
                         logger.warn("Failed to synchronize with writer expansion: could not create zone reader", e);
                         return null;
                     }
                     locator.addNode();
                 }
                 logger.info("CacheReader detected cache expansion: zoneNum from {} to {}", originalNodeNum, hashNodeNum);
-            }else if(hashNodeNum < originalNodeNum){
+            } 
+            else if (hashNodeNum < originalNodeNum) 
+            {
                 // shrink
                 int lastLazyZoneId = originalNodeNum - 1;
                 locator.removeNode();
@@ -133,30 +157,39 @@ public class PixelsCacheReader implements AutoCloseable {
         }
         long bucketId = locator.getLocation(new PixelsCacheKey(blockId, rowGroupId, columnId));
         int zoneId = bucketToZoneMap.getBucketToZone(bucketId);
-        if (zoneId < 0 || zoneId >= zones.size()) {
+        if (zoneId < 0 || zoneId >= zones.size()) 
+        {
             logger.warn("Invalid zone id: {}", zoneId);
             return null;
         }
         PixelsZoneReader zone = zones.get(zoneId);
-        if (zone == null) {
+        if (zone == null) 
+        {
             logger.warn("Zone reader {} not initialized", zoneId);
             return null;
         }
         return zone.get(blockId, rowGroupId, columnId, direct);
     }
 
-    public void close() {
-        try {
-            for (PixelsZoneReader zone : zones) {
+    public void close() 
+    {
+        try 
+        {
+            for (PixelsZoneReader zone : zones) 
+            {
                 zone.close();
             }
-            if (bucketToZoneMap != null) {
+            if (bucketToZoneMap != null) 
+            {
                 bucketToZoneMap.close();
             }
-            if (locator != null) {                
+            if (locator != null) 
+            {
                 locator.close();
             }
-        } catch (Exception e) {
+        } 
+        catch (Exception e) 
+        {
             e.printStackTrace();
         }
     }

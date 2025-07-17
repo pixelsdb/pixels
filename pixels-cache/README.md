@@ -42,6 +42,10 @@ cache.size=68719476736
 index.location=/mnt/ramfs/pixels.index
 # the size of the index file of pixels-cache in bytes
 index.size=1073741824
+# the number of zones in the cache
+cache.zone.num=3
+# the number of swap zones in the cache
+cache.zone.swap.num=1
 # the scheme of the storage system to be cached
 cache.storage.scheme=hdfs
 # set to true if cache.storage.scheme is a locality sensitive storage such as hdfs
@@ -135,3 +139,23 @@ Then, run:
 on any node in the cluster to reset the states related to pixels-cache in etcd.
 If you have modified the `etcd` hostname and port in `PIXELS_HOME/etc/pixels.properties`, change the `ENDPOINTS` property
 in `reset-cache.sh` as well.
+
+## Cache Scaling
+
+To enable cache scaling, set `cache_expand_or_shrink` to `1` or `2` in etcd to trigger cache expansion or shrink.
+The field values are interpreted as follows:
+- `0`: No scaling operation (default state)
+- `1`: Trigger cache expansion (scale out)
+- `2`: Trigger cache shrink (scale in)
+
+```bash
+# Set cache_expand_or_shrink to 1 to trigger cache expansion
+etcdctl --endpoints=$host:$port put cache_expand_or_shrink 1
+```
+
+**Notes for Cache Scaling:**
+
+- The scaling operation does not aim to modify the configuration file. Once the PixelsWorker restarts, the scaling effect is no longer active.
+- Now, Shrink cannot be used together with expansion within the same PixelsWorker lifecycle.
+- The cache can automatically create a new physical zone file, but the deleted physical zone file needs to be removed manually after the shrink operation. The deleted physical zone file is the one located before the swap zones (the swap zones are positioned before the last location). 
+- The added or deleted physical zone file requires pinning or unpinning manually.
