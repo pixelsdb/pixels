@@ -28,12 +28,12 @@ public class MainIndexBuffer
     }
 
     /**
-     * Insert a main index entry into this buffer.
+     * Insert a main index entry into this buffer if it does not exist in this buffer.
      * @param rowId the table row id of the entry
      * @param location the row location of the entry
-     * @return the previous row location of the same file, row group, and file id. Or null if this is a new entry
+     * @return true of the index entry does not exist and is put successfully in this buffer
      */
-    protected IndexProto.RowLocation insert(long rowId, IndexProto.RowLocation location)
+    protected boolean insert(long rowId, IndexProto.RowLocation location)
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(location.getFileId());
         if (fileBuffer == null)
@@ -41,11 +41,16 @@ public class MainIndexBuffer
             fileBuffer = new TreeMap<>();
             fileBuffer.put(rowId, location);
             indexBuffer.put(location.getFileId(), fileBuffer);
-            return null;
+            return true;
         }
         else
         {
-            return fileBuffer.put(rowId, location);
+            if (!fileBuffer.containsKey(rowId))
+            {
+                fileBuffer.put(rowId, location);
+                return true;
+            }
+            return false;
         }
     }
 

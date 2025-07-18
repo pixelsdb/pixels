@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.index.IndexProto;
 
@@ -54,7 +55,7 @@ public interface MainIndex extends Closeable
      * @param rowId the row id
      * @return the row location
      */
-    IndexProto.RowLocation getLocation(long rowId);
+    IndexProto.RowLocation getLocation(long rowId) throws MainIndexException;
 
     /**
      * Put a single row id into the main index, in order to enable simultaneous insert into the main index while

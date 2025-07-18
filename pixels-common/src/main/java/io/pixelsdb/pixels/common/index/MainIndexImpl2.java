@@ -29,10 +29,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.HashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -47,9 +44,8 @@ public class MainIndexImpl2 implements MainIndex
 
     private static final String createTableSql = "CREATE TABLE IF NOT EXISTS row_id_ranges" +
             "(row_id_start BIGINT NOT NULL, row_id_end BIGINT NOT NULL, file_id BIGINT NOT NULL, rg_id INT NOT NULL," +
-            "rg_row_id_start INT NOT NULL, rg_row_id_end INT NOT NULL)";
-    private static final String createIndexSql =
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_row_id_range ON row_id_ranges (row_id_start ASC, row_id_end ASC)";
+            "rg_row_id_start INT NOT NULL, rg_row_id_end INT NOT NULL, PRIMARY KEY (row_id_start, row_id_end))";
+    private static final String queryRowIdRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? < row_id_end";
 
     private final long tableId;
     private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
@@ -82,17 +78,11 @@ public class MainIndexImpl2 implements MainIndex
                 {
                     throw new MainIndexException("Failed to create table row_id_ranges");
                 }
-                res = statement.execute(createIndexSql);
-                if (!res)
-                {
-                    throw new MainIndexException("Failed to create index on row_id_range");
-                }
             }
         } catch (SQLException e)
         {
             throw new MainIndexException("failed to connect to sqlite", e);
         }
-
     }
 
     @Override
@@ -130,12 +120,40 @@ public class MainIndexImpl2 implements MainIndex
     }
 
     @Override
-    public IndexProto.RowLocation getLocation(long rowId)
+    public IndexProto.RowLocation getLocation(long rowId) throws MainIndexException
     {
         IndexProto.RowLocation location = this.indexBuffer.lookup(rowId);
         if (location == null)
         {
-
+            try (PreparedStatement pst = connection.prepareStatement(queryRowIdRangeSql))
+            {
+                pst.setLong(1, rowId);
+                pst.setLong(2, rowId);
+                try (ResultSet rs = pst.executeQuery())
+                {
+                    if (rs.next())
+                    {
+                        long rowIdStart = rs.getLong("row_id_start");
+                        long rowIdEnd = rs.getLong("row_id_end");
+                        long fileId = rs.getLong("file_id");
+                        int rgId = rs.getInt("rg_id");
+                        int rgRowIdStart = rs.getInt("rg_row_id_start");
+                        int rgRowIdEnd = rs.getInt("rg_row_id_end");
+                        if (rowIdEnd - rowIdStart != rgRowIdEnd - rgRowIdStart)
+                        {
+                            throw new MainIndexException("The width of row id range (" + rowIdStart + ", " + rgRowIdEnd +
+                                    ") does not match the width of row group row id range (" + rgRowIdStart + ", " + rgRowIdEnd + ")");
+                        }
+                        int offset = (int) (rowId - rowIdStart);
+                        location = IndexProto.RowLocation.newBuilder()
+                                .setFileId(fileId).setRgId(rgId).setRgRowId(rgRowIdStart + offset).build();
+                    }
+                }
+            }
+            catch (SQLException e)
+            {
+                throw new MainIndexException("failed to query row location from sqlite", e);
+            }
         }
         return location;
     }
@@ -143,10 +161,8 @@ public class MainIndexImpl2 implements MainIndex
     @Override
     public boolean putEntry(long rowId, IndexProto.RowLocation rowLocation)
     {
-        RowIdRange newRange = new RowIdRange(rowId, rowId, rowLocation.getFileId(),
-                rowLocation.getRgId(), rowLocation.getRgRowId(), rowLocation.getRgRowId()+1);
-        RgLocation rgLocation = new RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
-        return putRowIds(newRange, rgLocation);
+        boolean res = this.indexBuffer.insert(rowId, rowLocation);
+        return res;
     }
 
     @Override
@@ -180,66 +196,6 @@ public class MainIndexImpl2 implements MainIndex
         rwLock.writeLock().unlock();
         dirty = true;
         return true;
-    }
-
-    @Override
-    public boolean putRowIds(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
-    {
-        long start = rowIdRangeOfRg.getRowIdStart();
-        long end = rowIdRangeOfRg.getRowIdEnd();
-        if (start > end)
-        {
-            logger.error("Invalid RowIdRange: startRowId {} > endRowId {}", start, end);
-            return false;
-        }
-
-        // Check whether it conflicts with the last entry.
-        if (!entries.isEmpty())
-        {
-            RowIdRange lastRange = entries.get(entries.size() - 1).getRowIdRange();
-            if (start <= lastRange.getRowIdEnd())
-            {
-                logger.error("Insert failure: RowIdRange [{}-{}] overlaps with previous [{}-{}]",
-                        start, end, lastRange.getRowIdStart(), lastRange.getRowIdEnd());
-                return false;
-            }
-        }
-        rwLock.writeLock().lock();
-        entries.add(new Entry(rowIdRangeOfRg, rgLocation));
-        rwLock.writeLock().unlock();
-        dirty = true;
-        return true;
-    }
-
-    @Override
-    public boolean deleteRowIds(RowIdRange targetRange)
-    {
-        int index = binarySearch(targetRange.getRowIdStart());
-        if (index < 0)
-        {
-            logger.error("Delete failure: RowIdRange [{}-{}] not found", targetRange.getRowIdStart(), targetRange.getRowIdEnd());
-            return false;
-        }
-
-        Entry entry = entries.get(index);
-        RowIdRange existingRange = entry.getRowIdRange();
-
-        if (existingRange.getRowIdStart() == targetRange.getRowIdStart() && existingRange.getRowIdEnd() == targetRange.getRowIdEnd())
-        {
-            rwLock.writeLock().lock();
-            entries.remove(index);
-            rwLock.writeLock().unlock();
-            dirty = true;
-            return true;
-        }
-        else
-        {
-            logger.error("Delete failure: RowIdRange [{}-{}] does not exactly match existing range [{}-{}]",
-                    targetRange.getRowIdStart(), targetRange.getRowIdEnd(),
-                    existingRange.getRowIdStart(), existingRange.getRowIdEnd());
-            return false;
-        }
-
     }
 
     @Override
@@ -283,6 +239,7 @@ public class MainIndexImpl2 implements MainIndex
     {
         try
         {
+            this.connection.close();
             // Check dirty flag and persist to etcd if true
             if (!persistIfDirty())
             {
