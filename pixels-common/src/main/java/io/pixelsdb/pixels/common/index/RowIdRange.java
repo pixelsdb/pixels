@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.common.index;
 import java.util.Objects;
 
 /**
- * A range of continuous row ids. When writing data at high throughput,
+ * A range of continuous row ids in a file and row group. When writing data at high throughput,
  * we get a range of row ids at a time from the index cache, and insert it into the persistent main index storage.
  *
  * @author hank
@@ -31,13 +31,25 @@ import java.util.Objects;
 public class RowIdRange implements Comparable<RowIdRange>
 {
     // rowIdStart and rowIdEnd are the keys
+    /**
+     * inclusive
+     */
     private final long rowIdStart;
-    private final long rowIdEnd;
+    /**
+     * exclusive
+     */
+    private long rowIdEnd;
     // the following fields are the payloads
     private final long fileId;
     private final int rgId;
+    /**
+     * inclusive
+     */
     private final int rgRowIdStart;
-    private final int rgRowIdEnd;
+    /**
+     * exclusive
+     */
+    private int rgRowIdEnd;
 
     public RowIdRange(long rowIdStart, long rowIdEnd, long fileId, int rgId, int rgRowIdStart, int rgRowIdEnd)
     {
@@ -47,6 +59,14 @@ public class RowIdRange implements Comparable<RowIdRange>
         this.rgId = rgId;
         this.rgRowIdStart = rgRowIdStart;
         this.rgRowIdEnd = rgRowIdEnd;
+    }
+
+    public RowIdRange(long rowIdStart, long fileId, int rgId, int rgRowIdStart)
+    {
+        this.rowIdStart = rowIdStart;
+        this.fileId = fileId;
+        this.rgId = rgId;
+        this.rgRowIdStart = rgRowIdStart;
     }
 
     public long getRowIdStart()
@@ -77,6 +97,16 @@ public class RowIdRange implements Comparable<RowIdRange>
     public int getRgRowIdEnd()
     {
         return rgRowIdEnd;
+    }
+
+    public void setRowIdEnd(long rowIdEnd)
+    {
+        this.rowIdEnd = rowIdEnd;
+    }
+
+    public void setRgRowIdEnd(int rgRowIdEnd)
+    {
+        this.rgRowIdEnd = rgRowIdEnd;
     }
 
     @Override

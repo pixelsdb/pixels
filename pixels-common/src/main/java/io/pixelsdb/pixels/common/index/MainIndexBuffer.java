@@ -1,11 +1,10 @@
 package io.pixelsdb.pixels.common.index;
 
+import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
  * @author hank
@@ -55,8 +54,49 @@ public class MainIndexBuffer
         return fileBuffer.get(rowId);
     }
 
-    protected synchronized TreeSet<RowIdRange> flush (long fileId)
+    protected synchronized List<RowIdRange> flush (long fileId) throws MainIndexException
     {
-
+        Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(fileId);
+        if (fileBuffer == null)
+        {
+            return null;
+        }
+        ImmutableList.Builder<RowIdRange> ranges = ImmutableList.builder();
+        RowIdRange currRange = null;
+        long prevRowId = Long.MIN_VALUE;
+        int prevRgId = Integer.MIN_VALUE;
+        int prevRgRowId = Integer.MIN_VALUE;
+        for (Map.Entry<Long, IndexProto.RowLocation> entry : fileBuffer.entrySet())
+        {
+            // file buffer is a tree map, its entries are sorted in ascending order
+            long rowId = entry.getKey();
+            IndexProto.RowLocation location = entry.getValue();
+            if (location.getFileId() != fileId)
+            {
+                throw new MainIndexException("file index buffer contains invalid fileId: " + location.getFileId());
+            }
+            int rgId = location.getRgId();
+            int rgRowId = location.getRgRowId();
+            if (rowId != prevRowId + 1 || rgId != prevRgId || rgRowId != prevRgRowId + 1)
+            {
+                // occurs a new row group or a new range in the row group
+                if (currRange != null)
+                {
+                    // finish constructing the current row id range and add it to the ranges
+                    currRange.setRowIdEnd(prevRowId + 1);
+                    currRange.setRgRowIdEnd(prevRgRowId + 1);
+                    ranges.add(currRange);
+                }
+                // start constructing a new row id range
+                currRange = new RowIdRange(rowId, fileId, rgId, rgRowId);
+                prevRgId = rgId;
+            }
+            prevRowId = rowId;
+            prevRgRowId = rgRowId;
+        }
+        // release the flushed file index buffer
+        fileBuffer.clear();
+        indexBuffer.remove(fileId);
+        return ranges.build();
     }
 }
