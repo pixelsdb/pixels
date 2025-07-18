@@ -44,7 +44,7 @@ public class MainIndexImpl2 implements MainIndex
 
     private static final String createTableSql = "CREATE TABLE IF NOT EXISTS row_id_ranges" +
             "(row_id_start BIGINT NOT NULL, row_id_end BIGINT NOT NULL, file_id BIGINT NOT NULL, rg_id INT NOT NULL," +
-            "rg_row_id_start INT NOT NULL, rg_row_id_end INT NOT NULL, PRIMARY KEY (row_id_start, row_id_end))";
+            "rg_row_offset_start INT NOT NULL, rg_row_offset_end INT NOT NULL, PRIMARY KEY (row_id_start, row_id_end))";
     private static final String queryRowIdRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? < row_id_end";
 
     private final long tableId;
@@ -137,16 +137,16 @@ public class MainIndexImpl2 implements MainIndex
                         long rowIdEnd = rs.getLong("row_id_end");
                         long fileId = rs.getLong("file_id");
                         int rgId = rs.getInt("rg_id");
-                        int rgRowIdStart = rs.getInt("rg_row_id_start");
-                        int rgRowIdEnd = rs.getInt("rg_row_id_end");
-                        if (rowIdEnd - rowIdStart != rgRowIdEnd - rgRowIdStart)
+                        int rgRowOffsetStart = rs.getInt("rg_row_offset_start");
+                        int rgRowOffsetEnd = rs.getInt("rg_row_offset_end");
+                        if (rowIdEnd - rowIdStart != rgRowOffsetEnd - rgRowOffsetStart)
                         {
-                            throw new MainIndexException("The width of row id range (" + rowIdStart + ", " + rgRowIdEnd +
-                                    ") does not match the width of row group row id range (" + rgRowIdStart + ", " + rgRowIdEnd + ")");
+                            throw new MainIndexException("The width of row id range (" + rowIdStart + ", " + rgRowOffsetEnd +
+                                    ") does not match the width of row group row offset range (" + rgRowOffsetStart + ", " + rgRowOffsetEnd + ")");
                         }
                         int offset = (int) (rowId - rowIdStart);
                         location = IndexProto.RowLocation.newBuilder()
-                                .setFileId(fileId).setRgId(rgId).setRgRowId(rgRowIdStart + offset).build();
+                                .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
                     }
                 }
             }

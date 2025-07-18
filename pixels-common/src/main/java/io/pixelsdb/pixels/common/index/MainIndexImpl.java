@@ -144,7 +144,7 @@ public class MainIndexImpl implements MainIndex
     public boolean putEntry(long rowId, IndexProto.RowLocation rowLocation)
     {
         RowIdRange newRange = new RowIdRange(rowId, rowId, rowLocation.getFileId(),
-                rowLocation.getRgId(), rowLocation.getRgRowId(), rowLocation.getRgRowId()+1);
+                rowLocation.getRgId(), rowLocation.getRgRowOffset(), rowLocation.getRgRowOffset()+1);
         RgLocation rgLocation = new RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
         return putRowIds(newRange, rgLocation);
     }

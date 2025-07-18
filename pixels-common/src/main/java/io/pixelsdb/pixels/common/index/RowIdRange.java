@@ -45,28 +45,28 @@ public class RowIdRange implements Comparable<RowIdRange>
     /**
      * inclusive
      */
-    private final int rgRowIdStart;
+    private final int rgRowOffsetStart;
     /**
      * exclusive
      */
-    private int rgRowIdEnd;
+    private int rgRowOffsetEnd;
 
-    public RowIdRange(long rowIdStart, long rowIdEnd, long fileId, int rgId, int rgRowIdStart, int rgRowIdEnd)
+    public RowIdRange(long rowIdStart, long rowIdEnd, long fileId, int rgId, int rgRowOffsetStart, int rgRowOffsetEnd)
     {
         this.rowIdStart = rowIdStart;
         this.rowIdEnd = rowIdEnd;
         this.fileId = fileId;
         this.rgId = rgId;
-        this.rgRowIdStart = rgRowIdStart;
-        this.rgRowIdEnd = rgRowIdEnd;
+        this.rgRowOffsetStart = rgRowOffsetStart;
+        this.rgRowOffsetEnd = rgRowOffsetEnd;
     }
 
-    public RowIdRange(long rowIdStart, long fileId, int rgId, int rgRowIdStart)
+    public RowIdRange(long rowIdStart, long fileId, int rgId, int rgRowOffsetStart)
     {
         this.rowIdStart = rowIdStart;
         this.fileId = fileId;
         this.rgId = rgId;
-        this.rgRowIdStart = rgRowIdStart;
+        this.rgRowOffsetStart = rgRowOffsetStart;
     }
 
     public long getRowIdStart()
@@ -89,14 +89,14 @@ public class RowIdRange implements Comparable<RowIdRange>
         return rgId;
     }
 
-    public int getRgRowIdStart()
+    public int getRgRowOffsetStart()
     {
-        return rgRowIdStart;
+        return rgRowOffsetStart;
     }
 
-    public int getRgRowIdEnd()
+    public int getRgRowOffsetEnd()
     {
-        return rgRowIdEnd;
+        return rgRowOffsetEnd;
     }
 
     public void setRowIdEnd(long rowIdEnd)
@@ -104,9 +104,9 @@ public class RowIdRange implements Comparable<RowIdRange>
         this.rowIdEnd = rowIdEnd;
     }
 
-    public void setRgRowIdEnd(int rgRowIdEnd)
+    public void setRgRowOffsetEnd(int rgRowOffsetEnd)
     {
-        this.rgRowIdEnd = rgRowIdEnd;
+        this.rgRowOffsetEnd = rgRowOffsetEnd;
     }
 
     @Override

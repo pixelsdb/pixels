@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.daemon.index;
 
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
@@ -94,7 +95,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                 builder.setErrorCode(ErrorCode.SUCCESS).setRowLocation(IndexProto.RowLocation.getDefaultInstance());
             }
         }
-        catch (SinglePointIndexException e)
+        catch (SinglePointIndexException | MainIndexException e)
         {
             builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
         }
@@ -122,7 +123,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             }
             builder.setErrorCode(ErrorCode.SUCCESS).addAllRowLocations(rowLocations);
         }
-        catch (SinglePointIndexException e)
+        catch (SinglePointIndexException | MainIndexException e)
         {
             builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
         }
@@ -138,7 +139,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutPrimaryIndexEntryResponse.Builder builder = IndexProto.PutPrimaryIndexEntryResponse.newBuilder();
         try
         {
-            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getTableRowId(), true);
+            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId(), true);
             // TODO: put main index
             if (success)
             {
@@ -200,7 +201,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutSecondaryIndexEntryResponse.Builder builder = IndexProto.PutSecondaryIndexEntryResponse.newBuilder();
         try
         {
-            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getTableRowId(), entry.getUnique());
+            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId(), entry.getUnique());
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -301,7 +302,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         try
         {
             long rowId = singlePointIndex.deleteEntry(key);
-            builder.setErrorCode(ErrorCode.SUCCESS).setTableRowId(rowId);
+            builder.setErrorCode(ErrorCode.SUCCESS).setRowId(rowId);
         }
         catch (SinglePointIndexException e)
         {
@@ -320,7 +321,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         try
         {
             List<Long> rowIds = singlePointIndex.deleteEntries(keys);
-            builder.setErrorCode(ErrorCode.SUCCESS).addAllTableRowIds(rowIds);
+            builder.setErrorCode(ErrorCode.SUCCESS).addAllRowIds(rowIds);
         }
         catch (SinglePointIndexException e)
         {

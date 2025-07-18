@@ -27,7 +27,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * The main index of a table is the mapping from row id to data file.
+ * The main index of a table is the mapping from row id to the row offset in the data file.
  * Each version of each row has a unique row id.
  * The row id of each table is an unsigned int_64 increases from zero.
  *
@@ -37,13 +37,13 @@ import java.io.IOException;
 public interface MainIndex extends Closeable
 {
     /**
-     * Get the tableId of this mainIndex
+     * Get the tableId of this mainIndex.
      * @return the tableId
      */
     long getTableId();
 
     /**
-     * Allocate rowId batch for single point index
+     * Allocate rowId batch for single point index.
      * @param tableId the table id of single point index
      * @param numRowIds the rowId nums need to allocate
      * @return the RowIdBatch
@@ -58,8 +58,7 @@ public interface MainIndex extends Closeable
     IndexProto.RowLocation getLocation(long rowId) throws MainIndexException;
 
     /**
-     * Put a single row id into the main index, in order to enable simultaneous insert into the main index while
-     * inserting a single point index.
+     * Put a single row id into the main index.
      * @param rowId the row id
      * @param rowLocation the location of the row id
      * @return true on success
@@ -67,12 +66,12 @@ public interface MainIndex extends Closeable
     boolean putEntry(long rowId, IndexProto.RowLocation rowLocation);
 
     /**
-     * Delete a single row id from the main index. {@link #getLocation(long)} of a row id within a deleted range
+     * Delete range of row ids from the main index. {@link #getLocation(long)} of a row id within a deleted range
      * should return null.
-     * @param rowId the row id range to be deleted
+     * @param rowIdRange the row id range to be deleted
      * @return true on success
      */
-    boolean deleteEntry(long rowId);
+    boolean deleteRowIdRange(RowIdRange rowIdRange);
 
     /**
      * Persist the main index into persistent storage.

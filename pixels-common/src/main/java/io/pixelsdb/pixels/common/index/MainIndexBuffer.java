@@ -90,7 +90,7 @@ public class MainIndexBuffer
         RowIdRange currRange = null;
         long prevRowId = Long.MIN_VALUE;
         int prevRgId = Integer.MIN_VALUE;
-        int prevRgRowId = Integer.MIN_VALUE;
+        int prevRgRowOffset = Integer.MIN_VALUE;
         for (Map.Entry<Long, IndexProto.RowLocation> entry : fileBuffer.entrySet())
         {
             // file buffer is a tree map, its entries are sorted in ascending order
@@ -98,23 +98,23 @@ public class MainIndexBuffer
             IndexProto.RowLocation location = entry.getValue();
             checkArgument(fileId == location.getFileId());
             int rgId = location.getRgId();
-            int rgRowId = location.getRgRowId();
-            if (rowId != prevRowId + 1 || rgId != prevRgId || rgRowId != prevRgRowId + 1)
+            int rgRowOffset = location.getRgRowOffset();
+            if (rowId != prevRowId + 1 || rgId != prevRgId || rgRowOffset != prevRgRowOffset + 1)
             {
                 // occurs a new row group or a new range in the row group
                 if (currRange != null)
                 {
                     // finish constructing the current row id range and add it to the ranges
                     currRange.setRowIdEnd(prevRowId + 1);
-                    currRange.setRgRowIdEnd(prevRgRowId + 1);
+                    currRange.setRgRowOffsetEnd(prevRgRowOffset + 1);
                     ranges.add(currRange);
                 }
                 // start constructing a new row id range
-                currRange = new RowIdRange(rowId, fileId, rgId, rgRowId);
+                currRange = new RowIdRange(rowId, fileId, rgId, rgRowOffset);
                 prevRgId = rgId;
             }
             prevRowId = rowId;
-            prevRgRowId = rgRowId;
+            prevRgRowOffset = rgRowOffset;
         }
         // release the flushed file index buffer
         fileBuffer.clear();
