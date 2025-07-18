@@ -6,7 +6,12 @@ import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.*;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
+ * This is the index buffer for a main index.
+ * It is to be used inside the main index implementations and protected by the concurrent control in the main index,
+ * thus it is not necessary to be thread-safe.
  * @author hank
  * @create 2025-07-17
  */
@@ -28,7 +33,7 @@ public class MainIndexBuffer
      * @param location the row location of the entry
      * @return the previous row location of the same file, row group, and file id. Or null if this is a new entry
      */
-    protected synchronized IndexProto.RowLocation insert(long rowId, IndexProto.RowLocation location)
+    protected IndexProto.RowLocation insert(long rowId, IndexProto.RowLocation location)
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(location.getFileId());
         if (fileBuffer == null)
@@ -44,7 +49,7 @@ public class MainIndexBuffer
         }
     }
 
-    protected synchronized IndexProto.RowLocation lookup(long fileId, long rowId)
+    protected IndexProto.RowLocation lookup(long fileId, long rowId)
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(fileId);
         if (fileBuffer == null)
@@ -54,7 +59,22 @@ public class MainIndexBuffer
         return fileBuffer.get(rowId);
     }
 
-    protected synchronized List<RowIdRange> flush (long fileId) throws MainIndexException
+    protected IndexProto.RowLocation lookup(long rowId)
+    {
+        for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : indexBuffer.entrySet())
+        {
+            long fileId = entry.getKey();
+            IndexProto.RowLocation location = entry.getValue().get(rowId);
+            if (location != null)
+            {
+                checkArgument(fileId == location.getFileId());
+                return location;
+            }
+        }
+        return null;
+    }
+
+    protected List<RowIdRange> flush (long fileId) throws MainIndexException
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(fileId);
         if (fileBuffer == null)
@@ -71,10 +91,7 @@ public class MainIndexBuffer
             // file buffer is a tree map, its entries are sorted in ascending order
             long rowId = entry.getKey();
             IndexProto.RowLocation location = entry.getValue();
-            if (location.getFileId() != fileId)
-            {
-                throw new MainIndexException("file index buffer contains invalid fileId: " + location.getFileId());
-            }
+            checkArgument(fileId == location.getFileId());
             int rgId = location.getRgId();
             int rgRowId = location.getRgRowId();
             if (rowId != prevRowId + 1 || rgId != prevRgId || rgRowId != prevRgRowId + 1)
