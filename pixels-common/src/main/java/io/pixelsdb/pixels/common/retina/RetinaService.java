@@ -19,13 +19,11 @@
  */
 package io.pixelsdb.pixels.common.retina;
 
-import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -210,7 +208,7 @@ public class RetinaService
         return true;
     }
 
-    public RetinaProto.GetWriterBufferResponse getSuperVersion(String schemaName, String tableName) throws RetinaException
+    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.GetWriterBufferRequest request = RetinaProto.GetWriterBufferRequest.newBuilder()
