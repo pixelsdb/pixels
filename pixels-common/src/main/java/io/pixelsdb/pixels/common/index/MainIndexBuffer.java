@@ -87,7 +87,8 @@ public class MainIndexBuffer
             return null;
         }
         ImmutableList.Builder<RowIdRange> ranges = ImmutableList.builder();
-        RowIdRange currRange = null;
+        RowIdRange.Builder currRangeBuilder = new RowIdRange.Builder();
+        boolean first = true;
         long prevRowId = Long.MIN_VALUE;
         int prevRgId = Integer.MIN_VALUE;
         int prevRgRowOffset = Integer.MIN_VALUE;
@@ -102,15 +103,19 @@ public class MainIndexBuffer
             if (rowId != prevRowId + 1 || rgId != prevRgId || rgRowOffset != prevRgRowOffset + 1)
             {
                 // occurs a new row group or a new range in the row group
-                if (currRange != null)
+                if (!first)
                 {
                     // finish constructing the current row id range and add it to the ranges
-                    currRange.setRowIdEnd(prevRowId + 1);
-                    currRange.setRgRowOffsetEnd(prevRgRowOffset + 1);
-                    ranges.add(currRange);
+                    currRangeBuilder.setRowIdEnd(prevRowId + 1);
+                    currRangeBuilder.setRgRowOffsetEnd(prevRgRowOffset + 1);
+                    ranges.add(currRangeBuilder.build());
                 }
                 // start constructing a new row id range
-                currRange = new RowIdRange(rowId, fileId, rgId, rgRowOffset);
+                first = false;
+                currRangeBuilder.setRowIdStart(rowId);
+                currRangeBuilder.setFileId(fileId);
+                currRangeBuilder.setRgId(rgId);
+                currRangeBuilder.setRgRowOffsetStart(rgRowOffset);
                 prevRgId = rgId;
             }
             prevRowId = rowId;

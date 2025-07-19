@@ -38,7 +38,7 @@ public class RowIdRange implements Comparable<RowIdRange>
     /**
      * exclusive
      */
-    private long rowIdEnd;
+    private final long rowIdEnd;
     // the following fields are the payloads
     private final long fileId;
     private final int rgId;
@@ -49,7 +49,7 @@ public class RowIdRange implements Comparable<RowIdRange>
     /**
      * exclusive
      */
-    private int rgRowOffsetEnd;
+    private final int rgRowOffsetEnd;
 
     public RowIdRange(long rowIdStart, long rowIdEnd, long fileId, int rgId, int rgRowOffsetStart, int rgRowOffsetEnd)
     {
@@ -59,14 +59,6 @@ public class RowIdRange implements Comparable<RowIdRange>
         this.rgId = rgId;
         this.rgRowOffsetStart = rgRowOffsetStart;
         this.rgRowOffsetEnd = rgRowOffsetEnd;
-    }
-
-    public RowIdRange(long rowIdStart, long fileId, int rgId, int rgRowOffsetStart)
-    {
-        this.rowIdStart = rowIdStart;
-        this.fileId = fileId;
-        this.rgId = rgId;
-        this.rgRowOffsetStart = rgRowOffsetStart;
     }
 
     public long getRowIdStart()
@@ -99,16 +91,6 @@ public class RowIdRange implements Comparable<RowIdRange>
         return rgRowOffsetEnd;
     }
 
-    public void setRowIdEnd(long rowIdEnd)
-    {
-        this.rowIdEnd = rowIdEnd;
-    }
-
-    public void setRgRowOffsetEnd(int rgRowOffsetEnd)
-    {
-        this.rgRowOffsetEnd = rgRowOffsetEnd;
-    }
-
     @Override
     public boolean equals(Object o)
     {
@@ -131,5 +113,117 @@ public class RowIdRange implements Comparable<RowIdRange>
             return this.rowIdStart < o.rowIdStart ? -1 : 1;
         }
         return this.rowIdEnd < o.rowIdEnd ? -1 : 1;
+    }
+
+    public Builder toBuilder ()
+    {
+        return new Builder(this);
+    }
+
+    public static class Builder
+    {
+        /**
+         * inclusive
+         */
+        private long rowIdStart;
+        /**
+         * exclusive
+         */
+        private long rowIdEnd;
+        // the following fields are the payloads
+        private long fileId;
+        private int rgId;
+        /**
+         * inclusive
+         */
+        private int rgRowOffsetStart;
+        /**
+         * exclusive
+         */
+        private int rgRowOffsetEnd;
+
+        public Builder () { }
+
+        public Builder (RowIdRange rowIdRange)
+        {
+            this.rowIdStart = rowIdRange.rowIdStart;
+            this.rowIdEnd = rowIdRange.rowIdEnd;
+            this.fileId = rowIdRange.fileId;
+            this.rgId = rowIdRange.rgId;
+            this.rgRowOffsetStart = rowIdRange.rgRowOffsetStart;
+            this.rgRowOffsetEnd = rowIdRange.rgRowOffsetEnd;
+        }
+
+        public long getRowIdStart()
+        {
+            return rowIdStart;
+        }
+
+        public Builder setRowIdStart(long rowIdStart)
+        {
+            this.rowIdStart = rowIdStart;
+            return this;
+        }
+
+        public long getRowIdEnd()
+        {
+            return rowIdEnd;
+        }
+
+        public Builder setRowIdEnd(long rowIdEnd)
+        {
+            this.rowIdEnd = rowIdEnd;
+            return this;
+        }
+
+        public long getFileId()
+        {
+            return fileId;
+        }
+
+        public Builder setFileId(long fileId)
+        {
+            this.fileId = fileId;
+            return this;
+        }
+
+        public int getRgId()
+        {
+            return rgId;
+        }
+
+        public Builder setRgId(int rgId)
+        {
+            this.rgId = rgId;
+            return this;
+        }
+
+        public int getRgRowOffsetStart()
+        {
+            return rgRowOffsetStart;
+        }
+
+        public Builder setRgRowOffsetStart(int rgRowOffsetStart)
+        {
+            this.rgRowOffsetStart = rgRowOffsetStart;
+            return this;
+        }
+
+        public int getRgRowOffsetEnd()
+        {
+            return rgRowOffsetEnd;
+        }
+
+        public Builder setRgRowOffsetEnd(int rgRowOffsetEnd)
+        {
+            this.rgRowOffsetEnd = rgRowOffsetEnd;
+            return this;
+        }
+
+        public RowIdRange build ()
+        {
+            return new RowIdRange(this.rowIdStart, this.rowIdEnd,
+                    this.fileId, this.rgId, this.rgRowOffsetStart, this.rgRowOffsetEnd);
+        }
     }
 }

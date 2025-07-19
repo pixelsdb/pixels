@@ -46,8 +46,10 @@ public class MainIndexImpl2 implements MainIndex
     private static final String createTableSql = "CREATE TABLE IF NOT EXISTS row_id_ranges" +
             "(row_id_start BIGINT NOT NULL, row_id_end BIGINT NOT NULL, file_id BIGINT NOT NULL, rg_id INT NOT NULL," +
             "rg_row_offset_start INT NOT NULL, rg_row_offset_end INT NOT NULL, PRIMARY KEY (row_id_start, row_id_end))";
-    private static final String queryRowIdRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? <= row_id_end";
-    private static final String deleteRowIdRangeSql = "DELETE FROM row_id_ranges WHERE ? <= row_id_start AND row_id_end <= ?";
+    private static final String queryRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? < row_id_end";
+    private static final String deleteRangesSql = "DELETE FROM row_id_ranges WHERE ? <= row_id_start AND row_id_end <= ?";
+    private static final String updateRangeWidthSql = "UPDATE row_id_ranges SET row_id_start = ?, row_id_end = ?, " +
+            "rg_row_offset_start = ?, rg_row_offset_end = ? WHERE row_id_start = ? AND row_id_end = ?";
 
     private final long tableId;
     private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
@@ -130,34 +132,19 @@ public class MainIndexImpl2 implements MainIndex
         IndexProto.RowLocation location = this.indexBuffer.lookup(rowId);
         if (location == null)
         {
-            try (PreparedStatement pst = connection.prepareStatement(queryRowIdRangeSql))
+            try
             {
-                pst.setLong(1, rowId);
-                pst.setLong(2, rowId);
-                try (ResultSet rs = pst.executeQuery())
-                {
-                    if (rs.next())
-                    {
-                        long rowIdStart = rs.getLong("row_id_start");
-                        long rowIdEnd = rs.getLong("row_id_end");
-                        long fileId = rs.getLong("file_id");
-                        int rgId = rs.getInt("rg_id");
-                        int rgRowOffsetStart = rs.getInt("rg_row_offset_start");
-                        int rgRowOffsetEnd = rs.getInt("rg_row_offset_end");
-                        if (rowIdEnd - rowIdStart != rgRowOffsetEnd - rgRowOffsetStart)
-                        {
-                            throw new MainIndexException("The width of row id range (" + rowIdStart + ", " +
-                                    rgRowOffsetEnd + ") does not match the width of row group row offset range (" +
-                                    rgRowOffsetStart + ", " + rgRowOffsetEnd + ")");
-                        }
-                        int offset = (int) (rowId - rowIdStart);
-                        location = IndexProto.RowLocation.newBuilder()
-                                .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
-                    }
-                    this.rwLock.readLock().unlock();
-                }
+                RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
+                long rowIdStart = rowIdRange.getRowIdStart();
+                long fileId = rowIdRange.getFileId();
+                int rgId = rowIdRange.getRgId();
+                int rgRowOffsetStart = rowIdRange.getRgRowOffsetStart();
+                int offset = (int) (rowId - rowIdStart);
+                location = IndexProto.RowLocation.newBuilder()
+                        .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
+                this.rwLock.readLock().unlock();
             }
-            catch (SQLException e)
+            catch (RowIdException e)
             {
                 this.rwLock.readLock().unlock();
                 throw new MainIndexException("failed to query row location from sqlite", e);
@@ -179,31 +166,48 @@ public class MainIndexImpl2 implements MainIndex
     public boolean deleteRowIdRange(RowIdRange rowIdRange) throws MainIndexException
     {
         this.rwLock.writeLock().lock();
-        try (PreparedStatement pst = connection.prepareStatement(queryRowIdRangeSql))
+        try (PreparedStatement pst = connection.prepareStatement(deleteRangesSql))
         {
-            pst.setLong(1, rowIdRange.getRowIdStart());
-            pst.setLong(2, rowIdRange.getRowIdEnd());
+            long rowIdStart = rowIdRange.getRowIdStart();
+            long rowIdEnd = rowIdRange.getRowIdEnd();
+            pst.setLong(1, rowIdStart);
+            pst.setLong(2, rowIdEnd);
             pst.executeUpdate();
-
-            this.rwLock.readLock().unlock();
+            RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdStart());
+            RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdEnd());
+            if (leftBorderRange != null)
+            {
+                int offset = (int) (rowIdEnd - leftBorderRange.getRowIdStart());
+                RowIdRange newLeftBorderRange = leftBorderRange.toBuilder()
+                        .setRowIdEnd(rowIdEnd).setRgRowOffsetEnd(leftBorderRange.getRgRowOffsetStart()+offset).build();
+                updateRowIdRangeWidth(leftBorderRange, newLeftBorderRange);
+            }
+            if (rightBorderRange != null)
+            {
+                int offset = (int) (rightBorderRange.getRowIdEnd() - rowIdEnd);
+                RowIdRange newRightBorderRange = rightBorderRange.toBuilder()
+                        .setRowIdStart(rowIdEnd).setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd()-offset).build();
+                updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
+            }
+            this.rwLock.writeLock().unlock();
+            return true;
         }
-        catch (SQLException e)
+        catch (SQLException | RowIdException e)
         {
-            this.rwLock.readLock().unlock();
+            this.rwLock.writeLock().unlock();
             throw new MainIndexException("failed to delete row id ranges from sqlite", e);
         }
-        this.rwLock.writeLock().unlock();
     }
 
     /**
-     * Get the row id range that contains the given row id
-     *
+     * Get the row id range that contains the given row id from sqlite.
      * @param rowId the given row id
-     * @return the row id range
+     * @return the row id range, or null if no matching row id range is found
+     * @throws RowIdException if failed to query a valid row id range from sqlite
      */
-    private RowIdRange getRowIdRange(long rowId) throws RowIdException
+    private RowIdRange getRowIdRangeFromSqlite (long rowId) throws RowIdException
     {
-        try (PreparedStatement pst = connection.prepareStatement(queryRowIdRangeSql))
+        try (PreparedStatement pst = this.connection.prepareStatement(queryRangeSql))
         {
             pst.setLong(1, rowId);
             pst.setLong(2, rowId);
@@ -225,11 +229,40 @@ public class MainIndexImpl2 implements MainIndex
                     }
                     return new RowIdRange(rowIdStart, rowIdEnd, fileId, rgId, rgRowOffsetStart, rgRowOffsetEnd);
                 }
+                else
+                {
+                    return null;
+                }
             }
-        } catch (SQLException e)
+        }
+        catch (SQLException e)
         {
-            this.rwLock.readLock().unlock();
             throw new RowIdException("failed to query row id range from sqlite", e);
+        }
+    }
+
+    /**
+     * Update the width of an existing row id range
+     * @param oldRange the old row id range
+     * @param newRange the new row id range
+     * @return true if any row id range is updated successfully
+     * @throws RowIdException if failed to update the row id range in sqlite
+     */
+    private boolean updateRowIdRangeWidth(RowIdRange oldRange, RowIdRange newRange) throws RowIdException
+    {
+        try (PreparedStatement pst = this.connection.prepareStatement(updateRangeWidthSql))
+        {
+            pst.setLong(1, newRange.getRowIdStart());
+            pst.setLong(2, newRange.getRowIdEnd());
+            pst.setInt(3, newRange.getRgRowOffsetStart());
+            pst.setInt(4, newRange.getRgRowOffsetEnd());
+            pst.setLong(5, oldRange.getRowIdStart());
+            pst.setLong(6, oldRange.getRowIdEnd());
+            return pst.executeUpdate() > 0;
+        }
+        catch (SQLException e)
+        {
+            throw new RowIdException("failed to update row id range width", e);
         }
     }
 
