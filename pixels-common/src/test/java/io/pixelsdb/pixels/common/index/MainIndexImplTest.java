@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.index;
 
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.EtcdException;
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.AfterEach;
@@ -39,6 +40,7 @@ public class MainIndexImplTest
     long tableId = 100L;
     private final MainIndexManager manager = new MainIndexManager(MainIndexImpl::new);
     MainIndex mainIndex;
+
     @BeforeEach
     public void setUp() throws EtcdException
     {
@@ -53,13 +55,13 @@ public class MainIndexImplTest
     }
 
     @Test
-    public void testPutAndGetLocation()
+    public void testPutAndGetLocation() throws MainIndexException
     {
         long rowId = 1000L;
         IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
                 .setFileId(1)
                 .setRgId(10)
-                .setRgRowId(0)
+                .setRgRowOffset(0)
                 .build();
 
         Assertions.assertTrue(mainIndex.putEntry(rowId, location));
@@ -67,44 +69,26 @@ public class MainIndexImplTest
         Assertions.assertNotNull(fetched);
         Assertions.assertEquals(1, fetched.getFileId());
         Assertions.assertEquals(10, fetched.getRgId());
-        Assertions.assertEquals(0, fetched.getRgRowId());
+        Assertions.assertEquals(0, fetched.getRgRowOffset());
     }
 
     @Test
-    public void testDeleteEntry()
+    public void testDeleteEntry() throws MainIndexException
     {
         long rowId = 2000L;
         IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
                 .setFileId(2)
                 .setRgId(20)
-                .setRgRowId(0)
+                .setRgRowOffset(0)
                 .build();
 
         Assertions.assertTrue(mainIndex.putEntry(rowId, location));
         Assertions.assertNotNull(mainIndex.getLocation(rowId));
+        Assertions.assertTrue(mainIndex.flushCache(2));
 
-        Assertions.assertTrue(mainIndex.deleteEntry(rowId));
+        Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId, rowId+1,
+                2, 20, 0, 1)));
         Assertions.assertNull(mainIndex.getLocation(rowId));
-    }
-
-    @Test
-    public void testPutRowIdsOfRgAndDeleteRowIds()
-    {
-        RowIdRange range = new RowIdRange(3000L, 3004L, 1L, 0, 0, 4);
-        MainIndex.RgLocation location = new MainIndex.RgLocation(3, 30);
-
-        Assertions.assertTrue(mainIndex.putRowIds(range, location));
-        for (long i = 3000L; i <= 3004L; i++) {
-            IndexProto.RowLocation loc = mainIndex.getLocation(i);
-            Assertions.assertNotNull(loc);
-            Assertions.assertEquals(3, loc.getFileId());
-            Assertions.assertEquals(30, loc.getRgId());
-        }
-
-        Assertions.assertTrue(mainIndex.deleteRowIds(range));
-        for (long i = 3000L; i <= 3004L; i++) {
-            Assertions.assertNull(mainIndex.getLocation(i));
-        }
     }
 
     @Test
@@ -124,12 +108,12 @@ public class MainIndexImplTest
         IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
                 .setFileId(fileId)
                 .setRgId(rgId)
-                .setRgRowId(rgRowId)
+                .setRgRowOffset(rgRowId)
                 .build();
         IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
                 .setFileId(4)
                 .setRgId(40)
-                .setRgRowId(0)
+                .setRgRowOffset(0)
                 .build();
         Assertions.assertTrue(mainIndex.putEntry(0L, dummyLocation));
     }
@@ -142,10 +126,12 @@ public class MainIndexImplTest
         CountDownLatch latch = new CountDownLatch(threadCount);
         List<Future<Void>> futures = new ArrayList<>();
 
-        for (int i = 0; i < threadCount; i++) {
+        for (int i = 0; i < threadCount; i++)
+        {
             final int threadNum = i;
             futures.add(executor.submit(() -> {
-                try {
+                try
+                {
                     // Test getRowId()
                     byte[] key = ("key-" + threadNum).getBytes();
                     long timestamp = System.currentTimeMillis();
@@ -158,14 +144,14 @@ public class MainIndexImplTest
                     IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
                             .setFileId(1)
                             .setRgId(2)
-                            .setRgRowId(3)
+                            .setRgRowOffset(3)
                             .build();
 
                     // Test putRowId()
                     IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
                             .setFileId(100 + threadNum)
                             .setRgId(10)
-                            .setRgRowId(0)
+                            .setRgRowOffset(0)
                             .build();
                     Assertions.assertTrue(mainIndex.putEntry(rowId, dummyLocation));
 
@@ -173,11 +159,9 @@ public class MainIndexImplTest
                     IndexProto.RowLocation fetched = mainIndex.getLocation(rowId);
                     Assertions.assertNotNull(fetched);
                     Assertions.assertEquals(100 + threadNum, fetched.getFileId());
-
-                    // Test deleteRowId()
-                    Assertions.assertTrue(mainIndex.deleteEntry(rowId));
-                    Assertions.assertNull(mainIndex.getLocation(rowId));
-                } finally {
+                }
+                finally
+                {
                     latch.countDown();
                 }
                 return null;
@@ -203,28 +187,38 @@ public class MainIndexImplTest
 
         // Create RowIdRange for every thread
         List<RowIdRange> ranges = new ArrayList<>();
-        for (int i = 0; i < threadCount; i++) {
+        for (int i = 0; i < threadCount; i++)
+        {
             long base = 10_000L + i * 100;
             ranges.add(new RowIdRange(base, base + 4, 1L, 0, 0, 4));
         }
 
         // Concurrent putRowIdsOfRg
-        for (int i = 0; i < threadCount; i++) {
+        for (int i = 0; i < threadCount; i++)
+        {
             final int threadNum = i;
             futures.add(executor.submit(() -> {
-                try {
+                try
+                {
                     RowIdRange range = ranges.get(threadNum);
-                    MainIndex.RgLocation location = new MainIndex.RgLocation(threadNum, threadNum * 10);
+                    int offset = 0;
+                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++)
+                    {
+                        IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
+                                .setFileId(range.getFileId()).setRgId(range.getRgId()).setRgRowOffset(offset++).build();
+                        Assertions.assertTrue(mainIndex.putEntry(id, location));
+                    }
 
-                    Assertions.assertTrue(mainIndex.putRowIds(range, location));
-
-                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++) {
+                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++)
+                    {
                         IndexProto.RowLocation loc = mainIndex.getLocation(id);
                         Assertions.assertNotNull(loc);
                         Assertions.assertEquals(threadNum, loc.getFileId());
                         Assertions.assertEquals(threadNum * 10, loc.getRgId());
                     }
-                } finally {
+                }
+                finally
+                {
                     putLatch.countDown();
                 }
                 return null;
@@ -235,17 +229,21 @@ public class MainIndexImplTest
         putLatch.await();
 
         // Concurrent deleteRowIdRange
-        for (int i = 0; i < threadCount; i++) {
+        for (int i = 0; i < threadCount; i++)
+        {
             final int threadNum = i;
             futures.add(executor.submit(() -> {
-                try {
+                try
+                {
                     RowIdRange range = ranges.get(threadNum);
-
-                    Assertions.assertTrue(mainIndex.deleteRowIds(range));
-                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++) {
+                    Assertions.assertTrue(mainIndex.deleteRowIdRange(range));
+                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++)
+                    {
                         Assertions.assertNull(mainIndex.getLocation(id));
                     }
-                } finally {
+                }
+                finally
+                {
                     deleteLatch.countDown();
                 }
                 return null;
@@ -253,18 +251,10 @@ public class MainIndexImplTest
         }
 
         deleteLatch.await();
-        for (Future<Void> future : futures) {
+        for (Future<Void> future : futures)
+        {
             future.get();
         }
         executor.shutdown();
-    }
-
-    @Test
-    public void testPersist() {
-        RowIdRange range = new RowIdRange(4000L, 4002L, 1L, 0, 0, 2);
-        MainIndex.RgLocation location = new MainIndex.RgLocation(5, 50);
-
-        Assertions.assertTrue(mainIndex.putRowIds(range, location));
-        Assertions.assertTrue(mainIndex.persist());
     }
 }

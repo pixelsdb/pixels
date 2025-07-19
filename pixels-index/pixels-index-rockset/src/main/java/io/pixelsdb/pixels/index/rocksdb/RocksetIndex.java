@@ -238,7 +238,7 @@ public class RocksetIndex implements SinglePointIndex
             {
                 // Extract key and rowId from Entry object
                 IndexProto.IndexKey key = entry.getIndexKey();
-                long rowId = entry.getTableRowId();
+                long rowId = entry.getRowId();
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
                 // Convert rowId to byte array
@@ -266,7 +266,7 @@ public class RocksetIndex implements SinglePointIndex
             {
                 // Extract key and rowId from Entry object
                 IndexProto.IndexKey key = entry.getIndexKey();
-                long rowId = entry.getTableRowId();
+                long rowId = entry.getRowId();
                 boolean unique = entry.getUnique();
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);

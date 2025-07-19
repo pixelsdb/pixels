@@ -82,7 +82,7 @@ public class TestRocksDBIndex
         IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
                 .setFileId(fileId)
                 .setRgId(rgId)
-                .setRgRowId(rgRowId)
+                .setRgRowOffset(rgRowId)
                 .build();
 
         boolean success = rocksDBIndex.putEntry(keyProto, rowId, true);
@@ -124,11 +124,11 @@ public class TestRocksDBIndex
             IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
                     .setFileId(fileId)
                     .setRgId(rgId)
-                    .setRgRowId(i)
+                    .setRgRowOffset(i)
                     .build();
 
             IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
-                    .setIndexKey(keyProto).setTableRowId(rowId).setRowLocation(rowLocation).build();
+                    .setIndexKey(keyProto).setRowId(rowId).setRowLocation(rowLocation).build();
             entries.add(entry);
         }
 
@@ -169,7 +169,7 @@ public class TestRocksDBIndex
         IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
                 .setFileId(fileId)
                 .setRgId(rgId)
-                .setRgRowId(rgRowId)
+                .setRgRowOffset(rgRowId)
                 .build();
 
         rocksDBIndex.putEntry(keyProto, 0L, true);
@@ -215,11 +215,11 @@ public class TestRocksDBIndex
             IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
                     .setFileId(fileId)
                     .setRgId(rgId)
-                    .setRgRowId(i)
+                    .setRgRowOffset(i)
                     .build();
 
             IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
-                    .setIndexKey(keyProto).setTableRowId(0L).setRowLocation(rowLocation).build();
+                    .setIndexKey(keyProto).setRowId(0L).setRowLocation(rowLocation).build();
             entries.add(entry);
         }
 

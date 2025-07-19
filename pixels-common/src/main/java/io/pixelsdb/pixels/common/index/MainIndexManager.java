@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
@@ -53,7 +55,15 @@ public class MainIndexManager implements Closeable
      */
     public MainIndex getOrCreate(long tableId)
     {
-        return indexMap.computeIfAbsent(tableId, mainIndexFactory::create);
+        return indexMap.computeIfAbsent(tableId, tblId -> {
+            try
+            {
+                return mainIndexFactory.create(tblId);
+            } catch (MainIndexException e)
+            {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     /**
@@ -124,6 +134,6 @@ public class MainIndexManager implements Closeable
     @FunctionalInterface
     public interface MainIndexFactory
     {
-        MainIndex create(long tableId);
+        MainIndex create(long tableId) throws MainIndexException;
     }
 }

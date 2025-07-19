@@ -20,73 +20,84 @@
 package io.pixelsdb.pixels.common.index;
 
 import io.pixelsdb.pixels.common.exception.EtcdException;
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.sql.*;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author hank, Rolland1944
  * @create 2025-02-19
+ * @update 2025-07-19 use sqlite as the persistent storage.
  */
 public class MainIndexImpl implements MainIndex
 {
     private static final Logger logger = LogManager.getLogger(MainIndexImpl.class);
     private static final HashMap<Long, PersistentAutoIncrement> persistentAIMap = new HashMap<>();
 
+    private static final String createTableSql = "CREATE TABLE IF NOT EXISTS row_id_ranges" +
+            "(row_id_start BIGINT NOT NULL, row_id_end BIGINT NOT NULL, file_id BIGINT NOT NULL, rg_id INT NOT NULL," +
+            "rg_row_offset_start INT NOT NULL, rg_row_offset_end INT NOT NULL, PRIMARY KEY (row_id_start, row_id_end))";
+    private static final String queryRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? < row_id_end";
+    private static final String deleteRangesSql = "DELETE FROM row_id_ranges WHERE ? <= row_id_start AND row_id_end <= ?";
+    private static final String updateRangeWidthSql = "UPDATE row_id_ranges SET row_id_start = ?, row_id_end = ?, " +
+            "rg_row_offset_start = ?, rg_row_offset_end = ? WHERE row_id_start = ? AND row_id_end = ?";
+    private static final String insertRangeSql = "INSERT INTO row_id_ranges VALUES(?, ?, ?, ?, ?, ?)";
+
     private final long tableId;
-
-
-
-    // Cache for storing generated rowIds
-    private final Queue<Long> rowIdCache = new ConcurrentLinkedQueue<>();
-    // Get the singleton instance of EtcdUtil
-    private final EtcdUtil etcdUtil = EtcdUtil.Instance();
-    // Read-Write lock
+    private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
+    private final Connection connection;
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
-    // Dirty flag
-    private boolean dirty = false;
 
-    public MainIndexImpl(long tableId)
+    public MainIndexImpl(long tableId) throws MainIndexException
     {
         this.tableId = tableId;
+        String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
+        if (sqlitePath == null || sqlitePath.isEmpty())
+        {
+            throw new MainIndexException("index.sqlite.path is not set");
+        }
+        if (!sqlitePath.endsWith("/"))
+        {
+            sqlitePath += "/";
+        }
+        try
+        {
+            // We create a dependent sqlite instance for the main index of each table.
+            connection = DriverManager.getConnection("jdbc:sqlite:" + sqlitePath + tableId + ".main.index.db");
+            try (Statement statement = connection.createStatement())
+            {
+                boolean res = statement.execute(createTableSql);
+                if (!res)
+                {
+                    throw new MainIndexException("Failed to create table row_id_ranges");
+                }
+            }
+        } catch (SQLException e)
+        {
+            throw new MainIndexException("failed to connect to sqlite", e);
+        }
     }
-
-    public static class Entry
-    {
-        private final RowIdRange rowIdRange;
-        private final RgLocation rgLocation;
-
-        public Entry(RowIdRange rowIdRange, RgLocation rgLocation)
-        {
-            this.rowIdRange = rowIdRange;
-            this.rgLocation = rgLocation;
-        }
-
-        public RowIdRange getRowIdRange()
-        {
-            return rowIdRange;
-        }
-
-        public RgLocation getRgLocation()
-        {
-            return rgLocation;
-        }
-    }
-
-    private final List<Entry> entries = new ArrayList<>();
 
     @Override
     public long getTableId()
     {
         return tableId;
+    }
+
+    @Override
+    public boolean hasCache()
+    {
+        return true;
     }
 
     @Override
@@ -105,8 +116,7 @@ public class MainIndexImpl implements MainIndex
                     logger.error(e);
                     throw new RuntimeException(e); // wrap to unchecked, will rethrow
                 }
-            }
-            );
+            });
             // 2. allocate numRowIds
             long start = autoIncrement.getAndIncrement(numRowIds);
             return IndexProto.RowIdBatch.newBuilder().setRowIdStart(start).setLength(numRowIds).build();
@@ -118,221 +128,200 @@ public class MainIndexImpl implements MainIndex
     }
 
     @Override
-    public IndexProto.RowLocation getLocation(long rowId)
+    public IndexProto.RowLocation getLocation(long rowId) throws MainIndexException
     {
-
-    }
-
-    public IndexProto.RowLocation getLocationOld(long rowId)
-    {
-        // Use binary search to find the Entry containing the rowId
-        int index = binarySearch(rowId);
-        if (index >= 0)
+        this.rwLock.readLock().lock();
+        IndexProto.RowLocation location = this.indexBuffer.lookup(rowId);
+        if (location == null)
         {
-            Entry entry = entries.get(index);
-            RgLocation rgLocation = entry.getRgLocation();
-            return IndexProto.RowLocation.newBuilder()
-                    .setFileId(rgLocation.getFileId())
-                    .setRgId(rgLocation.getRowGroupId())
-                    .setRgRowId((int) (rowId - entry.getRowIdRange().getRowIdStart())) // Calculate the offset within the row group
-                    .build();
+            try
+            {
+                RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
+                long rowIdStart = rowIdRange.getRowIdStart();
+                long fileId = rowIdRange.getFileId();
+                int rgId = rowIdRange.getRgId();
+                int rgRowOffsetStart = rowIdRange.getRgRowOffsetStart();
+                int offset = (int) (rowId - rowIdStart);
+                location = IndexProto.RowLocation.newBuilder()
+                        .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
+                this.rwLock.readLock().unlock();
+            }
+            catch (RowIdException e)
+            {
+                this.rwLock.readLock().unlock();
+                throw new MainIndexException("failed to query row location from sqlite", e);
+            }
         }
-        return null; // Return null if not found
+        return location;
     }
 
     @Override
     public boolean putEntry(long rowId, IndexProto.RowLocation rowLocation)
     {
-        RowIdRange newRange = new RowIdRange(rowId, rowId, rowLocation.getFileId(),
-                rowLocation.getRgId(), rowLocation.getRgRowOffset(), rowLocation.getRgRowOffset()+1);
-        RgLocation rgLocation = new RgLocation(rowLocation.getFileId(), rowLocation.getRgId());
-        return putRowIds(newRange, rgLocation);
+        this.rwLock.writeLock().lock();
+        boolean res = this.indexBuffer.insert(rowId, rowLocation);
+        this.rwLock.writeLock().unlock();
+        return res;
     }
 
     @Override
-    public boolean deleteEntry(long rowId)
+    public boolean deleteRowIdRange(RowIdRange rowIdRange) throws MainIndexException
     {
-        int index = binarySearch(rowId);
-        if (index < 0)
+        this.rwLock.writeLock().lock();
+        try (PreparedStatement pst = connection.prepareStatement(deleteRangesSql))
         {
-            logger.error("Delete failure: RowId {} not found", rowId);
-            return false;
-        }
-
-        Entry entry = entries.get(index);
-        RowIdRange original = entry.getRowIdRange();
-
-        long start = original.getRowIdStart();
-        long end = original.getRowIdEnd();
-        // lock
-        rwLock.writeLock().lock();
-        entries.remove(index);
-        // In-place insert the remaining entries
-        if (rowId > start)
-        {
-            entries.add(index, new Entry(new RowIdRange(start, rowId - 1, 1L, 0, 0, 0), entry.getRgLocation()));
-            index++;
-        }
-        if (rowId < end)
-        {
-            entries.add(index, new Entry(new RowIdRange(rowId + 1, end, 1L, 0, 0, 0), entry.getRgLocation()));
-        }
-        rwLock.writeLock().unlock();
-        dirty = true;
-        return true;
-    }
-
-    @Override
-    public boolean putRowIds(RowIdRange rowIdRangeOfRg, RgLocation rgLocation)
-    {
-        long start = rowIdRangeOfRg.getRowIdStart();
-        long end = rowIdRangeOfRg.getRowIdEnd();
-        if (start > end)
-        {
-            logger.error("Invalid RowIdRange: startRowId {} > endRowId {}", start, end);
-            return false;
-        }
-
-        // Check whether it conflicts with the last entry.
-        if (!entries.isEmpty())
-        {
-            RowIdRange lastRange = entries.get(entries.size() - 1).getRowIdRange();
-            if (start <= lastRange.getRowIdEnd())
+            long rowIdStart = rowIdRange.getRowIdStart();
+            long rowIdEnd = rowIdRange.getRowIdEnd();
+            pst.setLong(1, rowIdStart);
+            pst.setLong(2, rowIdEnd);
+            pst.executeUpdate();
+            RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdStart());
+            RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdEnd());
+            if (leftBorderRange != null)
             {
-                logger.error("Insert failure: RowIdRange [{}-{}] overlaps with previous [{}-{}]",
-                        start, end, lastRange.getRowIdStart(), lastRange.getRowIdEnd());
-                return false;
+                int offset = (int) (rowIdEnd - leftBorderRange.getRowIdStart());
+                RowIdRange newLeftBorderRange = leftBorderRange.toBuilder()
+                        .setRowIdEnd(rowIdEnd).setRgRowOffsetEnd(leftBorderRange.getRgRowOffsetStart()+offset).build();
+                updateRowIdRangeWidth(leftBorderRange, newLeftBorderRange);
             }
-        }
-        rwLock.writeLock().lock();
-        entries.add(new Entry(rowIdRangeOfRg, rgLocation));
-        rwLock.writeLock().unlock();
-        dirty = true;
-        return true;
-    }
-
-    @Override
-    public boolean deleteRowIds(RowIdRange targetRange)
-    {
-        int index = binarySearch(targetRange.getRowIdStart());
-        if (index < 0)
-        {
-            logger.error("Delete failure: RowIdRange [{}-{}] not found", targetRange.getRowIdStart(), targetRange.getRowIdEnd());
-            return false;
-        }
-
-        Entry entry = entries.get(index);
-        RowIdRange existingRange = entry.getRowIdRange();
-
-        if (existingRange.getRowIdStart() == targetRange.getRowIdStart() && existingRange.getRowIdEnd() == targetRange.getRowIdEnd())
-        {
-            rwLock.writeLock().lock();
-            entries.remove(index);
-            rwLock.writeLock().unlock();
-            dirty = true;
+            if (rightBorderRange != null)
+            {
+                int offset = (int) (rightBorderRange.getRowIdEnd() - rowIdEnd);
+                RowIdRange newRightBorderRange = rightBorderRange.toBuilder()
+                        .setRowIdStart(rowIdEnd).setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd()-offset).build();
+                updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
+            }
+            this.rwLock.writeLock().unlock();
             return true;
         }
-        else
+        catch (SQLException | RowIdException e)
         {
-            logger.error("Delete failure: RowIdRange [{}-{}] does not exactly match existing range [{}-{}]",
-                    targetRange.getRowIdStart(), targetRange.getRowIdEnd(),
-                    existingRange.getRowIdStart(), existingRange.getRowIdEnd());
-            return false;
+            this.rwLock.writeLock().unlock();
+            throw new MainIndexException("failed to delete row id ranges from sqlite", e);
         }
+    }
 
+    /**
+     * Get the row id range that contains the given row id from sqlite.
+     * @param rowId the given row id
+     * @return the row id range, or null if no matching row id range is found
+     * @throws RowIdException if failed to query a valid row id range from sqlite
+     */
+    private RowIdRange getRowIdRangeFromSqlite (long rowId) throws RowIdException
+    {
+        try (PreparedStatement pst = this.connection.prepareStatement(queryRangeSql))
+        {
+            pst.setLong(1, rowId);
+            pst.setLong(2, rowId);
+            try (ResultSet rs = pst.executeQuery())
+            {
+                if (rs.next())
+                {
+                    long rowIdStart = rs.getLong("row_id_start");
+                    long rowIdEnd = rs.getLong("row_id_end");
+                    long fileId = rs.getLong("file_id");
+                    int rgId = rs.getInt("rg_id");
+                    int rgRowOffsetStart = rs.getInt("rg_row_offset_start");
+                    int rgRowOffsetEnd = rs.getInt("rg_row_offset_end");
+                    if (rowIdEnd - rowIdStart != rgRowOffsetEnd - rgRowOffsetStart)
+                    {
+                        throw new RowIdException("the width of row id range (" + rowIdStart + ", " +
+                                rgRowOffsetEnd + ") does not match the width of row group row offset range (" +
+                                rgRowOffsetStart + ", " + rgRowOffsetEnd + ")");
+                    }
+                    return new RowIdRange(rowIdStart, rowIdEnd, fileId, rgId, rgRowOffsetStart, rgRowOffsetEnd);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+        }
+        catch (SQLException e)
+        {
+            throw new RowIdException("failed to query row id range from sqlite", e);
+        }
+    }
+
+    /**
+     * Update the width of an existing row id range
+     * @param oldRange the old row id range
+     * @param newRange the new row id range
+     * @return true if any row id range is updated successfully
+     * @throws RowIdException if failed to update the row id range in sqlite
+     */
+    private boolean updateRowIdRangeWidth(RowIdRange oldRange, RowIdRange newRange) throws RowIdException
+    {
+        try (PreparedStatement pst = this.connection.prepareStatement(updateRangeWidthSql))
+        {
+            pst.setLong(1, newRange.getRowIdStart());
+            pst.setLong(2, newRange.getRowIdEnd());
+            pst.setInt(3, newRange.getRgRowOffsetStart());
+            pst.setInt(4, newRange.getRgRowOffsetEnd());
+            pst.setLong(5, oldRange.getRowIdStart());
+            pst.setLong(6, oldRange.getRowIdEnd());
+            return pst.executeUpdate() > 0;
+        }
+        catch (SQLException e)
+        {
+            throw new RowIdException("failed to update row id range width", e);
+        }
     }
 
     @Override
-    public boolean persist()
+    public boolean flushCache(long fileId) throws MainIndexException
     {
+        this.rwLock.writeLock().lock();
         try
         {
-            // Iterate through entries and persist each to etcd
-            for (Entry entry : entries)
+            List<RowIdRange> rowIdRanges = this.indexBuffer.flush(fileId);
+            try (PreparedStatement pst = this.connection.prepareStatement(insertRangeSql))
             {
-                String key = "/mainindex/" + entry.getRowIdRange().getRowIdStart();
-                String value = serializeEntry(entry); // Serialize Entry to string
-                etcdUtil.putKeyValue(key, value);
-            }
-            logger.info("Persisted {} entries to etcd", entries.size());
-            return true;
-        }
-        catch (Exception e)
-        {
-            logger.error("Failed to persist entries to etcd", e);
-            return false;
-        }
-    }
-
-    public boolean persistIfDirty()
-    {
-        if (dirty)
-        {
-            if (persist())
-            {
-                dirty = false; // Reset dirty flag
+                for (RowIdRange range : rowIdRanges)
+                {
+                    pst.setLong(1, range.getRowIdStart());
+                    pst.setLong(2, range.getRowIdEnd());
+                    pst.setLong(3, range.getFileId());
+                    pst.setInt(4, range.getRgId());
+                    pst.setInt(5, range.getRgRowOffsetStart());
+                    pst.setInt(6, range.getRgRowOffsetEnd());
+                    pst.addBatch();
+                }
+                pst.executeBatch();
+                this.rwLock.writeLock().unlock();
                 return true;
             }
-            return false;
         }
-        return true; // No changes, no need to persist
+        catch (MainIndexException | SQLException e)
+        {
+            this.rwLock.writeLock().unlock();
+            throw new MainIndexException("failed to flush index cache into sqlite", e);
+        }
     }
 
     @Override
     public void close() throws IOException
     {
+        this.rwLock.writeLock().lock();
+        List<Long> cachedFileIds = this.indexBuffer.cachedFileIds();
+        for (long fileId : cachedFileIds)
+        {
+            try
+            {
+                this.flushCache(fileId);
+            } catch (MainIndexException e)
+            {
+                throw new IOException("failed to flush main index cache of file id " + fileId, e);
+            }
+        }
+        this.indexBuffer.close();
         try
         {
-            // Check dirty flag and persist to etcd if true
-            if (!persistIfDirty())
-            {
-                logger.error("Failed to persist data to etcd before closing");
-                throw new IOException("Failed to persist data to etcd before closing");
-            }
-            logger.info("Data persisted to etcd successfully before closing");
-        }
-        catch (Exception e)
+            this.connection.close();
+        } catch (SQLException e)
         {
-            logger.error("Error occurred while closing MainIndexImpl", e);
-            throw new IOException("Error occurred while closing MainIndexImpl", e);
+            throw new IOException("failed to close sqlite connection", e);
         }
-    }
-
-    private int binarySearch(long rowId)
-    {
-        int low = 0;
-        int high = entries.size() - 1;
-
-        while (low <= high)
-        {
-            int mid = (low + high) >>> 1;
-            Entry entry = entries.get(mid);
-            RowIdRange range = entry.getRowIdRange();
-
-            if (rowId >= range.getRowIdStart() && rowId <= range.getRowIdEnd())
-            {
-                return mid; // Found the containing Entry
-            }
-            else if (rowId < range.getRowIdStart())
-            {
-                high = mid - 1;
-            }
-            else
-            {
-                low = mid + 1;
-            }
-        }
-
-        return -1; // Not found
-    }
-
-    // Serialize Entry
-    private String serializeEntry(Entry entry)
-    {
-        return String.format("{\"startRowId\": %d, \"endRowId\": %d, \"fieldId\": %d, \"rowGroupId\": %d}",
-                entry.getRowIdRange().getRowIdStart(),
-                entry.getRowIdRange().getRowIdEnd(),
-                entry.getRgLocation().getFileId(),
-                entry.getRgLocation().getRowGroupId());
+        this.rwLock.writeLock().unlock();
     }
 }
