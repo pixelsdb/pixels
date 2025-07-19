@@ -31,6 +31,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -50,6 +51,7 @@ public class MainIndexImpl2 implements MainIndex
     private static final String deleteRangesSql = "DELETE FROM row_id_ranges WHERE ? <= row_id_start AND row_id_end <= ?";
     private static final String updateRangeWidthSql = "UPDATE row_id_ranges SET row_id_start = ?, row_id_end = ?, " +
             "rg_row_offset_start = ?, rg_row_offset_end = ? WHERE row_id_start = ? AND row_id_end = ?";
+    private static final String insertRangeSql = "INSERT INTO row_id_ranges VALUES(?, ?, ?, ?, ?, ?)";
 
     private final long tableId;
     private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
@@ -267,16 +269,59 @@ public class MainIndexImpl2 implements MainIndex
     }
 
     @Override
-    public boolean flushCache()
+    public boolean flushCache(long fileId) throws MainIndexException
     {
         this.rwLock.writeLock().lock();
-        this.rwLock.writeLock().unlock();
+        try
+        {
+            List<RowIdRange> rowIdRanges = this.indexBuffer.flush(fileId);
+            try (PreparedStatement pst = this.connection.prepareStatement(insertRangeSql))
+            {
+                for (RowIdRange range : rowIdRanges)
+                {
+                    pst.setLong(1, range.getRowIdStart());
+                    pst.setLong(2, range.getRowIdEnd());
+                    pst.setLong(3, range.getFileId());
+                    pst.setInt(4, range.getRgId());
+                    pst.setInt(5, range.getRgRowOffsetStart());
+                    pst.setInt(6, range.getRgRowOffsetEnd());
+                    pst.addBatch();
+                }
+                pst.executeBatch();
+                this.rwLock.writeLock().unlock();
+                return true;
+            }
+        }
+        catch (MainIndexException | SQLException e)
+        {
+            this.rwLock.writeLock().unlock();
+            throw new MainIndexException("failed to flush index cache into sqlite", e);
+        }
     }
 
     @Override
     public void close() throws IOException
     {
         this.rwLock.writeLock().lock();
+        List<Long> cachedFileIds = this.indexBuffer.cachedFileIds();
+        for (long fileId : cachedFileIds)
+        {
+            try
+            {
+                this.flushCache(fileId);
+            } catch (MainIndexException e)
+            {
+                throw new IOException("failed to flush main index cache of file id " + fileId, e);
+            }
+        }
+        this.indexBuffer.close();
+        try
+        {
+            this.connection.close();
+        } catch (SQLException e)
+        {
+            throw new IOException("failed to close sqlite connection", e);
+        }
         this.rwLock.writeLock().unlock();
     }
 }

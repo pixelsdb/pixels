@@ -4,7 +4,13 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
-import java.util.*;
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -15,7 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * @author hank
  * @create 2025-07-17
  */
-public class MainIndexBuffer
+public class MainIndexBuffer implements Closeable
 {
     /**
      * fileId -> {tableRowId -> rowLocation}.
@@ -125,5 +131,16 @@ public class MainIndexBuffer
         fileBuffer.clear();
         indexBuffer.remove(fileId);
         return ranges.build();
+    }
+
+    protected List<Long> cachedFileIds()
+    {
+        return indexBuffer.keySet().stream().map(id -> id).collect(Collectors.toList());
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        this.indexBuffer.clear();
     }
 }
