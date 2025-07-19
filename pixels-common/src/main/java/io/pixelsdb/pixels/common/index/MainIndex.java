@@ -81,7 +81,7 @@ public interface MainIndex extends Closeable
      * @param rowIdRange the row id range to be deleted
      * @return true on success
      */
-    boolean deleteRowIdRange(RowIdRange rowIdRange);
+    boolean deleteRowIdRange(RowIdRange rowIdRange) throws MainIndexException;
 
     /**
      * Flush the main index cache into persistent storage.

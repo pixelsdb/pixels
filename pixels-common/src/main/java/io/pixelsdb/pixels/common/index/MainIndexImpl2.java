@@ -36,6 +36,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * @author hank, Rolland1944
  * @create 2025-02-19
+ * @update 2025-07-19 use sqlite as the persistent storage.
  */
 public class MainIndexImpl2 implements MainIndex
 {
@@ -45,7 +46,8 @@ public class MainIndexImpl2 implements MainIndex
     private static final String createTableSql = "CREATE TABLE IF NOT EXISTS row_id_ranges" +
             "(row_id_start BIGINT NOT NULL, row_id_end BIGINT NOT NULL, file_id BIGINT NOT NULL, rg_id INT NOT NULL," +
             "rg_row_offset_start INT NOT NULL, rg_row_offset_end INT NOT NULL, PRIMARY KEY (row_id_start, row_id_end))";
-    private static final String queryRowIdRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? < row_id_end";
+    private static final String queryRowIdRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? <= row_id_end";
+    private static final String deleteRowIdRangeSql = "DELETE FROM row_id_ranges WHERE ? <= row_id_start AND row_id_end <= ?";
 
     private final long tableId;
     private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
@@ -174,10 +176,61 @@ public class MainIndexImpl2 implements MainIndex
     }
 
     @Override
-    public boolean deleteRowIdRange(RowIdRange rowIdRange)
+    public boolean deleteRowIdRange(RowIdRange rowIdRange) throws MainIndexException
     {
         this.rwLock.writeLock().lock();
+        try (PreparedStatement pst = connection.prepareStatement(queryRowIdRangeSql))
+        {
+            pst.setLong(1, rowIdRange.getRowIdStart());
+            pst.setLong(2, rowIdRange.getRowIdEnd());
+            pst.executeUpdate();
+
+            this.rwLock.readLock().unlock();
+        }
+        catch (SQLException e)
+        {
+            this.rwLock.readLock().unlock();
+            throw new MainIndexException("failed to delete row id ranges from sqlite", e);
+        }
         this.rwLock.writeLock().unlock();
+    }
+
+    /**
+     * Get the row id range that contains the given row id
+     *
+     * @param rowId the given row id
+     * @return the row id range
+     */
+    private RowIdRange getRowIdRange(long rowId) throws RowIdException
+    {
+        try (PreparedStatement pst = connection.prepareStatement(queryRowIdRangeSql))
+        {
+            pst.setLong(1, rowId);
+            pst.setLong(2, rowId);
+            try (ResultSet rs = pst.executeQuery())
+            {
+                if (rs.next())
+                {
+                    long rowIdStart = rs.getLong("row_id_start");
+                    long rowIdEnd = rs.getLong("row_id_end");
+                    long fileId = rs.getLong("file_id");
+                    int rgId = rs.getInt("rg_id");
+                    int rgRowOffsetStart = rs.getInt("rg_row_offset_start");
+                    int rgRowOffsetEnd = rs.getInt("rg_row_offset_end");
+                    if (rowIdEnd - rowIdStart != rgRowOffsetEnd - rgRowOffsetStart)
+                    {
+                        throw new RowIdException("the width of row id range (" + rowIdStart + ", " +
+                                rgRowOffsetEnd + ") does not match the width of row group row offset range (" +
+                                rgRowOffsetStart + ", " + rgRowOffsetEnd + ")");
+                    }
+                    return new RowIdRange(rowIdStart, rowIdEnd, fileId, rgId, rgRowOffsetStart, rgRowOffsetEnd);
+                }
+            }
+        } catch (SQLException e)
+        {
+            this.rwLock.readLock().unlock();
+            throw new RowIdException("failed to query row id range from sqlite", e);
+        }
     }
 
     @Override
