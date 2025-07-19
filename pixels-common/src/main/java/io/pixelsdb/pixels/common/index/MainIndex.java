@@ -43,6 +43,15 @@ public interface MainIndex extends Closeable
     long getTableId();
 
     /**
+     * Whether the main index implementation has a main index cache.
+     * For main index with a cache, some methods (e.g., {@link #deleteRowIdRange(RowIdRange)})
+     * may bypass the cache, thus {@link #flushCache()} should be called before these methods
+     * to operate on the most fresh state of the main index.
+     * @return true if cache exists
+     */
+    boolean hasCache();
+
+    /**
      * Allocate rowId batch for single point index.
      * @param tableId the table id of single point index
      * @param numRowIds the rowId nums need to allocate
@@ -66,54 +75,25 @@ public interface MainIndex extends Closeable
     boolean putEntry(long rowId, IndexProto.RowLocation rowLocation);
 
     /**
-     * Delete range of row ids from the main index. {@link #getLocation(long)} of a row id within a deleted range
-     * should return null.
+     * Delete range of row ids from the main index. This method only has effect on the persistent storage
+     * of the main index. If there is a
+     * {@link #getLocation(long)} of a row id within a deleted range should return null.
      * @param rowIdRange the row id range to be deleted
      * @return true on success
      */
     boolean deleteRowIdRange(RowIdRange rowIdRange);
 
     /**
-     * Persist the main index into persistent storage.
+     * Flush the main index cache into persistent storage.
+     * If cache does not exist (i.e., {@link #hasCache()} returns false), this method has no effect.
      * @return true on success
      */
-    boolean persist();
+    boolean flushCache();
 
     /**
-     * Persist the main index and close it.
+     * Flush the main index cache if exists and close the main index instance.
      * @throws IOException
      */
     @Override
     void close() throws IOException;
-
-    /**
-     * The location of the row group, composed of the file id and the row group id inside the file.
-     */
-    class RgLocation
-    {
-        /**
-         * The file id of the file in pixels metadata, starts from 1.
-         */
-        private final long fileId;
-        /**
-         * The row group id inside the file, starts from 0.
-         */
-        private final int rowGroupId;
-
-        public RgLocation(long fileId, int rowGroupId)
-        {
-            this.fileId = fileId;
-            this.rowGroupId = rowGroupId;
-        }
-
-        public long getFileId()
-        {
-            return fileId;
-        }
-
-        public int getRowGroupId()
-        {
-            return rowGroupId;
-        }
-    }
 }

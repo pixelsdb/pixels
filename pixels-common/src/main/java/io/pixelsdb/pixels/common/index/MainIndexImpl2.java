@@ -50,10 +50,7 @@ public class MainIndexImpl2 implements MainIndex
     private final long tableId;
     private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
     private final Connection connection;
-    // Read-Write lock
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
-    // Dirty flag
-    private boolean dirty = false;
 
     public MainIndexImpl2(long tableId) throws MainIndexException
     {
@@ -92,6 +89,12 @@ public class MainIndexImpl2 implements MainIndex
     }
 
     @Override
+    public boolean hasCache()
+    {
+        return true;
+    }
+
+    @Override
     public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws RowIdException
     {
         try
@@ -107,8 +110,7 @@ public class MainIndexImpl2 implements MainIndex
                     logger.error(e);
                     throw new RuntimeException(e); // wrap to unchecked, will rethrow
                 }
-            }
-            );
+            });
             // 2. allocate numRowIds
             long start = autoIncrement.getAndIncrement(numRowIds);
             return IndexProto.RowIdBatch.newBuilder().setRowIdStart(start).setLength(numRowIds).build();
@@ -122,6 +124,7 @@ public class MainIndexImpl2 implements MainIndex
     @Override
     public IndexProto.RowLocation getLocation(long rowId) throws MainIndexException
     {
+        this.rwLock.readLock().lock();
         IndexProto.RowLocation location = this.indexBuffer.lookup(rowId);
         if (location == null)
         {
@@ -141,17 +144,20 @@ public class MainIndexImpl2 implements MainIndex
                         int rgRowOffsetEnd = rs.getInt("rg_row_offset_end");
                         if (rowIdEnd - rowIdStart != rgRowOffsetEnd - rgRowOffsetStart)
                         {
-                            throw new MainIndexException("The width of row id range (" + rowIdStart + ", " + rgRowOffsetEnd +
-                                    ") does not match the width of row group row offset range (" + rgRowOffsetStart + ", " + rgRowOffsetEnd + ")");
+                            throw new MainIndexException("The width of row id range (" + rowIdStart + ", " +
+                                    rgRowOffsetEnd + ") does not match the width of row group row offset range (" +
+                                    rgRowOffsetStart + ", " + rgRowOffsetEnd + ")");
                         }
                         int offset = (int) (rowId - rowIdStart);
                         location = IndexProto.RowLocation.newBuilder()
                                 .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
                     }
+                    this.rwLock.readLock().unlock();
                 }
             }
             catch (SQLException e)
             {
+                this.rwLock.readLock().unlock();
                 throw new MainIndexException("failed to query row location from sqlite", e);
             }
         }
@@ -161,135 +167,30 @@ public class MainIndexImpl2 implements MainIndex
     @Override
     public boolean putEntry(long rowId, IndexProto.RowLocation rowLocation)
     {
+        this.rwLock.writeLock().lock();
         boolean res = this.indexBuffer.insert(rowId, rowLocation);
+        this.rwLock.writeLock().unlock();
         return res;
     }
 
     @Override
-    public boolean deleteEntry(long rowId)
+    public boolean deleteRowIdRange(RowIdRange rowIdRange)
     {
-        int index = binarySearch(rowId);
-        if (index < 0)
-        {
-            logger.error("Delete failure: RowId {} not found", rowId);
-            return false;
-        }
-
-        Entry entry = entries.get(index);
-        RowIdRange original = entry.getRowIdRange();
-
-        long start = original.getRowIdStart();
-        long end = original.getRowIdEnd();
-        // lock
-        rwLock.writeLock().lock();
-        entries.remove(index);
-        // In-place insert the remaining entries
-        if (rowId > start)
-        {
-            entries.add(index, new Entry(new RowIdRange(start, rowId - 1, 1L, 0, 0, 0), entry.getRgLocation()));
-            index++;
-        }
-        if (rowId < end)
-        {
-            entries.add(index, new Entry(new RowIdRange(rowId + 1, end, 1L, 0, 0, 0), entry.getRgLocation()));
-        }
-        rwLock.writeLock().unlock();
-        dirty = true;
-        return true;
+        this.rwLock.writeLock().lock();
+        this.rwLock.writeLock().unlock();
     }
 
     @Override
-    public boolean persist()
+    public boolean flushCache()
     {
-        try
-        {
-            // Iterate through entries and persist each to etcd
-            for (Entry entry : entries)
-            {
-                String key = "/mainindex/" + entry.getRowIdRange().getRowIdStart();
-                String value = serializeEntry(entry); // Serialize Entry to string
-                etcdUtil.putKeyValue(key, value);
-            }
-            logger.info("Persisted {} entries to etcd", entries.size());
-            return true;
-        }
-        catch (Exception e)
-        {
-            logger.error("Failed to persist entries to etcd", e);
-            return false;
-        }
-    }
-
-    public boolean persistIfDirty()
-    {
-        if (dirty)
-        {
-            if (persist())
-            {
-                dirty = false; // Reset dirty flag
-                return true;
-            }
-            return false;
-        }
-        return true; // No changes, no need to persist
+        this.rwLock.writeLock().lock();
+        this.rwLock.writeLock().unlock();
     }
 
     @Override
     public void close() throws IOException
     {
-        try
-        {
-            this.connection.close();
-            // Check dirty flag and persist to etcd if true
-            if (!persistIfDirty())
-            {
-                logger.error("Failed to persist data to etcd before closing");
-                throw new IOException("Failed to persist data to etcd before closing");
-            }
-            logger.info("Data persisted to etcd successfully before closing");
-        }
-        catch (Exception e)
-        {
-            logger.error("Error occurred while closing MainIndexImpl", e);
-            throw new IOException("Error occurred while closing MainIndexImpl", e);
-        }
-    }
-
-    private int binarySearch(long rowId)
-    {
-        int low = 0;
-        int high = entries.size() - 1;
-
-        while (low <= high)
-        {
-            int mid = (low + high) >>> 1;
-            Entry entry = entries.get(mid);
-            RowIdRange range = entry.getRowIdRange();
-
-            if (rowId >= range.getRowIdStart() && rowId <= range.getRowIdEnd())
-            {
-                return mid; // Found the containing Entry
-            }
-            else if (rowId < range.getRowIdStart())
-            {
-                high = mid - 1;
-            }
-            else
-            {
-                low = mid + 1;
-            }
-        }
-
-        return -1; // Not found
-    }
-
-    // Serialize Entry
-    private String serializeEntry(Entry entry)
-    {
-        return String.format("{\"startRowId\": %d, \"endRowId\": %d, \"fieldId\": %d, \"rowGroupId\": %d}",
-                entry.getRowIdRange().getRowIdStart(),
-                entry.getRowIdRange().getRowIdEnd(),
-                entry.getRgLocation().getFileId(),
-                entry.getRgLocation().getRowGroupId());
+        this.rwLock.writeLock().lock();
+        this.rwLock.writeLock().unlock();
     }
 }
