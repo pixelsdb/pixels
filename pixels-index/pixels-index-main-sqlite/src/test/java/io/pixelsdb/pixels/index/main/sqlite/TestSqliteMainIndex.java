@@ -17,35 +17,36 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.index;
+package io.pixelsdb.pixels.index.main.sqlite;
 
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.MainIndexFactory;
+import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 
-public class MainIndexImplTest
+public class TestSqliteMainIndex
 {
     long tableId = 100L;
-    private final MainIndexManager manager = new MainIndexManager(MainIndexImpl::new);
     MainIndex mainIndex;
 
     @BeforeEach
-    public void setUp() throws EtcdException
+    public void setUp() throws EtcdException, MainIndexException
     {
-        EtcdUtil.Instance().deleteByPrefix("/mainindex/");
-        mainIndex = manager.getOrCreate(tableId);
+        mainIndex = MainIndexFactory.Instance().getMainIndex(tableId, MainIndex.Scheme.sqlite);
     }
 
     @AfterEach

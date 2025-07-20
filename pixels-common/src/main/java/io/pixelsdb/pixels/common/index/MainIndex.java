@@ -37,6 +37,52 @@ import java.io.IOException;
 public interface MainIndex extends Closeable
 {
     /**
+     * If we want to add more single point index schemes here, modify this enum.
+     */
+    enum Scheme
+    {
+        sqlite;  // main index stored in sqlite
+
+        /**
+         * Case-insensitive parsing from String name to enum value.
+         * @param value the name of main index scheme.
+         * @return
+         */
+        public static Scheme from(String value)
+        {
+            return valueOf(value.toLowerCase());
+        }
+
+        /**
+         * Whether the value is a valid main index scheme.
+         * @param value
+         * @return
+         */
+        public static boolean isValid(String value)
+        {
+            for (Scheme scheme : values())
+            {
+                if (scheme.equals(value))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public boolean equals(String other)
+        {
+            return this.toString().equalsIgnoreCase(other);
+        }
+
+        public boolean equals(Scheme other)
+        {
+            // enums in Java can be compared using '=='.
+            return this == other;
+        }
+    }
+
+    /**
      * Get the tableId of this mainIndex.
      * @return the tableId
      */
@@ -45,7 +91,7 @@ public interface MainIndex extends Closeable
     /**
      * Whether the main index implementation has a main index cache.
      * For main index with a cache, some methods (e.g., {@link #deleteRowIdRange(RowIdRange)})
-     * may bypass the cache, thus {@link #flushCache()} should be called before these methods
+     * may bypass the cache, thus {@link #flushCache(long fileId)} should be called before these methods
      * to operate on the most fresh state of the main index.
      * @return true if cache exists
      */

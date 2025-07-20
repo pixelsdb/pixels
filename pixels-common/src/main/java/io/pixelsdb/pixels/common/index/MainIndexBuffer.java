@@ -1,3 +1,22 @@
+/*
+ * Copyright 2025 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 package io.pixelsdb.pixels.common.index;
 
 import com.google.common.collect.ImmutableList;
@@ -28,7 +47,7 @@ public class MainIndexBuffer implements Closeable
      */
     private final Map<Long, Map<Long, IndexProto.RowLocation>> indexBuffer;
 
-    protected MainIndexBuffer()
+    public MainIndexBuffer()
     {
         indexBuffer = new HashMap<>();
     }
@@ -39,7 +58,7 @@ public class MainIndexBuffer implements Closeable
      * @param location the row location of the entry
      * @return true of the index entry does not exist and is put successfully in this buffer
      */
-    protected boolean insert(long rowId, IndexProto.RowLocation location)
+    public boolean insert(long rowId, IndexProto.RowLocation location)
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(location.getFileId());
         if (fileBuffer == null)
@@ -70,7 +89,7 @@ public class MainIndexBuffer implements Closeable
         return fileBuffer.get(rowId);
     }
 
-    protected IndexProto.RowLocation lookup(long rowId)
+    public IndexProto.RowLocation lookup(long rowId)
     {
         for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : indexBuffer.entrySet())
         {
@@ -85,7 +104,7 @@ public class MainIndexBuffer implements Closeable
         return null;
     }
 
-    protected List<RowIdRange> flush (long fileId) throws MainIndexException
+    public List<RowIdRange> flush(long fileId) throws MainIndexException
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(fileId);
         if (fileBuffer == null)
@@ -133,7 +152,7 @@ public class MainIndexBuffer implements Closeable
         return ranges.build();
     }
 
-    protected List<Long> cachedFileIds()
+    public List<Long> cachedFileIds()
     {
         return indexBuffer.keySet().stream().map(id -> id).collect(Collectors.toList());
     }

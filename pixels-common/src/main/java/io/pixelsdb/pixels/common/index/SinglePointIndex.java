@@ -45,7 +45,7 @@ public interface SinglePointIndex extends Closeable
 
         /**
          * Case-insensitive parsing from String name to enum value.
-         * @param value the name of storage scheme.
+         * @param value the name of single point index scheme.
          * @return
          */
         public static Scheme from(String value)
@@ -54,7 +54,7 @@ public interface SinglePointIndex extends Closeable
         }
 
         /**
-         * Whether the value is a valid storage scheme.
+         * Whether the value is a valid single point index scheme.
          * @param value
          * @return
          */

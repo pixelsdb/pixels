@@ -17,11 +17,14 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.index;
+package io.pixelsdb.pixels.index.main.sqlite;
 
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
+import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.MainIndexBuffer;
+import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
@@ -39,9 +42,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @create 2025-02-19
  * @update 2025-07-19 use sqlite as the persistent storage.
  */
-public class MainIndexImpl implements MainIndex
+public class SqliteMainIndex implements MainIndex
 {
-    private static final Logger logger = LogManager.getLogger(MainIndexImpl.class);
+    private static final Logger logger = LogManager.getLogger(SqliteMainIndex.class);
     private static final HashMap<Long, PersistentAutoIncrement> persistentAIMap = new HashMap<>();
 
     private static final String createTableSql = "CREATE TABLE IF NOT EXISTS row_id_ranges" +
@@ -58,7 +61,7 @@ public class MainIndexImpl implements MainIndex
     private final Connection connection;
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
-    public MainIndexImpl(long tableId) throws MainIndexException
+    public SqliteMainIndex(long tableId) throws MainIndexException
     {
         this.tableId = tableId;
         String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
