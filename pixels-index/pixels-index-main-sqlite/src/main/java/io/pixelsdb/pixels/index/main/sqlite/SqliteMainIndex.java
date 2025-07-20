@@ -177,7 +177,8 @@ public class SqliteMainIndex implements MainIndex
             long rowIdEnd = rowIdRange.getRowIdEnd();
             pst.setLong(1, rowIdStart);
             pst.setLong(2, rowIdEnd);
-            pst.executeUpdate();
+            int n = pst.executeUpdate();
+            logger.debug("deleted {} rows from sqlite", n);
             RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdStart());
             RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdEnd());
             boolean res = true;

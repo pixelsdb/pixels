@@ -71,49 +71,41 @@ public class TestSqliteMainIndex
     }
 
     @Test
-    public void testDeleteEntry() throws MainIndexException
+    public void testFlushCacheAndDeleteEntry() throws MainIndexException
     {
         long rowId = 2000L;
         IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
                 .setFileId(2)
-                .setRgId(20)
+                .setRgId(2)
                 .setRgRowOffset(0)
                 .build();
+
+        Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId, rowId + 1,
+                2, 2, 0, 1)));
 
         Assertions.assertTrue(mainIndex.putEntry(rowId, location));
         Assertions.assertNotNull(mainIndex.getLocation(rowId));
         Assertions.assertTrue(mainIndex.flushCache(2));
 
-        Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId, rowId+1,
-                2, 20, 0, 1)));
+        Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId, rowId + 1,
+                2, 2, 0, 1)));
         Assertions.assertNull(mainIndex.getLocation(rowId));
-    }
 
-    @Test
-    public void testGetRowId() throws Exception
-    {
-        long indexId = 1L;
-        byte[] key = "exampleKey".getBytes();
-        long timestamp = System.currentTimeMillis();
-        long fileId = 1L;
-        int rgId = 2;
-        int rgRowId = 3;
-        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                .setIndexId(indexId)
-                .setKey(ByteString.copyFrom(key))
-                .setTimestamp(timestamp)
-                .build();
-        IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                .setFileId(fileId)
-                .setRgId(rgId)
-                .setRgRowOffset(rgRowId)
-                .build();
-        IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
-                .setFileId(4)
-                .setRgId(40)
-                .setRgRowOffset(0)
-                .build();
-        Assertions.assertTrue(mainIndex.putEntry(0L, dummyLocation));
+        Assertions.assertTrue(mainIndex.putEntry(rowId, location));
+        Assertions.assertNotNull(mainIndex.getLocation(rowId));
+        Assertions.assertTrue(mainIndex.flushCache(2));
+
+        Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId - 1, rowId + 1,
+                2, 2, 0, 2)));
+        Assertions.assertNull(mainIndex.getLocation(rowId));
+
+        Assertions.assertTrue(mainIndex.putEntry(rowId, location));
+        Assertions.assertNotNull(mainIndex.getLocation(rowId));
+        Assertions.assertTrue(mainIndex.flushCache(2));
+
+        Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId - 1, rowId,
+                2, 2, 0, 1)));
+        Assertions.assertNotNull(mainIndex.getLocation(rowId));
     }
 
     @Test

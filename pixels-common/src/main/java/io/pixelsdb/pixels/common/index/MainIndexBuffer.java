@@ -113,7 +113,7 @@ public class MainIndexBuffer implements Closeable
         }
         ImmutableList.Builder<RowIdRange> ranges = ImmutableList.builder();
         RowIdRange.Builder currRangeBuilder = new RowIdRange.Builder();
-        boolean first = true;
+        boolean first = true, last = false;
         long prevRowId = Long.MIN_VALUE;
         int prevRgId = Integer.MIN_VALUE;
         int prevRgRowOffset = Integer.MIN_VALUE;
@@ -134,6 +134,7 @@ public class MainIndexBuffer implements Closeable
                     currRangeBuilder.setRowIdEnd(prevRowId + 1);
                     currRangeBuilder.setRgRowOffsetEnd(prevRgRowOffset + 1);
                     ranges.add(currRangeBuilder.build());
+                    last = true;
                 }
                 // start constructing a new row id range
                 first = false;
@@ -145,6 +146,13 @@ public class MainIndexBuffer implements Closeable
             }
             prevRowId = rowId;
             prevRgRowOffset = rgRowOffset;
+        }
+        // add the last range
+        if (!last)
+        {
+            currRangeBuilder.setRowIdEnd(prevRowId + 1);
+            currRangeBuilder.setRgRowOffsetEnd(prevRgRowOffset + 1);
+            ranges.add(currRangeBuilder.build());
         }
         // release the flushed file index buffer
         fileBuffer.clear();
