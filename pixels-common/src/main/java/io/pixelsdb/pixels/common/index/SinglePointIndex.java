@@ -116,18 +116,17 @@ public interface SinglePointIndex extends Closeable
      * @return true if the index entry is put successfully
      * @throws SinglePointIndexException
      */
-    boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique)
-            throws SinglePointIndexException;
+    boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique) throws SinglePointIndexException;
 
     /**
      * Put the index entries of a primary index.
      * @param entries the primary index entries
      * @return true if the index entries are put successfully
-     * @throws SinglePointIndexException if failed to put entries into the single point index
      * @throws MainIndexException if failed to put entries into the main index of the table
+     * @throws SinglePointIndexException if failed to put entries into the single point index
      */
     boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
-            throws SinglePointIndexException, MainIndexException;
+            throws MainIndexException, SinglePointIndexException;
 
     /**
      * Put the index entries of a secondary index. Only the index key ({@link io.pixelsdb.pixels.index.IndexProto.IndexKey})
@@ -136,8 +135,7 @@ public interface SinglePointIndex extends Closeable
      * @return true if the index entries are put successfully
      * @throws SinglePointIndexException
      */
-    boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries)
-            throws SinglePointIndexException;
+    boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException;
 
     /**
      * Delete the index entry of the index key
@@ -145,8 +143,7 @@ public interface SinglePointIndex extends Closeable
      * @return the row id of the deleted index entry
      * @throws SinglePointIndexException
      */
-    long deleteEntry(IndexProto.IndexKey indexKey)
-            throws SinglePointIndexException;
+    long deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
 
     /**
      * Delete the index entries of the index keys
@@ -154,8 +151,7 @@ public interface SinglePointIndex extends Closeable
      * @return the row ids of the deleted index entries
      * @throws SinglePointIndexException
      */
-    List<Long> deleteEntries(List<IndexProto.IndexKey> indexKeys)
-            throws SinglePointIndexException;
+    List<Long> deleteEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException;
 
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the

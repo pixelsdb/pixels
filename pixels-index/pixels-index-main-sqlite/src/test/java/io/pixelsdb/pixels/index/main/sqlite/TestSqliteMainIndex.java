@@ -60,16 +60,13 @@ public class TestSqliteMainIndex
     {
         long rowId = 1000L;
         IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
-                .setFileId(1)
-                .setRgId(10)
-                .setRgRowOffset(0)
-                .build();
+                .setFileId(1).setRgId(1).setRgRowOffset(0).build();
 
         Assertions.assertTrue(mainIndex.putEntry(rowId, location));
         IndexProto.RowLocation fetched = mainIndex.getLocation(rowId);
         Assertions.assertNotNull(fetched);
         Assertions.assertEquals(1, fetched.getFileId());
-        Assertions.assertEquals(10, fetched.getRgId());
+        Assertions.assertEquals(1, fetched.getRgId());
         Assertions.assertEquals(0, fetched.getRgRowOffset());
     }
 

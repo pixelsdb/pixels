@@ -19,7 +19,8 @@
  */
 package io.pixelsdb.pixels.common.exception;
 
-public class MainIndexException extends IndexException {
+public class MainIndexException extends IndexException
+{
     public MainIndexException()
     {
         super();

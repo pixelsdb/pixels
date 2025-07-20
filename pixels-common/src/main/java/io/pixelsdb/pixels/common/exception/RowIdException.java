@@ -19,7 +19,8 @@
  */
 package io.pixelsdb.pixels.common.exception;
 
-public class RowIdException extends IndexException {
+public class RowIdException extends IndexException
+{
     public RowIdException()
     {
         super();

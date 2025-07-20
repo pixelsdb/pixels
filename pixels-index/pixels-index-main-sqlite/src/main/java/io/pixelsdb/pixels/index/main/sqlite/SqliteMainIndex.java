@@ -79,15 +79,12 @@ public class SqliteMainIndex implements MainIndex
             connection = DriverManager.getConnection("jdbc:sqlite:" + sqlitePath + tableId + ".main.index.db");
             try (Statement statement = connection.createStatement())
             {
-                boolean res = statement.execute(createTableSql);
-                if (!res)
-                {
-                    throw new MainIndexException("Failed to create table row_id_ranges");
-                }
+                statement.execute(createTableSql);
             }
-        } catch (SQLException e)
+        }
+        catch (SQLException e)
         {
-            throw new MainIndexException("failed to connect to sqlite", e);
+            throw new MainIndexException("failed to connect to sqlite and open/create table", e);
         }
     }
 
@@ -140,14 +137,16 @@ public class SqliteMainIndex implements MainIndex
             try
             {
                 RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
-                long rowIdStart = rowIdRange.getRowIdStart();
-                long fileId = rowIdRange.getFileId();
-                int rgId = rowIdRange.getRgId();
-                int rgRowOffsetStart = rowIdRange.getRgRowOffsetStart();
-                int offset = (int) (rowId - rowIdStart);
-                location = IndexProto.RowLocation.newBuilder()
-                        .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
-                this.rwLock.readLock().unlock();
+                if (rowIdRange != null)
+                {
+                    long rowIdStart = rowIdRange.getRowIdStart();
+                    long fileId = rowIdRange.getFileId();
+                    int rgId = rowIdRange.getRgId();
+                    int rgRowOffsetStart = rowIdRange.getRgRowOffsetStart();
+                    int offset = (int) (rowId - rowIdStart);
+                    location = IndexProto.RowLocation.newBuilder()
+                            .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
+                }
             }
             catch (RowIdException e)
             {
@@ -155,6 +154,7 @@ public class SqliteMainIndex implements MainIndex
                 throw new MainIndexException("failed to query row location from sqlite", e);
             }
         }
+        this.rwLock.readLock().unlock();
         return location;
     }
 
@@ -180,22 +180,23 @@ public class SqliteMainIndex implements MainIndex
             pst.executeUpdate();
             RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdStart());
             RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdEnd());
+            boolean res = true;
             if (leftBorderRange != null)
             {
                 int offset = (int) (rowIdEnd - leftBorderRange.getRowIdStart());
                 RowIdRange newLeftBorderRange = leftBorderRange.toBuilder()
                         .setRowIdEnd(rowIdEnd).setRgRowOffsetEnd(leftBorderRange.getRgRowOffsetStart()+offset).build();
-                updateRowIdRangeWidth(leftBorderRange, newLeftBorderRange);
+                res &= updateRowIdRangeWidth(leftBorderRange, newLeftBorderRange);
             }
             if (rightBorderRange != null)
             {
                 int offset = (int) (rightBorderRange.getRowIdEnd() - rowIdEnd);
                 RowIdRange newRightBorderRange = rightBorderRange.toBuilder()
                         .setRowIdStart(rowIdEnd).setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd()-offset).build();
-                updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
+                res &= updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
             }
             this.rwLock.writeLock().unlock();
-            return true;
+            return res;
         }
         catch (SQLException | RowIdException e)
         {
@@ -312,8 +313,10 @@ public class SqliteMainIndex implements MainIndex
             try
             {
                 this.flushCache(fileId);
-            } catch (MainIndexException e)
+            }
+            catch (MainIndexException e)
             {
+                this.rwLock.writeLock().unlock();
                 throw new IOException("failed to flush main index cache of file id " + fileId, e);
             }
         }
@@ -321,8 +324,10 @@ public class SqliteMainIndex implements MainIndex
         try
         {
             this.connection.close();
-        } catch (SQLException e)
+        }
+        catch (SQLException e)
         {
+            this.rwLock.writeLock().unlock();
             throw new IOException("failed to close sqlite connection", e);
         }
         this.rwLock.writeLock().unlock();

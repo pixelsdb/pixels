@@ -108,7 +108,7 @@ public interface MainIndex extends Closeable
     /**
      * Get the physical location of a row given the row id
      * @param rowId the row id
-     * @return the row location
+     * @return the row location, or null if not found
      */
     IndexProto.RowLocation getLocation(long rowId) throws MainIndexException;
 
