@@ -46,7 +46,7 @@ public class TestSqliteMainIndex
     @BeforeEach
     public void setUp() throws EtcdException, MainIndexException
     {
-        mainIndex = MainIndexFactory.Instance().getMainIndex(tableId, MainIndex.Scheme.sqlite);
+        mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
     }
 
     @AfterEach

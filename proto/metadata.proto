@@ -54,6 +54,7 @@ service MetadataService {
     rpc DeleteRange (DeleteRangeRequest) returns (DeleteRangeResponse);
     rpc CreateSinglePointIndex (CreateSinglePointIndexRequest) returns (CreateSinglePointIndexResponse);
     rpc GetPrimaryIndex (GetPrimaryIndexRequest) returns (GetPrimaryIndexResponse);
+    rpc GetSinglePointIndex (GetSinglePointIndexRequest) returns (GetSinglePointIndexResponse);
     rpc GetSinglePointIndices (GetSinglePointIndicesRequest) returns (GetSinglePointIndicesResponse);
     rpc UpdateSinglePointIndex (UpdateSinglePointIndexRequest) returns (UpdateSinglePointIndexResponse);
     rpc DropSinglePointIndex (DropSinglePointIndexRequest) returns (DropSinglePointIndexResponse);
@@ -513,6 +514,16 @@ message GetPrimaryIndexRequest {
 message GetPrimaryIndexResponse {
     ResponseHeader header = 1;
     SinglePointIndex primaryIndex = 2;
+}
+
+message GetSinglePointIndexRequest {
+    RequestHeader header = 1;
+    uint64 indexId = 2;
+}
+
+message GetSinglePointIndexResponse {
+    ResponseHeader header = 1;
+    SinglePointIndex singlePointIndex = 2;
 }
 
 message GetSinglePointIndicesRequest {

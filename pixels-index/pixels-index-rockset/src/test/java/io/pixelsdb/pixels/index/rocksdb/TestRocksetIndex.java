@@ -29,8 +29,8 @@ public class TestRocksetIndex
     @Test
     public void test() throws SinglePointIndexException
     {
-        RocksetIndex rocksetIndex = (RocksetIndex) SinglePointIndexFactory.Instance()
-                .getSinglePointIndex(1L, 1L, SinglePointIndex.Scheme.rockset);
+        RocksetIndex rocksetIndex = (RocksetIndex) SinglePointIndexFactory.Instance().getSinglePointIndex(
+                        new SinglePointIndexFactory.TableIndex(1L, 1L, SinglePointIndex.Scheme.rockset));
         long dbHandle = 0;
 
         try

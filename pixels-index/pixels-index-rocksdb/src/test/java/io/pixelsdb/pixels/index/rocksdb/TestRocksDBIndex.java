@@ -97,7 +97,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testPutEntries() throws RocksDBException, SinglePointIndexException
+    public void testPutEntries() throws RocksDBException, SinglePointIndexException, MainIndexException
     {
         long indexId = 1L;
         long timestamp = System.currentTimeMillis();
@@ -186,7 +186,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntries() throws RocksDBException, SinglePointIndexException
+    public void testDeleteEntries() throws RocksDBException, SinglePointIndexException, MainIndexException
     {
         long indexId = 1L;
         long timestamp = System.currentTimeMillis();

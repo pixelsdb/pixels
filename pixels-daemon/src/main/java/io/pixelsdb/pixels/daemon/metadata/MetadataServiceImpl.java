@@ -831,13 +831,38 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         if (primaryIndex != null)
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
-            response = MetadataProto.GetPrimaryIndexResponse.newBuilder().setPrimaryIndex(primaryIndex).setHeader(headerBuilder).build();
+            response = MetadataProto.GetPrimaryIndexResponse.newBuilder()
+                    .setPrimaryIndex(primaryIndex).setHeader(headerBuilder).build();
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_SINGLE_POINT_INDEX_NOT_FOUND).setErrorMsg("primary single point index with table id '" +
-                    request.getTableId() + "' is not found");
+            headerBuilder.setErrorCode(METADATA_SINGLE_POINT_INDEX_NOT_FOUND).setErrorMsg(
+                    "primary single point index with table id '" + request.getTableId() + "' is not found");
             response = MetadataProto.GetPrimaryIndexResponse.newBuilder().setHeader(headerBuilder).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getSinglePointIndex(MetadataProto.GetSinglePointIndexRequest request,
+                                    StreamObserver<MetadataProto.GetSinglePointIndexResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.GetSinglePointIndexResponse response;
+        MetadataProto.SinglePointIndex singlePointIndex = singlePointIndexDao.getById(request.getIndexId());
+        if (singlePointIndex != null)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.GetSinglePointIndexResponse.newBuilder().setSinglePointIndex(singlePointIndex)
+                    .setHeader(headerBuilder).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_SINGLE_POINT_INDEX_NOT_FOUND).setErrorMsg(
+                    "single point index with index id '" + request.getIndexId() + "' is not found");
+            response = MetadataProto.GetSinglePointIndexResponse.newBuilder().setHeader(headerBuilder).build();
         }
         responseObserver.onNext(response);
         responseObserver.onCompleted();
@@ -854,12 +879,13 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         if (singlePointIndices != null && !singlePointIndices.isEmpty())
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
-            response = MetadataProto.GetSinglePointIndicesResponse.newBuilder().addAllSinglePointIndices(singlePointIndices).setHeader(headerBuilder).build();
+            response = MetadataProto.GetSinglePointIndicesResponse.newBuilder().
+                    addAllSinglePointIndices(singlePointIndices).setHeader(headerBuilder).build();
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_SINGLE_POINT_INDEX_NOT_FOUND).setErrorMsg("single point indices with table id '" +
-                    request.getTableId() + "' are not found");
+            headerBuilder.setErrorCode(METADATA_SINGLE_POINT_INDEX_NOT_FOUND).setErrorMsg(
+                    "single point indices with table id '" + request.getTableId() + "' are not found");
             response = MetadataProto.GetSinglePointIndicesResponse.newBuilder().setHeader(headerBuilder).build();
         }
         responseObserver.onNext(response);
@@ -878,7 +904,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_UPDATE_SINGLE_POINT_INDEX_FAILED).setErrorMsg("make sure the single point index exists");
+            headerBuilder.setErrorCode(METADATA_UPDATE_SINGLE_POINT_INDEX_FAILED)
+                    .setErrorMsg("make sure the single point index exists");
         }
         MetadataProto.UpdateSinglePointIndexResponse response = MetadataProto.UpdateSinglePointIndexResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();

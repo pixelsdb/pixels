@@ -21,7 +21,9 @@ package io.pixelsdb.pixels.common.index;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,6 +43,7 @@ public class SinglePointIndexFactory
     private static final Logger logger = LogManager.getLogger(SinglePointIndexFactory.class);
     private final Map<TableIndex, SinglePointIndex> singlePointIndexImpls = new HashMap<>();
     private final Set<SinglePointIndex.Scheme> enabledSchemes = new TreeSet<>();
+    private final Map<Long, SinglePointIndex.Scheme> indexIdToSchemes = new HashMap<>();
     /**
      * The providers of the enabled single point index schemes.
      */
@@ -115,12 +118,29 @@ public class SinglePointIndexFactory
      * Get the single point index instance.
      * @param tableId the table id of the index
      * @param indexId the index id of the index
-     * @param scheme the scheme of the index
      * @return the single point index instance
      * @throws SinglePointIndexException
      */
-    public synchronized SinglePointIndex getSinglePointIndex(long tableId, long indexId, SinglePointIndex.Scheme scheme) throws SinglePointIndexException
+    public synchronized SinglePointIndex getSinglePointIndex(long tableId, long indexId) throws SinglePointIndexException
     {
+        SinglePointIndex.Scheme scheme = indexIdToSchemes.get(indexId);
+        if (scheme == null)
+        {
+            try
+            {
+                io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex singlePointIndex =
+                        MetadataService.Instance().getSinglePointIndex(indexId);
+                if (singlePointIndex == null)
+                {
+                    throw new SinglePointIndexException("single point index with id " + indexId + " does not exist");
+                }
+                scheme = singlePointIndex.getIndexScheme();
+                indexIdToSchemes.put(indexId, scheme);
+            } catch (MetadataException e)
+            {
+                throw new SinglePointIndexException("failed to query single point index information from metadata", e);
+            }
+        }
         // 'synchronized' in Java is reentrant,  it is fine to call the other getSinglePointIndex() from here.
         return getSinglePointIndex(new TableIndex(tableId, indexId, scheme));
     }

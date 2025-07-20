@@ -19,19 +19,17 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ServiceLoader;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -43,48 +41,38 @@ public class MainIndexFactory
 {
     private static final Logger logger = LogManager.getLogger(MainIndexFactory.class);
     private final Map<Long, MainIndex> mainIndexImpls = new HashMap<>();
-    private final Set<MainIndex.Scheme> enabledSchemes = new TreeSet<>();
+    private final MainIndex.Scheme enabledScheme;
     /**
      * The providers of the enabled main index schemes.
      */
-    private final ImmutableMap<MainIndex.Scheme, MainIndexProvider> mainIndexProviders;
+    private MainIndexProvider mainIndexProvider;
 
-    private MainIndexFactory()
+    private MainIndexFactory() throws MainIndexException
     {
-        String value = ConfigFactory.Instance().getProperty("enabled.main.index.schemes");
-        requireNonNull(value, "enabled.main.index.schemes is not configured");
-        String[] schemeNames = value.trim().split(",");
-        checkArgument(schemeNames.length > 0,
-                "at lease one main index scheme must be enabled");
+        String name = ConfigFactory.Instance().getProperty("enabled.main.index.scheme");
+        requireNonNull(name, "enabled.main.index.scheme is not configured");
 
-        ImmutableMap.Builder<MainIndex.Scheme, MainIndexProvider> providersBuilder = ImmutableMap.builder();
         ServiceLoader<MainIndexProvider> providerLoader = ServiceLoader.load(MainIndexProvider.class);
-        for (String name : schemeNames)
+        this.enabledScheme = MainIndex.Scheme.from(name);
+        boolean providerExists = false;
+        for (MainIndexProvider mainIndexProvider : providerLoader)
         {
-            MainIndex.Scheme scheme = MainIndex.Scheme.from(name);
-            this.enabledSchemes.add(scheme);
-            boolean providerExists = false;
-            for (MainIndexProvider mainIndexProvider : providerLoader)
+            if (mainIndexProvider.compatibleWith(enabledScheme))
             {
-                if (mainIndexProvider.compatibleWith(scheme))
-                {
-                    providersBuilder.put(scheme, mainIndexProvider);
-                    providerExists = true;
-                    break;
-                }
-            }
-            if (!providerExists)
-            {
-                // only log a warning, do not throw exception.
-                logger.warn("no main index provider exists for scheme: {}", scheme.name());
+                this.mainIndexProvider = mainIndexProvider;
+                providerExists = true;
+                break;
             }
         }
-        this.mainIndexProviders = providersBuilder.build();
+        if (!providerExists)
+        {
+            throw new MainIndexException("no main index provider exists for enabled scheme " + enabledScheme.name());
+        }
     }
 
     private static MainIndexFactory instance = null;
 
-    public static MainIndexFactory Instance()
+    public static MainIndexFactory Instance() throws MainIndexException
     {
         if (instance == null)
         {
@@ -104,33 +92,30 @@ public class MainIndexFactory
         return instance;
     }
 
-    public List<MainIndex.Scheme> getEnabledSchemes()
+    public MainIndex.Scheme getEnabledScheme()
     {
-        return ImmutableList.copyOf(this.enabledSchemes);
+        return this.enabledScheme;
     }
 
     public boolean isSchemeEnabled(MainIndex.Scheme scheme)
     {
-        return this.enabledSchemes.contains(scheme);
+        return this.enabledScheme == scheme;
     }
 
     /**
      * Get the main index instance.
      * @param tableId the table id of the index
-     * @param scheme the scheme of the index
      * @return the main index instance
      * @throws SinglePointIndexException
      */
-    public synchronized MainIndex getMainIndex(long tableId, @Nonnull MainIndex.Scheme scheme) throws MainIndexException
+    public synchronized MainIndex getMainIndex(long tableId) throws MainIndexException
     {
-        checkArgument(this.enabledSchemes.contains(scheme), "main index scheme '" +
-                scheme + "' is not enabled.");
         if (mainIndexImpls.containsKey(tableId))
         {
             return mainIndexImpls.get(tableId);
         }
 
-        MainIndex mainIndex = this.mainIndexProviders.get(scheme).createInstance(tableId, scheme);
+        MainIndex mainIndex = this.mainIndexProvider.createInstance(tableId, enabledScheme);
         mainIndexImpls.put(tableId, mainIndex);
 
         return mainIndex;

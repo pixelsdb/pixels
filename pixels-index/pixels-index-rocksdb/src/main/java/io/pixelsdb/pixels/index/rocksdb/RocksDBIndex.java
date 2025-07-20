@@ -20,7 +20,10 @@
 package io.pixelsdb.pixels.index.rocksdb;
 
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
@@ -212,10 +215,12 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
+    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
+            throws SinglePointIndexException, MainIndexException
     {
-        try(WriteBatch writeBatch = new WriteBatch())
+        try (WriteBatch writeBatch = new WriteBatch())
         {
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             // Process each Entry object
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
@@ -228,6 +233,8 @@ public class RocksDBIndex implements SinglePointIndex
                 byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
                 // Write to RocksDB
                 writeBatch.put(keyBytes, valueBytes);
+                // Put main index
+                mainIndex.putEntry(entry.getRowId(), entry.getRowLocation());
             }
             rocksDB.write(new WriteOptions(), writeBatch);
             return true;

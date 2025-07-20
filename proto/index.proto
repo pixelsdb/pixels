@@ -119,7 +119,9 @@ message PutPrimaryIndexEntryResponse {
 }
 
 message PutPrimaryIndexEntriesRequest {
-  repeated PrimaryIndexEntry indexEntries = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated PrimaryIndexEntry indexEntries = 3; // all entries must from the same index
 }
 
 message PutPrimaryIndexEntriesResponse {
@@ -135,7 +137,9 @@ message PutSecondaryIndexEntryResponse {
 }
 
 message PutSecondaryIndexEntriesRequest {
-  repeated SecondaryIndexEntry indexEntries = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated SecondaryIndexEntry indexEntries = 3; // all entries must from the same index
 }
 
 message PutSecondaryIndexEntriesResponse {
@@ -152,7 +156,9 @@ message DeletePrimaryIndexEntryResponse {
 }
 
 message DeletePrimaryIndexEntriesRequest {
-  repeated IndexKey indexKeys = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
 }
 
 message DeletePrimaryIndexEntriesResponse {
@@ -170,7 +176,9 @@ message DeleteSecondaryIndexEntryResponse {
 }
 
 message DeleteSecondaryIndexEntriesRequest {
-  repeated IndexKey indexKeys = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
 }
 
 message DeleteSecondaryIndexEntriesResponse {
@@ -188,7 +196,9 @@ message UpdatePrimaryIndexEntryResponse {
 }
 
 message UpdatePrimaryIndexEntriesRequest {
-  repeated IndexKey indexKeys = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
 }
 
 message UpdatePrimaryIndexEntriesResponse {
@@ -206,7 +216,9 @@ message UpdateSecondaryIndexEntryResponse {
 }
 
 message UpdateSecondaryIndexEntriesRequest {
-  repeated IndexKey indexKeys = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
 }
 
 message UpdateSecondaryIndexEntriesResponse {

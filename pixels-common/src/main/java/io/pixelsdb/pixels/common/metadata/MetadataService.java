@@ -1046,6 +1046,40 @@ public class MetadataService
         }
     }
 
+    public SinglePointIndex getSinglePointIndex(long indexId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetSinglePointIndexRequest request = MetadataProto.GetSinglePointIndexRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setIndexId(indexId).build();
+        try
+        {
+            MetadataProto.GetSinglePointIndexResponse response = this.stub.getSinglePointIndex(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                if (response.getHeader().getErrorCode() == METADATA_SINGLE_POINT_INDEX_NOT_FOUND)
+                {
+                    /**
+                     * return null if the single point index is not found, this is useful for clients
+                     * as they can hardly deal with error code.
+                     */
+                    return null;
+                }
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return new SinglePointIndex(response.getSinglePointIndex());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get single point index", e);
+        }
+    }
+
     /**
      * Get the single point index by table id.
      * @param tableId the table id
@@ -1066,7 +1100,7 @@ public class MetadataService
                 if (response.getHeader().getErrorCode() == METADATA_SINGLE_POINT_INDEX_NOT_FOUND)
                 {
                     /**
-                     * return null if single point indices are not found, this is useful for clients
+                     * return null if the single point indices are not found, this is useful for clients
                      * as they can hardly deal with error code.
                      */
                     return null;

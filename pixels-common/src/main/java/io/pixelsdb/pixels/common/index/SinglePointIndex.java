@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
@@ -119,14 +120,14 @@ public interface SinglePointIndex extends Closeable
             throws SinglePointIndexException;
 
     /**
-     * Put the index entries of a primary index. Only the index key ({@link io.pixelsdb.pixels.index.IndexProto.IndexKey})
-     * and the row ids are put into this single point index.
+     * Put the index entries of a primary index.
      * @param entries the primary index entries
      * @return true if the index entries are put successfully
-     * @throws SinglePointIndexException
+     * @throws SinglePointIndexException if failed to put entries into the single point index
+     * @throws MainIndexException if failed to put entries into the main index of the table
      */
     boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
-            throws SinglePointIndexException;
+            throws SinglePointIndexException, MainIndexException;
 
     /**
      * Put the index entries of a secondary index. Only the index key ({@link io.pixelsdb.pixels.index.IndexProto.IndexKey})

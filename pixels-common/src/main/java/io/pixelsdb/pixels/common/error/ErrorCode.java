@@ -132,5 +132,6 @@ public class ErrorCode
     public static final int INDEX_PUT_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 2;
     public static final int INDEX_DELETE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 3;
     public static final int INDEX_DELETE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 4;
-    public static final int INDEX_GET_ROW_ID_FAIL = ERROR_INDEX_SERVER +5;
+    public static final int INDEX_GET_ROW_ID_FAIL = ERROR_INDEX_SERVER + 5;
+    public static final int INDEX_GET_ROW_LOCATION_FAIL = ERROR_INDEX_SERVER + 6;
 }
