@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.index.main.sqlite;
 
-import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
@@ -122,20 +121,7 @@ public class TestSqliteMainIndex
             futures.add(executor.submit(() -> {
                 try
                 {
-                    // Test getRowId()
-                    byte[] key = ("key-" + threadNum).getBytes();
-                    long timestamp = System.currentTimeMillis();
                     long rowId = 3000L;
-                    IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                            .setIndexId(threadNum)
-                            .setKey(ByteString.copyFrom(key))
-                            .setTimestamp(timestamp)
-                            .build();
-                    IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                            .setFileId(1)
-                            .setRgId(2)
-                            .setRgRowOffset(3)
-                            .build();
 
                     // Test putRowId()
                     IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
@@ -159,7 +145,8 @@ public class TestSqliteMainIndex
         }
 
         latch.await();
-        for (Future<Void> future : futures) {
+        for (Future<Void> future : futures)
+        {
             future.get();
         }
         executor.shutdown();
