@@ -79,9 +79,6 @@ public class TestSqliteMainIndex
                 .setRgRowOffset(0)
                 .build();
 
-        Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId, rowId + 1,
-                2, 2, 0, 1)));
-
         Assertions.assertTrue(mainIndex.putEntry(rowId, location));
         Assertions.assertNotNull(mainIndex.getLocation(rowId));
         Assertions.assertTrue(mainIndex.flushCache(2));
@@ -105,6 +102,9 @@ public class TestSqliteMainIndex
         Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId - 1, rowId,
                 2, 2, 0, 1)));
         Assertions.assertNotNull(mainIndex.getLocation(rowId));
+
+        Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId, rowId + 1,
+                2, 2, 0, 1)));
     }
 
     @Test
@@ -123,16 +123,13 @@ public class TestSqliteMainIndex
                 {
                     long rowId = 3000L;
 
-                    // Test putRowId()
+                    // test putEntry()
                     IndexProto.RowLocation dummyLocation = IndexProto.RowLocation.newBuilder()
-                            .setFileId(100 + threadNum)
-                            .setRgId(10)
-                            .setRgRowOffset(0)
-                            .build();
-                    Assertions.assertTrue(mainIndex.putEntry(rowId, dummyLocation));
+                            .setFileId(100 + threadNum).setRgId(10).setRgRowOffset(0).build();
+                    Assertions.assertTrue(mainIndex.putEntry(rowId + threadNum, dummyLocation));
 
-                    // Test getLocation()
-                    IndexProto.RowLocation fetched = mainIndex.getLocation(rowId);
+                    // test getLocation()
+                    IndexProto.RowLocation fetched = mainIndex.getLocation(rowId + threadNum);
                     Assertions.assertNotNull(fetched);
                     Assertions.assertEquals(100 + threadNum, fetched.getFileId());
                 }
@@ -164,10 +161,11 @@ public class TestSqliteMainIndex
 
         // Create RowIdRange for every thread
         List<RowIdRange> ranges = new ArrayList<>();
+        // create 10 row id ranges of the same file
         for (int i = 0; i < threadCount; i++)
         {
             long base = 10_000L + i * 100;
-            ranges.add(new RowIdRange(base, base + 4, 1L, 0, 0, 4));
+            ranges.add(new RowIdRange(base, base + 4, i, i, 0, 4));
         }
 
         // Concurrent putRowIdsOfRg
@@ -179,19 +177,19 @@ public class TestSqliteMainIndex
                 {
                     RowIdRange range = ranges.get(threadNum);
                     int offset = 0;
-                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++)
+                    for (long id = range.getRowIdStart(); id < range.getRowIdEnd(); id++)
                     {
                         IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
                                 .setFileId(range.getFileId()).setRgId(range.getRgId()).setRgRowOffset(offset++).build();
                         Assertions.assertTrue(mainIndex.putEntry(id, location));
                     }
 
-                    for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++)
+                    for (long id = range.getRowIdStart(); id < range.getRowIdEnd(); id++)
                     {
                         IndexProto.RowLocation loc = mainIndex.getLocation(id);
                         Assertions.assertNotNull(loc);
                         Assertions.assertEquals(threadNum, loc.getFileId());
-                        Assertions.assertEquals(threadNum * 10, loc.getRgId());
+                        Assertions.assertEquals(threadNum, loc.getRgId());
                     }
                 }
                 finally
@@ -212,6 +210,7 @@ public class TestSqliteMainIndex
             futures.add(executor.submit(() -> {
                 try
                 {
+                    mainIndex.flushCache(threadNum);
                     RowIdRange range = ranges.get(threadNum);
                     Assertions.assertTrue(mainIndex.deleteRowIdRange(range));
                     for (long id = range.getRowIdStart(); id <= range.getRowIdEnd(); id++)

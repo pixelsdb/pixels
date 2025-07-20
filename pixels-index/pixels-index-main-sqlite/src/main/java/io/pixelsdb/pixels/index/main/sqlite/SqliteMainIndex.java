@@ -47,13 +47,32 @@ public class SqliteMainIndex implements MainIndex
     private static final Logger logger = LogManager.getLogger(SqliteMainIndex.class);
     private static final HashMap<Long, PersistentAutoIncrement> persistentAIMap = new HashMap<>();
 
+    /**
+     * The SQL statement to create the row id range table.
+     */
     private static final String createTableSql = "CREATE TABLE IF NOT EXISTS row_id_ranges" +
             "(row_id_start BIGINT NOT NULL, row_id_end BIGINT NOT NULL, file_id BIGINT NOT NULL, rg_id INT NOT NULL," +
             "rg_row_offset_start INT NOT NULL, rg_row_offset_end INT NOT NULL, PRIMARY KEY (row_id_start, row_id_end))";
+
+    /**
+     * The SQL statement to query the row id range that covers the given row id (the two ? are of the same value).
+     */
     private static final String queryRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? < row_id_end";
+
+    /**
+     * The SQL statement to delete the row id ranges covered by the given row id range.
+     */
     private static final String deleteRangesSql = "DELETE FROM row_id_ranges WHERE ? <= row_id_start AND row_id_end <= ?";
+
+    /**
+     * The SQL statement to update the width of the give row id range
+     */
     private static final String updateRangeWidthSql = "UPDATE row_id_ranges SET row_id_start = ?, row_id_end = ?, " +
             "rg_row_offset_start = ?, rg_row_offset_end = ? WHERE row_id_start = ? AND row_id_end = ?";
+
+    /**
+     * The SQL statement to insert a new row id range
+     */
     private static final String insertRangeSql = "INSERT INTO row_id_ranges VALUES(?, ?, ?, ?, ?, ?)";
 
     private final long tableId;
@@ -179,21 +198,21 @@ public class SqliteMainIndex implements MainIndex
             pst.setLong(2, rowIdEnd);
             int n = pst.executeUpdate();
             logger.debug("deleted {} rows from sqlite", n);
-            RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdStart());
-            RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdRange.getRowIdEnd());
+            RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdStart);
+            RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdEnd - 1);
             boolean res = true;
             if (leftBorderRange != null)
             {
-                int offset = (int) (rowIdEnd - leftBorderRange.getRowIdStart());
+                int width = (int) (rowIdStart - leftBorderRange.getRowIdStart());
                 RowIdRange newLeftBorderRange = leftBorderRange.toBuilder()
-                        .setRowIdEnd(rowIdEnd).setRgRowOffsetEnd(leftBorderRange.getRgRowOffsetStart()+offset).build();
+                        .setRowIdEnd(rowIdStart).setRgRowOffsetEnd(leftBorderRange.getRgRowOffsetStart() + width).build();
                 res &= updateRowIdRangeWidth(leftBorderRange, newLeftBorderRange);
             }
             if (rightBorderRange != null)
             {
-                int offset = (int) (rightBorderRange.getRowIdEnd() - rowIdEnd);
+                int width = (int) (rightBorderRange.getRowIdEnd() - rowIdEnd);
                 RowIdRange newRightBorderRange = rightBorderRange.toBuilder()
-                        .setRowIdStart(rowIdEnd).setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd()-offset).build();
+                        .setRowIdStart(rowIdEnd).setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd() - width).build();
                 res &= updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
             }
             this.rwLock.writeLock().unlock();

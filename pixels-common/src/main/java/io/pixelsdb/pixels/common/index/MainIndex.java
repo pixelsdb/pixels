@@ -132,6 +132,8 @@ public interface MainIndex extends Closeable
     /**
      * Flush the main index cache into persistent storage.
      * If cache does not exist (i.e., {@link #hasCache()} returns false), this method has no effect.
+     * <p/>
+     * <b>Note: row ids of a flushed file id should not be put into the main index again.</b>
      * @param fileId the file id of which the cached index entries are to be flushed
      * @return true on success
      */
