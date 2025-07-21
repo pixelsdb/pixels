@@ -237,7 +237,7 @@ public class IndexService
         IndexProto.DeletePrimaryIndexEntriesResponse response = stub.deletePrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete index primary entries, error code=" + response.getErrorCode());
+            throw new IndexException("failed to delete primary index entries, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -250,7 +250,7 @@ public class IndexService
         IndexProto.DeleteSecondaryIndexEntriesResponse response = stub.deleteSecondaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete index secondary entries, error code=" + response.getErrorCode());
+            throw new IndexException("failed to delete secondary index entries, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -289,7 +289,7 @@ public class IndexService
         IndexProto.UpdatePrimaryIndexEntriesResponse response = stub.updatePrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to update index primary entries, error code=" + response.getErrorCode());
+            throw new IndexException("failed to update primary index entries, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -302,7 +302,7 @@ public class IndexService
         IndexProto.UpdateSecondaryIndexEntriesResponse response = stub.updateSecondaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to update index secondary entries, error code=" + response.getErrorCode());
+            throw new IndexException("failed to update secondary index entries, error code=" + response.getErrorCode());
         }
         return true;
     }
