@@ -109,10 +109,8 @@ public class IndexService
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
-        // Create gRPC channel
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
-        // Create gRPC client stub
         this.stub = IndexServiceGrpc.newBlockingStub(channel);
         this.isShutDown = false;
     }
@@ -128,43 +126,36 @@ public class IndexService
 
     public IndexProto.RowIdBatch allocateRowIdBatch (long tableId, int numRowIds)
     {
-        // Create gRPC request
         IndexProto.AllocateRowIdBatchRequest request = IndexProto.AllocateRowIdBatchRequest.newBuilder()
                 .setTableId(tableId).setNumRowIds(numRowIds).build();
-        // Send request and get response
+
         IndexProto.AllocateRowIdBatchResponse response = stub.allocateRowIdBatch(request);
-        // Return RowLocation
         return response.getRowIdBatch();
     }
 
     public IndexProto.RowLocation lookupUniqueIndex (IndexProto.IndexKey key)
     {
-        // Create gRPC request
         IndexProto.LookupUniqueIndexRequest request = IndexProto.LookupUniqueIndexRequest.newBuilder()
                 .setIndexKey(key).build();
-        // Send request and get response
+
         IndexProto.LookupUniqueIndexResponse response = stub.lookupUniqueIndex(request);
-        // Return RowLocation
         return response.getRowLocation();
     }
 
     public List<IndexProto.RowLocation> lookupNonUniqueIndex (IndexProto.IndexKey key)
     {
-        // Create gRPC request
         IndexProto.LookupNonUniqueIndexRequest request = IndexProto.LookupNonUniqueIndexRequest.newBuilder()
                 .setIndexKey(key).build();
-        // Send request and get response
+
         IndexProto.LookupNonUniqueIndexResponse response = stub.lookupNonUniqueIndex(request);
-        // Return RowLocation list
         return response.getRowLocationsList();
     }
 
     public boolean putPrimaryIndexEntry (IndexProto.PrimaryIndexEntry entry) throws IndexException
     {
-        // Create gRPC request
         IndexProto.PutPrimaryIndexEntryRequest request = IndexProto.PutPrimaryIndexEntryRequest.newBuilder()
                 .setIndexEntry(entry).build();
-        // Send request and get response
+
         IndexProto.PutPrimaryIndexEntryResponse response = stub.putPrimaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
@@ -175,10 +166,9 @@ public class IndexService
 
     public boolean putSecondaryIndexEntry (IndexProto.SecondaryIndexEntry entry) throws IndexException
     {
-        // Create gRPC request
         IndexProto.PutSecondaryIndexEntryRequest request = IndexProto.PutSecondaryIndexEntryRequest.newBuilder()
                 .setIndexEntry(entry).build();
-        // Send request and get response
+
         IndexProto.PutSecondaryIndexEntryResponse response = stub.putSecondaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
@@ -187,12 +177,37 @@ public class IndexService
         return true;
     }
 
+    public boolean putPrimaryIndexEntries (List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
+    {
+        IndexProto.PutPrimaryIndexEntriesRequest request = IndexProto.PutPrimaryIndexEntriesRequest.newBuilder()
+                .addAllIndexEntries(entries).build();
+
+        IndexProto.PutPrimaryIndexEntriesResponse response = stub.putPrimaryIndexEntries(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to put primary index entries, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean putSecondaryIndexEntries (List<IndexProto.SecondaryIndexEntry> entries) throws IndexException
+    {
+        IndexProto.PutSecondaryIndexEntriesRequest request = IndexProto.PutSecondaryIndexEntriesRequest.newBuilder()
+                .addAllIndexEntries(entries).build();
+
+        IndexProto.PutSecondaryIndexEntriesResponse response = stub.putSecondaryIndexEntries(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to put secondary index entries, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
     public boolean deletePrimaryIndexEntry (IndexProto.IndexKey key) throws IndexException
     {
-        // Create gRPC request
         IndexProto.DeletePrimaryIndexEntryRequest request = IndexProto.DeletePrimaryIndexEntryRequest.newBuilder()
                 .setIndexKey(key).build();
-        // Send request and get response
+
         IndexProto.DeletePrimaryIndexEntryResponse response = stub.deletePrimaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
@@ -203,10 +218,9 @@ public class IndexService
 
     public boolean deleteSecondaryIndexEntry (IndexProto.IndexKey key) throws IndexException
     {
-        // Create gRPC request
         IndexProto.DeleteSecondaryIndexEntryRequest request = IndexProto.DeleteSecondaryIndexEntryRequest.newBuilder()
                 .setIndexKey(key).build();
-        // Send request and get response
+
         IndexProto.DeleteSecondaryIndexEntryResponse response = stub.deleteSecondaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
@@ -215,62 +229,132 @@ public class IndexService
         return true;
     }
 
-    public boolean putPrimaryIndexEntries (List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
-    {
-        // Create gRPC request
-        IndexProto.PutPrimaryIndexEntriesRequest request = IndexProto.PutPrimaryIndexEntriesRequest.newBuilder()
-                .addAllIndexEntries(entries).build();
-        // Send request and get response
-        IndexProto.PutPrimaryIndexEntriesResponse response = stub.putPrimaryIndexEntries(request);
-        if (response.getErrorCode() != ErrorCode.SUCCESS)
-        {
-            throw new IndexException("failed to put primary index entries, error code=" + response.getErrorCode());
-        }
-        // Return operation success status
-        return true;
-    }
-
-    public boolean putSecondaryIndexEntries (List<IndexProto.SecondaryIndexEntry> entries) throws IndexException
-    {
-        // Create gRPC request
-        IndexProto.PutSecondaryIndexEntriesRequest request = IndexProto.PutSecondaryIndexEntriesRequest.newBuilder()
-                .addAllIndexEntries(entries).build();
-        // Send request and get response
-        IndexProto.PutSecondaryIndexEntriesResponse response = stub.putSecondaryIndexEntries(request);
-        if (response.getErrorCode() != ErrorCode.SUCCESS)
-        {
-            throw new IndexException("failed to put secondary index entries, error code=" + response.getErrorCode());
-        }
-        // Return operation success status
-        return true;
-    }
-
     public boolean deletePrimaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
     {
-        // Create gRPC request
         IndexProto.DeletePrimaryIndexEntriesRequest request = IndexProto.DeletePrimaryIndexEntriesRequest.newBuilder()
                 .addAllIndexKeys(keys).build();
-        // Send request and get response
+
         IndexProto.DeletePrimaryIndexEntriesResponse response = stub.deletePrimaryIndexEntries(request);
-        // Return operation success status
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete index primary entries, error code=" + response.getErrorCode());
+            throw new IndexException("failed to delete primary index entries, error code=" + response.getErrorCode());
         }
         return true;
     }
 
     public boolean deleteSecondaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
     {
-        // Create gRPC request
         IndexProto.DeleteSecondaryIndexEntriesRequest request = IndexProto.DeleteSecondaryIndexEntriesRequest.newBuilder()
                 .addAllIndexKeys(keys).build();
-        // Send request and get response
+
         IndexProto.DeleteSecondaryIndexEntriesResponse response = stub.deleteSecondaryIndexEntries(request);
-        // Return operation success status
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete index secondary entries, error code=" + response.getErrorCode());
+            throw new IndexException("failed to delete secondary index entries, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean updatePrimaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    {
+        IndexProto.UpdatePrimaryIndexEntryRequest request = IndexProto.UpdatePrimaryIndexEntryRequest.newBuilder()
+                .setIndexKey(key).build();
+
+        IndexProto.UpdatePrimaryIndexEntryResponse response = stub.updatePrimaryIndexEntry(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to update primary index entry, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean updateSecondaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    {
+        IndexProto.UpdateSecondaryIndexEntryRequest request = IndexProto.UpdateSecondaryIndexEntryRequest.newBuilder()
+                .setIndexKey(key).build();
+
+        IndexProto.UpdateSecondaryIndexEntryResponse response = stub.updateSecondaryIndexEntry(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to update secondary index entry, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean updatePrimaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
+    {
+        IndexProto.UpdatePrimaryIndexEntriesRequest request = IndexProto.UpdatePrimaryIndexEntriesRequest.newBuilder()
+                .addAllIndexKeys(keys).build();
+
+        IndexProto.UpdatePrimaryIndexEntriesResponse response = stub.updatePrimaryIndexEntries(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to update primary index entries, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean updateSecondaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
+    {
+        IndexProto.UpdateSecondaryIndexEntriesRequest request = IndexProto.UpdateSecondaryIndexEntriesRequest.newBuilder()
+                .addAllIndexKeys(keys).build();
+
+        IndexProto.UpdateSecondaryIndexEntriesResponse response = stub.updateSecondaryIndexEntries(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to update secondary index entries, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean flushIndexEntriesOfFile (long fileId) throws IndexException
+    {
+        IndexProto.FlushIndexEntriesOfFileRequest request = IndexProto.FlushIndexEntriesOfFileRequest.newBuilder()
+                .setFileId(fileId).build();
+
+        IndexProto.FlushIndexEntriesOfFileResponse response = stub.flushIndexEntriesOfFile(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to flush index entries of file, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean openIndex (long tableId, long indexId) throws IndexException
+    {
+        IndexProto.OpenIndexRequest request = IndexProto.OpenIndexRequest.newBuilder()
+                .setTableId(tableId).setIndexId(indexId).build();
+
+        IndexProto.OpenIndexResponse response = stub.openIndex(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to open index, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean closeIndex (long tableId, long indexId) throws IndexException
+    {
+        IndexProto.CloseIndexRequest request = IndexProto.CloseIndexRequest.newBuilder()
+                .setTableId(tableId).setIndexId(indexId).build();
+
+        IndexProto.CloseIndexResponse response = stub.closeIndex(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to close index, error code=" + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public boolean removeIndex (long tableId, long indexId) throws IndexException
+    {
+        IndexProto.RemoveIndexRequest request = IndexProto.RemoveIndexRequest.newBuilder()
+                .setTableId(tableId).setIndexId(indexId).build();
+
+        IndexProto.RemoveIndexResponse response = stub.removeIndex(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to remove index, error code=" + response.getErrorCode());
         }
         return true;
     }

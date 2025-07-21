@@ -41,6 +41,11 @@ service IndexService {
   rpc DeletePrimaryIndexEntries (DeletePrimaryIndexEntriesRequest) returns (DeletePrimaryIndexEntriesResponse);
   rpc DeleteSecondaryIndexEntry (DeleteSecondaryIndexEntryRequest) returns (DeleteSecondaryIndexEntryResponse);
   rpc DeleteSecondaryIndexEntries (DeleteSecondaryIndexEntriesRequest) returns (DeleteSecondaryIndexEntriesResponse);
+  rpc UpdatePrimaryIndexEntry (UpdatePrimaryIndexEntryRequest) returns (UpdatePrimaryIndexEntryResponse);
+  rpc UpdatePrimaryIndexEntries (UpdatePrimaryIndexEntriesRequest) returns (UpdatePrimaryIndexEntriesResponse);
+  rpc UpdateSecondaryIndexEntry (UpdateSecondaryIndexEntryRequest) returns (UpdateSecondaryIndexEntryResponse);
+  rpc UpdateSecondaryIndexEntries (UpdateSecondaryIndexEntriesRequest) returns (UpdateSecondaryIndexEntriesResponse);
+  rpc FlushIndexEntriesOfFile (FlushIndexEntriesOfFileRequest) returns (FlushIndexEntriesOfFileResponse);
   rpc OpenIndex (OpenIndexRequest) returns (OpenIndexResponse);
   rpc CloseIndex (CloseIndexRequest) returns (CloseIndexResponse);
   rpc RemoveIndex (RemoveIndexRequest) returns (RemoveIndexResponse);
@@ -56,7 +61,7 @@ message IndexKey {
 message RowLocation {
   uint64 fileId = 1; // the id of the file in pixels metadata, starts from 1
   uint32 rgId = 2; // the index of the row group inside the file, starts from 0
-  uint32 rgRowId = 3; // the index of the row index the row group, starts from 0
+  uint32 rgRowOffset = 3; // the offset of the row in the row group, starting from 0
 }
 
 message RowIdBatch {
@@ -66,14 +71,15 @@ message RowIdBatch {
 
 message PrimaryIndexEntry {
   IndexKey indexKey = 1;
-  uint64 tableRowId = 2; // the rowId in this table
+  uint64 rowId = 2; // the rowId in this table
   RowLocation rowLocation = 3;
 }
 
 message SecondaryIndexEntry {
   IndexKey indexKey = 1;
-  uint64 tableRowId = 2; // the rowId in this table
+  uint64 rowId = 2; // the rowId in this table
   // secondary index entry does not have associated row location
+  // bool unique = 3; // whether this secondary index is unique
 }
 
 message AllocateRowIdBatchRequest {
@@ -113,7 +119,9 @@ message PutPrimaryIndexEntryResponse {
 }
 
 message PutPrimaryIndexEntriesRequest {
-  repeated PrimaryIndexEntry indexEntries = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated PrimaryIndexEntry indexEntries = 3; // all entries must from the same index
 }
 
 message PutPrimaryIndexEntriesResponse {
@@ -129,7 +137,9 @@ message PutSecondaryIndexEntryResponse {
 }
 
 message PutSecondaryIndexEntriesRequest {
-  repeated SecondaryIndexEntry indexEntries = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated SecondaryIndexEntry indexEntries = 3; // all entries must from the same index
 }
 
 message PutSecondaryIndexEntriesResponse {
@@ -146,7 +156,9 @@ message DeletePrimaryIndexEntryResponse {
 }
 
 message DeletePrimaryIndexEntriesRequest {
-  repeated IndexKey indexKeys = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
 }
 
 message DeletePrimaryIndexEntriesResponse {
@@ -160,16 +172,66 @@ message DeleteSecondaryIndexEntryRequest {
 
 message DeleteSecondaryIndexEntryResponse {
   int32 errorCode = 1;
-  uint64 tableRowId = 2;
+  repeated uint64 rowIds = 2;
 }
 
 message DeleteSecondaryIndexEntriesRequest {
-  repeated IndexKey indexKeys = 1;
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
 }
 
 message DeleteSecondaryIndexEntriesResponse {
   int32 errorCode = 1;
-  repeated uint64 tableRowIds = 2;
+  repeated uint64 rowIds = 2;
+}
+
+message UpdatePrimaryIndexEntryRequest {
+  IndexKey indexKey = 1;
+}
+
+message UpdatePrimaryIndexEntryResponse {
+  int32 errorCode = 1;
+  RowLocation rowLocation = 2;
+}
+
+message UpdatePrimaryIndexEntriesRequest {
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
+}
+
+message UpdatePrimaryIndexEntriesResponse {
+  int32 errorCode = 1;
+  repeated RowLocation rowLocations = 2;
+}
+
+message UpdateSecondaryIndexEntryRequest {
+  IndexKey indexKey = 1;
+}
+
+message UpdateSecondaryIndexEntryResponse {
+  int32 errorCode = 1;
+  repeated uint64 rowIds = 2;
+}
+
+message UpdateSecondaryIndexEntriesRequest {
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
+}
+
+message UpdateSecondaryIndexEntriesResponse {
+  int32 errorCode = 1;
+  repeated uint64 rowIds = 2;
+}
+
+message FlushIndexEntriesOfFileRequest {
+  uint64 fileId = 1; // the file id of which the index entries will be flushed
+}
+
+message FlushIndexEntriesOfFileResponse {
+  int32 errorCode = 1;
 }
 
 message OpenIndexRequest {

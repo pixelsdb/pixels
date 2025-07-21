@@ -22,9 +22,9 @@ package io.pixelsdb.pixels.index.rocksdb;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexImpl;
+import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -47,15 +47,36 @@ public class TestRocksDBIndex
     private RocksDB rocksDB;
     private final String rocksDBpath = "/tmp/rocksdb";
     private final long tableId = 100L;
+    private final long indexId = 100L;
     private SinglePointIndex rocksDBIndex; // Class under test
-    private final MainIndex mainIndex = new MainIndexImpl(tableId);
+
     @BeforeEach
     public void setUp() throws RocksDBException, IOException
     {
+        // Create RocksDB Directory
+        try
+        {
+            FileUtils.forceMkdir(new File(rocksDBpath));
+        }
+        catch (IOException e)
+        {
+            System.err.println("Failed to create RocksDB test directory: " + e.getMessage());
+        }
+
+        // Create SQLite Directory for main index
+        try
+        {
+            String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
+            FileUtils.forceMkdir(new File(sqlitePath));
+        }
+        catch (IOException e)
+        {
+            System.err.println("Failed to create SQLite test directory: " + e.getMessage());
+        }
         System.out.println("Debug: Creating RocksDBIndex.."); // Debug log
         Options options = new Options().setCreateIfMissing(true);
         rocksDB = RocksDB.open(options, rocksDBpath);
-        rocksDBIndex = new RocksDBIndex(rocksDB,mainIndex);
+        rocksDBIndex = new RocksDBIndex(tableId, indexId, rocksDB, true);
         System.out.println("Debug: RocksDBIndex instance: " + rocksDBIndex); // Check for null
         assertNotNull(rocksDBIndex);
     }
@@ -64,12 +85,8 @@ public class TestRocksDBIndex
     public void testPutEntry() throws RocksDBException, MainIndexException, SinglePointIndexException
     {
         // Create Entry
-        long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
-        long fileId = 1L;
-        int rgId = 2;
-        int rgRowId = 3;
         long rowId = 100L;
 
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
@@ -77,19 +94,9 @@ public class TestRocksDBIndex
         byte[] keyBytes = buffer.array();
 
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                .setIndexId(indexId)
-                .setKey(ByteString.copyFrom(key))
-                .setTimestamp(timestamp)
-                .build();
-        IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                .setFileId(fileId)
-                .setRgId(rgId)
-                .setRgRowId(rgRowId)
-                .build();
+                .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, rowId, true, rowLocation);
-
-        boolean success = rocksDBIndex.putPrimaryEntry(entry);
+        boolean success = rocksDBIndex.putEntry(keyProto, rowId);
         assertTrue(success, "putEntry should return true");
 
         // Assert index has been written to rocksDB
@@ -101,14 +108,13 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testPutEntries() throws RocksDBException, MainIndexException, SinglePointIndexException
+    public void testPutEntries() throws RocksDBException, SinglePointIndexException, MainIndexException
     {
-        long indexId = 1L;
         long timestamp = System.currentTimeMillis();
         long fileId = 1L;
         int rgId = 2;
 
-        List<SinglePointIndex.Entry> entries = new ArrayList<>();
+        List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>();
 
         // Create two entries
         for (int i = 0; i < 2; i++)
@@ -120,18 +126,13 @@ public class TestRocksDBIndex
             long rowId = i*1000L;
 
             IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                    .setIndexId(indexId)
-                    .setKey(ByteString.copyFrom(key))
-                    .setTimestamp(timestamp)
-                    .build();
+                    .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
             IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                    .setFileId(fileId)
-                    .setRgId(rgId)
-                    .setRgRowId(i)
-                    .build();
+                    .setFileId(fileId).setRgId(rgId).setRgRowOffset(i).build();
 
-            SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, rowId, true, rowLocation);
+            IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
+                    .setIndexKey(keyProto).setRowId(rowId).setRowLocation(rowLocation).build();
             entries.add(entry);
         }
 
@@ -141,8 +142,8 @@ public class TestRocksDBIndex
         // Assert every index has been written to rocksDB
         for (int i = 0; i < entries.size(); i++)
         {
-            SinglePointIndex.Entry entry = entries.get(i);
-            byte[] keyBytes = toByteArray(entry.getKey());
+            IndexProto.PrimaryIndexEntry entry = entries.get(i);
+            byte[] keyBytes = toByteArray(entry.getIndexKey());
             byte[] storedValue = rocksDB.get(keyBytes);
             assertNotNull(storedValue);
             long storedRowId = ByteBuffer.wrap(storedValue).getLong();
@@ -151,39 +152,25 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntry() throws RocksDBException, MainIndexException, SinglePointIndexException
+    public void testDeleteEntry() throws RocksDBException, SinglePointIndexException
     {
-        long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
-        long fileId = 1L;
-        int rgId = 2;
-        int rgRowId = 3;
 
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
         buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
         byte[] keyBytes = buffer.array();
 
-        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                .setIndexId(indexId)
-                .setKey(ByteString.copyFrom(key))
-                .setTimestamp(timestamp)
-                .build();
-        IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                .setFileId(fileId)
-                .setRgId(rgId)
-                .setRgRowId(rgRowId)
-                .build();
+        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setTableId(tableId).setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-        SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
-
-        rocksDBIndex.putPrimaryEntry(entry);
+        rocksDBIndex.putEntry(keyProto, 0L);
 
         // Delete index
-        IndexProto.RowLocation ret = rocksDBIndex.deletePrimaryEntry(keyProto);
+        long ret = rocksDBIndex.deleteUniqueEntry(keyProto);
 
         // Assert return value
-        assertNotNull(ret, "deleteEntry should return true");
+        assertTrue(ret >= 0, "deleteEntry should return true");
 
         // Assert index has been deleted
         byte[] result = rocksDB.get(keyBytes);
@@ -191,46 +178,40 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntries() throws RocksDBException, MainIndexException, SinglePointIndexException
+    public void testDeleteEntries() throws RocksDBException, SinglePointIndexException, MainIndexException
     {
-        long indexId = 1L;
         long timestamp = System.currentTimeMillis();
         long fileId = 1L;
         int rgId = 2;
 
-        List<SinglePointIndex.Entry> entries = new ArrayList<>();
+        List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>();
         List<byte[]> keyBytesList = new ArrayList<>();
         List<IndexProto.IndexKey> keyList = new ArrayList<>();
 
         for (int i = 0; i < 2; i++)
         {
-            byte[] key = ("exampleKey" + i).getBytes(); // 不同 key
+            byte[] key = ("exampleKey" + i).getBytes();
             keyBytesList.add(key);
-            ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-            buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
+            //ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
+            //buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
 
-            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                    .setIndexId(indexId)
-                    .setKey(ByteString.copyFrom(key))
-                    .setTimestamp(timestamp)
-                    .build();
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setTableId(tableId).setIndexId(indexId)
+                    .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
             keyList.add(keyProto);
 
             IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                    .setFileId(fileId)
-                    .setRgId(rgId)
-                    .setRgRowId(i)
-                    .build();
+                    .setFileId(fileId).setRgId(rgId).setRgRowOffset(i).build();
 
-            SinglePointIndex.Entry entry = new SinglePointIndex.Entry(keyProto, 0L, true, rowLocation);
+            IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
+                    .setIndexKey(keyProto).setRowId(i).setRowLocation(rowLocation).build();
             entries.add(entry);
         }
 
         rocksDBIndex.putPrimaryEntries(entries);
 
         // delete Indexes
-        List<IndexProto.RowLocation> ret = rocksDBIndex.deletePrimaryEntries(keyList);
+        List<Long> ret = rocksDBIndex.deleteEntries(keyList);
         assertNotNull(ret, "deleteEntries should return true");
 
         // Assert all indexes have been deleted
@@ -242,11 +223,12 @@ public class TestRocksDBIndex
     }
 
     @AfterEach
-    public void tearDown()
+    public void tearDown() throws MainIndexException, IOException
     {
         if (rocksDB != null)
         {
             rocksDB.close();
+            MainIndexFactory.Instance().closeAll();
         }
 
         // Clear RocksDB Directory
@@ -257,6 +239,17 @@ public class TestRocksDBIndex
         catch (IOException e)
         {
             System.err.println("Failed to clean up RocksDB test directory: " + e.getMessage());
+        }
+
+        // Clear SQLite Directory for main index
+        try
+        {
+            String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
+            FileUtils.deleteDirectory(new File(sqlitePath));
+        }
+        catch (IOException e)
+        {
+            System.err.println("Failed to clean up SQLite test directory: " + e.getMessage());
         }
     }
 
@@ -276,7 +269,8 @@ public class TestRocksDBIndex
         // Add separator
         compositeKey[indexIdBytes.length + 1 + keyBytes.length] = ':';
         // Copy timestamp
-        System.arraycopy(timestampBytes, 0, compositeKey, indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
+        System.arraycopy(timestampBytes, 0, compositeKey,
+                indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
 
         return compositeKey;
     }

@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.util.List;
 
 /**
+ * This class is used to create an instance for each single point index. It maintains the mapping from
+ * the index key (the value of the key column(s)) to the unique row ids in the table.
  * @author hank
  * @create 2025-02-07
  * @update 2025-06-22 hank: rename from SecondaryIndex to SinglePointIndex
@@ -44,7 +46,7 @@ public interface SinglePointIndex extends Closeable
 
         /**
          * Case-insensitive parsing from String name to enum value.
-         * @param value the name of storage scheme.
+         * @param value the name of single point index scheme.
          * @return
          */
         public static Scheme from(String value)
@@ -53,7 +55,7 @@ public interface SinglePointIndex extends Closeable
         }
 
         /**
-         * Whether the value is a valid storage scheme.
+         * Whether the value is a valid single point index scheme.
          * @param value
          * @return
          */
@@ -81,53 +83,88 @@ public interface SinglePointIndex extends Closeable
         }
     }
 
-    long getUniqueRowId(IndexProto.IndexKey key);
-
-    long[] getRowIds(IndexProto.IndexKey key);
-
-    boolean putPrimaryEntry(Entry entry) throws MainIndexException, SinglePointIndexException;
-
-    boolean putPrimaryEntries(List<Entry> entries) throws MainIndexException, SinglePointIndexException;
-
-    boolean putSecondaryEntry(Entry entry) throws SinglePointIndexException;
-
-    boolean putSecondaryEntries(List<Entry> entries) throws SinglePointIndexException;
+    /**
+     * @return the table id of this single point index.
+     */
+    long getTableId();
 
     /**
-     * Delete the primary index entry of the index key
-     * @param indexKey the index key
-     * @return the row location of the deleted index entry
-     * @throws MainIndexException
+     * @return the index id of this single point index.
+     */
+    long getIndexId();
+
+    /**
+     * @return true if this is a unique index.
+     */
+    boolean isUnique();
+
+    /**
+     * Get the row id of an index key. <b>This method should only be called on a unique index.</b>
+     * @param key the index key
+     * @return the row id
      * @throws SinglePointIndexException
      */
-    IndexProto.RowLocation deletePrimaryEntry(IndexProto.IndexKey indexKey) throws MainIndexException, SinglePointIndexException;
+    long getUniqueRowId(IndexProto.IndexKey key) throws SinglePointIndexException;
 
     /**
-     * Delete the primary index entries of the index keys
-     * @param indexKeys the index keys
-     * @return the row locations of the deleted index entries
-     * @throws MainIndexException
+     * Get the row id(s) of an index key. <b>This method can be called on unique or non-unique index.</b>
+     * @param key the index key
+     * @return the row ids
      * @throws SinglePointIndexException
      */
-    List<IndexProto.RowLocation> deletePrimaryEntries(List<IndexProto.IndexKey> indexKeys) throws MainIndexException, SinglePointIndexException;
+    List<Long> getRowIds(IndexProto.IndexKey key) throws SinglePointIndexException;
 
     /**
-     * Delete the secondary index entry of the index key
+     * Put an entry into this single point index.
+     * @param key the index key
+     * @param rowId the row id in the table
+     * @return true if the index entry is put successfully
+     * @throws SinglePointIndexException
+     */
+    boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
+
+    /**
+     * Put the index entries of a primary index.
+     * @param entries the primary index entries
+     * @return true if the index entries are put successfully
+     * @throws MainIndexException if failed to put entries into the main index of the table
+     * @throws SinglePointIndexException if failed to put entries into the single point index
+     */
+    boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
+            throws MainIndexException, SinglePointIndexException;
+
+    /**
+     * Put the index entries of a secondary index. Only the index key ({@link io.pixelsdb.pixels.index.IndexProto.IndexKey})
+     * and the row ids are put into this single point index.
+     * @param entries the secondary index entries
+     * @return true if the index entries are put successfully
+     * @throws SinglePointIndexException
+     */
+    boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException;
+
+    /**
+     * Delete the index entry of the index key. <b>This method should only be called on a unique index.</b>
      * @param indexKey the index key
      * @return the row id of the deleted index entry
-     * @throws MainIndexException
      * @throws SinglePointIndexException
      */
-    long deleteSecondaryEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
+    long deleteUniqueEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
 
     /**
-     * Delete the secondary index entries of the index keys
-     * @param indexKeys the index keys
-     * @return the row ids of the deleted index entries
-     * @throws MainIndexException
+     * Delete the index entry(ies) of the index key. <b>This method can be called on unique or non-unique index.</b>
+     * @param indexKey the index key
+     * @return the row ids of the deleted index entry
      * @throws SinglePointIndexException
      */
-    List<Long> deleteSecondaryEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException;
+    List<Long> deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
+
+    /**
+     * Delete the index entries of the index keys. <b>This method can be called on unique or non-unique index.</b>
+     * @param indexKeys the index keys
+     * @return the row ids of the deleted index entries
+     * @throws SinglePointIndexException
+     */
+    List<Long> deleteEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException;
 
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the
@@ -136,57 +173,6 @@ public interface SinglePointIndex extends Closeable
      * @throws IOException
      */
     @Override
+    @Deprecated
     void close() throws IOException;
-
-    class Entry
-    {
-        private final IndexProto.IndexKey key;
-        private long rowId;
-        private final boolean unique;
-        private final IndexProto.RowLocation rowLocation;
-
-        public Entry(IndexProto.IndexKey key, long rowId, boolean unique, IndexProto.RowLocation rowLocation)
-        {
-            this.key = key;
-            this.rowId = rowId;
-            this.unique = unique;
-            this.rowLocation = rowLocation;
-        }
-
-        public IndexProto.IndexKey getKey()
-        {
-            return key;
-        }
-
-        public long getRowId()
-        {
-            return rowId;
-        }
-
-        public boolean getIsUnique() { return unique; }
-
-        public IndexProto.RowLocation getRowLocation()
-        {
-            return rowLocation;
-        }
-
-        public void setRowId(long rowId) {
-            this.rowId = rowId;
-        }
-
-        @Override
-        public boolean equals(Object other)
-        {
-            if (!(other instanceof Entry))
-            {
-                return false;
-            }
-            Entry that = (Entry) other;
-            if (this.key == null || that.key == null)
-            {
-                return this.key == that.key && this.rowId == that.rowId;
-            }
-            return this.key.equals(that.key) && this.rowId == that.rowId;
-        }
-    }
 }

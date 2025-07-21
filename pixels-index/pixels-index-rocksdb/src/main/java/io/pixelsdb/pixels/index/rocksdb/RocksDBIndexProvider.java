@@ -19,14 +19,15 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
-import io.pixelsdb.pixels.common.index.*;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.rocksdb.RocksDBException;
 
 import javax.annotation.Nonnull;
-import java.io.IOException;
 
 /**
  * @author hank, Rolland1944
@@ -35,26 +36,25 @@ import java.io.IOException;
 public class RocksDBIndexProvider implements SinglePointIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksDBIndexProvider.class);
-    private final MainIndexManager manager = new MainIndexManager(MainIndexImpl::new);
     private final String RocksdbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
 
     @Override
-    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId) throws IOException
+    public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme,
+                                           boolean unique) throws SinglePointIndexException
     {
         if (scheme == SinglePointIndex.Scheme.rocksdb)
         {
             try
             {
-                MainIndex mainIndex = manager.getOrCreate(tableId);
-                return new RocksDBIndex(RocksdbPath,mainIndex);
+                return new RocksDBIndex(tableId, indexId, RocksdbPath, unique);
             }
             catch (RocksDBException e)
             {
-                logger.error("Failed to create RocksDB instance", e);
-                return null;
+                logger.error("failed to create RocksDB instance", e);
+                throw new SinglePointIndexException("failed to create RocksDB instance", e);
             }
         }
-        throw new IllegalArgumentException("Unsupported scheme: " + scheme);
+        throw new SinglePointIndexException("unsupported scheme: " + scheme);
     }
 
     @Override

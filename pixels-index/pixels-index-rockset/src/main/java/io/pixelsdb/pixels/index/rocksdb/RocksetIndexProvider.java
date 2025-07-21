@@ -19,13 +19,14 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
-import io.pixelsdb.pixels.common.index.*;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
-import java.io.IOException;
 
 /**
  * @author hank, Rolland1944
@@ -34,7 +35,6 @@ import java.io.IOException;
 public class RocksetIndexProvider implements SinglePointIndexProvider
 {
     private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
-    private final MainIndexManager manager = new MainIndexManager(MainIndexImpl::new);
     private final String bucketName = ConfigFactory.Instance().getProperty("index.rockset.s3.bucket");
     private final String s3Prefix = ConfigFactory.Instance().getProperty("index.rockset.s3.prefix");
     private final String localDbPath = ConfigFactory.Instance().getProperty("index.rockset.local.data.path");
@@ -43,21 +43,25 @@ public class RocksetIndexProvider implements SinglePointIndexProvider
     private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
 
     @Override
-    public SinglePointIndex createInstance(@Nonnull SinglePointIndex.Scheme scheme, long tableId) throws IOException
+    public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme,
+                                           boolean unique) throws SinglePointIndexException
     {
         if (scheme == SinglePointIndex.Scheme.rockset)
         {
              try
              {
-                 MainIndex mainIndex = manager.getOrCreate(tableId);
-                 return new RocksetIndex(mainIndex, bucketName, s3Prefix, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
+                 CloudDBOptions dbOptions = new CloudDBOptions().setBucketName(bucketName).setS3Prefix(s3Prefix)
+                         .setLocalDbPath(localDbPath).setPersistentCachePath(persistentCachePath)
+                         .setPersistentCacheSizeGB(persistentCacheSizeGB).setReadOnly(readOnly);
+                 return new RocksetIndex(tableId, indexId, dbOptions, unique);
              }
-             catch (Exception e) {
-                 logger.error("Failed to create RocksDB instance", e);
-                 return null;
+             catch (Exception e)
+             {
+                 logger.error("failed to create RocksDB instance", e);
+                 throw new SinglePointIndexException("failed to create RocksDB instance", e);
              }
         }
-        throw new IllegalArgumentException("Unsupported scheme: " + scheme);
+        throw new SinglePointIndexException("unsupported scheme: " + scheme);
     }
 
     @Override

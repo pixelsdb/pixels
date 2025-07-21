@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.index.IndexProto;
 
@@ -26,7 +27,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * The main index of a table is the mapping from row id to data file.
+ * The main index of a table is the mapping from row id to the row offset in the data file.
  * Each version of each row has a unique row id.
  * The row id of each table is an unsigned int_64 increases from zero.
  *
@@ -36,13 +37,68 @@ import java.io.IOException;
 public interface MainIndex extends Closeable
 {
     /**
-     * Get the tableId of this mainIndex
+     * If we want to add more single point index schemes here, modify this enum.
+     */
+    enum Scheme
+    {
+        sqlite;  // main index stored in sqlite
+
+        /**
+         * Case-insensitive parsing from String name to enum value.
+         * @param value the name of main index scheme.
+         * @return
+         */
+        public static Scheme from(String value)
+        {
+            return valueOf(value.toLowerCase());
+        }
+
+        /**
+         * Whether the value is a valid main index scheme.
+         * @param value
+         * @return
+         */
+        public static boolean isValid(String value)
+        {
+            for (Scheme scheme : values())
+            {
+                if (scheme.equals(value))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public boolean equals(String other)
+        {
+            return this.toString().equalsIgnoreCase(other);
+        }
+
+        public boolean equals(Scheme other)
+        {
+            // enums in Java can be compared using '=='.
+            return this == other;
+        }
+    }
+
+    /**
+     * Get the tableId of this mainIndex.
      * @return the tableId
      */
     long getTableId();
 
     /**
-     * Allocate rowId batch for single point index
+     * Whether the main index implementation has a main index cache.
+     * For main index with a cache, some methods (e.g., {@link #deleteRowIdRange(RowIdRange)})
+     * may bypass the cache, thus {@link #flushCache(long fileId)} should be called before these methods
+     * to operate on the most fresh state of the main index.
+     * @return true if cache exists
+     */
+    boolean hasCache();
+
+    /**
+     * Allocate rowId batch for single point index.
      * @param tableId the table id of single point index
      * @param numRowIds the rowId nums need to allocate
      * @return the RowIdBatch
@@ -52,85 +108,41 @@ public interface MainIndex extends Closeable
     /**
      * Get the physical location of a row given the row id
      * @param rowId the row id
-     * @return the row location
+     * @return the row location, or null if not found
      */
-    IndexProto.RowLocation getLocation(long rowId);
+    IndexProto.RowLocation getLocation(long rowId) throws MainIndexException;
 
     /**
-     * Put a single row id into the main index, in order to enable simultaneous insert into the main index while
-     * inserting a single point index.
+     * Put a single row id into the main index.
      * @param rowId the row id
      * @param rowLocation the location of the row id
      * @return true on success
      */
-    boolean putRowId(long rowId, IndexProto.RowLocation rowLocation);
+    boolean putEntry(long rowId, IndexProto.RowLocation rowLocation);
 
     /**
-     * Delete a single row id from the main index. {@link #getLocation(long)} of a row id within a deleted range
-     * should return null.
-     * @param rowId the row id range to be deleted
-     * @return true on success
-     */
-    boolean deleteRowId(long rowId);
-
-    /**
-     * Put a range of row ids into the main index. In pixels, we may allocate the row ids in batches (ranges)
-     * and put the row id range into the main index at once.
-     * @param rowIdRange the row id range
-     * @param rgLocation the location
-     * @return true on success
-     */
-    boolean putRowIds(RowIdRange rowIdRange, RgLocation rgLocation);
-
-    /**
-     * Delete a range of row ids from the main index. {@link #getLocation(long)} of a row id within a deleted range
-     * should return null.
+     * Delete range of row ids from the main index. This method only has effect on the persistent storage
+     * of the main index. If there is a
+     * {@link #getLocation(long)} of a row id within a deleted range should return null.
      * @param rowIdRange the row id range to be deleted
      * @return true on success
      */
-    boolean deleteRowIds(RowIdRange rowIdRange);
+    boolean deleteRowIdRange(RowIdRange rowIdRange) throws MainIndexException;
 
     /**
-     * Persist the main index into persistent storage.
+     * Flush the main index cache into persistent storage.
+     * If cache does not exist (i.e., {@link #hasCache()} returns false), this method has no effect.
+     * <p/>
+     * <b>Note: row ids of a flushed file id should not be put into the main index again.</b>
+     * @param fileId the file id of which the cached index entries are to be flushed
      * @return true on success
      */
-    boolean persist();
+    boolean flushCache(long fileId) throws MainIndexException;
 
     /**
-     * Persist the main index and close it.
+     * Flush the main index cache if exists and close the main index instance.
      * @throws IOException
      */
     @Override
     void close() throws IOException;
-
-    /**
-     * The location of the row group, composed of the file id and the row group id inside the file.
-     */
-    class RgLocation
-    {
-        /**
-         * The file id of the file in pixels metadata, starts from 1.
-         */
-        private final long fileId;
-        /**
-         * The row group id inside the file, starts from 0.
-         */
-        private final int rowGroupId;
-
-        public RgLocation(long fileId, int rowGroupId)
-        {
-            this.fileId = fileId;
-            this.rowGroupId = rowGroupId;
-        }
-
-        public long getFileId()
-        {
-            return fileId;
-        }
-
-        public int getRowGroupId()
-        {
-            return rowGroupId;
-        }
-    }
 }

@@ -25,7 +25,9 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
+import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.index.SinglePointIndexFactory;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.index.IndexServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -33,7 +35,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * @author hank, Rolland1944
@@ -42,14 +43,8 @@ import java.util.stream.Collectors;
 public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
 {
     private static final Logger logger = LogManager.getLogger(IndexServiceImpl.class);
-    private final SinglePointIndex singlePointIndex;
-    private final MainIndex mainIndex;
 
-    public IndexServiceImpl(SinglePointIndex singlePointIndex, MainIndex mainIndex)
-    {
-        this.singlePointIndex = singlePointIndex;
-        this.mainIndex = mainIndex;
-    }
+    public IndexServiceImpl() { }
 
     @Override
     public void allocateRowIdBatch(IndexProto.AllocateRowIdBatchRequest request,
@@ -61,8 +56,8 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.AllocateRowIdBatchResponse.Builder response = IndexProto.AllocateRowIdBatchResponse.newBuilder();
         try
         {
-            rowIdBatch = mainIndex.allocateRowIdBatch(tableId, numRowIds);
-        } catch (RowIdException e)
+            rowIdBatch = MainIndexFactory.Instance().getMainIndex(tableId).allocateRowIdBatch(tableId, numRowIds);
+        } catch (RowIdException | MainIndexException e)
         {
             logger.error("failed to allocate row ids", e);
             response.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
@@ -80,21 +75,31 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                                   StreamObserver<IndexProto.LookupUniqueIndexResponse> responseObserver)
     {
         IndexProto.IndexKey key = request.getIndexKey();
-        long rowId = singlePointIndex.getUniqueRowId(key);
-        IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
-        IndexProto.LookupUniqueIndexResponse response;
-        if (rowLocation != null)
+        IndexProto.LookupUniqueIndexResponse.Builder builder = IndexProto.LookupUniqueIndexResponse.newBuilder();
+        try
         {
-            response = IndexProto.LookupUniqueIndexResponse.newBuilder()
-                    .setRowLocation(rowLocation).build();
+            long tableId = key.getTableId();
+            long indexId = key.getIndexId();
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            long rowId = singlePointIndex.getUniqueRowId(key);
+            IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
+
+            if (rowLocation != null)
+            {
+                builder.setRowLocation(rowLocation);
+            }
+            else
+            {
+                // If not found, return empty RowLocation
+                builder.setErrorCode(ErrorCode.SUCCESS).setRowLocation(IndexProto.RowLocation.getDefaultInstance());
+            }
         }
-        else
+        catch (SinglePointIndexException | MainIndexException e)
         {
-            // If not found, return empty RowLocation
-            response = IndexProto.LookupUniqueIndexResponse.newBuilder()
-                    .setRowLocation(IndexProto.RowLocation.getDefaultInstance()).build();
+            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
         }
-        responseObserver.onNext(response);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
@@ -103,19 +108,30 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                                      StreamObserver<IndexProto.LookupNonUniqueIndexResponse> responseObserver)
     {
         IndexProto.IndexKey key = request.getIndexKey();
-        long[] rowIds = singlePointIndex.getRowIds(key);
-        List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
-        for (long rowId : rowIds)
+        IndexProto.LookupNonUniqueIndexResponse.Builder builder = IndexProto.LookupNonUniqueIndexResponse.newBuilder();
+        try
         {
-            IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
-            if (rowLocation != null)
+            long tableId = key.getTableId();
+            long indexId = key.getIndexId();
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            List<Long> rowIds = singlePointIndex.getRowIds(key);
+            List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
+            for (long rowId : rowIds)
             {
-                rowLocations.add(rowLocation);
+                IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
+                if (rowLocation != null)
+                {
+                    rowLocations.add(rowLocation);
+                }
             }
+            builder.setErrorCode(ErrorCode.SUCCESS).addAllRowLocations(rowLocations);
         }
-        IndexProto.LookupNonUniqueIndexResponse response = IndexProto.LookupNonUniqueIndexResponse.newBuilder()
-                .addAllRowLocations(rowLocations).build();
-        responseObserver.onNext(response);
+        catch (SinglePointIndexException | MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
+        }
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
@@ -127,8 +143,12 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutPrimaryIndexEntryResponse.Builder builder = IndexProto.PutPrimaryIndexEntryResponse.newBuilder();
         try
         {
-            boolean success = singlePointIndex.putPrimaryEntry(new SinglePointIndex.Entry(entry.getIndexKey(),
-                    entry.getTableRowId(), true, entry.getRowLocation()));
+            IndexProto.IndexKey key = entry.getIndexKey();
+            long tableId = key.getTableId();
+            long indexId = key.getIndexId();
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -136,6 +156,15 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             else
             {
                 builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
+            }
+            success = mainIndex.putEntry(entry.getRowId(), entry.getRowLocation());
+            if (success)
+            {
+                builder.setErrorCode(ErrorCode.SUCCESS);
+            }
+            else
+            {
+                builder.setErrorCode(ErrorCode.INDEX_PUT_MAIN_INDEX_FAIL);
             }
         }
         catch (MainIndexException e)
@@ -154,13 +183,13 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void putPrimaryIndexEntries(IndexProto.PutPrimaryIndexEntriesRequest request,
                                        StreamObserver<IndexProto.PutPrimaryIndexEntriesResponse> responseObserver)
     {
-        List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream()
-                .map(entry -> new SinglePointIndex.Entry(
-                        entry.getIndexKey(), entry.getTableRowId(), true, entry.getRowLocation()))
-                .collect(Collectors.toList());
-        IndexProto.PutPrimaryIndexEntriesResponse.Builder builder  = IndexProto.PutPrimaryIndexEntriesResponse.newBuilder();
+        List<IndexProto.PrimaryIndexEntry> entries = request.getIndexEntriesList();
+        IndexProto.PutPrimaryIndexEntriesResponse.Builder builder = IndexProto.PutPrimaryIndexEntriesResponse.newBuilder();
         try
         {
+            long tableId = request.getTableId();
+            long indexId = request.getIndexId();
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
             boolean success = singlePointIndex.putPrimaryEntries(entries);
             if (success)
             {
@@ -191,8 +220,11 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.PutSecondaryIndexEntryResponse.Builder builder = IndexProto.PutSecondaryIndexEntryResponse.newBuilder();
         try
         {
-            boolean success = singlePointIndex.putSecondaryEntry(new SinglePointIndex.Entry(entry.getIndexKey(),
-                    entry.getTableRowId(), true, null));
+            IndexProto.IndexKey key = entry.getIndexKey();
+            long tableId = key.getTableId();
+            long indexId = key.getIndexId();
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -214,13 +246,13 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void putSecondaryIndexEntries(IndexProto.PutSecondaryIndexEntriesRequest request,
                                          StreamObserver<IndexProto.PutSecondaryIndexEntriesResponse> responseObserver)
     {
-        List<SinglePointIndex.Entry> entries = request.getIndexEntriesList().stream().map(
-                entry -> new SinglePointIndex.Entry(
-                        entry.getIndexKey(), entry.getTableRowId(), true, null))
-                .collect(Collectors.toList());
-        IndexProto.PutSecondaryIndexEntriesResponse.Builder builder  = IndexProto.PutSecondaryIndexEntriesResponse.newBuilder();
+        List<IndexProto.SecondaryIndexEntry> entries = request.getIndexEntriesList();
+        IndexProto.PutSecondaryIndexEntriesResponse.Builder builder = IndexProto.PutSecondaryIndexEntriesResponse.newBuilder();
         try
         {
+            long tableId = request.getTableId();
+            long indexId = request.getIndexId();
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
             boolean success = singlePointIndex.putSecondaryEntries(entries);
             if (success)
             {
@@ -247,12 +279,31 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeletePrimaryIndexEntryResponse.Builder builder = IndexProto.DeletePrimaryIndexEntryResponse.newBuilder();
         try
         {
-            IndexProto.RowLocation rowLocation = singlePointIndex.deletePrimaryEntry(key);
-            builder.setErrorCode(ErrorCode.SUCCESS).setRowLocation(rowLocation);
+            long tableId = key.getTableId();
+            long indexId = key.getIndexId();
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            long rowId = singlePointIndex.deleteUniqueEntry(key);
+            if (rowId > 0)
+            {
+                IndexProto.RowLocation location = mainIndex.getLocation(rowId);
+                if (location != null)
+                {
+                    builder.setErrorCode(ErrorCode.SUCCESS).setRowLocation(location);
+                }
+                else
+                {
+                    builder.setErrorCode(ErrorCode.INDEX_GET_ROW_LOCATION_FAIL);
+                }
+            }
+            else
+            {
+                builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
+            }
         }
         catch (MainIndexException e)
         {
-            builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
+            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_LOCATION_FAIL);
         }
         catch (SinglePointIndexException e)
         {
@@ -270,12 +321,28 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeletePrimaryIndexEntriesResponse.Builder builder = IndexProto.DeletePrimaryIndexEntriesResponse.newBuilder();
         try
         {
-            List<IndexProto.RowLocation> rowLocations = singlePointIndex.deletePrimaryEntries(keys);
-            builder.setErrorCode(ErrorCode.SUCCESS).addAllRowLocations(rowLocations);
+            long tableId = request.getTableId();
+            long indexId = request.getIndexId();
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            List<Long> rowIds = singlePointIndex.deleteEntries(keys);
+            if (rowIds != null && !rowIds.isEmpty())
+            {
+                for (long rowId : rowIds)
+                {
+                    IndexProto.RowLocation location = mainIndex.getLocation(rowId);
+                    builder.addRowLocations(location);
+                }
+                builder.setErrorCode(ErrorCode.SUCCESS);
+            }
+            else
+            {
+                builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
+            }
         }
         catch (MainIndexException e)
         {
-            builder.setErrorCode(ErrorCode.INDEX_DELETE_MAIN_INDEX_FAIL);
+            builder.setErrorCode(ErrorCode.INDEX_GET_ROW_LOCATION_FAIL);
         }
         catch (SinglePointIndexException e)
         {
@@ -293,8 +360,11 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeleteSecondaryIndexEntryResponse.Builder builder = IndexProto.DeleteSecondaryIndexEntryResponse.newBuilder();
         try
         {
-            long rowId = singlePointIndex.deleteSecondaryEntry(key);
-            builder.setErrorCode(ErrorCode.SUCCESS).setTableRowId(rowId);
+            long tableId = key.getTableId();
+            long indexId = key.getIndexId();
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            List<Long> rowIds = singlePointIndex.deleteEntry(key);
+            builder.setErrorCode(ErrorCode.SUCCESS).addAllRowIds(rowIds);
         }
         catch (SinglePointIndexException e)
         {
@@ -312,8 +382,18 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         IndexProto.DeleteSecondaryIndexEntriesResponse.Builder builder = IndexProto.DeleteSecondaryIndexEntriesResponse.newBuilder();
         try
         {
-            List<Long> rowIds = singlePointIndex.deleteSecondaryEntries(keys);
-            builder.setErrorCode(ErrorCode.SUCCESS).addAllTableRowIds(rowIds);
+            long tableId = request.getTableId();
+            long indexId = request.getIndexId();
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            List<Long> rowIds = singlePointIndex.deleteEntries(keys);
+            if (rowIds != null && !rowIds.isEmpty())
+            {
+                builder.setErrorCode(ErrorCode.SUCCESS).addAllRowIds(rowIds);
+            }
+            else
+            {
+                builder.setErrorCode(ErrorCode.INDEX_DELETE_SINGLE_POINT_INDEX_FAIL);
+            }
         }
         catch (SinglePointIndexException e)
         {
@@ -321,5 +401,61 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updatePrimaryIndexEntry(IndexProto.UpdatePrimaryIndexEntryRequest request,
+                                        StreamObserver<IndexProto.UpdatePrimaryIndexEntryResponse> responseObserver)
+    {
+        super.updatePrimaryIndexEntry(request, responseObserver);
+    }
+
+    @Override
+    public void updatePrimaryIndexEntries(IndexProto.UpdatePrimaryIndexEntriesRequest request,
+                                          StreamObserver<IndexProto.UpdatePrimaryIndexEntriesResponse> responseObserver)
+    {
+        super.updatePrimaryIndexEntries(request, responseObserver);
+    }
+
+    @Override
+    public void updateSecondaryIndexEntry(IndexProto.UpdateSecondaryIndexEntryRequest request,
+                                          StreamObserver<IndexProto.UpdateSecondaryIndexEntryResponse> responseObserver)
+    {
+        super.updateSecondaryIndexEntry(request, responseObserver);
+    }
+
+    @Override
+    public void updateSecondaryIndexEntries(IndexProto.UpdateSecondaryIndexEntriesRequest request,
+                                            StreamObserver<IndexProto.UpdateSecondaryIndexEntriesResponse> responseObserver)
+    {
+        super.updateSecondaryIndexEntries(request, responseObserver);
+    }
+
+    @Override
+    public void flushIndexEntriesOfFile(IndexProto.FlushIndexEntriesOfFileRequest request,
+                                        StreamObserver<IndexProto.FlushIndexEntriesOfFileResponse> responseObserver)
+    {
+        super.flushIndexEntriesOfFile(request, responseObserver);
+    }
+
+    @Override
+    public void openIndex(IndexProto.OpenIndexRequest request,
+                          StreamObserver<IndexProto.OpenIndexResponse> responseObserver)
+    {
+        super.openIndex(request, responseObserver);
+    }
+
+    @Override
+    public void closeIndex(IndexProto.CloseIndexRequest request,
+                           StreamObserver<IndexProto.CloseIndexResponse> responseObserver)
+    {
+        super.closeIndex(request, responseObserver);
+    }
+
+    @Override
+    public void removeIndex(IndexProto.RemoveIndexRequest request,
+                            StreamObserver<IndexProto.RemoveIndexResponse> responseObserver)
+    {
+        super.removeIndex(request, responseObserver);
     }
 }

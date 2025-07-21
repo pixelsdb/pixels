@@ -17,27 +17,26 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.exception;
+package io.pixelsdb.pixels.common.index;
 
-public class MainIndexException extends IndexException
+import io.pixelsdb.pixels.common.exception.MainIndexException;
+
+import javax.annotation.Nonnull;
+
+/**
+ * @author hank
+ * @create 2025-07-20
+ */
+public interface MainIndexProvider
 {
-    public MainIndexException()
-    {
-        super();
-    }
+    /**
+     * Create an instance of the main index.
+     */
+    MainIndex createInstance(long tableId, @Nonnull MainIndex.Scheme scheme) throws MainIndexException;
 
-    public MainIndexException(String message)
-    {
-        super(message);
-    }
-
-    public MainIndexException(Throwable cause)
-    {
-        super(cause);
-    }
-
-    public MainIndexException(String message, Throwable cause)
-    {
-        super(message, cause);
-    }
+    /**
+     * @param scheme the given single main index scheme.
+     * @return true if this main index provider is compatible with the given scheme.
+     */
+    boolean compatibleWith(@Nonnull MainIndex.Scheme scheme);
 }
