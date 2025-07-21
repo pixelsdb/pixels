@@ -16,7 +16,6 @@
         <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <dep.junit.jupiter.version>5.8.2</dep.junit.jupiter.version>
         <dep.commons.io.version>2.16.1</dep.commons.io.version>
     </properties>
 
@@ -81,16 +80,8 @@
         </dependency>-->
 
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>${dep.junit.jupiter.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>${dep.junit.jupiter.version}</version>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-main-sqlite</artifactId>
             <scope>test</scope>
         </dependency>
 

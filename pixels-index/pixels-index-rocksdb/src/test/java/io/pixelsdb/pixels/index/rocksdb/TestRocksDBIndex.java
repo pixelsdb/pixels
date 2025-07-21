@@ -65,9 +65,6 @@ public class TestRocksDBIndex
         long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
-        long fileId = 1L;
-        int rgId = 2;
-        int rgRowId = 3;
         long rowId = 100L;
 
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
@@ -75,15 +72,7 @@ public class TestRocksDBIndex
         byte[] keyBytes = buffer.array();
 
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                .setIndexId(indexId)
-                .setKey(ByteString.copyFrom(key))
-                .setTimestamp(timestamp)
-                .build();
-        IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                .setFileId(fileId)
-                .setRgId(rgId)
-                .setRgRowOffset(rgRowId)
-                .build();
+                .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
         boolean success = rocksDBIndex.putEntry(keyProto, rowId, true);
         assertTrue(success, "putEntry should return true");
@@ -116,16 +105,10 @@ public class TestRocksDBIndex
             long rowId = i*1000L;
 
             IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                    .setIndexId(indexId)
-                    .setKey(ByteString.copyFrom(key))
-                    .setTimestamp(timestamp)
-                    .build();
+                    .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
             IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                    .setFileId(fileId)
-                    .setRgId(rgId)
-                    .setRgRowOffset(i)
-                    .build();
+                    .setFileId(fileId).setRgId(rgId).setRgRowOffset(i).build();
 
             IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
                     .setIndexKey(keyProto).setRowId(rowId).setRowLocation(rowLocation).build();
@@ -153,24 +136,13 @@ public class TestRocksDBIndex
         long indexId = 1L;
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
-        long fileId = 1L;
-        int rgId = 2;
-        int rgRowId = 3;
 
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
         buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
         byte[] keyBytes = buffer.array();
 
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                .setIndexId(indexId)
-                .setKey(ByteString.copyFrom(key))
-                .setTimestamp(timestamp)
-                .build();
-        IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                .setFileId(fileId)
-                .setRgId(rgId)
-                .setRgRowOffset(rgRowId)
-                .build();
+                .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
         rocksDBIndex.putEntry(keyProto, 0L, true);
 
@@ -205,18 +177,12 @@ public class TestRocksDBIndex
             buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
 
             IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                    .setIndexId(indexId)
-                    .setKey(ByteString.copyFrom(key))
-                    .setTimestamp(timestamp)
-                    .build();
+                    .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
             keyList.add(keyProto);
 
             IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                    .setFileId(fileId)
-                    .setRgId(rgId)
-                    .setRgRowOffset(i)
-                    .build();
+                    .setFileId(fileId).setRgId(rgId).setRgRowOffset(i).build();
 
             IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
                     .setIndexKey(keyProto).setRowId(0L).setRowLocation(rowLocation).build();
@@ -272,7 +238,8 @@ public class TestRocksDBIndex
         // Add separator
         compositeKey[indexIdBytes.length + 1 + keyBytes.length] = ':';
         // Copy timestamp
-        System.arraycopy(timestampBytes, 0, compositeKey, indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
+        System.arraycopy(timestampBytes, 0, compositeKey,
+                indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
 
         return compositeKey;
     }

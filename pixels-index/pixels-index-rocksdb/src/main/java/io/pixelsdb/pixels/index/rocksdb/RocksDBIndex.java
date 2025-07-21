@@ -57,7 +57,12 @@ public class RocksDBIndex implements SinglePointIndex
         this.rocksDB = createRocksDB(rocksDBPath);
     }
 
-    // Constructor for testing (direct RocksDB injection)
+    /**
+     * The constructor only for testing (direct RocksDB injection)
+     * @param tableId the table id
+     * @param indexId the index id
+     * @param rocksDB the rocksdb instance
+     */
     protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB)
     {
         this.tableId = tableId;
