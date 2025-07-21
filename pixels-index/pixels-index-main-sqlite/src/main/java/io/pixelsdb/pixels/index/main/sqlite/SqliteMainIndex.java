@@ -78,7 +78,8 @@ public class SqliteMainIndex implements MainIndex
     private final long tableId;
     private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
     private final Connection connection;
-    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final ReentrantReadWriteLock cacheRwLock = new ReentrantReadWriteLock();
+    private final ReentrantReadWriteLock dbRwLock = new ReentrantReadWriteLock();
 
     public SqliteMainIndex(long tableId) throws MainIndexException
     {
@@ -149,12 +150,27 @@ public class SqliteMainIndex implements MainIndex
     @Override
     public IndexProto.RowLocation getLocation(long rowId) throws MainIndexException
     {
-        this.rwLock.readLock().lock();
+        this.cacheRwLock.readLock().lock();
+        /*
+         * Issue #916:
+         * cache-read lock and db-read lock are not acquired together before reading cache.
+         * Thus putEntry() does not block db-read in this method. It is fine that deleteRowIdRange(rowIdRange)
+         * happen between cache-read and db-read of this method.
+         */
         IndexProto.RowLocation location = this.indexBuffer.lookup(rowId);
+        this.cacheRwLock.readLock().unlock();
         if (location == null)
         {
+            /*
+             * Issue #916:
+             * There is a gap between cache-read unlocking and db-read locking, and flushCache(fileId) and close()
+             * may happen in this gap. This is OK, because if the cache is hit, this method will not read db;
+             * otherwise, if cache misses, cache-flushing in flushCache(fileId) and close() has the same effect
+             * as flushing the cache before read it.
+             */
             try
             {
+                this.dbRwLock.readLock().lock();
                 RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
                 if (rowIdRange != null)
                 {
@@ -166,30 +182,30 @@ public class SqliteMainIndex implements MainIndex
                     location = IndexProto.RowLocation.newBuilder()
                             .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
                 }
+                this.dbRwLock.readLock().unlock();
             }
             catch (RowIdException e)
             {
-                this.rwLock.readLock().unlock();
+                this.dbRwLock.readLock().unlock();
                 throw new MainIndexException("failed to query row location from sqlite", e);
             }
         }
-        this.rwLock.readLock().unlock();
         return location;
     }
 
     @Override
     public boolean putEntry(long rowId, IndexProto.RowLocation rowLocation)
     {
-        this.rwLock.writeLock().lock();
+        this.cacheRwLock.writeLock().lock();
         boolean res = this.indexBuffer.insert(rowId, rowLocation);
-        this.rwLock.writeLock().unlock();
+        this.cacheRwLock.writeLock().unlock();
         return res;
     }
 
     @Override
     public boolean deleteRowIdRange(RowIdRange rowIdRange) throws MainIndexException
     {
-        this.rwLock.writeLock().lock();
+        this.dbRwLock.writeLock().lock();
         try (PreparedStatement pst = connection.prepareStatement(deleteRangesSql))
         {
             long rowIdStart = rowIdRange.getRowIdStart();
@@ -215,12 +231,12 @@ public class SqliteMainIndex implements MainIndex
                         .setRowIdStart(rowIdEnd).setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd() - width).build();
                 res &= updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
             }
-            this.rwLock.writeLock().unlock();
+            this.dbRwLock.writeLock().unlock();
             return res;
         }
         catch (SQLException | RowIdException e)
         {
-            this.rwLock.writeLock().unlock();
+            this.dbRwLock.writeLock().unlock();
             throw new MainIndexException("failed to delete row id ranges from sqlite", e);
         }
     }
@@ -295,7 +311,8 @@ public class SqliteMainIndex implements MainIndex
     @Override
     public boolean flushCache(long fileId) throws MainIndexException
     {
-        this.rwLock.writeLock().lock();
+        this.cacheRwLock.writeLock().lock();
+        this.dbRwLock.writeLock().lock();
         try
         {
             List<RowIdRange> rowIdRanges = this.indexBuffer.flush(fileId);
@@ -312,13 +329,15 @@ public class SqliteMainIndex implements MainIndex
                     pst.addBatch();
                 }
                 pst.executeBatch();
-                this.rwLock.writeLock().unlock();
+                this.cacheRwLock.writeLock().unlock();
+                this.dbRwLock.writeLock().unlock();
                 return true;
             }
         }
         catch (MainIndexException | SQLException e)
         {
-            this.rwLock.writeLock().unlock();
+            this.cacheRwLock.writeLock().unlock();
+            this.dbRwLock.writeLock().unlock();
             throw new MainIndexException("failed to flush index cache into sqlite", e);
         }
     }
@@ -326,17 +345,20 @@ public class SqliteMainIndex implements MainIndex
     @Override
     public void close() throws IOException
     {
-        this.rwLock.writeLock().lock();
+        this.cacheRwLock.writeLock().lock();
+        this.dbRwLock.writeLock().lock();
         List<Long> cachedFileIds = this.indexBuffer.cachedFileIds();
         for (long fileId : cachedFileIds)
         {
             try
             {
+                // the locks are reentrant, no deadlocking problem
                 this.flushCache(fileId);
             }
             catch (MainIndexException e)
             {
-                this.rwLock.writeLock().unlock();
+                this.cacheRwLock.writeLock().unlock();
+                this.dbRwLock.writeLock().unlock();
                 throw new IOException("failed to flush main index cache of file id " + fileId, e);
             }
         }
@@ -347,9 +369,11 @@ public class SqliteMainIndex implements MainIndex
         }
         catch (SQLException e)
         {
-            this.rwLock.writeLock().unlock();
+            this.cacheRwLock.writeLock().unlock();
+            this.dbRwLock.writeLock().unlock();
             throw new IOException("failed to close sqlite connection", e);
         }
-        this.rwLock.writeLock().unlock();
+        this.cacheRwLock.writeLock().unlock();
+        this.dbRwLock.writeLock().unlock();
     }
 }

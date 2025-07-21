@@ -74,10 +74,7 @@ public class TestSqliteMainIndex
     {
         long rowId = 2000L;
         IndexProto.RowLocation location = IndexProto.RowLocation.newBuilder()
-                .setFileId(2)
-                .setRgId(2)
-                .setRgRowOffset(0)
-                .build();
+                .setFileId(2).setRgId(2).setRgRowOffset(0).build();
 
         Assertions.assertTrue(mainIndex.putEntry(rowId, location));
         Assertions.assertNotNull(mainIndex.getLocation(rowId));
@@ -105,6 +102,21 @@ public class TestSqliteMainIndex
 
         Assertions.assertTrue(mainIndex.deleteRowIdRange(new RowIdRange(rowId, rowId + 1,
                 2, 2, 0, 1)));
+    }
+
+    @Test
+    public void testPutPerformance() throws MainIndexException
+    {
+        long rowIdBase = 0L;
+        IndexProto.RowLocation.Builder locationBuilder = IndexProto.RowLocation.newBuilder()
+                .setFileId(1L).setRgId(0);
+        for (int i = 0; i < 10000000; i++)
+        {
+            mainIndex.putEntry(rowIdBase + i, locationBuilder.setRgRowOffset(i).build());
+        }
+        mainIndex.flushCache(1);
+        mainIndex.deleteRowIdRange(new RowIdRange(
+                0L, 10_000_000L, 1L, 0, 0, 10_000_000));
     }
 
     @Test
