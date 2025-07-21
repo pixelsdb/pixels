@@ -82,7 +82,8 @@ public class MainIndexFactory
                 try
                 {
                     instance.closeAll();
-                } catch (IOException e)
+                }
+                catch (MainIndexException e)
                 {
                     logger.error("Failed to close all main index instances.", e);
                     e.printStackTrace();
@@ -125,11 +126,41 @@ public class MainIndexFactory
      * Close all the opened main index instances.
      * @throws IOException
      */
-    public synchronized void closeAll() throws IOException
+    public synchronized void closeAll() throws MainIndexException
     {
         for (long tableId : mainIndexImpls.keySet())
         {
-            mainIndexImpls.get(tableId).close();
+            try
+            {
+                MainIndex removing = mainIndexImpls.get(tableId);
+                if (removing != null)
+                {
+                    removing.close();
+                }
+            }
+            catch (IOException e)
+            {
+                throw new MainIndexException(
+                        "failed to close main index of table " + tableId, e);
+            }
+        }
+        mainIndexImpls.clear();
+    }
+
+    public synchronized void closeIndex(long tableId) throws MainIndexException
+    {
+        MainIndex removed = mainIndexImpls.remove(tableId);
+        if (removed != null)
+        {
+            try
+            {
+                removed.close();
+            }
+            catch (IOException e)
+            {
+                throw new MainIndexException(
+                        "failed to close main index of table " + tableId, e);
+            }
         }
     }
 }

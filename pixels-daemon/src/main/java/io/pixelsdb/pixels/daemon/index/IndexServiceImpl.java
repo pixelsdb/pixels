@@ -442,14 +442,74 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void openIndex(IndexProto.OpenIndexRequest request,
                           StreamObserver<IndexProto.OpenIndexResponse> responseObserver)
     {
-        super.openIndex(request, responseObserver);
+        IndexProto.OpenIndexResponse.Builder builder = IndexProto.OpenIndexResponse.newBuilder();
+        try
+        {
+            long tableId = request.getTableId();
+            long indexId = request.getIndexId();
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            if (singlePointIndex != null)
+            {
+                if (request.getIsPrimary())
+                {
+                    MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+                    if (mainIndex != null)
+                    {
+                        builder.setErrorCode(ErrorCode.SUCCESS);
+                    }
+                    else
+                    {
+                        builder.setErrorCode(ErrorCode.INDEX_OPEN_MAIN_INDEX_FAIL);
+                    }
+                }
+                else
+                {
+                    builder.setErrorCode(ErrorCode.SUCCESS);
+                }
+            }
+            else
+            {
+                builder.setErrorCode(ErrorCode.INDEX_OPEN_SINGLE_POINT_INDEX_FAIL);
+            }
+
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_OPEN_MAIN_INDEX_FAIL);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_OPEN_SINGLE_POINT_INDEX_FAIL);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
     public void closeIndex(IndexProto.CloseIndexRequest request,
                            StreamObserver<IndexProto.CloseIndexResponse> responseObserver)
     {
-        super.closeIndex(request, responseObserver);
+        IndexProto.CloseIndexResponse.Builder builder = IndexProto.CloseIndexResponse.newBuilder();
+        try
+        {
+            long tableId = request.getTableId();
+            long indexId = request.getIndexId();
+            SinglePointIndexFactory.Instance().closeIndex(tableId, indexId);
+            if (request.getIsPrimary())
+            {
+                MainIndexFactory.Instance().closeIndex(tableId);
+            }
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_CLOSE_MAIN_INDEX_FAIL);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_CLOSE_SINGLE_POINT_INDEX_FAIL);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 
     @Override
