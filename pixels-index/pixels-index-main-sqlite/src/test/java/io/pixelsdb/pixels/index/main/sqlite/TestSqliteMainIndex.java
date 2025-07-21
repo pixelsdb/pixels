@@ -24,12 +24,16 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.RowIdRange;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
+import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -45,6 +49,17 @@ public class TestSqliteMainIndex
     @BeforeEach
     public void setUp() throws EtcdException, MainIndexException
     {
+        // Create SQLite Directory
+        try
+        {
+            String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
+            FileUtils.forceMkdir(new File(sqlitePath));
+        }
+        catch (IOException e)
+        {
+            System.err.println("Failed to create SQLite test directory: " + e.getMessage());
+        }
+
         mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
     }
 
@@ -52,6 +67,17 @@ public class TestSqliteMainIndex
     public void tearDown() throws Exception
     {
         mainIndex.close();
+
+        // Clear SQLite Directory
+        try
+        {
+            String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
+            FileUtils.deleteDirectory(new File(sqlitePath));
+        }
+        catch (IOException e)
+        {
+            System.err.println("Failed to clean up SQLite test directory: " + e.getMessage());
+        }
     }
 
     @Test
