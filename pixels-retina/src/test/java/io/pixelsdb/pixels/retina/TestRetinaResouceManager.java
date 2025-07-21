@@ -21,9 +21,7 @@ package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.junit.jupiter.api.Test;
-
-import java.nio.ByteBuffer;
+import org.junit.Test;
 
 public class TestRetinaResouceManager
 {
@@ -101,7 +99,7 @@ public class TestRetinaResouceManager
             System.out.println(response.getBitmaps(0));
 
             // delete record
-            long fileId = 322;  // obtained during debug
+            long fileId = 323;  // obtained during debug
             int rgId = 0;
             int rgRowId = 0;
             retinaResourceManager.deleteRecord(fileId, rgId, rgRowId, 10);

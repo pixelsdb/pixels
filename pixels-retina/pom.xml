@@ -88,27 +88,10 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- test-->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-server</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>ch.qos.logback</groupId>
-                    <artifactId>logback-classic</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.logging.log4j</groupId>
-                    <artifactId>log4j-to-slf4j</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
     </dependencies>
 

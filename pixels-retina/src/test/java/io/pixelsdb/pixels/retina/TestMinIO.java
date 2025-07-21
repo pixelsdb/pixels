@@ -25,7 +25,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 
 import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 
