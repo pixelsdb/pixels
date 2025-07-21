@@ -41,8 +41,7 @@ public class TestRocksDB
     @Test
     public void testBasic()
     {
-        final String db_path = "tmp/rocksdb";
-        final String db_path_not_found = db_path + "_not_found";
+        final String dbPath = "/tmp/rocksdb";
 
         try (final Options options = new Options();
              final Filter bloomFilter = new BloomFilter(10);
@@ -50,10 +49,11 @@ public class TestRocksDB
              final Statistics stats = new Statistics();
              final RateLimiter rateLimiter = new RateLimiter(10000000, 10000, 10))
         {
-            try (final RocksDB db = RocksDB.open(options, db_path_not_found))
+            try (final RocksDB db = RocksDB.open(options, dbPath))
             {
                 assert (false);
-            } catch (final RocksDBException e)
+            }
+            catch (final RocksDBException e)
             {
                 System.out.format("Caught the expected exception -- %s\n", e);
             }
@@ -67,12 +67,13 @@ public class TestRocksDB
                         .setMaxBackgroundJobs(10)
                         .setCompressionType(CompressionType.ZLIB_COMPRESSION)
                         .setCompactionStyle(CompactionStyle.UNIVERSAL);
-            } catch (final IllegalArgumentException e)
+            }
+            catch (final IllegalArgumentException e)
             {
                 assert (false);
             }
 
-            assert (options.createIfMissing() == true);
+            assert (options.createIfMissing());
             assert (options.writeBufferSize() == 8 * SizeUnit.KB);
             assert (options.maxWriteBufferNumber() == 3);
             assert (options.maxBackgroundJobs() == 10);
@@ -116,12 +117,12 @@ public class TestRocksDB
 
             assert (table_options.blockSizeDeviation() == 5);
             assert (table_options.blockRestartInterval() == 10);
-            assert (table_options.cacheIndexAndFilterBlocks() == true);
+            assert (table_options.cacheIndexAndFilterBlocks());
 
             options.setTableFormatConfig(table_options);
             assert (options.tableFactoryName().equals("BlockBasedTable"));
 
-            try (final RocksDB db = RocksDB.open(options, db_path))
+            try (final RocksDB db = RocksDB.open(options, dbPath))
             {
                 db.put("hello".getBytes(), "world".getBytes());
 
@@ -130,25 +131,24 @@ public class TestRocksDB
 
                 final String str = db.getProperty("rocksdb.stats");
                 assert (str != null && !str.equals(""));
-            } catch (final RocksDBException e)
+            }
+            catch (final RocksDBException e)
             {
                 System.out.format("[ERROR] caught the unexpected exception -- %s\n", e);
                 assert (false);
             }
 
-            try (final RocksDB db = RocksDB.open(options, db_path))
+            try (final RocksDB db = RocksDB.open(options, dbPath))
             {
                 db.put("hello".getBytes(), "world".getBytes());
                 byte[] value = db.get("hello".getBytes());
-                System.out.format("Get('hello') = %s\n",
-                        new String(value));
+                System.out.format("Get('hello') = %s\n", new String(value));
 
                 for (int i = 1; i <= 9; ++i)
                 {
                     for (int j = 1; j <= 9; ++j)
                     {
-                        db.put(String.format("%dx%d", i, j).getBytes(),
-                                String.format("%d", i * j).getBytes());
+                        db.put(String.format("%dx%d", i, j).getBytes(), String.format("%d", i * j).getBytes());
                     }
                 }
 
@@ -156,8 +156,7 @@ public class TestRocksDB
                 {
                     for (int j = 1; j <= 9; ++j)
                     {
-                        System.out.format("%s ", new String(db.get(
-                                String.format("%dx%d", i, j).getBytes())));
+                        System.out.format("%s ", new String(db.get(String.format("%dx%d", i, j).getBytes())));
                     }
                     System.out.println("");
                 }
@@ -182,11 +181,9 @@ public class TestRocksDB
                 {
                     for (int j = 10; j <= 19; ++j)
                     {
-                        assert (new String(
-                                db.get(String.format("%dx%d", i, j).getBytes())).equals(
+                        assert (new String(db.get(String.format("%dx%d", i, j).getBytes())).equals(
                                 String.format("%d", i * j)));
-                        System.out.format("%s ", new String(db.get(
-                                String.format("%dx%d", i, j).getBytes())));
+                        System.out.format("%s ", new String(db.get(String.format("%dx%d", i, j).getBytes())));
                     }
                     System.out.println("");
                 }
@@ -240,8 +237,7 @@ public class TestRocksDB
                     db.put(writeOpts, testKey, testValue);
                     len = db.get(testKey, enoughArray);
                     assert (len == testValue.length);
-                    assert (new String(testValue).equals(
-                            new String(enoughArray, 0, len)));
+                    assert (new String(testValue).equals(new String(enoughArray, 0, len)));
                 }
 
                 try
@@ -254,7 +250,8 @@ public class TestRocksDB
                         }
                     }
                     System.out.println("getTickerCount() passed.");
-                } catch (final Exception e)
+                }
+                catch (final Exception e)
                 {
                     System.out.println("Failed in call to getTickerCount()");
                     assert (false); //Should never reach here.
@@ -270,7 +267,8 @@ public class TestRocksDB
                         }
                     }
                     System.out.println("getHistogramData() passed.");
-                } catch (final Exception e)
+                }
+                catch (final Exception e)
                 {
                     System.out.println("Failed in call to getHistogramData()");
                     assert (false); //Should never reach here.
@@ -338,7 +336,8 @@ public class TestRocksDB
                 {
                     assert (value1 != null);
                 }
-            } catch (final RocksDBException e)
+            }
+            catch (final RocksDBException e)
             {
                 System.err.println(e);
             }
