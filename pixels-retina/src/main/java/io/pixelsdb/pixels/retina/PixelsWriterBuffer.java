@@ -107,7 +107,6 @@ public class PixelsWriterBuffer
     private int currentMemTableCount;
     private final List<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
-    private ReentrantLock bufferSizeLock;
     private AtomicLong maxObjectKey;
 
     public PixelsWriterBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
@@ -143,7 +142,6 @@ public class PixelsWriterBuffer
         this.flushDiskExecutor = Executors.newSingleThreadScheduledExecutor();
         this.idCounter++;
 
-        this.bufferSizeLock = new ReentrantLock();
         this.fileWriterManagers = new ArrayList<>();
         this.maxObjectKey = new AtomicLong(0);
 
@@ -206,7 +204,6 @@ public class PixelsWriterBuffer
                 return;
             }
 
-            this.bufferSizeLock.lock();
             if (this.currentMemTableCount >= this.maxMemTableCount)
             {
                 this.currentMemTableCount = 0;
@@ -219,7 +216,6 @@ public class PixelsWriterBuffer
                         this.encodingLevel, this.nullsPadding, this.idCounter,
                         this.memTableSize * this.maxMemTableCount);
             }
-            this.bufferSizeLock.unlock();
 
             /**
              * For activeMemTable, at initialization the reference count is 2 because of *this and superVersion
@@ -346,7 +342,10 @@ public class PixelsWriterBuffer
 
                         for (ObjectEntry objectEntry : toRemove)
                         {
-                            objectEntry.unref();
+                            if (objectEntry.unref())
+                            {
+                                this.minioManager.delete(this.tableId, objectEntry.getId());
+                            }
                         }
                     }
                 }
@@ -415,6 +414,7 @@ public class PixelsWriterBuffer
         } finally
         {
             sv.unref();
+            currentVersion.unref();
             activeMemTable.unref();
             for (MemTable immutableMemTable: sv.getImmutableMemTables())
             {

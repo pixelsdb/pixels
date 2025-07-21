@@ -259,6 +259,9 @@ public class RetinaResourceManager
                     objectEntry.getStartIndex(), objectEntry.getLength()));
         }
 
+        // unref super version
+        superVersion.unref();
+
         return responseBuilder.build();
     }
 

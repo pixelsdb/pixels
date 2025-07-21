@@ -52,12 +52,12 @@ public class ObjectEntry implements Referenceable
 
     public int getStartIndex()
     {
-        return this.getStartIndex();
+        return this.startIndex;
     }
 
     public int getLength()
     {
-        return this.getLength();
+        return this.length;
     }
 
     @Override
