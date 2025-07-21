@@ -160,7 +160,7 @@ public class RetinaResourceManager
         }
     }
 
-    public void insertData(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
+    public void insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
     {
         PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
         writerBuffer.addRow(colValues, timestamp);

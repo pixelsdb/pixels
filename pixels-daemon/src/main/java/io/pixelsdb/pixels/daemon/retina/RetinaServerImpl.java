@@ -135,7 +135,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         colValuesByteArray[i] = colValuesList.get(i).toByteArray();
                     }
                     // TODO: insert index
-                    this.retinaResourceManager.insertData(schemaName, insertData.getTableName(),
+                    this.retinaResourceManager.insertRecord(schemaName, insertData.getTableName(),
                             colValuesByteArray, timestamp);
                 }
             }
@@ -288,14 +288,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try
         {
-            RetinaProto.GetWriterBufferResponse.Builder responseBuilder = RetinaProto.GetWriterBufferResponse
-                    .newBuilder()
-                    .setHeader(headerBuilder.build());
-
             RetinaProto.GetWriterBufferResponse response = this.retinaResourceManager.getWriterBuffer(
                     request.getSchemaName(), request.getTableName(), request.getTimestamp());
 
-            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (RetinaException e)
         {
