@@ -302,13 +302,13 @@ public class RocksDBIndex implements SinglePointIndex
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
+            long rowId = this.getUniqueRowId(key);
             // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
             // Delete key-value pair from RocksDB
             writeBatch.delete(keyBytes);
-            rocksDB.get(keyBytes);
             rocksDB.write(writeOptions, writeBatch);
-            return 0; // TODO: implement
+            return rowId;
         }
         catch (RocksDBException e)
         {
@@ -329,16 +329,18 @@ public class RocksDBIndex implements SinglePointIndex
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
+            List<Long> rowIds = new ArrayList<>();
             // Delete single point index
             for(IndexProto.IndexKey key : keys)
             {
+                rowIds.addAll(this.getRowIds(key));
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
                 // Delete key-value pair from RocksDB
                 writeBatch.delete(keyBytes);
             }
             rocksDB.write(new WriteOptions(), writeBatch);
-            return null; // TODO: implement
+            return rowIds;
         }
         catch (RocksDBException e)
         {

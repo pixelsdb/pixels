@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.index.rocksdb;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
@@ -222,11 +223,12 @@ public class TestRocksDBIndex
     }
 
     @AfterEach
-    public void tearDown()
+    public void tearDown() throws MainIndexException, IOException
     {
         if (rocksDB != null)
         {
             rocksDB.close();
+            MainIndexFactory.Instance().closeAll();
         }
 
         // Clear RocksDB Directory
