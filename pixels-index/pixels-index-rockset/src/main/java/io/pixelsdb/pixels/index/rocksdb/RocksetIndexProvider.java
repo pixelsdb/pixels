@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -42,22 +43,25 @@ public class RocksetIndexProvider implements SinglePointIndexProvider
     private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
 
     @Override
-    public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme)
+    public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme,
+                                           boolean unique) throws SinglePointIndexException
     {
         if (scheme == SinglePointIndex.Scheme.rockset)
         {
              try
              {
-                 return new RocksetIndex(tableId, indexId, bucketName, s3Prefix,
-                         localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
+                 CloudDBOptions dbOptions = new CloudDBOptions().setBucketName(bucketName).setS3Prefix(s3Prefix)
+                         .setLocalDbPath(localDbPath).setPersistentCachePath(persistentCachePath)
+                         .setPersistentCacheSizeGB(persistentCacheSizeGB).setReadOnly(readOnly);
+                 return new RocksetIndex(tableId, indexId, dbOptions, unique);
              }
              catch (Exception e)
              {
-                 logger.error("Failed to create RocksDB instance", e);
-                 return null;
+                 logger.error("failed to create RocksDB instance", e);
+                 throw new SinglePointIndexException("failed to create RocksDB instance", e);
              }
         }
-        throw new IllegalArgumentException("Unsupported scheme: " + scheme);
+        throw new SinglePointIndexException("unsupported scheme: " + scheme);
     }
 
     @Override

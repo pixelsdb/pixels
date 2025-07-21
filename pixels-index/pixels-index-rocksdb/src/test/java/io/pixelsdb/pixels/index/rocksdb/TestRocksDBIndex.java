@@ -75,7 +75,7 @@ public class TestRocksDBIndex
         System.out.println("Debug: Creating RocksDBIndex.."); // Debug log
         Options options = new Options().setCreateIfMissing(true);
         rocksDB = RocksDB.open(options, rocksDBpath);
-        rocksDBIndex = new RocksDBIndex(tableId, indexId, rocksDB);
+        rocksDBIndex = new RocksDBIndex(tableId, indexId, rocksDB, true);
         System.out.println("Debug: RocksDBIndex instance: " + rocksDBIndex); // Check for null
         assertNotNull(rocksDBIndex);
     }
@@ -95,7 +95,7 @@ public class TestRocksDBIndex
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-        boolean success = rocksDBIndex.putEntry(keyProto, rowId, true);
+        boolean success = rocksDBIndex.putEntry(keyProto, rowId);
         assertTrue(success, "putEntry should return true");
 
         // Assert index has been written to rocksDB
@@ -163,10 +163,10 @@ public class TestRocksDBIndex
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setTableId(tableId).setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-        rocksDBIndex.putEntry(keyProto, 0L, true);
+        rocksDBIndex.putEntry(keyProto, 0L);
 
         // Delete index
-        long ret = rocksDBIndex.deleteEntry(keyProto);
+        long ret = rocksDBIndex.deleteUniqueEntry(keyProto);
 
         // Assert return value
         assertTrue(ret >= 0, "deleteEntry should return true");

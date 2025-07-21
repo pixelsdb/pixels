@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,28 +47,35 @@ public class RocksDBIndex implements SinglePointIndex
     public static final Logger LOGGER = LogManager.getLogger(RocksDBIndex.class);
 
     private final RocksDB rocksDB;
+    private final WriteOptions writeOptions;
     private final long tableId;
     private final long indexId;
+    private final boolean unique;
 
-    public RocksDBIndex(long tableId, long indexId, String rocksDBPath) throws RocksDBException
+    public RocksDBIndex(long tableId, long indexId, String rocksDBPath, boolean unique) throws RocksDBException
     {
         this.tableId = tableId;
         this.indexId = indexId;
         // Initialize RocksDB instance
         this.rocksDB = createRocksDB(rocksDBPath);
+        this.unique = unique;
+        this.writeOptions = new WriteOptions();
     }
 
     /**
      * The constructor only for testing (direct RocksDB injection)
+     *
      * @param tableId the table id
      * @param indexId the index id
      * @param rocksDB the rocksdb instance
      */
-    protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB)
+    protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB, boolean unique)
     {
         this.tableId = tableId;
         this.indexId = indexId;
         this.rocksDB = rocksDB;  // Use injected mock directly
+        this.unique = unique;
+        this.writeOptions = new WriteOptions();
     }
 
     protected RocksDB createRocksDB(String path) throws RocksDBException
@@ -93,16 +101,12 @@ public class RocksDBIndex implements SinglePointIndex
 
         // 3. Prepare column family descriptors
         List<ColumnFamilyDescriptor> descriptors = existingColumnFamilies.stream()
-                .map(name -> new ColumnFamilyDescriptor(
-                        name,
-                        new ColumnFamilyOptions()
-                ))
+                .map(name -> new ColumnFamilyDescriptor(name, new ColumnFamilyOptions()))
                 .collect(Collectors.toList());
 
         // 4. Open database
         List<ColumnFamilyHandle> handles = new ArrayList<>();
-        DBOptions dbOptions = new DBOptions()
-                .setCreateIfMissing(true);
+        DBOptions dbOptions = new DBOptions().setCreateIfMissing(true);
 
         return RocksDB.open(dbOptions, path, descriptors, handles);
     }
@@ -117,6 +121,12 @@ public class RocksDBIndex implements SinglePointIndex
     public long getIndexId()
     {
         return indexId;
+    }
+
+    @Override
+    public boolean isUnique()
+    {
+        return unique;
     }
 
     @Override
@@ -148,7 +158,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> getNonUniqueRowIds(IndexProto.IndexKey key)
+    public List<Long> getRowIds(IndexProto.IndexKey key)
     {
         List<Long> rowIdList = new ArrayList<>();
 
@@ -189,7 +199,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique) throws SinglePointIndexException
+    public boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -209,7 +219,7 @@ public class RocksDBIndex implements SinglePointIndex
                 // Store in RocksDB
                 writeBatch.put(nonUniqueKey, null);
             }
-            rocksDB.write(new WriteOptions(), writeBatch);
+            rocksDB.write(writeOptions, writeBatch);
             return true;
         }
         catch (RocksDBException e)
@@ -241,7 +251,7 @@ public class RocksDBIndex implements SinglePointIndex
                 // Put main index
                 mainIndex.putEntry(entry.getRowId(), entry.getRowLocation());
             }
-            rocksDB.write(new WriteOptions(), writeBatch);
+            rocksDB.write(writeOptions, writeBatch);
             return true;
         }
         catch (RocksDBException e)
@@ -262,7 +272,6 @@ public class RocksDBIndex implements SinglePointIndex
                 // Extract key and rowId from Entry object
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-                boolean unique = entry.getUnique();
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
                 // Convert rowId to byte array
@@ -278,7 +287,7 @@ public class RocksDBIndex implements SinglePointIndex
                     writeBatch.put(nonUniqueKey, null);
                 }
             }
-            rocksDB.write(new WriteOptions(), writeBatch);
+            rocksDB.write(writeOptions, writeBatch);
             return true;
         }
         catch (RocksDBException e)
@@ -289,7 +298,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    public long deleteUniqueEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -297,7 +306,8 @@ public class RocksDBIndex implements SinglePointIndex
             byte[] keyBytes = toByteArray(key);
             // Delete key-value pair from RocksDB
             writeBatch.delete(keyBytes);
-            rocksDB.write(new WriteOptions(), writeBatch);
+            rocksDB.get(keyBytes);
+            rocksDB.write(writeOptions, writeBatch);
             return 0; // TODO: implement
         }
         catch (RocksDBException e)
@@ -306,6 +316,13 @@ public class RocksDBIndex implements SinglePointIndex
             throw new SinglePointIndexException("failed to delete entry", e);
         }
     }
+
+    @Override
+    public List<Long> deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException
+    {
+        return Collections.emptyList();
+    }
+
 
     @Override
     public List<Long> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException

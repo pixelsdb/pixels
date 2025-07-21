@@ -79,7 +79,7 @@ message SecondaryIndexEntry {
   IndexKey indexKey = 1;
   uint64 rowId = 2; // the rowId in this table
   // secondary index entry does not have associated row location
-  bool unique = 3; // whether this secondary index is unique
+  // bool unique = 3; // whether this secondary index is unique
 }
 
 message AllocateRowIdBatchRequest {
@@ -172,7 +172,7 @@ message DeleteSecondaryIndexEntryRequest {
 
 message DeleteSecondaryIndexEntryResponse {
   int32 errorCode = 1;
-  uint64 rowId = 2;
+  repeated uint64 rowIds = 2;
 }
 
 message DeleteSecondaryIndexEntriesRequest {
@@ -212,7 +212,7 @@ message UpdateSecondaryIndexEntryRequest {
 
 message UpdateSecondaryIndexEntryResponse {
   int32 errorCode = 1;
-  uint64 rowId = 2;
+  repeated uint64 rowIds = 2;
 }
 
 message UpdateSecondaryIndexEntriesRequest {

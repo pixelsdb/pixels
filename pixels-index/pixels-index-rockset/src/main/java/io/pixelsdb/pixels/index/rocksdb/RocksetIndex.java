@@ -26,10 +26,12 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -80,16 +82,16 @@ public class RocksetIndex implements SinglePointIndex
 
     private native void CloseDB0(long dbHandle);
 
-    protected long CreateDBCloud(String bucketName, String s3Prefix, String localDbPath,
-                                 String persistentCachePath, long persistentCacheSizeGB, boolean readOnly)
+    protected long CreateDBCloud(@Nonnull CloudDBOptions dbOptions)
     {
-        long cloudEnvPtr = CreateCloudFileSystem0(bucketName, s3Prefix);
+        long cloudEnvPtr = CreateCloudFileSystem0(dbOptions.getBucketName(), dbOptions.getS3Prefix());
         if (cloudEnvPtr == 0)
         {
             throw new RuntimeException("Failed to create CloudFileSystem");
         }
 
-        long dbHandle = OpenDBCloud0(cloudEnvPtr, localDbPath, persistentCachePath, persistentCacheSizeGB, readOnly);
+        long dbHandle = OpenDBCloud0(cloudEnvPtr, dbOptions.getLocalDbPath(), dbOptions.getPersistentCachePath(),
+                dbOptions.getPersistentCacheSizeGB(), dbOptions.isReadOnly());
         if (dbHandle == 0)
         {
             CloseDB0(0);
@@ -127,15 +129,14 @@ public class RocksetIndex implements SinglePointIndex
     private long dbHandle = 0;
     private final long tableId;
     private final long indexId;
+    private final boolean unique;
 
-
-    protected RocksetIndex(long tableId, long indexId, String bucketName, String s3Prefix, String localDbPath,
-                           String persistentCachePath, long persistentCacheSizeGB, boolean readOnly)
+    protected RocksetIndex(long tableId, long indexId, CloudDBOptions dbOptions, boolean unique)
     {
-        this.dbHandle = CreateDBCloud(bucketName, s3Prefix, localDbPath,
-                persistentCachePath, persistentCacheSizeGB, readOnly);
+        this.dbHandle = CreateDBCloud(dbOptions);
         this.tableId = tableId;
         this.indexId = indexId;
+        this.unique = unique;
     }
 
     protected long getDbHandle()
@@ -153,6 +154,12 @@ public class RocksetIndex implements SinglePointIndex
     public long getIndexId()
     {
         return indexId;
+    }
+
+    @Override
+    public boolean isUnique()
+    {
+        return unique;
     }
 
     @Override
@@ -184,13 +191,13 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> getNonUniqueRowIds(IndexProto.IndexKey key)
+    public List<Long> getRowIds(IndexProto.IndexKey key)
     {
         return ImmutableList.of();
     }
 
     @Override
-    public boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique) throws SinglePointIndexException
+    public boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try
         {
@@ -267,7 +274,6 @@ public class RocksetIndex implements SinglePointIndex
                 // Extract key and rowId from Entry object
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-                boolean unique = entry.getUnique();
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
                 // Convert rowId to byte array
@@ -293,7 +299,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public long deleteEntry(IndexProto.IndexKey key)
+    public long deleteUniqueEntry(IndexProto.IndexKey key)
     {
         try
         {
@@ -308,6 +314,12 @@ public class RocksetIndex implements SinglePointIndex
             LOGGER.error("failed to delete rockset index entry", e);
             return 0; // TODO: implement
         }
+    }
+
+    @Override
+    public List<Long> deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException
+    {
+        return Collections.emptyList();
     }
 
     @Override

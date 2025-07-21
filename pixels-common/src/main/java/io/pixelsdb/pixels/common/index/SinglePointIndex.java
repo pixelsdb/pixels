@@ -92,8 +92,14 @@ public interface SinglePointIndex extends Closeable
      * @return the index id of this single point index.
      */
     long getIndexId();
+
     /**
-     * Get the row id of an index key. This should be only used on a unique single point index.
+     * @return true if this is a unique index.
+     */
+    boolean isUnique();
+
+    /**
+     * Get the row id of an index key. <b>This method should only be called on a unique index.</b>
      * @param key the index key
      * @return the row id
      * @throws SinglePointIndexException
@@ -101,22 +107,21 @@ public interface SinglePointIndex extends Closeable
     long getUniqueRowId(IndexProto.IndexKey key) throws SinglePointIndexException;
 
     /**
-     * Get the row ids of an index key. This should be only used on a non-unique single point index.
+     * Get the row id(s) of an index key. <b>This method can be called on unique or non-unique index.</b>
      * @param key the index key
      * @return the row ids
      * @throws SinglePointIndexException
      */
-    List<Long> getNonUniqueRowIds(IndexProto.IndexKey key) throws SinglePointIndexException;
+    List<Long> getRowIds(IndexProto.IndexKey key) throws SinglePointIndexException;
 
     /**
      * Put an entry into this single point index.
      * @param key the index key
      * @param rowId the row id in the table
-     * @param unique whether this index is unique
      * @return true if the index entry is put successfully
      * @throws SinglePointIndexException
      */
-    boolean putEntry(IndexProto.IndexKey key, long rowId, boolean unique) throws SinglePointIndexException;
+    boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
 
     /**
      * Put the index entries of a primary index.
@@ -138,15 +143,23 @@ public interface SinglePointIndex extends Closeable
     boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException;
 
     /**
-     * Delete the index entry of the index key
+     * Delete the index entry of the index key. <b>This method should only be called on a unique index.</b>
      * @param indexKey the index key
      * @return the row id of the deleted index entry
      * @throws SinglePointIndexException
      */
-    long deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
+    long deleteUniqueEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
 
     /**
-     * Delete the index entries of the index keys
+     * Delete the index entry(ies) of the index key. <b>This method can be called on unique or non-unique index.</b>
+     * @param indexKey the index key
+     * @return the row ids of the deleted index entry
+     * @throws SinglePointIndexException
+     */
+    List<Long> deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
+
+    /**
+     * Delete the index entries of the index keys. <b>This method can be called on unique or non-unique index.</b>
      * @param indexKeys the index keys
      * @return the row ids of the deleted index entries
      * @throws SinglePointIndexException

@@ -115,7 +115,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             long indexId = key.getIndexId();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-            List<Long> rowIds = singlePointIndex.getNonUniqueRowIds(key);
+            List<Long> rowIds = singlePointIndex.getRowIds(key);
             List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
             for (long rowId : rowIds)
             {
@@ -148,7 +148,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             long indexId = key.getIndexId();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId(), true);
+            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -224,7 +224,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId(), entry.getUnique());
+            boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
             if (success)
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
@@ -283,7 +283,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             long indexId = key.getIndexId();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-            long rowId = singlePointIndex.deleteEntry(key);
+            long rowId = singlePointIndex.deleteUniqueEntry(key);
             if (rowId > 0)
             {
                 IndexProto.RowLocation location = mainIndex.getLocation(rowId);
@@ -363,8 +363,8 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-            long rowId = singlePointIndex.deleteEntry(key);
-            builder.setErrorCode(ErrorCode.SUCCESS).setRowId(rowId);
+            List<Long> rowIds = singlePointIndex.deleteEntry(key);
+            builder.setErrorCode(ErrorCode.SUCCESS).addAllRowIds(rowIds);
         }
         catch (SinglePointIndexException e)
         {

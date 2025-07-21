@@ -43,7 +43,7 @@ public class SinglePointIndexFactory
     private static final Logger logger = LogManager.getLogger(SinglePointIndexFactory.class);
     private final Map<TableIndex, SinglePointIndex> singlePointIndexImpls = new HashMap<>();
     private final Set<SinglePointIndex.Scheme> enabledSchemes = new TreeSet<>();
-    private final Map<Long, SinglePointIndex.Scheme> indexIdToSchemes = new HashMap<>();
+    private final Map<Long, TableIndex> indexIdToTableIndex = new HashMap<>();
     /**
      * The providers of the enabled single point index schemes.
      */
@@ -123,8 +123,8 @@ public class SinglePointIndexFactory
      */
     public synchronized SinglePointIndex getSinglePointIndex(long tableId, long indexId) throws SinglePointIndexException
     {
-        SinglePointIndex.Scheme scheme = indexIdToSchemes.get(indexId);
-        if (scheme == null)
+        TableIndex tableIndex = indexIdToTableIndex.get(indexId);
+        if (tableIndex == null)
         {
             try
             {
@@ -134,15 +134,15 @@ public class SinglePointIndexFactory
                 {
                     throw new SinglePointIndexException("single point index with id " + indexId + " does not exist");
                 }
-                scheme = singlePointIndex.getIndexScheme();
-                indexIdToSchemes.put(indexId, scheme);
+                tableIndex = new TableIndex(tableId, indexId, singlePointIndex.getIndexScheme(), singlePointIndex.isUnique());
+                indexIdToTableIndex.put(indexId, tableIndex);
             } catch (MetadataException e)
             {
                 throw new SinglePointIndexException("failed to query single point index information from metadata", e);
             }
         }
         // 'synchronized' in Java is reentrant,  it is fine to call the other getSinglePointIndex() from here.
-        return getSinglePointIndex(new TableIndex(tableId, indexId, scheme));
+        return getSinglePointIndex(tableIndex);
     }
 
     /**
@@ -162,7 +162,7 @@ public class SinglePointIndexFactory
         }
 
         SinglePointIndex singlePointIndex = this.singlePointIndexProviders.get(tableIndex.getScheme())
-                .createInstance(tableIndex.tableId, tableIndex.indexId, tableIndex.scheme);
+                .createInstance(tableIndex.tableId, tableIndex.indexId, tableIndex.scheme, tableIndex.isUnique());
         singlePointIndexImpls.put(tableIndex, singlePointIndex);
 
         return singlePointIndex;
@@ -185,12 +185,14 @@ public class SinglePointIndexFactory
         private final long tableId;
         private final long indexId;
         private final SinglePointIndex.Scheme scheme;
+        private final boolean unique;
 
-        public TableIndex(long tableId, long indexId, SinglePointIndex.Scheme scheme)
+        public TableIndex(long tableId, long indexId, SinglePointIndex.Scheme scheme, boolean unique)
         {
             this.tableId = tableId;
             this.indexId = indexId;
             this.scheme = scheme;
+            this.unique = unique;
         }
 
         public long getTableId()
@@ -208,10 +210,15 @@ public class SinglePointIndexFactory
             return scheme;
         }
 
+        public boolean isUnique()
+        {
+            return unique;
+        }
+
         @Override
         public int hashCode()
         {
-            return Objects.hash(tableId, indexId, scheme);
+            return Objects.hash(tableId, indexId);
         }
 
         @Override
@@ -226,9 +233,7 @@ public class SinglePointIndexFactory
                 return false;
             }
             TableIndex that = (TableIndex) obj;
-            return this.indexId == that.indexId &&
-                    this.tableId == that.tableId &&
-                    this.scheme == that.scheme;
+            return this.indexId == that.indexId && this.tableId == that.tableId;
         }
     }
 }
