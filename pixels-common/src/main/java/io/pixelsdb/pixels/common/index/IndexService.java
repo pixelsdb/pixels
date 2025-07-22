@@ -307,10 +307,10 @@ public class IndexService
         return true;
     }
 
-    public boolean flushIndexEntriesOfFile (long fileId) throws IndexException
+    public boolean flushIndexEntriesOfFile (long tableId, long indexId, long fileId, boolean isPrimary) throws IndexException
     {
         IndexProto.FlushIndexEntriesOfFileRequest request = IndexProto.FlushIndexEntriesOfFileRequest.newBuilder()
-                .setFileId(fileId).build();
+                .setTableId(tableId).setIndexId(indexId).setFileId(fileId).setIsPrimary(isPrimary).build();
 
         IndexProto.FlushIndexEntriesOfFileResponse response = stub.flushIndexEntriesOfFile(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
@@ -320,10 +320,10 @@ public class IndexService
         return true;
     }
 
-    public boolean openIndex (long tableId, long indexId) throws IndexException
+    public boolean openIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
     {
         IndexProto.OpenIndexRequest request = IndexProto.OpenIndexRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).build();
+                .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
 
         IndexProto.OpenIndexResponse response = stub.openIndex(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
@@ -333,10 +333,10 @@ public class IndexService
         return true;
     }
 
-    public boolean closeIndex (long tableId, long indexId) throws IndexException
+    public boolean closeIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
     {
         IndexProto.CloseIndexRequest request = IndexProto.CloseIndexRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).build();
+                .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
 
         IndexProto.CloseIndexResponse response = stub.closeIndex(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
@@ -346,10 +346,10 @@ public class IndexService
         return true;
     }
 
-    public boolean removeIndex (long tableId, long indexId) throws IndexException
+    public boolean removeIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
     {
         IndexProto.RemoveIndexRequest request = IndexProto.RemoveIndexRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).build();
+                .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
 
         IndexProto.RemoveIndexResponse response = stub.removeIndex(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)

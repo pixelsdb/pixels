@@ -230,8 +230,8 @@ message UpdateSecondaryIndexEntriesResponse {
 message FlushIndexEntriesOfFileRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
-  bool isPrimary = 3;
-  uint64 fileId = 4; // the file id of which the index entries will be flushed
+  uint64 fileId = 3; // the file id of which the index entries will be flushed
+  bool isPrimary = 4;
 }
 
 message FlushIndexEntriesOfFileResponse {
