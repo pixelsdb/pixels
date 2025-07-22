@@ -140,4 +140,6 @@ public class ErrorCode
     public static final int INDEX_CLOSE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 10;
     public static final int INDEX_REMOVE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 11;
     public static final int INDEX_REMOVE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 12;
+    public static final int INDEX_FLUSH_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 13;
+    public static final int INDEX_FLUSH_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 14;
 }

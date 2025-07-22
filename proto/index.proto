@@ -228,7 +228,10 @@ message UpdateSecondaryIndexEntriesResponse {
 }
 
 message FlushIndexEntriesOfFileRequest {
-  uint64 fileId = 1; // the file id of which the index entries will be flushed
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  bool isPrimary = 3;
+  uint64 fileId = 4; // the file id of which the index entries will be flushed
 }
 
 message FlushIndexEntriesOfFileResponse {
@@ -236,8 +239,8 @@ message FlushIndexEntriesOfFileResponse {
 }
 
 message OpenIndexRequest {
-  uint64 tableId = 1; // table id
-  uint64 indexId = 2; // index id
+  uint64 tableId = 1;
+  uint64 indexId = 2;
   bool isPrimary = 3;
 }
 
@@ -246,8 +249,8 @@ message OpenIndexResponse {
 }
 
 message CloseIndexRequest {
-  uint64 tableId = 1; // table id
-  uint64 indexId = 2; // index id
+  uint64 tableId = 1;
+  uint64 indexId = 2;
   bool isPrimary = 3;
 }
 
@@ -256,8 +259,8 @@ message CloseIndexResponse {
 }
 
 message RemoveIndexRequest {
-  uint64 tableId = 1; // table id
-  uint64 indexId = 2; // index id
+  uint64 tableId = 1;
+  uint64 indexId = 2;
   bool isPrimary = 3;
 }
 

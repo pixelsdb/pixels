@@ -435,7 +435,36 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void flushIndexEntriesOfFile(IndexProto.FlushIndexEntriesOfFileRequest request,
                                         StreamObserver<IndexProto.FlushIndexEntriesOfFileResponse> responseObserver)
     {
-        super.flushIndexEntriesOfFile(request, responseObserver);
+        IndexProto.FlushIndexEntriesOfFileResponse.Builder builder = IndexProto.FlushIndexEntriesOfFileResponse.newBuilder();
+        try
+        {
+            long tableId = request.getTableId();
+            long fileId = request.getFileId();
+            if (request.getIsPrimary())
+            {
+                MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+                if (mainIndex != null)
+                {
+                    mainIndex.flushCache(fileId);
+                    builder.setErrorCode(ErrorCode.SUCCESS);
+                }
+                else
+                {
+                    builder.setErrorCode(ErrorCode.INDEX_FLUSH_MAIN_INDEX_FAIL);
+                }
+            }
+            else
+            {
+                builder.setErrorCode(ErrorCode.SUCCESS);
+            }
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_FLUSH_MAIN_INDEX_FAIL);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+
     }
 
     @Override
@@ -499,6 +528,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             {
                 MainIndexFactory.Instance().closeIndex(tableId, false);
             }
+            builder.setErrorCode(ErrorCode.SUCCESS);
         }
         catch (MainIndexException e)
         {
@@ -526,6 +556,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             {
                 MainIndexFactory.Instance().closeIndex(tableId, true);
             }
+            builder.setErrorCode(ErrorCode.SUCCESS);
         }
         catch (MainIndexException e)
         {
