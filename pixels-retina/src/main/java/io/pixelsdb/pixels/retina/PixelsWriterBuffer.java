@@ -26,7 +26,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -40,8 +39,6 @@ import org.apache.logging.log4j.Logger;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-
-import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 
 /**
  * Data flows from the CDC into pixels, where it is first written to
@@ -140,10 +137,9 @@ public class PixelsWriterBuffer
 
         this.flushMinioExecutor = Executors.newSingleThreadExecutor();
         this.flushDiskExecutor = Executors.newSingleThreadScheduledExecutor();
-        this.idCounter++;
 
         this.fileWriterManagers = new ArrayList<>();
-        this.maxObjectKey = new AtomicLong(0);
+        this.maxObjectKey = new AtomicLong(-1);
 
         // minio
         this.minioManager = MinioManager.Instance();
@@ -155,9 +151,9 @@ public class PixelsWriterBuffer
                 0, this.memTableSize * this.maxMemTableCount);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
-                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
-                this.currentFileWriterManager.getFileId(),
+                TypeDescription.Mode.NONE, this.currentFileWriterManager.getFileId(),
                 0, this.memTableSize);
+        this.idCounter++;
         this.currentMemTableCount = 1;
 
         // Initialization adds reference counts to all data
@@ -222,9 +218,10 @@ public class PixelsWriterBuffer
              * Here only currentVersion is destroyed, *this is still in use, so only one call to unref() is needed.
              */
             MemTable oldMemTable = this.activeMemTable;
+            SuperVersion oldVersion = this.currentVersion;
             this.immutableMemTables.add(this.activeMemTable);
             this.activeMemTable = new MemTable(this.idCounter, this.schema,
-                    this.memTableSize, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
+                    this.memTableSize, TypeDescription.Mode.NONE,
                     this.currentFileWriterManager.getFileId(),
                     this.currentMemTableCount * this.memTableSize,
                     this.memTableSize);
@@ -232,7 +229,6 @@ public class PixelsWriterBuffer
             this.idCounter++;
 
             SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
-            SuperVersion oldVersion = this.currentVersion;
             this.currentVersion = newVersion;
             oldVersion.unref();
 
@@ -392,7 +388,7 @@ public class PixelsWriterBuffer
         try
         {
             // add memtable to writer
-            this.currentFileWriterManager.addRowBatch(sv.getMemTable().getRowBatch());
+            this.currentFileWriterManager.addRowBatch(sv.getActiveMemTable().getRowBatch());
 
             // add immutable memtable to writer
             for (MemTable immutableMemTable: sv.getImmutableMemTables())

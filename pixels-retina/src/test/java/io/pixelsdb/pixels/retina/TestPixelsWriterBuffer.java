@@ -24,14 +24,12 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestPixelsWriterBuffer
 {
@@ -46,11 +44,11 @@ public class TestPixelsWriterBuffer
     public void setup()
     {
         targetOrderDirPath = new Path();
-        targetOrderDirPath.setUri("file:///home/gengdy/data/test/ordered/");
-        targetOrderDirPath.setId(33);
+        targetOrderDirPath.setUri("file:///home/gengdy/data/test/v-0-ordered");
+        targetOrderDirPath.setId(21);
         targetCompactDirPath = new Path();
-        targetCompactDirPath.setUri("file:///home/gengdy/data/test/compact/");
-        targetCompactDirPath.setId(33);
+        targetCompactDirPath.setUri("file:///home/gengdy/data/test/v-0-compact");
+        targetCompactDirPath.setId(22);
         try
         {
             columnNames.add("id");
@@ -71,7 +69,7 @@ public class TestPixelsWriterBuffer
     public void testConcurrentWriteOperations()
     {
         int numThreads = 1;
-        int numRowsPerThread = 1000;
+        int numRowsPerThread = 10241;
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch completionLatch = new CountDownLatch(numThreads);
         AtomicBoolean hasError = new AtomicBoolean(false);

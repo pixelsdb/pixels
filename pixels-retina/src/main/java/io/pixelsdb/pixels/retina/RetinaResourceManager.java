@@ -198,7 +198,7 @@ public class RetinaResourceManager
         // get super version
         PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
         SuperVersion superVersion = writerBuffer.getCurrentVersion();
-        MemTable activeMemtable = superVersion.getMemTable();
+        MemTable activeMemtable = superVersion.getActiveMemTable();
         List<MemTable> immutableMemTables = superVersion.getImmutableMemTables();
         List<ObjectEntry> objectEntries = superVersion.getObjectEntries();
 

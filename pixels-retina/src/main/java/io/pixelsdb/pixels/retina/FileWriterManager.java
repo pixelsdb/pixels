@@ -52,7 +52,7 @@ public class FileWriterManager
 
     // [firstBlockId, lastBlockId]
     private final long firstBlockId;
-    private long lastBlockId;
+    private long lastBlockId = -1;
 
     /**
      * Creating pixelsWriter by passing in parameters avoids the need to read
