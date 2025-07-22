@@ -316,7 +316,7 @@ public class PixelsWriterBuffer
                 while (iterator.hasNext())
                 {
                     FileWriterManager fileWriterManager = iterator.next();
-                    if (this.minioManager.exist(this.tableId, fileWriterManager.getLastBlockId()))
+                    if (fileWriterManager.getLastBlockId() <= this.maxObjectKey.get())
                     {
                         fileWriterManager.finish();
                         iterator.remove();
@@ -383,26 +383,56 @@ public class PixelsWriterBuffer
             Thread.currentThread().interrupt();
         }
 
-
         SuperVersion sv = getCurrentVersion();
         try
         {
-            // add memtable to writer
+            long maxObjectKey = this.maxObjectKey.get();
+
+            // process current fileWriterManager
+            this.currentFileWriterManager.setLastBlockId(maxObjectKey);
             this.currentFileWriterManager.addRowBatch(sv.getActiveMemTable().getRowBatch());
-
-            // add immutable memtable to writer
-            for (MemTable immutableMemTable: sv.getImmutableMemTables())
+            long firstBlockId = this.currentFileWriterManager.getFirstBlockId();
+            Iterator<MemTable> iterator = sv.getImmutableMemTables().iterator();
+            while (iterator.hasNext())
             {
-                this.currentFileWriterManager.addRowBatch(immutableMemTable.getRowBatch());
+                MemTable immutableMemtable = iterator.next();
+                if (immutableMemtable.getId() >= firstBlockId)
+                {
+                    this.currentFileWriterManager.addRowBatch(immutableMemtable.getRowBatch());
+                    iterator.remove();
+                }
             }
-
-            this.currentFileWriterManager.setLastBlockId(this.maxObjectKey.get());
             this.currentFileWriterManager.finish();
 
-            // handle fileWriterManager that has not yet been written to the file
+            // process the remaining fileWriterManager
             for (FileWriterManager fileWriterManager : this.fileWriterManagers)
             {
-                fileWriterManager.finish();
+                firstBlockId = fileWriterManager.getFirstBlockId();
+                long lastBlockId = fileWriterManager.getLastBlockId();
+
+                // all written to minio
+                if (lastBlockId <= maxObjectKey)
+                {
+                    fileWriterManager.finish();
+                } else
+                {
+                    // process elements in immutable memTable
+                    iterator = sv.getImmutableMemTables().iterator();
+                    while (iterator.hasNext())
+                    {
+                        MemTable immutableMemtable = iterator.next();
+                        long id = immutableMemtable.getId();
+                        if (id >= firstBlockId && id <= lastBlockId)
+                        {
+                            fileWriterManager.addRowBatch(immutableMemtable.getRowBatch());
+                            iterator.remove();
+                        }
+                    }
+
+                    // elements in minio will be processed in finish() later
+                    fileWriterManager.setLastBlockId(maxObjectKey);
+                    fileWriterManager.finish();
+                }
             }
         } catch (Exception e)
         {
