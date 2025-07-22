@@ -35,6 +35,8 @@ public class ReferenceCounter
 
     /**
      * Decrement the reference count and check whether it is zero.
+     * If zero, release internal resources, the object itself releases
+     * resources called by the caller.
      */
     public boolean unref()
     {

@@ -28,39 +28,53 @@ public class ObjectEntry implements Referenceable
 {
     private final ReferenceCounter refCounter = new ReferenceCounter();
     private final long id;
-    private long size;
+    private final long fileId;
+    private final int startIndex;
+    private final int length;
 
-    public ObjectEntry(long id, long size)
+    public ObjectEntry(long id, long fileId, int startIndex, int length)
     {
         this.id = id;
-        this.size = size;
+        this.fileId = fileId;
+        this.startIndex = startIndex;
+        this.length = length;
     }
 
     public long getId()
     {
-        return id;
+        return this.id;
     }
 
-    public long getSize()
+    public long getFileId()
     {
-        return this.size;
+        return this.fileId;
+    }
+
+    public int getStartIndex()
+    {
+        return this.startIndex;
+    }
+
+    public int getLength()
+    {
+        return this.length;
     }
 
     @Override
     public void ref()
     {
-        refCounter.ref();
+        this.refCounter.ref();
     }
 
     @Override
     public boolean unref()
     {
-        return refCounter.unref();
+        return this.refCounter.unref();
     }
 
     @Override
     public int getRefCount()
     {
-        return refCounter.getCount();
+        return this.refCounter.getCount();
     }
 }

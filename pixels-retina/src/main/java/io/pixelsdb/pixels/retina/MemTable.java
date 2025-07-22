@@ -31,14 +31,21 @@ public class MemTable implements Referenceable
     private final long id;  // unique identifier
     private final TypeDescription schema;
     private final VectorizedRowBatch rowBatch;
-    private long size;
 
-    public MemTable(long id, TypeDescription schema, int pixelStride, int mode)
+
+    private final long fileId;
+    private final int startIndex;
+    private final int length;
+
+    public MemTable(long id, TypeDescription schema, int size, int mode,
+                    long fileId, int startIndex, int length)
     {
         this.id = id;
         this.schema = schema;
-        this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, mode);
-        this.size = 0L;
+        this.rowBatch = schema.createRowBatchWithHiddenColumn(size, mode);
+        this.fileId = fileId;
+        this.startIndex = startIndex;
+        this.length = length;
 
         // init reference count
         this.refCounter.ref();
@@ -46,53 +53,53 @@ public class MemTable implements Referenceable
 
     /**
      * values is one record with all column values and timestamp.
-     * return the rowId after successfully inserting data into the index;
-     * return -1 on failure.
      * @param values
      * @param timestamp
      * @return
      * @throws RetinaException
      */
-    public synchronized long add(byte[][] values, long timestamp, RecordLocation recordLocation) throws RetinaException
+    public synchronized boolean add(byte[][] values, long timestamp) throws RetinaException
     {
         if (isFull())
         {
-            return -1L;
+            return false;
         }
         int columnCount = schema.getChildren().size();
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
-        recordLocation.setLocationIdentifier(this.id);
-        recordLocation.setRecordIndex(this.rowBatch.size);
-
         for (int i = 0; i < values.length; ++i)
         {
             this.rowBatch.cols[i].add(new String(values[i]));
-            this.size += values[i].length;
         }
         this.rowBatch.cols[columnCount].add(timestamp);
-        this.size += 8;
         this.rowBatch.size++;
-
-        // insert the record into index
-        long rowId = 0L;
-        return rowId;
+        return true;
     }
 
     public long getId()
     {
-        return id;
+        return this.id;
+    }
+
+    public long getFileId()
+    {
+        return this.fileId;
+    }
+
+    public int getStartIndex()
+    {
+        return this.startIndex;
+    }
+
+    public int getLength()
+    {
+        return this.length;
     }
 
     public VectorizedRowBatch getRowBatch()
     {
         return this.rowBatch;
-    }
-
-    public long getSize()
-    {
-        return this.size;
     }
 
     public boolean isFull()

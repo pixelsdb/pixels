@@ -22,7 +22,9 @@ package io.pixelsdb.pixels.core.reader;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.cache.ColumnChunkId;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
@@ -503,12 +505,17 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         {
             try
             {
-                rgVisibilityBitmaps = retinaService.queryVisibility(physicalReader.getPathUri(),
-                        targetRGs, option.getTransTimestamp());
+                MetadataService metadataService = MetadataService.Instance();
+                long fileId = metadataService.getFileId(physicalReader.getPathUri());
+                rgVisibilityBitmaps = retinaService.queryVisibility(fileId, targetRGs, option.getTransTimestamp());
             } catch (IOException e)
             {
-                logger.error("Failed to get path uri for file " + physicalReader.getPathUri(), e);
-                throw new IOException("Failed to get path uri for file " + physicalReader.getPathUri(), e);
+                logger.error("Failed to get path uri");
+                throw new IOException("Failed to get path uri");
+            } catch (MetadataException e)
+            {
+                logger.error("Failed to get file id for file " + physicalReader.getPathUri(), e);
+                throw new IOException("Failed to get file id for file " + physicalReader.getPathUri(), e);
             } catch (RetinaException e)
             {
                 logger.error("Failed to query visibility bitmap for file " + physicalReader.getPathUri(), e);

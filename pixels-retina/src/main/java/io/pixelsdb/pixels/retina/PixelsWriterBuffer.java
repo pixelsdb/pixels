@@ -26,7 +26,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -40,8 +39,6 @@ import org.apache.logging.log4j.Logger;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-
-import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 
 /**
  * Data flows from the CDC into pixels, where it is first written to
@@ -59,19 +56,18 @@ public class PixelsWriterBuffer
 {
     private static final Logger logger = LogManager.getLogger(PixelsWriterBuffer.class);
 
-    private final String schemaName;
-    private final String tableName;
+    private final long tableId;
 
     // Column information is recorded to create rowBatch.
     private final TypeDescription schema;
 
     // Configuration information of PixelsWriter
-    private final int pixelStride;
+    private final int memTableSize;
     private final long blockSize;
     private final short replication;
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
-    private final int maxBufferSize;
+    private final int maxMemTableCount;  // threshold number of memTable to be dumped to file
     private final Path targetOrderedDirPath;
     private final Path targetCompactDirPath;
     private final Storage targetOrderedStorage;
@@ -91,7 +87,7 @@ public class PixelsWriterBuffer
     private final List<MemTable> immutableMemTables;
 
     // minio
-    private final Storage minio;
+    private final MinioManager minioManager;
     private final List<ObjectEntry> objectEntries;
 
     // Current data view
@@ -105,32 +101,20 @@ public class PixelsWriterBuffer
     // Lock for SuperVersion switch
     private final ReadWriteLock versionLock = new ReentrantReadWriteLock();
 
-    /**
-     * The mapping from rowId to record position
-     */
-    private final Map<Long, RecordLocation> recordLocationMap;
-
-    /**
-     * The mapping from rowBatch location to rowBatch visibility
-     */
-    private final Map<Long, RGVisibility> visibilityMap;
-
-    private long fileId;   // current fileId
-    private long currentBufferSize;
+    private int currentMemTableCount;
     private final List<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
-    private ReentrantLock bufferSizeLock;
     private AtomicLong maxObjectKey;
 
-    public PixelsWriterBuffer(TypeDescription schema, String schemaName, String tableName,
-                              Path targetOrderedDirPath, Path targetCompactDirPath) throws RetinaException
+    public PixelsWriterBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
+                              Path targetCompactDirPath) throws RetinaException
     {
-        this.schemaName = schemaName;
-        this.tableName = tableName;
+        this.tableId = tableId;
         this.schema = schema;
 
         ConfigFactory configFactory = ConfigFactory.Instance();
-        this.pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
+        this.memTableSize = Integer.parseInt(configFactory.getProperty("retina.buffer.memTable.size"));
+        checkArgument(this.memTableSize % 64 == 0,"memTable size must be a multiple of 64.");
         this.targetOrderedDirPath = targetOrderedDirPath;
         this.targetCompactDirPath = targetCompactDirPath;
         try
@@ -146,51 +130,34 @@ public class PixelsWriterBuffer
         this.replication = Short.parseShort(configFactory.getProperty("block.replication"));
         this.encodingLevel = EncodingLevel.from(Integer.parseInt(configFactory.getProperty("retina.buffer.flush.encodingLevel")));
         this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
-        this.maxBufferSize = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.size"));
+        this.maxMemTableCount = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.count"));
 
-        this.activeMemTable = new MemTable(this.idCounter, schema, pixelStride, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT);
         this.immutableMemTables = new ArrayList<>();
         this.objectEntries = new ArrayList<>();
-
-        // Initialization adds reference counts to all data
-        this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
 
         this.flushMinioExecutor = Executors.newSingleThreadExecutor();
         this.flushDiskExecutor = Executors.newSingleThreadScheduledExecutor();
 
-        this.recordLocationMap = new ConcurrentHashMap<>();
-        this.visibilityMap = new ConcurrentHashMap<>();
-
-        // init first visibility for active memTable
-        RGVisibility visibility = new RGVisibility(pixelStride);
-        this.visibilityMap.put(this.idCounter, visibility);
-        this.idCounter++;
-
-        this.currentBufferSize = 0;
-        this.bufferSizeLock = new ReentrantLock();
         this.fileWriterManagers = new ArrayList<>();
-        this.maxObjectKey = new AtomicLong(0);
+        this.maxObjectKey = new AtomicLong(-1);
 
         // minio
-        try
-        {
-            ConfigMinio(configFactory.getProperty("minio.region"),
-                    configFactory.getProperty("minio.endpoint"),
-                    configFactory.getProperty("minio.access.key"),
-                    configFactory.getProperty("minio.secret.key"));
-            this.minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
-        } catch (IOException e)
-        {
-            logger.error("error when config minio ", e);
-            throw new RetinaException("error when config minio ", e);
-        }
+        this.minioManager = MinioManager.Instance();
 
-        this.currentFileWriterManager = new FileWriterManager(this.minio,
-                this.schemaName, this.tableName, this.schema,
-                this.targetOrderedDirPath, this.targetOrderedStorage,
-                this.pixelStride, this.blockSize, this.replication,
-                this.encodingLevel, this.nullsPadding, 0);
-        this.fileId = this.currentFileWriterManager.getFileId();
+        this.currentFileWriterManager = new FileWriterManager(
+                this.tableId, this.schema, this.targetOrderedDirPath,
+                this.targetOrderedStorage, this.memTableSize, this.blockSize,
+                this.replication, this.encodingLevel, this.nullsPadding,
+                0, this.memTableSize * this.maxMemTableCount);
+
+        this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
+                TypeDescription.Mode.NONE, this.currentFileWriterManager.getFileId(),
+                0, this.memTableSize);
+        this.idCounter++;
+        this.currentMemTableCount = 1;
+
+        // Initialization adds reference counts to all data
+        this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
 
         startFlushMinioToDiskScheduler();
     }
@@ -208,16 +175,14 @@ public class PixelsWriterBuffer
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
-        long rowId = -1;
-        while (rowId < 0) {
-            RecordLocation recordLocation = new RecordLocation();
+        boolean added = false;
+        while (!added)
+        {
             this.versionLock.readLock().lock();
-            rowId = this.activeMemTable.add(values, timestamp, recordLocation);
-            // add block id, need read activeMemTable.id
+            added = this.activeMemTable.add(values, timestamp);
             this.versionLock.readLock().unlock();
-            recordLocationMap.put(rowId, recordLocation);
 
-            if (rowId == -1)  // active memTable is full
+            if (!added)  // active memTable is full
             {
                 switchMemTable();
             }
@@ -235,36 +200,35 @@ public class PixelsWriterBuffer
                 return;
             }
 
-            this.bufferSizeLock.lock();
-            this.currentBufferSize += this.activeMemTable.getSize();
-            if (this.currentBufferSize >= this.maxBufferSize)
+            if (this.currentMemTableCount >= this.maxMemTableCount)
             {
-                long id = this.activeMemTable.getId();
-                this.currentBufferSize = 0;
-                this.currentFileWriterManager.setLastBlockId(id);
+                this.currentMemTableCount = 0;
+                this.currentFileWriterManager.setLastBlockId(this.activeMemTable.getId());
                 this.fileWriterManagers.add(this.currentFileWriterManager);
-                this.currentFileWriterManager = new FileWriterManager(this.minio,
-                        this.schemaName, this.tableName, this.schema,
+                this.currentFileWriterManager = new FileWriterManager(
+                        this.tableId, this.schema,
                         this.targetOrderedDirPath, this.targetOrderedStorage,
-                        this.pixelStride, this.blockSize, this.replication,
-                        this.encodingLevel, this.nullsPadding, this.idCounter);
-                this.fileId = this.currentFileWriterManager.getFileId();
+                        this.memTableSize, this.blockSize, this.replication,
+                        this.encodingLevel, this.nullsPadding, this.idCounter,
+                        this.memTableSize * this.maxMemTableCount);
             }
-            this.bufferSizeLock.unlock();
 
             /**
              * For activeMemTable, at initialization the reference count is 2 because of *this and superVersion
              * Here only currentVersion is destroyed, *this is still in use, so only one call to unref() is needed.
              */
             MemTable oldMemTable = this.activeMemTable;
+            SuperVersion oldVersion = this.currentVersion;
             this.immutableMemTables.add(this.activeMemTable);
-            this.activeMemTable = new MemTable(this.idCounter, this.schema, this.pixelStride, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT);
-            RGVisibility visibility = new RGVisibility(pixelStride);
-            this.visibilityMap.put(this.idCounter, visibility);
+            this.activeMemTable = new MemTable(this.idCounter, this.schema,
+                    this.memTableSize, TypeDescription.Mode.NONE,
+                    this.currentFileWriterManager.getFileId(),
+                    this.currentMemTableCount * this.memTableSize,
+                    this.memTableSize);
+            this.currentMemTableCount += 1;
             this.idCounter++;
 
             SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
-            SuperVersion oldVersion = this.currentVersion;
             this.currentVersion = newVersion;
             oldVersion.unref();
 
@@ -286,10 +250,10 @@ public class PixelsWriterBuffer
             {
                 // put into minio
                 long id = flushMemTable.getId();
-                writeIntoMinio(this.schemaName + '/' + this.tableName + '/' + id,
-                        flushMemTable.serialize());
+                this.minioManager.write(this.tableId, id, flushMemTable.serialize());
 
-                ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getSize());
+                ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getFileId(),
+                        flushMemTable.getStartIndex(), flushMemTable.getLength());
                 objectEntry.ref();
 
                 this.maxObjectKey.updateAndGet(current -> Math.max(current, id));
@@ -352,8 +316,7 @@ public class PixelsWriterBuffer
                 while (iterator.hasNext())
                 {
                     FileWriterManager fileWriterManager = iterator.next();
-                    String lastMinioEntry = this.schemaName + '/' + this.tableName + '/' + fileWriterManager.getLastBlockId();
-                    if (this.minio.exists(lastMinioEntry))
+                    if (fileWriterManager.getLastBlockId() <= this.maxObjectKey.get())
                     {
                         fileWriterManager.finish();
                         iterator.remove();
@@ -375,7 +338,10 @@ public class PixelsWriterBuffer
 
                         for (ObjectEntry objectEntry : toRemove)
                         {
-                            objectEntry.unref();
+                            if (objectEntry.unref())
+                            {
+                                this.minioManager.delete(this.tableId, objectEntry.getId());
+                            }
                         }
                     }
                 }
@@ -384,20 +350,6 @@ public class PixelsWriterBuffer
                 throw new RuntimeException(e);
             }
         }, 0, 5, TimeUnit.SECONDS);
-    }
-
-    private void writeIntoMinio(String filePath, byte[] data)
-    {
-        try
-        {
-            PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(
-                    this.minio, filePath, true);
-            writer.append(data, 0, data.length);
-            writer.close();
-        } catch (IOException e)
-        {
-            logger.error("failed to write data into minio: ", e);
-        }
     }
 
     /**
@@ -431,26 +383,56 @@ public class PixelsWriterBuffer
             Thread.currentThread().interrupt();
         }
 
-
         SuperVersion sv = getCurrentVersion();
         try
         {
-            // add memtable to writer
-            this.currentFileWriterManager.addRowBatch(sv.getMemTable().getRowBatch());
+            long maxObjectKey = this.maxObjectKey.get();
 
-            // add immutable memtable to writer
-            for (MemTable immutableMemTable: sv.getImmutableMemTables())
+            // process current fileWriterManager
+            this.currentFileWriterManager.setLastBlockId(maxObjectKey);
+            this.currentFileWriterManager.addRowBatch(sv.getActiveMemTable().getRowBatch());
+            long firstBlockId = this.currentFileWriterManager.getFirstBlockId();
+            Iterator<MemTable> iterator = sv.getImmutableMemTables().iterator();
+            while (iterator.hasNext())
             {
-                this.currentFileWriterManager.addRowBatch(immutableMemTable.getRowBatch());
+                MemTable immutableMemtable = iterator.next();
+                if (immutableMemtable.getId() >= firstBlockId)
+                {
+                    this.currentFileWriterManager.addRowBatch(immutableMemtable.getRowBatch());
+                    iterator.remove();
+                }
             }
-
-            this.currentFileWriterManager.setLastBlockId(this.maxObjectKey.get());
             this.currentFileWriterManager.finish();
 
-            // handle fileWriterManager that has not yet been written to the file
+            // process the remaining fileWriterManager
             for (FileWriterManager fileWriterManager : this.fileWriterManagers)
             {
-                fileWriterManager.finish();
+                firstBlockId = fileWriterManager.getFirstBlockId();
+                long lastBlockId = fileWriterManager.getLastBlockId();
+
+                // all written to minio
+                if (lastBlockId <= maxObjectKey)
+                {
+                    fileWriterManager.finish();
+                } else
+                {
+                    // process elements in immutable memTable
+                    iterator = sv.getImmutableMemTables().iterator();
+                    while (iterator.hasNext())
+                    {
+                        MemTable immutableMemtable = iterator.next();
+                        long id = immutableMemtable.getId();
+                        if (id >= firstBlockId && id <= lastBlockId)
+                        {
+                            fileWriterManager.addRowBatch(immutableMemtable.getRowBatch());
+                            iterator.remove();
+                        }
+                    }
+
+                    // elements in minio will be processed in finish() later
+                    fileWriterManager.setLastBlockId(maxObjectKey);
+                    fileWriterManager.finish();
+                }
             }
         } catch (Exception e)
         {
@@ -458,6 +440,7 @@ public class PixelsWriterBuffer
         } finally
         {
             sv.unref();
+            currentVersion.unref();
             activeMemTable.unref();
             for (MemTable immutableMemTable: sv.getImmutableMemTables())
             {
@@ -466,7 +449,7 @@ public class PixelsWriterBuffer
             for (ObjectEntry objectEntry : sv.getObjectEntries())
             {
                 objectEntry.unref();
-                this.minio.delete(this.schemaName + '/' + this.tableName + '/' + objectEntry.getId(), false);
+                this.minioManager.delete(this.tableId, objectEntry.getId());
             }
         }
     }

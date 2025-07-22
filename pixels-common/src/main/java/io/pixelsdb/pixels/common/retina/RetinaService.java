@@ -19,13 +19,11 @@
  */
 package io.pixelsdb.pixels.common.retina;
 
-import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -116,57 +114,21 @@ public class RetinaService
         }
     }
 
-    public boolean deleteRecord(long fileId, int rgId, int rgRowId, long timestamp) throws RetinaException
+    public boolean updateRecord(String schemaName, List<RetinaProto.InsertData> insertData,
+                                List<RetinaProto.DeleteData> deleteData, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
-        RetinaProto.DeleteRecordRequest request = RetinaProto.DeleteRecordRequest.newBuilder()
+        RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setFileId(fileId)
-                .setRgId(rgId)
-                .setRgRowId(rgRowId)
+                .setSchemaName(schemaName)
+                .addAllInsertData(insertData)
+                .addAllDeleteData(deleteData)
                 .setTimestamp(timestamp)
                 .build();
-        RetinaProto.DeleteRecordResponse response = this.stub.deleteRecord(request);
+        RetinaProto.UpdateRecordResponse response = this.stub.updateRecord(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new RetinaException("failed to delete record: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("response token does not match.");
-        }
-        return true;
-    }
-
-    public boolean deleteRecords(long[] fileIds, int[] rgIds, int[] rgRowIds, long timestamp) throws RetinaException
-    {
-        String token = UUID.randomUUID().toString();
-
-        if (fileIds == null || rgIds == null || rgRowIds == null ||
-            fileIds.length != rgIds.length || rgIds.length != rgRowIds.length)
-        {
-            throw new RetinaException("Invalid input arrays: Length mismatch");
-        }
-
-        RetinaProto.DeleteRecordsRequest.Builder requestBuiler = RetinaProto.DeleteRecordsRequest.newBuilder()
-                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setTimestamp(timestamp);
-
-        for (int i = 0; i < fileIds.length; i++)
-        {
-            IndexProto.RowLocation row = IndexProto.RowLocation.newBuilder()
-                    .setFileId(fileIds[i])
-                    .setRgId(rgIds[i])
-                    .setRgRowId(rgRowIds[i])
-                    .build();
-            requestBuiler.addRows(row);
-        }
-
-        RetinaProto.DeleteRecordsResponse response = this.stub.deleteRecords(requestBuiler.build());
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("failed to delete records: " + response.getHeader().getErrorCode()
+            throw new RetinaException("failed to update record: " + response.getHeader().getErrorCode()
                     + " " + response.getHeader().getErrorMsg());
         }
         if (!response.getHeader().getToken().equals(token))
@@ -196,12 +158,12 @@ public class RetinaService
         return true;
     }
 
-    public long[][] queryVisibility(String filePath, int[] rgIds, long timestamp) throws RetinaException
+    public long[][] queryVisibility(long fileId, int[] rgIds, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.QueryVisibilityRequest request = RetinaProto.QueryVisibilityRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setFilePath(filePath)
+                .setFileId(fileId)
                 .addAllRgIds(Arrays.stream(rgIds).boxed().collect(Collectors.toList()))
                 .setTimestamp(timestamp)
                 .build();
@@ -224,16 +186,16 @@ public class RetinaService
         return visibilityBitmaps;
     }
 
-    public boolean garbageCollect(String filePath, int[] rgIds, long timestamp) throws RetinaException
+    public boolean reclaimVisibility(long fileId, int[] rgIds, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
-        RetinaProto.GarbageCollectRequest request = RetinaProto.GarbageCollectRequest.newBuilder()
+        RetinaProto.ReclaimVisibilityRequest request = RetinaProto.ReclaimVisibilityRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setFilePath(filePath)
+                .setFileId(fileId)
                 .addAllRgIds(Arrays.stream(rgIds).boxed().collect(Collectors.toList()))
                 .setTimestamp(timestamp)
                 .build();
-        RetinaProto.GarbageCollectResponse response = this.stub.garbageCollect(request);
+        RetinaProto.ReclaimVisibilityResponse response = this.stub.reclaimVisibility(request);
         if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("failed to garbage collect: " + response.getHeader().getErrorCode()
@@ -246,15 +208,15 @@ public class RetinaService
         return true;
     }
 
-    public RetinaProto.GetSuperVersionResponse getSuperVersion(String schemaName, String tableName) throws RetinaException
+    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
-        RetinaProto.GetSuperVersionRequest request = RetinaProto.GetSuperVersionRequest.newBuilder()
+        RetinaProto.GetWriterBufferRequest request = RetinaProto.GetWriterBufferRequest.newBuilder()
             .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
             .setSchemaName(schemaName)
             .setTableName(tableName)
             .build();
-        RetinaProto.GetSuperVersionResponse response = this.stub.getSuperVersion(request);
+        RetinaProto.GetWriterBufferResponse response = this.stub.getWriterBuffer(request);
                 if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("Schema: " + schemaName + "\tTable: " + tableName + ", failed to get superversion: " + response.getHeader().getErrorCode()
@@ -265,40 +227,6 @@ public class RetinaService
             throw new RetinaException("response token does not match.");
         }
         return response;
-    }
-
-    public boolean insertRecord(String schemaName, String tableName, List<ByteString> colValues, long timestamp) throws RetinaException
-    {
-        String token = UUID.randomUUID().toString();
-        RetinaProto.InsertRecordRequest request = RetinaProto.InsertRecordRequest.newBuilder()
-                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName)
-                .setTableName(tableName)
-                .addAllColValues(colValues)
-                .setTimestamp(timestamp)
-                .build();
-
-        RetinaProto.InsertRecordResponse response = this.stub.insertRecord(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("failed to insert record: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("response token does not match.");
-        }
-        return true;
-    }
-
-    public boolean insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
-    {
-        List<ByteString> colValueList = new ArrayList<>(colValues.length);
-        for (byte[] col : colValues)
-        {
-            colValueList.add(ByteString.copyFrom(col));
-        }
-        return insertRecord(schemaName, tableName, colValueList, timestamp);
     }
 
     public boolean addWriterBuffer(String schemaName, String tableName) throws RetinaException
