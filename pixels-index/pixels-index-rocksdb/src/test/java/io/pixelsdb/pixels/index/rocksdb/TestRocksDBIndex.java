@@ -37,6 +37,7 @@ import org.rocksdb.RocksDBException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -89,13 +90,10 @@ public class TestRocksDBIndex
         long timestamp = System.currentTimeMillis();
         long rowId = 100L;
 
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
-        byte[] keyBytes = buffer.array();
-
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
+                .setTableId(tableId).setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
+        byte[] keyBytes = toByteArray(keyProto);
         boolean success = rocksDBIndex.putEntry(keyProto, rowId);
         assertTrue(success, "putEntry should return true");
 
@@ -120,13 +118,11 @@ public class TestRocksDBIndex
         for (int i = 0; i < 2; i++)
         {
             byte[] key = ("exampleKey" + i).getBytes(); // use different keys
-            ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-            buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
 
             long rowId = i*1000L;
 
             IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                    .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
+                    .setTableId(tableId).setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
             IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
                     .setFileId(fileId).setRgId(rgId).setRgRowOffset(i).build();
@@ -152,18 +148,48 @@ public class TestRocksDBIndex
     }
 
     @Test
+    public void testGetUniqueRowId() throws MainIndexException, SinglePointIndexException
+    {
+        long indexId = 1L;
+        byte[] key = "multiKey".getBytes();
+        long timestamp1 = System.currentTimeMillis();
+        long timestamp2 = timestamp1 + 1000; // newer
+
+        long rowId1 = 111L;
+        long rowId2 = 222L; // expected
+
+        IndexProto.IndexKey key1 = IndexProto.IndexKey.newBuilder()
+                .setTableId(tableId)
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp1)
+                .build();
+
+        rocksDBIndex.putEntry(key1, rowId1);
+
+        IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
+                .setTableId(tableId)
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp2)
+                .build();
+
+        rocksDBIndex.putEntry(key2,rowId2);
+
+        long result = rocksDBIndex.getUniqueRowId(key1);
+        assertEquals(rowId2, result, "getUniqueRowId should return the rowId of the latest timestamp entry");
+    }
+
+    @Test
     public void testDeleteEntry() throws RocksDBException, SinglePointIndexException
     {
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
 
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
-        byte[] keyBytes = buffer.array();
-
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setTableId(tableId).setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
+        byte[] keyBytes = toByteArray(keyProto);
         rocksDBIndex.putEntry(keyProto, 0L);
 
         // Delete index
@@ -255,22 +281,26 @@ public class TestRocksDBIndex
 
     private static byte[] toByteArray(IndexProto.IndexKey key)
     {
-        byte[] indexIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getIndexId()).array(); // Get indexId bytes
-        byte[] keyBytes = key.getKey().toByteArray(); // Get key bytes
-        byte[] timestampBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getTimestamp()).array(); // Get timestamp bytes
-        // Combine indexId, key and timestamp
-        byte[] compositeKey = new byte[indexIdBytes.length + 1 + keyBytes.length + 1 + timestampBytes.length];
+        byte[] tableIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getTableId()).array();
+        byte[] indexIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getIndexId()).array();
+        byte[] keyBytes = key.getKey().toByteArray();
+        byte[] timestampBytes = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.BIG_ENDIAN).putLong(key.getTimestamp()).array();
+        // Combine tableId, indexId, key and timestamp
+        byte[] compositeKey = new byte[tableIdBytes.length + 1 + indexIdBytes.length + 1 + keyBytes.length + 1 + timestampBytes.length];
+        // Copy tableId
+        System.arraycopy(tableIdBytes, 0, compositeKey, 0, tableIdBytes.length);
+        // Add separator
+        compositeKey[indexIdBytes.length] = ':';
         // Copy indexId
-        System.arraycopy(indexIdBytes, 0, compositeKey, 0, indexIdBytes.length);
+        System.arraycopy(indexIdBytes, 0, compositeKey, tableIdBytes.length + 1, indexIdBytes.length);
         // Add separator
         compositeKey[indexIdBytes.length] = ':';
         // Copy key
-        System.arraycopy(keyBytes, 0, compositeKey, indexIdBytes.length + 1, keyBytes.length);
+        System.arraycopy(keyBytes, 0, compositeKey, tableIdBytes.length + 1 + indexIdBytes.length + 1, keyBytes.length);
         // Add separator
         compositeKey[indexIdBytes.length + 1 + keyBytes.length] = ':';
         // Copy timestamp
-        System.arraycopy(timestampBytes, 0, compositeKey,
-                indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
+        System.arraycopy(timestampBytes, 0, compositeKey, tableIdBytes.length + 1+ indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
 
         return compositeKey;
     }
