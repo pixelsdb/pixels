@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.rocksdb;
+package io.pixelsdb.pixels.index.rockset;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
@@ -130,6 +130,7 @@ public class RocksetIndex implements SinglePointIndex
     private final long tableId;
     private final long indexId;
     private final boolean unique;
+    private boolean closed = false;
 
     protected RocksetIndex(long tableId, long indexId, CloudDBOptions dbOptions, boolean unique)
     {
@@ -170,7 +171,7 @@ public class RocksetIndex implements SinglePointIndex
             // Generate composite key
             byte[] compositeKey = toByteArray(key);
 
-            // Get value from RocksDB
+            // Get value from Rockset
             byte[] valueBytes = DBget(this.dbHandle, compositeKey);
 
             if (valueBytes != null)
@@ -208,7 +209,7 @@ public class RocksetIndex implements SinglePointIndex
             // Check if dbHandle is valid
             if (this.dbHandle == 0)
             {
-                throw new IllegalStateException("RocksDB not initialized");
+                throw new IllegalStateException("Rockset not initialized");
             }
             if (keyBytes.length == 0 || (unique && valueBytes.length == 0))
             {
@@ -216,14 +217,14 @@ public class RocksetIndex implements SinglePointIndex
             }
             if (unique)
             {
-                // Write to RocksDB
+                // Write to Rockset
                 DBput(this.dbHandle, keyBytes, valueBytes);
             }
             else
             {
                 // Create composite key
                 byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
-                // Store in RocksDB
+                // Store in Rockset
                 DBput(this.dbHandle, nonUniqueKey, null);
             }
             return true;
@@ -251,7 +252,7 @@ public class RocksetIndex implements SinglePointIndex
                 // Convert rowId to byte array
                 byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
 
-                // Write to RocksDB
+                // Write to Rockset
                 DBput(this.dbHandle, keyBytes, valueBytes);
             }
             return true; // All entries written successfully
@@ -280,7 +281,7 @@ public class RocksetIndex implements SinglePointIndex
                 byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
                 if (unique)
                 {
-                    // Write to RocksDB
+                    // Write to Rockset
                     DBput(this.dbHandle, keyBytes, valueBytes);
                 }
                 else
@@ -305,7 +306,7 @@ public class RocksetIndex implements SinglePointIndex
         {
             // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
-            // Delete key-value pair from RocksDB
+            // Delete key-value pair from Rockset
             DBdelete(this.dbHandle, keyBytes);
             return 0; // TODO: implement
         }
@@ -331,7 +332,7 @@ public class RocksetIndex implements SinglePointIndex
             {
                 // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
-                // Delete key-value pair from RocksDB
+                // Delete key-value pair from Rockset
                 DBdelete(this.dbHandle, keyBytes);
             }
             return null; // TODO: implement
@@ -346,7 +347,18 @@ public class RocksetIndex implements SinglePointIndex
     @Override
     public void close() throws IOException
     {
-        CloseDB(this.dbHandle); // Close RocksDB instance
+        if (!closed)
+        {
+            closed = true;
+            CloseDB(this.dbHandle); // Close Rockset instance
+        }
+    }
+
+    @Override
+    public boolean closeAndRemove() throws SinglePointIndexException
+    {
+        // TODO: implement
+        return false;
     }
 
     private static byte[] toByteArray(IndexProto.IndexKey key)

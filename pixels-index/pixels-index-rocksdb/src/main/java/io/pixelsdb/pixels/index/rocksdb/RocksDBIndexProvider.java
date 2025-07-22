@@ -23,8 +23,6 @@ import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.rocksdb.RocksDBException;
 
 import javax.annotation.Nonnull;
@@ -35,8 +33,7 @@ import javax.annotation.Nonnull;
  */
 public class RocksDBIndexProvider implements SinglePointIndexProvider
 {
-    private static final Logger logger = LogManager.getLogger(RocksDBIndexProvider.class);
-    private final String RocksdbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
+    private static final String rocksdbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
 
     @Override
     public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme,
@@ -46,11 +43,10 @@ public class RocksDBIndexProvider implements SinglePointIndexProvider
         {
             try
             {
-                return new RocksDBIndex(tableId, indexId, RocksdbPath, unique);
+                return new RocksDBIndex(tableId, indexId, rocksdbPath, unique);
             }
             catch (RocksDBException e)
             {
-                logger.error("failed to create RocksDB instance", e);
                 throw new SinglePointIndexException("failed to create RocksDB instance", e);
             }
         }

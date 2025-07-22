@@ -141,8 +141,18 @@ public interface MainIndex extends Closeable
 
     /**
      * Flush the main index cache if exists and close the main index instance.
-     * @throws IOException
+     * This method is to be used by the main index factory to close the
+     * managed main index instances when the process is shutting down.
+     * <p/>
+     * <b>Note: Users do not need to close the managed main index instances by themselves.</b>
      */
     @Override
+    @Deprecated
     void close() throws IOException;
+
+    /**
+     * Close the index and remove it from the storage. This method is idempotent.
+     * @return true if success
+     */
+    boolean closeAndRemove() throws MainIndexException;
 }

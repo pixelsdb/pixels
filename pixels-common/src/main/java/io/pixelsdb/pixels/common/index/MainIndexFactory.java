@@ -82,7 +82,8 @@ public class MainIndexFactory
                 try
                 {
                     instance.closeAll();
-                } catch (IOException e)
+                }
+                catch (MainIndexException e)
                 {
                     logger.error("Failed to close all main index instances.", e);
                     e.printStackTrace();
@@ -125,11 +126,54 @@ public class MainIndexFactory
      * Close all the opened main index instances.
      * @throws IOException
      */
-    public synchronized void closeAll() throws IOException
+    public synchronized void closeAll() throws MainIndexException
     {
         for (long tableId : mainIndexImpls.keySet())
         {
-            mainIndexImpls.get(tableId).close();
+            try
+            {
+                MainIndex removing = mainIndexImpls.get(tableId);
+                if (removing != null)
+                {
+                    removing.close();
+                }
+            }
+            catch (IOException e)
+            {
+                throw new MainIndexException(
+                        "failed to close main index of table " + tableId, e);
+            }
+        }
+        mainIndexImpls.clear();
+    }
+
+    /**
+     * Close the main index.
+     * @param tableId the  id of the main index
+     * @param closeAndRemove remove the index storage after closing if true
+     * @throws MainIndexException
+     */
+    public synchronized void closeIndex(long tableId, boolean closeAndRemove) throws MainIndexException
+    {
+        MainIndex removed = mainIndexImpls.remove(tableId);
+        if (removed != null)
+        {
+            try
+            {
+                if (closeAndRemove)
+                {
+                    removed.closeAndRemove();
+                }
+                else
+                {
+                    removed.close();
+                }
+            }
+            catch (IOException e)
+            {
+                throw new MainIndexException(
+                        "failed to close main index of table " + tableId, e);
+            }
         }
     }
 }

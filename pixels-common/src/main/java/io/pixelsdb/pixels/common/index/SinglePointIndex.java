@@ -169,10 +169,17 @@ public interface SinglePointIndex extends Closeable
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the
      * managed single point index instances when the process is shutting down.
-     * Users do not need to close the managed single point index instances by themselves.
+     * <p/>
+     * <b>Note: Users do not need to close the managed single point index instances by themselves.</b>
      * @throws IOException
      */
     @Override
     @Deprecated
     void close() throws IOException;
+
+    /**
+     * Close the index and remove it from the storage. This method is idempotent.
+     * @return true if success
+     */
+    boolean closeAndRemove() throws SinglePointIndexException;
 }

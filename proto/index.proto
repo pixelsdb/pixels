@@ -46,6 +46,7 @@ service IndexService {
   rpc UpdateSecondaryIndexEntry (UpdateSecondaryIndexEntryRequest) returns (UpdateSecondaryIndexEntryResponse);
   rpc UpdateSecondaryIndexEntries (UpdateSecondaryIndexEntriesRequest) returns (UpdateSecondaryIndexEntriesResponse);
   rpc FlushIndexEntriesOfFile (FlushIndexEntriesOfFileRequest) returns (FlushIndexEntriesOfFileResponse);
+  // openIndex is optional, index will also be opened on first access
   rpc OpenIndex (OpenIndexRequest) returns (OpenIndexResponse);
   rpc CloseIndex (CloseIndexRequest) returns (CloseIndexResponse);
   rpc RemoveIndex (RemoveIndexRequest) returns (RemoveIndexResponse);
@@ -227,7 +228,10 @@ message UpdateSecondaryIndexEntriesResponse {
 }
 
 message FlushIndexEntriesOfFileRequest {
-  uint64 fileId = 1; // the file id of which the index entries will be flushed
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  uint64 fileId = 3; // the file id of which the index entries will be flushed
+  bool isPrimary = 4;
 }
 
 message FlushIndexEntriesOfFileResponse {
@@ -235,8 +239,9 @@ message FlushIndexEntriesOfFileResponse {
 }
 
 message OpenIndexRequest {
-  uint64 tableId = 1; // table id
-  uint64 indexId = 2; // index id
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  bool isPrimary = 3;
 }
 
 message OpenIndexResponse {
@@ -244,8 +249,9 @@ message OpenIndexResponse {
 }
 
 message CloseIndexRequest {
-  uint64 tableId = 1; // table id
-  uint64 indexId = 2; // index id
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  bool isPrimary = 3;
 }
 
 message CloseIndexResponse {
@@ -253,8 +259,9 @@ message CloseIndexResponse {
 }
 
 message RemoveIndexRequest {
-  uint64 tableId = 1; // table id
-  uint64 indexId = 2; // index id
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  bool isPrimary = 3;
 }
 
 message RemoveIndexResponse {
