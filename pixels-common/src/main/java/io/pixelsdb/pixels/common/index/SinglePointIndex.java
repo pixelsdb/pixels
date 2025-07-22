@@ -176,4 +176,10 @@ public interface SinglePointIndex extends Closeable
     @Override
     @Deprecated
     void close() throws IOException;
+
+    /**
+     * Close the index and remove it from the storage. This method is idempotent.
+     * @return true if success
+     */
+    boolean closeAndRemove() throws SinglePointIndexException;
 }

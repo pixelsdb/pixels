@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.rocksdb;
+package io.pixelsdb.pixels.index.rockset;
 
 import javax.annotation.Nonnull;
 

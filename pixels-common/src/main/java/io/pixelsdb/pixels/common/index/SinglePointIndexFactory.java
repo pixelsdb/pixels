@@ -201,7 +201,14 @@ public class SinglePointIndexFactory
         indexIdToTableIndex.clear();
     }
 
-    public synchronized void closeIndex(long tableId, long indexId) throws SinglePointIndexException
+    /**
+     * Close the single point index.
+     * @param tableId the table id of the single point index
+     * @param indexId the index id of the single point index
+     * @param closeAndRemove remove the index storage after closing if true
+     * @throws SinglePointIndexException
+     */
+    public synchronized void closeIndex(long tableId, long indexId, boolean closeAndRemove) throws SinglePointIndexException
     {
         TableIndex tableIndex = indexIdToTableIndex.remove(indexId);
         if (tableIndex != null)
@@ -211,7 +218,14 @@ public class SinglePointIndexFactory
             {
                 try
                 {
-                    removed.close();
+                    if (closeAndRemove)
+                    {
+                        removed.closeAndRemove();
+                    }
+                    else
+                    {
+                        removed.close();
+                    }
                 }
                 catch (IOException e)
                 {
@@ -232,7 +246,14 @@ public class SinglePointIndexFactory
             {
                 try
                 {
-                    removed.close();
+                    if (closeAndRemove)
+                    {
+                        removed.closeAndRemove();
+                    }
+                    else
+                    {
+                        removed.close();
+                    }
                 }
                 catch (IOException e)
                 {

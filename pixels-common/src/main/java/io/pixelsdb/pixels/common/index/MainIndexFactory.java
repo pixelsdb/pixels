@@ -147,14 +147,27 @@ public class MainIndexFactory
         mainIndexImpls.clear();
     }
 
-    public synchronized void closeIndex(long tableId) throws MainIndexException
+    /**
+     * Close the main index.
+     * @param tableId the  id of the main index
+     * @param closeAndRemove remove the index storage after closing if true
+     * @throws MainIndexException
+     */
+    public synchronized void closeIndex(long tableId, boolean closeAndRemove) throws MainIndexException
     {
         MainIndex removed = mainIndexImpls.remove(tableId);
         if (removed != null)
         {
             try
             {
-                removed.close();
+                if (closeAndRemove)
+                {
+                    removed.closeAndRemove();
+                }
+                else
+                {
+                    removed.close();
+                }
             }
             catch (IOException e)
             {

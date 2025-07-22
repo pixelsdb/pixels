@@ -494,10 +494,10 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         {
             long tableId = request.getTableId();
             long indexId = request.getIndexId();
-            SinglePointIndexFactory.Instance().closeIndex(tableId, indexId);
+            SinglePointIndexFactory.Instance().closeIndex(tableId, indexId, false);
             if (request.getIsPrimary())
             {
-                MainIndexFactory.Instance().closeIndex(tableId);
+                MainIndexFactory.Instance().closeIndex(tableId, false);
             }
         }
         catch (MainIndexException e)
@@ -516,6 +516,26 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     public void removeIndex(IndexProto.RemoveIndexRequest request,
                             StreamObserver<IndexProto.RemoveIndexResponse> responseObserver)
     {
-        super.removeIndex(request, responseObserver);
+        IndexProto.RemoveIndexResponse.Builder builder = IndexProto.RemoveIndexResponse.newBuilder();
+        try
+        {
+            long tableId = request.getTableId();
+            long indexId = request.getIndexId();
+            SinglePointIndexFactory.Instance().closeIndex(tableId, indexId, true);
+            if (request.getIsPrimary())
+            {
+                MainIndexFactory.Instance().closeIndex(tableId, true);
+            }
+        }
+        catch (MainIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_REMOVE_MAIN_INDEX_FAIL);
+        }
+        catch (SinglePointIndexException e)
+        {
+            builder.setErrorCode(ErrorCode.INDEX_REMOVE_SINGLE_POINT_INDEX_FAIL);
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 }

@@ -17,14 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.rocksdb;
+package io.pixelsdb.pixels.index.rockset;
 
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
 
@@ -34,13 +32,12 @@ import javax.annotation.Nonnull;
  */
 public class RocksetIndexProvider implements SinglePointIndexProvider
 {
-    private static final Logger logger = LogManager.getLogger(RocksetIndexProvider.class);
-    private final String bucketName = ConfigFactory.Instance().getProperty("index.rockset.s3.bucket");
-    private final String s3Prefix = ConfigFactory.Instance().getProperty("index.rockset.s3.prefix");
-    private final String localDbPath = ConfigFactory.Instance().getProperty("index.rockset.local.data.path");
-    private final String persistentCachePath = ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.path");
-    private final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.size.gb"));
-    private final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
+    private static final String bucketName = ConfigFactory.Instance().getProperty("index.rockset.s3.bucket");
+    private static final String s3Prefix = ConfigFactory.Instance().getProperty("index.rockset.s3.prefix");
+    private static final String localDbPath = ConfigFactory.Instance().getProperty("index.rockset.local.data.path");
+    private static final String persistentCachePath = ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.path");
+    private static final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.size.gb"));
+    private static final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
 
     @Override
     public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme,
@@ -57,8 +54,7 @@ public class RocksetIndexProvider implements SinglePointIndexProvider
              }
              catch (Exception e)
              {
-                 logger.error("failed to create RocksDB instance", e);
-                 throw new SinglePointIndexException("failed to create RocksDB instance", e);
+                 throw new SinglePointIndexException("failed to create Rockset instance", e);
              }
         }
         throw new SinglePointIndexException("unsupported scheme: " + scheme);

@@ -26,10 +26,12 @@ import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
+import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.rocksdb.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -47,16 +49,20 @@ public class RocksDBIndex implements SinglePointIndex
     public static final Logger LOGGER = LogManager.getLogger(RocksDBIndex.class);
 
     private final RocksDB rocksDB;
+    private final String rocksDBPath;
     private final WriteOptions writeOptions;
     private final long tableId;
     private final long indexId;
     private final boolean unique;
+    private boolean closed = false;
+    private boolean removed = false;
 
     public RocksDBIndex(long tableId, long indexId, String rocksDBPath, boolean unique) throws RocksDBException
     {
         this.tableId = tableId;
         this.indexId = indexId;
         // Initialize RocksDB instance
+        this.rocksDBPath = rocksDBPath;
         this.rocksDB = createRocksDB(rocksDBPath);
         this.unique = unique;
         this.writeOptions = new WriteOptions();
@@ -69,10 +75,11 @@ public class RocksDBIndex implements SinglePointIndex
      * @param indexId the index id
      * @param rocksDB the rocksdb instance
      */
-    protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB, boolean unique)
+    protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB, String rocksDBPath, boolean unique)
     {
         this.tableId = tableId;
         this.indexId = indexId;
+        this.rocksDBPath = rocksDBPath;
         this.rocksDB = rocksDB;  // Use injected mock directly
         this.unique = unique;
         this.writeOptions = new WriteOptions();
@@ -352,10 +359,40 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public void close() throws IOException
     {
-        if (rocksDB != null)
+        if (!closed)
         {
-            rocksDB.close(); // Close RocksDB instance
+            closed = true;
+            if (rocksDB != null)
+            {
+                rocksDB.close(); // Close RocksDB instance
+            }
         }
+    }
+
+    @Override
+    public boolean closeAndRemove() throws SinglePointIndexException
+    {
+        try
+        {
+            this.close();
+        } catch (IOException e)
+        {
+            throw new SinglePointIndexException("failed to close single point index", e);
+        }
+
+        if (!removed)
+        {
+            removed = true;
+            // clear RocksDB directory for main index
+            try
+            {
+                FileUtils.deleteDirectory(new File(rocksDBPath));
+            } catch (IOException e)
+            {
+                throw new SinglePointIndexException("failed to clean up RocksDB directory: " + e);
+            }
+        }
+        return true;
     }
 
     // Convert IndexKey to byte array

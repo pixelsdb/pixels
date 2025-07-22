@@ -26,11 +26,12 @@ import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexBuffer;
 import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
+import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
 import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
@@ -76,23 +77,26 @@ public class SqliteMainIndex implements MainIndex
     private static final String insertRangeSql = "INSERT INTO row_id_ranges VALUES(?, ?, ?, ?, ?, ?)";
 
     private final long tableId;
+    private final String sqlitePath;
     private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
     private final Connection connection;
     private final ReentrantReadWriteLock cacheRwLock = new ReentrantReadWriteLock();
     private final ReentrantReadWriteLock dbRwLock = new ReentrantReadWriteLock();
+    private boolean closed = false;
+    private boolean removed = false;
 
-    public SqliteMainIndex(long tableId) throws MainIndexException
+    public SqliteMainIndex(long tableId, String sqlitePath) throws MainIndexException
     {
         this.tableId = tableId;
-        String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
         if (sqlitePath == null || sqlitePath.isEmpty())
         {
-            throw new MainIndexException("index.sqlite.path is not set");
+            throw new MainIndexException("invalid sqlite path");
         }
         if (!sqlitePath.endsWith("/"))
         {
             sqlitePath += "/";
         }
+        this.sqlitePath = sqlitePath;
         try
         {
             // We create a dependent sqlite instance for the main index of each table.
@@ -345,35 +349,63 @@ public class SqliteMainIndex implements MainIndex
     @Override
     public void close() throws IOException
     {
-        this.cacheRwLock.writeLock().lock();
-        this.dbRwLock.writeLock().lock();
-        List<Long> cachedFileIds = this.indexBuffer.cachedFileIds();
-        for (long fileId : cachedFileIds)
+        if (!closed)
         {
+            this.closed = true;
+            this.cacheRwLock.writeLock().lock();
+            this.dbRwLock.writeLock().lock();
+            List<Long> cachedFileIds = this.indexBuffer.cachedFileIds();
+            for (long fileId : cachedFileIds)
+            {
+                try
+                {
+                    // the locks are reentrant, no deadlocking problem
+                    this.flushCache(fileId);
+                } catch (MainIndexException e)
+                {
+                    this.cacheRwLock.writeLock().unlock();
+                    this.dbRwLock.writeLock().unlock();
+                    throw new IOException("failed to flush main index cache of file id " + fileId, e);
+                }
+            }
+            this.indexBuffer.close();
             try
             {
-                // the locks are reentrant, no deadlocking problem
-                this.flushCache(fileId);
-            }
-            catch (MainIndexException e)
+                this.connection.close();
+            } catch (SQLException e)
             {
                 this.cacheRwLock.writeLock().unlock();
                 this.dbRwLock.writeLock().unlock();
-                throw new IOException("failed to flush main index cache of file id " + fileId, e);
+                throw new IOException("failed to close sqlite connection", e);
             }
-        }
-        this.indexBuffer.close();
-        try
-        {
-            this.connection.close();
-        }
-        catch (SQLException e)
-        {
             this.cacheRwLock.writeLock().unlock();
             this.dbRwLock.writeLock().unlock();
-            throw new IOException("failed to close sqlite connection", e);
         }
-        this.cacheRwLock.writeLock().unlock();
-        this.dbRwLock.writeLock().unlock();
+    }
+
+    @Override
+    public boolean closeAndRemove() throws MainIndexException
+    {
+        try
+        {
+            this.close();
+        } catch (IOException e)
+        {
+            throw new MainIndexException("failed to close main index", e);
+        }
+
+        if (!removed)
+        {
+            removed = true;
+            // clear SQLite directory for main index
+            try
+            {
+                FileUtils.deleteDirectory(new File(sqlitePath));
+            } catch (IOException e)
+            {
+                throw new MainIndexException("failed to clean up SQLite directory: " + e);
+            }
+        }
+        return true;
     }
 }

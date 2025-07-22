@@ -51,7 +51,7 @@ public class TestRocksDBIndex
     private SinglePointIndex rocksDBIndex; // Class under test
 
     @BeforeEach
-    public void setUp() throws RocksDBException, IOException
+    public void setUp() throws RocksDBException
     {
         // Create RocksDB Directory
         try
@@ -76,13 +76,13 @@ public class TestRocksDBIndex
         System.out.println("Debug: Creating RocksDBIndex.."); // Debug log
         Options options = new Options().setCreateIfMissing(true);
         rocksDB = RocksDB.open(options, rocksDBpath);
-        rocksDBIndex = new RocksDBIndex(tableId, indexId, rocksDB, true);
+        rocksDBIndex = new RocksDBIndex(tableId, indexId, rocksDB, rocksDBpath, true);
         System.out.println("Debug: RocksDBIndex instance: " + rocksDBIndex); // Check for null
         assertNotNull(rocksDBIndex);
     }
 
     @Test
-    public void testPutEntry() throws RocksDBException, MainIndexException, SinglePointIndexException
+    public void testPutEntry() throws RocksDBException, SinglePointIndexException
     {
         // Create Entry
         byte[] key = "exampleKey".getBytes();
@@ -119,7 +119,7 @@ public class TestRocksDBIndex
         // Create two entries
         for (int i = 0; i < 2; i++)
         {
-            byte[] key = ("exampleKey" + i).getBytes(); // 不同 key
+            byte[] key = ("exampleKey" + i).getBytes(); // use different keys
             ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
             buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
 
@@ -223,7 +223,7 @@ public class TestRocksDBIndex
     }
 
     @AfterEach
-    public void tearDown() throws MainIndexException, IOException
+    public void tearDown() throws MainIndexException
     {
         if (rocksDB != null)
         {

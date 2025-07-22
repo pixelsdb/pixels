@@ -22,8 +22,7 @@ package io.pixelsdb.pixels.index.main.sqlite;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexProvider;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import javax.annotation.Nonnull;
 
@@ -33,7 +32,7 @@ import javax.annotation.Nonnull;
  */
 public class SqliteMainIndexProvider implements MainIndexProvider
 {
-    private static final Logger logger = LogManager.getLogger(SqliteMainIndexProvider.class);
+    private static final String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
 
     @Override
     public MainIndex createInstance(long tableId, @Nonnull MainIndex.Scheme scheme) throws MainIndexException
@@ -42,15 +41,14 @@ public class SqliteMainIndexProvider implements MainIndexProvider
         {
             try
             {
-                return new SqliteMainIndex(tableId);
+                return new SqliteMainIndex(tableId, sqlitePath);
             }
             catch (MainIndexException e)
             {
-                logger.error("Failed to create SQLite instance", e);
-                return null;
+                throw new MainIndexException("failed to create SQLite instance", e);
             }
         }
-        throw new IllegalArgumentException("Unsupported scheme: " + scheme);
+        throw new MainIndexException("unsupported scheme: " + scheme);
     }
 
     @Override
