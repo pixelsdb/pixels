@@ -19,13 +19,14 @@
  */
 package io.pixelsdb.pixels.retina;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class SuperVersion implements Referenceable
 {
     private final ReferenceCounter refCounter = new ReferenceCounter();
 
-    private final MemTable memTable;
+    private final MemTable activeMemTable;
     private final List<MemTable> immutableMemTables;
     private final List<ObjectEntry> objectEntries;
 
@@ -34,11 +35,11 @@ public class SuperVersion implements Referenceable
             List<MemTable> immutableMemTables,
             List<ObjectEntry> objectEntries)
     {
-        this.memTable = memTable;
-        this.immutableMemTables  = immutableMemTables;
-        this.objectEntries = objectEntries;
+        this.activeMemTable = memTable;
+        this.immutableMemTables  = new ArrayList<>(immutableMemTables);
+        this.objectEntries = new ArrayList<>(objectEntries);
 
-        this.memTable.ref();
+        this.activeMemTable.ref();
         for (MemTable immutableMemTable : this.immutableMemTables)
         {
             immutableMemTable.ref();
@@ -50,9 +51,9 @@ public class SuperVersion implements Referenceable
         this.refCounter.ref();
     }
 
-    public MemTable getMemTable()
+    public MemTable getActiveMemTable()
     {
-        return this.memTable;
+        return this.activeMemTable;
     }
 
     public List<MemTable> getImmutableMemTables()
@@ -77,7 +78,7 @@ public class SuperVersion implements Referenceable
         boolean shouldDelete = this.refCounter.unref();
         if (shouldDelete)
         {
-            this.memTable.unref();
+            this.activeMemTable.unref();
             for (MemTable immutableMemTable : this.immutableMemTables)
             {
                 immutableMemTable.unref();
