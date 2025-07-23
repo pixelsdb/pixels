@@ -30,21 +30,28 @@ package index.proto;
 
 // The index services definition.
 service IndexService {
+  // allocate a batch of continuous row ids for a primary index, which be putted into the index later by the client
   rpc AllocateRowIdBatch (AllocateRowIdBatchRequest) returns (AllocateRowIdBatchResponse);
+  // lookup a snapshot of the index following timestamp ordering rules
   rpc LookupUniqueIndex (LookupUniqueIndexRequest) returns (LookupUniqueIndexResponse);
   rpc LookupNonUniqueIndex (LookupNonUniqueIndexRequest) returns (LookupNonUniqueIndexResponse);
+  // put adds a new version for the entry into the index
   rpc PutPrimaryIndexEntry (PutPrimaryIndexEntryRequest) returns (PutPrimaryIndexEntryResponse);
   rpc PutPrimaryIndexEntries (PutPrimaryIndexEntriesRequest) returns (PutPrimaryIndexEntriesResponse);
   rpc PutSecondaryIndexEntry (PutSecondaryIndexEntryRequest) returns (PutSecondaryIndexEntryResponse);
   rpc PutSecondaryIndexEntries (PutSecondaryIndexEntriesRequest) returns (PutSecondaryIndexEntriesResponse);
+  // delete only mark the entry as deleted by adding a tombstone for it
   rpc DeletePrimaryIndexEntry (DeletePrimaryIndexEntryRequest) returns (DeletePrimaryIndexEntryResponse);
   rpc DeletePrimaryIndexEntries (DeletePrimaryIndexEntriesRequest) returns (DeletePrimaryIndexEntriesResponse);
   rpc DeleteSecondaryIndexEntry (DeleteSecondaryIndexEntryRequest) returns (DeleteSecondaryIndexEntryResponse);
   rpc DeleteSecondaryIndexEntries (DeleteSecondaryIndexEntriesRequest) returns (DeleteSecondaryIndexEntriesResponse);
+  // update is equivalent to lookup+put, i.e., it adds a new version of the index entry and returns the previous one
   rpc UpdatePrimaryIndexEntry (UpdatePrimaryIndexEntryRequest) returns (UpdatePrimaryIndexEntryResponse);
   rpc UpdatePrimaryIndexEntries (UpdatePrimaryIndexEntriesRequest) returns (UpdatePrimaryIndexEntriesResponse);
   rpc UpdateSecondaryIndexEntry (UpdateSecondaryIndexEntryRequest) returns (UpdateSecondaryIndexEntryResponse);
   rpc UpdateSecondaryIndexEntries (UpdateSecondaryIndexEntriesRequest) returns (UpdateSecondaryIndexEntriesResponse);
+  // permanently delete the index entries (including tombstones), this is done asynchronously during garbage collection
+  rpc PurgeIndexEntries (PurgeIndexEntriesRequest) returns (PurgeIndexEntriesResponse);
   rpc FlushIndexEntriesOfFile (FlushIndexEntriesOfFileRequest) returns (FlushIndexEntriesOfFileResponse);
   // openIndex is optional, index will also be opened on first access
   rpc OpenIndex (OpenIndexRequest) returns (OpenIndexResponse);
@@ -188,43 +195,54 @@ message DeleteSecondaryIndexEntriesResponse {
 }
 
 message UpdatePrimaryIndexEntryRequest {
-  IndexKey indexKey = 1;
+  PrimaryIndexEntry indexEntry = 1;
 }
 
 message UpdatePrimaryIndexEntryResponse {
   int32 errorCode = 1;
-  RowLocation rowLocation = 2;
+  RowLocation prevRowLocation = 2;
 }
 
 message UpdatePrimaryIndexEntriesRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
-  repeated IndexKey indexKeys = 3; // all entries must from the same index
+  repeated PrimaryIndexEntry indexEntries = 3; // all entries must from the same index
 }
 
 message UpdatePrimaryIndexEntriesResponse {
   int32 errorCode = 1;
-  repeated RowLocation rowLocations = 2;
+  repeated RowLocation prevRowLocations = 2;
 }
 
 message UpdateSecondaryIndexEntryRequest {
-  IndexKey indexKey = 1;
+  SecondaryIndexEntry indexEntry = 1;
 }
 
 message UpdateSecondaryIndexEntryResponse {
   int32 errorCode = 1;
-  repeated uint64 rowIds = 2;
+  repeated uint64 prevRowIds = 2;
 }
 
 message UpdateSecondaryIndexEntriesRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
-  repeated IndexKey indexKeys = 3; // all entries must from the same index
+  repeated SecondaryIndexEntry indexEntries = 3; // all entries must from the same index
 }
 
 message UpdateSecondaryIndexEntriesResponse {
   int32 errorCode = 1;
-  repeated uint64 rowIds = 2;
+  repeated uint64 prevRowIds = 2;
+}
+
+message PurgeIndexEntriesRequest {
+  uint64 tableId = 1;
+  uint64 indexId = 2;
+  repeated IndexKey indexKeys = 3; // all entries must from the same index
+  bool isPrimary = 4;
+}
+
+message PurgeIndexEntriesResponse {
+  int32 errorCode = 1;
 }
 
 message FlushIndexEntriesOfFileRequest {

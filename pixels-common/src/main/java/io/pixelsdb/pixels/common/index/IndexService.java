@@ -124,6 +124,13 @@ public class IndexService
         }
     }
 
+    /**
+     * Allocate a batch of continuous row ids for the primary index on a table.
+     * These row ids are to be put into the primary index by the client (e.g., retina or sink)
+     * @param tableId the table id of the table
+     * @param numRowIds the number of row ids to allocate
+     * @return the allocated row ids
+     */
     public IndexProto.RowIdBatch allocateRowIdBatch (long tableId, int numRowIds)
     {
         IndexProto.AllocateRowIdBatchRequest request = IndexProto.AllocateRowIdBatchRequest.newBuilder()
@@ -133,24 +140,47 @@ public class IndexService
         return response.getRowIdBatch();
     }
 
-    public IndexProto.RowLocation lookupUniqueIndex (IndexProto.IndexKey key)
+    /**
+     * Lookup a unique index.
+     * @param key the index key
+     * @return the row location
+     */
+    public IndexProto.RowLocation lookupUniqueIndex (IndexProto.IndexKey key) throws IndexException
     {
         IndexProto.LookupUniqueIndexRequest request = IndexProto.LookupUniqueIndexRequest.newBuilder()
                 .setIndexKey(key).build();
 
         IndexProto.LookupUniqueIndexResponse response = stub.lookupUniqueIndex(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to lookup unique index, error code=" + response.getErrorCode());
+        }
         return response.getRowLocation();
     }
 
-    public List<IndexProto.RowLocation> lookupNonUniqueIndex (IndexProto.IndexKey key)
+    /**
+     * Lookup a non-unique index.
+     * @param key the index key
+     * @return the row locations
+     */
+    public List<IndexProto.RowLocation> lookupNonUniqueIndex (IndexProto.IndexKey key) throws IndexException
     {
         IndexProto.LookupNonUniqueIndexRequest request = IndexProto.LookupNonUniqueIndexRequest.newBuilder()
                 .setIndexKey(key).build();
 
         IndexProto.LookupNonUniqueIndexResponse response = stub.lookupNonUniqueIndex(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to lookup non-unique index, error code=" + response.getErrorCode());
+        }
         return response.getRowLocationsList();
     }
 
+    /**
+     * Put an index entry into the primary index.
+     * @param entry the index entry
+     * @return true on success
+     */
     public boolean putPrimaryIndexEntry (IndexProto.PrimaryIndexEntry entry) throws IndexException
     {
         IndexProto.PutPrimaryIndexEntryRequest request = IndexProto.PutPrimaryIndexEntryRequest.newBuilder()
@@ -164,6 +194,11 @@ public class IndexService
         return true;
     }
 
+    /**
+     * Put an index entry into the secondary index.
+     * @param entry the index entry
+     * @return true on success
+     */
     public boolean putSecondaryIndexEntry (IndexProto.SecondaryIndexEntry entry) throws IndexException
     {
         IndexProto.PutSecondaryIndexEntryRequest request = IndexProto.PutSecondaryIndexEntryRequest.newBuilder()
@@ -177,10 +212,18 @@ public class IndexService
         return true;
     }
 
-    public boolean putPrimaryIndexEntries (List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
+    /**
+     * Put a batch of index entries into the primary index.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param entries the index entries
+     * @return true on success
+     */
+    public boolean putPrimaryIndexEntries (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> entries)
+            throws IndexException
     {
         IndexProto.PutPrimaryIndexEntriesRequest request = IndexProto.PutPrimaryIndexEntriesRequest.newBuilder()
-                .addAllIndexEntries(entries).build();
+                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(entries).build();
 
         IndexProto.PutPrimaryIndexEntriesResponse response = stub.putPrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
@@ -190,10 +233,18 @@ public class IndexService
         return true;
     }
 
-    public boolean putSecondaryIndexEntries (List<IndexProto.SecondaryIndexEntry> entries) throws IndexException
+    /**
+     * Put a batch of index entries into the secondary index.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param entries the index entries
+     * @return true on success
+     */
+    public boolean putSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> entries)
+            throws IndexException
     {
         IndexProto.PutSecondaryIndexEntriesRequest request = IndexProto.PutSecondaryIndexEntriesRequest.newBuilder()
-                .addAllIndexEntries(entries).build();
+                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(entries).build();
 
         IndexProto.PutSecondaryIndexEntriesResponse response = stub.putSecondaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
@@ -203,7 +254,12 @@ public class IndexService
         return true;
     }
 
-    public boolean deletePrimaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    /**
+     * Delete an entry from the primary index. The deleted index entry is marked as deleted using a tombstone.
+     * @param key the index key
+     * @return the row location of the deleted index entry
+     */
+    public IndexProto.RowLocation deletePrimaryIndexEntry (IndexProto.IndexKey key) throws IndexException
     {
         IndexProto.DeletePrimaryIndexEntryRequest request = IndexProto.DeletePrimaryIndexEntryRequest.newBuilder()
                 .setIndexKey(key).build();
@@ -213,10 +269,15 @@ public class IndexService
         {
             throw new IndexException("failed to delete primary index entry, error code=" + response.getErrorCode());
         }
-        return true;
+        return response.getRowLocation();
     }
 
-    public boolean deleteSecondaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    /**
+     * Delete entry(ies) from the secondary index. Each deleted index entry is marked as deleted using a tombstone.
+     * @param key the index key
+     * @return the row id(s) of the deleted index entry(ies)
+     */
+    public List<Long> deleteSecondaryIndexEntry (IndexProto.IndexKey key) throws IndexException
     {
         IndexProto.DeleteSecondaryIndexEntryRequest request = IndexProto.DeleteSecondaryIndexEntryRequest.newBuilder()
                 .setIndexKey(key).build();
@@ -226,87 +287,163 @@ public class IndexService
         {
             throw new IndexException("failed to delete secondary index entry, error code=" + response.getErrorCode());
         }
-        return true;
+        return response.getRowIdsList();
     }
 
-    public boolean deletePrimaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
+    /**
+     * Delete entries from the primary index. Each deleted index entry is marked as deleted using a tombstone.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param keys the keys of the entries to delete
+     * @return the row locations of the deleted index entries
+     */
+    public List<IndexProto.RowLocation> deletePrimaryIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> keys)
+            throws IndexException
     {
         IndexProto.DeletePrimaryIndexEntriesRequest request = IndexProto.DeletePrimaryIndexEntriesRequest.newBuilder()
-                .addAllIndexKeys(keys).build();
+                .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(keys).build();
 
         IndexProto.DeletePrimaryIndexEntriesResponse response = stub.deletePrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to delete primary index entries, error code=" + response.getErrorCode());
         }
-        return true;
+        return response.getRowLocationsList();
     }
 
-    public boolean deleteSecondaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
+    /**
+     * Delete entries from the secondary index. Each deleted index entry is marked as deleted using a tombstone.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param keys the keys of the entries to delete
+     * @return the row ids of the deleted index entries
+     */
+    public List<Long> deleteSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> keys)
+            throws IndexException
     {
         IndexProto.DeleteSecondaryIndexEntriesRequest request = IndexProto.DeleteSecondaryIndexEntriesRequest.newBuilder()
-                .addAllIndexKeys(keys).build();
+                .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(keys).build();
 
         IndexProto.DeleteSecondaryIndexEntriesResponse response = stub.deleteSecondaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to delete secondary index entries, error code=" + response.getErrorCode());
         }
-        return true;
+        return response.getRowIdsList();
     }
 
-    public boolean updatePrimaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    /**
+     * Update the entry of a primary index.
+     * @param indexEntry the index entry to update
+     * @return the previous row location of the index entry
+     */
+    public IndexProto.RowLocation updatePrimaryIndexEntry (IndexProto.PrimaryIndexEntry indexEntry) throws IndexException
     {
         IndexProto.UpdatePrimaryIndexEntryRequest request = IndexProto.UpdatePrimaryIndexEntryRequest.newBuilder()
-                .setIndexKey(key).build();
+                .setIndexEntry(indexEntry).build();
 
         IndexProto.UpdatePrimaryIndexEntryResponse response = stub.updatePrimaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to update primary index entry, error code=" + response.getErrorCode());
         }
-        return true;
+        return response.getPrevRowLocation();
     }
 
-    public boolean updateSecondaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    /**
+     * Update the entry of a secondary index.
+     * @param indexEntry the index entry to update
+     * @return the previous row id(s) of the index entry
+     */
+    public List<Long> updateSecondaryIndexEntry (IndexProto.SecondaryIndexEntry indexEntry) throws IndexException
     {
         IndexProto.UpdateSecondaryIndexEntryRequest request = IndexProto.UpdateSecondaryIndexEntryRequest.newBuilder()
-                .setIndexKey(key).build();
+                .setIndexEntry(indexEntry).build();
 
         IndexProto.UpdateSecondaryIndexEntryResponse response = stub.updateSecondaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to update secondary index entry, error code=" + response.getErrorCode());
         }
-        return true;
+        return response.getPrevRowIdsList();
     }
 
-    public boolean updatePrimaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
+    /**
+     * Update the entries of a primary index.
+     * @param tableId the table id of the primary index
+     * @param indexId the index id of the primary index
+     * @param indexEntries the index entries to update
+     * @return the previous row locations of the index entries
+     */
+    public List<IndexProto.RowLocation> updatePrimaryIndexEntries (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> indexEntries)
+            throws IndexException
     {
         IndexProto.UpdatePrimaryIndexEntriesRequest request = IndexProto.UpdatePrimaryIndexEntriesRequest.newBuilder()
-                .addAllIndexKeys(keys).build();
+                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(indexEntries).build();
 
         IndexProto.UpdatePrimaryIndexEntriesResponse response = stub.updatePrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to update primary index entries, error code=" + response.getErrorCode());
         }
-        return true;
+        return response.getPrevRowLocationsList();
     }
 
-    public boolean updateSecondaryIndexEntries (List<IndexProto.IndexKey> keys) throws IndexException
+    /**
+     * Update the entries of a secondary index.
+     * @param tableId the table id of the secondary index
+     * @param indexId the index id of the secondary index
+     * @param indexEntries the index entries to update
+     * @return the previous row ids of the index entries
+     */
+    public List<Long> updateSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> indexEntries)
+            throws IndexException
     {
         IndexProto.UpdateSecondaryIndexEntriesRequest request = IndexProto.UpdateSecondaryIndexEntriesRequest.newBuilder()
-                .addAllIndexKeys(keys).build();
+                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(indexEntries).build();
 
         IndexProto.UpdateSecondaryIndexEntriesResponse response = stub.updateSecondaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new IndexException("failed to update secondary index entries, error code=" + response.getErrorCode());
         }
+        return response.getPrevRowIdsList();
+    }
+
+    /**
+     * Purge (remove) the index entries of an index permanently. This should only be done asynchronously by the garbage
+     * collection process.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param indexKeys the index keys of the index entries
+     * @param isPrimary true if the index is a primary index
+     * @return true on success
+     */
+    public boolean purgeIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> indexKeys, boolean isPrimary)
+            throws IndexException
+    {
+        IndexProto.PurgeIndexEntriesRequest request = IndexProto.PurgeIndexEntriesRequest.newBuilder()
+                .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(indexKeys).setIsPrimary(isPrimary).build();
+
+        IndexProto.PurgeIndexEntriesResponse response = stub.purgeIndexEntries(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new IndexException("failed to purge index entries, error code=" + response.getErrorCode());
+        }
         return true;
     }
 
+    /**
+     * Flush the index entries of an index corresponding to a buffered Pixels data file.
+     * In Pixels, the index entries corresponding to a write-buffered data file (usually stored in the write buffer)
+     * may be buffered in memory by the index server. This method tells to index server to flush such buffered index
+     * entries for a write-buffered data file. This methods should be called by retina when flushing a write buffer.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param fileId the file id of the write buffer
+     * @param isPrimary true if the index is a primary index
+     * @return true on success
+     */
     public boolean flushIndexEntriesOfFile (long tableId, long indexId, long fileId, boolean isPrimary) throws IndexException
     {
         IndexProto.FlushIndexEntriesOfFileRequest request = IndexProto.FlushIndexEntriesOfFileRequest.newBuilder()
@@ -320,6 +457,14 @@ public class IndexService
         return true;
     }
 
+    /**
+     * Open an index in the index server. This method is optional and is used to pre-warm an index instance in
+     * the index server. Even without calling this method, an index will be opened on its first access.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param isPrimary true if the index is a primary index
+     * @return true on success
+     */
     public boolean openIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
     {
         IndexProto.OpenIndexRequest request = IndexProto.OpenIndexRequest.newBuilder()
@@ -333,6 +478,13 @@ public class IndexService
         return true;
     }
 
+    /**
+     * Close an index in the index server.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param isPrimary true if the index is a primary index
+     * @return true on success
+     */
     public boolean closeIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
     {
         IndexProto.CloseIndexRequest request = IndexProto.CloseIndexRequest.newBuilder()
@@ -346,6 +498,13 @@ public class IndexService
         return true;
     }
 
+    /**
+     * Close an index and remove its persistent storage content in the index server.
+     * @param tableId the table id of the index
+     * @param indexId the index id of the index
+     * @param isPrimary true if the index is a primary index
+     * @return true on success
+     */
     public boolean removeIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
     {
         IndexProto.RemoveIndexRequest request = IndexProto.RemoveIndexRequest.newBuilder()
