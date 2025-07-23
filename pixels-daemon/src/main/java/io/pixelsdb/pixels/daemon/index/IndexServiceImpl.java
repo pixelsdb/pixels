@@ -83,16 +83,22 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
             long rowId = singlePointIndex.getUniqueRowId(key);
-            IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
+            if( rowId >= 0) {
+                IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
 
-            if (rowLocation != null)
-            {
-                builder.setRowLocation(rowLocation);
+                if (rowLocation != null)
+                {
+                    builder.setRowLocation(rowLocation);
+                }
+                else
+                {
+                    // If not found, return empty RowLocation
+                    builder.setErrorCode(ErrorCode.SUCCESS).setRowLocation(IndexProto.RowLocation.getDefaultInstance());
+                }
             }
             else
             {
-                // If not found, return empty RowLocation
-                builder.setErrorCode(ErrorCode.SUCCESS).setRowLocation(IndexProto.RowLocation.getDefaultInstance());
+                builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_NOT_FOUND);
             }
         }
         catch (SinglePointIndexException | MainIndexException e)
@@ -117,15 +123,22 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
             List<Long> rowIds = singlePointIndex.getRowIds(key);
             List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
-            for (long rowId : rowIds)
+            if(!rowIds.isEmpty())
             {
-                IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
-                if (rowLocation != null)
+                for (long rowId : rowIds)
                 {
-                    rowLocations.add(rowLocation);
+                    IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
+                    if (rowLocation != null)
+                    {
+                        rowLocations.add(rowLocation);
+                    }
                 }
+                builder.setErrorCode(ErrorCode.SUCCESS).addAllRowLocations(rowLocations);
             }
-            builder.setErrorCode(ErrorCode.SUCCESS).addAllRowLocations(rowLocations);
+            else
+            {
+                builder.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_NOT_FOUND);
+            }
         }
         catch (SinglePointIndexException | MainIndexException e)
         {

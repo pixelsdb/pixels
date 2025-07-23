@@ -101,7 +101,7 @@ public interface SinglePointIndex extends Closeable
     /**
      * Get the row id of an index key. <b>This method should only be called on a unique index.</b>
      * @param key the index key
-     * @return the row id
+     * @return the row id. Illegal row id is less than zero.
      * @throws SinglePointIndexException
      */
     long getUniqueRowId(IndexProto.IndexKey key) throws SinglePointIndexException;
@@ -109,7 +109,7 @@ public interface SinglePointIndex extends Closeable
     /**
      * Get the row id(s) of an index key. <b>This method can be called on unique or non-unique index.</b>
      * @param key the index key
-     * @return the row ids
+     * @return the row ids. Illegal row ids are empty list.
      * @throws SinglePointIndexException
      */
     List<Long> getRowIds(IndexProto.IndexKey key) throws SinglePointIndexException;
