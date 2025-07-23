@@ -37,7 +37,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -140,76 +139,79 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public long getUniqueRowId(IndexProto.IndexKey key)
     {
+        // Get prefix
+        byte[] keyBytes = toByteArray(key);
         byte[] prefixBytes = toKeyPrefix(key);
-        long latestTimestamp = Long.MIN_VALUE;
-        long latestRowId = 0;
-        try (RocksIterator iterator = rocksDB.newIterator())
+        long timestamp = key.getTimestamp();
+        // Build lower bound and upper bound
+        Slice lowerBound = setLowerBound(prefixBytes);
+        Slice upperBound = setUpperBound(prefixBytes, timestamp);
+        // Build readOptions
+        ReadOptions readOptions = new ReadOptions();
+        readOptions.setIterateLowerBound(lowerBound);
+        readOptions.setIterateUpperBound(upperBound);
+
+        long RowId = -1L;
+        try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
-            iterator.seek(prefixBytes);
-            while (iterator.isValid())
+            iterator.seekForPrev(keyBytes);
+            if(iterator.isValid())
             {
-                byte[] fullKey = iterator.key();
-                if (!startsWith(fullKey, prefixBytes))
-                {
-                    break;
-                }
-                // extract timestamp from key
-                long timestamp = ByteBuffer.wrap(fullKey, fullKey.length - Long.BYTES, Long.BYTES).getLong();
-                if (timestamp > latestTimestamp)
-                {
-                    latestTimestamp = timestamp;
-                    // get rowId
-                    byte[] valueBytes = iterator.value();
-                    latestRowId = ByteBuffer.wrap(valueBytes).getLong();
-                }
-                iterator.next();
+                byte[] valueBytes = iterator.value();
+                RowId = ByteBuffer.wrap(valueBytes).getLong();
             }
         }
         catch (Exception e)
         {
             LOGGER.error("Failed to get unique row ID by prefix for key: {}", key, e);
         }
-        return latestRowId;
+        return RowId;
     }
 
     @Override
     public List<Long> getRowIds(IndexProto.IndexKey key)
     {
         List<Long> rowIdList = new ArrayList<>();
-        try
+        byte[] keyBytes = toByteArray(key);
+        byte[] prefixBytes = toKeyPrefix(key);
+        long timestamp = key.getTimestamp();
+        // Build lower bound and upper bound
+        Slice lowerBound = setLowerBound(prefixBytes);
+        Slice upperBound = setUpperBound(prefixBytes, timestamp);
+        // Build readOptions
+        ReadOptions readOptions = new ReadOptions();
+        readOptions.setIterateLowerBound(lowerBound);
+        readOptions.setIterateUpperBound(upperBound);
+
+        // Use RocksDB iterator for prefix search
+        try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
-            // Convert IndexKey to byte array (without rowId)
-            byte[] prefixBytes = toKeyPrefix(key);
-
-            // Use RocksDB iterator for prefix search
-            try (RocksIterator iterator = rocksDB.newIterator())
+            for (iterator.seek(prefixBytes); iterator.isValid(); iterator.next())
             {
-                for (iterator.seek(prefixBytes); iterator.isValid(); iterator.next())
-                {
-                    byte[] currentKeyBytes = iterator.key();
+                byte[] currentKeyBytes = iterator.key();
 
-                    // Check if current key starts with prefixBytes
-                    if (startsWith(currentKeyBytes, prefixBytes))
-                    {
-                        // Extract rowId from key
-                        long rowId = extractRowIdFromKey(currentKeyBytes, prefixBytes.length);
-                        rowIdList.add(rowId);
-                    }
-                    else
-                    {
-                        break; // Stop when prefix no longer matches
-                    }
+                // Check if current key starts with prefixBytes
+                if (startsWith(currentKeyBytes, prefixBytes))
+                {
+                    // Extract rowId from key
+                    long rowId = extractRowIdFromKey(currentKeyBytes, prefixBytes.length);
+                    if(rowId < 0)
+                        continue;
+                    rowIdList.add(rowId);
+                }
+                else
+                {
+                    break; // Stop when prefix no longer matches
                 }
             }
-            // Convert List<Long> to long[]
-            return rowIdList;
         }
         catch (Exception e)
         {
             LOGGER.error("Failed to get row IDs for key: {}", key, e);
+            // Return empty array if key doesn't exist or exception occurs
+            return ImmutableList.of();
         }
-        // Return empty array if key doesn't exist or exception occurs
-        return ImmutableList.of();
+        return rowIdList;
     }
 
     @Override
@@ -231,7 +233,7 @@ public class RocksDBIndex implements SinglePointIndex
                 // Create composite key
                 byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
                 // Store in RocksDB
-                writeBatch.put(nonUniqueKey, null);
+                writeBatch.put(nonUniqueKey, new byte[0]);
             }
             rocksDB.write(writeOptions, writeBatch);
             return true;
@@ -298,7 +300,7 @@ public class RocksDBIndex implements SinglePointIndex
                 else
                 {
                     byte[] nonUniqueKey = toNonUniqueKey(keyBytes, valueBytes);
-                    writeBatch.put(nonUniqueKey, null);
+                    writeBatch.put(nonUniqueKey, new byte[0]);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -314,43 +316,14 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public long deleteUniqueEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
+        long rowId = getUniqueRowId(key);
         try(WriteBatch writeBatch = new WriteBatch())
         {
-            byte[] prefixBytes = toKeyPrefix(key);
-            long latestTimestamp = Long.MIN_VALUE;
-            long latestRowId = 0;
-            // Traverse to get all version
-            try (RocksIterator iterator = rocksDB.newIterator())
-            {
-                iterator.seek(prefixBytes);
-                while (iterator.isValid())
-                {
-                    byte[] fullKey = iterator.key();
-                    if (!startsWith(fullKey, prefixBytes))
-                    {
-                        break;
-                    }
-                    // extract timestamp from key
-                    long timestamp = ByteBuffer.wrap(fullKey, fullKey.length - Long.BYTES, Long.BYTES).getLong();
-                    if (timestamp > latestTimestamp)
-                    {
-                        latestTimestamp = timestamp;
-                        // get rowId
-                        byte[] valueBytes = iterator.value();
-                        latestRowId = ByteBuffer.wrap(valueBytes).getLong();
-                    }
-                    // Delete key-value pair from RocksDB
-                    writeBatch.delete(fullKey);
-                    iterator.next();
-                }
-            }
-            catch (Exception e)
-            {
-                System.out.println("Failed to delete row ID by prefix for key");
-                LOGGER.error("Failed to delete unique entry for rowId {}", latestRowId);
-            }
+            byte[] keyBytes = toByteArray(key);
+            byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array();
+            writeBatch.put(keyBytes,newValue);
             rocksDB.write(writeOptions, writeBatch);
-            return latestRowId;
+            return rowId;
         }
         catch (RocksDBException e)
         {
@@ -360,15 +333,24 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException
+    public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
+        List<Long> rowIds = new ArrayList<>();
         try(WriteBatch writeBatch = new WriteBatch())
         {
-            List<Long> rowIds = new ArrayList<>(this.getRowIds(indexKey));
-            // Convert IndexKey to byte array
-            byte[] keyBytes = toByteArray(indexKey);
-            // Delete key-value pair from RocksDB
-            writeBatch.delete(keyBytes);
+            byte[] keyBytes = toByteArray(key);
+            if(unique)
+            {
+                rowIds.add(this.getUniqueRowId(key));
+                byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array();
+                writeBatch.put(keyBytes,newValue);
+            }
+            else
+            {
+                rowIds.addAll(this.getRowIds(key));
+                overwriteRowId(keyBytes, -1L);
+                writeBatch.put(keyBytes, new byte[0]);
+            }
             rocksDB.write(writeOptions, writeBatch);
             return rowIds;
         }
@@ -383,17 +365,25 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public List<Long> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
+        List<Long> rowIds = new ArrayList<>();
         try(WriteBatch writeBatch = new WriteBatch())
         {
-            List<Long> rowIds = new ArrayList<>();
             // Delete single point index
             for(IndexProto.IndexKey key : keys)
             {
-                rowIds.addAll(this.getRowIds(key));
-                // Convert IndexKey to byte array
                 byte[] keyBytes = toByteArray(key);
-                // Delete key-value pair from RocksDB
-                writeBatch.delete(keyBytes);
+                if(unique)
+                {
+                    rowIds.add(this.getUniqueRowId(key));
+                    byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array();
+                    writeBatch.put(keyBytes,newValue);
+                }
+                else
+                {
+                    rowIds.addAll(this.getRowIds(key));
+                    overwriteRowId(keyBytes, -1L);
+                    writeBatch.put(keyBytes, new byte[0]);
+                }
             }
             rocksDB.write(new WriteOptions(), writeBatch);
             return rowIds;
@@ -447,26 +437,17 @@ public class RocksDBIndex implements SinglePointIndex
     // Convert IndexKey to byte array
     private static byte[] toByteArray(IndexProto.IndexKey key)
     {
-        byte[] tableIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getTableId()).array();
         byte[] indexIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getIndexId()).array();
         byte[] keyBytes = key.getKey().toByteArray();
         byte[] timestampBytes = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.BIG_ENDIAN).putLong(key.getTimestamp()).array();
-        // Combine tableId, indexId, key and timestamp
-        byte[] compositeKey = new byte[tableIdBytes.length + 1 + indexIdBytes.length + 1 + keyBytes.length + 1 + timestampBytes.length];
-        // Copy tableId
-        System.arraycopy(tableIdBytes, 0, compositeKey, 0, tableIdBytes.length);
-        // Add separator
-        compositeKey[indexIdBytes.length] = ':';
+        // Combine indexId, key and timestamp
+        byte[] compositeKey = new byte[indexIdBytes.length + keyBytes.length + timestampBytes.length];
         // Copy indexId
-        System.arraycopy(indexIdBytes, 0, compositeKey, tableIdBytes.length + 1, indexIdBytes.length);
-        // Add separator
-        compositeKey[indexIdBytes.length] = ':';
+        System.arraycopy(indexIdBytes, 0, compositeKey, 0, indexIdBytes.length);
         // Copy key
-        System.arraycopy(keyBytes, 0, compositeKey, tableIdBytes.length + 1 + indexIdBytes.length + 1, keyBytes.length);
-        // Add separator
-        compositeKey[indexIdBytes.length + 1 + keyBytes.length] = ':';
+        System.arraycopy(keyBytes, 0, compositeKey, indexIdBytes.length, keyBytes.length);
         // Copy timestamp
-        System.arraycopy(timestampBytes, 0, compositeKey, tableIdBytes.length + 1+ indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
+        System.arraycopy(timestampBytes, 0, compositeKey, indexIdBytes.length + keyBytes.length, timestampBytes.length);
 
         return compositeKey;
     }
@@ -476,17 +457,15 @@ public class RocksDBIndex implements SinglePointIndex
     {
         byte[] fullKey = toByteArray(key);
         int prefixLength = fullKey.length - Long.BYTES;
-
         return Arrays.copyOf(fullKey, prefixLength);
     }
 
     // Create composite key with rowId
     private static byte[] toNonUniqueKey(byte[] keyBytes, byte[] valueBytes)
     {
-        byte[] nonUniqueKey = new byte[keyBytes.length + 1 + valueBytes.length];
+        byte[] nonUniqueKey = new byte[keyBytes.length + valueBytes.length];
         System.arraycopy(keyBytes, 0, nonUniqueKey, 0, keyBytes.length);
-        nonUniqueKey[keyBytes.length] = ':';
-        System.arraycopy(valueBytes, 0, nonUniqueKey, keyBytes.length + 1, valueBytes.length);
+        System.arraycopy(valueBytes, 0, nonUniqueKey, keyBytes.length, valueBytes.length);
         return nonUniqueKey;
     }
 
@@ -507,6 +486,24 @@ public class RocksDBIndex implements SinglePointIndex
         return true;
     }
 
+    private Slice setLowerBound(byte[] prefixBytes)
+    {
+        ByteBuffer lowerBoundBuffer = ByteBuffer.allocate(prefixBytes.length + Long.BYTES);
+        lowerBoundBuffer.put(prefixBytes);
+        lowerBoundBuffer.putLong(0L);
+        byte[] lowerBoundBytes = lowerBoundBuffer.array();
+        return new Slice(lowerBoundBytes);
+    }
+
+    private Slice setUpperBound(byte[] prefixBytes, long timestamp)
+    {
+        ByteBuffer upperBoundBuffer = ByteBuffer.allocate(prefixBytes.length + Long.BYTES);
+        upperBoundBuffer.put(prefixBytes);
+        upperBoundBuffer.order(ByteOrder.BIG_ENDIAN).putLong(timestamp + 1);
+        byte[] upperBoundBytes = upperBoundBuffer.array();
+        return new Slice(upperBoundBytes);
+    }
+
     // Extract rowId from key
     private long extractRowIdFromKey(byte[] keyBytes, int prefixLength)
     {
@@ -516,5 +513,12 @@ public class RocksDBIndex implements SinglePointIndex
 
         // Convert rowId to long
         return ByteBuffer.wrap(rowIdBytes).getLong();
+    }
+
+    // Update rowId for single point index
+    private void overwriteRowId(byte[] key, long value)
+    {
+        byte[] minusOneBytes = ByteBuffer.allocate(Long.BYTES).putLong(value).array();
+        System.arraycopy(minusOneBytes, 0, key, key.length - Long.BYTES, Long.BYTES);
     }
 }

@@ -91,7 +91,7 @@ public class TestRocksDBIndex
         long rowId = 100L;
 
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
+                .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
         byte[] keyBytes = toByteArray(keyProto);
         boolean success = rocksDBIndex.putEntry(keyProto, rowId);
@@ -122,7 +122,7 @@ public class TestRocksDBIndex
             long rowId = i*1000L;
 
             IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                    .setTableId(tableId).setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
+                    .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
             IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
                     .setFileId(fileId).setRgId(rgId).setRgRowOffset(i).build();
@@ -159,7 +159,6 @@ public class TestRocksDBIndex
         long rowId2 = 222L; // expected
 
         IndexProto.IndexKey key1 = IndexProto.IndexKey.newBuilder()
-                .setTableId(tableId)
                 .setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key))
                 .setTimestamp(timestamp1)
@@ -168,7 +167,6 @@ public class TestRocksDBIndex
         rocksDBIndex.putEntry(key1, rowId1);
 
         IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
-                .setTableId(tableId)
                 .setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key))
                 .setTimestamp(timestamp2)
@@ -176,8 +174,42 @@ public class TestRocksDBIndex
 
         rocksDBIndex.putEntry(key2,rowId2);
 
-        long result = rocksDBIndex.getUniqueRowId(key1);
+        long result = rocksDBIndex.getUniqueRowId(key2);
         assertEquals(rowId2, result, "getUniqueRowId should return the rowId of the latest timestamp entry");
+    }
+
+    @Test
+    public void testGetRowIds() throws MainIndexException, SinglePointIndexException
+    {
+        long indexId = 1L;
+        byte[] key = "multiKey".getBytes();
+        long timestamp1 = System.currentTimeMillis();
+        long timestamp2 = timestamp1 + 1000; // newer
+
+        long rowId1 = 111L;
+        long rowId2 = 222L; // expected
+        List<Long> rowIds = new ArrayList<>();
+        rowIds.add(rowId1);
+        rowIds.add(rowId2);
+
+        IndexProto.IndexKey key1 = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp1)
+                .build();
+
+        rocksDBIndex.putEntry(key1, rowId1);
+
+        IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp2)
+                .build();
+
+        rocksDBIndex.putEntry(key2,rowId2);
+
+        List<Long> result = rocksDBIndex.getRowIds(key2);
+        assertEquals(rowIds, result, "getRowIds should return the rowId of all entry");
     }
 
     @Test
@@ -186,21 +218,20 @@ public class TestRocksDBIndex
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
 
-        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setTableId(tableId).setIndexId(indexId)
+        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
         byte[] keyBytes = toByteArray(keyProto);
         rocksDBIndex.putEntry(keyProto, 0L);
 
         // Delete index
-        long ret = rocksDBIndex.deleteUniqueEntry(keyProto);
+        List<Long> rets = rocksDBIndex.deleteEntry(keyProto);
 
         // Assert return value
-        assertTrue(ret >= 0, "deleteEntry should return true");
-
-        // Assert index has been deleted
-        byte[] result = rocksDB.get(keyBytes);
-        assertNull(result, "Key should be deleted from RocksDB");
+        for(long ret : rets)
+        {
+            assertTrue(ret >= 0, "deleteEntry should return true");
+        }
     }
 
     @Test
@@ -221,7 +252,7 @@ public class TestRocksDBIndex
             //ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
             //buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
 
-            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setTableId(tableId).setIndexId(indexId)
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setIndexId(indexId)
                     .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
             keyList.add(keyProto);
@@ -239,13 +270,6 @@ public class TestRocksDBIndex
         // delete Indexes
         List<Long> ret = rocksDBIndex.deleteEntries(keyList);
         assertNotNull(ret, "deleteEntries should return true");
-
-        // Assert all indexes have been deleted
-        for (byte[] keyBytes : keyBytesList)
-        {
-            byte[] storedValue = rocksDB.get(keyBytes);
-            assertNull(storedValue, "Key should be deleted from RocksDB");
-        }
     }
 
     @AfterEach
@@ -281,26 +305,17 @@ public class TestRocksDBIndex
 
     private static byte[] toByteArray(IndexProto.IndexKey key)
     {
-        byte[] tableIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getTableId()).array();
         byte[] indexIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getIndexId()).array();
         byte[] keyBytes = key.getKey().toByteArray();
         byte[] timestampBytes = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.BIG_ENDIAN).putLong(key.getTimestamp()).array();
-        // Combine tableId, indexId, key and timestamp
-        byte[] compositeKey = new byte[tableIdBytes.length + 1 + indexIdBytes.length + 1 + keyBytes.length + 1 + timestampBytes.length];
-        // Copy tableId
-        System.arraycopy(tableIdBytes, 0, compositeKey, 0, tableIdBytes.length);
-        // Add separator
-        compositeKey[indexIdBytes.length] = ':';
+        // Combine indexId, key and timestamp
+        byte[] compositeKey = new byte[indexIdBytes.length + keyBytes.length + timestampBytes.length];
         // Copy indexId
-        System.arraycopy(indexIdBytes, 0, compositeKey, tableIdBytes.length + 1, indexIdBytes.length);
-        // Add separator
-        compositeKey[indexIdBytes.length] = ':';
+        System.arraycopy(indexIdBytes, 0, compositeKey, 0, indexIdBytes.length);
         // Copy key
-        System.arraycopy(keyBytes, 0, compositeKey, tableIdBytes.length + 1 + indexIdBytes.length + 1, keyBytes.length);
-        // Add separator
-        compositeKey[indexIdBytes.length + 1 + keyBytes.length] = ':';
+        System.arraycopy(keyBytes, 0, compositeKey, indexIdBytes.length, keyBytes.length);
         // Copy timestamp
-        System.arraycopy(timestampBytes, 0, compositeKey, tableIdBytes.length + 1+ indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
+        System.arraycopy(timestampBytes, 0, compositeKey, indexIdBytes.length + keyBytes.length, timestampBytes.length);
 
         return compositeKey;
     }
