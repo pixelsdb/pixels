@@ -432,6 +432,13 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
     }
 
     @Override
+    public void purgeIndexEntries(IndexProto.PurgeIndexEntriesRequest request,
+                                  StreamObserver<IndexProto.PurgeIndexEntriesResponse> responseObserver)
+    {
+        super.purgeIndexEntries(request, responseObserver);
+    }
+
+    @Override
     public void flushIndexEntriesOfFile(IndexProto.FlushIndexEntriesOfFileRequest request,
                                         StreamObserver<IndexProto.FlushIndexEntriesOfFileResponse> responseObserver)
     {
