@@ -313,6 +313,8 @@ public class RocksDBIndex implements SinglePointIndex
         }
     }
 
+
+
     @Override
     public long deleteUniqueEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
