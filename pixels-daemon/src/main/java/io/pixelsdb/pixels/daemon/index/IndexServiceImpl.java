@@ -582,7 +582,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                     IndexProto.RowLocation rowLocationLast = mainIndex.getLocation(rowIds.get(last));
                     // delete mainIndex
                     RowIdRange rowIdRange = new RowIdRange(
-                            rowIds.getFirst(), rowIds.getLast(),
+                            rowIds.get(0), rowIds.get(last),
                             rowLocationFirst.getFileId(),
                             rowLocationFirst.getRgId(),
                             rowLocationFirst.getRgRowOffset(),
