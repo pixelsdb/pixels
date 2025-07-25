@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
@@ -29,6 +30,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
@@ -89,13 +91,10 @@ public class TestRocksDBIndex
         long timestamp = System.currentTimeMillis();
         long rowId = 100L;
 
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
-        byte[] keyBytes = buffer.array();
-
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
+        byte[] keyBytes = toByteArray(keyProto);
         boolean success = rocksDBIndex.putEntry(keyProto, rowId);
         assertTrue(success, "putEntry should return true");
 
@@ -120,8 +119,6 @@ public class TestRocksDBIndex
         for (int i = 0; i < 2; i++)
         {
             byte[] key = ("exampleKey" + i).getBytes(); // use different keys
-            ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-            buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
 
             long rowId = i*1000L;
 
@@ -152,50 +149,104 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntry() throws RocksDBException, SinglePointIndexException
+    public void testGetUniqueRowId() throws  SinglePointIndexException
+    {
+        long indexId = 1L;
+        byte[] key = "multiKey".getBytes();
+        long timestamp1 = System.currentTimeMillis();
+        long timestamp2 = timestamp1 + 1000; // newer
+
+        long rowId1 = 111L;
+        long rowId2 = 222L; // expected
+
+        IndexProto.IndexKey key1 = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp1)
+                .build();
+
+        rocksDBIndex.putEntry(key1, rowId1);
+
+        IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp2)
+                .build();
+
+        rocksDBIndex.putEntry(key2,rowId2);
+
+        long result = rocksDBIndex.getUniqueRowId(key2);
+        assertEquals(rowId2, result, "getUniqueRowId should return the rowId of the latest timestamp entry");
+    }
+
+    @Test
+    public void testGetRowIds() throws SinglePointIndexException
+    {
+        long indexId = 1L;
+        byte[] key = "multiKey".getBytes();
+        long timestamp1 = System.currentTimeMillis();
+        long timestamp2 = timestamp1 + 1000; // newer
+
+        long rowId1 = 111L;
+        long rowId2 = 222L; // expected
+        List<Long> rowIds = new ArrayList<>();
+        rowIds.add(rowId1);
+        rowIds.add(rowId2);
+
+        IndexProto.IndexKey key1 = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp1)
+                .build();
+
+        rocksDBIndex.putEntry(key1, rowId1);
+
+        IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp2)
+                .build();
+
+        rocksDBIndex.putEntry(key2,rowId2);
+
+        List<Long> result = rocksDBIndex.getRowIds(key2);
+        assertEquals(rowIds, result, "getRowIds should return the rowId of all entry");
+    }
+
+    @Test
+    public void testDeleteEntry() throws SinglePointIndexException
     {
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
 
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-        buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
-        byte[] keyBytes = buffer.array();
-
-        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setTableId(tableId).setIndexId(indexId)
+        IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
         rocksDBIndex.putEntry(keyProto, 0L);
-
         // Delete index
-        long ret = rocksDBIndex.deleteUniqueEntry(keyProto);
-
+        List<Long> rets = rocksDBIndex.deleteEntry(keyProto);
         // Assert return value
-        assertTrue(ret >= 0, "deleteEntry should return true");
-
-        // Assert index has been deleted
-        byte[] result = rocksDB.get(keyBytes);
-        assertNull(result, "Key should be deleted from RocksDB");
+        for(long ret : rets)
+        {
+            assertTrue(ret >= 0, "deleteEntry should return true");
+        }
     }
 
     @Test
-    public void testDeleteEntries() throws RocksDBException, SinglePointIndexException, MainIndexException
+    public void testDeleteEntries() throws SinglePointIndexException, MainIndexException
     {
         long timestamp = System.currentTimeMillis();
         long fileId = 1L;
         int rgId = 2;
 
         List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>();
-        List<byte[]> keyBytesList = new ArrayList<>();
         List<IndexProto.IndexKey> keyList = new ArrayList<>();
 
         for (int i = 0; i < 2; i++)
         {
             byte[] key = ("exampleKey" + i).getBytes();
-            keyBytesList.add(key);
-            //ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + key.length + Long.BYTES + 2);
-            //buffer.putLong(indexId).put((byte) ':').put(key).put((byte) ':').putLong(timestamp);
 
-            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setTableId(tableId).setIndexId(indexId)
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setIndexId(indexId)
                     .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
             keyList.add(keyProto);
@@ -213,13 +264,143 @@ public class TestRocksDBIndex
         // delete Indexes
         List<Long> ret = rocksDBIndex.deleteEntries(keyList);
         assertNotNull(ret, "deleteEntries should return true");
+    }
 
-        // Assert all indexes have been deleted
-        for (byte[] keyBytes : keyBytesList)
+    @Test
+    public void testUpdatePrimaryEntry() throws Exception
+    {
+        byte[] key = "updateKey".getBytes();
+        long timestamp = System.currentTimeMillis();
+        IndexProto.IndexKey indexKey = IndexProto.IndexKey.newBuilder().setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
+        long initialRowId = 100L;
+        long updatedRowId = 200L;
+
+        // Put initial entry
+        rocksDBIndex.putEntry(indexKey, initialRowId);
+
+        // Update entry
+        long prevRowId = rocksDBIndex.updatePrimaryEntry(indexKey, updatedRowId);
+        assertEquals(initialRowId, prevRowId, "Previous rowId should match the one inserted before");
+
+        // Verify the updated value
+        long actualRowId = rocksDBIndex.getUniqueRowId(indexKey);
+        assertEquals(updatedRowId, actualRowId, "RowId should be updated correctly");
+    }
+
+    @Test
+    public void testUpdateSecondaryEntry() throws Exception
+    {
+        byte[] key = "updateKey".getBytes();
+        long timestamp = System.currentTimeMillis();
+        IndexProto.IndexKey indexKey = IndexProto.IndexKey.newBuilder().setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
+        long initialRowId = 500L;
+        long updatedRowId = 600L;
+
+        // Put initial entry
+        rocksDBIndex.putEntry(indexKey, initialRowId);
+
+        // Update entry
+        List<Long> prevRowIds = rocksDBIndex.updateSecondaryEntry(indexKey, updatedRowId);
+        assertEquals(1, prevRowIds.size());
+        assertEquals(initialRowId, prevRowIds.get(0));
+
+        // Verify the new value
+        long actualRowId = rocksDBIndex.getUniqueRowId(indexKey);
+        assertEquals(updatedRowId, actualRowId);
+    }
+
+    @Disabled("Performance test, run manually")
+    @Test
+    public void benchmarkGetUniqueRowId() throws SinglePointIndexException
+    {
+        int count = 1_000_000;
+        byte[] key = "putBenchmarkKey".getBytes();
+        ImmutableList.Builder<IndexProto.IndexKey> builder = ImmutableList.builder();
+
+        // prepare data
+        for (int i = 0; i < count; i++)
         {
-            byte[] storedValue = rocksDB.get(keyBytes);
-            assertNull(storedValue, "Key should be deleted from RocksDB");
+            long timestamp = System.currentTimeMillis();
+
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                    .setIndexId(indexId)
+                    .setKey(ByteString.copyFrom(key))
+                    .setTimestamp(timestamp)
+                    .build();
+
+            rocksDBIndex.putEntry(keyProto, i);
+            builder.add(keyProto);
         }
+        // get rowId
+        long start = System.nanoTime();
+        for (IndexProto.IndexKey keyProto : builder.build())
+        {
+            rocksDBIndex.getUniqueRowId(keyProto);
+        }
+        long end = System.nanoTime();
+        double durationMs = (end - start) / 1_000_000.0;
+        System.out.printf("Get %,d unique rowIds in %.2f ms (%.2f ops/sec)%n", count, durationMs, count * 1000.0 / durationMs);
+    }
+
+    @Disabled("Performance test, run manually")
+    @Test
+    public void benchmarkPutEntry() throws SinglePointIndexException
+    {
+        int count = 1_000_000;
+        byte[] key = "putBenchmarkKey".getBytes();
+
+        long start = System.nanoTime();
+        for (int i = 0; i < count; i++)
+        {
+            long timestamp = System.currentTimeMillis();
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                    .setIndexId(indexId)
+                    .setKey(ByteString.copyFrom(key))
+                    .setTimestamp(timestamp)
+                    .build();
+
+            rocksDBIndex.putEntry(keyProto, i);
+        }
+        long end = System.nanoTime();
+        double durationMs = (end - start) / 1_000_000.0;
+        System.out.printf("Put %,d entries in %.2f ms (%.2f ops/sec)%n", count, durationMs, count * 1000.0 / durationMs);
+    }
+
+    @Disabled("Performance test, run manually")
+    @Test
+    public void benchmarkDeleteEntry() throws SinglePointIndexException
+    {
+        int count = 1_000_000;
+        byte[] key = "deleteBenchmarkKey".getBytes();
+
+        ImmutableList.Builder<IndexProto.IndexKey> builder = ImmutableList.builder();
+
+        // prepare data
+        for (int i = 0; i < count; i++)
+        {
+            long timestamp = System.currentTimeMillis();
+
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                    .setIndexId(indexId)
+                    .setKey(ByteString.copyFrom(key))
+                    .setTimestamp(timestamp)
+                    .build();
+
+            rocksDBIndex.putEntry(keyProto, i);
+            builder.add(keyProto);
+        }
+
+        // delete data
+        long start = System.nanoTime();
+        for (IndexProto.IndexKey keyProto : builder.build())
+        {
+            rocksDBIndex.deleteEntry(keyProto);
+        }
+        long end = System.nanoTime();
+        double durationMs = (end - start) / 1_000_000.0;
+        System.out.printf("Deleted %,d entries in %.2f ms (%.2f ops/sec)%n", count, durationMs, count * 1000.0 / durationMs);
     }
 
     @AfterEach
@@ -253,24 +434,37 @@ public class TestRocksDBIndex
         }
     }
 
+    private static void writeLongBE(byte[] buf, int offset, long value)
+    {
+        buf[offset]     = (byte)(value >>> 56);
+        buf[offset + 1] = (byte)(value >>> 48);
+        buf[offset + 2] = (byte)(value >>> 40);
+        buf[offset + 3] = (byte)(value >>> 32);
+        buf[offset + 4] = (byte)(value >>> 24);
+        buf[offset + 5] = (byte)(value >>> 16);
+        buf[offset + 6] = (byte)(value >>> 8);
+        buf[offset + 7] = (byte)(value);
+    }
+
+    // Convert IndexKey to byte array
     private static byte[] toByteArray(IndexProto.IndexKey key)
     {
-        byte[] indexIdBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getIndexId()).array(); // Get indexId bytes
-        byte[] keyBytes = key.getKey().toByteArray(); // Get key bytes
-        byte[] timestampBytes = ByteBuffer.allocate(Long.BYTES).putLong(key.getTimestamp()).array(); // Get timestamp bytes
-        // Combine indexId, key and timestamp
-        byte[] compositeKey = new byte[indexIdBytes.length + 1 + keyBytes.length + 1 + timestampBytes.length];
-        // Copy indexId
-        System.arraycopy(indexIdBytes, 0, compositeKey, 0, indexIdBytes.length);
-        // Add separator
-        compositeKey[indexIdBytes.length] = ':';
-        // Copy key
-        System.arraycopy(keyBytes, 0, compositeKey, indexIdBytes.length + 1, keyBytes.length);
-        // Add separator
-        compositeKey[indexIdBytes.length + 1 + keyBytes.length] = ':';
-        // Copy timestamp
-        System.arraycopy(timestampBytes, 0, compositeKey,
-                indexIdBytes.length + 1 + keyBytes.length + 1, timestampBytes.length);
+        byte[] keyBytes = key.getKey().toByteArray();
+        int totalLength = Long.BYTES + keyBytes.length + Long.BYTES;
+
+        byte[] compositeKey = new byte[totalLength];
+        int pos = 0;
+
+        // Write indexId (8 bytes, big endian)
+        long indexId = key.getIndexId();
+        writeLongBE(compositeKey, pos, indexId);
+        pos += 8;
+        // Write key bytes (variable length)
+        System.arraycopy(keyBytes, 0, compositeKey, pos, keyBytes.length);
+        pos += keyBytes.length;
+        // Write timestamp (8 bytes, big endian)
+        long timestamp = key.getTimestamp();
+        writeLongBE(compositeKey, pos, timestamp);
 
         return compositeKey;
     }

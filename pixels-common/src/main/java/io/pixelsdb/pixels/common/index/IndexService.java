@@ -143,7 +143,7 @@ public class IndexService
     /**
      * Lookup a unique index.
      * @param key the index key
-     * @return the row location
+     * @return the row location or null if the index entry is not found.
      */
     public IndexProto.RowLocation lookupUniqueIndex (IndexProto.IndexKey key) throws IndexException
     {
@@ -151,17 +151,24 @@ public class IndexService
                 .setIndexKey(key).build();
 
         IndexProto.LookupUniqueIndexResponse response = stub.lookupUniqueIndex(request);
-        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        if (response.getErrorCode() == ErrorCode.SUCCESS)
+        {
+            return response.getRowLocation();
+        }
+        else if (response.getErrorCode() == ErrorCode.INDEX_ENTRY_NOT_FOUND)
+        {
+            return null;
+        }
+        else
         {
             throw new IndexException("failed to lookup unique index, error code=" + response.getErrorCode());
         }
-        return response.getRowLocation();
     }
 
     /**
      * Lookup a non-unique index.
      * @param key the index key
-     * @return the row locations
+     * @return the row locations or null if the index entry is not found.
      */
     public List<IndexProto.RowLocation> lookupNonUniqueIndex (IndexProto.IndexKey key) throws IndexException
     {
@@ -169,11 +176,18 @@ public class IndexService
                 .setIndexKey(key).build();
 
         IndexProto.LookupNonUniqueIndexResponse response = stub.lookupNonUniqueIndex(request);
-        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        if (response.getErrorCode() == ErrorCode.INDEX_ENTRY_NOT_FOUND)
+        {
+            return null;
+        }
+        else if (response.getErrorCode() == ErrorCode.SUCCESS)
+        {
+            return response.getRowLocationsList();
+        }
+        else
         {
             throw new IndexException("failed to lookup non-unique index, error code=" + response.getErrorCode());
         }
-        return response.getRowLocationsList();
     }
 
     /**

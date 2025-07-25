@@ -134,12 +134,17 @@ public class ErrorCode
     public static final int INDEX_DELETE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 4;
     public static final int INDEX_GET_ROW_ID_FAIL = ERROR_INDEX_SERVER + 5;
     public static final int INDEX_GET_ROW_LOCATION_FAIL = ERROR_INDEX_SERVER + 6;
-    public static final int INDEX_OPEN_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 7;
-    public static final int INDEX_OPEN_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 8;
-    public static final int INDEX_CLOSE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 9;
-    public static final int INDEX_CLOSE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 10;
-    public static final int INDEX_REMOVE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 11;
-    public static final int INDEX_REMOVE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 12;
-    public static final int INDEX_FLUSH_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 13;
-    public static final int INDEX_FLUSH_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 14;
+    public static final int INDEX_ENTRY_NOT_FOUND = ERROR_INDEX_SERVER + 7;
+    public static final int INDEX_OPEN_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 8;
+    public static final int INDEX_OPEN_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 9;
+    public static final int INDEX_CLOSE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 10;
+    public static final int INDEX_CLOSE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 11;
+    public static final int INDEX_REMOVE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 12;
+    public static final int INDEX_REMOVE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 13;
+    public static final int INDEX_FLUSH_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 14;
+    public static final int INDEX_FLUSH_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 15;
+    public static final int INDEX_UPDATE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 16;
+    public static final int INDEX_UPDATE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 17;
+    public static final int INDEX_PURGE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 18;
+    public static final int INDEX_PURGE_SINGLE_POINT_FAIL = ERROR_INDEX_SERVER + 19;
 }

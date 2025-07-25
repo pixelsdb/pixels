@@ -4,7 +4,7 @@
 This is a single point index implementation based on RocksDB. The single point index is used to store the mapping between data and RowId. Combined with the MainIndex, it forms a complete indexing service, which is invoked by gRPC.
 
 ### Build Instructions
-1. Configure the RocksDB path in `pixels-common/src/main/resources/pixels.properties`.
+1. Configure the RocksDB path in `$PIXELS_HOME/etc/pixels.properties`.
 
 2. Build this together with the root project using `mvn clean install` under the root directory of this repository.
 
