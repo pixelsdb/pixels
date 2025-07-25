@@ -345,6 +345,41 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
+    public long updatePrimaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    {
+        // TODO: implement
+        return 0;
+    }
+
+    @Override
+    public List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    {
+        // TODO: implement
+        return ImmutableList.of();
+    }
+
+    @Override
+    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
+    {
+        // TODO: implement
+        return ImmutableList.of();
+    }
+
+    @Override
+    public List<Long> updateSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
+    {
+        // TODO: implement
+        return ImmutableList.of();
+    }
+
+    @Override
+    public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
+    {
+        // TODO: implement
+        return ImmutableList.of();
+    }
+
+    @Override
     public void close() throws IOException
     {
         if (!closed)

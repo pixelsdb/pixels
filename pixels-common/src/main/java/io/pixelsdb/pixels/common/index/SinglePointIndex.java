@@ -143,6 +143,46 @@ public interface SinglePointIndex extends Closeable
     boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException;
 
     /**
+     * Update an entry of this primary index.
+     * @param key the index key
+     * @param rowId the row id in the table
+     * @return previous rowId if the index entry is update successfully. Illegal rowId is below zero.
+     * Notice: updateEntry won't check the entry exist or not. For entries not found or deleted, update equals to put.
+     * @throws SinglePointIndexException
+     */
+    long updatePrimaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
+
+    /**
+     * Update an entry of this secondary index.
+     * @param key the index key
+     * @param rowId the row id in the table
+     * @return list of previous rowIds if the index entry is update successfully. Illegal list is empty.
+     * Notice: updateEntry won't check the entry exist or not. For entries not found or deleted, update equals to put.
+     * @throws SinglePointIndexException
+     */
+    List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
+
+    /**
+     * Update the index entries of a primary index.
+     * @param entries the primary index entries
+     * @return list of previous rowIds if the index entries are update successfully. Illegal list is empty.
+     * Notice: updateEntry won't check the entry exist or not. For entries not found or deleted, update equals to put.
+     * @throws SinglePointIndexException if failed to put entries into the single point index
+     */
+    List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
+            throws SinglePointIndexException;
+
+    /**
+     * Update the index entries of a secondary index. Only the index key ({@link io.pixelsdb.pixels.index.IndexProto.IndexKey})
+     * and the row ids are put into this single point index.
+     * @param entries the secondary index entries
+     * @return list of previous rowIds if the index entries are update successfully. Illegal list is empty.
+     * Notice: updateEntry won't check the entry exist or not. For entries not found or deleted, update equals to put.
+     * @throws SinglePointIndexException
+     */
+    List<Long> updateSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException;
+
+    /**
      * Delete the index entry of the index key. <b>This method should only be called on a unique index.</b>
      * @param indexKey the index key
      * @return the row id of the deleted index entry
@@ -153,7 +193,7 @@ public interface SinglePointIndex extends Closeable
     /**
      * Delete the index entry(ies) of the index key. <b>This method can be called on unique or non-unique index.</b>
      * @param indexKey the index key
-     * @return the row ids of the deleted index entry
+     * @return the row id or list of row ids of the deleted index entry
      * @throws SinglePointIndexException
      */
     List<Long> deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException;
@@ -165,6 +205,14 @@ public interface SinglePointIndex extends Closeable
      * @throws SinglePointIndexException
      */
     List<Long> deleteEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException;
+
+    /**
+     * Purge the deleted index entries. This method can be called on primary or secondary index.
+     * @param indexKeys the index keys. All entries must from the same index
+     * @return the row ids of the purged index entries
+     * @throws SinglePointIndexException
+     */
+    List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException;
 
     /**
      * Close the single point index. This method is to be used by the single point index factory to close the
