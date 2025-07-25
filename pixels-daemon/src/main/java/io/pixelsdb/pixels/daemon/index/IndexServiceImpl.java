@@ -577,10 +577,16 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                 if(isPrimary)
                 {
                     MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-                    IndexProto.RowLocation rowLocationFirst = mainIndex.getLocation(rowIds.getFirst());
-                    IndexProto.RowLocation rowLocationLast = mainIndex.getLocation(rowIds.getLast());
+                    int last = rowIds.size() - 1;
+                    IndexProto.RowLocation rowLocationFirst = mainIndex.getLocation(rowIds.get(0));
+                    IndexProto.RowLocation rowLocationLast = mainIndex.getLocation(rowIds.get(last));
                     // delete mainIndex
-                    RowIdRange rowIdRange = new RowIdRange(rowIds.getFirst(), rowIds.getLast(), rowLocationFirst.getFileId(), rowLocationFirst.getRgId(), rowLocationFirst.getRgRowOffset(), rowLocationLast.getRgRowOffset());
+                    RowIdRange rowIdRange = new RowIdRange(
+                            rowIds.getFirst(), rowIds.getLast(),
+                            rowLocationFirst.getFileId(),
+                            rowLocationFirst.getRgId(),
+                            rowLocationFirst.getRgRowOffset(),
+                            rowLocationLast.getRgRowOffset());
                     mainIndex.deleteRowIdRange(rowIdRange);
                 }
                 else

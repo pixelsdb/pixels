@@ -39,9 +39,7 @@ import org.rocksdb.RocksDBException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -151,7 +149,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testGetUniqueRowId() throws MainIndexException, SinglePointIndexException
+    public void testGetUniqueRowId() throws  SinglePointIndexException
     {
         long indexId = 1L;
         byte[] key = "multiKey".getBytes();
@@ -181,42 +179,42 @@ public class TestRocksDBIndex
         assertEquals(rowId2, result, "getUniqueRowId should return the rowId of the latest timestamp entry");
     }
 
-//    @Test
-//    public void testGetRowIds() throws MainIndexException, SinglePointIndexException
-//    {
-//        long indexId = 1L;
-//        byte[] key = "multiKey".getBytes();
-//        long timestamp1 = System.currentTimeMillis();
-//        long timestamp2 = timestamp1 + 1000; // newer
-//
-//        long rowId1 = 111L;
-//        long rowId2 = 222L; // expected
-//        List<Long> rowIds = new ArrayList<>();
-//        rowIds.add(rowId1);
-//        rowIds.add(rowId2);
-//
-//        IndexProto.IndexKey key1 = IndexProto.IndexKey.newBuilder()
-//                .setIndexId(indexId)
-//                .setKey(ByteString.copyFrom(key))
-//                .setTimestamp(timestamp1)
-//                .build();
-//
-//        rocksDBIndex.putEntry(key1, rowId1);
-//
-//        IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
-//                .setIndexId(indexId)
-//                .setKey(ByteString.copyFrom(key))
-//                .setTimestamp(timestamp2)
-//                .build();
-//
-//        rocksDBIndex.putEntry(key2,rowId2);
-//
-//        List<Long> result = rocksDBIndex.getRowIds(key2);
-//        assertEquals(rowIds, result, "getRowIds should return the rowId of all entry");
-//    }
+    @Test
+    public void testGetRowIds() throws SinglePointIndexException
+    {
+        long indexId = 1L;
+        byte[] key = "multiKey".getBytes();
+        long timestamp1 = System.currentTimeMillis();
+        long timestamp2 = timestamp1 + 1000; // newer
+
+        long rowId1 = 111L;
+        long rowId2 = 222L; // expected
+        List<Long> rowIds = new ArrayList<>();
+        rowIds.add(rowId1);
+        rowIds.add(rowId2);
+
+        IndexProto.IndexKey key1 = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp1)
+                .build();
+
+        rocksDBIndex.putEntry(key1, rowId1);
+
+        IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp2)
+                .build();
+
+        rocksDBIndex.putEntry(key2,rowId2);
+
+        List<Long> result = rocksDBIndex.getRowIds(key2);
+        assertEquals(rowIds, result, "getRowIds should return the rowId of all entry");
+    }
 
     @Test
-    public void testDeleteEntry() throws RocksDBException, SinglePointIndexException
+    public void testDeleteEntry() throws SinglePointIndexException
     {
         byte[] key = "exampleKey".getBytes();
         long timestamp = System.currentTimeMillis();
@@ -235,7 +233,7 @@ public class TestRocksDBIndex
     }
 
     @Test
-    public void testDeleteEntries() throws RocksDBException, SinglePointIndexException, MainIndexException
+    public void testDeleteEntries() throws SinglePointIndexException, MainIndexException
     {
         long timestamp = System.currentTimeMillis();
         long fileId = 1L;
@@ -315,7 +313,40 @@ public class TestRocksDBIndex
 
     @Disabled("Performance test, run manually")
     @Test
-    public void benchmarkPutEntry() throws RocksDBException, SinglePointIndexException
+    public void benchmarkGetUniqueRowId() throws SinglePointIndexException
+    {
+        int count = 1_000_000;
+        byte[] key = "putBenchmarkKey".getBytes();
+        ImmutableList.Builder<IndexProto.IndexKey> builder = ImmutableList.builder();
+
+        // prepare data
+        for (int i = 0; i < count; i++)
+        {
+            long timestamp = System.currentTimeMillis();
+
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                    .setIndexId(indexId)
+                    .setKey(ByteString.copyFrom(key))
+                    .setTimestamp(timestamp)
+                    .build();
+
+            rocksDBIndex.putEntry(keyProto, i);
+            builder.add(keyProto);
+        }
+        // get rowId
+        long start = System.nanoTime();
+        for (IndexProto.IndexKey keyProto : builder.build())
+        {
+            rocksDBIndex.getUniqueRowId(keyProto);
+        }
+        long end = System.nanoTime();
+        double durationMs = (end - start) / 1_000_000.0;
+        System.out.printf("Get %,d unique rowIds in %.2f ms (%.2f ops/sec)%n", count, durationMs, count * 1000.0 / durationMs);
+    }
+
+    @Disabled("Performance test, run manually")
+    @Test
+    public void benchmarkPutEntry() throws SinglePointIndexException
     {
         int count = 1_000_000;
         byte[] key = "putBenchmarkKey".getBytes();
@@ -339,7 +370,7 @@ public class TestRocksDBIndex
 
     @Disabled("Performance test, run manually")
     @Test
-    public void benchmarkDeleteEntry() throws RocksDBException, SinglePointIndexException
+    public void benchmarkDeleteEntry() throws SinglePointIndexException
     {
         int count = 1_000_000;
         byte[] key = "deleteBenchmarkKey".getBytes();
