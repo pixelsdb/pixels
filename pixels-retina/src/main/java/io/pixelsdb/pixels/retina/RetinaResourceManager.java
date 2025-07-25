@@ -121,15 +121,15 @@ public class RetinaResourceManager
         rgVisibility.getVisibilityBitmap(timestamp);
     }
 
-    public void deleteRecord(long fileId, int rgId, int rgRowId, long timestamp) throws RetinaException
+    public void deleteRecord(long fileId, int rgId, int rgRowOffset, long timestamp) throws RetinaException
     {
         RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
-        rgVisibility.deleteRecord(rgRowId, timestamp);
+        rgVisibility.deleteRecord(rgRowOffset, timestamp);
     }
 
     public void deleteRecord(IndexProto.RowLocation rowLocation, long timestamp) throws RetinaException
     {
-        deleteRecord(rowLocation.getFileId(), rowLocation.getRgId(), rowLocation.getRgRowId(), timestamp);
+        deleteRecord(rowLocation.getFileId(), rowLocation.getRgId(), rowLocation.getRgRowOffset(), timestamp);
     }
 
     public void addWriterBuffer(String schemaName, String tableName) throws RetinaException
