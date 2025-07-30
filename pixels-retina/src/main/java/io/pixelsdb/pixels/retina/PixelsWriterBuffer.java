@@ -33,6 +33,7 @@ import java.util.stream.LongStream;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -72,7 +73,7 @@ public class PixelsWriterBuffer
     private final Path targetCompactDirPath;
     private final Storage targetOrderedStorage;
     private final Storage targetCompactStorage;
-
+    private final RowIdAllocator rowIdAllocator;
     /**
      * Allocate unique identifier for data (MemTable/MinioEntry)
      * There is no need to use atomic variables because
@@ -158,6 +159,7 @@ public class PixelsWriterBuffer
 
         // Initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
+        this.rowIdAllocator = new RowIdAllocator(tableId, 10); // TODO(AntiO2): Batch Size
 
         startFlushMinioToDiskScheduler();
     }
@@ -167,9 +169,9 @@ public class PixelsWriterBuffer
      *
      * @param values
      * @param timestamp
-     * @return
+     * @return RowID
      */
-    public boolean addRow(byte[][] values, long timestamp) throws RetinaException
+    public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
     {
         int columnCount = this.schema.getChildren().size();
         checkArgument(values.length == columnCount,
@@ -181,13 +183,17 @@ public class PixelsWriterBuffer
             this.versionLock.readLock().lock();
             added = this.activeMemTable.add(values, timestamp);
             this.versionLock.readLock().unlock();
-
             if (!added)  // active memTable is full
             {
                 switchMemTable();
             }
         }
-        return true;
+        int rowOffset = (int) (currentMemTableCount * blockSize - blockSize + idCounter);
+        builder.setFileId(currentFileWriterManager.getFileId())
+                .setRgId(0)
+                .setRgRowOffset(rowOffset);
+
+        return rowIdAllocator.getRowId();
     }
 
     private void switchMemTable()

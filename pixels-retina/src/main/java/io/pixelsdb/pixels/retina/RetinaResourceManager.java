@@ -50,7 +50,6 @@ public class RetinaResourceManager
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
     private final Map<String, PixelsWriterBuffer> pixelsWriterBufferMap;
-
     private RetinaResourceManager()
     {
         this.metadataService = MetadataService.Instance();
@@ -160,10 +159,12 @@ public class RetinaResourceManager
         }
     }
 
-    public void insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
+    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
     {
+        IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
         PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
-        writerBuffer.addRow(colValues, timestamp);
+        builder.setRowId(writerBuffer.addRow(colValues, timestamp, builder.getRowLocationBuilder()));
+        return builder;
     }
 
     private RetinaProto.VisibilityBitmap getVisibilityBitmapSlice(long[] visibilityBitmap, long startIndex, int length)

@@ -23,6 +23,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.index.IndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
@@ -54,6 +55,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 {
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
     private final MetadataService metadataService;
+    private final IndexService indexService;
     private final RetinaResourceManager retinaResourceManager;
 
     /**
@@ -62,6 +64,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     public RetinaServerImpl()
     {
         this.metadataService = MetadataService.Instance();
+        this.indexService = IndexService.Instance();
         this.retinaResourceManager = RetinaResourceManager.Instance();
         try
         {
@@ -134,9 +137,18 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     {
                         colValuesByteArray[i] = colValuesList.get(i).toByteArray();
                     }
-                    // TODO: insert index
-                    this.retinaResourceManager.insertRecord(schemaName, insertData.getTableName(),
+
+                    IndexProto.PrimaryIndexEntry.Builder primaryIndexEntryBuilder =
+                            this.retinaResourceManager.insertRecord(schemaName, insertData.getTableName(),
                             colValuesByteArray, timestamp);
+                    // TODO: insert index
+
+                    IndexProto.PrimaryIndexEntry.newBuilder();
+                    primaryIndexEntryBuilder.setIndexKey(insertData.getIndexKeys(0))
+                            .setRowId()
+                            .setRowLocation();
+
+                    this.indexService.putPrimaryIndexEntry(primaryIndexEntryBuilder.build());
                 }
             }
 
