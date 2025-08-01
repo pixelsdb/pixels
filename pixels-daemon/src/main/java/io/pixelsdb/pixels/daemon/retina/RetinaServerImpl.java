@@ -21,27 +21,22 @@ package io.pixelsdb.pixels.daemon.retina;
 
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
-import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.index.IndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
-import io.pixelsdb.pixels.common.physical.PhysicalReader;
-import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.index.IndexProto;
-import io.pixelsdb.pixels.retina.*;
+import io.pixelsdb.pixels.retina.RetinaProto;
+import io.pixelsdb.pixels.retina.RetinaResourceManager;
+import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -120,57 +115,56 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
-        try
-        {
             String schemaName = request.getSchemaName();
             long timestamp = request.getTimestamp();
 
-            // insert record
-            List<RetinaProto.InsertData> insertDataList = request.getInsertDataList();
-            if (!insertDataList.isEmpty())
-            {
-                for (RetinaProto.InsertData insertData : insertDataList)
-                {
-                    List<ByteString> colValuesList = insertData.getColValuesList();
-                    byte[][] colValuesByteArray = new byte[colValuesList.size()][];
-                    for (int i = 0; i < colValuesList.size(); ++i)
-                    {
-                        colValuesByteArray[i] = colValuesList.get(i).toByteArray();
+            // update record
+            List<RetinaProto.UpdateData> updateDataList = request.getUpdateDataList();
+            if(updateDataList.isEmpty()) {
+                return;
+            }
+
+            for(RetinaProto.UpdateData updateData : updateDataList) {
+                try {
+                    if (updateData.hasDelete()) {
+                        // delete record
+                        RetinaProto.DeleteData deleteData = updateData.getDelete();
+                        try {
+                            IndexProto.RowLocation rowLocation = indexService.deletePrimaryIndexEntry(deleteData.getIndexKeys(0));
+                            this.retinaResourceManager.deleteRecord(rowLocation, timestamp);
+                        } catch (IndexException e) {
+                            throw new RetinaException(e);
+                        }
                     }
+                    if (updateData.hasInsert()) {
+                        RetinaProto.InsertData insertData = updateData.getInsert();
+                        List<ByteString> colValuesList = insertData.getColValuesList();
+                        byte[][] colValuesByteArray = new byte[colValuesList.size()][];
+                        for (int i = 0; i < colValuesList.size(); ++i) {
+                            colValuesByteArray[i] = colValuesList.get(i).toByteArray();
+                        }
 
-                    IndexProto.PrimaryIndexEntry.Builder primaryIndexEntryBuilder =
-                            this.retinaResourceManager.insertRecord(schemaName, insertData.getTableName(),
-                            colValuesByteArray, timestamp);
-                    // TODO: insert index
-
-                    IndexProto.PrimaryIndexEntry.newBuilder();
-                    primaryIndexEntryBuilder.setIndexKey(insertData.getIndexKeys(0))
-                            .setRowId()
-                            .setRowLocation();
-
-                    this.indexService.putPrimaryIndexEntry(primaryIndexEntryBuilder.build());
-                }
-            }
-
-            // delete record
-            List<RetinaProto.DeleteData> deleteDataList = request.getDeleteDataList();
-            if (!deleteDataList.isEmpty())
-            {
-                for (RetinaProto.DeleteData deleteData : deleteDataList)
+                        IndexProto.PrimaryIndexEntry.Builder primaryIndexEntryBuilder =
+                                this.retinaResourceManager.insertRecord(schemaName, insertData.getTableName(),
+                                        colValuesByteArray, timestamp);
+                        primaryIndexEntryBuilder.setIndexKey(insertData.getIndexKeys(0));
+                        try {
+                            this.indexService.putPrimaryIndexEntry(primaryIndexEntryBuilder.build());
+                        } catch (IndexException e) {
+                            // TODO: If the index insertion fails, we need to roll back the insertion of the retina.
+                            // or retry?
+                            throw new RetinaException(e);
+                        }
+                    }
+                } catch (RetinaException e)
                 {
-                    // TODO: delete index
-                    IndexProto.RowLocation rowLocation = null; // returned by deleteIndex
-                    this.retinaResourceManager.deleteRecord(rowLocation, timestamp);
+                    headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+                    responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
+                            .setHeader(headerBuilder.build())
+                            .build());
+                    responseObserver.onCompleted();
                 }
             }
-        } catch (RetinaException e)
-        {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .build());
-            responseObserver.onCompleted();
-        }
     }
 
     @Override

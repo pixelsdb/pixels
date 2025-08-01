@@ -114,15 +114,13 @@ public class RetinaService
         }
     }
 
-    public boolean updateRecord(String schemaName, List<RetinaProto.InsertData> insertData,
-                                List<RetinaProto.DeleteData> deleteData, long timestamp) throws RetinaException
+    public boolean updateRecord(String schemaName, List<RetinaProto.UpdateData> updateData, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
-                .addAllInsertData(insertData)
-                .addAllDeleteData(deleteData)
+                .addAllUpdateData(updateData)
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.UpdateRecordResponse response = this.stub.updateRecord(request);

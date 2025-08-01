@@ -69,13 +69,18 @@ message DeleteData {
     repeated index.proto.IndexKey indexKeys = 2;
 }
 
+message UpdateData {
+    oneof update {
+        InsertData insert = 1;
+        DeleteData delete = 2;
+    }
+}
 // update
 message UpdateRecordRequest {
     RequestHeader header = 1;
     string schemaName = 2;
-    repeated InsertData insertData = 3;
-    repeated DeleteData deleteData = 4;
-    uint64 timestamp = 5;
+    repeated UpdateData updateData = 3;
+    uint64 timestamp = 4;
 }
 
 message UpdateRecordResponse {

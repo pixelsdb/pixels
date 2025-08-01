@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -85,9 +86,10 @@ public class TestPixelsWriterBuffer
                     byte[][] values = new byte[columnTypes.size()][];
                     for (int i = 0; i < numRowsPerThread; ++i)
                     {
+                        IndexProto.RowLocation.Builder builder = IndexProto.RowLocation.newBuilder();
                         values[0] = String.valueOf(threadId * numRowsPerThread + i).getBytes();
                         values[1] = String.valueOf(threadId * numRowsPerThread + i + 1).getBytes();
-                        buffer.addRow(values, threadId);
+                        buffer.addRow(values, threadId, builder);
                     }
                 } catch (Exception e)
                 {
