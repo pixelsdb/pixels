@@ -33,6 +33,7 @@ import java.util.stream.LongStream;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -72,7 +73,7 @@ public class PixelsWriterBuffer
     private final Path targetCompactDirPath;
     private final Storage targetOrderedStorage;
     private final Storage targetCompactStorage;
-
+    private final RowIdAllocator rowIdAllocator;
     /**
      * Allocate unique identifier for data (MemTable/MinioEntry)
      * There is no need to use atomic variables because
@@ -151,13 +152,14 @@ public class PixelsWriterBuffer
                 0, this.memTableSize * this.maxMemTableCount);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
-                TypeDescription.Mode.NONE, this.currentFileWriterManager.getFileId(),
+                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
                 0, this.memTableSize);
         this.idCounter++;
         this.currentMemTableCount = 1;
 
         // Initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
+        this.rowIdAllocator = new RowIdAllocator(tableId, 200);
 
         startFlushMinioToDiskScheduler();
     }
@@ -167,27 +169,31 @@ public class PixelsWriterBuffer
      *
      * @param values
      * @param timestamp
-     * @return
+     * @return RowID
      */
-    public boolean addRow(byte[][] values, long timestamp) throws RetinaException
+    public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
     {
         int columnCount = this.schema.getChildren().size();
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
-        boolean added = false;
-        while (!added)
+        int rowOffset = -1;
+        while (rowOffset < 0)
         {
             this.versionLock.readLock().lock();
-            added = this.activeMemTable.add(values, timestamp);
+            rowOffset = this.activeMemTable.add(values, timestamp);
             this.versionLock.readLock().unlock();
-
-            if (!added)  // active memTable is full
+            if (rowOffset < 0)  // active memTable is full
             {
                 switchMemTable();
             }
         }
-        return true;
+        int rgRowOffset = (int) (currentMemTableCount * blockSize - blockSize + rowOffset);
+        builder.setFileId(activeMemTable.getFileId())
+                .setRgId(0)
+                .setRgRowOffset(rgRowOffset);
+
+        return rowIdAllocator.getRowId();
     }
 
     private void switchMemTable()
@@ -221,7 +227,7 @@ public class PixelsWriterBuffer
             SuperVersion oldVersion = this.currentVersion;
             this.immutableMemTables.add(this.activeMemTable);
             this.activeMemTable = new MemTable(this.idCounter, this.schema,
-                    this.memTableSize, TypeDescription.Mode.NONE,
+                    this.memTableSize, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
                     this.currentFileWriterManager.getFileId(),
                     this.currentMemTableCount * this.memTableSize,
                     this.memTableSize);

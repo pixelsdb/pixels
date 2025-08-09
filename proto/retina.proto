@@ -59,23 +59,27 @@ message VisibilityBitmap {
 }
 
 message InsertData {
-    string tableName = 1;
-    repeated index.proto.IndexKey indexKeys = 2;
-    repeated bytes colValues = 3;
+    repeated index.proto.IndexKey indexKeys = 1;
+    repeated bytes colValues = 2;
 }
 
 message DeleteData {
+    repeated index.proto.IndexKey indexKeys = 1;
+}
+
+message TableUpdateData {
     string tableName = 1;
-    repeated index.proto.IndexKey indexKeys = 2;
+    uint64 primaryIndexId = 2;
+    repeated DeleteData deleteData = 3;
+    repeated InsertData insertData = 4;
 }
 
 // update
 message UpdateRecordRequest {
     RequestHeader header = 1;
     string schemaName = 2;
-    repeated InsertData insertData = 3;
-    repeated DeleteData deleteData = 4;
-    uint64 timestamp = 5;
+    repeated TableUpdateData tableUpdateData = 3;
+    uint64 timestamp = 4;
 }
 
 message UpdateRecordResponse {

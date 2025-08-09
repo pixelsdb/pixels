@@ -160,10 +160,12 @@ public class RetinaResourceManager
         }
     }
 
-    public void insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
+    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
     {
+        IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
         PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
-        writerBuffer.addRow(colValues, timestamp);
+        builder.setRowId(writerBuffer.addRow(colValues, timestamp, builder.getRowLocationBuilder()));
+        return builder;
     }
 
     private RetinaProto.VisibilityBitmap getVisibilityBitmapSlice(long[] visibilityBitmap, long startIndex, int length)
@@ -191,7 +193,7 @@ public class RetinaResourceManager
                 .build();
     }
 
-    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName, long timestamp) throws RetinaException
+    public RetinaProto.GetWriterBufferResponse.Builder getWriterBuffer(String schemaName, String tableName, long timestamp) throws RetinaException
     {
         RetinaProto.GetWriterBufferResponse.Builder responseBuilder = RetinaProto.GetWriterBufferResponse.newBuilder();
 
@@ -245,6 +247,9 @@ public class RetinaResourceManager
             responseBuilder.addBitmaps(getVisibilityBitmapSlice(
                     fileIdToVisibility.get(activeMemtable.getFileId()),
                     activeMemtable.getStartIndex(), activeMemtable.getLength()));
+        } else
+        {
+            responseBuilder.addBitmaps(RetinaProto.VisibilityBitmap.newBuilder());
         }
         for (MemTable immutableMemtable : immutableMemTables)
         {
@@ -262,7 +267,7 @@ public class RetinaResourceManager
         // unref super version
         superVersion.unref();
 
-        return responseBuilder.build();
+        return responseBuilder;
     }
 
     /**
