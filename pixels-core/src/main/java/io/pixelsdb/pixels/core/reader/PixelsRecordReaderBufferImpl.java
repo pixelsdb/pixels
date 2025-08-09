@@ -38,7 +38,8 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
+public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
+{
 
     private byte[] data;
     private final byte[] activeMemtableData;
@@ -86,6 +87,8 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
     private final List<RetinaProto.VisibilityBitmap> visibilityBitmap;
     private TypeDescription resultSchema = null;
     private final List<PixelsProto.Type> includedColumnTypes;
+    private long dataReadBytes = 0L;
+    private long dataReadRow = 0L;
 
     private static boolean checkBit(RetinaProto.VisibilityBitmap bitmap, int k)
     {
@@ -94,12 +97,13 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
     }
 
     public PixelsRecordReaderBufferImpl(PixelsReaderOption option,
-                                 byte[] activeMemtableData, List<Long> fileIds,  // read version
-                                 List<RetinaProto.VisibilityBitmap> visibilityBitmap,
-                                 Storage storage,
-                                 String schemaName, String tableName, // to locate file with file id
-                                 TypeDescription typeDescription
-    ) throws IOException {
+                                        byte[] activeMemtableData, List<Long> fileIds,  // read version
+                                        List<RetinaProto.VisibilityBitmap> visibilityBitmap,
+                                        Storage storage,
+                                        String schemaName, String tableName, // to locate file with file id
+                                        TypeDescription typeDescription
+    ) throws IOException
+    {
         this.option = option;
         this.activeMemtableData = activeMemtableData;
         this.fileIds = fileIds;
@@ -114,7 +118,8 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
         checkBeforeRead();
     }
 
-    private void checkBeforeRead() throws IOException {
+    private void checkBeforeRead() throws IOException
+    {
         // filter included columns
         includedColumnNum = 0;
         String[] optionIncludedCols = option.getIncludedCols();
@@ -122,9 +127,12 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
 
         List<Integer> optionColsIndices = new ArrayList<>();
         this.includedColumns = new boolean[colNum];
-        for (String col : optionIncludedCols) {
-            for (int j = 0; j < colNum; j++) {
-                if (col.equalsIgnoreCase(typeDescription.getFieldNames().get(j))) {
+        for (String col : optionIncludedCols)
+        {
+            for (int j = 0; j < colNum; j++)
+            {
+                if (col.equalsIgnoreCase(typeDescription.getFieldNames().get(j)))
+                {
                     optionColsIndices.add(j);
                     includedColumns[j] = true;
                     includedColumnNum++;
@@ -134,30 +142,35 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
         }
 
         // check included columns
-        if (includedColumnNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution()) {
+        if (includedColumnNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution())
+        {
             checkValid = false;
             throw new IOException("includedColumnsNum is " + includedColumnNum +
                     " whereas optionIncludedCols.length is " + optionIncludedCols.length);
         }
 
         // check retina
-        if(visibilityBitmap.size() != fileIds.size() + 1) {
+        if (visibilityBitmap.size() != fileIds.size() + 1)
+        {
             checkValid = false;
-            throw new IOException("visibilityBitmap.getBitmapCount is " + visibilityBitmap.getFirst().getBitmapCount() +
-                     "except: " + fileIds.size() + 1);
+            throw new IOException("visibilityBitmap.getSize is " + visibilityBitmap.size() +
+                    "except: " + fileIds.size() + 1);
         }
 
         // create result columns storing result column ids in user specified order
         this.resultColumns = new int[optionIncludedCols.length];
-        for (int i = 0; i < optionIncludedCols.length; i++) {
+        for (int i = 0; i < optionIncludedCols.length; i++)
+        {
             this.resultColumns[i] = optionColsIndices.get(i);
         }
         // assign target columns, ordered by original column order in schema
         int targetColumnNum = new HashSet<>(optionColsIndices).size();
         targetColumns = new int[targetColumnNum];
         int targetColIdx = 0;
-        for (int i = 0; i < includedColumns.length; i++) {
-            if (includedColumns[i]) {
+        for (int i = 0; i < includedColumns.length; i++)
+        {
+            if (includedColumns[i])
+            {
                 targetColumns[targetColIdx] = i;
                 targetColIdx++;
             }
@@ -165,39 +178,44 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
         checkValid = true;
     }
 
-
     // get Data of the next memtable
-    private boolean read() throws IOException {
-        if (!checkValid) {
+    private boolean read() throws IOException
+    {
+        if (!checkValid)
+        {
             return false;
         }
 
-        if (endOfFile) {
+        if (endOfFile)
+        {
             return false;
         }
 
-        if (!activeMemtableDataEverRead) {
+        if (!activeMemtableDataEverRead)
+        {
             // We haven't read active memory table data yet
             activeMemtableDataEverRead = true;
-            if (activeMemtableData != null && activeMemtableData.length != 0) {
+            if (activeMemtableData != null && activeMemtableData.length != 0)
+            {
                 data = activeMemtableData;
                 return true;
             }
         }
 
-        if (fileIdIndex >= fileIds.size()) {
+        if (fileIdIndex >= fileIds.size())
+        {
             endOfFile = true;
             return false;
         }
 
         String path = getMinioPathFromId(fileIdIndex++);
-        getMemtableDataFromMinio(path);
+        getMemtableDataFromStorage(path);
         return true;
     }
 
-
     @Override
-    public int prepareBatch(int batchSize) throws IOException {
+    public int prepareBatch(int batchSize) throws IOException
+    {
         return batchSize;
     }
 
@@ -208,7 +226,8 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
      * @param size the number of rows in the row batch.
      * @return the empty row batch.
      */
-    private VectorizedRowBatch createEmptyEOFRowBatch(int size) {
+    private VectorizedRowBatch createEmptyEOFRowBatch(int size)
+    {
         TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
         VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0, this.typeMode);
         resultRowBatch.projectionSize = 0;
@@ -218,9 +237,11 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
     }
 
     @Override
-    public VectorizedRowBatch readBatch() throws IOException {
+    public VectorizedRowBatch readBatch() throws IOException
+    {
         long start = System.nanoTime();
-        if (!read()) {
+        if (!read())
+        {
             return createEmptyEOFRowBatch(0);
         }
         readTimeNanos += System.nanoTime() - start;
@@ -234,127 +255,155 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader {
         int curBatchSize = curRowBatch.size;
         Bitmap selectedRows = new Bitmap(curBatchSize, false);
         int addedRows = 0;
-        for (int i = 0; i < curBatchSize; i++) {
+        for (int i = 0; i < curBatchSize; i++)
+        {
             if ((hiddenTimestampVector == null || hiddenTimestampVector.vector[i] <= this.option.getTransTimestamp())
-                    && (!checkBit(visibilityBitmap.get(fileIdIndex), i))) {
+                    && (!checkBit(visibilityBitmap.get(fileIdIndex), i)))
+            {
                 selectedRows.set(i);
                 addedRows++;
             }
         }
         curRowBatch.applyFilter(selectedRows);
+        dataReadBytes += data.length;
+        dataReadRow += curRowBatch.size;
         return curRowBatch;
     }
 
     @Override
-    public TypeDescription getResultSchema() {
+    public TypeDescription getResultSchema()
+    {
         // TODO(AntiO2): Schema evolution is currently not supported in Retina.
         return typeDescription;
     }
 
     @Override
-    public boolean isValid() {
+    public boolean isValid()
+    {
         return false;
     }
 
     @Override
-    public boolean isEndOfFile() {
+    public boolean isEndOfFile()
+    {
         return endOfFile;
     }
 
     @Override
-    public boolean seekToRow(long rowIndex) throws IOException {
+    public boolean seekToRow(long rowIndex) throws IOException
+    {
         return false;
     }
 
     @Override
-    public boolean skip(long rowNum) throws IOException {
+    public boolean skip(long rowNum) throws IOException
+    {
         return false;
     }
 
     @Override
-    public long getCompletedRows() {
-        return 0;
+    public long getCompletedRows()
+    {
+        return dataReadRow;
     }
 
     @Override
-    public long getCompletedBytes() {
-        return 0;
+    public long getCompletedBytes()
+    {
+        return dataReadBytes;
     }
 
     @Override
-    public int getNumReadRequests() {
+    public int getNumReadRequests()
+    {
         return fileIdIndex;
     }
 
     @Override
-    public long getReadTimeNanos() {
+    public long getReadTimeNanos()
+    {
         return readTimeNanos;
     }
 
     @Override
-    public long getMemoryUsage() {
+    public long getMemoryUsage()
+    {
         return 0;
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() throws IOException
+    {
         scheduler.shutdown();
     }
 
-    private String getMinioPathFromId(Integer id) {
+    private String getMinioPathFromId(Integer id)
+    {
         return schemaName + '/' + tableName + '/' + id;
     }
 
-    private void getMemtableDataFromMinio(String path) throws IOException {
+    private void getMemtableDataFromStorage(String path) throws IOException
+    {
         // Firstly, if the id is an immutable memtable,
         // we need to wait for it to be flushed to the storage
         // (currently implemented using minio)
         CountDownLatch latch = new CountDownLatch(1);
         final AtomicBoolean fileExists = new AtomicBoolean(false);
 
-        ScheduledFuture<?> pollTask = scheduler.scheduleAtFixedRate(() -> {
-            try {
-                if (storage.exists(path)) {
+        ScheduledFuture<?> pollTask = scheduler.scheduleAtFixedRate(() ->
+        {
+            try
+            {
+                if (storage.exists(path))
+                {
                     fileExists.set(true);
                     latch.countDown();
                 }
-            } catch (IOException e) {
+            } catch (IOException e)
+            {
                 fileExists.set(false);
                 latch.countDown();
             }
         }, 0, POLL_INTERVAL_MILLS, TimeUnit.MILLISECONDS);
-        try {
+        try
+        {
             latch.await();
             pollTask.cancel(true);
 
-            if (!fileExists.get()) {
+            if (!fileExists.get())
+            {
                 throw new IOException("Can't get Retina File: " + path);
             }
             // Create Physical Reader & read this object fully
             ByteBuffer buffer;
-            try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path)) {
+            try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path))
+            {
                 int length = (int) reader.getFileLength();
                 buffer = reader.readFully(length);
             }
             data = buffer.array();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException e)
+        {
             throw new RuntimeException("failed to sleep for retry to get retina file", e);
         }
     }
 
 
     @Override
-    public VectorizedRowBatch readBatch(int batchSize, boolean reuse) throws IOException {
+    public VectorizedRowBatch readBatch(int batchSize, boolean reuse) throws IOException
+    {
         return readBatch();
     }
 
     @Override
-    public VectorizedRowBatch readBatch(int batchSize) throws IOException {
+    public VectorizedRowBatch readBatch(int batchSize) throws IOException
+    {
         return readBatch();
     }
 
     @Override
-    public VectorizedRowBatch readBatch(boolean reuse) throws IOException {
+    public VectorizedRowBatch readBatch(boolean reuse) throws IOException
+    {
         return readBatch();
     }
 }
