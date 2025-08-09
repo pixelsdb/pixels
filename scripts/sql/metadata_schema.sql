@@ -341,7 +341,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
 -- Table `pixels_metadata`.`SINGLE_POINT_INDICES`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`SINGLE_POINT_INDICES` (
-    `SPI_ID` BIGINT NOT NULL,
+    `SPI_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `SPI_KEY_COLUMNS` TEXT NOT NULL COMMENT 'The ids of the key columns of this index, stored in json format.',
     `SPI_PRIMARY` TINYINT NOT NULL COMMENT 'True (1) if this single point index is the primary index. There can be only one primary index on a table.',
     `SPI_UNIQUE` TINYINT NOT NULL COMMENT 'True (1) if this single point index is an unique index.',
