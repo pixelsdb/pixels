@@ -114,13 +114,13 @@ public class RetinaService
         }
     }
 
-    public boolean updateRecord(String schemaName, List<RetinaProto.UpdateData> updateData, long timestamp) throws RetinaException
+    public boolean updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData, long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
-                .addAllUpdateData(updateData)
+                .addAllTableUpdateData(tableUpdateData)
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.UpdateRecordResponse response = this.stub.updateRecord(request);
@@ -210,12 +210,12 @@ public class RetinaService
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.GetWriterBufferRequest request = RetinaProto.GetWriterBufferRequest.newBuilder()
-            .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-            .setSchemaName(schemaName)
-            .setTableName(tableName)
-            .build();
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName)
+                .setTableName(tableName)
+                .build();
         RetinaProto.GetWriterBufferResponse response = this.stub.getWriterBuffer(request);
-                if (response.getHeader().getErrorCode() != 0)
+        if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("Schema: " + schemaName + "\tTable: " + tableName + ", failed to get superversion: " + response.getHeader().getErrorCode()
                     + " " + response.getHeader().getErrorMsg());

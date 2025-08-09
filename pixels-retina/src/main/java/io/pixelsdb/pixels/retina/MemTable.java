@@ -55,14 +55,14 @@ public class MemTable implements Referenceable
      * values is one record with all column values and timestamp.
      * @param values
      * @param timestamp
-     * @return
+     * @return rowOffset
      * @throws RetinaException
      */
-    public synchronized boolean add(byte[][] values, long timestamp) throws RetinaException
+    public synchronized int add(byte[][] values, long timestamp) throws RetinaException
     {
         if (isFull())
         {
-            return false;
+            return -1;
         }
         int columnCount = schema.getChildren().size();
         checkArgument(values.length == columnCount,
@@ -73,8 +73,7 @@ public class MemTable implements Referenceable
             this.rowBatch.cols[i].add(new String(values[i]));
         }
         this.rowBatch.cols[columnCount].add(timestamp);
-        this.rowBatch.size++;
-        return true;
+        return this.rowBatch.size++;
     }
 
     public long getId()

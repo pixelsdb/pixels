@@ -50,6 +50,7 @@ public class RetinaResourceManager
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
     private final Map<String, PixelsWriterBuffer> pixelsWriterBufferMap;
+
     private RetinaResourceManager()
     {
         this.metadataService = MetadataService.Instance();
@@ -192,7 +193,7 @@ public class RetinaResourceManager
                 .build();
     }
 
-    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName, long timestamp) throws RetinaException
+    public RetinaProto.GetWriterBufferResponse.Builder getWriterBuffer(String schemaName, String tableName, long timestamp) throws RetinaException
     {
         RetinaProto.GetWriterBufferResponse.Builder responseBuilder = RetinaProto.GetWriterBufferResponse.newBuilder();
 
@@ -246,6 +247,9 @@ public class RetinaResourceManager
             responseBuilder.addBitmaps(getVisibilityBitmapSlice(
                     fileIdToVisibility.get(activeMemtable.getFileId()),
                     activeMemtable.getStartIndex(), activeMemtable.getLength()));
+        } else
+        {
+            responseBuilder.addBitmaps(RetinaProto.VisibilityBitmap.newBuilder());
         }
         for (MemTable immutableMemtable : immutableMemTables)
         {
@@ -263,7 +267,7 @@ public class RetinaResourceManager
         // unref super version
         superVersion.unref();
 
-        return responseBuilder.build();
+        return responseBuilder;
     }
 
     /**

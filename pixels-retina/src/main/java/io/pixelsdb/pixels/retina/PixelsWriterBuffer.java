@@ -152,14 +152,14 @@ public class PixelsWriterBuffer
                 0, this.memTableSize * this.maxMemTableCount);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
-                TypeDescription.Mode.NONE, this.currentFileWriterManager.getFileId(),
+                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
                 0, this.memTableSize);
         this.idCounter++;
         this.currentMemTableCount = 1;
 
         // Initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
-        this.rowIdAllocator = new RowIdAllocator(tableId, 10); // TODO(AntiO2): Batch Size
+        this.rowIdAllocator = new RowIdAllocator(tableId, 200);
 
         startFlushMinioToDiskScheduler();
     }
@@ -177,21 +177,21 @@ public class PixelsWriterBuffer
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
-        boolean added = false;
-        while (!added)
+        int rowOffset = -1;
+        while (rowOffset < 0)
         {
             this.versionLock.readLock().lock();
-            added = this.activeMemTable.add(values, timestamp);
+            rowOffset = this.activeMemTable.add(values, timestamp);
             this.versionLock.readLock().unlock();
-            if (!added)  // active memTable is full
+            if (rowOffset < 0)  // active memTable is full
             {
                 switchMemTable();
             }
         }
-        int rowOffset = (int) (currentMemTableCount * blockSize - blockSize + idCounter);
-        builder.setFileId(currentFileWriterManager.getFileId())
+        int rgRowOffset = (int) (currentMemTableCount * blockSize - blockSize + rowOffset);
+        builder.setFileId(activeMemTable.getFileId())
                 .setRgId(0)
-                .setRgRowOffset(rowOffset);
+                .setRgRowOffset(rgRowOffset);
 
         return rowIdAllocator.getRowId();
     }
@@ -227,7 +227,7 @@ public class PixelsWriterBuffer
             SuperVersion oldVersion = this.currentVersion;
             this.immutableMemTables.add(this.activeMemTable);
             this.activeMemTable = new MemTable(this.idCounter, this.schema,
-                    this.memTableSize, TypeDescription.Mode.NONE,
+                    this.memTableSize, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
                     this.currentFileWriterManager.getFileId(),
                     this.currentMemTableCount * this.memTableSize,
                     this.memTableSize);
