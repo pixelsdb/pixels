@@ -141,6 +141,13 @@ public class DaemonMain
                         CacheWorker cacheWorker = new CacheWorker();
                         container.addServer("cache_worker", cacheWorker);
                     }
+                    if (indexServerEnabled)
+                    {
+                        // start index server
+                        int indexServerPort = Integer.parseInt(config.getProperty("index.server.port"));
+                        IndexServer indexServer = new IndexServer(indexServerPort);
+                        container.addServer("index", indexServer);
+                    }
                 }
                 catch (Throwable e)
                 {
@@ -164,13 +171,6 @@ public class DaemonMain
             }
 
             // start the servers that may run on any node
-            if (indexServerEnabled)
-            {
-                // start index server
-                int indexServerPort = Integer.parseInt(config.getProperty("index.server.port"));
-                IndexServer indexServer = new IndexServer(indexServerPort);
-                container.addServer("index", indexServer);
-            }
             if(sinkServerEnabled)
             {
                 // start sink server
