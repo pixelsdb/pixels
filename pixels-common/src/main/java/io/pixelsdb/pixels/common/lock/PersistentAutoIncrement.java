@@ -52,28 +52,35 @@ public class PersistentAutoIncrement
     public long getAndIncrement() throws EtcdException
     {
         this.lock.lock();
-        if (this.count > 0)
+        try
         {
-            long value = this.id++;
-            this.count--;
-            this.lock.unlock();
-            return value;
+            if (this.count > 0)
+            {
+                long value = this.id++;
+                this.count--;
+                return value;
+            }
+            else
+            {
+                EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP, segment -> {
+                    this.id = segment.getStart();
+                    this.count = segment.getLength();
+                });
+                // no need to release the reentrant lock
+                return this.getAndIncrement();
+            }
         }
-        else
+        finally
         {
-            EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP, segment -> {
-                this.id = segment.getStart();
-                this.count = segment.getLength();
-            });
-            // no need to release the reentrant lock
-            return this.getAndIncrement();
+            this.lock.unlock();
         }
     }
 
     public long getAndIncrement(int batchSize) throws EtcdException
     {
         this.lock.lock();
-        try {
+        try
+        {
             if (this.count >= batchSize)
             {
                 long value = this.id;
@@ -83,14 +90,19 @@ public class PersistentAutoIncrement
             }
             else
             {
-                EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP, segment -> {
+                /* Issue #986:
+                 * We use batchSize * 10L as the step for etcd auto-increment generation, reducing the etcd-overhead to
+                 * less than 10%.
+                 */
+                EtcdAutoIncrement.GenerateId(idKey, batchSize * 10L, segment -> {
                     this.id = segment.getStart();
                     this.count = segment.getLength();
                 });
                 return this.getAndIncrement(batchSize);
             }
         }
-        finally {
+        finally
+        {
             this.lock.unlock();
         }
     }
