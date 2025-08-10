@@ -37,18 +37,45 @@ public class PersistentAutoIncrement
 {
     private final String idKey;
     private final Lock lock = new ReentrantLock();
+    private final long etcdAIStep;
     private volatile long id;
     private volatile long count;
 
+    /**
+     * @param idKey the key of this auto increment id in etcd.
+     * @throws EtcdException when fail to interact with the backed etcd instance.
+     */
     public PersistentAutoIncrement(String idKey) throws EtcdException
     {
         this.idKey = idKey;
+        this.etcdAIStep = Constants.AI_DEFAULT_STEP;
         EtcdAutoIncrement.InitId(idKey);
-        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP);
+        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep);
         this.id = segment.getStart();
         this.count = segment.getLength();
     }
 
+    /**
+     * @param idKey the key of this auto increment id in etcd.
+     * @param etcdStep the step for allocating row ids in etcd, determining the frequency of updating the backed key-value
+     *             of this auto increment id in etcd.
+     * @throws EtcdException when fail to interact with the backed etcd instance.
+     */
+    public PersistentAutoIncrement(String idKey, long etcdStep) throws EtcdException
+    {
+        this.idKey = idKey;
+        this.etcdAIStep = etcdStep;
+        EtcdAutoIncrement.InitId(idKey);
+        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep);
+        this.id = segment.getStart();
+        this.count = segment.getLength();
+    }
+
+    /**
+     * Get the current value of this auto increment and increase it by one.
+     * @return the current value of this auto increment.
+     * @throws EtcdException when fail to interact with the backed etcd instance.
+     */
     public long getAndIncrement() throws EtcdException
     {
         this.lock.lock();
@@ -62,7 +89,7 @@ public class PersistentAutoIncrement
             }
             else
             {
-                EtcdAutoIncrement.GenerateId(idKey, Constants.AI_DEFAULT_STEP, segment -> {
+                EtcdAutoIncrement.GenerateId(this.idKey, this.etcdAIStep, segment -> {
                     this.id = segment.getStart();
                     this.count = segment.getLength();
                 });
@@ -76,6 +103,15 @@ public class PersistentAutoIncrement
         }
     }
 
+    /**
+     * Get the current value of this auto increment and increase it by the given batch size.
+     * <br/>
+     * <b>Note: It is recommended that the etcdStep in the constructor of this class is significantly larger than
+     * the batchSize here. Thus, the etcd overhead would not be significant.</b>
+     * @param batchSize the given batch size
+     * @return the current value of this auto increment.
+     * @throws EtcdException when fail to interact with the backed etcd instance.
+     */
     public long getAndIncrement(int batchSize) throws EtcdException
     {
         this.lock.lock();
@@ -90,11 +126,13 @@ public class PersistentAutoIncrement
             }
             else
             {
-                /* Issue #986:
-                 * We use batchSize * 10L as the step for etcd auto-increment generation, reducing the etcd-overhead to
-                 * less than 10%.
-                 */
-                EtcdAutoIncrement.GenerateId(idKey, batchSize * 10L, segment -> {
+                long step = this.etcdAIStep;
+                if (batchSize > step)
+                {
+                    // Issue #986: avoid infinite recursion by ensuring step >= batchSize.
+                    step = batchSize;
+                }
+                EtcdAutoIncrement.GenerateId(this.idKey, step, segment -> {
                     this.id = segment.getStart();
                     this.count = segment.getLength();
                 });

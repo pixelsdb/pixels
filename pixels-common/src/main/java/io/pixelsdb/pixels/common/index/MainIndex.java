@@ -99,8 +99,9 @@ public interface MainIndex extends Closeable
 
     /**
      * Allocate rowId batch for single point index.
+     * <br/><b>For better performance, use consistent numRowIds when calling this method.</b>
      * @param tableId the table id of single point index
-     * @param numRowIds the rowId nums need to allocate
+     * @param numRowIds the number of row ids to allocate
      * @return the RowIdBatch
      */
     IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws RowIdException;
