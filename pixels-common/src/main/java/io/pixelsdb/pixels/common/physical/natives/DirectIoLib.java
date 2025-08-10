@@ -199,6 +199,10 @@ public class DirectIoLib
 
     private static native Pointer malloc(long size);
 
+    private static native Pointer mmap(Pointer addr, long len, int prot, int flags, int fd, long off);
+
+    private static native int munmap(Pointer addr, long len);
+
     /**
      * @param ptr The pointer to the hunk of memory which needs freeing
      */
