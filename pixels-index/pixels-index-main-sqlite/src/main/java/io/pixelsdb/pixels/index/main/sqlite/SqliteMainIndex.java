@@ -133,7 +133,11 @@ public class SqliteMainIndex implements MainIndex
             PersistentAutoIncrement autoIncrement = persistentAIMap.computeIfAbsent(tableId, tblId -> {
                 try
                 {
-                    return new PersistentAutoIncrement("rowid-" + tblId); // key in etcd
+                    /* Issue #986:
+                     * We use numRowIds * 10L as the step for etcd auto-increment generation, reducing the etcd-overhead
+                     * to less than 10%.
+                     */
+                    return new PersistentAutoIncrement("rowid-" + tblId, numRowIds * 10L); // key in etcd
                 }
                 catch (EtcdException e)
                 {
