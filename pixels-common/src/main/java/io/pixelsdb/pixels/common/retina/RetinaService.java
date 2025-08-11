@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.retina;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -30,6 +31,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -37,7 +40,7 @@ public class RetinaService
 {
     private static final Logger logger = LogManager.getLogger(RetinaService.class);
     private static final RetinaService defaultInstance;
-    private static final Map<HostAddress, RetinaService> otherInstances = new HashMap<>();
+    private static final Map<HostAddress, RetinaService> otherInstances = new ConcurrentHashMap<>();
 
     static
     {
@@ -69,7 +72,10 @@ public class RetinaService
      * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
      * @return
      */
-    public static RetinaService Instance() { return defaultInstance; }
+    public static RetinaService Instance()
+    {
+        return defaultInstance;
+    }
 
     /**
      * This method should only be used to connect to a retina server that is not configured through
@@ -81,18 +87,15 @@ public class RetinaService
     public static RetinaService CreateInstance(String host, int port)
     {
         HostAddress address = HostAddress.fromParts(host, port);
-        RetinaService retinaService = otherInstances.get(address);
-        if (retinaService != null)
-        {
-            return retinaService;
-        }
-        retinaService = new RetinaService(host, port);
-        otherInstances.put(address, retinaService);
-        return retinaService;
+        return otherInstances.computeIfAbsent(
+                address,
+                addr -> new RetinaService(addr.getHostText(), addr.getPort())
+        );
     }
     
     private final ManagedChannel channel;
     private final RetinaWorkerServiceGrpc.RetinaWorkerServiceBlockingStub stub;
+    private final RetinaWorkerServiceGrpc.RetinaWorkerServiceStub asyncStub;
     private boolean isShutdown;
 
     private RetinaService(String host, int port)
@@ -101,6 +104,7 @@ public class RetinaService
         assert (port > 0 && port <= 65535);
         this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
         this.stub = RetinaWorkerServiceGrpc.newBlockingStub(this.channel);
+        this.asyncStub = RetinaWorkerServiceGrpc.newStub(this.channel);
         this.isShutdown = false;
     }
 
@@ -134,6 +138,83 @@ public class RetinaService
             throw new RetinaException("response token does not match.");
         }
         return true;
+    }
+
+    public static class StreamHandle implements  AutoCloseable
+    {
+        private final Logger logger = LogManager.getLogger(StreamHandle.class);
+        private final StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver;
+        private final CountDownLatch finishLatch;
+
+        StreamHandle(StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver, CountDownLatch finishLatch)
+        {
+            this.requestObserver = requestObserver;
+            this.finishLatch = finishLatch;
+        }
+
+        public void updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData,
+                                 long timestamp) throws RetinaException
+        {
+            String token = UUID.randomUUID().toString();
+            RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
+                    .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                    .setSchemaName(schemaName)
+                    .addAllTableUpdateData(tableUpdateData)
+                    .setTimestamp(timestamp)
+                    .build();
+            requestObserver.onNext(request);
+        }
+
+        @Override
+        public void close()
+        {
+            requestObserver.onCompleted();
+            try
+            {
+                if (!finishLatch.await(5, TimeUnit.SECONDS))
+                {
+                    logger.warn("Stream completion did not finish in time.");
+                }
+            } catch (InterruptedException e)
+            {
+                logger.error("Interrupted while waiting for stream completion.", e);
+            }
+        }
+    }
+
+    public StreamHandle startUpdateStream()
+    {
+        CountDownLatch latch = new CountDownLatch(1);
+
+        StreamObserver<RetinaProto.UpdateRecordResponse> responseObserver = new StreamObserver<RetinaProto.UpdateRecordResponse>()
+        {
+            @Override
+            public void onNext(RetinaProto.UpdateRecordResponse response)
+            {
+                if (response.getHeader().getErrorCode() != 0)
+                {
+                    logger.error("Failed to update record: " + response.getHeader().getErrorCode()
+                            + " " + response.getHeader().getErrorMsg());
+                }
+            }
+
+            @Override
+            public void onError(Throwable t)
+            {
+                logger.error("Retina Stream update failed from server side.", t);
+                latch.countDown();
+            }
+
+            @Override
+            public void onCompleted()
+            {
+                latch.countDown();
+            }
+        };
+
+        StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver = asyncStub.streamUpdateRecord(responseObserver);
+
+        return new StreamHandle(requestObserver, latch);
     }
 
     public boolean addVisibility(String filePath) throws RetinaException
