@@ -23,16 +23,43 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexProvider;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import org.apache.commons.io.FileUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
 
 /**
  * @author hank
  * @create 2025-07-20
+ * @update 2025-08-11 Create the directory for index.sqlite.path if it does not exist.
  */
 public class SqliteMainIndexProvider implements MainIndexProvider
 {
-    private static final String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
+    private static final Logger logger = LogManager.getLogger(SqliteMainIndexProvider.class);
+    private static final String sqlitePath;
+
+    static
+    {
+        String path = ConfigFactory.Instance().getProperty("index.sqlite.path");
+        if (path == null || path.isEmpty())
+        {
+            logger.error("Sqlite path not set");
+            throw new RuntimeException("index.sqlite.path is not set");
+        }
+        sqlitePath = path;
+        try
+        {
+            FileUtils.forceMkdir(new File(sqlitePath));
+        }
+        catch (IOException e)
+        {
+            logger.error("failed to create sqlite data path", e);
+            throw new RuntimeException("failed to create sqlite data path", e);
+        }
+    }
 
     @Override
     public MainIndex createInstance(long tableId, @Nonnull MainIndex.Scheme scheme) throws MainIndexException
