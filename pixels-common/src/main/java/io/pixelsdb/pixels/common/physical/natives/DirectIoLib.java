@@ -30,7 +30,6 @@ import org.apache.logging.log4j.Logger;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -62,7 +61,6 @@ public class DirectIoLib
      */
     public static final boolean DirectIoEnabled;
 
-    private static Field jnaPointerPeer = null;
     private static Method directByteBufferAddress = null;
     private static Constructor<?> directByteBufferRConstructor = null;
 
@@ -73,6 +71,10 @@ public class DirectIoLib
     private static final int O_TRUNC = 01000;
     private static final int O_DIRECT = 040000;
     private static final int O_SYNC = 04000000;
+    private static final int PROT_READ = 0x1;
+    private static final int PROT_WRITE = 0x2;
+    private static final int MAP_SHARED = 0x1;
+    private static final int MAP_FAILED = -1;
 
     static
     {
@@ -109,8 +111,6 @@ public class DirectIoLib
                 }
                 directByteBufferRConstructor.setAccessible(true);
 
-                jnaPointerPeer = Class.forName("com.sun.jna.Pointer").getDeclaredField("peer");
-                jnaPointerPeer.setAccessible(true);
                 // sun.nio.ch.DirectBuffer is the parent of java.nio.DirectByteBuffer(R)
                 directByteBufferAddress = Class.forName("sun.nio.ch.DirectBuffer").getDeclaredMethod("address");
                 directByteBufferAddress.setAccessible(true);
@@ -200,15 +200,19 @@ public class DirectIoLib
     private static native Pointer malloc(long size);
 
     /**
-     * @param ptr The pointer to the hunk of memory which needs freeing
+     * @param ptr The pointer to the chunk of memory which needs freeing
      */
     public static native void free(Pointer ptr);
+
+    private static native Pointer mmap(Pointer addr, long len, int prot, int flags, int fd, long off);
+
+    private static native int munmap(Pointer addr, long len);
 
     private static native String strerror(int errnum);
 
     public static long getAddress(Pointer pointer) throws IllegalAccessException
     {
-        return (Long) jnaPointerPeer.get(pointer);
+        return Pointer.nativeValue(pointer);
     }
 
     public static long getAddress(ByteBuffer byteBuffer) throws InvocationTargetException, IllegalAccessException
@@ -354,6 +358,51 @@ public class DirectIoLib
         } catch (Throwable e)
         {
             throw new IOException("error opening " + path + ", got " + getLastError(), e);
+        }
+    }
+
+    /**
+     * Create a shared virtual address mapping that is backed by the file at the given path. Updates to the mapping are
+     * visible to other processes mapping the same region, and are carried through to the backed file. This method can
+     * be used to build shared memory between processes.
+     * @param path the backed file path
+     * @param length the length of the memory mapping
+     * @param offset the offset in the file where the mapping starts
+     * @param readOnly whether the memory region is mapped as read only
+     * @return the address where the mapping starts in virtual memory space
+     * @throws IOException if failed to map the memory region
+     */
+    public static long mmap(String path, long length, long offset, boolean readOnly) throws IOException
+    {
+        int fd = open(path, readOnly);
+        int prot = PROT_READ;
+        if (!readOnly)
+        {
+            prot |= PROT_WRITE;
+        }
+        Pointer addr = mmap(null, length, prot, MAP_SHARED, fd, offset);
+        if (Pointer.nativeValue(addr) == MAP_FAILED)
+        {
+            throw new IOException("mmap failed, got " + getLastError());
+        }
+        // After the mmap() returns, fd can be closed immediately without invalidating the mapping.
+        close(fd);
+        return Pointer.nativeValue(addr);
+    }
+
+    /**
+     * Unmap the mapped virtual memory region.
+     * @param addr the start address of the mapped region
+     * @param length the length of the mapped region
+     * @throws IOException if failed to unmap the memory region
+     */
+    public static void munmap(long addr, long length) throws IOException
+    {
+        Pointer paddr = new Pointer(addr);
+        int ret = munmap(paddr, length);
+        if (ret != 0)
+        {
+            throw new IOException("munmap failed, got " + getLastError());
         }
     }
 
