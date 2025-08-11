@@ -17,9 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.cache;
+package io.pixelsdb.pixels.common.physical.natives;
 
-import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.junit.Test;
 
 import java.io.File;
@@ -31,29 +30,38 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * @author: tao
- * @date: Create in 2019-02-21 16:41
+ * @author tao
+ * @create 2019-02-21 16:41
  **/
 public class TestMemFile
 {
     String path = "/dev/shm/pixels.cache";
 
     @Test
-    public void testRound4096() {
+    public void testRound4096()
+    {
         assert (MemoryMappedFile.roundTo4096(0) == 0);
         assert (MemoryMappedFile.roundTo4096(1) == 4096);
         assert (MemoryMappedFile.roundTo4096(4097) == 8192);
         assert (MemoryMappedFile.roundTo4096(4096 * 37 + 2048) == 4096 * 38);
         assert (MemoryMappedFile.roundTo4096(4096 * 37 - 1453) == 4096 * 37);
-
     }
 
     @Test
-    public void testWriteSize() throws Exception {
-        MemoryMappedFile file = new MemoryMappedFile("/scratch/yeeef/pixels-cache/__test", 4 * 1024 * 1024);
+    public void testWrite() throws Exception
+    {
+        MemoryMappedFile file = new MemoryMappedFile(this.path, 4L * 1024 * 1024 * 1024);
         file.setInt(2 * 1024 * 1024, 1);
         System.out.println(file.getInt(2 * 1024 * 1024));
+        file.unmap();
+    }
 
+    @Test
+    public void testRead() throws Exception
+    {
+        MemoryMappedFile file = new MemoryMappedFile(this.path, 4L * 1024 * 1024 * 1024);
+        System.out.println(file.getInt(2 * 1024 * 1024));
+        file.unmap();
     }
 
     @Test
@@ -77,15 +85,14 @@ public class TestMemFile
         long start = System.nanoTime();
         for (int i = 0; i < 100; ++i)
         {
-            MemoryMappedFile mem = new MemoryMappedFile(path, 1024L*1024L);
+            MemoryMappedFile mem = new MemoryMappedFile(path, 1024L * 1024L);
         }
         long duration = System.nanoTime() - start;
         System.out.println((duration/1000) + " us");
     }
 
     @Test
-    public void testMulti()
-            throws Exception
+    public void testMulti() throws Exception
     {
         MemoryMappedFile mem = new MemoryMappedFile(path, 1024L * 1024L * 10L);
         Map<Integer, byte[]> kvMap = new HashMap<>();
@@ -114,8 +121,7 @@ public class TestMemFile
         System.out.println("Read cost time: " + (endReadTime - startReadTime));
     }
 
-    private void write(Map<Integer, byte[]> kvMap)
-            throws Exception
+    private void write(Map<Integer, byte[]> kvMap) throws Exception
     {
         new File(path);
 
@@ -141,15 +147,13 @@ public class TestMemFile
     }
 
     @Test
-    public void test()
-            throws Exception
+    public void test() throws Exception
     {
         write(ByteOrder.BIG_ENDIAN, 0xffff0000ffff0000L);
         read();
     }
 
-    public void write(ByteOrder byteOrder, long repeatLong)
-            throws Exception
+    public void write(ByteOrder byteOrder, long repeatLong) throws Exception
     {
         new File(path);
 
@@ -165,8 +169,7 @@ public class TestMemFile
         }
     }
 
-    public void read()
-            throws Exception
+    public void read() throws Exception
     {
         MemoryMappedFile mem = new MemoryMappedFile(path, 1024L * 1024L * 10L);
         byte[] res = new byte[8];
@@ -208,7 +211,7 @@ public class TestMemFile
                     try
                     {
                         System.out.println(
-                                "ERROR in read: 值不相同\n" + Arrays.toString(value) + "\n" + Arrays.toString(oldValue));
+                                "ERROR in read: inconsistent value\n" + Arrays.toString(value) + "\n" + Arrays.toString(oldValue));
                         System.exit(-1);
                     }
                     catch (Exception e)
@@ -221,6 +224,5 @@ public class TestMemFile
             System.out.println(Thread.currentThread().getName() + "," + len + " end");
         }
     }
-
 }
 

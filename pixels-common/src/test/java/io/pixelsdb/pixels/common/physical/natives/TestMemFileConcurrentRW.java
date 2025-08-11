@@ -17,20 +17,18 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.cache;
+package io.pixelsdb.pixels.common.physical.natives;
 
-import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.junit.Test;
 
 /**
- * Created at: 18-10-24
- * Author: hank
+ * @author hank
+ * @create 2018-10-24
  */
 public class TestMemFileConcurrentRW
 {
     @Test
-    public void testRead()
-            throws Exception
+    public void testRead() throws Exception
     {
         long start = System.nanoTime();
         MemoryMappedFile mem = new MemoryMappedFile("/dev/shm/test", 1024L * 1024L * 256L);
@@ -43,8 +41,7 @@ public class TestMemFileConcurrentRW
     }
 
     @Test
-    public void testWrite()
-            throws Exception
+    public void testWrite() throws Exception
     {
         long start = System.nanoTime();
         MemoryMappedFile mem = new MemoryMappedFile("/dev/shm/test", 1024L * 1024L * 256L);

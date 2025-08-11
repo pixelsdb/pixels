@@ -78,6 +78,7 @@ public class MemoryMappedFile
         }
         try
         {
+            // Issue #960: use custom mmap implementation instead of FileChannel.map for JDK compatibility.
             this.addr = DirectIoLib.mmap(this.loc, this.size, 0L, false);
             if (this.addr < 0)
             {

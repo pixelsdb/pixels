@@ -17,9 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.cache;
+package io.pixelsdb.pixels.common.physical.natives;
 
-import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.junit.Test;
 
 import java.io.File;
@@ -29,8 +28,7 @@ import java.nio.ByteOrder;
 public class TestMemFileWrite
 {
     @Test
-    public void test()
-            throws Exception
+    public void test() throws Exception
     {
         String path = "/Users/Jelly/Desktop/pixels.index";
         new File(path);

@@ -27,8 +27,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 
 /**
- * Created at: 02/02/2023
- * Author: hank
+ * @author hank
+ * @create 2023-02-02
  */
 public class TestNatives
 {
