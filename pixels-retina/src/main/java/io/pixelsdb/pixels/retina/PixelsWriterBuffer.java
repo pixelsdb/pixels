@@ -159,7 +159,7 @@ public class PixelsWriterBuffer
 
         // Initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
-        this.rowIdAllocator = new RowIdAllocator(tableId, 200);
+        this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize);
 
         startFlushMinioToDiskScheduler();
     }
