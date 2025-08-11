@@ -163,7 +163,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     List<RetinaProto.InsertData> insertDataList = tableUpdateData.getInsertDataList();
                     if (!insertDataList.isEmpty())
                     {
-                        List<List<IndexProto.IndexKey>> indexKeysList = new ArrayList<>(insertDataList.size());
+                        int indexNum = insertDataList.get(0).getIndexKeysList().size();
+                        List<List<IndexProto.IndexKey>> indexKeysList = new ArrayList<>(indexNum);
                         List<IndexProto.PrimaryIndexEntry> primaryIndexEntries = new ArrayList<>(insertDataList.size());
                         List<Long> rowIdList = new ArrayList<>(insertDataList.size());
                         for (RetinaProto.InsertData insertData : insertDataList)
@@ -190,7 +191,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         }
                         long tableId = primaryIndexEntries.get(0).getIndexKey().getTableId();
                         indexService.putPrimaryIndexEntries(tableId, primaryIndexId, primaryIndexEntries);
-                        for (int i = 1; i < indexKeysList.size(); i++)
+                        for (int i = 1; i < indexNum; i++)
                         {
                             List<IndexProto.IndexKey> indexKeys = indexKeysList.get(i);
                             long indexId = indexKeys.get(0).getIndexId();
@@ -202,7 +203,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                                                     .build())
                                             .collect(Collectors.toList());
                             indexService.putSecondaryIndexEntries
-                                    (indexKeys.get(0).getTableId(), indexKeys.get(0).getIndexId(), secondaryIndexEntries);
+                                    (indexKeys.get(0).getTableId(), indexId, secondaryIndexEntries);
                         }
                     }
                     init = false;

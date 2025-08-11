@@ -31,6 +31,7 @@ public class RangeIndex extends Base
     private KeyColumns keyColumns;
     private String keyColumnsJson;
     private long tableId;
+    private long schemaVersionId;
 
     public RangeIndex()
     {
@@ -42,6 +43,7 @@ public class RangeIndex extends Base
         this.keyColumnsJson = rangeIndex.getKeyColumns();
         this.keyColumns = JSON.parseObject(this.keyColumnsJson, KeyColumns.class);
         this.tableId = rangeIndex.getTableId();
+        this.schemaVersionId = rangeIndex.getSchemaVersionId();
     }
 
     public KeyColumns getKeyColumns()
@@ -74,10 +76,21 @@ public class RangeIndex extends Base
         this.tableId = tableId;
     }
 
+    public long getSchemaVersionId()
+    {
+        return schemaVersionId;
+    }
+
+    public void setSchemaVersionId(long schemaVersionId)
+    {
+        this.schemaVersionId = schemaVersionId;
+    }
+
     @Override
     public MetadataProto.RangeIndex toProto()
     {
         return MetadataProto.RangeIndex.newBuilder().setId(this.getId())
-                .setKeyColumns(this.keyColumnsJson).setTableId(this.tableId).build();
+                .setKeyColumns(this.keyColumnsJson).setTableId(this.tableId)
+                .setSchemaVersionId(this.schemaVersionId).build();
     }
 }

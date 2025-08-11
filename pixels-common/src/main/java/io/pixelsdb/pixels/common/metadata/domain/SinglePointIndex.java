@@ -35,6 +35,7 @@ public class SinglePointIndex extends Base
     private boolean unique;
     private Scheme indexScheme;
     private long tableId;
+    private long schemaVersionId;
 
     public SinglePointIndex()
     {
@@ -49,6 +50,7 @@ public class SinglePointIndex extends Base
         this.unique = singlePointIndex.getUnique();
         this.indexScheme = Scheme.from(singlePointIndex.getIndexScheme());
         this.tableId = singlePointIndex.getTableId();
+        this.schemaVersionId = singlePointIndex.getSchemaVersionId();
     }
 
     public KeyColumns getKeyColumns()
@@ -111,11 +113,22 @@ public class SinglePointIndex extends Base
         this.tableId = tableId;
     }
 
+    public long getSchemaVersionId()
+    {
+        return schemaVersionId;
+    }
+
+    public void setSchemaVersionId(long schemaVersionId)
+    {
+        this.schemaVersionId = schemaVersionId;
+    }
+
     @Override
     public MetadataProto.SinglePointIndex toProto()
     {
         return MetadataProto.SinglePointIndex.newBuilder().setId(this.getId())
                 .setKeyColumns(this.keyColumnsJson).setPrimary(this.primary).setUnique(this.unique)
-                .setIndexScheme(this.indexScheme.name()).setTableId(this.tableId).build();
+                .setIndexScheme(this.indexScheme.name()).setTableId(this.tableId)
+                .setSchemaVersionId(this.getSchemaVersionId()).build();
     }
 }
