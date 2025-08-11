@@ -33,12 +33,10 @@ package io.pixelsdb.pixels.common.physical.natives;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.natives.DirectIoLib.wrapReadOnlyDirectByteBuffer;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
@@ -56,37 +54,13 @@ public class MemoryMappedFile
 {
     private static final int BYTE_ARRAY_OFFSET;
 
-    private static final Method fileChannelUnmap;
     private long addr;
-    private MappedByteBuffer mappedBuffer;
     private final long size;
     private final String loc;
 
     static
     {
-        try
-        {
-            /* Issue #841:
-             * In Java 21+, sun.nio.ch.FileChannelImpl no longer provides the map0() and unmap0() native methods.
-             * Hence, we can not reflect these methods to mmap and unmap the shared memory.
-             *
-             * Therefore, we use sun.nio.ch.FileChannelImpl.map() and unmap() methods instead. However, unmap() is
-             * a private static method. So we have to reflect it here.
-             *
-             * unmap uses ((DirectBuffer)mappedBuffer).cleaner().clean() to unmap the memory explicitly.
-             * However, we can not directly do this in our code. Because Cleaner has different definitions in different
-             * versions of Java. If the code is compiled and run by different versions of Java, calling
-             * DirectBuffer.cleaner() may leads to MethodNotFound exception due to the inconsistent return types.
-             */
-            fileChannelUnmap = Class.forName("sun.nio.ch.FileChannelImpl")
-                    .getDeclaredMethod("unmap", MappedByteBuffer.class);
-            fileChannelUnmap.setAccessible(true);
-            BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
-        }
+        BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
     }
 
     public static long roundTo4096(long i)
@@ -94,64 +68,51 @@ public class MemoryMappedFile
         return (i + 0xfffL) & ~0xfffL;
     }
 
-    private void mapAndSetOffset(boolean forceSize) throws IOException
+    private void mapAndSetAddr(boolean forceSize) throws IOException
     {
-        RandomAccessFile backingFile = new RandomAccessFile(this.loc, "rw");
         if (forceSize)
         {
+            final RandomAccessFile backingFile = new RandomAccessFile(this.loc, "rw");
             backingFile.setLength(this.size);
+            backingFile.close();
         }
-        final FileChannel ch = backingFile.getChannel();
         try
         {
-            this.mappedBuffer = ch.map(FileChannel.MapMode.READ_WRITE, 0L, this.size);
-            if (!this.mappedBuffer.isDirect())
+            this.addr = DirectIoLib.mmap(this.loc, this.size, 0L, false);
+            if (this.addr < 0)
             {
-                throw new IOException("the file is not mapped as a direct buffer, which is unexpected");
+                throw new IOException("addr returned by the native mmap method is negative");
             }
-            this.addr = DirectIoLib.getAddress(this.mappedBuffer);
         }
         catch (Throwable e)
         {
-            throw new IOException("mmap failed", e);
-        }
-        finally
-        {
-            /*
-             * Issue #841:
-             * Closing the channel and the backing file does not affect the mapped buffer.
-             * The mapped memory region is only unmapped when the mapped buffer is cleaned or garbage collected.
-             */
-            ch.close();
-            backingFile.close();
+            throw new IOException("failed to the backed file to virtual memory", e);
         }
     }
 
     /**
      * Constructs a new memory mapped file. The file size will be rounded to 4KB by force, which may extend the file
      * by padding 0.
-     *
      * @param loc the file name
      * @param len the file length
      * @throws Exception in case there was an error creating the memory mapped file
      */
-    public MemoryMappedFile(final String loc, long len)
-            throws Exception
+    public MemoryMappedFile(final String loc, long len) throws Exception
     {
         this (loc, len, true);
     }
 
     /**
      * Constructs a new memory mapped file.
-     *
      * @param loc the file name
      * @param len the file length
      * @param forceRound4K true to round the file length to 4KB by force, which may extend the file by padding 0.
      * @throws Exception in case there was an error creating the memory mapped file
      */
-    public MemoryMappedFile(final String loc, long len, boolean forceRound4K)
-            throws IOException
+    public MemoryMappedFile(final String loc, long len, boolean forceRound4K) throws IOException
     {
+        checkArgument(loc != null && !loc.isEmpty(), "loc must not be null or empty");
+        checkArgument(len > 0, "len must be positive");
         this.loc = loc;
         if (forceRound4K)
         {
@@ -161,11 +122,14 @@ public class MemoryMappedFile
         {
             this.size = len;
         }
-        mapAndSetOffset(forceRound4K);
+        mapAndSetAddr(forceRound4K);
     }
 
     private MemoryMappedFile(final String loc, long addr, long len)
     {
+        checkArgument(loc != null && !loc.isEmpty(), "loc must not be null or empty");
+        checkArgument(addr >= 0, "addr must be non-negative");
+        checkArgument(len > 0, "len must be positive");
         this.loc = loc;
         this.size = len;
         this.addr = addr;
@@ -192,18 +156,14 @@ public class MemoryMappedFile
     {
         try
         {
-            if (this.mappedBuffer.isDirect())
+            if (addr >= 0 && this.size > 0)
             {
-                fileChannelUnmap.invoke(null, this.mappedBuffer);
-            }
-            else
-            {
-                throw new IllegalAccessException("the mapped buffer is not direct");
+                DirectIoLib.munmap(this.addr, this.size);
             }
         }
         catch (Throwable e)
         {
-            throw new IOException("unmap failed", e);
+            throw new IOException("failed to unmap the backed file from virtual memory", e);
         }
     }
 
