@@ -49,13 +49,14 @@ public class TestPixelsRecordReaderBufferImpl
 
 
         RetinaService retinaService = RetinaService.Instance();
-        RetinaProto.GetWriterBufferResponse superVersion = retinaService.getWriterBuffer(schemaName, tableName);
+        long timeStamp = 100000;
+        RetinaProto.GetWriterBufferResponse superVersion = retinaService.getWriterBuffer(schemaName, tableName, timeStamp);
         TypeDescription typeDescription = null;
 
 
         PixelsReaderOption option = new PixelsReaderOption();
         option.transId(100)
-                .transTimestamp(100000);
+                .transTimestamp(timeStamp);
 
         com.google.protobuf.ByteString byteString = superVersion.getData();
         PixelsRecordReaderBufferImpl recordReaderBuffer = new PixelsRecordReaderBufferImpl(
