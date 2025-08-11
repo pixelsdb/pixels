@@ -164,19 +164,19 @@ public class CacheWorker implements Server
             int status;
             if (cacheWriter.isCacheEmpty())
             {
-                logger.debug("Cache update all for layout version " + version);
+                logger.debug("Cache update all for layout version {}", version);
                 status = cacheWriter.updateAll(version, matchedLayout);
             }
             else
             {
-                logger.debug("Cache update incremental for layout version " + version);
+                logger.debug("Cache update incremental for layout version {}", version);
                 status = cacheWriter.updateIncremental(version, matchedLayout);
             }
             cacheStatus.set(status);
             localCacheVersion = version;
         } else
         {
-            logger.warn("No matching layout found for the update version " + version);
+            logger.warn("No matching layout found for the update version {}", version);
         }
     }
 
@@ -233,8 +233,8 @@ public class CacheWorker implements Server
                                 }
                                 else
                                 {
-                                    logger.debug("New global cache version " + globalCacheVersion +
-                                            " is equal to or less than the local version " + localCacheVersion);
+                                    logger.debug("New global cache version {} is equal to or less than the local version {}",
+                                            globalCacheVersion, localCacheVersion);
                                 }
                             } else if (cacheStatus.get() == CacheWorkerStatus.UPDATING.StatusCode)
                             {
