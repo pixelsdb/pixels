@@ -176,15 +176,13 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         };
     }
 
-
     /**
-     * common method to process updates for both normal and streaming rpc.
+     * Common method to process updates for both normal and streaming rpc.
      * @param request
      * @throws RetinaException
      * @throws IndexException
      */
-    private void processUpdateRequest(RetinaProto.UpdateRecordRequest request)
-            throws RetinaException, IndexException
+    private void processUpdateRequest(RetinaProto.UpdateRecordRequest request) throws RetinaException, IndexException
     {
         String schemaName = request.getSchemaName();
         List<RetinaProto.TableUpdateData> tableUpdateDataList = request.getTableUpdateDataList();

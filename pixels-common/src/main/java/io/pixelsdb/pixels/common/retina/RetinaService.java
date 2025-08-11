@@ -140,7 +140,7 @@ public class RetinaService
         return true;
     }
 
-    public static class StreamHandle implements  AutoCloseable
+    public static class StreamHandle implements AutoCloseable
     {
         private final Logger logger = LogManager.getLogger(StreamHandle.class);
         private final StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver;
@@ -152,8 +152,7 @@ public class RetinaService
             this.finishLatch = finishLatch;
         }
 
-        public void updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData,
-                                 long timestamp) throws RetinaException
+        public void updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData, long timestamp)
         {
             String token = UUID.randomUUID().toString();
             RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
