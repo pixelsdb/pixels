@@ -22,8 +22,6 @@ syntax = "proto3";
 
 package sink.proto;
 
-
-import "retina.proto";
 import "pixels.proto";
 
 option java_multiple_files = false;
