@@ -33,6 +33,8 @@ import "index.proto";
 // RetinaService and its related messages where from retina_service.proto
 service RetinaWorkerService {
     rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
+    // Bidirectional streaming method
+    rpc StreamUpdateRecord (stream UpdateRecordRequest) returns (stream UpdateRecordResponse);
     rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
     rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
     rpc ReclaimVisibility (ReclaimVisibilityRequest) returns (ReclaimVisibilityResponse);
