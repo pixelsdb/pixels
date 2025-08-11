@@ -149,6 +149,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 try
                 {
                     processUpdateRequest(request);
+                    responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
+                            .setHeader(headerBuilder.build())
+                            .build());
                 } catch (RetinaException | IndexException e)
                 {
                     headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
@@ -157,9 +160,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                             .build());
                     logger.error("error processing streaming update", e);
                 }
-                responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
-                        .setHeader(headerBuilder.build())
-                        .build());
             }
 
             @Override
