@@ -29,11 +29,15 @@ import sun.nio.ch.DirectBuffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-public class NativeHashIndexReader implements AutoCloseable, CacheIndexReader {
-    static {
+public class NativeHashIndexReader implements AutoCloseable, CacheIndexReader
+{
+    private static final Logger logger = LogManager.getLogger(NativeHashIndexReader.class);
+
+    static
+    {
         System.loadLibrary("HashIndexReader");
     }
-    private static final Logger logger = LogManager.getLogger(NativeHashIndexReader.class);
+
     private final int kvSize = PixelsCacheKey.SIZE + PixelsCacheIdx.SIZE;
     private final byte[] kv = new byte[kvSize];
 
@@ -52,38 +56,43 @@ public class NativeHashIndexReader implements AutoCloseable, CacheIndexReader {
     }
 
     @Override
-    public PixelsCacheIdx read(PixelsCacheKey key) {
+    public PixelsCacheIdx read(PixelsCacheKey key)
+    {
         return nativeSearch(key.blockId, key.rowGroupId, key.columnId);
     }
 
     @Override
-    public void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results) {
+    public void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results)
+    {
         throw new RuntimeException("not implemented yet");
     }
 
     private native void doNativeSearch(long mmAddress, long mmSize, long blockId, short rowGroupId, short columnId, long cacheIdxBufAddr);
 
-    private PixelsCacheIdx nativeSearch(long blockId, short rowGroupId, short columnId) {
+    private PixelsCacheIdx nativeSearch(long blockId, short rowGroupId, short columnId)
+    {
         cacheIdxBuf.position(0);
         doNativeSearch(indexFile.getAddress(), indexFile.getSize(), blockId, rowGroupId, columnId, cacheIdxBufAddr);
         long offset = cacheIdxBuf.getLong();
         int length = cacheIdxBuf.getInt();
-        if (offset == -1) {
+        if (offset == -1)
+        {
             return null;
-        } else {
+        } else
+        {
             return new PixelsCacheIdx(offset, length);
         }
     }
 
 
     @Override
-    public void close() throws Exception {
+    public void close() throws Exception
+    {
         try
         {
 //            logger.info("cache reader unmaps cache/index file");
             indexFile.unmap();
-        }
-        catch (Exception e)
+        } catch (Exception e)
         {
             e.printStackTrace();
         }

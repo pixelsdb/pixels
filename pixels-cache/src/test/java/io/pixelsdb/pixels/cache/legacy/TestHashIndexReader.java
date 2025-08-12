@@ -27,22 +27,28 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
-public class TestHashIndexReader {
+public class TestHashIndexReader
+{
 
     @Test
-    public void testConstructor() {
-        try {
+    public void testConstructor()
+    {
+        try
+        {
             MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.hash-index", 102400000);
             HashIndexReader reader = new HashIndexReader(indexFile);
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             e.printStackTrace();
         }
 
     }
 
     @Test
-    public void testDiskIndexReader() {
-        try {
+    public void testDiskIndexReader()
+    {
+        try
+        {
             MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.hash-index", 102400000);
             RandomAccessFile indexDiskFile = new RandomAccessFile("/dev/shm/pixels.hash-index", "r");
 
@@ -53,7 +59,8 @@ public class TestHashIndexReader {
             indexDiskFile.read(buf);
             Charset utf8 = StandardCharsets.UTF_8;
             System.out.println(utf8.decode(wrapBuf));
-            for(int i = 0; i < buf.length; ++i) {
+            for (int i = 0; i < buf.length; ++i)
+            {
                 System.out.println(buf[i]);
             }
 
@@ -62,7 +69,8 @@ public class TestHashIndexReader {
             System.out.println(utf8.decode(wrapBuf));
 
             // print the byte value
-            for(int i = 0; i < buf.length; ++i) {
+            for (int i = 0; i < buf.length; ++i)
+            {
                 System.out.println(buf[i]);
             }
 
@@ -77,13 +85,17 @@ public class TestHashIndexReader {
             indexDiskFile.seek(16);
             System.out.println("disk " + indexDiskFile.readLong());
 
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             e.printStackTrace();
         }
     }
+
     @Test
-    public void testNativeSearch() {
-        try {
+    public void testNativeSearch()
+    {
+        try
+        {
             MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.hash-index", 102400000);
             HashIndexReader reader = new HashIndexReader(indexFile);
             NativeHashIndexReader nativeReader = new NativeHashIndexReader(indexFile);
@@ -94,7 +106,8 @@ public class TestHashIndexReader {
             System.out.println(nativeReader.read(1073747600L, (short) 10, (short) 1013));
 
 
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             e.printStackTrace();
         }
     }

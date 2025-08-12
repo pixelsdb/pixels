@@ -27,23 +27,23 @@ import org.apache.logging.log4j.Logger;
 import java.nio.ByteBuffer;
 
 // serialize to a memory mapped file
-public class RadixIndexWriter implements CacheIndexWriter {
+public class RadixIndexWriter implements CacheIndexWriter
+{
     private final static Logger logger = LogManager.getLogger(RadixIndexWriter.class);
 
     private final PixelsRadix radix;
     private final MemoryMappedFile out;
-    private long currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
-    private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
-
     private final ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private final ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
     private final int bandwidthLimit = 50; // 50 mib/s
+    private long currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
+    private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
     private long startTime;
     private long windowWriteBytes = 0;
 
 
-
-    RadixIndexWriter(MemoryMappedFile out) {
+    RadixIndexWriter(MemoryMappedFile out)
+    {
         this.radix = new PixelsRadix();
         this.out = out;
     }
@@ -51,12 +51,14 @@ public class RadixIndexWriter implements CacheIndexWriter {
     /**
      * Write radix tree node.
      */
-    private boolean writeRadix(RadixNode node) throws InterruptedException {
+    private boolean writeRadix(RadixNode node) throws InterruptedException
+    {
         if (!flushNode(node)) return false;
         boolean ret = true;
         for (RadixNode n : node.getChildren().values())
         {
-            if (!writeRadix(n)) {
+            if (!writeRadix(n))
+            {
                 ret = false;
                 break;
             }
@@ -70,7 +72,8 @@ public class RadixIndexWriter implements CacheIndexWriter {
      * Header: isKey(1 bit) + edgeSize(22 bits) + childrenSize(9 bits)
      * Child: leader(1 byte) + child_offset(7 bytes)
      */
-    private boolean flushNode(RadixNode node) throws InterruptedException {
+    private boolean flushNode(RadixNode node) throws InterruptedException
+    {
         nodeBuffer.clear();
         if (currentIndexOffset >= out.getSize())
         {
@@ -80,8 +83,7 @@ public class RadixIndexWriter implements CacheIndexWriter {
         if (node.offset == 0)
         {
             node.offset = currentIndexOffset;
-        }
-        else
+        } else
         {
             currentIndexOffset = node.offset;
         }
@@ -135,26 +137,31 @@ public class RadixIndexWriter implements CacheIndexWriter {
     }
 
     @Override
-    public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx) {
+    public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx)
+    {
         this.radix.put(cacheKey, cacheIdx);
     }
 
     @Override
-    public void clear() {
+    public void clear()
+    {
         this.radix.removeAll();
     }
 
     @Override
-    public long flush() {
+    public long flush()
+    {
         startTime = System.currentTimeMillis();
-        try {
+        try
+        {
             // if root contains nodes, which means the tree is not empty,then write nodes.
             if (radix.getRoot().getSize() != 0)
             {
                 if (writeRadix(radix.getRoot())) return currentIndexOffset;
                 else return -1;
             }
-        } catch (InterruptedException e) {
+        } catch (InterruptedException e)
+        {
             e.printStackTrace();
         }
         return currentIndexOffset;

@@ -29,40 +29,43 @@ import org.apache.logging.log4j.Logger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-public class RadixIndexReader implements AutoCloseable, CacheIndexReader {
+public class RadixIndexReader implements AutoCloseable, CacheIndexReader
+{
 
     private static final Logger logger = LogManager.getLogger(RadixIndexReader.class);
     private final MemoryMappedFile indexFile;
 
     /**
      * <p>
-     *     A node can have at most 256 children, plus an edge (a segment of
-     *     lookup key). Each child is 8 bytes.
+     * A node can have at most 256 children, plus an edge (a segment of
+     * lookup key). Each child is 8 bytes.
      * </p>
      * <p>
-     *     In pixels, where will be one PixelsCacheReader on each split. And each
-     *     split is supposed to be processed by one single thread. There are
-     *     typically 10 - 200 concurrent threads (splits) on a machine. So that it
-     *     is not a problem to allocate nodeData in each PixelsCacheReader instance.
-     *     By this, we can avoid frequent memory allocation in the search() method.
+     * In pixels, where will be one PixelsCacheReader on each split. And each
+     * split is supposed to be processed by one single thread. There are
+     * typically 10 - 200 concurrent threads (splits) on a machine. So that it
+     * is not a problem to allocate nodeData in each PixelsCacheReader instance.
+     * By this, we can avoid frequent memory allocation in the search() method.
      * </p>
      * <p>
-     *     For the edge, although PixelsRadix can support 1MB edge length, we only
-     *     use 12 byte path (PixelsCacheKey). That means no edges can exceeds 12 bytes.
-     *     So that 16 bytes is more than enough.
+     * For the edge, although PixelsRadix can support 1MB edge length, we only
+     * use 12 byte path (PixelsCacheKey). That means no edges can exceeds 12 bytes.
+     * So that 16 bytes is more than enough.
      * </p>
      */
-    private byte[] nodeData = new byte[256 * 8 + 16];
-    private ByteBuffer childrenBuffer = ByteBuffer.wrap(nodeData);
+    private final byte[] nodeData = new byte[256 * 8 + 16];
+    private final ByteBuffer childrenBuffer = ByteBuffer.wrap(nodeData);
 
-    private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
+    private final ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
 
-    public RadixIndexReader(MemoryMappedFile indexFile) {
+    public RadixIndexReader(MemoryMappedFile indexFile)
+    {
         this.indexFile = indexFile;
     }
 
     @Override
-    public PixelsCacheIdx read(PixelsCacheKey key) {
+    public PixelsCacheIdx read(PixelsCacheKey key)
+    {
         return search(key.blockId, key.rowGroupId, key.columnId);
     }
 
@@ -185,12 +188,14 @@ public class RadixIndexReader implements AutoCloseable, CacheIndexReader {
     }
 
     @Override
-    public void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results) {
+    public void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results)
+    {
         throw new RuntimeException("not implemented yet");
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() throws Exception
+    {
         indexFile.unmap();
     }
 }

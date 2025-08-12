@@ -29,20 +29,21 @@ import org.apache.logging.log4j.Logger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-public class HashIndexWriter implements CacheIndexWriter {
+public class HashIndexWriter implements CacheIndexWriter
+{
     private final static Logger logger = LogManager.getLogger(HashIndexWriter.class);
-    private long currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
-    private double loadFactor;
     private final int kvSize = PixelsCacheKey.SIZE + PixelsCacheIdx.SIZE;
     private final long tableSize;
-    private int nKeys = 0;
     private final byte[] kv = new byte[kvSize];
     private final ByteBuffer kvBuf = ByteBuffer.wrap(kv).order(ByteOrder.LITTLE_ENDIAN);
     private final ByteBuffer keyBuf = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.LITTLE_ENDIAN);
-
     private final MemoryMappedFile out;
+    private long currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
+    private double loadFactor;
+    private int nKeys = 0;
 
-    public HashIndexWriter(MemoryMappedFile out) {
+    public HashIndexWriter(MemoryMappedFile out)
+    {
         this.out = out;
         this.out.clear();
         this.tableSize = out.getSize() / kvSize;
@@ -51,10 +52,12 @@ public class HashIndexWriter implements CacheIndexWriter {
         currentIndexOffset += 8;
     }
 
-    private int hashcode(byte[] bytes) {
+    private int hashcode(byte[] bytes)
+    {
         int var1 = 1;
 
-        for(int var3 = 0; var3 < bytes.length; ++var3) {
+        for (int var3 = 0; var3 < bytes.length; ++var3)
+        {
             var1 = 31 * var1 + bytes[var3];
         }
 
@@ -63,7 +66,8 @@ public class HashIndexWriter implements CacheIndexWriter {
 
 
     @Override
-    public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx) {
+    public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx)
+    {
         // construct a little endian key buf, this is good for C-compatibility
         keyBuf.position(0);
         keyBuf.putLong(cacheKey.blockId).putShort(cacheKey.rowGroupId).putShort(cacheKey.columnId);
@@ -72,7 +76,8 @@ public class HashIndexWriter implements CacheIndexWriter {
         long offset = bucket * kvSize;
         out.getBytes(offset + currentIndexOffset, kv, 0, this.kvSize);
         boolean valid = kvBuf.getLong(0) == 0 && kvBuf.getLong(8) == 0 && kvBuf.getLong(16) == 0; // all zero
-        for(int i = 1; !valid; ++i) {
+        for (int i = 1; !valid; ++i)
+        {
             bucket += (long) i * i;
             bucket = bucket % tableSize;
             offset = bucket * kvSize;
@@ -90,12 +95,14 @@ public class HashIndexWriter implements CacheIndexWriter {
     }
 
     @Override
-    public void clear() {
+    public void clear()
+    {
 
     }
 
     @Override
-    public long flush() {
+    public long flush()
+    {
         loadFactor = nKeys / (double) tableSize;
         logger.debug("load factor=" + loadFactor + " keys=" + nKeys + " tableSize=" + tableSize);
         return 0;

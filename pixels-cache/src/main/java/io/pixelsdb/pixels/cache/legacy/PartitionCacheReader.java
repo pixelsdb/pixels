@@ -42,7 +42,8 @@ import static com.google.common.base.Preconditions.checkArgument;
  * it is agnostic to the type of the index, either hash or radix can be used
  * TODO: rename class name to Pixels_____
  */
-public class PartitionCacheReader implements CacheReader {
+public class PartitionCacheReader implements CacheReader
+{
     private static final Logger logger = LogManager.getLogger(PartitionRadixIndexReader.class);
     private final MemoryMappedFile indexWholeRegion;
     private final MemoryMappedFile cacheWholeRegion;
@@ -51,18 +52,18 @@ public class PartitionCacheReader implements CacheReader {
 
     private final int partitions;
     private final long metaSize = PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
-    ByteBuffer partitionHashKeyBuf = ByteBuffer.allocate(2 + 2);
     // Note: we cannot directly use the PartitionedRadixIndexReader, as the read-write protocol is tightly coupled
     private final CacheIndexReader[] readers; // related to physical partitions, length=partitions+1
-
     private final CacheContentReader[] contentReaders;
+    ByteBuffer partitionHashKeyBuf = ByteBuffer.allocate(2 + 2);
 
 
     private PartitionCacheReader(MemoryMappedFile indexWholeRegion, MemoryMappedFile[] indexSubRegions,
-                                MemoryMappedFile cacheWholeRegion, MemoryMappedFile[] cacheSubRegions,
-                                CacheIndexReader[] readers,
-                                CacheContentReader[] contentReaders,
-                                int partitions) {
+                                 MemoryMappedFile cacheWholeRegion, MemoryMappedFile[] cacheSubRegions,
+                                 CacheIndexReader[] readers,
+                                 CacheContentReader[] contentReaders,
+                                 int partitions)
+    {
         assert (indexSubRegions.length == partitions + 1);
         assert (cacheSubRegions.length == partitions + 1);
         assert (readers.length == partitions + 1);
@@ -76,7 +77,13 @@ public class PartitionCacheReader implements CacheReader {
         this.contentReaders = contentReaders;
     }
 
-    public PixelsCacheIdx naivesearch(PixelsCacheKey key) {
+    public static PartitionCacheReader.Builder newBuilder()
+    {
+        return new PartitionCacheReader.Builder();
+    }
+
+    public PixelsCacheIdx naivesearch(PixelsCacheKey key)
+    {
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
         partitionHashKeyBuf.putShort(2, key.columnId);
         int logicalPartition = PixelsCacheUtil.hashcode(partitionHashKeyBuf.array()) & 0x7fffffff % partitions;
@@ -87,7 +94,8 @@ public class PartitionCacheReader implements CacheReader {
     }
 
     // optimized protocol without reader count
-    public PixelsCacheIdx search(PixelsCacheKey key) {
+    public PixelsCacheIdx search(PixelsCacheKey key)
+    {
         // retrieve freePhysical + startPhysical
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
         partitionHashKeyBuf.putShort(2, key.columnId);
@@ -98,7 +106,8 @@ public class PartitionCacheReader implements CacheReader {
         int readCount = 0;
         int v;
         long lease;
-        do {
+        do
+        {
             // 0. use free and start to decide the physical partition
             physicalPartition = PixelsCacheUtil.retrievePhysicalPartition(indexWholeRegion,
                     logicalPartition, partitions);
@@ -119,7 +128,8 @@ public class PartitionCacheReader implements CacheReader {
 
         // check the lease, version and read_count
         if (version != PixelsCacheUtil.getIndexVersion(indexSubRegion) ||
-                System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS) {
+                System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS)
+        {
             // it is a staggler reader, abort the read
             logger.debug("read aborted elapsed=" +
                     (System.currentTimeMillis() - lease) + "ms partition=" + logicalPartition);
@@ -130,28 +140,8 @@ public class PartitionCacheReader implements CacheReader {
         return cacheIdx;
     }
 
-    static class ReadLease {
-        long startMilis;
-        int physicalPartition;
-        int version;
-        boolean valid;
-        long expireMilis = PixelsCacheUtil.CACHE_READ_LEASE_MS;
-        ReadLease(boolean valid) { this.valid = valid; }
-        ReadLease(long start, int partition, int version) {
-            startMilis = start;
-            physicalPartition = partition;
-            valid = true;
-            this.version = version;
-        }
-        static ReadLease invalid() {
-            return new ReadLease(false);
-        }
-        boolean isValid(int currentVersion) {
-            return valid && version == currentVersion && System.currentTimeMillis() - startMilis <= expireMilis;
-        }
-    }
-
-    private ReadLease prepareRead(PixelsCacheKey key) {
+    private ReadLease prepareRead(PixelsCacheKey key)
+    {
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
         partitionHashKeyBuf.putShort(2, key.columnId);
         int logicalPartition = PixelsCacheUtil.hashcode(partitionHashKeyBuf.array()) & 0x7fffffff % partitions;
@@ -162,7 +152,8 @@ public class PartitionCacheReader implements CacheReader {
         int v;
         long start;
         int cnt = 0;
-        do {
+        do
+        {
             // 0. use free and start to decide the physical partition
             physicalPartition = PixelsCacheUtil.retrievePhysicalPartition(indexWholeRegion,
                     logicalPartition, partitions);
@@ -172,7 +163,8 @@ public class PartitionCacheReader implements CacheReader {
             v = indexSubRegion.getIntVolatile(6);
             rwflag = v & PixelsCacheUtil.RW_MASK;
             readCount = (v & PixelsCacheUtil.READER_COUNT_MASK) >> PixelsCacheUtil.READER_COUNT_RIGHT_SHIFT_BITS;
-            if (readCount >= PixelsCacheUtil.MAX_READER_COUNT) {
+            if (readCount >= PixelsCacheUtil.MAX_READER_COUNT)
+            {
                 return ReadLease.invalid();
             }
             start = System.currentTimeMillis();
@@ -185,21 +177,23 @@ public class PartitionCacheReader implements CacheReader {
         return new ReadLease(start, physicalPartition, PixelsCacheUtil.getIndexVersion(indexSubRegion));
     }
 
-    private boolean endRead(ReadLease lease) {
+    private boolean endRead(ReadLease lease)
+    {
         MemoryMappedFile indexSubRegion = indexSubRegions[lease.physicalPartition];
         // check the lease, version and read_count
         int v = indexSubRegion.getIntVolatile(6);
         int readCount = (v & PixelsCacheUtil.READER_COUNT_MASK) >>
                 PixelsCacheUtil.READER_COUNT_RIGHT_SHIFT_BITS;
 
-        if (readCount == 0 || !lease.isValid(PixelsCacheUtil.getIndexVersion(indexSubRegion))) {
+        if (readCount == 0 || !lease.isValid(PixelsCacheUtil.getIndexVersion(indexSubRegion)))
+        {
             logger.debug("read aborted readCount=" + readCount + " " + (System.currentTimeMillis() - lease.startMilis));
             return false;
         }
         // try to decrement the reader count
         while ((v & PixelsCacheUtil.READER_COUNT_MASK) > 0)
         {
-            if (indexSubRegion.compareAndSwapInt(6, v, v-PixelsCacheUtil.READER_COUNT_INC))
+            if (indexSubRegion.compareAndSwapInt(6, v, v - PixelsCacheUtil.READER_COUNT_INC))
             {
                 // if v is not changed and the reader count is successfully decreased, break.
                 break;
@@ -213,7 +207,8 @@ public class PartitionCacheReader implements CacheReader {
     // in search, we have an optimized protocol which only relies on timing to reduce contention
     // between readers
     // this method is supposed to be used with test
-    public PixelsCacheIdx searchWithReaderCount(PixelsCacheKey key) {
+    public PixelsCacheIdx searchWithReaderCount(PixelsCacheKey key)
+    {
         ReadLease lease = prepareRead(key);
 
         logger.trace("physical partition=" + lease.physicalPartition);
@@ -221,7 +216,7 @@ public class PartitionCacheReader implements CacheReader {
         PixelsCacheIdx cacheIdx = reader.read(key);
 
         if (endRead(lease) && cacheIdx != null)
-           return new PixelsCacheIdx(cacheIdx.offset, cacheIdx.length, lease.physicalPartition);
+            return new PixelsCacheIdx(cacheIdx.offset, cacheIdx.length, lease.physicalPartition);
             // return cacheIdx;
 
         else
@@ -229,7 +224,8 @@ public class PartitionCacheReader implements CacheReader {
     }
 
     // return a direct buffer
-    public ByteBuffer getZeroCopy(PixelsCacheKey key) {
+    public ByteBuffer getZeroCopy(PixelsCacheKey key)
+    {
         // TODO: 这个方案是有缺陷的! 因为返回的只是一个地址的拷贝, 在 reader 实际 process 的时候, writer 是有可能重写这部分区域的
         ReadLease lease = prepareRead(key);
 
@@ -238,18 +234,21 @@ public class PartitionCacheReader implements CacheReader {
         CacheContentReader contentReader = contentReaders[lease.physicalPartition];
 
         PixelsCacheIdx cacheIdx = reader.read(key);
-        if (cacheIdx == null) {
+        if (cacheIdx == null)
+        {
             endRead(lease);
             return null;
         }
 
-        try {
+        try
+        {
             ByteBuffer ret = contentReader.readZeroCopy(cacheIdx);
             if (endRead(lease))
                 return ret;
             else
                 return null;
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
             return null;
         }
@@ -257,32 +256,37 @@ public class PartitionCacheReader implements CacheReader {
 
     // TODO: what if buf.length is not enough to hold?
     // TODO: make the simpleGet as ligitimate get method
-    public int get(PixelsCacheKey key, byte[] buf, int size) {
+    public int get(PixelsCacheKey key, byte[] buf, int size)
+    {
         ReadLease lease = prepareRead(key);
         logger.trace("physical partition=" + lease.physicalPartition);
         CacheIndexReader reader = readers[lease.physicalPartition];
         CacheContentReader contentReader = contentReaders[lease.physicalPartition];
 
         PixelsCacheIdx cacheIdx = reader.read(key);
-        if (cacheIdx == null) {
+        if (cacheIdx == null)
+        {
             endRead(lease);
             return 0;
         }
-        try {
+        try
+        {
             contentReader.read(cacheIdx, buf);
-            if (endRead(lease)) {
+            if (endRead(lease))
+            {
                 return size;
-            }
-            else
+            } else
                 return 0;
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
             return 0;
         }
     }
 
     // w/o protocol
-    public int naiveget(PixelsCacheKey key, byte[] buf, int size) {
+    public int naiveget(PixelsCacheKey key, byte[] buf, int size)
+    {
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
         partitionHashKeyBuf.putShort(2, key.columnId);
         int logicalPartition = PixelsCacheUtil.hashcode(partitionHashKeyBuf.array()) & 0x7fffffff % partitions;
@@ -293,12 +297,15 @@ public class PartitionCacheReader implements CacheReader {
 
 
         PixelsCacheIdx cacheIdx = reader.read(key);
-        if (cacheIdx == null) {
+        if (cacheIdx == null)
+        {
             return 0;
         }
-        try {
+        try
+        {
             contentReader.read(cacheIdx, buf);
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
         }
 //        content.getBytes(cacheIdx.offset, buf, 0, size);
@@ -306,7 +313,8 @@ public class PartitionCacheReader implements CacheReader {
     }
 
     // w/ simple protocol
-    public int simpleget(PixelsCacheKey key, byte[] buf, int size) {
+    public int simpleget(PixelsCacheKey key, byte[] buf, int size)
+    {
         // retrieve freePhysical + startPhysical
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
         partitionHashKeyBuf.putShort(2, key.columnId);
@@ -317,7 +325,8 @@ public class PartitionCacheReader implements CacheReader {
         int v;
         long lease;
         int cnt = 0;
-        do {
+        do
+        {
             // 0. use free and start to decide the physical partition
             physicalPartition = PixelsCacheUtil.retrievePhysicalPartition(indexWholeRegion,
                     logicalPartition, partitions);
@@ -330,8 +339,9 @@ public class PartitionCacheReader implements CacheReader {
             cnt++;
 
         } while (rwflag > 0);
-        if (cnt > 1) {
-            logger.debug(String.format("route %d times, physical partition=%d, logical partition=%d",cnt , physicalPartition, logicalPartition));
+        if (cnt > 1)
+        {
+            logger.debug(String.format("route %d times, physical partition=%d, logical partition=%d", cnt, physicalPartition, logicalPartition));
         }
         // the loop will exit if rw_flag=0 and we have increased the rw_count atomically at the same time.
         int version = PixelsCacheUtil.getIndexVersion(indexSubRegion);
@@ -344,7 +354,8 @@ public class PartitionCacheReader implements CacheReader {
         PixelsCacheIdx cacheIdx = reader.read(key);
 
         // check the lease, version and read_count
-        if (version != PixelsCacheUtil.getIndexVersion(indexSubRegion) || System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS) {
+        if (version != PixelsCacheUtil.getIndexVersion(indexSubRegion) || System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS)
+        {
             // it is a staggler reader, abort the read
             logger.debug("read aborted elapsed=" + (System.currentTimeMillis() - lease) + "ms partition=" + logicalPartition);
             return 0;
@@ -353,19 +364,55 @@ public class PartitionCacheReader implements CacheReader {
         // end indexRead, the cacheIdx is a valid thing to return, we just tries to decrease the read_count
         // it is possible that read_count will be forced to
         // if reader count is already <= 0, nothing will be done, just return
-        if (cacheIdx == null) {
+        if (cacheIdx == null)
+        {
             return 0;
         }
-        try {
+        try
+        {
             contentReader.read(cacheIdx, buf);
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
         }
 //        content.getBytes(cacheIdx.offset, buf, 0, size);
         return size;
     }
 
-    public static class Builder {
+    static class ReadLease
+    {
+        long startMilis;
+        int physicalPartition;
+        int version;
+        boolean valid;
+        long expireMilis = PixelsCacheUtil.CACHE_READ_LEASE_MS;
+
+        ReadLease(boolean valid)
+        {
+            this.valid = valid;
+        }
+
+        ReadLease(long start, int partition, int version)
+        {
+            startMilis = start;
+            physicalPartition = partition;
+            valid = true;
+            this.version = version;
+        }
+
+        static ReadLease invalid()
+        {
+            return new ReadLease(false);
+        }
+
+        boolean isValid(int currentVersion)
+        {
+            return valid && version == currentVersion && System.currentTimeMillis() - startMilis <= expireMilis;
+        }
+    }
+
+    public static class Builder
+    {
         private MemoryMappedFile indexWholeRegion;
         private MemoryMappedFile cacheWholeRegion;
         private int partitions = Integer.parseInt(ConfigFactory.Instance().getProperty("cache.partitions"));
@@ -377,29 +424,34 @@ public class PartitionCacheReader implements CacheReader {
         private String contentLoc;
 
 
-        private Builder() {
+        private Builder()
+        {
         }
 
         public PartitionCacheReader.Builder setIndexType(String indexType)
         {
             checkArgument(Objects.equals(indexType, "hash") || Objects.equals(indexType, "radix"),
                     "unknown index type " + indexType);
-            if (indexType.equals("hash")) {
+            if (indexType.equals("hash"))
+            {
                 indexReaderFactory = HashIndexReader::new;
-            } else {
+            } else
+            {
                 indexReaderFactory = RadixIndexReader::new;
             }
             return this;
         }
 
-        public PartitionCacheReader.Builder setIndexLocation(String loc) {
+        public PartitionCacheReader.Builder setIndexLocation(String loc)
+        {
 //            requireNonNull(indexFile, "index file is null");
             this.indexLoc = loc;
 
             return this;
         }
 
-        public PartitionCacheReader.Builder setCacheLocation(String loc) {
+        public PartitionCacheReader.Builder setCacheLocation(String loc)
+        {
 //            requireNonNull(indexFile, "index file is null");
             this.contentLoc = loc;
 
@@ -407,43 +459,49 @@ public class PartitionCacheReader implements CacheReader {
         }
 
 
-        public PartitionCacheReader.Builder setIndexFile(MemoryMappedFile indexFile) {
+        public PartitionCacheReader.Builder setIndexFile(MemoryMappedFile indexFile)
+        {
 //            requireNonNull(indexFile, "index file is null");
             this.indexWholeRegion = indexFile;
 
             return this;
         }
 
-        public PartitionCacheReader.Builder setCacheFile(MemoryMappedFile cacheFile) {
+        public PartitionCacheReader.Builder setCacheFile(MemoryMappedFile cacheFile)
+        {
 //            requireNonNull(indexFile, "index file is null");
             this.cacheWholeRegion = cacheFile;
 
             return this;
         }
 
-        public PartitionCacheReader.Builder setCacheIndexReader(Function<MemoryMappedFile, CacheIndexReader> factory) {
+        public PartitionCacheReader.Builder setCacheIndexReader(Function<MemoryMappedFile, CacheIndexReader> factory)
+        {
 //            requireNonNull(indexFile, "index file is null");
             indexReaderFactory = factory;
 
             return this;
         }
 
-        public PartitionCacheReader.Builder setPartitions(int partitions) {
+        public PartitionCacheReader.Builder setPartitions(int partitions)
+        {
 //            requireNonNull(indexFile, "index file is null");
             this.partitions = partitions;
 
             return this;
         }
 
-        public PartitionCacheReader build2() throws Exception {
-            assert(indexReaderFactory != null);
+        public PartitionCacheReader build2() throws Exception
+        {
+            assert (indexReaderFactory != null);
             indexSubRegionBytes = Long.parseLong(ConfigFactory.Instance().getProperty("index.size")) / partitions;
             cacheSubRegionBytes = Long.parseLong(ConfigFactory.Instance().getProperty("cache.size")) / partitions;
             MemoryMappedFile indexHeader;
             MemoryMappedFile cacheHeader;
             MemoryMappedFile[] indexSubRegions = new MemoryMappedFile[partitions + 1];
             MemoryMappedFile[] cacheSubRegions = new MemoryMappedFile[partitions + 1];
-            for (int i = 0; i < partitions + 1; ++i) {
+            for (int i = 0; i < partitions + 1; ++i)
+            {
                 indexSubRegions[i] = new MemoryMappedFile(Paths.get(indexLoc, "physical-" + i).toString(), indexSubRegionBytes);
                 cacheSubRegions[i] = new MemoryMappedFile(Paths.get(contentLoc, "physical-" + i).toString(), cacheSubRegionBytes);
             }
@@ -451,21 +509,24 @@ public class PartitionCacheReader implements CacheReader {
             cacheHeader = new MemoryMappedFile(Paths.get(contentLoc, "header").toString(), PixelsCacheUtil.CACHE_DATA_OFFSET);
             CacheIndexReader[] indexReaders = new CacheIndexReader[partitions + 1];
             CacheContentReader[] contentReaders = new CacheContentReader[partitions + 1];
-            for (int i = 0; i < partitions + 1; ++i) {
+            for (int i = 0; i < partitions + 1; ++i)
+            {
                 indexReaders[i] = this.indexReaderFactory.apply(indexSubRegions[i]);
-                contentReaders[i] = new DiskCacheContentReader(Paths.get(contentLoc, "physical-"+i).toString());
+                contentReaders[i] = new DiskCacheContentReader(Paths.get(contentLoc, "physical-" + i).toString());
             }
             return new PartitionCacheReader(indexHeader, indexSubRegions, cacheHeader, cacheSubRegions,
                     indexReaders, contentReaders, partitions);
         }
 
-        public PartitionCacheReader build() {
-            assert(indexReaderFactory != null);
+        public PartitionCacheReader build()
+        {
+            assert (indexReaderFactory != null);
             indexSubRegionBytes = Long.parseLong(ConfigFactory.Instance().getProperty("index.size")) / partitions;
             cacheSubRegionBytes = Long.parseLong(ConfigFactory.Instance().getProperty("cache.size")) / partitions;
             MemoryMappedFile[] indexSubRegions = new MemoryMappedFile[partitions + 1];
             MemoryMappedFile[] cacheSubRegions = new MemoryMappedFile[partitions + 1];
-            for (int i = 0; i < partitions + 1; ++i) {
+            for (int i = 0; i < partitions + 1; ++i)
+            {
                 indexSubRegions[i] = indexWholeRegion.regionView(
                         PixelsCacheUtil.PARTITION_INDEX_META_SIZE + i * indexSubRegionBytes, indexSubRegionBytes);
                 cacheSubRegions[i] = cacheWholeRegion.regionView(
@@ -473,21 +534,20 @@ public class PartitionCacheReader implements CacheReader {
             }
             CacheIndexReader[] indexReaders = new CacheIndexReader[partitions + 1];
             CacheContentReader[] contentReaders = new CacheContentReader[partitions + 1];
-            for (int i = 0; i < partitions + 1; ++i) {
+            for (int i = 0; i < partitions + 1; ++i)
+            {
                 indexReaders[i] = this.indexReaderFactory.apply(indexSubRegions[i]);
-                try {
+                try
+                {
                     contentReaders[i] = new MmapFileCacheContentReader(cacheSubRegions[i]);
 
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     e.printStackTrace();
                 }
             }
             return new PartitionCacheReader(indexWholeRegion, indexSubRegions, cacheWholeRegion, cacheSubRegions,
                     indexReaders, contentReaders, partitions);
         }
-    }
-
-    public static PartitionCacheReader.Builder newBuilder() {
-        return new PartitionCacheReader.Builder();
     }
 }

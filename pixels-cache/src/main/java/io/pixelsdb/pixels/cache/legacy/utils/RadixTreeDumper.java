@@ -27,22 +27,18 @@ import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 // yet, you can convert a big-endian radix index file by RadixIndexEndianRewriter
 public class RadixTreeDumper
 {
-    // little endian radix tree file
-    private final MemoryMappedFile indexFile;
-
     static
     {
         System.loadLibrary("RadixTreeDumper");
     }
 
+    // little endian radix tree file
+    private final MemoryMappedFile indexFile;
+
     RadixTreeDumper(MemoryMappedFile indexFile)
     {
         this.indexFile = indexFile;
     }
-
-    // traverse the index
-    // currently the output file name is fixed to dumpedCache.txt in c file
-    public native void nativeTraverse();
 
     public static void main(String[] args)
     {
@@ -53,10 +49,13 @@ public class RadixTreeDumper
             RadixTreeDumper cis = new RadixTreeDumper(index);
             cis.nativeTraverse();
 
-        }
-        catch (Exception e)
+        } catch (Exception e)
         {
             e.printStackTrace();
         }
     }
+
+    // traverse the index
+    // currently the output file name is fixed to dumpedCache.txt in c file
+    public native void nativeTraverse();
 }

@@ -30,7 +30,8 @@ import sun.nio.ch.DirectBuffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-public class HashIndexReader implements AutoCloseable, CacheIndexReader {
+public class HashIndexReader implements AutoCloseable, CacheIndexReader
+{
 
     private static final Logger logger = LogManager.getLogger(HashIndexReader.class);
     private final byte[] key = new byte[PixelsCacheKey.SIZE];
@@ -54,10 +55,12 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
         logger.trace("tableSize={}", tableSize);
     }
 
-    private int hashcode(byte[] bytes) {
+    private int hashcode(byte[] bytes)
+    {
         int var1 = 1;
 
-        for(int var3 = 0; var3 < bytes.length; ++var3) {
+        for (int var3 = 0; var3 < bytes.length; ++var3)
+        {
             var1 = 31 * var1 + bytes[var3];
         }
 
@@ -65,12 +68,14 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
     }
 
     @Override
-    public PixelsCacheIdx read(PixelsCacheKey key) {
+    public PixelsCacheIdx read(PixelsCacheKey key)
+    {
         return search(key.blockId, key.rowGroupId, key.columnId);
     }
 
     @Override
-    public void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results) {
+    public void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results)
+    {
         throw new RuntimeException("not implemented yet");
     }
 
@@ -93,14 +98,16 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
         kvBuf.position(0);
         boolean valid = keyBuf.position(0).equals(kvBuf.slice().position(0).limit(PixelsCacheKey.SIZE));
         int dramAccess = 1;
-        for(int i = 1; !valid; ++i) {
+        for (int i = 1; !valid; ++i)
+        {
             bucket += i * i;
             bucket = bucket % tableSize;
 //            bucket &= tableSize - 1;
             offset = bucket * kvSize;
             indexFile.getBytes(offset + HEADER_OFFSET, kv, 0, this.kvSize);
             // check if key matches
-            if (kvBuf.getLong(0) == 0 && kvBuf.getLong(8) == 0 && kvBuf.getLong(16) == 0) {
+            if (kvBuf.getLong(0) == 0 && kvBuf.getLong(8) == 0 && kvBuf.getLong(16) == 0)
+            {
                 System.out.printf("cache miss! blk=%d, rg=%d, col=%d, probe_i=%d, bucket=%d, offset=%d\n", blockId, rowGroupId, columnId, i, bucket, offset);
                 return null;
             } // all zero
@@ -117,13 +124,13 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() throws Exception
+    {
         try
         {
 //            logger.info("cache reader unmaps cache/index file");
             indexFile.unmap();
-        }
-        catch (Exception e)
+        } catch (Exception e)
         {
             e.printStackTrace();
         }

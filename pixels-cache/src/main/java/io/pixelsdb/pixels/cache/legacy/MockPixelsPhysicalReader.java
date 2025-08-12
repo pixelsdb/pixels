@@ -27,23 +27,27 @@ import java.io.IOException;
 import java.util.*;
 
 // TODO: how it used? I remember that I didn't do a clear refactor
-public class MockPixelsPhysicalReader {
-    private static List<String> cacheIdxs = new ArrayList<>();
-    private static List<String> cacheKeys = new ArrayList<>();
-    private static Map<String, String> keyToIdxs = new HashMap<>();
-    private static Map<Long, Long> blkSizes = new HashMap<>();
+public class MockPixelsPhysicalReader
+{
+    private static final List<String> cacheIdxs = new ArrayList<>();
+    private static final List<String> cacheKeys = new ArrayList<>();
+    private static final Map<String, String> keyToIdxs = new HashMap<>();
+    private static final Map<Long, Long> blkSizes = new HashMap<>();
 
-    private static Map<Long, String> blkToKeys = new HashMap<>();
-    private static Map<Long, String> blkToIdxs = new HashMap<>();
+    private static final Map<Long, String> blkToKeys = new HashMap<>();
+    private static final Map<Long, String> blkToIdxs = new HashMap<>();
 
-    static {
-        try {
+    static
+    {
+        try
+        {
             // read the mock file
             BufferedReader br = new BufferedReader(new FileReader("dumpedCache.txt"));
             String line = br.readLine();
             String idxString = "";
             String keyString = "";
-            while (line != null) {
+            while (line != null)
+            {
                 keyString = line.split(";")[1];
                 String[] keyTokens = keyString.split("-");
                 long blkId = Long.parseLong(keyTokens[0]);
@@ -54,9 +58,11 @@ public class MockPixelsPhysicalReader {
                 long offset = Long.parseLong(idxTokens[0]);
                 int length = Integer.parseInt(idxTokens[1]);
 
-                if (blkSizes.containsKey(blkId)) {
+                if (blkSizes.containsKey(blkId))
+                {
                     blkSizes.put(blkId, blkSizes.get(blkId) + length);
-                } else {
+                } else
+                {
                     blkSizes.put(blkId, (long) length);
                 }
                 cacheIdxs.add(idxString);
@@ -64,25 +70,29 @@ public class MockPixelsPhysicalReader {
                 keyToIdxs.put(keyString, idxString);
                 line = br.readLine();
             }
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             e.printStackTrace();
         }
 
     }
 
     private final long blkId;
+
     public MockPixelsPhysicalReader(Storage storage, String path) throws IOException
     {
         assert (storage.getScheme() == Storage.Scheme.mock);
         blkId = Long.parseLong(path);
     }
 
-    public int read(short rgId, short colId, byte[] buf) {
+    public int read(short rgId, short colId, byte[] buf)
+    {
         String cacheIdx = keyToIdxs.get(blkId + "-" + rgId + "-" + colId);
         String[] idxTokens = cacheIdx.split("-");
         long offset = Long.parseLong(idxTokens[0]);
         int length = Integer.parseInt(idxTokens[1]);
-        if (buf.length >= length) {
+        if (buf.length >= length)
+        {
             Arrays.fill(buf, 0, length, (byte) ('A' + (cacheIdx.hashCode() % 26)));
         }
         return length;

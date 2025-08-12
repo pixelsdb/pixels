@@ -33,17 +33,20 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TestIndexWriter {
+public class TestIndexWriter
+{
     List<PixelsCacheIdx> pixelsCacheIdxs = new ArrayList<>(4096);
     List<PixelsCacheKey> pixelsCacheKeys = new ArrayList<>(4096);
 
     @Before
-    public void loadMockData() throws IOException {
+    public void loadMockData() throws IOException
+    {
         BufferedReader br = new BufferedReader(new FileReader("dumpedCache.txt"));
         String line = br.readLine();
         String idxString = "";
         String keyString = "";
-        while (line != null) {
+        while (line != null)
+        {
             keyString = line.split(";")[1];
             idxString = line.split(";")[2];
 
@@ -62,7 +65,8 @@ public class TestIndexWriter {
     }
 
     @Test
-    public void testHashIndexWriter() throws Exception {
+    public void testHashIndexWriter() throws Exception
+    {
         Configurator.setRootLevel(Level.DEBUG);
 
         MemoryMappedFile hashIndex = new MemoryMappedFile("/dev/shm/pixels.hash-index-test", 512000 * 24 * 2);
@@ -70,12 +74,14 @@ public class TestIndexWriter {
         CacheIndexWriter indexWriter = new HashIndexWriter(hashIndex);
         CacheIndexReader indexReader = new HashIndexReader(hashIndex);
 
-        for (int i = 0; i < pixelsCacheIdxs.size(); ++i) {
+        for (int i = 0; i < pixelsCacheIdxs.size(); ++i)
+        {
             PixelsCacheKey cacheKey = pixelsCacheKeys.get(i);
             PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(i);
             indexWriter.put(cacheKey, cacheIdx);
             PixelsCacheIdx readed = indexReader.read(cacheKey);
-            if (readed == null || readed.length != cacheIdx.length) {
+            if (readed == null || readed.length != cacheIdx.length)
+            {
                 System.out.println(i + " " + cacheKey + " " + cacheIdx);
                 break;
             }
