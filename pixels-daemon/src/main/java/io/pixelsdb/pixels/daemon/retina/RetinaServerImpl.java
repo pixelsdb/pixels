@@ -186,7 +186,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         String schemaName = request.getSchemaName();
         List<RetinaProto.TableUpdateData> tableUpdateDataList = request.getTableUpdateDataList();
-        long timestamp = request.getTimestamp(
+        long timestamp = request.getTimestamp();
 
         if (!tableUpdateDataList.isEmpty())
         {
