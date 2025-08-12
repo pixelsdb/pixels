@@ -197,7 +197,8 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 long primaryIndexId = tableUpdateData.getPrimaryIndexId();
                 if (!deleteDataList.isEmpty())
                 {
-                    List<List<IndexProto.IndexKey>> indexKeysList = new ArrayList<>(deleteDataList.size());
+                    int indexNum = deleteDataList.get(0).getIndexKeysList().size();
+                    List<List<IndexProto.IndexKey>> indexKeysList = new ArrayList<>(indexNum);
                     for (RetinaProto.DeleteData deleteData : deleteDataList)
                     {
                         List<IndexProto.IndexKey> deleteDataIndexKeysList = deleteData.getIndexKeysList();
@@ -217,11 +218,11 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         this.retinaResourceManager.deleteRecord(rowLocation, timestamp);
                     }
 
-                    for (int i = 1; i < indexKeysList.size(); i++)
+                    for (int i = 1; i < indexNum; i++)
                     {
                         List<IndexProto.IndexKey> indexKeys = indexKeysList.get(i);
                         indexService.deleteSecondaryIndexEntries
-                                (indexKeys.get(0).getTableId(), indexKeys.get(0).getIndexId(), indexKeys);
+                               (indexKeys.get(0).getTableId(), indexKeys.get(0).getIndexId(), indexKeys);
                     }
                 }
 
