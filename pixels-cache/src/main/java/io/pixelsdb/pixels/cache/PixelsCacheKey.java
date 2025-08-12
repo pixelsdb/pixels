@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.cache;
 
-import io.pixelsdb.pixels.cache.mq.Message;
+import io.pixelsdb.pixels.common.physical.mq.Message;
 import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 import java.nio.ByteBuffer;
@@ -32,12 +32,11 @@ import static com.google.common.base.Preconditions.checkArgument;
  * The key to look up the cache index. It is also the cache miss message
  * that can be written into the cache miss message queue.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 public class PixelsCacheKey implements Message
 {
-    final static int SIZE = 2 * Short.BYTES + Long.BYTES;
+    public final static int SIZE = 2 * Short.BYTES + Long.BYTES;
 
     public long blockId;
     public short rowGroupId;

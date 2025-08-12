@@ -24,8 +24,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 public class PixelsCacheConfig
 {

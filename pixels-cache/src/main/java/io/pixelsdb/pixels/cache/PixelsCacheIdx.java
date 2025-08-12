@@ -23,13 +23,12 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /**
- * The location of a cached item, i.e., a cached column chunk,
- * in the cache.
+ * The location of a cached item, i.e., a cached column chunk, in the cache.
  * @author guodong
  */
 public class PixelsCacheIdx
 {
-    static final int SIZE = Long.BYTES + Integer.BYTES;
+    public static final int SIZE = Long.BYTES + Integer.BYTES;
     public final long offset;
     public final int length;
     public final int partition; // physical

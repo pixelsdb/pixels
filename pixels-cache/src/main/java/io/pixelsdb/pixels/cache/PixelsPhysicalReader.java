@@ -29,8 +29,7 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 
 /**
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 public class PixelsPhysicalReader implements Closeable
 {

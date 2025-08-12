@@ -26,8 +26,8 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * Created at: 19-5-12
- * @author hank
+ * @author guodong
+ * @create 2019-05-12
  */
 public class CacheLogger implements Runnable
 {

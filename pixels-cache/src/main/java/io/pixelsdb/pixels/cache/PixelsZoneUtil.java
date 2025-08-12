@@ -30,11 +30,10 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 /**
- * @create 2024-01-20
  * @author alph00
+ * @create 2024-01-20
  */
 class PixelsZoneUtil
 {

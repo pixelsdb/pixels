@@ -23,8 +23,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * Created at: 19-5-11
- * Author: hank
+ * @author hank
+ * @create 2019-05-11
  */
 public class NativePixelsCacheReader
 {

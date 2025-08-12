@@ -43,8 +43,7 @@ import static java.util.Objects.requireNonNull;
  * - HEADER: MAGIC(6 bytes), STATUS(2 bytes), SIZE(8 bytes)
  * - CONTENT
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 
 /**
@@ -354,14 +353,14 @@ public class PixelsCacheUtil
      * @param indexFile the index file
      * @return the local cache version in the index file
      */
-    protected static int getIndexVersion(MemoryMappedFile indexFile)
+    public static int getIndexVersion(MemoryMappedFile indexFile)
     {
         return indexFile.getIntVolatile(10);
     }
 
     /**
      * @param indexFile the index file of the local cache
-     * @param cacheFile the cache file of the local cache
+     * @param cacheWriter the writer of the local cache
      * @return the local cache version in the index file, or -1 when the local cache is empty
      */
     public static int getIndexVersion(MemoryMappedFile indexFile, PixelsCacheWriter cacheWriter)

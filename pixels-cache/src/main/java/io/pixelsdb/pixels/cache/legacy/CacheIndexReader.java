@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2019 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,15 +17,25 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+package io.pixelsdb.pixels.cache.legacy;
 
-package io.pixelsdb.pixels.cache;
+import io.pixelsdb.pixels.cache.PixelsCacheIdx;
+import io.pixelsdb.pixels.cache.PixelsCacheKey;
 
-/**
- * @author alph00
- * @create 2024-02-24
- */
-
-public interface PixelsHasher 
+public interface CacheIndexReader
 {
-    public long getHashCode(String key);
+    PixelsCacheIdx read(PixelsCacheKey key);
+
+    default PixelsCacheIdx read(long blockId, short rowGroupId, short columnId)
+    {
+        return read(new PixelsCacheKey(blockId, rowGroupId, columnId));
+    }
+
+    default void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results)
+    {
+        for (int i = 0; i < keys.length; ++i)
+        {
+            results[i] = read(keys[i]);
+        }
+    }
 }

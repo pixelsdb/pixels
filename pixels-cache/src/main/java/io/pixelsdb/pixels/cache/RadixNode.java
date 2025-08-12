@@ -23,8 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 public class RadixNode
 {

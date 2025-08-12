@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2019 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,15 +17,16 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+package io.pixelsdb.pixels.cache.legacy;
 
-package io.pixelsdb.pixels.cache;
+import io.pixelsdb.pixels.cache.PixelsCacheIdx;
+import io.pixelsdb.pixels.cache.PixelsCacheKey;
 
-/**
- * @author alph00
- * @create 2024-02-24
- */
-
-public interface PixelsHasher 
+public interface CacheIndexWriter
 {
-    public long getHashCode(String key);
+    void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx);
+
+    void clear();
+
+    long flush();
 }

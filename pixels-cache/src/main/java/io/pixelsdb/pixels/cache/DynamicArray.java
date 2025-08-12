@@ -30,8 +30,7 @@ import javax.annotation.concurrent.NotThreadSafe;
  * when the array is too sparse to meet the utilization payload(default value is 0.6),
  * the array will shrink its capacity automatically.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 
 @NotThreadSafe

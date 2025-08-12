@@ -28,13 +28,10 @@ import java.nio.ByteOrder;
 import java.util.List;
 
 /**
- * pixels zone reader.
- * this file is derived from old version of PixelsCacheReader.java
- * It is not thread safe.
+ * Pixels zone reader.
+ * This class is not thread-safe and it is derived from old version of PixelsCacheReader.java.
  *
- * @author guodong
- * @author hank
- * @author alph00
+ * @author guodong, hank, alph00
  */
 public class PixelsZoneReader implements AutoCloseable
 {
