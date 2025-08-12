@@ -21,8 +21,8 @@
 package io.pixelsdb.pixels.cache;
 
 /**
- * @create 2024-02-24
  * @author alph00
+ * @create 2024-02-24
  */
 
 public interface PixelsHasher 

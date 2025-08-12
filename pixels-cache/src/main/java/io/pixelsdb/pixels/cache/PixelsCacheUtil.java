@@ -43,8 +43,7 @@ import static java.util.Objects.requireNonNull;
  * - HEADER: MAGIC(6 bytes), STATUS(2 bytes), SIZE(8 bytes)
  * - CONTENT
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 
 /**

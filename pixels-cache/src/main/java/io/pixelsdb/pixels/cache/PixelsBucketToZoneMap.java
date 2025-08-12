@@ -23,11 +23,9 @@ import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.List;
-
 /**
- * @create 2024-02-17
  * @author alph00
+ * @create 2024-02-17
  */
 public class PixelsBucketToZoneMap 
 {

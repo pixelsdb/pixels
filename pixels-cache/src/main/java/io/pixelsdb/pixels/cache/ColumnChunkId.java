@@ -26,8 +26,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 /**
  * This is used to represent the cached column chunk inside a file.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 public class ColumnChunkId
 {

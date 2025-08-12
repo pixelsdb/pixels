@@ -28,8 +28,8 @@ import static java.util.Objects.requireNonNull;
  *
  * <p><b>Note: </b>The CompareTo method of this class only compares the offset in cache file.</p>
  *
- * Created at: 2020/9/6
- * @author: hank
+ * @author hank
+ * @create 2020-09-06
  */
 public class PixelsCacheEntry implements Comparable<PixelsCacheEntry>
 {

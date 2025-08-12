@@ -27,7 +27,6 @@ public class RadixIndexEndianRewriter
 {
     private final MemoryMappedFile indexFile;
 
-
     static
     {
         System.loadLibrary("RadixIndexEndianRewriter");
@@ -47,7 +46,8 @@ public class RadixIndexEndianRewriter
             MemoryMappedFile index = new MemoryMappedFile("/dev/shm/pixels.index.little", 102400000);
             RadixIndexEndianRewriter cir = new RadixIndexEndianRewriter(index);
             cir.rewrite();
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             e.printStackTrace();
         }

@@ -48,7 +48,7 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
     {
         this.indexFile = indexFile;
         this.tableSize = (int) indexFile.getLong(PixelsCacheUtil.INDEX_RADIX_OFFSET);
-        logger.trace("tableSize=" + tableSize);
+        logger.trace("tableSize={}", tableSize);
     }
 
     private int hashcode(byte[] bytes) {
@@ -124,6 +124,5 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
         {
             e.printStackTrace();
         }
-
     }
 }

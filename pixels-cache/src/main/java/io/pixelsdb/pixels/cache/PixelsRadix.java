@@ -28,10 +28,9 @@ import java.util.List;
 import static java.util.Objects.requireNonNull;
 
 /**
- * a radix tree implementation
+ * A radix tree implementation.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 public class PixelsRadix
 {

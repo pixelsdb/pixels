@@ -26,8 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @create 2024-01-23
  * @author alph00
+ * @create 2024-01-23
  */
 public class PixelsBucketTypeInfo 
 {

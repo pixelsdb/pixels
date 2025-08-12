@@ -28,8 +28,8 @@ import java.nio.ByteOrder;
 import java.util.List;
 
 /**
- * @create 2024-01-17
  * @author alph00
+ * @create 2024-01-17
  */
 public class PixelsZoneWriter 
 {

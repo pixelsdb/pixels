@@ -32,8 +32,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * The key to look up the cache index. It is also the cache miss message
  * that can be written into the cache miss message queue.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 public class PixelsCacheKey implements Message
 {

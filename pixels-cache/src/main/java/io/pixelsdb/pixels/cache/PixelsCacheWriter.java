@@ -42,9 +42,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 /**
  * pixels cache writer
  *
- * @author guodong
- * @author hank
- * @author alph00
+ * @author guodong, hank, alph00
  */
 public class PixelsCacheWriter
 {

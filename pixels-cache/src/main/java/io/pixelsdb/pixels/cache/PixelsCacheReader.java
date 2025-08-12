@@ -27,8 +27,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 /**
- * pixels cache reader.
- * This was moved from the previous non-zoned PixelsCache Reader.
+ * Zoned Pixels cache reader.
+ * The previous non-zoned PixelsCacheReader has been moved as the PixelsZoneReader.
  *
  * @author alph00
  */

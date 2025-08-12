@@ -23,8 +23,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * @create 2024-02-26
  * @author alph00
+ * @create 2024-02-26
  */
 
 public class PixelsMurmurHasher implements PixelsHasher 
