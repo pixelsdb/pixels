@@ -29,8 +29,7 @@ import java.util.List;
 
 /**
  * Pixels zone reader.
- * this file is derived from old version of PixelsCacheReader.java
- * It is not thread safe.
+ * This class is not thread-safe and it is derived from old version of PixelsCacheReader.java.
  *
  * @author guodong, hank, alph00
  */
