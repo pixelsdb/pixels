@@ -26,8 +26,8 @@ import org.apache.logging.log4j.Logger;
 import org.junit.Test;
 
 /**
- * Created at: 18-10-28
- * Author: hank
+ * @author hank
+ * @create 2018-10-28
  */
 public class TestEtcdLock
 {

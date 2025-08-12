@@ -27,8 +27,8 @@ import org.junit.Test;
 import java.util.Arrays;
 
 /**
- * Created at: 10/20/21
- * Author: hank
+ * @author hank
+ * @create 2021-10-20
  */
 public class TestProjections
 {
