@@ -286,13 +286,14 @@ public class RetinaService
         return true;
     }
 
-    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName) throws RetinaException
+    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName, long timeStamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.GetWriterBufferRequest request = RetinaProto.GetWriterBufferRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
+                .setTimestamp(timeStamp)
                 .build();
         RetinaProto.GetWriterBufferResponse response = this.stub.getWriterBuffer(request);
         if (response.getHeader().getErrorCode() != 0)
