@@ -22,8 +22,6 @@ package io.pixelsdb.pixels.daemon.transaction;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -37,8 +35,8 @@ import static java.util.Objects.requireNonNull;
 /**
  * This context manager of the transactions.
  *
- * @update 2023-05-02
  * @author hank
+ * @update 2023-05-02
  */
 public class TransContextManager
 {

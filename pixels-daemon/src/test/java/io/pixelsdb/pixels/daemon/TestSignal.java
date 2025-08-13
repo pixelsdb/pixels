@@ -25,8 +25,8 @@ import sun.misc.SignalHandler;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created at: 19-3-7
- * Author: hank
+ * @author hank
+ * @create 2019-03-07
  */
 public class TestSignal
 {

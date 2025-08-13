@@ -39,9 +39,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
+ * @author hank
  * @create 2022-02-20
  * @update 2022-05-02 update protocol to support transaction context operations
- * @author hank
  */
 public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {

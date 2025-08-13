@@ -97,7 +97,6 @@ public class TestRdbDaos
         columnDao.getByTable(table, false);
         List<MetadataProto.Layout> layouts = layoutDao.getAllByTable(table);
 
-
         MetadataProto.Layout layout = null;
 
         for (MetadataProto.Layout layout1 : layouts)

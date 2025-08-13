@@ -30,8 +30,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created at: 18-11-26
- * Author: hank
+ * @author hank
+ * @create 2018-11-26
  */
 public class TestBalancer
 {

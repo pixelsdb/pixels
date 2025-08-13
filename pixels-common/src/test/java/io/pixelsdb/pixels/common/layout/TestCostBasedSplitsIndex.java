@@ -26,7 +26,7 @@ import org.junit.Test;
 
 /**
  * @author hank
- * @date 14/07/2022
+ * @create 2022-07-14
  */
 public class TestCostBasedSplitsIndex
 {
