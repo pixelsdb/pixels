@@ -318,7 +318,7 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
     `FILE_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `FILE_NAME` VARCHAR(128) NOT NULL,
-    `FILE_TYPE` TINYINT NOT NULL COMMENT "Valid value can be 0 (empty), or 1 (regular).",
+    `FILE_TYPE` TINYINT NOT NULL COMMENT "Valid value can be 0 (temporary), or 1 (regular).",
     `FILE_NUM_RG` INT NOT NULL,
     `FILE_MIN_ROW_ID` BIGINT NOT NULL,
     `FILE_MAX_ROW_ID` BIGINT NOT NULL,

@@ -170,7 +170,7 @@ message Path {
 
 message File {
     enum Type {
-        EMPTY = 0;
+        TEMPORARY = 0;
         REGULAR = 1;
     }
     uint64 id = 1;
