@@ -102,7 +102,18 @@ public class CompactExecutor implements CommandExecutor
         Storage compactStorage = StorageFactory.Instance().getStorage(layout.getCompactPathUris()[0]);
         long blockSize = Long.parseLong(configFactory.getProperty("block.size"));
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
+
+        // Issue #998: compact need to exclude empty files
         List<Status> statuses = orderStorage.listStatus(layout.getOrderedPathUris());
+        Iterator<Status> statusIterator = statuses.iterator();
+        while (statusIterator.hasNext())
+        {
+            if (metadataService.getFileType(statusIterator.next().getPath()) == File.Type.EMPTY)
+            {
+                statusIterator.remove();
+            }
+        }
+
         List<Path> targetPaths = layout.getCompactPaths();
         ConcurrentLinkedQueue<File> compactFiles = new ConcurrentLinkedQueue<>();
         ConcurrentLinkedQueue<Path> compactPaths = new ConcurrentLinkedQueue<>();

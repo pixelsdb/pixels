@@ -1343,6 +1343,38 @@ public class MetadataService
         }
     }
 
+    /**
+     * Get the file type of the file given the full uri path containing the storage scheme prefix.
+     * @param filePathUri the file path uri containing the storage scheme prefix
+     * @return the id of the file, valid file id should be a positive integer
+     * @throws MetadataException if failed to request the file id
+     */
+    public File.Type getFileType(String filePathUri) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetFileTypeRequest request = MetadataProto.GetFileTypeRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setFilePathUri(filePathUri).build();
+        try
+        {
+            MetadataProto.GetFileTypeResponse response = this.stub.getFileType(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return File.Type.valueOf(response.getFileType().getNumber());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get file type", e);
+        }
+    }
+
     public List<File> getFiles(long pathId) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
