@@ -108,7 +108,7 @@ public class CompactExecutor implements CommandExecutor
         Iterator<Status> statusIterator = statuses.iterator();
         while (statusIterator.hasNext())
         {
-            if (metadataService.getFileType(statusIterator.next().getPath()) == File.Type.EMPTY)
+            if (metadataService.getFileType(statusIterator.next().getPath()) != File.Type.REGULAR)
             {
                 statusIterator.remove();
             }
