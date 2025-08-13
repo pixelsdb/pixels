@@ -86,7 +86,7 @@ public class FileWriterManager
             MetadataService metadataService = MetadataService.Instance();
             file = new File();
             this.file.setName(targetFileName);
-            this.file.setType(File.Type.EMPTY);
+            this.file.setType(File.Type.TEMPORARY);
             this.file.setNumRowGroup(1);
             this.file.setPathId(targetOrderedDirPath.getId());
             metadataService.addFiles(Collections.singletonList(file));

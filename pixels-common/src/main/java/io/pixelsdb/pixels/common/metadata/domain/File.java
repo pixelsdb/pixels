@@ -34,19 +34,19 @@ import static java.util.Objects.requireNonNull;
 public class File extends Base
 {
     /**
-     * Files such as loaded and compacted are marked as REGULAR, while empty file
-     * created by pixelsWriterImpl during build are marked as EMPTY.
+     * Files such as loaded and compacted are marked as REGULAR, while file
+     * created by pixelsWriterImpl during build are marked as TEMPORARY.
      */
     public enum Type
     {
-        EMPTY, REGULAR;
+        TEMPORARY, REGULAR;
 
         public static Type valueOf(int number)
         {
             switch (number)
             {
                 case 0:
-                    return EMPTY;
+                    return TEMPORARY;
                 case 1:
                     return REGULAR;
                 default:
