@@ -1312,6 +1312,43 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void getFileType(MetadataProto.GetFileTypeRequest request,
+                                 StreamObserver<MetadataProto.GetFileTypeResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetFileTypeResponse.Builder responseBuilder = MetadataProto.GetFileTypeResponse.newBuilder();
+        String dirPathUri = request.getFilePathUri();
+        int lastSlashIndex = dirPathUri.lastIndexOf("/");
+        String fileName = dirPathUri.substring(lastSlashIndex + 1);
+        dirPathUri = dirPathUri.substring(0, lastSlashIndex);
+        if (Storage.Scheme.fromPath(dirPathUri) == null)
+        {
+            headerBuilder.setErrorCode(METADATA_GET_FILE_TYPE_FAILED)
+                    .setErrorMsg("the file path uri does not contain storage scheme prefix");
+            responseBuilder.setHeader(headerBuilder);
+        }
+        else
+        {
+            MetadataProto.Path path = this.pathDao.getByPathUri(dirPathUri);
+            MetadataProto.File file = this.fileDao.getByPathIdAndFileName(path.getId(), fileName);
+            if (file != null)
+            {
+                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                responseBuilder.setFileType(file.getType()).setHeader(headerBuilder);
+            } else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_FILE_TYPE_FAILED).setErrorMsg("get file type by path uri failed");
+                responseBuilder.setHeader(headerBuilder);
+            }
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void updateFile(MetadataProto.UpdateFileRequest request,
                            StreamObserver<MetadataProto.UpdateFileResponse> responseObserver)
     {
