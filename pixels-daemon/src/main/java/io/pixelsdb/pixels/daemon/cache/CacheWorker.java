@@ -47,10 +47,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * pixels cache manager.
+ * Pixels cache manager on each worker node.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 public class CacheWorker implements Server
 {
@@ -72,20 +71,20 @@ public class CacheWorker implements Server
     {
         this.cacheConfig = new PixelsCacheConfig();
         this.hostName = System.getenv("HOSTNAME");
-        logger.debug("HostName from system env: " + hostName);
+        logger.debug("HostName from system env: {}", hostName);
         if (hostName == null)
         {
             try
             {
                 this.hostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: " + hostName);
+                logger.debug("HostName from InetAddress: {}", hostName);
             } catch (UnknownHostException e)
             {
                 logger.debug("Hostname is null. Exit");
                 return;
             }
         }
-        logger.debug("HostName: " + hostName);
+        logger.debug("HostName: {}", hostName);
         initialize();
     }
 
@@ -133,7 +132,7 @@ public class CacheWorker implements Server
                     int globalCacheVersion = Integer.parseInt(splits[1]);
                     checkArgument(globalCacheVersion >= 0,
                             "invalid cache version in etcd: " + globalCacheVersion);
-                    logger.debug("Current global cache version: " + globalCacheVersion);
+                    logger.debug("Current global cache version: {}", globalCacheVersion);
                     // if cache file exists already. we need check local cache version with global cache version stored in etcd.
                     if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion)
                     {
@@ -218,14 +217,12 @@ public class CacheWorker implements Server
                                 int globalCacheVersion = Integer.parseInt(splits[1]);
                                 checkArgument(globalCacheVersion >= 0,
                                         "invalid cache version in etcd: " + globalCacheVersion);
-                                logger.debug("Cache version update detected, new global version is (" +
-                                        globalCacheVersion + ").");
+                                logger.debug("Cache version update detected, new global version is ({}).", globalCacheVersion);
                                 if (globalCacheVersion > localCacheVersion)
                                 {
                                     // The new version is newer, update the local cache.
-                                    logger.debug("New global cache version " + globalCacheVersion +
-                                            " is greater than the local version " + localCacheVersion +
-                                            ", update the local cache.");
+                                    logger.debug("New global cache version {} is greater than the local version {}, update the local cache.",
+                                            globalCacheVersion, localCacheVersion);
                                     try
                                     {
                                         updateLocalCache(schemaTableName, globalCacheVersion);
@@ -243,7 +240,7 @@ public class CacheWorker implements Server
                             {
                                 // The local cache is updating, ignore the new version.
                                 String value = event.getKeyValue().getValue().toString(StandardCharsets.UTF_8);
-                                logger.warn("The local cache is updating, ignore the global cache version (" + value + ").");
+                                logger.warn("The local cache is updating, ignore the global cache version ({}).", value);
                             } else
                             {
                                 // Shutdown this node manager.
@@ -350,6 +347,6 @@ public class CacheWorker implements Server
             runningLatch.countDown();
         }
         EtcdUtil.Instance().getClient().close();
-        logger.info("Cache worker on '" + hostName + "' is shutdown.");
+        logger.info("Cache worker on '{}' is shutdown.", hostName);
     }
 }

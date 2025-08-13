@@ -185,7 +185,8 @@ public class PixelsCacheWriter
             List<PixelsZoneWriter> zones = new ArrayList<>(zoneNum);
             for(int i=0; i<zoneNum; i++)
             {
-                zones.add(new PixelsZoneWriter(builderCacheLocation+"."+String.valueOf(i),builderIndexLocation+"."+String.valueOf(i),builderZoneSize,builderZoneIndexSize,i));
+                zones.add(new PixelsZoneWriter(builderCacheLocation+"." + i,
+                        builderIndexLocation + "." + i, builderZoneSize,builderZoneIndexSize, i));
             }
 
             MemoryMappedFile globalIndexFile = new MemoryMappedFile(builderIndexLocation, builderZoneIndexSize);
@@ -239,7 +240,7 @@ public class PixelsCacheWriter
                             schemaTableName.getSchemaName(), schemaTableName.getSchemaName(), cachedVersion);
                     Compact compact = cachedLayout.getCompact();
                     int cacheBorder = compact.getCacheBorder();
-                    cachedColumnChunks.addAll(compact.getColumnChunkOrder());//.subList(0, cacheBorder));
+                    cachedColumnChunks.addAll(compact.getColumnChunkOrder().subList(0, cacheBorder));
                 }
             }
             else
@@ -286,8 +287,6 @@ public class PixelsCacheWriter
     {
         return zones.get(zoneId).getIndexFile();
     }
-
-
 
     /**
      * <p>
@@ -391,7 +390,6 @@ public class PixelsCacheWriter
         }
     }
 
-
     /**
      * Currently, this is an interface for unit tests.
      * This method only updates index content and cache content (without touching headers)
@@ -402,7 +400,6 @@ public class PixelsCacheWriter
        PixelsZoneWriter zone = zones.get(zoneId);
        zone.write(key, value);
     }
-
 
     /**
      * Currently, this is an interface for unit tests.
@@ -421,8 +418,7 @@ public class PixelsCacheWriter
         // get the new caching layout
         Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
-        List<String> cacheColumnChunkOrders = compact.getColumnChunkOrder();//.subList(0, cacheBorder);
-
+        List<String> cacheColumnChunkOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
 
         // update cache content
         cachedColumnChunks.clear();
@@ -472,9 +468,8 @@ public class PixelsCacheWriter
                     {
                         // TODO: Now the strategy for handling incomplete files is discarding them directly.
                         //  This may lead to certain column chunks not being read into the cache as expected.
-                        logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
-                                pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " +
-                                file + ". This file will be ignored.");
+                        logger.warn("{} row groups are required for cache, but only {} row groups are found in {}. This file will be ignored.",
+                                rowGroupNumInLayout, pixelsPhysicalReader.getRowGroupNum(), file);
                         continue;
                     }
                     // update radix and cache content
@@ -496,7 +491,8 @@ public class PixelsCacheWriter
                         physicalOffset = chunkIndex.getChunkOffset();
                         if (currCacheOffset + physicalLen >= zone.getZoneFile().getSize())
                         {
-                            logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + currCacheOffset + "current bucketId: " + bucketId);
+                            logger.debug("Cache writes have exceeded bucket size. Break. Current size: {} current bucketId: {}",
+                                    currCacheOffset, bucketId);
                             break outer_loop;
                         } 
                         else
@@ -505,8 +501,8 @@ public class PixelsCacheWriter
                                     new PixelsCacheIdx(currCacheOffset, physicalLen));
                             byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                             zone.getZoneFile().setBytes(currCacheOffset, columnChunk);
-                            logger.debug(
-                                    "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnChunk.length);
+                            logger.debug("Cache write: {}-{}-{}, offset: {}, length: {}",
+                                    file, rowGroupId, columnId, currCacheOffset, columnChunk.length);
                             currCacheOffset += physicalLen;
                         }
                     }
@@ -547,7 +543,7 @@ public class PixelsCacheWriter
          */
         Compact compact = layout.getCompact();
         int cacheBorder = compact.getCacheBorder();
-        List<String> nextVersionCached = compact.getColumnChunkOrder();//.subList(0, cacheBorder);
+        List<String> nextVersionCached = compact.getColumnChunkOrder().subList(0, cacheBorder);
         /**
          * Prepare structures for the survived and new coming cache elements.
          */
@@ -575,9 +571,8 @@ public class PixelsCacheWriter
                 {
                     // TODO: Now the strategy for handling incomplete files is discarding them directly.
                     //  This may lead to certain column chunks not being read into the cache as expected.
-                    logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
-                            physicalReader.getRowGroupNum() + " row groups are found in " +
-                            file + ". This file was ignored before.");
+                    logger.warn("{} row groups are required for cache, but only {} row groups are found in {}. This file was ignored before.",
+                            rowGroupNumInLayout, physicalReader.getRowGroupNum(), file);
                     continue;
                 }
                 // TODO: in case of block id was changed, the survived column chunks in this block can not survive in the cache update.
@@ -636,7 +631,8 @@ public class PixelsCacheWriter
                 {
                     continue;
                 }
-                swapZone.getZoneFile().copyMemory(zone.getZoneFile().getAddress() + survivedIdx.idx.offset, swapZone.getZoneFile().getAddress() + newCacheOffset, survivedIdx.idx.length);
+                swapZone.getZoneFile().copyMemory(zone.getZoneFile().getAddress() + survivedIdx.idx.offset,
+                        swapZone.getZoneFile().getAddress() + newCacheOffset, survivedIdx.idx.length);
                 swapZone.getRadix().put(survivedIdx.key, new PixelsCacheIdx(newCacheOffset, survivedIdx.idx.length));
                 newCacheOffset += survivedIdx.idx.length;
             }
@@ -668,9 +664,8 @@ public class PixelsCacheWriter
                     {
                         // TODO: Now the strategy for handling incomplete files is discarding them directly.
                         //  This may lead to certain column chunks not being read into the cache as expected.
-                        logger.warn(rowGroupNumInLayout + " row groups are required for cache, but only " +
-                                pixelsPhysicalReader.getRowGroupNum() + " row groups are found in " +
-                                file + ". This file was ignored before.");
+                        logger.warn("{} row groups are required for cache, but only {} row groups are found in {}. This file was ignored before.",
+                                rowGroupNumInLayout, pixelsPhysicalReader.getRowGroupNum(), file);
                         continue;
                     }
                     int physicalLen;
@@ -692,7 +687,8 @@ public class PixelsCacheWriter
                         physicalOffset = chunkIndex.getChunkOffset();
                         if (newCacheOffset + physicalLen >= swapZone.getZoneFile().getSize())
                         {
-                            logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newCacheOffset + "current bucketId: " + bucketId);
+                            logger.debug("Cache writes have exceeded bucket size. Break. Current size: {} current bucketId: {}",
+                                    newCacheOffset, bucketId);
                             break outer_loop;
                         }
                         else
@@ -702,8 +698,8 @@ public class PixelsCacheWriter
                                     new PixelsCacheIdx(newCacheOffset, physicalLen)));
                             byte[] columnChunk = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                             swapZone.getZoneFile().setBytes(newCacheOffset, columnChunk);
-                            logger.debug(
-                                    "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + newCacheOffset + ", length: " + columnChunk.length);
+                            logger.debug("Cache write: {}-{}-{}, offset: {}, length: {}",
+                                    file, rowGroupId, columnId, newCacheOffset, columnChunk.length);
                             newCacheOffset += physicalLen;
                         }
                     }
@@ -722,7 +718,8 @@ public class PixelsCacheWriter
                             physicalOffset = chunkIndex.getChunkOffset();
                             if(newCacheOffset + physicalLen >= swapZone.getZoneFile().getSize())
                             {
-                                logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newCacheOffset + "current bucketId: " + bucketId);
+                                logger.debug("Cache writes have exceeded bucket size. Break. Current size: {} current bucketId: {}",
+                                        newCacheOffset, bucketId);
                                 break outer_loop;
                             }
                             else
@@ -736,7 +733,7 @@ public class PixelsCacheWriter
                     }
                 }
             }
-            logger.debug("Bucket " + bucketId + " append finished, writer ends at offset: " + newCacheOffset);
+            logger.debug("Bucket {} append finished, writer ends at offset: {}", bucketId, newCacheOffset);
 
             /**
              * Start phase 3: activate new cache elements.
@@ -829,7 +826,7 @@ public class PixelsCacheWriter
         }
         bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(0), firstSwapZoneId);
         // there is no data in the cache, just build a empty zone
-        if(this.files == null || this.files.size() == 0)
+        if(this.files == null || this.files.isEmpty())
         {
             PixelsZoneUtil.setIndexVersion(newZone.getIndexFile(), PixelsZoneUtil.getIndexVersion(zones.get(bucketTypeInfo.getLazyBucketIds().get(0)).getIndexFile()));
             PixelsZoneUtil.setStatus(newZone.getZoneFile(), PixelsZoneUtil.ZoneStatus.OK.getId());
@@ -878,7 +875,8 @@ public class PixelsCacheWriter
                             }
                             else
                             {
-                                logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newZoneOffset + "current bucketId: " + newBucketId);
+                                logger.debug("Cache writes have exceeded bucket size. Break. Current size: {} current bucketId: {}",
+                                        newZoneOffset, newBucketId);
                             }
                         }
                         else
@@ -897,7 +895,8 @@ public class PixelsCacheWriter
                             }
                             else
                             {
-                                logger.debug("Cache writes have exceeded bucket size. Break. Current size: " + newZoneOffset + "current bucketId: " + newBucketId);
+                                logger.debug("Cache writes have exceeded bucket size. Break. Current size: {} current bucketId: {}",
+                                        newZoneOffset, newBucketId);
                             }
                         }
                     }
@@ -986,7 +985,7 @@ public class PixelsCacheWriter
                     break;
                 }
             }
-            if (isLocal == false)
+            if (!isLocal)
             {
                 // file is not local, move it to local.
                 PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path);

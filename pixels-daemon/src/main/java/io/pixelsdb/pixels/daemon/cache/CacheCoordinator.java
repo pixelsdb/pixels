@@ -61,8 +61,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * 1. caching balance. It assigns each file a caching location, which are updated into etcd for global synchronization, and maintains a dynamic caching balance in the cluster.
  * 3. caching node monitor. It monitors all cache workers in the cluster, and update running status(available, busy, dead, etc.) of caching nodes.
  *
- * @author guodong
- * @author hank
+ * @author guodong, hank
  */
 // TODO: cache location compaction. Cache locations for older versions still exist after being used.
 public class CacheCoordinator implements Server
@@ -187,15 +186,15 @@ public class CacheCoordinator implements Server
                                 String value = event.getKeyValue().getValue().toString(StandardCharsets.UTF_8);
                                 // Issue #636: get schema and table name from etcd instead of config file.
                                 String[] splits = value.split(":");
-                                checkArgument(splits.length == 2, "invalid value for key '" +
+                                checkArgument(splits.length == 2, "Invalid value for key '" +
                                         Constants.LAYOUT_VERSION_LITERAL + "' in etcd: " + value);
                                 SchemaTableName schemaTableName = new SchemaTableName(splits[0]);
                                 int layoutVersion = Integer.parseInt(splits[1]);
                                 checkArgument(layoutVersion >= 0,
-                                        "invalid layout version in etcd: " + layoutVersion);
+                                        "Invalid layout version in etcd: " + layoutVersion);
                                 updateCachePlan(schemaTableName, layoutVersion);
                                 // update cache version, notify cache managers on each node to update cache.
-                                logger.debug("Update cache version to " + layoutVersion);
+                                logger.debug("Update cache version to {}", layoutVersion);
                                 EtcdUtil.Instance().putKeyValue(Constants.CACHE_VERSION_LITERAL, value);
                             }
                             catch (IOException | MetadataException e)
@@ -320,7 +319,7 @@ public class CacheCoordinator implements Server
             HostAddress node = workers[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
-            logger.debug(files.size() + " files are allocated to " + node + " at layout version" + layoutVersion);
+            logger.debug("{} files are allocated to {} at layout version{}", files.size(), node, layoutVersion);
             EtcdUtil.Instance().putKeyValue(key, String.join(";", files));
         }
     }
