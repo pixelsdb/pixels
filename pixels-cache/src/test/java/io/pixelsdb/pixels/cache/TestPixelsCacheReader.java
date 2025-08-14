@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.cache;
 import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,7 +34,8 @@ public class TestPixelsCacheReader
 {
 
     @Test
-    public void testSimpleSearchAndGet() throws Exception {
+    public void testSimpleSearchAndGet() throws IOException
+    {
         MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
 
         PixelsCacheKey key = new PixelsCacheKey(1073747711, (short) 0, (short) 191);
@@ -71,7 +73,7 @@ public class TestPixelsCacheReader
                 }
             }
         }
-        catch (Exception e)
+        catch (IOException e)
         {
             e.printStackTrace();
         }

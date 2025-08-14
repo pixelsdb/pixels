@@ -19,10 +19,12 @@
  */
 package io.pixelsdb.pixels.cache;
 
+import io.pixelsdb.pixels.common.exception.CacheException;
 import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
@@ -44,7 +46,8 @@ public class PixelsZoneWriter
     private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
 
-    public PixelsZoneWriter(String builderZoneLocation, String builderIndexLocation, long builderZoneSize, long builderIndexSize, int zoneId) throws Exception 
+    public PixelsZoneWriter(String builderZoneLocation, String builderIndexLocation,
+                            long builderZoneSize, long builderIndexSize, int zoneId) throws IOException
     {
         this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
         this.zoneFile = new MemoryMappedFile(builderZoneLocation, builderZoneSize);
@@ -52,25 +55,25 @@ public class PixelsZoneWriter
         this.zoneId = zoneId;
     }
 
-    public void buildLazy(PixelsCacheConfig cacheConfig) throws Exception 
+    public void buildLazy(PixelsCacheConfig cacheConfig)
     {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeLazy(indexFile, zoneFile);
     }
 
-    public void buildLazy() throws Exception 
+    public void buildLazy()
     {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeLazy(indexFile, zoneFile);
     }
 
-    public void buildSwap(PixelsCacheConfig cacheConfig) throws Exception 
+    public void buildSwap(PixelsCacheConfig cacheConfig)
     {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeSwap(indexFile, zoneFile);
     }
 
-    public void loadIndex() throws Exception 
+    public void loadIndex() throws CacheException
     {
         radix = PixelsZoneUtil.loadRadixIndex(indexFile);
     }

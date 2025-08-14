@@ -96,9 +96,9 @@ public class MemoryMappedFile
      * by padding 0.
      * @param loc the file name
      * @param len the file length
-     * @throws Exception in case there was an error creating the memory mapped file
+     * @throws IOException in case there was an error creating the memory mapped file
      */
-    public MemoryMappedFile(final String loc, long len) throws Exception
+    public MemoryMappedFile(final String loc, long len) throws IOException
     {
         this (loc, len, true);
     }
