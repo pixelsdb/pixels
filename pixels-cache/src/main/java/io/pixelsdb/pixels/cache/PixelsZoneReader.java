@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
@@ -74,7 +75,8 @@ public class PixelsZoneReader implements AutoCloseable
         this.indexFile = indexFile;
     }
 
-    public PixelsZoneReader(String zoneLocation, String indexLocation, long zoneSize, long indexSize) throws Exception {
+    public PixelsZoneReader(String zoneLocation, String indexLocation, long zoneSize, long indexSize) throws IOException
+    {
         this.zoneFile = new MemoryMappedFile(zoneLocation, zoneSize);
         this.indexFile = new MemoryMappedFile(indexLocation, indexSize);
     }   

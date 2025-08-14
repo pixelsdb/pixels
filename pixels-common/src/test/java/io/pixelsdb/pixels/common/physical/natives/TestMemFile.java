@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical.natives;
 import org.junit.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -48,7 +49,7 @@ public class TestMemFile
     }
 
     @Test
-    public void testWrite() throws Exception
+    public void testWrite() throws IOException
     {
         MemoryMappedFile file = new MemoryMappedFile(this.path, 4L * 1024 * 1024 * 1024);
         file.setInt(2 * 1024 * 1024, 1);
@@ -57,7 +58,7 @@ public class TestMemFile
     }
 
     @Test
-    public void testRead() throws Exception
+    public void testRead() throws IOException
     {
         MemoryMappedFile file = new MemoryMappedFile(this.path, 4L * 1024 * 1024 * 1024);
         System.out.println(file.getInt(2 * 1024 * 1024));
@@ -65,7 +66,7 @@ public class TestMemFile
     }
 
     @Test
-    public void testEndian () throws Exception
+    public void testEndian () throws IOException
     {
         write(ByteOrder.BIG_ENDIAN, 0xf0ff00008fff0000L);
         MemoryMappedFile mem = new MemoryMappedFile(path, 1024L * 1024L * 10L);
@@ -80,7 +81,7 @@ public class TestMemFile
     }
 
     @Test
-    public void testOpenMemFile() throws Exception
+    public void testOpenMemFile() throws IOException
     {
         long start = System.nanoTime();
         for (int i = 0; i < 100; ++i)
@@ -92,7 +93,7 @@ public class TestMemFile
     }
 
     @Test
-    public void testMulti() throws Exception
+    public void testMulti() throws IOException
     {
         MemoryMappedFile mem = new MemoryMappedFile(path, 1024L * 1024L * 10L);
         Map<Integer, byte[]> kvMap = new HashMap<>();
@@ -121,7 +122,7 @@ public class TestMemFile
         System.out.println("Read cost time: " + (endReadTime - startReadTime));
     }
 
-    private void write(Map<Integer, byte[]> kvMap) throws Exception
+    private void write(Map<Integer, byte[]> kvMap) throws IOException
     {
         new File(path);
 
@@ -147,13 +148,13 @@ public class TestMemFile
     }
 
     @Test
-    public void test() throws Exception
+    public void test() throws IOException
     {
         write(ByteOrder.BIG_ENDIAN, 0xffff0000ffff0000L);
         read();
     }
 
-    public void write(ByteOrder byteOrder, long repeatLong) throws Exception
+    public void write(ByteOrder byteOrder, long repeatLong) throws IOException
     {
         new File(path);
 
@@ -169,7 +170,7 @@ public class TestMemFile
         }
     }
 
-    public void read() throws Exception
+    public void read() throws IOException
     {
         MemoryMappedFile mem = new MemoryMappedFile(path, 1024L * 1024L * 10L);
         byte[] res = new byte[8];

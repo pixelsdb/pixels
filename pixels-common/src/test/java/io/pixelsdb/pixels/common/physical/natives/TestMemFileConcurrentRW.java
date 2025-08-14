@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.common.physical.natives;
 
 import org.junit.Test;
 
+import java.io.IOException;
+
 /**
  * @author hank
  * @create 2018-10-24
@@ -28,7 +30,7 @@ import org.junit.Test;
 public class TestMemFileConcurrentRW
 {
     @Test
-    public void testRead() throws Exception
+    public void testRead() throws IOException, InterruptedException
     {
         long start = System.nanoTime();
         MemoryMappedFile mem = new MemoryMappedFile("/dev/shm/test", 1024L * 1024L * 256L);
@@ -41,7 +43,7 @@ public class TestMemFileConcurrentRW
     }
 
     @Test
-    public void testWrite() throws Exception
+    public void testWrite() throws IOException, InterruptedException
     {
         long start = System.nanoTime();
         MemoryMappedFile mem = new MemoryMappedFile("/dev/shm/test", 1024L * 1024L * 256L);

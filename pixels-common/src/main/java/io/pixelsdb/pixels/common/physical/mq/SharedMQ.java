@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.common.physical.mq;
 
 import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
+import java.io.IOException;
+
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 import static java.util.Objects.requireNonNull;
@@ -105,17 +107,17 @@ public class SharedMQ
      */
     private final long _EOQ;
 
-    public SharedMQ (String location, long totalSize) throws Exception
+    public SharedMQ (String location, long totalSize) throws IOException
     {
         this(location, totalSize, SHARED_MQ_DEFAULT_TIMEOUT_MS, false);
     }
 
-    public SharedMQ (String location, long totalSize, boolean forceInit) throws Exception
+    public SharedMQ (String location, long totalSize, boolean forceInit) throws IOException
     {
         this(location, totalSize, SHARED_MQ_DEFAULT_TIMEOUT_MS, forceInit);
     }
 
-    public SharedMQ (String location, long totalSize, int timeout, boolean forceInit) throws Exception
+    public SharedMQ (String location, long totalSize, int timeout, boolean forceInit) throws IOException
     {
         _timeout = timeout;
         //_messageSize = messageSize;

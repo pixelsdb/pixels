@@ -184,7 +184,8 @@ public class BenchmarkCacheReader
             averageLatency += res.latency;
         }
         averageLatency /= nReaders;
-        System.out.printf("threads=%d, totalIOPS=%f, bandwidth=%fMB(%fMiB), latency=%fms%n", nReaders, totalIOPS, totalBandwidthMB, totalBandwidthMiB, averageLatency);
+        System.out.printf("threads=%d, totalIOPS=%f, bandwidth=%fMB(%fMiB), latency=%fms%n",
+                nReaders, totalIOPS, totalBandwidthMB, totalBandwidthMiB, averageLatency);
 
     }
     // Note: for cacheReader test, the bandwidth and latency is bounded by the cache content read.

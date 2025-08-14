@@ -84,13 +84,11 @@ public class BenchmarkCacheIndexReader
                 line = br.readLine();
             }
             System.out.println(Arrays.toString(Arrays.copyOfRange(pixelsCacheKeys, 0, 10)));
-
         } catch (Exception e)
         {
 
             e.printStackTrace();
         }
-
     }
 
     void benchmarkIndexReader(int threadNum, Supplier<CacheIndexReader> factory) throws ExecutionException, InterruptedException
@@ -129,7 +127,6 @@ public class BenchmarkCacheIndexReader
                         (searchEnd - searchStart) / 1e6, totalRamAccess);
                 System.out.println(result);
                 return result;
-
             });
             futures.add(future);
         }

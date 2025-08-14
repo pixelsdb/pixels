@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.cache;
 
 import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.exception.CacheException;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
@@ -175,7 +177,7 @@ public class PixelsCacheWriter
             return this;
         }
 
-        public PixelsCacheWriter build() throws Exception
+        public PixelsCacheWriter build() throws IOException, CacheException, MetadataException
         {
             this.builderZoneSize = this.builderZoneSize / (zoneNum - swapZoneNum);
             this.builderZoneIndexSize = this.builderZoneIndexSize / (zoneNum - swapZoneNum);

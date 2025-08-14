@@ -22,13 +22,14 @@ package io.pixelsdb.pixels.common.physical.natives;
 import org.junit.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 public class TestMemFileWrite
 {
     @Test
-    public void test() throws Exception
+    public void test() throws IOException
     {
         String path = "/Users/Jelly/Desktop/pixels.index";
         new File(path);
