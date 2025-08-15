@@ -35,13 +35,13 @@ Install Pixels following the instructions [HERE](../docs/INSTALL.md), but do not
 
 Check the following settings related to pixels-cache in `PIXELS_HOME/etc/pixels.properties` on each node:
 ```properties
-# the location of the cache content file of pixels-cache
-cache.location=/mnt/ramfs/pixels.cache
-# the size of the cache content file of pixels-cache in bytes
+# the base location of the cache zone files, the file name of each cache zone adds a postfix to the base location
+cache.base.location=/mnt/ramfs/pixels.cache
+# the user available size of the whole cache, including all zones, in bytes
 cache.size=68719476736
-# the location of the index file of pixels-cache
-index.location=/mnt/ramfs/pixels.index
-# the size of the index file of pixels-cache in bytes
+# the location of the index files, the name of each index file adds a postfix to the base location
+index.base.location=/mnt/ramfs/pixels.index
+# the user available size of the whole index, including the global index and the zone indexes, in bytes
 index.size=1073741824
 # the number of zones in the cache
 cache.zone.num=3
