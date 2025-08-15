@@ -75,7 +75,7 @@ public class TestRetinaService
     public void testStreamUpdateRecord()
     {
         String[] colNames = {"key", "name", "region", "comment"};
-        try (RetinaService.StreamHandle streamHandle = RetinaService.Instance().startUpdateStream();)
+        try (RetinaService.StreamHandle streamHandle = RetinaService.Instance().startUpdateStream())
         {
             for (int i = 0; i < 10; ++i)
             {
