@@ -55,19 +55,13 @@ public class PixelsZoneWriter
         this.zoneId = zoneId;
     }
 
-    public void buildLazy(PixelsCacheConfig cacheConfig)
-    {
-        radix = new PixelsRadix();
-        PixelsZoneUtil.initializeLazy(indexFile, zoneFile);
-    }
-
     public void buildLazy()
     {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeLazy(indexFile, zoneFile);
     }
 
-    public void buildSwap(PixelsCacheConfig cacheConfig)
+    public void buildSwap()
     {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeSwap(indexFile, zoneFile);

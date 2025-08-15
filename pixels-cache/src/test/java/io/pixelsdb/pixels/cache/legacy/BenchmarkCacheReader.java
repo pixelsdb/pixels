@@ -88,13 +88,13 @@ public class BenchmarkCacheReader
         ConfigFactory config = ConfigFactory.Instance();
         // disk cache
 //        config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned/pixels.cache");
 
         config.addProperty("cache.size", String.valueOf(70 * 1024 * 1024 * 1024L)); // 70GiB
         config.addProperty("cache.partitions", "32");
 
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.index");
 
@@ -198,9 +198,9 @@ public class BenchmarkCacheReader
     {
         ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
 
         int nReaders = 8;
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
@@ -278,7 +278,7 @@ public class BenchmarkCacheReader
     public void benchmarkProtocolPartitionedHashRead() throws Exception
     {
         ConfigFactory config = ConfigFactory.Instance();
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
 
@@ -781,9 +781,9 @@ public class BenchmarkCacheReader
     {
         ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
 
         int nReaders = 6;
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
@@ -886,7 +886,7 @@ public class BenchmarkCacheReader
     public void benchmarkProtocolReadAndWriteIndex() throws Exception
     {
         ConfigFactory config = ConfigFactory.Instance();
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
         int nReaders = 8;

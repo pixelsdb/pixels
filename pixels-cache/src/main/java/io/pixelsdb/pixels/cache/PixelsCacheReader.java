@@ -19,12 +19,15 @@
  */
 package io.pixelsdb.pixels.cache;
 
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Zoned Pixels cache reader.
@@ -48,47 +51,51 @@ public class PixelsCacheReader implements AutoCloseable
 
     public static class Builder
     {
-        private List<MemoryMappedFile> zoneFiles;
-        private List<MemoryMappedFile> indexFiles;
+        private List<MemoryMappedFile> zoneCacheFiles;
+        private List<MemoryMappedFile> zoneIndexFiles;
         private MemoryMappedFile globalIndexFile;
+        /**
+         * The number of zones in the cache, including the swap zones.
+         */
         private int zoneNum = 0;
+        /**
+         * The number of swap zones.
+         */
         private int swapZoneNum = 1;
 
         private Builder()
         {
         }
 
-        // we calculate zoneNum from zoneFiles including swap zone
-        public PixelsCacheReader.Builder setCacheFile(List<MemoryMappedFile> zoneFiles)
+        /**
+         * Set the cache files of the zones in the cache.
+         * @param zoneCacheFiles the zone cache files, including those of the swap zones
+         * @param swapZoneNum the number of swap zones in the cache, should be less than the number of zones
+         * @return this builder
+         */
+        public PixelsCacheReader.Builder setCacheFiles(List<MemoryMappedFile> zoneCacheFiles, int swapZoneNum)
         {
-            this.zoneFiles = zoneFiles;
-            if (zoneFiles != null)
-            {
-                zoneNum = zoneFiles.size();
-            }
-            else
-            {
-                zoneNum = 0;
-            }
+            checkArgument(zoneCacheFiles != null && !zoneCacheFiles.isEmpty(),
+                    "zoneCacheFiles is null or empty");
+            checkArgument(swapZoneNum < zoneCacheFiles.size(),
+                    "swapZoneNum must be less than the number of zoneCacheFiles");
+            this.zoneCacheFiles = zoneCacheFiles;
+            this.zoneNum = zoneCacheFiles.size();
+            this.swapZoneNum = swapZoneNum;
             return this;
         }
 
-        public PixelsCacheReader.Builder setIndexFile(List<MemoryMappedFile> indexFiles)
-        {
-            this.indexFiles = indexFiles;
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setGlobalIndexFile(MemoryMappedFile globalIndexFile)
+        /**
+         * Set the index files of the zones in the cache, and the global index file of the cache.
+         * @param zoneIndexFiles the index files of the zones
+         * @param globalIndexFile the global index file
+         * @return this builder
+         */
+        public PixelsCacheReader.Builder setIndexFiles(List<MemoryMappedFile> zoneIndexFiles,
+                                                       MemoryMappedFile globalIndexFile)
         {
             this.globalIndexFile = globalIndexFile;
-            return this;
-        }
-
-        // now this function is not used, swapZoneNum is set to 1 by default
-        public PixelsCacheReader.Builder setSwapZoneNum(int swapZoneNum)
-        {
-            this.swapZoneNum = swapZoneNum;
+            this.zoneIndexFiles = zoneIndexFiles;
             return this;
         }
 
@@ -97,7 +104,8 @@ public class PixelsCacheReader implements AutoCloseable
             List<PixelsZoneReader> builderZones = new ArrayList<>();
             for (int i = 0; i < zoneNum; i++)
             {
-                builderZones.add(PixelsZoneReader.newBuilder().setZoneFile(zoneFiles.get(i)).setIndexFile(indexFiles.get(i)).build());
+                builderZones.add(PixelsZoneReader.newBuilder().setZoneFile(
+                        zoneCacheFiles.get(i)).setIndexFile(zoneIndexFiles.get(i)).build());
             }
             PixelsLocator builderLocator = new PixelsLocator(zoneNum - swapZoneNum);
             PixelsBucketToZoneMap bucketToZoneMap = new PixelsBucketToZoneMap(globalIndexFile, zoneNum);
