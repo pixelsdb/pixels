@@ -145,6 +145,7 @@ public class RetinaService
         private final Logger logger = LogManager.getLogger(StreamHandle.class);
         private final StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver;
         private final CountDownLatch finishLatch;
+        private volatile boolean isClosed = false;
 
         StreamHandle(StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver, CountDownLatch finishLatch)
         {
@@ -154,6 +155,11 @@ public class RetinaService
 
         public void updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData, long timestamp)
         {
+            if (isClosed)
+            {
+                throw new IllegalStateException("Stream is already closed");
+            }
+            
             String token = UUID.randomUUID().toString();
             RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                     .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
@@ -161,22 +167,35 @@ public class RetinaService
                     .addAllTableUpdateData(tableUpdateData)
                     .setTimestamp(timestamp)
                     .build();
-            requestObserver.onNext(request);
+            
+            try
+            {
+                requestObserver.onNext(request);
+            } catch (Exception e)
+            {
+                logger.error("Failed to send update record request", e);
+                throw new RuntimeException("Failed to send update record request", e);
+            }
         }
 
         @Override
         public void close()
         {
-            requestObserver.onCompleted();
-            try
+            if (!isClosed)
             {
-                if (!finishLatch.await(5, TimeUnit.SECONDS))
+                isClosed = true;
+                requestObserver.onCompleted();
+                try
                 {
-                    logger.warn("Stream completion did not finish in time.");
+                    if (!finishLatch.await(5, TimeUnit.SECONDS))
+                    {
+                        logger.warn("Stream completion did not finish in time.");
+                    }
+                } catch (InterruptedException e)
+                {
+                    logger.error("Interrupted while waiting for stream completion.", e);
+                    Thread.currentThread().interrupt();
                 }
-            } catch (InterruptedException e)
-            {
-                logger.error("Interrupted while waiting for stream completion.", e);
             }
         }
     }
