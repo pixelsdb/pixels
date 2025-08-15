@@ -24,14 +24,15 @@ import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.Watch;
 import io.etcd.jetcd.options.WatchOption;
 import io.etcd.jetcd.watch.WatchEvent;
+import io.pixelsdb.pixels.cache.CacheScalingOperation;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.cache.PixelsCacheUtil;
 import io.pixelsdb.pixels.cache.PixelsCacheWriter;
-import io.pixelsdb.pixels.cache.CacheScalingOperation;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
@@ -104,15 +105,14 @@ public class CacheWorker implements Server
             {
                 // 1. init cache writer and metadata service.
                 this.cacheWriter = PixelsCacheWriter.newBuilder()
-                        .setCacheLocation(cacheConfig.getCacheLocation())
+                        .setCacheBaseLocation(cacheConfig.getCacheLocation())
                         .setCacheSize(cacheConfig.getCacheSize())
-                        .setIndexLocation(cacheConfig.getIndexLocation())
+                        .setIndexBaseLocation(cacheConfig.getIndexLocation())
                         .setIndexSize(cacheConfig.getIndexSize())
-                        .setZoneNum(cacheConfig.getZoneNum())
-                        .setSwapZoneNum(cacheConfig.getSwapZoneNum())
+                        .setZoneNum(cacheConfig.getZoneNum(), cacheConfig.getSwapZoneNum())
                         .setOverwrite(false)
                         .setHostName(hostName)
-                        .setCacheConfig(cacheConfig)
+                        .setCachedStorage(StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme()))
                         .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
                 this.metadataService = MetadataService.Instance();
 

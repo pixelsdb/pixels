@@ -19,14 +19,6 @@
  */
 package io.pixelsdb.pixels.core.writer;
 
-import io.pixelsdb.pixels.cache.PixelsCacheConfig;
-import io.pixelsdb.pixels.cache.PixelsCacheKey;
-import io.pixelsdb.pixels.cache.PixelsCacheWriter;
-import io.pixelsdb.pixels.cache.PixelsPhysicalReader;
-import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.metadata.domain.Compact;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.*;
@@ -41,7 +33,6 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.List;
 
 /**
  * pixels
@@ -329,70 +320,6 @@ public class TestPixelsWriter
             pixelsReader.close();
         }
         catch (IOException e)
-        {
-            e.printStackTrace();
-        }
-    }
-
-    @Test
-    public void prepareCacheData()
-    {
-        try
-        {
-            // get fs
-            Storage storage = StorageFactory.Instance().getStorage("hdfs");
-            PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-            PixelsCacheWriter cacheWriter =
-                    PixelsCacheWriter.newBuilder()
-                            .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
-                            .setCacheSize(1024 * 1024 * 1024L)
-                            .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
-                            .setIndexSize(1024 * 1024 * 1024L)
-                            .setOverwrite(true)
-                            .setCacheConfig(cacheConfig)
-                            .build();
-            String directory = "hdfs://node01:9000/pixels/pixels/test_105/v_1_compact";
-            long cacheLength = 0L;
-            List<Status> fileStatuses = storage.listStatus(directory);
-            MetadataService metadataService = MetadataService.CreateInstance("node10", 18888);
-            Layout layout = metadataService.getLayout("pixels", "test_105", 0);
-            Compact compact = layout.getCompact();
-            int cacheBorder = compact.getCacheBorder();
-            List<String> cacheOrders = compact.getColumnChunkOrder().subList(0, cacheBorder);
-            long startNano = System.nanoTime();
-            // write cache
-            for (Status fileStatus : fileStatuses)
-            {
-                String file = fileStatus.getPath();
-                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
-                {
-                    for (int i = 0; i < cacheBorder; i++)
-                    {
-                        String[] cacheColumnChunkIdParts = cacheOrders.get(i).split(":");
-                        short cacheRGId = Short.parseShort(cacheColumnChunkIdParts[0]);
-                        short cacheColId = Short.parseShort(cacheColumnChunkIdParts[1]);
-                        PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(cacheRGId);
-                        PixelsProto.ColumnChunkIndex chunkIndex =
-                                rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(cacheColId);
-                        int chunkLen = chunkIndex.getChunkLength();
-                        long chunkOffset = chunkIndex.getChunkOffset();
-                        cacheLength += chunkLen;
-                        byte[] columnChunk = pixelsPhysicalReader.read(chunkOffset, chunkLen);
-                        PixelsCacheKey cacheKey = new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), cacheRGId, cacheColId);
-                        cacheWriter.write(cacheKey, columnChunk);
-                    }
-                }
-            }
-            long endNano = System.nanoTime();
-            System.out.println("Time cost: " + (endNano - startNano) + "ns");
-            System.out.println("Total length: " + cacheLength);
-            long flushStartNano = System.nanoTime();
-            // flush index
-            cacheWriter.flush();
-            long flushEndNano = System.nanoTime();
-            System.out.println("Flush time cost: " + (flushEndNano - flushStartNano) + "ns");
-        }
-        catch (Exception e)
         {
             e.printStackTrace();
         }

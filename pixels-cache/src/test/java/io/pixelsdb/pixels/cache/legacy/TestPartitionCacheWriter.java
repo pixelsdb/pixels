@@ -88,13 +88,13 @@ public class TestPartitionCacheWriter
         ConfigFactory config = ConfigFactory.Instance();
         // disk cache
 //        config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned/pixels.cache");
 
         config.addProperty("cache.size", String.valueOf(70 * 1024 * 1024 * 1024L)); // 70GiB
         config.addProperty("cache.partitions", "32");
 
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.index");
 
@@ -333,9 +333,9 @@ public class TestPartitionCacheWriter
     {
         ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
         PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
         String hostName = "diascld34";
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
@@ -547,9 +547,9 @@ public class TestPartitionCacheWriter
     {
         ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
 
         testBulkLoadIndex2("radix");
     }
@@ -558,7 +558,7 @@ public class TestPartitionCacheWriter
     public void testBulkLoadHashIndex() throws Exception
     {
         ConfigFactory config = ConfigFactory.Instance();
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
 
@@ -569,9 +569,9 @@ public class TestPartitionCacheWriter
     public void testBulkLoadHashIndex2() throws Exception
     {
         ConfigFactory config = ConfigFactory.Instance();
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.hash-index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache-2/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.hash-index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
 
 
         testBulkLoadIndex2("hash");
@@ -588,9 +588,9 @@ public class TestPartitionCacheWriter
     {
         ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned/pixels.cache");
         testBulkLoadIndexAndContent("hash");
     }
 
@@ -605,9 +605,9 @@ public class TestPartitionCacheWriter
     {
         ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.hash-index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache-2/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.hash-index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
         testBulkLoadIndexAndContent2("hash");
     }
 
@@ -621,7 +621,7 @@ public class TestPartitionCacheWriter
     public void testStaticIncrementalLoadHashIndex() throws Exception
     {
         ConfigFactory config = ConfigFactory.Instance();
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
 
@@ -638,7 +638,7 @@ public class TestPartitionCacheWriter
     public void testDynamicIncrementalLoadHashIndex() throws Exception
     {
         ConfigFactory config = ConfigFactory.Instance();
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
         testDynamicIncrementalLoadIndex("hash");
@@ -737,9 +737,9 @@ public class TestPartitionCacheWriter
     {
         ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
 
         int nReaders = 1;
         String hostName = "diascld34";

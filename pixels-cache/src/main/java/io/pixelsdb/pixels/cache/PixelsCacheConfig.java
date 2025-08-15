@@ -39,7 +39,7 @@ public class PixelsCacheConfig
 
     public String getIndexLocation()
     {
-        return configFactory.getProperty("index.location");
+        return configFactory.getProperty("index.base.location");
     }
 
     public long getIndexSize()
@@ -54,7 +54,7 @@ public class PixelsCacheConfig
 
     public String getCacheLocation()
     {
-        return configFactory.getProperty("cache.location");
+        return configFactory.getProperty("cache.base.location");
     }
 
     public long getCacheSize()
@@ -66,11 +66,16 @@ public class PixelsCacheConfig
     {
         return Integer.parseInt(configFactory.getProperty("cache.zone.num"));
     }
+
     public int getSwapZoneNum()
     {
         return Integer.parseInt(configFactory.getProperty("cache.zone.swap.num"));
     }
 
+    /**
+     * Get the scheme of the underlying storage to be cached.
+     * @return
+     */
     public String getStorageScheme()
     {
          return configFactory.getProperty("cache.storage.scheme");

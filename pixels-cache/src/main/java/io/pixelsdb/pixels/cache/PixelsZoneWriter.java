@@ -43,8 +43,8 @@ public class PixelsZoneWriter
     private long currentIndexOffset;
     private long allocatedIndexOffset = PixelsZoneUtil.INDEX_RADIX_OFFSET;
     private long cacheOffset = PixelsZoneUtil.ZONE_DATA_OFFSET; // this is only used in the write() method.
-    private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
-    private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
+    private final ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
+    private final ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
 
     public PixelsZoneWriter(String builderZoneLocation, String builderIndexLocation,
                             long builderZoneSize, long builderIndexSize, int zoneId) throws IOException
@@ -55,19 +55,13 @@ public class PixelsZoneWriter
         this.zoneId = zoneId;
     }
 
-    public void buildLazy(PixelsCacheConfig cacheConfig)
-    {
-        radix = new PixelsRadix();
-        PixelsZoneUtil.initializeLazy(indexFile, zoneFile);
-    }
-
     public void buildLazy()
     {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeLazy(indexFile, zoneFile);
     }
 
-    public void buildSwap(PixelsCacheConfig cacheConfig)
+    public void buildSwap()
     {
         radix = new PixelsRadix();
         PixelsZoneUtil.initializeSwap(indexFile, zoneFile);

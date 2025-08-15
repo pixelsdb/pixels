@@ -55,7 +55,10 @@ public class PixelsCacheWriter
     private final PixelsBucketTypeInfo bucketTypeInfo;
     private final PixelsBucketToZoneMap bucketToZoneMap;
     private final MemoryMappedFile globalIndexFile;
-    private final Storage storage;
+    /**
+     * The underlying storage to be cached.
+     */
+    private final Storage cachedStorage;
     private final EtcdUtil etcdUtil;
     private int zoneNum;
     private List<String> files;
@@ -70,7 +73,7 @@ public class PixelsCacheWriter
                               PixelsBucketTypeInfo bucketTypeInfo,
                               PixelsBucketToZoneMap bucketToZoneMap,
                               MemoryMappedFile globalIndexFile,
-                              Storage storage,
+                              Storage cachedStorage,
                               Set<String> cachedColumnChunks,
                               EtcdUtil etcdUtil,
                               String host,
@@ -78,14 +81,14 @@ public class PixelsCacheWriter
     {
         this.locator = locator;
         this.zones = zones;
-        this.storage = storage;
+        this.cachedStorage = cachedStorage;
         this.etcdUtil = etcdUtil;
         this.host = host;
         this.globalIndexFile = globalIndexFile;
         this.bucketTypeInfo = bucketTypeInfo;
         this.bucketToZoneMap = bucketToZoneMap;
         this.zoneNum = zoneNum;
-        if (cachedColumnChunks != null && cachedColumnChunks.isEmpty() == false)
+        if (cachedColumnChunks != null && !cachedColumnChunks.isEmpty())
         {
             this.cachedColumnChunks.addAll(cachedColumnChunks);
         }
@@ -94,26 +97,29 @@ public class PixelsCacheWriter
 
     public static class Builder
     {
-        private String builderCacheLocation = "";
-        private long builderZoneSize;
-        private String builderIndexLocation = "";
-        private long builderZoneIndexSize;
+        private String builderCacheBaseLocation;
+        private long builderCacheSize;
+        private String builderIndexBaseLocation;
+        private long builderIndexSize;
         private boolean builderOverwrite = true;
         private String builderHostName = null;
-        private PixelsCacheConfig cacheConfig = null;
-        private int zoneNum = 3;// default zone num: 2 lazy + 1 swap
-        private int swapZoneNum = 1;
+        /**
+         * The underlying storage to be cached.
+         */
+        private Storage builderCachedStorage = null;
+        private int builderZoneNum = 3;// default zone num: 2 lazy + 1 swap
+        private int builderSwapZoneNum = 1;
         private PixelsBucketTypeInfo bucketTypeInfo = null;
 
         private Builder()
         {
         }
 
-        public Builder setCacheLocation(String cacheLocation)
+        public Builder setCacheBaseLocation(String cacheBaseLocation)
         {
-            checkArgument(cacheLocation != null && !cacheLocation.isEmpty(),
-                    "cache location should bot be empty");
-            this.builderCacheLocation = cacheLocation;
+            checkArgument(cacheBaseLocation != null && !cacheBaseLocation.isEmpty(),
+                    "cache base location should bot be empty");
+            this.builderCacheBaseLocation = cacheBaseLocation;
 
             return this;
         }
@@ -121,16 +127,16 @@ public class PixelsCacheWriter
         public Builder setCacheSize(long cacheSize)
         {
             checkArgument(cacheSize > 0, "cache size should be positive");
-            this.builderZoneSize = cacheSize;
+            this.builderCacheSize = cacheSize;
 
             return this;
         }
 
-        public Builder setIndexLocation(String indexLocation)
+        public Builder setIndexBaseLocation(String indexBaseLocation)
         {
-            checkArgument(indexLocation != null && !indexLocation.isEmpty(),
-                    "index location should not be empty");
-            this.builderIndexLocation = indexLocation;
+            checkArgument(indexBaseLocation != null && !indexBaseLocation.isEmpty(),
+                    "index base location should not be empty");
+            this.builderIndexBaseLocation = indexBaseLocation;
 
             return this;
         }
@@ -138,7 +144,7 @@ public class PixelsCacheWriter
         public Builder setIndexSize(long indexSize)
         {
             checkArgument(indexSize > 0, "index size should be positive");
-            this.builderZoneIndexSize = indexSize;
+            this.builderIndexSize = indexSize;
 
             return this;
         }
@@ -156,46 +162,42 @@ public class PixelsCacheWriter
             return this;
         }
 
-        public Builder setCacheConfig(PixelsCacheConfig cacheConfig)
+        public Builder setCachedStorage(Storage cachedStorage)
         {
-            checkArgument(cacheConfig != null, "cache config should not be null");
-            this.cacheConfig = cacheConfig;
+            checkArgument(cachedStorage != null, "cached storage should not be null");
+            this.builderCachedStorage = cachedStorage;
             return this;
         }
 
-        public Builder setZoneNum(int zoneNum)
+        public Builder setZoneNum(int zoneNum, int swapZoneNum)
         {
-            checkArgument(zoneNum > 1, "zone number should be positive and greater than 1");
-            this.zoneNum=zoneNum;
-            return this;
-        }
-
-        public Builder setSwapZoneNum(int swapZoneNum)
-        {
-            checkArgument(swapZoneNum > 0, "swap zone number should be positive");
-            this.swapZoneNum = swapZoneNum;
+            checkArgument(zoneNum > 1, "number of zones should be positive and greater than 1");
+            checkArgument(swapZoneNum > 0, "number of swap zones should be positive");
+            checkArgument(swapZoneNum < zoneNum, "number of swap zones should less that the number of zones");
+            this.builderZoneNum = zoneNum;
+            this.builderSwapZoneNum = swapZoneNum;
             return this;
         }
 
         public PixelsCacheWriter build() throws IOException, CacheException, MetadataException
         {
-            this.builderZoneSize = this.builderZoneSize / (zoneNum - swapZoneNum);
-            this.builderZoneIndexSize = this.builderZoneIndexSize / (zoneNum - swapZoneNum);
+            long zoneCacheSize = this.builderCacheSize / (builderZoneNum - builderSwapZoneNum);
+            long zoneIndexSize = this.builderIndexSize / (builderZoneNum - builderSwapZoneNum);
 
-            bucketTypeInfo = PixelsBucketTypeInfo.newBuilder(zoneNum).build();
+            bucketTypeInfo = PixelsBucketTypeInfo.newBuilder(builderZoneNum).build();
 
-            List<PixelsZoneWriter> zones = new ArrayList<>(zoneNum);
-            for(int i=0; i<zoneNum; i++)
+            List<PixelsZoneWriter> zoneWriters = new ArrayList<>(builderZoneNum);
+            for(int i = 0; i < builderZoneNum; i++)
             {
-                zones.add(new PixelsZoneWriter(builderCacheLocation+"." + i,
-                        builderIndexLocation + "." + i, builderZoneSize,builderZoneIndexSize, i));
+                zoneWriters.add(new PixelsZoneWriter(builderCacheBaseLocation + "." + i,
+                        builderIndexBaseLocation + "." + i, zoneCacheSize, zoneIndexSize, i));
             }
 
-            MemoryMappedFile globalIndexFile = new MemoryMappedFile(builderIndexLocation, builderZoneIndexSize);
+            MemoryMappedFile globalIndexFile = new MemoryMappedFile(builderIndexBaseLocation + ".g", zoneIndexSize);
 
             Set<String> cachedColumnChunks = new HashSet<>();
 
-            PixelsBucketToZoneMap bucketToZoneMap = new PixelsBucketToZoneMap(globalIndexFile, zoneNum);
+            PixelsBucketToZoneMap bucketToZoneMap = new PixelsBucketToZoneMap(globalIndexFile, builderZoneNum);
 
             // check if cache and index exists.
             // if overwrite is not true, and cache and index file already exists, reconstruct radix from existing index.
@@ -204,11 +206,11 @@ public class PixelsCacheWriter
                 // // reload bucketToZoneMap from index.
                 // PixelsZoneUtil.getBucketZoneMap(globalIndexFile, bucketToZoneMap);
                 // cache exists in local cache file and index, reload the index.
-                for(int i=0; i<zoneNum; i++)
+                for(int i = 0; i < builderZoneNum; i++)
                 {
                     int zoneId = bucketToZoneMap.getBucketToZone(i);
-                    zones.get(zoneId).loadIndex();
-                    switch (zones.get(zoneId).getZoneType())
+                    zoneWriters.get(zoneId).loadIndex();
+                    switch (zoneWriters.get(zoneId).getZoneType())
                     {
                         case LAZY:
                             bucketTypeInfo.incrementLazyBucketNum();
@@ -248,30 +250,42 @@ public class PixelsCacheWriter
             else
             {
                 PixelsZoneUtil.initializeGlobalIndex(globalIndexFile, bucketToZoneMap);
-                bucketTypeInfo.setLazyBucketNum(zoneNum - swapZoneNum);
-                bucketTypeInfo.getLazyBucketIds().addAll(new ArrayList<Integer>(){{for(int i=0;i<zoneNum-swapZoneNum;i++)add(i);}});
-                for (int i = 0; i < zoneNum - swapZoneNum; i++)
+                bucketTypeInfo.setLazyBucketNum(builderZoneNum - builderSwapZoneNum);
+                bucketTypeInfo.getLazyBucketIds().addAll(new ArrayList<Integer>() {
+                    {
+                        for(int i = 0; i < builderZoneNum - builderSwapZoneNum; i++)
+                        {
+                            add(i);
+                        }
+                    }
+                });
+                for (int i = 0; i < builderZoneNum - builderSwapZoneNum; i++)
                 {
-                    zones.get(i).buildLazy(cacheConfig);
+                    zoneWriters.get(i).buildLazy();
                 }
                 // initialize swap zone
-                bucketTypeInfo.setSwapBucketNum(swapZoneNum);
-                bucketTypeInfo.getSwapBucketIds().addAll(new ArrayList<Integer>(){{for(int i=zoneNum-swapZoneNum;i<zoneNum;i++)add(i);}});
-                for (int i = zoneNum - swapZoneNum; i < zoneNum; i++)
+                bucketTypeInfo.setSwapBucketNum(builderSwapZoneNum);
+                bucketTypeInfo.getSwapBucketIds().addAll(new ArrayList<Integer>() {
+                    {
+                        for(int i = builderZoneNum - builderSwapZoneNum; i < builderZoneNum; i++)
+                        {
+                            add(i);
+                        }
+                    }
+                });
+                for (int i = builderZoneNum - builderSwapZoneNum; i < builderZoneNum; i++)
                 {
-                    zones.get(i).buildSwap(cacheConfig);
+                    zoneWriters.get(i).buildSwap();
                 }
             }
 
             // initialize the hashFunction with the number of zones.
-            PixelsLocator locator = new PixelsLocator(zoneNum - swapZoneNum);
+            PixelsLocator locator = new PixelsLocator(builderZoneNum - builderSwapZoneNum);
 
             EtcdUtil etcdUtil = EtcdUtil.Instance();
 
-            Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
-
-            return new PixelsCacheWriter(locator, zones, bucketTypeInfo, bucketToZoneMap, globalIndexFile, storage,
-                    cachedColumnChunks, etcdUtil, builderHostName, zoneNum);
+            return new PixelsCacheWriter(locator, zoneWriters, bucketTypeInfo, bucketToZoneMap, globalIndexFile,
+                    builderCachedStorage, cachedColumnChunks, etcdUtil, builderHostName, builderZoneNum);
         }
     }
 
@@ -309,7 +323,7 @@ public class PixelsCacheWriter
             KeyValue keyValue = etcdUtil.getKeyValue(key);
             if (keyValue == null)
             {
-                logger.warn("Found no allocated files, no updates are performed, key=" + key);
+                logger.warn("Found no allocated files, no updates are performed, key={}", key);
                 return 0;
             }
             String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
@@ -456,7 +470,7 @@ public class PixelsCacheWriter
             outer_loop:
             for (String file : files)
             {
-                if (enableAbsoluteBalancer && storage.hasLocality())
+                if (enableAbsoluteBalancer && cachedStorage.hasLocality())
                 {
                     // TODO: this is used for experimental purpose only.
                     // may be removed later.
@@ -464,7 +478,7 @@ public class PixelsCacheWriter
                 }
                 int physicalLen;
                 long physicalOffset;
-                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
+                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(cachedStorage, file))
                 {
                     if (pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
                     {
@@ -518,7 +532,7 @@ public class PixelsCacheWriter
             PixelsZoneUtil.setSize(zone.getZoneFile(), currCacheOffset);
             // set rwFlag as readable
             PixelsZoneUtil.endIndexWrite(zone.getIndexFile());
-            logger.debug("Writer ends at offset: " + currCacheOffset);
+            logger.debug("Writer ends at offset: {}", currCacheOffset);
         }
 
         cachedColumnChunks.addAll(cacheColumnChunkOrders);
@@ -567,7 +581,7 @@ public class PixelsCacheWriter
         int rowGroupNumInLayout = compact.getNumRowGroupInFile();
         for (String file : files)
         {
-            try (PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file))
+            try (PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(cachedStorage, file))
             {
                 if(physicalReader.getRowGroupNum() < rowGroupNumInLayout)
                 {
@@ -654,13 +668,13 @@ public class PixelsCacheWriter
             outer_loop:
             for (String file : files)
             {
-                if (enableAbsoluteBalancer && storage.hasLocality())
+                if (enableAbsoluteBalancer && cachedStorage.hasLocality())
                 {
                     // TODO: this is used for experimental purpose only.
                     // may be removed later.
                     file = ensureLocality(file);
                 }
-                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
+                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(cachedStorage, file))
                 {
                     if(pixelsPhysicalReader.getRowGroupNum() < rowGroupNumInLayout)
                     {
@@ -850,7 +864,7 @@ public class PixelsCacheWriter
             // Phase 2: copy data
             for (String file : this.files)
             {
-                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file))
+                try (PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(cachedStorage, file))
                 {
                     for (String cacheColumnChunkOrder : this.cachedColumnChunks)
                     {
@@ -953,17 +967,20 @@ public class PixelsCacheWriter
         // update logical bucket info and bucketToZoneMap, delete the last lazy bucket and move the other swap buckets forward
         bucketTypeInfo.getLazyBucketIds().remove(bucketTypeInfo.getLazyBucketNum() - 1);
         bucketTypeInfo.decrementLazyBucketNum();
-        int lastSwapZoneId = bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(bucketTypeInfo.getSwapBucketNum() - 1));
+        int lastSwapZoneId = bucketToZoneMap.getBucketToZone(
+                bucketTypeInfo.getSwapBucketIds().get(bucketTypeInfo.getSwapBucketNum() - 1));
         for(int i = bucketTypeInfo.getSwapBucketNum() - 1; i > 0; i--)
         {
             bucketTypeInfo.getSwapBucketIds().set(i, bucketTypeInfo.getSwapBucketIds().get(i-1));
         }
         bucketTypeInfo.getSwapBucketIds().set(0, lastLazyBucketId);
-        for(int i = 0; i < bucketTypeInfo.getSwapBucketNum()-1; i++)
+        for(int i = 0; i < bucketTypeInfo.getSwapBucketNum() - 1; i++)
         {
-            bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(i), bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(i+1)-1));
+            bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(i),
+                    bucketToZoneMap.getBucketToZone(bucketTypeInfo.getSwapBucketIds().get(i+1)-1));
         }
-        bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(bucketTypeInfo.getSwapBucketNum() - 1), lastSwapZoneId-1);
+        bucketToZoneMap.updateBucketZoneMap(bucketTypeInfo.getSwapBucketIds().get(bucketTypeInfo.getSwapBucketNum() - 1),
+                lastSwapZoneId - 1);
         logger.info("finish shrink operation");
     }
 
@@ -977,7 +994,7 @@ public class PixelsCacheWriter
         String newPath = path.substring(0, path.indexOf(".pxl")) + "_" + host + ".pxl";
         try
         {
-            String[] dataNodes = storage.getHosts(path);
+            String[] dataNodes = cachedStorage.getHosts(path);
             boolean isLocal = false;
             for (String dataNode : dataNodes)
             {
@@ -990,9 +1007,9 @@ public class PixelsCacheWriter
             if (!isLocal)
             {
                 // file is not local, move it to local.
-                PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path);
-                PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(storage, newPath,
-                        2048l*1024l*1024l, (short) 1, true);
+                PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(cachedStorage, path);
+                PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(cachedStorage, newPath,
+                        2048L * 1024L * 1024L, (short) 1, true);
                 byte[] buffer = new byte[1024*1024*32]; // 32MB buffer for copy.
                 long copiedBytes = 0l, fileLength = reader.getFileLength();
                 boolean success = true;
@@ -1025,12 +1042,12 @@ public class PixelsCacheWriter
                 }
                 if (success)
                 {
-                    storage.delete(path, false);
+                    cachedStorage.delete(path, false);
                     return newPath;
                 }
                 else
                 {
-                    storage.delete(newPath, false);
+                    cachedStorage.delete(newPath, false);
                     return path;
                 }
 

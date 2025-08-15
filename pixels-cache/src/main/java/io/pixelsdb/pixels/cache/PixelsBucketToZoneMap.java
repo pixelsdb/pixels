@@ -24,6 +24,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /**
+ * Mapping of hash bucket to zone id, stored in the global cache index file.
  * @author alph00
  * @create 2024-02-17
  */

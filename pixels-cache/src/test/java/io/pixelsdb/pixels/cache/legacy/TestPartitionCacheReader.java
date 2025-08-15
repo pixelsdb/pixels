@@ -86,13 +86,13 @@ public class TestPartitionCacheReader
         ConfigFactory config = ConfigFactory.Instance();
         // disk cache
 //        config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned/pixels.cache");
+        config.addProperty("cache.base.location", "/mnt/nvme1n1/partitioned/pixels.cache");
 
         config.addProperty("cache.size", String.valueOf(70 * 1024 * 1024 * 1024L)); // 70GiB
         config.addProperty("cache.partitions", "32");
 
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
+        config.addProperty("index.base.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.index");
 

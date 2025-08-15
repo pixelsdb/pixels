@@ -24,7 +24,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -34,31 +33,19 @@ public class TestPixelsCacheReader
 {
 
     @Test
-    public void testSimpleSearchAndGet() throws IOException
-    {
-        MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
-
-        PixelsCacheKey key = new PixelsCacheKey(1073747711, (short) 0, (short) 191);
-        PixelsCacheReader cacheReader = PixelsCacheReader
-                .newBuilder()
-                .setIndexFile(new ArrayList<>(Arrays.asList(indexFile)))
-                .build();
-        System.out.println(cacheReader.get(key.blockId, key.rowGroupId, key.columnId, false));
-    }
-
-    @Test
     public void testReader()
     {
         try
         {
-            MemoryMappedFile cacheFile = new MemoryMappedFile("/Users/Jelly/Desktop/pixels.cache", 64000000L);
-            MemoryMappedFile indexFile = new MemoryMappedFile("/Users/Jelly/Desktop/pixels.index", 64000000L);
-            PixelsCacheReader cacheReader = PixelsCacheReader
-                    .newBuilder()
-                    .setIndexFile(new ArrayList<>(Arrays.asList(indexFile)))
-                    .setCacheFile(new ArrayList<>(Arrays.asList(cacheFile)))
+            MemoryMappedFile zoneCacheFile1 = new MemoryMappedFile("/Users/Jelly/Desktop/pixels.cache/zone1", 64000000L);
+            MemoryMappedFile zoneCacheFile2 = new MemoryMappedFile("/Users/Jelly/Desktop/pixels.cache/zone2", 64000000L);
+            MemoryMappedFile globalIndexFile = new MemoryMappedFile("/Users/Jelly/Desktop/pixels.index/global", 64000000L);
+            MemoryMappedFile zoneIndexFile1 = new MemoryMappedFile("/Users/Jelly/Desktop/pixels.index/zone1", 64000000L);
+            MemoryMappedFile zoneIndexFile2 = new MemoryMappedFile("/Users/Jelly/Desktop/pixels.index/zone2", 64000000L);
+            PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
+                    .setIndexFiles(Arrays.asList(zoneIndexFile1, zoneIndexFile2), globalIndexFile)
+                    .setCacheFiles(Arrays.asList(zoneCacheFile1, zoneCacheFile2), 1)
                     .build();
-            String path = "/pixels/pixels/test_105/2121211211212.pxl";
             int index = 0;
             for (short i = 0; i < 1000; i++)
             {
@@ -72,6 +59,7 @@ public class TestPixelsCacheReader
                     }
                 }
             }
+            cacheReader.close();
         }
         catch (IOException e)
         {
