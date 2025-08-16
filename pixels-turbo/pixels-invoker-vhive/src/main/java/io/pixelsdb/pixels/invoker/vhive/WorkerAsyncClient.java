@@ -177,7 +177,7 @@ public class WorkerAsyncClient
     public ListenableFuture<TurboProto.vHiveWorkerResponse> scanStream(ScanInput input)
     {
         TurboProto.vHiveWorkerRequest request = TurboProto.vHiveWorkerRequest.newBuilder()
-                .setWorkerType(String.valueOf(WorkerType.SCAN_STREAM))
+                .setWorkerType(String.valueOf(WorkerType.SCAN_STREAMING))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.process(request);

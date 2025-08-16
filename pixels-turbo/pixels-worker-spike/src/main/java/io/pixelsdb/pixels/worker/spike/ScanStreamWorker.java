@@ -47,6 +47,6 @@ public class ScanStreamWorker extends BaseScanStreamWorker implements WorkerInte
     @Override
     public WorkerType getWorkerType()
     {
-        return WorkerType.SCAN_STREAM;
+        return WorkerType.SCAN_STREAMING;
     }
 }

@@ -27,6 +27,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * @author zhujiaxuan
+ * @create 2024-10-08
+ */
 public class GeneralMetricsCollector extends MetricsCollector
 {
     private final TransContextCache transContextCache;

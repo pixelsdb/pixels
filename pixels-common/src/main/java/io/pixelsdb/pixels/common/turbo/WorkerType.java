@@ -20,13 +20,15 @@
 package io.pixelsdb.pixels.common.turbo;
 
 /**
+ * Worker type is the type of cloud function for query execution. In pixels-turbo, each physical query operator is
+ * implemented as a cloud function, each has a corresponding worker type.
  * @author hank
  * @create 2022-06-28
  */
 public enum WorkerType
 {
     UNKNOWN, // The first enum value is the default value.
-    SCAN, SCAN_STREAM,
+    SCAN, SCAN_STREAMING,
     PARTITION, PARTITION_STREAMING,
     BROADCAST_JOIN, BROADCAST_JOIN_STREAMING,
     BROADCAST_CHAIN_JOIN, BROADCAST_CHAIN_JOIN_STREAMING,

@@ -32,6 +32,13 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * The runtime query schedule service used in the query engine to decide whether to execute the query in
+ * virtual machines or cloud functions. This schedule service is used for the queries that already
+ * entered the query engine and started running.
+ * <br/>
+ * The query engine can call this schedule service during
+ * query parsing and before actual query execution. Other modules such as the query manager in pixels-server
+ * may also call this schedule service to get the vacuum query slots and the query concurrency.
  * @author hank
  * @create 2023-05-31
  */
@@ -43,6 +50,9 @@ public class QueryScheduleService
     private final boolean scalingEnabled;
     private final MetricsCollector metricsCollector;
 
+    /**
+     * The vacuum query slots in each computing service.
+     */
     public static class QuerySlots
     {
         public final int mppSlots;
@@ -55,6 +65,9 @@ public class QueryScheduleService
         }
     }
 
+    /**
+     * The current query concurrency in each computing service.
+     */
     public static class QueryConcurrency
     {
         public final int mppConcurrency;
@@ -101,6 +114,9 @@ public class QueryScheduleService
         }
     }
 
+    /**
+     * Shutdown the query schedule service.
+     */
     public void shutdown()
     {
         try
@@ -116,6 +132,13 @@ public class QueryScheduleService
         }
     }
 
+    /**
+     * Schedule a query and decide the computing service where the query is to be executed
+     * @param transId the unique transaction id of the query
+     * @param forceMpp true to force the query being executed in MPP
+     * @return the executor type of the computing service
+     * @throws QueryScheduleException
+     */
     public ExecutorType scheduleQuery(long transId, boolean forceMpp) throws QueryScheduleException
     {
         TurboProto.ScheduleQueryRequest request = TurboProto.ScheduleQueryRequest.newBuilder()
@@ -132,6 +155,12 @@ public class QueryScheduleService
         return ExecutorType.valueOf(response.getExecutorType());
     }
 
+    /**
+     * Mark a query as finished.
+     * @param transId the transaction id of the query
+     * @param executorType the executor type of the query
+     * @return true on success, false on failure
+     */
     public boolean finishQuery(long transId, ExecutorType executorType)
     {
         TurboProto.FinishQueryRequest request = TurboProto.FinishQueryRequest.newBuilder()
@@ -140,6 +169,10 @@ public class QueryScheduleService
         return response.getErrorCode() == ErrorCode.SUCCESS;
     }
 
+    /**
+     * Get the vacuum query slots for every computing service.
+     * @throws QueryScheduleException if failed to get the query slots
+     */
     public QuerySlots getQuerySlots() throws QueryScheduleException
     {
         TurboProto.GetQuerySlotsRequest request = TurboProto.GetQuerySlotsRequest.newBuilder().build();
@@ -151,6 +184,10 @@ public class QueryScheduleService
         return new QuerySlots(response.getMppSlots(), response.getCfSlots());
     }
 
+    /**
+     * Get the query concurrency in each computing service.
+     * @throws QueryScheduleException if failed to get the query concurrency
+     */
     public QueryConcurrency getQueryConcurrency() throws QueryScheduleException
     {
         TurboProto.GetQueryConcurrencyRequest request = TurboProto.GetQueryConcurrencyRequest.newBuilder().build();

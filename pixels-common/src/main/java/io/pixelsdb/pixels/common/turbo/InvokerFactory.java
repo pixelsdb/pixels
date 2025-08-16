@@ -74,6 +74,11 @@ public class InvokerFactory
         });
     }
 
+    /**
+     * Get the cloud function invoker of a worker type.
+     * @param workerType the worker type
+     * @return the cloud function invoker
+     */
     public Invoker getInvoker(WorkerType workerType)
     {
         return this.invokerMap.get(workerType);

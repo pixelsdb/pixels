@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 
 /**
+ * {@link MetricsCollector} collects the performance metrics (e.g., query concurrency, CPU, or memory) in the workers
+ * of the {@link MachineService}. The collected metrics are used to monitor and auto-scaling the machine service.
  * @create 2023-04-10
  * @author hank
  */

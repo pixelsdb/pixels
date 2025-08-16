@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.planner.plan.physical;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
 import java.util.List;
@@ -52,7 +51,7 @@ public class ScanStreamOperator extends ScanOperator
             for (ScanInput scanInput : this.scanInputs)
             {
                 this.scanOutputs[i++] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.SCAN_STREAM).invoke(scanInput);
+                        .getInvoker(WorkerType.SCAN_STREAMING).invoke(scanInput);
             }
             return this.scanOutputs;
         });

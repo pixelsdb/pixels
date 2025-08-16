@@ -44,52 +44,62 @@ public class RequestHandlerImpl implements RequestHandler
             {
                 case AGGREGATION:
                 {
-                    WorkerService<AggregationWorker, AggregationInput, AggregationOutput> service = new WorkerService<>(AggregationWorker.class, AggregationInput.class);
+                    WorkerService<AggregationWorker, AggregationInput, AggregationOutput> service =
+                            new WorkerService<>(AggregationWorker.class, AggregationInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case BROADCAST_CHAIN_JOIN:
                 {
-                    WorkerService<BroadcastChainJoinWorker, BroadcastChainJoinInput, JoinOutput> service = new WorkerService<>(BroadcastChainJoinWorker.class, BroadcastChainJoinInput.class);
+                    WorkerService<BroadcastChainJoinWorker, BroadcastChainJoinInput, JoinOutput> service =
+                            new WorkerService<>(BroadcastChainJoinWorker.class, BroadcastChainJoinInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case BROADCAST_JOIN:
                 {
-                    WorkerService<BroadcastJoinWorker, BroadcastJoinInput, JoinOutput> service = new WorkerService<>(BroadcastJoinWorker.class, BroadcastJoinInput.class);
+                    WorkerService<BroadcastJoinWorker, BroadcastJoinInput, JoinOutput> service =
+                            new WorkerService<>(BroadcastJoinWorker.class, BroadcastJoinInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case PARTITIONED_CHAIN_JOIN:
                 {
-                    WorkerService<PartitionedChainJoinWorker, PartitionedChainJoinInput, JoinOutput> service = new WorkerService<>(PartitionedChainJoinWorker.class, PartitionedChainJoinInput.class);
+                    WorkerService<PartitionedChainJoinWorker, PartitionedChainJoinInput, JoinOutput> service =
+                            new WorkerService<>(PartitionedChainJoinWorker.class, PartitionedChainJoinInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case PARTITIONED_JOIN:
                 {
-                    WorkerService<PartitionedJoinWorker, PartitionedJoinInput, JoinOutput> service = new WorkerService<>(PartitionedJoinWorker.class, PartitionedJoinInput.class);
+                    WorkerService<PartitionedJoinWorker, PartitionedJoinInput, JoinOutput> service =
+                            new WorkerService<>(PartitionedJoinWorker.class, PartitionedJoinInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case PARTITIONED_JOIN_STREAMING:
                 {
-                    WorkerService<PartitionedJoinStreamWorker, PartitionedJoinInput, JoinOutput> service = new WorkerService<>(PartitionedJoinStreamWorker.class, PartitionedJoinInput.class);
+                    WorkerService<PartitionedJoinStreamWorker, PartitionedJoinInput, JoinOutput> service =
+                            new WorkerService<>(PartitionedJoinStreamWorker.class, PartitionedJoinInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case PARTITION:
                 {
-                    WorkerService<PartitionWorker, PartitionInput, PartitionOutput> service = new WorkerService<>(PartitionWorker.class, PartitionInput.class);
+                    WorkerService<PartitionWorker, PartitionInput, PartitionOutput> service =
+                            new WorkerService<>(PartitionWorker.class, PartitionInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case PARTITION_STREAMING:
                 {
-                    WorkerService<PartitionStreamWorker, PartitionInput, PartitionOutput> service = new WorkerService<>(PartitionStreamWorker.class, PartitionInput.class);
+                    WorkerService<PartitionStreamWorker, PartitionInput, PartitionOutput> service =
+                            new WorkerService<>(PartitionStreamWorker.class, PartitionInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case SCAN:
                 {
-                    WorkerService<ScanWorker, ScanInput, ScanOutput> service = new WorkerService<>(ScanWorker.class, ScanInput.class);
+                    WorkerService<ScanWorker, ScanInput, ScanOutput> service =
+                            new WorkerService<>(ScanWorker.class, ScanInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
-                case SCAN_STREAM:
+                case SCAN_STREAMING:
                 {
-                    WorkerService<ScanStreamWorker, ScanInput, ScanOutput> service = new WorkerService<>(ScanStreamWorker.class, ScanInput.class);
+                    WorkerService<ScanStreamWorker, ScanInput, ScanOutput> service =
+                            new WorkerService<>(ScanStreamWorker.class, ScanInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 default:

@@ -29,8 +29,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created at: 19/01/2023
- * Author: hank
+ * @author hank
+ * @create 2023-01-19
  */
 public class Ec2MetricsCollector extends MetricsCollector
 {

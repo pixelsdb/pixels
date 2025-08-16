@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.common.turbo;
 
 /**
- * The cloud function services we support.
+ * The cloud function (serverless computing) services we support.
  * Modify this enum if we add new cloud function service support.
  *
  * @create 2023-04-10
@@ -30,7 +30,7 @@ public enum FunctionService
 {
     lambda,  // AWS Lambda
     vhive,   // vhive
-    spike,    // Spike
+    spike,   // Pixels Spike
     ;
 
     /**

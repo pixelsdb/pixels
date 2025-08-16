@@ -20,6 +20,9 @@
 package io.pixelsdb.pixels.common.turbo;
 
 /**
+ * The simplified output that does not contain the detailed information such as output file paths.
+ * {@link SimpleOutput} can be written into Etcd by the query engine's coordinator to notify the query engine worker
+ * that the serverless worker (cloud function) has completed.
  * @author hank
  * @create 2024-04-22
  */

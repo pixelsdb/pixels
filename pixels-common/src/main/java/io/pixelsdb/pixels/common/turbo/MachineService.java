@@ -35,7 +35,7 @@ public enum MachineService
     /**
      * Case-insensitive parsing from String name to enum value.
      * @param value the name of virtual machine service.
-     * @return
+     * @return the machine service type
      */
     public static MachineService from(String value)
     {
@@ -44,8 +44,7 @@ public enum MachineService
 
     /**
      * Whether the value is a valid virtual machine service.
-     * @param value
-     * @return
+     * @return true if valid
      */
     public static boolean isValid(String value)
     {

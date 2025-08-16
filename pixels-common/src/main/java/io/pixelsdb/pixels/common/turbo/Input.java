@@ -22,33 +22,41 @@ package io.pixelsdb.pixels.common.turbo;
 import static java.util.Objects.requireNonNull;
 
 /**
- * The base class for the input of a cloud function.
+ * The base class for the input of a cloud function (serverless) worker.
  * @author hank
  * @create 2022-06-28
  */
 public abstract class Input
 {
     /**
-     * The unique id of the transaction.
+     * The unique transaction id of the query.
      */
     private long transId;
 
     /**
-     * The timestamp of the transaction.
+     * The transaction timestamp of the query.
      */
     private long timestamp;
     
     /**
-     * The stage of worker.
+     * The stage id of this function worker.
      */
     private int stageId;
 
+    /**
+     * The operator name of this function worker. This is optional and might be null.
+     */
     private String operatorName;
-    /*
-    * The requirement for resources
-    * */
-    private int requiredCpu; // Every 1024 represents a vCPU
-    private int requiredMemory; // in MB
+
+    /**
+     * The required CPU of each function worker. Every 1024 represents a vCPU.
+     */
+    private int requiredCpu;
+
+    /**
+     * The required memory capacity in MB of each function worker.
+     */
+    private int requiredMemory;
 
     public Input(long transId, long timestamp)
     {
@@ -91,10 +99,6 @@ public abstract class Input
         this.stageId = stageId;
     }
 
-    /**
-     * Operator name is optional, it might be null if not set.
-     * @return the operator name.
-     */
     public String getOperatorName()
     {
         return operatorName;
