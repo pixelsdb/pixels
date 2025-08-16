@@ -50,6 +50,12 @@ import static io.pixelsdb.pixels.common.utils.Constants.RELAXED_EXECUTION_RETRY_
 import static io.pixelsdb.pixels.server.constant.ControllerParameters.*;
 
 /**
+ * The query manager that provides pending queues for different SLAs. It decides when to submit the query to the
+ * query engine for execution, provides execution hint to the query engine (through session properties), traces
+ * the execution status of queries, and collects query results.
+ * <br/>
+ * Query manager is upstream of {@link QueryScheduleService}, which maintains the running queues of queries and
+ * decides in which computing service to execute the queries for the query engine.
  * @author hank
  * @create 2023-06-01
  */
@@ -393,7 +399,7 @@ public class QueryManager
                 // put result before removing from running queries, to avoid unknown query status
                 this.queryResults.put(traceToken, result);
                 this.runningQueries.remove(traceToken);
-                log.error("failed to execute query with trace token " + traceToken, e);
+                log.error("failed to execute query with trace token {}", traceToken, e);
                 throw new QueryServerException("failed to execute query with trace token " + traceToken, e);
             }
         });
@@ -476,7 +482,7 @@ public class QueryManager
                     response.setBilledCents(billedCents);
                 } catch (TransException e)
                 {
-                    log.error("failed to get trans context with trace token " + traceToken, e);
+                    log.error("failed to get trans context with trace token {}", traceToken, e);
                     throw new QueryServerException("failed to get trans context with trace token " + traceToken, e);
                 } catch (InterruptedException e)
                 {

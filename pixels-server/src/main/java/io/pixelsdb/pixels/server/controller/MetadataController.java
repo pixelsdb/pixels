@@ -38,6 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
+ * Metadata controller provides the proxy for the front-end modules such as pixels-rover to access the metadata
+ * (data dictionary and data catalog) of pixels. It restricts the access to the metadata service of pixels.
  * @author hank
  * @create 2023-04-21
  */
