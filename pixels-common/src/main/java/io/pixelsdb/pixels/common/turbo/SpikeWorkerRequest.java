@@ -22,14 +22,17 @@ package io.pixelsdb.pixels.common.turbo;
 import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
 
+/**
+ * The request sent to Spike workers. Such a request is serialized to a Json string and sent as the payload to
+ * the Spike serverless computing framework.
+ */
 @JSONType
 public class SpikeWorkerRequest
 {
     @JSONField(name = "workerType")
-
     private WorkerType workerType;
-    @JSONField(name = "workerPayload")
 
+    @JSONField(name = "workerPayload")
     private String workerPayload;
 
     public SpikeWorkerRequest() { }

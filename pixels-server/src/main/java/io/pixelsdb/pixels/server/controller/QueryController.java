@@ -40,7 +40,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * The REST methods for query execution, scheduling, and cost estimation.
+ * Query controller provides the REST methods for query execution, scheduling, and cost estimation.
+ * It supports submitting queries with SLA hints. It can be used by front-end modules such as pixels-rover to
+ * execute and trace queries.
  * @author hank
  * @create 2023-05-30
  * @update 2023-07-23 add {@link #getQueryStatus(GetQueryStatusRequest)}.

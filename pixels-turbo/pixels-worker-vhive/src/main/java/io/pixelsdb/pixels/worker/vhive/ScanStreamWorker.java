@@ -55,6 +55,6 @@ public class ScanStreamWorker extends BaseScanStreamWorker implements RequestHan
     @Override
     public WorkerType getWorkerType()
     {
-        return WorkerType.SCAN_STREAM;
+        return WorkerType.SCAN_STREAMING;
     }
 }

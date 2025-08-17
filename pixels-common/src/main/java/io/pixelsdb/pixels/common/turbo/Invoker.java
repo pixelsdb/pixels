@@ -22,17 +22,33 @@ package io.pixelsdb.pixels.common.turbo;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The interface for the invokers of cloud function worker.
+ * The interface for the invokers of cloud function (serverless) worker.
  * @create 2023-04-06
  * @author hank
  */
 public interface Invoker
 {
+    /**
+     * Parse a string output in Json format to the output object.
+     * @param outputJson the Json output
+     * @return the output object
+     */
     Output parseOutput(String outputJson);
 
+    /**
+     * Invoke the cloud function. This creates a new worker of the cloud function on success.
+     * @param input the input of the cloud function
+     * @return the output of the cloud function
+     */
     CompletableFuture<Output> invoke(Input input);
 
+    /**
+     * @return name of the invoked cloud function.
+     */
     String getFunctionName();
 
+    /**
+     * @return the template memory size in MB of the invoked cloud function.
+     */
     int getMemoryMB();
 }

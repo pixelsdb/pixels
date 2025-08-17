@@ -43,7 +43,7 @@ public class ScanStreamInvokerProvider implements InvokerProvider
     @Override
     public WorkerType workerType()
     {
-        return WorkerType.SCAN_STREAM;
+        return WorkerType.SCAN_STREAMING;
     }
 
     @Override

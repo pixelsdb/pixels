@@ -32,7 +32,7 @@ public class ScanStreamInvoker extends SpikeInvoker
 {
     protected ScanStreamInvoker(String functionName)
     {
-        super(functionName, WorkerType.SCAN_STREAM);
+        super(functionName, WorkerType.SCAN_STREAMING);
     }
 
     @Override

@@ -51,7 +51,7 @@ import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Some common functions for the lambda workers.
+ * Some common functions for the serverless workers.
  * @author hank
  * @create 2022-05-15
  */
