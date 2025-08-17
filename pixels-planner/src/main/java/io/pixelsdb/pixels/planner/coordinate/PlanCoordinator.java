@@ -27,17 +27,23 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * The coordinator of a query plan.
  * @author hank
  * @create 2023-07-31
  */
 public class PlanCoordinator
 {
+    /**
+     * The transaction id of the query.
+     */
     private final long transId;
     /**
+     * Mapping from stage id to stage coordinator.
      * It is only modified during coordinator initialization, thus there is no read-write conflict.
      */
     private final Map<Integer, StageCoordinator> stageCoordinators = new HashMap<>();
     /**
+     * Mapping from stage id to stage dependency.
      * It is only modified during coordinator initialization, thus there is no read-write conflict.
      */
     private final Map<Integer, StageDependency> stageDependencies = new HashMap<>();

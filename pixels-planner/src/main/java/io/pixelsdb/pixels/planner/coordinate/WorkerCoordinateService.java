@@ -156,7 +156,6 @@ public class WorkerCoordinateService
      */
     public void completeTasks(long workerId, List<TaskInfo> tasks) throws WorkerCoordinateException
     {
-
         TurboProto.CompleteTasksRequest.Builder request =
                 TurboProto.CompleteTasksRequest.newBuilder().setWorkerId(workerId);
         for (TaskInfo taskInfo : tasks)

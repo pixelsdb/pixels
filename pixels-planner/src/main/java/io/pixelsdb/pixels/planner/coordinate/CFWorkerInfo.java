@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.turbo.TurboProto;
 import java.util.List;
 
 /**
+ * The information of a cloud function (serverless) worker.
  * @author hank
  * @create 2023-08-02
  */

@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.task;
 
 /**
+ * The information of a worker.
  * @author hank
  * @create 2023-07-31
  */

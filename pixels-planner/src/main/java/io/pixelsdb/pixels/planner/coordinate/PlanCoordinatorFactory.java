@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
+ * The factory to create and manage the plan coordinators of queries.
  * @author hank
  * @create 2023-09-25
  */

@@ -171,9 +171,9 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
         TurboProto.CompleteTasksResponse.Builder builder = TurboProto.CompleteTasksResponse.newBuilder();
-        for (TurboProto.TaskResult taskOutput : taskResults)
+        for (TurboProto.TaskResult taskResult : taskResults)
         {
-            stageCoordinator.completeTask(taskOutput.getTaskId(), taskOutput.getSuccess());
+            stageCoordinator.completeTask(taskResult.getTaskId(), taskResult.getSuccess());
         }
         builder.setErrorCode(SUCCESS);
         responseObserver.onNext(builder.build());

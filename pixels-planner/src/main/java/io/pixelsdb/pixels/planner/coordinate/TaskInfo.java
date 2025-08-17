@@ -19,9 +19,11 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.turbo.TurboProto;
 
 /**
+ * The basic information of a {@link Task} to be executed by the serverless worker.
  * @author hank
  * @create 2023-10-04
  */
