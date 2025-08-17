@@ -38,7 +38,6 @@ import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-
 public abstract class SortedJoinOperator extends SingleStageJoinOperator
 {
     protected final List<SortInput> smallSortedInputs;

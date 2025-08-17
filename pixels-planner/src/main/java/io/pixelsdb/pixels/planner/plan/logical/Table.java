@@ -20,9 +20,9 @@
 package io.pixelsdb.pixels.planner.plan.logical;
 
 /**
- * The table that is used in joins.
+ * The interface of tables in pixels-turbo. A table is a (might be materialized) view of the result of a query operator.
  * @author hank
- * @date 26/05/2022
+ * @create 2022-05-26
  */
 public interface Table
 {

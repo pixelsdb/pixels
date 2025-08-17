@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.executor.join.JoinType;
  * It represents the join type and condition between the two tables.
  *
  * @author hank
- * @date 29/05/2022
+ * @create 2022-05-29
  */
 public class Join
 {
