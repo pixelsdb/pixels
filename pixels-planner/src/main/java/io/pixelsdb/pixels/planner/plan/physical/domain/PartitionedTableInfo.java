@@ -31,6 +31,7 @@ public class PartitionedTableInfo extends TableInfo
      * The partitioned file paths of the table.
      */
     private List<String> inputFiles;
+
     /**
      * The number of threads used to process the table.
      */

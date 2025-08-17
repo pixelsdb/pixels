@@ -54,7 +54,7 @@ public final class Constants
 
     public static final String PARTITION_OPERATOR_NAME = "partition";
     public static final String PARTITION_JOIN_OPERATOR_NAME = "partition_join";
-    public static final String BROADCAST_OPERATOR_NAME = "broadcast_join";
+    public static final String BROADCAST_JOIN_OPERATOR_NAME = "broadcast_join";
 
     /*
      * Issue #649:

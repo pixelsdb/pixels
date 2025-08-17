@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.HashJoiner;
 import io.pixelsdb.pixels.executor.join.JoinType;
-import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
@@ -76,7 +75,7 @@ public class BroadcastJoinStreamWorker extends BaseBroadcastJoinWorker implement
             String coordinatorIp = WorkerCommon.getCoordinatorIp();
             int coordinatorPort = WorkerCommon.getCoordinatorPort();
             CFWorkerInfo workerInfo = new CFWorkerInfo(ip, port, transId, stageId,
-                    Constants.BROADCAST_OPERATOR_NAME, Collections.emptyList());
+                    Constants.BROADCAST_JOIN_OPERATOR_NAME, Collections.emptyList());
             workerCoordinatorService = new WorkerCoordinateService(coordinatorIp, coordinatorPort);
             worker = workerCoordinatorService.registerWorker(workerInfo);
             JoinOutput output = process(input);

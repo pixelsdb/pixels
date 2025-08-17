@@ -22,17 +22,26 @@ package io.pixelsdb.pixels.planner.coordinate;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * The dependency of a query execution stage.
+ * The down-stream dependency of a query execution stage. It defines how the current stage is dependent on the
+ * dow stream (i.e., parent) stage. The dependency can be wide or narrow. A wide dependency means there is an all-to-all
+ * data shuffle (exchange) between the current stage and the down stream-stage. Whereas, a narrow dependency means there
+ * is a one-to-one or m-to-one data passing from the current stage to the down-stream stage.
  * @author hank
  * @create 2023-09-24
  */
 public class StageDependency
 {
+    /**
+     * The id of the current stage.
+     */
     private final int currentStageId;
     /**
      * {@link #downStreamStageId} can be negative if there is no valid downstream stage
      */
     private final int downStreamStageId;
+    /**
+     * True if this is a wide dependency between the current and the down-stream stages.
+     */
     private final boolean isWide;
 
     /**

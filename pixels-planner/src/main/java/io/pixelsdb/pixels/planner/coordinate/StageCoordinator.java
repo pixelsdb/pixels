@@ -52,17 +52,49 @@ public class StageCoordinator
                 .getProperty("executor.intra.worker.parallelism"));
     }
 
+    /**
+     * The stage id of this stage.
+     */
     private final int stageId;
+    /**
+     * Whether this stage is queued. A queued stage
+     */
     private final boolean isQueued;
+    /**
+     * The number of workers in the down-stream stage. It is only valid if the down-stream stage is non-queued.
+     */
     private int downStreamWorkerNum;
+    /**
+     * The number of workers in this stage. It is zero if this is a queued stage.
+     */
     private final int fixedWorkerNum;
+    /**
+     * The task queue for a queued stage. It is null if this is a non-queued stage.
+     */
     private final TaskQueue<Task> taskQueue;
+    /**
+     * Mapping from worker index to worker.
+     */
     private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers = new ConcurrentHashMap<>();
-    // this.workers is used for dependency checking, no concurrent reads and writes
+    /**
+     * The workers of this stage. It is used for dependency checking, no concurrent reads and writes.
+     */
     private final List<Worker<CFWorkerInfo>> workers = new ArrayList<>();
+    /**
+     * Mapping from the global worker id to the intra-stage worker index.
+     */
     private final Map<Long, List<Integer>> workerIdToWorkerIndex = new ConcurrentHashMap<>();
+    /**
+     * The counter used to assign worker index.
+     */
     private int workerIndexAssigner;
+    /**
+     * The number of workers in the left child stage.
+     */
     private int leftChildWorkerNum;
+    /**
+     * The number of workers in the right child stage.
+     */
     private int rightChildWorkerNum;
     private final Object lock = new Object();
 
@@ -88,14 +120,20 @@ public class StageCoordinator
         this.rightChildWorkerNum = 0;
     }
 
-    public StageCoordinator(int stageId, int workerNum, int workerIndexAssigner)
+    /**
+     * Same as {@link #StageCoordinator(int, int)}, besides specifying the beginning value of worker index.
+     * @param stageId the id of this stage
+     * @param workerNum the fixed number of workers in this stage
+     * @param workerIndexBegin the beginning of worker index for this stage
+     */
+    public StageCoordinator(int stageId, int workerNum, int workerIndexBegin)
     {
         this.stageId = stageId;
         this.isQueued = false;
         this.fixedWorkerNum = workerNum;
         this.taskQueue = null;
         this.downStreamWorkerNum = 0;
-        this.workerIndexAssigner = workerIndexAssigner;
+        this.workerIndexAssigner = workerIndexBegin;
         this.leftChildWorkerNum = 0;
         this.rightChildWorkerNum = 0;
     }
@@ -105,27 +143,37 @@ public class StageCoordinator
      * upstream (child) stage does not exist or has a narrow dependency on this stage. The stage coordinator will
      * notify the child stage waits on {@link #waitForAllWorkersReady()} when there is none tasks pending in this
      * stage (i.e., when all the tasks are assigned to corresponding workers, meaning no more workers will be added).
-     * @param stageId
-     * @param pendingTasks
+     * @param stageId the id of this stage
+     * @param pendingTasks the pending tasks to be executed in this stage
      */
-    public StageCoordinator(int stageId, List<Task> pendingTasks, int workerIndex)
-    {
-        this.stageId = stageId;
-        this.isQueued = true;
-        this.fixedWorkerNum = 0;
-        this.taskQueue = new TaskQueue<>(pendingTasks);
-        this.downStreamWorkerNum = 0;
-        this.workerIndexAssigner = workerIndex;
-        this.leftChildWorkerNum = 0;
-        this.rightChildWorkerNum = 0;
-    }
-
     public StageCoordinator(int stageId, List<Task> pendingTasks)
     {
         this.stageId = stageId;
         this.isQueued = true;
         this.fixedWorkerNum = 0;
         this.taskQueue = new TaskQueue<>(pendingTasks);
+        this.downStreamWorkerNum = 0;
+        this.workerIndexAssigner = 0;
+        this.leftChildWorkerNum = 0;
+        this.rightChildWorkerNum = 0;
+    }
+    
+    /**
+     * Same as {@link #StageCoordinator(int, List)}, besides specifying the beginning value of worker index.
+     * @param stageId the id of this stage
+     * @param pendingTasks the pending tasks to be executed in this stage
+     * @param workerIndexBegin  the beginning of worker index for this stage
+     */
+    public StageCoordinator(int stageId, List<Task> pendingTasks, int workerIndexBegin)
+    {
+        this.stageId = stageId;
+        this.isQueued = true;
+        this.fixedWorkerNum = 0;
+        this.taskQueue = new TaskQueue<>(pendingTasks);
+        this.downStreamWorkerNum = 0;
+        this.workerIndexAssigner = workerIndexBegin;
+        this.leftChildWorkerNum = 0;
+        this.rightChildWorkerNum = 0;
     }
 
     /**
@@ -142,7 +190,7 @@ public class StageCoordinator
             {
                 worker.setWorkerPortIndex(workerIndexAssigner);
                 workerIndexAssigner++;
-            } else if (worker.getWorkerInfo().getOperatorName().equals(Constants.BROADCAST_OPERATOR_NAME))
+            } else if (worker.getWorkerInfo().getOperatorName().equals(Constants.BROADCAST_JOIN_OPERATOR_NAME))
             {
                 if (downStreamWorkerNum != 0)
                 {
@@ -217,14 +265,6 @@ public class StageCoordinator
     }
 
     /**
-     * @return the stage id of this stage
-     */
-    public int getStageId()
-    {
-        return this.stageId;
-    }
-
-    /**
      * Get the worker with the worker id.
      * @param workerId the worker id
      * @return the worker
@@ -235,7 +275,8 @@ public class StageCoordinator
     }
 
     /**
-     * Get the index of the worker in this stage, the index starts from 0.
+     * Get the index of the worker in this stage, the index starts from 0 or a non-negative value specified in
+     * {@link #StageCoordinator(int, int, int)} or {@link #StageCoordinator(int, List, int)}.
      * @param workerId the (global) id of the worker
      * @return the index of the worker in this stage, or < 0 if the worker is not found
      */
@@ -287,25 +328,21 @@ public class StageCoordinator
     // todo: should we write a "waitForWorkerReady(int workerId)" method in WorkerCoordinateServiceImpl
     //  for non-wide stages? Currently, we only have "waitForAllWorkersReady()" for wide stages.
 
-    /**
-     * @return all the workers in this stage coordinator
-     */
+    public int getStageId()
+    {
+        return this.stageId;
+    }
+
     public List<Worker<CFWorkerInfo>> getWorkers()
     {
         return this.workers;
     }
 
-    /**
-     * set down stream workers num
-     */
     public void setDownStreamWorkerNum(int downStreamWorkerNum)
     {
         this.downStreamWorkerNum = downStreamWorkerNum;
     }
 
-    /**
-     * get worker num of this stage
-     */
     public int getFixedWorkerNum()
     {
         return this.fixedWorkerNum;
