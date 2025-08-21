@@ -520,17 +520,6 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                 {
                     throw new IllegalArgumentException("Unknown type: " + typeName);
                 }
-            } else if (typeName.startsWith("time"))
-            {
-                Matcher matcher = Pattern.compile("time\\((\\d+)\\)").matcher(typeName);
-                if (matcher.matches())
-                {
-                    int precision = Integer.parseInt(matcher.group(1));
-                    fieldType = TypeDescription.createTime(precision);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
             } else if (typeName.startsWith("timestamp"))
             {
                 Matcher matcher = Pattern.compile("timestamp\\((\\d+)\\)").matcher(typeName);
@@ -538,6 +527,17 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                 {
                     int precision = Integer.parseInt(matcher.group(1));
                     fieldType = TypeDescription.createTimestamp(precision);
+                } else
+                {
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+                }
+            } else if (typeName.startsWith("time"))
+            {
+                Matcher matcher = Pattern.compile("time\\((\\d+)\\)").matcher(typeName);
+                if (matcher.matches())
+                {
+                    int precision = Integer.parseInt(matcher.group(1));
+                    fieldType = TypeDescription.createTime(precision);
                 } else
                 {
                     throw new IllegalArgumentException("Unknown type: " + typeName);
