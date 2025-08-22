@@ -24,7 +24,6 @@ import io.pixelsdb.pixels.cli.load.Parameters;
 import io.pixelsdb.pixels.cli.load.PixelsConsumer;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
@@ -33,7 +32,6 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.transaction.TransService;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import net.sourceforge.argparse4j.inf.Namespace;
 
@@ -92,13 +90,13 @@ public class LoadExecutor implements CommandExecutor
         long startTime = System.currentTimeMillis();
         if (startConsumers(threadNum, inputFiles, parameters, loadedFiles, loadedPaths))
         {
-            metadataService.addFiles(loadedFiles);
             Iterator<File> fileIterator = loadedFiles.iterator();
             Iterator<Path> pathIterator = loadedPaths.iterator();
             while (fileIterator.hasNext() && pathIterator.hasNext())
             {
                 File file = fileIterator.next();
                 Path path = pathIterator.next();
+                metadataService.updateFile(file);
                 try
                 {
                     retinaService.addVisibility(File.getFilePath(path, file));
