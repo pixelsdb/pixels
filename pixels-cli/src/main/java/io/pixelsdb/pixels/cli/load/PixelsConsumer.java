@@ -123,6 +123,7 @@ public class PixelsConsumer extends Consumer
             Path currTargetPath = null;
             int rowCounter = 0;
             int rgId = 0;
+            int prevRgId = 0;
             int rgRowOffset = 0;
             File currFile = null;
             List<IndexProto.PrimaryIndexEntry> indexEntries = new ArrayList<>();
@@ -248,7 +249,12 @@ public class PixelsConsumer extends Consumer
                             pixelsWriter.addRowBatch(rowBatch);
                             rowBatch.reset();
                             rgId = pixelsWriter.getNumRowGroup();
-                            rgRowOffset = 0;
+
+                            if(prevRgId != rgId)
+                            {
+                                rgRowOffset = 0;
+                                prevRgId = rgId;
+                            }
 
                             indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
                             indexEntries.clear();
@@ -334,8 +340,9 @@ public class PixelsConsumer extends Consumer
         file.setType(File.Type.TEMPORARY);
         file.setNumRowGroup(1);
         file.setPathId(filePath.getId());
+        String tmpFilePath = filePath.getUri() + "/" + fileName;
         this.metadataService.addFiles(Collections.singletonList(file));
-        file.setId(metadataService.getFileId(filePath.getUri()));
+        file.setId(metadataService.getFileId(tmpFilePath));
         return file;
     }
 }
