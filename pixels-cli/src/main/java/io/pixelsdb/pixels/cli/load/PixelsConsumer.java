@@ -64,6 +64,7 @@ public class PixelsConsumer extends Consumer
     private final Parameters parameters;
     private final ConcurrentLinkedQueue<File> loadedFiles;
     private final ConcurrentLinkedQueue<Path> loadedPaths;
+    private final List<File> tmpFiles = new ArrayList<>();
     private MetadataService metadataService;
 
     public PixelsConsumer(BlockingQueue<String> queue, Parameters parameters,
@@ -182,6 +183,7 @@ public class PixelsConsumer extends Consumer
                                     .build();
 
                             currFile = openTmpFile(targetFileName, currTargetPath);
+                            tmpFiles.add(currFile);
                             rgId = pixelsWriter.getNumRowGroup();
                             rgRowOffset = 0;
                         }
@@ -215,34 +217,36 @@ public class PixelsConsumer extends Consumer
                         // add hidden timestamp column value
                         columnVectors[columnVectors.length - 1].add(timestamp);
 
-                        int indexKeySize = 0;
-                        for(int pkColumnId : pkMapping)
+                        if(index != null)
                         {
-                            indexKeySize += colsInLine[pkColumnId].length();
+                            // TODO: Support Secondary Index
+                            int indexKeySize = 0;
+                            for(int pkColumnId : pkMapping)
+                            {
+                                indexKeySize += colsInLine[pkColumnId].length();
+                            }
+                            indexKeySize += Long.BYTES + (pkMapping.length + 1) * 2; // table id + index key
+                            ByteBuffer indexKeyBuffer = ByteBuffer.allocate(indexKeySize);
+
+                            indexKeyBuffer.putLong(index.getTableId()).putChar(':');
+                            for(int pkColumnId : pkMapping)
+                            {
+                                indexKeyBuffer.put(colsInLine[pkColumnId].getBytes());
+                                indexKeyBuffer.putChar(':');
+                            }
+                            IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
+                            builder.getIndexKeyBuilder()
+                                    .setTimestamp(parameters.getTimestamp())
+                                    .setKey(ByteString.copyFrom((ByteBuffer) indexKeyBuffer.rewind()))
+                                    .setIndexId(index.getId())
+                                    .setTableId(index.getTableId());
+                            builder.setRowId(rowIdAllocator.getRowId());
+                            builder.getRowLocationBuilder()
+                                    .setRgId(rgId)
+                                    .setFileId(currFile.getId())
+                                    .setRgRowOffset(rgRowOffset++);
+                            indexEntries.add(builder.build());
                         }
-                        indexKeySize += Long.BYTES + (pkMapping.length + 1) * 2; // table id + index key
-                        ByteBuffer indexKeyBuffer = ByteBuffer.allocate(indexKeySize);
-
-                        indexKeyBuffer.putLong(index.getTableId()).putChar(':');
-                        for(int pkColumnId : pkMapping)
-                        {
-                            indexKeyBuffer.put(colsInLine[pkColumnId].getBytes());
-                            indexKeyBuffer.putChar(':');
-                        }
-
-                        IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
-                        builder.getIndexKeyBuilder()
-                                .setTimestamp(parameters.getTimestamp())
-                                .setKey(ByteString.copyFrom((ByteBuffer) indexKeyBuffer.rewind()))
-                                .setIndexId(index.getId())
-                                .setTableId(index.getTableId());
-                        builder.setRowId(rowIdAllocator.getRowId());
-                        builder.getRowLocationBuilder()
-                                .setRgId(rgId)
-                                .setFileId(currFile.getId())
-                                .setRgRowOffset(rgRowOffset++);
-
-                        indexEntries.add(builder.build());
 
                         if (rowBatch.size >= rowBatch.getMaxSize())
                         {
@@ -256,8 +260,11 @@ public class PixelsConsumer extends Consumer
                                 prevRgId = rgId;
                             }
 
-                            indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
-                            indexEntries.clear();
+                            if(index != null)
+                            {
+                                indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
+                                indexEntries.clear();
+                            }
                         }
 
                         if (rowCounter >= maxRowNum)
@@ -267,8 +274,11 @@ public class PixelsConsumer extends Consumer
                             {
                                 pixelsWriter.addRowBatch(rowBatch);
                                 rowBatch.reset();
-                                indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
-                                indexEntries.clear();
+                                if(index != null)
+                                {
+                                    indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
+                                    indexEntries.clear();
+                                }
                             }
                             closeWriterAndAddFile(pixelsWriter, currFile, currTargetPath);
                             rowCounter = 0;
@@ -290,9 +300,12 @@ public class PixelsConsumer extends Consumer
                 if (rowBatch.size != 0)
                 {
                     pixelsWriter.addRowBatch(rowBatch);
-                    indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
-                    indexEntries.clear();
                     rowBatch.reset();
+                    if(index != null)
+                    {
+                        indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
+                        indexEntries.clear();
+                    }
                 }
                 closeWriterAndAddFile(pixelsWriter, currFile, currTargetPath);
             }
@@ -305,6 +318,21 @@ public class PixelsConsumer extends Consumer
             e.printStackTrace();
         } finally
         {
+            for(File tmpFile: tmpFiles)
+            {
+                // If the file is successfully loaded, its type should have been locally modified to REGULAR.
+                // Otherwise, TEMPORARY files need to be cleaned up in the Metadata Service.
+                if(tmpFile.getType() == File.Type.TEMPORARY)
+                {
+                    try
+                    {
+                        metadataService.deleteFiles(Collections.singletonList((tmpFile.getId())));
+                    } catch (MetadataException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
             System.out.println(currentThread().getName() + ":" + count);
             System.out.println("Exit PixelsConsumer, thread: " + currentThread().getName() +
                     ", time: " + DateUtil.formatTime(new Date()));

@@ -200,6 +200,7 @@ public class Parameters
         }
 
         // get index information
+        // TODO: Support Secondary Index
         try
         {
             this.index = metadataService.getPrimaryIndex(table.getId());
