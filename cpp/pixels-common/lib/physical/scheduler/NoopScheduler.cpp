@@ -25,6 +25,7 @@
 #include "physical/scheduler/NoopScheduler.h"
 #include "exception/InvalidArgumentException.h"
 #include "physical/io/PhysicalLocalReader.h"
+#include <unordered_set>
 
 Scheduler *NoopScheduler::instance = nullptr;
 
@@ -48,6 +49,8 @@ std::vector <std::shared_ptr<ByteBuffer>>
 NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatch batch,
                             std::vector <std::shared_ptr<ByteBuffer>> reuseBuffers, long queryId)
 {
+
+    std::lock_guard<std::mutex> lock(mtx);  // 进入临界区，自动加锁
     auto requests = batch.getRequests();
     std::vector <std::shared_ptr<ByteBuffer>> results;
     results.resize(batch.getSize());
@@ -55,13 +58,32 @@ NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatc
     {
         // async read
         auto localReader = std::static_pointer_cast<PhysicalLocalReader>(reader);
+        std::unordered_set<int> ring_index_set=localReader->getRingIndexes();
+        std::unordered_map<int, uint32_t> ringIndexCountMap;
+
         for (int i = 0; i < batch.getSize(); i++)
         {
             Request request = requests[i];
-            localReader->seek(request.start);
-            results.at(i) = localReader->readAsync(request.length, reuseBuffers.at(i), request.bufferId);
+            // localReader->seek(request.start);
+            if (request.length>reuseBuffers.at(i)->size()) {
+                throw InvalidArgumentException("说明出错的不是这个，需要关注之前的临界区\n");
+
+            }
+            results.at(i) = localReader->readAsync(request.length, reuseBuffers.at(i), request.bufferId,request.ring_index,request.start);
+            // if (request.ring_index !=0) {
+            //     std::cout<<"notice readAsync"<<std::endl;
+            // }
+            // std::cout<<"i: "<<i<<" start:"<<request.start<<" resuseBuffers.size:"<<reuseBuffers.at(i)->size()<<std::endl;
+            if (ring_index_set.find(request.ring_index) == ring_index_set.end())
+            {
+                ring_index_set.insert(request.ring_index);
+                localReader->addRingIndex(request.ring_index);
+            }
+            ringIndexCountMap[request.ring_index]++;
         }
-        localReader->readAsyncSubmit(batch.getSize());
+        localReader->readAsyncSubmit(ringIndexCountMap,ring_index_set);
+        localReader->setRingIndexCountMap(ringIndexCountMap);
+
     }
     else
     {

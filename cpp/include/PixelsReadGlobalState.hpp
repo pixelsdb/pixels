@@ -40,6 +40,9 @@ namespace duckdb
     {
         mutex lock;
 
+        atomic<int> active_threads;  // 活跃线程数
+        atomic<bool> all_done;       // 是否所有线程都已完成
+
         //! The initial reader from the bind phase
         std::shared_ptr <PixelsReader> initialPixelsReader;
 

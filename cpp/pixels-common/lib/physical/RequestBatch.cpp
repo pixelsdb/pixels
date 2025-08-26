@@ -66,3 +66,11 @@ void RequestBatch::add(Request request)
     requests.push_back(request);
     size++;
 }
+
+
+Request& RequestBatch::getRequest(int index) {
+    if (index < 0 || index >= size) {
+        throw std::out_of_range("RequestBatch::getRequest: index out of range");
+    }
+    return requests[index];
+}
