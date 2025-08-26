@@ -19,8 +19,14 @@
  */
 package io.pixelsdb.pixels.cli.load;
 
+import com.google.protobuf.ByteString;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.index.IndexService;
+import io.pixelsdb.pixels.common.index.RowIdAllocator;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
+import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -31,10 +37,14 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -54,6 +64,8 @@ public class PixelsConsumer extends Consumer
     private final Parameters parameters;
     private final ConcurrentLinkedQueue<File> loadedFiles;
     private final ConcurrentLinkedQueue<Path> loadedPaths;
+    private final List<File> tmpFiles = new ArrayList<>();
+    private MetadataService metadataService;
 
     public PixelsConsumer(BlockingQueue<String> queue, Parameters parameters,
                           ConcurrentLinkedQueue<File> loadedFiles, ConcurrentLinkedQueue<Path> loadedPaths)
@@ -62,6 +74,7 @@ public class PixelsConsumer extends Consumer
         this.parameters = parameters;
         this.loadedFiles = loadedFiles;
         this.loadedPaths = loadedPaths;
+        this.metadataService = parameters.getMetadataService();
     }
 
     @Override
@@ -81,6 +94,11 @@ public class PixelsConsumer extends Consumer
             String regex = parameters.getRegex();
             EncodingLevel encodingLevel = parameters.getEncodingLevel();
             boolean nullsPadding = parameters.isNullsPadding();
+            RowIdAllocator rowIdAllocator = parameters.getRowIdAllocator();
+            int[] pkMapping = parameters.getPkMapping();
+            SinglePointIndex index = parameters.getIndex();
+            IndexService indexService = IndexService.Instance();
+
             if (regex.equals("\\s"))
             {
                 regex = " ";
@@ -105,6 +123,11 @@ public class PixelsConsumer extends Consumer
             PixelsWriter pixelsWriter = null;
             Path currTargetPath = null;
             int rowCounter = 0;
+            int rgId = 0;
+            int prevRgId = 0;
+            int rgRowOffset = 0;
+            File currFile = null;
+            List<IndexProto.PrimaryIndexEntry> indexEntries = new ArrayList<>();
 
             while (isRunning)
             {
@@ -158,6 +181,11 @@ public class PixelsConsumer extends Consumer
                                     .setNullsPadding(nullsPadding)
                                     .setCompressionBlockSize(1)
                                     .build();
+
+                            currFile = openTmpFile(targetFileName, currTargetPath);
+                            tmpFiles.add(currFile);
+                            rgId = pixelsWriter.getNumRowGroup();
+                            rgRowOffset = 0;
                         }
                         initPixelsFile = false;
 
@@ -189,10 +217,54 @@ public class PixelsConsumer extends Consumer
                         // add hidden timestamp column value
                         columnVectors[columnVectors.length - 1].add(timestamp);
 
+                        if(index != null)
+                        {
+                            // TODO: Support Secondary Index
+                            int indexKeySize = 0;
+                            for(int pkColumnId : pkMapping)
+                            {
+                                indexKeySize += colsInLine[pkColumnId].length();
+                            }
+                            indexKeySize += Long.BYTES + (pkMapping.length + 1) * 2; // table id + index key
+                            ByteBuffer indexKeyBuffer = ByteBuffer.allocate(indexKeySize);
+
+                            indexKeyBuffer.putLong(index.getTableId()).putChar(':');
+                            for(int pkColumnId : pkMapping)
+                            {
+                                indexKeyBuffer.put(colsInLine[pkColumnId].getBytes());
+                                indexKeyBuffer.putChar(':');
+                            }
+                            IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
+                            builder.getIndexKeyBuilder()
+                                    .setTimestamp(parameters.getTimestamp())
+                                    .setKey(ByteString.copyFrom((ByteBuffer) indexKeyBuffer.rewind()))
+                                    .setIndexId(index.getId())
+                                    .setTableId(index.getTableId());
+                            builder.setRowId(rowIdAllocator.getRowId());
+                            builder.getRowLocationBuilder()
+                                    .setRgId(rgId)
+                                    .setFileId(currFile.getId())
+                                    .setRgRowOffset(rgRowOffset++);
+                            indexEntries.add(builder.build());
+                        }
+
                         if (rowBatch.size >= rowBatch.getMaxSize())
                         {
                             pixelsWriter.addRowBatch(rowBatch);
                             rowBatch.reset();
+                            rgId = pixelsWriter.getNumRowGroup();
+
+                            if(prevRgId != rgId)
+                            {
+                                rgRowOffset = 0;
+                                prevRgId = rgId;
+                            }
+
+                            if(index != null)
+                            {
+                                indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
+                                indexEntries.clear();
+                            }
                         }
 
                         if (rowCounter >= maxRowNum)
@@ -202,8 +274,13 @@ public class PixelsConsumer extends Consumer
                             {
                                 pixelsWriter.addRowBatch(rowBatch);
                                 rowBatch.reset();
+                                if(index != null)
+                                {
+                                    indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
+                                    indexEntries.clear();
+                                }
                             }
-                            closeWriterAndAddFile(pixelsWriter, targetFileName, currTargetPath);
+                            closeWriterAndAddFile(pixelsWriter, currFile, currTargetPath);
                             rowCounter = 0;
                             initPixelsFile = true;
                         }
@@ -224,8 +301,13 @@ public class PixelsConsumer extends Consumer
                 {
                     pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();
+                    if(index != null)
+                    {
+                        indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), indexEntries);
+                        indexEntries.clear();
+                    }
                 }
-                closeWriterAndAddFile(pixelsWriter, targetFileName, currTargetPath);
+                closeWriterAndAddFile(pixelsWriter, currFile, currTargetPath);
             }
         } catch (InterruptedException e)
         {
@@ -236,6 +318,21 @@ public class PixelsConsumer extends Consumer
             e.printStackTrace();
         } finally
         {
+            for(File tmpFile: tmpFiles)
+            {
+                // If the file is successfully loaded, its type should have been locally modified to REGULAR.
+                // Otherwise, TEMPORARY files need to be cleaned up in the Metadata Service.
+                if(tmpFile.getType() == File.Type.TEMPORARY)
+                {
+                    try
+                    {
+                        metadataService.deleteFiles(Collections.singletonList((tmpFile.getId())));
+                    } catch (MetadataException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
             System.out.println(currentThread().getName() + ":" + count);
             System.out.println("Exit PixelsConsumer, thread: " + currentThread().getName() +
                     ", time: " + DateUtil.formatTime(new Date()));
@@ -244,21 +341,36 @@ public class PixelsConsumer extends Consumer
 
     /**
      * Close the pixels writer and add the file to loaded file queue.
-     * Files in the loaded files queue will be saved in metadata.
+     * Files in the loaded files queue will be updated in metadata.
      * @param pixelsWriter the pixels writer
-     * @param fileName the file name without directory path
+     * @param loadedFile the file name has been loaded
      * @param filePath the path of the directory where the file was written
      * @throws IOException
      */
-    private void closeWriterAndAddFile(PixelsWriter pixelsWriter, String fileName, Path filePath) throws IOException
+    private void closeWriterAndAddFile(PixelsWriter pixelsWriter, File loadedFile, Path filePath) throws IOException
     {
         pixelsWriter.close();
-        File loadedFile = new File();
-        loadedFile.setName(fileName);
         loadedFile.setType(File.Type.REGULAR);
         loadedFile.setNumRowGroup(pixelsWriter.getNumRowGroup());
-        loadedFile.setPathId(filePath.getId());
         this.loadedFiles.offer(loadedFile);
         this.loadedPaths.offer(filePath);
+    }
+
+    /**
+     * Create a temporary file through the metadata service
+     * @param fileName the file name without directory path
+     * @param filePath the path of the directory where the file was written
+     */
+    private File openTmpFile(String fileName, Path filePath) throws MetadataException
+    {
+        File file = new File();
+        file.setName(fileName);
+        file.setType(File.Type.TEMPORARY);
+        file.setNumRowGroup(1);
+        file.setPathId(filePath.getId());
+        String tmpFilePath = filePath.getUri() + "/" + fileName;
+        this.metadataService.addFiles(Collections.singletonList(file));
+        file.setId(metadataService.getFileId(tmpFilePath));
+        return file;
     }
 }

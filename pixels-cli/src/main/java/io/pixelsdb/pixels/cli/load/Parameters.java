@@ -20,15 +20,14 @@
 package io.pixelsdb.pixels.cli.load;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.metadata.domain.Column;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Ordered;
-import io.pixelsdb.pixels.common.metadata.domain.Path;
+import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static io.pixelsdb.pixels.cli.Main.validateOrderedOrCompactPaths;
 
@@ -41,11 +40,14 @@ public class Parameters
     private List<Path> loadingPaths;
     private String schema;
     private int[] orderMapping;
+    private int[] pkMapping;
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
     private final MetadataService metadataService;
     private final long transId;
     private final long timestamp;
+    private RowIdAllocator rowIdAllocator;
+    private SinglePointIndex index;
 
     public List<Path> getLoadingPaths()
     {
@@ -86,6 +88,26 @@ public class Parameters
 
     public long getTimestamp() { return timestamp; }
 
+    public RowIdAllocator getRowIdAllocator()
+    {
+        return rowIdAllocator;
+    }
+
+    public int[] getPkMapping()
+    {
+        return pkMapping;
+    }
+
+    public SinglePointIndex getIndex()
+    {
+        return index;
+    }
+
+    public MetadataService getMetadataService()
+    {
+        return metadataService;
+    }
+
     public Parameters(String dbName, String tableName, int maxRowNum, String regex, EncodingLevel encodingLevel,
                       boolean nullsPadding, MetadataService metadataService, long transId, long timestamp)
     {
@@ -99,6 +121,7 @@ public class Parameters
         this.metadataService = metadataService;
         this.transId = transId;
         this.timestamp = timestamp;
+        this.index = null;
     }
 
     /**
@@ -110,6 +133,9 @@ public class Parameters
      */
     public boolean initExtra() throws MetadataException, InterruptedException
     {
+        // get table info
+        Table table = metadataService.getTable(dbName, tableName);
+
         // get columns of the specified table
         List<Column> columns = metadataService.getColumns(dbName, tableName, false);
         int colSize = columns.size();
@@ -172,6 +198,41 @@ public class Parameters
             this.loadingPaths = writableLayout.getOrderedPaths();
             validateOrderedOrCompactPaths(this.loadingPaths);
         }
+
+        // get index information
+        // TODO: Support Secondary Index
+        try
+        {
+            this.index = metadataService.getPrimaryIndex(table.getId());
+        } catch (MetadataException ignored)
+        {
+            // Primary key not required
+        }
+
+        if(index != null)
+        {
+            rowIdAllocator = new RowIdAllocator(table.getId(), 1000);
+            int[] orderKeyColIds = new int[index.getKeyColumns().getKeyColumnIds().size()];
+            if (!index.isUnique()) {
+                throw new MetadataException("Non Unique Index is not supported, Schema:" + dbName + " Table: " + tableName);
+            }
+
+            int keyColumnIdx = 0;
+            for (Integer keyColumnId : index.getKeyColumns().getKeyColumnIds()) {
+                int i = IntStream.range(0, columns.size())
+                        .filter(idx -> columns.get(idx).getId() == keyColumnId)
+                        .findFirst()
+                        .orElse(-1);
+                if(i == -1)
+                {
+                    throw new MetadataException("Cant find key column id: " + keyColumnId + " in table "
+                            + table.getName() + " schema id is " + table.getSchemaId());
+                }
+                orderKeyColIds[keyColumnIdx++] = i;
+            }
+            this.pkMapping = orderKeyColIds;
+        }
+
         // init the params
         this.schema = schemaBuilder.toString();
         this.orderMapping = orderMapping;
