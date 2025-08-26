@@ -17,10 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.retina;
+package io.pixelsdb.pixels.common.index;
 
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.common.index.IndexService;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.concurrent.locks.ReentrantLock;
