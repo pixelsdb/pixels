@@ -67,6 +67,10 @@ public:
 
     long blockEnd(long value);
 
+    int getBlockSize() const {
+        return fsBlockSize;
+    };
+
 private:
     int fsBlockSize;
     long fsBlockNotMask;

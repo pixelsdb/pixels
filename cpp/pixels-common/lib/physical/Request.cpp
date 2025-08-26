@@ -31,6 +31,7 @@ Request::Request(uint64_t queryId_, uint64_t start_, uint64_t length_, int64_t b
     start = start_;
     length = length_;
     this->bufferId = bufferId;
+    ring_index=0;
 }
 
 int Request::hashCode()

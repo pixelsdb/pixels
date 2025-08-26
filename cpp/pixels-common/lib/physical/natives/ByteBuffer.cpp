@@ -66,6 +66,26 @@ ByteBuffer::ByteBuffer(ByteBuffer &bb, uint32_t startId, uint32_t length)
     name = "";
     fromOtherBB = true;
     allocated_by_new = true;
+    fromSlice=false;
+}
+ByteBuffer::ByteBuffer(ByteBuffer &bb, uint32_t startId, uint32_t length,bool from_slice)
+{
+    assert(startId >= 0 && startId + length <= bb.size() && length > 0);
+    buf = bb.getPointer() + startId;
+    bufSize = length;
+    resetPosition();
+    name = "";
+    fromOtherBB = true;
+    allocated_by_new = true;
+    fromSlice=true;
+}
+
+std::shared_ptr<ByteBuffer> ByteBuffer::slice(uint32_t offset, uint32_t length) {
+    if (offset + length > this->bufSize) {
+        throw std::runtime_error("Slice range out of bounds");
+    }
+
+    return std::make_shared<ByteBuffer>(*this, offset, length,true);
 }
 
 /**

@@ -43,7 +43,11 @@ public:
 
     ByteBuffer(ByteBuffer &bb, uint32_t startId, uint32_t length);
 
+    ByteBuffer(ByteBuffer &bb,uint32_t startId,uint32_t length,bool from_slice);
+
     ~ByteBuffer();
+
+    std::shared_ptr<ByteBuffer> slice(uint32_t offset, uint32_t length);
 
     void filp();// reset the readPosition
     uint32_t bytesRemaining(); // Number of uint8_ts from the current read position till the end of the buffer
@@ -167,6 +171,7 @@ protected:
     std::string name;
     uint32_t rmark;
     bool fromOtherBB;
+    bool fromSlice;
     // Sometimes the buffer is allocated by malloc/poxis_memalign, in this case, we
     // should use free() to deallocate the buf
     bool allocated_by_new;
