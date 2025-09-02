@@ -65,7 +65,7 @@ private:
     static thread_local bool isInitialized;
     static thread_local std::map<uint32_t, std::shared_ptr < ByteBuffer>>
     buffers[2];
-    static std::shared_ptr <DirectIoLib> directIoLib;
+    static thread_local std::shared_ptr <DirectIoLib> directIoLib;
     static thread_local int currBufferIdx;
     static thread_local int nextBufferIdx;
     friend class DirectUringRandomAccessFile;

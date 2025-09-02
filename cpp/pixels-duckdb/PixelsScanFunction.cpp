@@ -29,7 +29,7 @@
 namespace duckdb
 {
 
-bool PixelsScanFunction::enable_filter_pushdown = false;
+bool PixelsScanFunction::enable_filter_pushdown = true;
 
 static idx_t PixelsScanGetBatchIndex(ClientContext &context, const FunctionData *bind_data_p,
                                      LocalTableFunctionState *local_state,
@@ -63,8 +63,8 @@ TableFunctionSet PixelsScanFunction::GetFunctionSet()
   TableFunction table_function("pixels_scan", {LogicalType::VARCHAR}, PixelsScanImplementation, PixelsScanBind,
                                PixelsScanInitGlobal, PixelsScanInitLocal);
   table_function.projection_pushdown = true;
-//	table_function.filter_pushdown = true;
-  //table_function.filter_prune = true;
+	table_function.filter_pushdown = true;
+  // table_function.filter_prune = true;
   enable_filter_pushdown = table_function.filter_pushdown;
   MultiFileReader::AddParameters(table_function);
   table_function.cardinality = PixelsCardinality;
@@ -501,7 +501,12 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     scan_data.currReader->close();
     }
 
-  ::BufferPool::Switch();
+  if (ConfigFactory::Instance().getProperty("pixels.doublebuffer")=="true")
+  {
+    ::BufferPool::Switch();
+  }
+  // double/single buffer
+
   scan_data.currReader = scan_data.nextReader;
   scan_data.currPixelsRecordReader = scan_data.nextPixelsRecordReader;
   // asyncReadComplete is not invoked in the first run (is_init_state = true)
@@ -509,6 +514,12 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     {
     auto currPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(
         scan_data.currPixelsRecordReader);
+    if (ConfigFactory::Instance().getProperty("pixels.doublebuffer")=="false")
+    {
+      //single buffer
+      currPixelsRecordReader->read();
+    }
+
     currPixelsRecordReader->asyncReadComplete((int) scan_data.column_names.size());
     }
   if (scan_data.next_file_index < StorageInstance->getFileSum(scan_data.deviceID))
@@ -526,7 +537,13 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     scan_data.nextPixelsRecordReader = scan_data.nextReader->read(option);
     auto nextPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(
         scan_data.nextPixelsRecordReader);
-    nextPixelsRecordReader->read();
+
+    if (ConfigFactory::Instance().getProperty("pixels.doublebuffer")=="true")
+    {
+      //double buffer
+      nextPixelsRecordReader->read();
+    }
+
     } else
     {
     scan_data.nextReader = nullptr;

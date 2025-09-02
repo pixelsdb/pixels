@@ -34,7 +34,7 @@ BufferPool::buffers[2];
 // since we call switch function first.
 thread_local int BufferPool::currBufferIdx = 1;
 thread_local int BufferPool::nextBufferIdx = 0;
-std::shared_ptr <DirectIoLib> BufferPool::directIoLib;
+thread_local std::shared_ptr <DirectIoLib> BufferPool::directIoLib;
 
 void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t> bytes,
                             std::vector <std::string> columnNames)
