@@ -199,9 +199,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         if (!tableUpdateDataList.isEmpty())
         {
-            boolean init = true;
             for (RetinaProto.TableUpdateData tableUpdateData : tableUpdateDataList)
             {
+                boolean init = true;
                 List<RetinaProto.DeleteData> deleteDataList = tableUpdateData.getDeleteDataList();
                 long primaryIndexId = tableUpdateData.getPrimaryIndexId();
                 if (!deleteDataList.isEmpty())
