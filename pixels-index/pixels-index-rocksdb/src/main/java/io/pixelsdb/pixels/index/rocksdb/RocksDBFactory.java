@@ -40,7 +40,6 @@ public class RocksDBFactory
 
     private RocksDBFactory()
     {
-        // private constructor 防止外部实例化
     }
 
     private static RocksDB createRocksDB(String path) throws RocksDBException
