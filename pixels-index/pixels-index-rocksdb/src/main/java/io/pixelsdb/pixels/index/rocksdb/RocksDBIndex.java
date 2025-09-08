@@ -64,7 +64,7 @@ public class RocksDBIndex implements SinglePointIndex
         this.indexId = indexId;
         // Initialize RocksDB instance
         this.rocksDBPath = rocksDBPath;
-        this.rocksDB = createRocksDB(rocksDBPath);
+        this.rocksDB = RocksDBFactory.getRocksDB(rocksDBPath);
         this.unique = unique;
         this.writeOptions = new WriteOptions();
         this.readOptions = new ReadOptions();
@@ -86,39 +86,6 @@ public class RocksDBIndex implements SinglePointIndex
         this.unique = unique;
         this.writeOptions = new WriteOptions();
         this.readOptions = new ReadOptions();
-    }
-
-    protected RocksDB createRocksDB(String path) throws RocksDBException
-    {
-        // 1. Get existing column families (returns empty list for new database)
-        List<byte[]> existingColumnFamilies;
-        try
-        {
-            existingColumnFamilies = RocksDB.listColumnFamilies(new Options(), path);
-        }
-        catch (RocksDBException e)
-        {
-            // For new database, return list containing only default column family
-            existingColumnFamilies = Arrays.asList(RocksDB.DEFAULT_COLUMN_FAMILY);
-        }
-
-        // 2. Ensure default column family is included
-        if (!existingColumnFamilies.contains(RocksDB.DEFAULT_COLUMN_FAMILY))
-        {
-            existingColumnFamilies = new ArrayList<>(existingColumnFamilies);
-            existingColumnFamilies.add(RocksDB.DEFAULT_COLUMN_FAMILY);
-        }
-
-        // 3. Prepare column family descriptors
-        List<ColumnFamilyDescriptor> descriptors = existingColumnFamilies.stream()
-                .map(name -> new ColumnFamilyDescriptor(name, new ColumnFamilyOptions()))
-                .collect(Collectors.toList());
-
-        // 4. Open database
-        List<ColumnFamilyHandle> handles = new ArrayList<>();
-        DBOptions dbOptions = new DBOptions().setCreateIfMissing(true);
-
-        return RocksDB.open(dbOptions, path, descriptors, handles);
     }
 
     @Override
