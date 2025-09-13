@@ -179,7 +179,9 @@ public class HttpInputStream extends InputStream
                     contentQueue.poll();
                     content.release();
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 if (!content.isReadable())
                 {
                     contentQueue.poll();
@@ -212,7 +214,8 @@ public class HttpInputStream extends InputStream
             {
                 tries++;
                 Thread.sleep(this.DELAY_MS);
-            } catch (InterruptedException e)
+            }
+            catch (InterruptedException e)
             {
                 throw new IOException(e);
             }

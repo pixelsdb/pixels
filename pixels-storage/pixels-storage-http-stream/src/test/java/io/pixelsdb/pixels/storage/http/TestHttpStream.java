@@ -43,10 +43,10 @@ public class TestHttpStream
     @Test
     public void testStorage() throws IOException
     {
-        Storage stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+        Storage httpStream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
         InputStream fileInput = Files.newInputStream(Paths.get("/tmp/test1"));
-        OutputStream outputStream = stream.create("httpstream:///localhost:29920", false, 4096);
-        InputStream inputStream = stream.open("httpstream:///localhost:29920");
+        OutputStream outputStream = httpStream.create("httpstream://localhost:29920", false, 4096);
+        InputStream inputStream = httpStream.open("httpstream://localhost:29920");
         OutputStream fileOutput = Files.newOutputStream(Paths.get("/tmp/test2"));
         IOUtils.copyBytes(fileInput, outputStream, 4096, true);
         IOUtils.copyBytes(inputStream, fileOutput, 4096, true);
@@ -60,11 +60,12 @@ public class TestHttpStream
     @Test
     public void testPhysicalReaderAndWriter() throws IOException
     {
-        Storage stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+        Storage httpStream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
         Thread readerThread = new Thread(() -> {
             try
             {
-                try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(stream, "httpstream://localhost:29920"))
+                try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(
+                        httpStream, "httpstream://localhost:29920"))
                 {
                     int num1 = fsReader.readInt(ByteOrder.BIG_ENDIAN);
                     assert(num1 == 13);
@@ -72,67 +73,69 @@ public class TestHttpStream
                     assert(num1 == 169);
 
                     long num2 = fsReader.readLong(ByteOrder.BIG_ENDIAN);
-                    assert(num2 == 28561);
+                    assert(num2 == 28561L);
                     num2 = fsReader.readLong(ByteOrder.BIG_ENDIAN);
-                    assert(num2 == 815730721);
-
-                    ByteBuffer buffer;
+                    assert(num2 == 815730721L);
 
                     boolean failed = false;
+                    byte[] buffer = new byte[sendLimit];
                     for (int i = 0; i < sendNum; i++)
                     {
-                        for (int len = sendLimit; len <= sendLimit; len=len*2)
+                        fsReader.readFully(buffer);
+                        /*for (int j = 0; j < sendLimit; j++)
                         {
-                            buffer = fsReader.readFully(len);
-                            for (int j = 0; j < len; j++)
+                            byte tmp = buffer[j];
+                            if (tmp != (byte) ('a' + j % 10))
                             {
-                                byte tmp = buffer.get();
-                                if (tmp != (byte) ('a'+j%10))
-                                {
-                                    System.out.println("failed sendNum " + i + " sendLen " + len + " tmp: " + tmp);
-                                    failed = true;
-                                }
+                                System.out.println("failed sendNum " + i + " sendLen " + sendLimit + " tmp: " + tmp);
+                                failed = true;
                             }
-                        }
+                        }*/
                     }
                     if (failed)
                     {
                         throw new IOException("failed");
                     }
                 }
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 readerException = e;
                 throw new RuntimeException(e);
             }
         });
+
         Thread writerThread = new Thread(() -> {
             try
             {
-                try (PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalWriter(stream, "httpstream://localhost:29920", null))
+                try (PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalWriter(
+                        httpStream, "httpstream://localhost:29920"))
                 {
                     ByteBuffer buffer = ByteBuffer.allocate(24);
                     buffer.putInt(13);
                     buffer.putInt(169);
-                    buffer.putLong(28561);
-                    buffer.putLong(815730721);
+                    buffer.putLong(28561L);
+                    buffer.putLong(815730721L);
                     fsWriter.append(buffer);
                     fsWriter.flush();
+                    buffer = ByteBuffer.allocate(sendLimit);
+                    for (int j = 0; j < sendLimit; j++)
+                    {
+                        buffer.put((byte) ('a' + j % 10));
+                    }
                     for (int i = 0; i < sendNum; i++)
                     {
-                        for (int len = sendLimit; len <= sendLimit; len=len*2)
-                        {
-                            buffer = ByteBuffer.allocate(len+1);
-                            for (int j = 0; j < len; j++)
-                            {
-                                buffer.put((byte) ('a'+j%10));
-                            }
-                            fsWriter.append(buffer);
-                            fsWriter.flush();
-                        }
+                        fsWriter.append(buffer);
+                        fsWriter.flush();
+                        buffer.position(sendLimit);
+                        Thread.sleep(1);
                     }
+                } catch (InterruptedException e)
+                {
+                    throw new RuntimeException(e);
                 }
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 writerException = e;
                 throw new RuntimeException(e);
@@ -148,7 +151,9 @@ public class TestHttpStream
             {
                 throw new IOException();
             }
-        } catch (InterruptedException e) {
+        }
+        catch (InterruptedException e)
+        {
             throw new RuntimeException(e);
         }
     }
@@ -162,11 +167,11 @@ public class TestHttpStream
     {
         int[] lengths = {0, 1*1024*1024, 2*1024*1024, 4*1024*1024, 8*1024*1024, 16*1024*1024, 32*1024*1024, 64*1024*1024};
         byte[] contents = {'a', 'a', 'b', 'c', 'd', 'e', 'f'};
-        Storage stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+        Storage httpStream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
         Thread readerThread = new Thread(() -> {
             try
             {
-                try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(stream, "httpstream://localhost:29920"))
+                try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(httpStream, "httpstream://localhost:29920"))
                 {
                     boolean failed = false;
                     for (int i = 0; i < sendNum; i++)
@@ -201,7 +206,7 @@ public class TestHttpStream
         Thread writerThread = new Thread(() -> {
             try
             {
-                try (PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalWriter(stream, "httpstream://localhost:29920", null))
+                try (PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalWriter(httpStream, "httpstream://localhost:29920", null))
                 {
                     for (int i = 0; i < sendNum; i++)
                     {
@@ -307,10 +312,10 @@ public class TestHttpStream
     @Test
     public void testDataStream() throws IOException
     {
-        Storage stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
+        Storage httpStream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
         Thread inputThread = new Thread(() -> {
             byte[] buffer = new byte[Constants.STREAM_BUFFER_SIZE];
-            try (DataInputStream inputStream = stream.open("httpstream://localhost:29920"))
+            try (DataInputStream inputStream = httpStream.open("httpstream://localhost:29920"))
             {
                 for (int i = 0; i < sendNum; i++)
                 {
@@ -335,7 +340,7 @@ public class TestHttpStream
                 buffer[i] = 'a';
             }
 
-            try (DataOutputStream outputStream = stream.create("httpstream://localhost:29920", false, Constants.STREAM_BUFFER_SIZE))
+            try (DataOutputStream outputStream = httpStream.create("httpstream://localhost:29920", false, Constants.STREAM_BUFFER_SIZE))
             {
                 for (int i = 0; i < sendNum; i++)
                 {

@@ -102,7 +102,8 @@ public class HttpOutputStream extends OutputStream
      */
     private final BlockingQueue<byte[]> contentQueue;
 
-    public HttpOutputStream(String host, int port, int bufferCapacity) {
+    public HttpOutputStream(String host, int port, int bufferCapacity)
+    {
         this.open = true;
         this.host = host;
         this.port = port;
