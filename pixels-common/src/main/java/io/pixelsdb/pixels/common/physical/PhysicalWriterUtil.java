@@ -35,10 +35,10 @@ public class PhysicalWriterUtil
     }
 
     /**
-     * Get a physical file system writer, using the given writer option.
-     * @param storage the file storage system.
-     * @param path the path of the file to write.
-     * @param option the writer option.
+     * Get a physical writer, using the given writer option.
+     * @param storage the storage to use
+     * @param path the path of the file to write
+     * @param option the writer option
      * @return
      * @throws IOException
      */
@@ -55,6 +55,11 @@ public class PhysicalWriterUtil
         }
         return StorageFactory.Instance().getStorageProviders().get(storage.getScheme())
                 .createWriter(storage, path, option);
+    }
+
+    public static PhysicalWriter newPhysicalWriter(Storage storage, String path) throws IOException
+    {
+        return newPhysicalWriter(storage, path, null);
     }
 
     /**

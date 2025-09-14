@@ -27,8 +27,7 @@ import java.nio.ByteBuffer;
  * @author guodong
  * @author hank
  */
-public interface PhysicalWriter
-        extends Closeable
+public interface PhysicalWriter extends Closeable
 {
     /**
      * Prepare the writer to ensure the length can fit into current block.

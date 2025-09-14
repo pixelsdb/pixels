@@ -27,7 +27,6 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.HashJoiner;
 import io.pixelsdb.pixels.executor.join.JoinType;
-import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateService;
 import io.pixelsdb.pixels.planner.plan.physical.domain.MultiOutputInfo;
@@ -143,7 +142,7 @@ public class PartitionedJoinStreamWorker extends BasePartitionedJoinWorker imple
             String[] rightColumnsToRead = event.getLargeTable().getColumnsToRead();
             int[] rightKeyColumnIds = event.getLargeTable().getKeyColumnIds();
             
-            if (leftInputStorageInfo.getScheme().equals(Storage.Scheme.httpstream) || 
+            if (leftInputStorageInfo.getScheme().equals(Storage.Scheme.httpstream) ||
                     rightInputStorageInfo.getScheme().equals(Storage.Scheme.httpstream))
             {
                 int port = WorkerCommon.getPort();

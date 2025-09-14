@@ -46,7 +46,8 @@ public interface Storage
         minio, // Minio
         redis, // Redis
         gcs,   // google cloud storage
-        httpstream,
+        httpstream,  // http (netty) based stream storage
+        sqsstream,   // AWS SQS+S3 based stream storage
         mock; // mock
 
         /**

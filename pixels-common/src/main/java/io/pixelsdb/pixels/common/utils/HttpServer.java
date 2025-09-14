@@ -50,7 +50,7 @@ public final class HttpServer
         handler.setServerCloser(this::close);
     }
 
-    public void serve(int PORT) throws InterruptedException
+    public void serve(int port) throws InterruptedException
     {
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
@@ -63,9 +63,10 @@ public final class HttpServer
                     .handler(new LoggingHandler(LogLevel.DEBUG))
                     .childHandler(this.initializer);
 
-            channel = b.bind(PORT).sync().channel();
+            channel = b.bind(port).sync().channel();
             channel.closeFuture().sync();
-        } finally
+        }
+        finally
         {
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();

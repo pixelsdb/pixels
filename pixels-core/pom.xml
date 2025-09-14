@@ -84,21 +84,9 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- asynchttpclient -->
-        <dependency>
-            <groupId>org.asynchttpclient</groupId>
-            <artifactId>async-http-client</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-            <optional>true</optional>
-        </dependency>
-
         <dependency>
             <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-storage-stream</artifactId>
+            <artifactId>pixels-storage-http-stream</artifactId>
             <scope>test</scope>
             <optional>true</optional>
         </dependency>

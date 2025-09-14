@@ -33,6 +33,14 @@ public class PhysicalReaderUtil
     {
     }
 
+    /**
+     * Create a physical reader with the reader option
+     * @param storage the storage to use
+     * @param path the path of the file to reader
+     * @param option the reader option
+     * @return
+     * @throws IOException
+     */
     public static PhysicalReader newPhysicalReader(
             Storage storage, String path, PhysicalReaderOption option) throws IOException
     {
@@ -48,11 +56,25 @@ public class PhysicalReaderUtil
                 .createReader(storage, path, option);
     }
 
+    /**
+     * Create a physical reader without reader option
+     * @param storage the storage to use
+     * @param path the path of the file to reader
+     * @return
+     * @throws IOException
+     */
     public static PhysicalReader newPhysicalReader(Storage storage, String path) throws IOException
     {
-        return newPhysicalReader(storage, path, null); // currently, we do not use reader option.
+        return newPhysicalReader(storage, path, null);
     }
 
+    /**
+     * Create a physical reader without reader option
+     * @param scheme the scheme of the storage to use
+     * @param path the path of the file to reader
+     * @return
+     * @throws IOException
+     */
     public static PhysicalReader newPhysicalReader(Storage.Scheme scheme, String path) throws IOException
     {
         checkArgument(scheme != null, "scheme should not be null");

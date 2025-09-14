@@ -52,7 +52,8 @@
         <module>pixels-storage/pixels-storage-redis</module>
         <module>pixels-storage/pixels-storage-localfs</module>
         <module>pixels-storage/pixels-storage-mock</module>
-        <module>pixels-storage/pixels-storage-stream</module>
+        <module>pixels-storage/pixels-storage-http-stream</module>
+        <module>pixels-storage/pixels-storage-sqs</module>
         <module>pixels-turbo/pixels-worker-common</module>
         <module>pixels-turbo/pixels-worker-lambda</module>
         <module>pixels-turbo/pixels-invoker-lambda</module>
@@ -103,7 +104,7 @@
         <dep.spike.java.version>0.1.1</dep.spike.java.version>
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
         <dep.netty.version>4.1.118.Final</dep.netty.version>
-        <dep.asynchttpclient.version>2.12.3</dep.asynchttpclient.version>
+        <dep.asynchttpclient.version>2.12.4</dep.asynchttpclient.version>
         <dep.fastjson.version>1.2.83</dep.fastjson.version>
         <dep.commons-cli.version>1.5.0</dep.commons-cli.version>
         <dep.commons-io.version>2.16.1</dep.commons-io.version>
@@ -201,7 +202,7 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-storage-stream</artifactId>
+                <artifactId>pixels-storage-http-stream</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -640,6 +641,36 @@
                 <groupId>org.asynchttpclient</groupId>
                 <artifactId>async-http-client</artifactId>
                 <version>${dep.asynchttpclient.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-buffer</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-handler</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-handler-proxy</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-codec-http</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-codec-socks</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-transport-native-epoll</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty-transport-native-kqueue</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>
