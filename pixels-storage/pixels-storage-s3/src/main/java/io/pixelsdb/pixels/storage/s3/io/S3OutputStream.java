@@ -160,20 +160,20 @@ public class S3OutputStream extends OutputStream
     }
 
     /**
-     * Write an array to the S3 output stream.
+     * Write a byte array to the S3 output stream.
      *
-     * @param b the byte-array to append
+     * @param buf the byte array to append
      */
     @Override
-    public void write(byte[] b) throws IOException
+    public void write(final byte[] buf) throws IOException
     {
-        write(b, 0, b.length);
+        write(buf, 0, buf.length);
     }
 
     /**
-     * Writes an array to the S3 Output Stream
+     * Writes a byte array to the S3 Output Stream
      *
-     * @param buf the array to write
+     * @param buf the byte array to write
      * @param off the offset into the array
      * @param len the number of bytes to write
      */

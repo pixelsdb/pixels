@@ -94,13 +94,14 @@ public class HttpInputStream extends InputStream
      */
     private final CompletableFuture<Void> httpServerFuture;
 
-    public HttpInputStream(String host, int port) throws CertificateException, SSLException {
+    public HttpInputStream(String host, int port) throws CertificateException, SSLException
+    {
         this.open = true;
         this.contentQueue = new LinkedBlockingDeque<>();
         this.host = host;
         this.port = port;
         this.uri = this.schema + "://" + host + ":" + port;
-        this.httpServer = new HttpServer(new StreamHttpServerHandler(this.contentQueue));
+        this.httpServer = new HttpServer(new HttpStreamServerHandler(this.contentQueue));
         this.executorService = Executors.newFixedThreadPool(1);
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
             try
@@ -205,6 +206,12 @@ public class HttpInputStream extends InputStream
         }
     }
 
+    /**
+     * Check if the content queue is empty. This method waits for the content queue to be none-empty for at most
+     * {@link #MAX_TRIES} seconds.
+     * @return true if the content queue is still empty after the waiting period.
+     * @throws IOException
+     */
     private boolean emptyData() throws IOException
     {
         int tries = 0;
@@ -237,14 +244,13 @@ public class HttpInputStream extends InputStream
         }
     }
 
-    public static class StreamHttpServerHandler extends HttpServerHandler
+    public static class HttpStreamServerHandler extends HttpServerHandler
     {
-        private static final Logger logger = LogManager.getLogger(StreamHttpServerHandler.class);
-        private final BlockingQueue<ByteBuf> contenQueue;
+        private final BlockingQueue<ByteBuf> contentQueue;
 
-        public StreamHttpServerHandler(BlockingQueue<ByteBuf> contenQueue)
+        public HttpStreamServerHandler(BlockingQueue<ByteBuf> contentQueue)
         {
-            this.contenQueue = contenQueue;
+            this.contentQueue = contentQueue;
         }
 
         @Override
@@ -269,7 +275,7 @@ public class HttpInputStream extends InputStream
             if (content.isReadable())
             {
                 content.retain();
-                this.contenQueue.add(content);
+                this.contentQueue.add(content);
             }
             sendResponse(ctx, req, HttpResponseStatus.OK);
         }

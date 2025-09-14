@@ -38,18 +38,18 @@ public class PhysicalHttpStreamWriter implements PhysicalWriter
     private long position;
     private DataOutputStream dataOutputStream;
 
-    public PhysicalHttpStreamWriter(Storage stream, String path) throws IOException
+    public PhysicalHttpStreamWriter(Storage storage, String path) throws IOException
     {
-        if (stream instanceof HttpStream)
+        if (storage instanceof HttpStream)
         {
-            this.httpStream = (HttpStream) stream;
+            this.httpStream = (HttpStream) storage;
         }
         else
         {
-            throw new IOException("Storage is not httpStream");
+            throw new IOException("storage is not HttpStream");
         }
         this.path = path;
-        this.dataOutputStream = stream.create(path, false, Constants.STREAM_BUFFER_SIZE);
+        this.dataOutputStream = storage.create(path, false, Constants.HTTP_STREAM_BUFFER_SIZE);
     }
 
     /**
@@ -111,5 +111,5 @@ public class PhysicalHttpStreamWriter implements PhysicalWriter
     public String getPath() { return path; }
 
     @Override
-    public int getBufferSize() { return Constants.STREAM_BUFFER_SIZE; }
+    public int getBufferSize() { return Constants.HTTP_STREAM_BUFFER_SIZE; }
 }

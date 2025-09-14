@@ -83,14 +83,14 @@ public class RedisOutputStream extends OutputStream
     }
 
     /**
-     * Write an array to the Redis output stream.
+     * Write a byte array to the Redis output stream.
      *
-     * @param b the byte-array to append
+     * @param buf the byte array to append
      */
     @Override
-    public void write(byte[] b) throws IOException
+    public void write(final byte[] buf) throws IOException
     {
-        write(b, 0, b.length);
+        write(buf, 0, buf.length);
     }
 
     /**

@@ -43,7 +43,7 @@ import static java.util.Objects.requireNonNull;
 public class StreamWorkerCommon extends WorkerCommon
 {
     private static final Logger logger = LogManager.getLogger(StreamWorkerCommon.class);
-    private static final Storage http = null;  // placeholder. todo: modularize into a pixels-storage-stream module.
+    private static final Storage http = null;  // placeholder. todo: modularize into a pixels-storage-http module.
 
     public static void initStorage(StorageInfo storageInfo, Boolean isOutput) throws IOException
     {

@@ -42,25 +42,15 @@ public class HttpOutputStream extends OutputStream
     private boolean open;
 
     /**
-     * The schema of http stream.
+     * The underlying protocol of http stream.
      * Default value is http.
      */
-    private final String schema = "http";
-
-    /**
-     * The host of http stream.
-     */
-    private String host;
-
-    /**
-     * The port of http stream.
-     */
-    private int port;
+    private final String protocol = "http";
 
     /**
      * The uri of http stream.
      */
-    private String uri;
+    private final String uri;
 
     /**
      * The maximum retry count.
@@ -105,9 +95,7 @@ public class HttpOutputStream extends OutputStream
     public HttpOutputStream(String host, int port, int bufferCapacity)
     {
         this.open = true;
-        this.host = host;
-        this.port = port;
-        this.uri = this.schema + "://" + host + ":" + port;
+        this.uri = this.protocol + "://" + host + ":" + port;
         this.bufferCapacity = bufferCapacity;
         this.buffer = new byte[bufferCapacity];
         this.bufferPosition = 0;
@@ -127,10 +115,10 @@ public class HttpOutputStream extends OutputStream
                         closeStreamReader();
                         break;
                     }
-                    sendContentWithRetry(content);
+                    sendContent(content);
                 } catch (InterruptedException e)
                 {
-                    logger.error("Background thread interrupted", e);
+                    logger.error("background thread interrupted", e);
                     break;
                 }
             }
@@ -145,9 +133,9 @@ public class HttpOutputStream extends OutputStream
     }
 
     /**
-     * Write an array to the S3 output stream
+     * Write a byte array to the http output stream.
      *
-     * @param b
+     * @param b the byte array to write
      * @throws IOException
      */
     @Override
@@ -159,6 +147,10 @@ public class HttpOutputStream extends OutputStream
     @Override
     public void write(final byte[] buf, final int off, final int len) throws IOException
     {
+        if (len == 0)
+        {
+            return;
+        }
         this.assertOpen();
         int offsetInBuf = off, remainToRead = len;
         int remainInBuffer;
@@ -229,7 +221,7 @@ public class HttpOutputStream extends OutputStream
         }
     }
 
-    private void sendContentWithRetry(byte[] content)
+    private void sendContent(byte[] content)
     {
         int retry = 0;
         while (retry <= MAX_RETRIES)
@@ -247,8 +239,7 @@ public class HttpOutputStream extends OutputStream
             } catch (Exception e)
             {
                 retry++;
-                if (retry > MAX_RETRIES ||
-                        !(e.getCause() instanceof java.net.ConnectException || e.getCause() instanceof java.io.IOException))
+                if (!(e.getCause() instanceof java.net.ConnectException || e.getCause() instanceof java.io.IOException))
                 {
                     logger.error("Failed to send content after {} retries, exception: {}", retry, e.getMessage());
                     break;
@@ -285,7 +276,7 @@ public class HttpOutputStream extends OutputStream
             } catch (Exception e)
             {
                 retry++;
-                if (retry > MAX_RETRIES || !(e.getCause() instanceof java.net.ConnectException))
+                if (!(e.getCause() instanceof java.net.ConnectException))
                 {
                     logger.error("Failed to close http output stream after {} retries, exception: {}", retry, e.getMessage());
                     break;
