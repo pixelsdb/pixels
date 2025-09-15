@@ -64,7 +64,7 @@ DirectRandomAccessFile::DirectRandomAccessFile(const std::string &file)
     directIoLib = std::make_shared<DirectIoLib>(fsBlockSize);
     try
     {
-        smallDirectBuffer = directIoLib->allocateDirectBuffer(fsBlockSize);
+        smallDirectBuffer = directIoLib->allocateDirectBuffer(fsBlockSize,true);
     }
     catch (...)
     {
@@ -91,7 +91,7 @@ std::shared_ptr <ByteBuffer> DirectRandomAccessFile::readFully(int len)
 {
     if (enableDirect)
     {
-        auto directBuffer = directIoLib->allocateDirectBuffer(len);
+        auto directBuffer = directIoLib->allocateDirectBuffer(len,true);
         auto buffer = directIoLib->read(fd, offset, directBuffer, len);
         seek(offset + len);
         largeBuffers.emplace_back(directBuffer);

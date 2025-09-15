@@ -47,6 +47,5 @@ public:
                                                                    RequestBatch batch,
                                                                    std::vector <std::shared_ptr<ByteBuffer>> reuseBuffers,
                                                                    long queryId) = 0;
-    std::mutex mtx;
 };
 #endif //PIXELS_SCHEDULER_H

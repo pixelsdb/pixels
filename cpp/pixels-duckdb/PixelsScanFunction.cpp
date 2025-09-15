@@ -451,7 +451,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
   vectorizedRowBatch->increment(thisOutputChunkRows);
 }
 
-bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
+bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsReadBindData &bind_data,
                                                  PixelsReadLocalState &scan_data,
                                                  PixelsReadGlobalState &parallel_state,
                                                  bool is_init_state)
@@ -488,7 +488,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
               "PhysicalLocalReader::readAsync: We don't support aio for our async read yet.");
         }
       }
-      parallel_state.all_done = true;  // 标记已完成，避免重复调用
+      parallel_state.all_done = true;
     }
     parallel_lock.unlock();
     return false;
@@ -499,6 +499,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
   scan_data.next_file_index = parallel_state.file_index.at(scan_data.deviceID);
   scan_data.next_batch_index = StorageInstance->getBatchID(scan_data.deviceID, scan_data.next_file_index);
   scan_data.curr_file_name = scan_data.next_file_name;
+  bind_data.curFileId.fetch_add(1);
   parallel_state.file_index.at(scan_data.deviceID)++;
   parallel_lock.unlock();
   // The below code uses global state but no race happens, so we don't need the lock anymore

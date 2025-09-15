@@ -218,18 +218,11 @@ void StringColumnReader::readContent(std::shared_ptr <ByteBuffer> input,
         input->skipBytes(inputLength - sizeof(int));
         int startsOffset = input->getInt();
         input->resetReaderIndex();
-        // std::cout<<"input getBuffer:"<<static_cast<void*>(input->getPointer())<<" startOffset:"
-        // <<std::dec<<startsOffset<<" inputLength:"<<std::dec<<inputLength<<std::endl;
         // read strings
         contentBuf = std::make_shared<ByteBuffer>(*input, 0, startsOffset);
         startsBuf = std::make_shared<ByteBuffer>(
                 *input, startsOffset, inputLength - sizeof(int) - startsOffset);
         nextStart = startsBuf->getInt(); // read out the first start offset, which is 0
-        // assert(inputLength>0 && startsOffset>=0);
-        if (startsOffset>inputLength||startsOffset<=0) {
-            // std::cout<<"debug"<<std::endl;
-        }
-
     }
 }
 

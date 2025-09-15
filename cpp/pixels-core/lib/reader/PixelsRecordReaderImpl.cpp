@@ -470,16 +470,11 @@ bool PixelsRecordReaderImpl::read()
             bytes.emplace_back(chunk.length);
         }
 
-        // std::cout<<"开始 现在是BufferID:"<<::BufferPool::GetBufferId()<<std::endl;
         std::thread::id thread_id=std::this_thread::get_id();
-        // std::cout << "线程 " << thread_id << " 尝试获取global_mutex..." << std::endl;
         auto columnNames=fileSchema->getFieldNames();
         ::BufferPool::Initialize(colIds, bytes, columnNames);
-        // std::cout<<"初始化bufferpool完毕?"<<std::endl;
         ::DirectUringRandomAccessFile::RegisterBufferFromPool(colIds);
-        // std::cout<<"初始化direct uring 完毕?"<<std::endl;
         std::vector <std::shared_ptr<ByteBuffer>> originalByteBuffers;
-        // std::cout<<"初始化完毕?"<<std::endl;
         std::vector<int> ring_col;
         for (int i = 0; i < colIds.size(); i++)
         {
@@ -499,8 +494,6 @@ bool PixelsRecordReaderImpl::read()
             if (requestBatch.getRequest(i).ring_index !=0) {
                 requestBatch.getRequest(i).bufferId=0;
                 ring_col.emplace_back(i);
-                // std::cout<<"i:"<<i<<"ring_index"<<::BufferPool::getRingIndex(colId)<<" originalByteBuffer:"<<static_cast<void*>(originalByteBuffers.at(i)->getPointer())<<std::endl;
-                // std::cout<<"notice!"<<std::endl;
             }
         }
 
@@ -520,9 +513,6 @@ bool PixelsRecordReaderImpl::read()
             ChunkId chunk = diskChunks.at(index);
             std::shared_ptr <ByteBuffer> bb = byteBuffers.at(index);
             uint32_t colId = chunk.columnId;
-
-            // if (std::find(ring_col.begin(), ring_col.end(), colId) != ring_col.end())
-                // std::cout<<"colId "<<colId<<" bb:"<<static_cast<void*>(bb->getPointer())<<std::endl;
 
             if (bb != nullptr)
             {

@@ -25,104 +25,112 @@
 #ifndef DUCKDB_BUFFERPOOL_H
 #define DUCKDB_BUFFERPOOL_H
 
-#include <iostream>
-#include <vector>
-#include "physical/natives/ByteBuffer.h"
-#include <memory>
-#include "physical/natives/DirectIoLib.h"
 #include "exception/InvalidArgumentException.h"
-#include "utils/ColumnSizeCSVReader.h"
-#include <map>
 #include "physical/BufferPool/Bitmap.h"
 #include "physical/BufferPool/BufferPoolEntry.h"
+#include "physical/natives/ByteBuffer.h"
+#include "physical/natives/DirectIoLib.h"
+#include "utils/ColumnSizeCSVReader.h"
+#include <cstdio>
+#include <iostream>
+#include <map>
+#include <memory>
 #include <mutex>
 #include <thread>
-#include <cstdio>
-// when allocating buffer pool, we use the size of the first pxl file. Consider that
-// the remaining pxl file has larger size than the first file, we allocate some extra
-// size (10MB) to each column.
+#include <vector>
+// when allocating buffer pool, we use the size of the first pxl file. Consider
+// that the remaining pxl file has larger size than the first file, we allocate
+// some extra size (10MB) to each column.
 // TODO: how to evaluate the maximal pool size
-#define EXTRA_POOL_SIZE 10*1024*1024
+#define EXTRA_POOL_SIZE 10 * 1024 * 1024
 
 class DirectUringRandomAccessFile;
+
 // This class is global class. The variable is shared by each thread
 class BufferPool
 {
 public:
-  class BufferPoolManagedEntry {
-  public:
-    enum class State{
-      InitizaledNotAllocated,
-      AllocatedAndInUse,
-      UselessButNotFree
+
+    class BufferPoolManagedEntry
+    {
+    public:
+        enum class State
+        {
+            InitizaledNotAllocated,
+            AllocatedAndInUse,
+            UselessButNotFree
+        };
+
+    private:
+        std::shared_ptr<BufferPoolEntry> bufferPoolEntry;
+        int ring_index;
+        size_t current_size;
+        int offset;
+        State state;
+
+    public:
+        BufferPoolManagedEntry(std::shared_ptr<BufferPoolEntry> entry, int ringIdx,
+                               size_t currSize, off_t off)
+            : bufferPoolEntry(std::move(entry)), ring_index(ringIdx),
+              current_size(currSize), offset(off),
+              state(State::InitizaledNotAllocated)
+        {
+        }
+
+        std::shared_ptr<BufferPoolEntry> getBufferPoolEntry() const
+        {
+            return bufferPoolEntry;
+        }
+
+        int getRingIndex() const
+        {
+            return ring_index;
+        }
+
+        void setRingIndex(int index)
+        {
+            ring_index = index;
+        }
+
+        size_t getCurrentSize() const
+        {
+            return current_size;
+        }
+
+        void setCurrentSize(size_t size)
+        {
+            current_size = size;
+        }
+
+        int getOffset() const
+        {
+            return offset;
+        }
+
+        void setOffset(int off)
+        {
+            offset = off;
+        }
+
+        State getStatus() const
+        {
+            return state;
+        }
+
+        void setStatus(State newStatus)
+        {
+            state = newStatus;
+        }
     };
-  private:
-    std::shared_ptr<BufferPoolEntry> bufferPoolEntry;  // ptr point to buffer
-    int ring_index;                                   // ring index
-    size_t current_size;                              // current usage
-    int offset;                                     // offset
-    State state;
 
+    static void Initialize(std::vector<uint32_t> colIds,
+                           std::vector<uint64_t> bytes,
+                           std::vector<std::string> columnNames);
 
+    static void InitializeBuffers();
 
-  public:
-
-    BufferPoolManagedEntry(std::shared_ptr<BufferPoolEntry> entry,
-                          int ringIdx,
-                          size_t currSize,
-                          off_t off)
-        : bufferPoolEntry(std::move(entry)),
-          ring_index(ringIdx),
-          current_size(currSize),
-          offset(off) ,
-          state(State::InitizaledNotAllocated){}
-
-    std::shared_ptr<BufferPoolEntry> getBufferPoolEntry() const {
-      return bufferPoolEntry;
-    }
-
-    int getRingIndex() const {
-      return ring_index;
-    }
-
-    void setRingIndex(int index) {
-      ring_index = index;
-    }
-
-    size_t getCurrentSize() const {
-      return current_size;
-    }
-
-    void setCurrentSize(size_t size) {
-      current_size = size;
-    }
-
-    int getOffset() const {
-      return offset;
-    }
-
-    void setOffset(int off) {
-      offset = off;
-    }
-
-    // 获取当前状态
-    State getStatus() const {
-      return state;
-    }
-
-    // 设置状态
-    void setStatus(State newStatus) {
-      state = newStatus;
-    }
-  };
-
-    static void
-    Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t> bytes, std::vector <std::string> columnNames);
-
-    static void
-    InitializeBuffers();
-
-    static std::shared_ptr <ByteBuffer> GetBuffer(uint32_t colId,uint64_t byte,std::string columnName);
+    static std::shared_ptr<ByteBuffer> GetBuffer(uint32_t colId, uint64_t byte,
+                                                 std::string columnName);
 
     static int64_t GetBufferId();
 
@@ -134,52 +142,62 @@ public:
 
     static int getRingIndex(uint32_t colId);
 
-    static std::shared_ptr<ByteBuffer> AllocateNewBuffer(std::shared_ptr<BufferPoolManagedEntry> currentBufferManagedEntry, uint32_t colId,uint64_t byte,std::string columnName);
+    static std::shared_ptr<ByteBuffer> AllocateNewBuffer(
+        std::shared_ptr<BufferPoolManagedEntry> currentBufferManagedEntry,
+        uint32_t colId, uint64_t byte, std::string columnName);
 
-    static std::shared_ptr<ByteBuffer> ReusePreviousBuffer(std::shared_ptr<BufferPoolManagedEntry> currentBufferManagedEntry,uint32_t colId,uint64_t byte,std::string columnName);
+    static std::shared_ptr<ByteBuffer> ReusePreviousBuffer(
+        std::shared_ptr<BufferPoolManagedEntry> currentBufferManagedEntry,
+        uint32_t colId, uint64_t byte, std::string columnName);
 
-  static void PrintStats() {
-    // Print current thread ID
-    std::thread::id tid = std::this_thread::get_id();
+    static void PrintStats()
+    {
+        // Get the ID of the current thread
+        std::thread::id tid = std::this_thread::get_id();
 
-    printf("Thread %zu -> Global buffer usage: %ld / %ld\n",
-           std::hash<std::thread::id>{}(tid), // Convert to integer for readability
-           global_used_size, global_free_size);
+        // Print global buffer usage: used size / free size
+        // Convert thread ID to integer for readability using hash
+        printf("Thread %zu -> Global buffer usage: %ld / %ld\n",
+               std::hash<std::thread::id>{}(tid), global_used_size,
+               global_free_size);
 
-    // Thread-local statistics
-    printf("Thread %zu -> Buffer0 usage: %zu, Buffer count: %d\n",
-           std::hash<std::thread::id>{}(tid),
-           thread_local_used_size[0], thread_local_buffer_count[0]);
+        // Print thread-local statistics for Buffer0
+        printf("Thread %zu -> Buffer0 usage: %zu, Buffer count: %d\n",
+               std::hash<std::thread::id>{}(tid), thread_local_used_size[0],
+               thread_local_buffer_count[0]);
 
-    printf("Thread %zu -> Buffer1 usage: %zu, Buffer count: %d\n",
-           std::hash<std::thread::id>{}(tid),
-           thread_local_used_size[1], thread_local_buffer_count[1]);
-  }
-
+        // Print thread-local statistics for Buffer1
+        printf("Thread %zu -> Buffer1 usage: %zu, Buffer count: %d\n",
+               std::hash<std::thread::id>{}(tid), thread_local_used_size[1],
+               thread_local_buffer_count[1]);
+    }
 private:
     BufferPool() = default;
-  // global
-  static std::mutex bufferPoolMutex;
+    // global
+    static std::mutex bufferPoolMutex;
 
-  // thread local
-  static thread_local bool isInitialized;
-  static thread_local std::vector <std::shared_ptr<BufferPoolEntry>> registeredBuffers[2];
-  static thread_local long global_used_size;
-  static thread_local long global_free_size;
-  static thread_local std::shared_ptr <DirectIoLib> directIoLib;
-  static thread_local int nextRingIndex;
-  static thread_local std::shared_ptr<BufferPoolEntry> nextEmptyBufferPoolEntry[2];
+    // thread local
+    static thread_local bool isInitialized;
+    static thread_local std::vector<std::shared_ptr<BufferPoolEntry>>
+    registeredBuffers[2];
+    static thread_local long global_used_size;
+    static thread_local long global_free_size;
+    static thread_local std::shared_ptr<DirectIoLib> directIoLib;
+    static thread_local int nextRingIndex;
+    static thread_local std::shared_ptr<BufferPoolEntry>
+    nextEmptyBufferPoolEntry[2];
     static thread_local int colCount;
     static thread_local int currBufferIdx;
     static thread_local int nextBufferIdx;
-    static thread_local std::map <uint32_t, std::shared_ptr<ByteBuffer>> buffersAllocated[2];
+    static thread_local std::map<uint32_t, std::shared_ptr<ByteBuffer>>
+    buffersAllocated[2];
     friend class DirectUringRandomAccessFile;
 
-    static thread_local std::unordered_map<uint32_t, std::shared_ptr<BufferPoolManagedEntry>> ringBufferMap[2];
+    static thread_local std::unordered_map<
+        uint32_t, std::shared_ptr<BufferPoolManagedEntry>>
+    ringBufferMap[2];
 
-
-
-  static thread_local size_t thread_local_used_size[2];  // 线程已使用大小
-  static thread_local int thread_local_buffer_count[2];   // 线程持有的缓冲区数量
+    static thread_local size_t thread_local_used_size[2];
+    static thread_local int thread_local_buffer_count[2];
 };
 #endif // DUCKDB_BUFFERPOOL_H
