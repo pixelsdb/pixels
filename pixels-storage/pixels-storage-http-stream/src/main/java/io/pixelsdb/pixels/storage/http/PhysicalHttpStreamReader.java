@@ -47,7 +47,7 @@ public class PhysicalHttpStreamReader implements PhysicalReader
             throw new IOException("Storage is not LocalFS.");
         }
         this.path = path;
-        this.dataInputStream = storage.open(path);
+        this.dataInputStream = this.httpStream.open(path);
     }
 
     @Override

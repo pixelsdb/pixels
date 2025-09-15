@@ -38,17 +38,12 @@ public class HttpServerInitializer extends ChannelInitializer<SocketChannel>
     private final SslContext sslCtx;
     private final HttpServerHandler handler;
 
-    public HttpServerInitializer(SslContext sslCtx)
-    {
-        this.sslCtx = sslCtx;
-        this.handler = new HttpServerHandler();
-    }
-
     public HttpServerInitializer(SslContext sslCtx, HttpServerHandler handler)
     {
         this.sslCtx = sslCtx;
         this.handler = handler;
     }
+
     @Override
     public void initChannel(SocketChannel ch)
     {

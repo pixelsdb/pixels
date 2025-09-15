@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.storage.http.io;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
@@ -101,7 +101,7 @@ public class HttpInputStream extends InputStream
         this.host = host;
         this.port = port;
         this.uri = this.schema + "://" + host + ":" + port;
-        this.httpServer = new HttpServer(new HttpStreamServerHandler(this.contentQueue));
+        this.httpServer = new HttpServer(new HttpServerHandlerImpl(this.contentQueue));
         this.executorService = Executors.newFixedThreadPool(1);
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
             try
@@ -244,11 +244,11 @@ public class HttpInputStream extends InputStream
         }
     }
 
-    public static class HttpStreamServerHandler extends HttpServerHandler
+    public static class HttpServerHandlerImpl extends HttpServerHandler
     {
         private final BlockingQueue<ByteBuf> contentQueue;
 
-        public HttpStreamServerHandler(BlockingQueue<ByteBuf> contentQueue)
+        public HttpServerHandlerImpl(BlockingQueue<ByteBuf> contentQueue)
         {
             this.contentQueue = contentQueue;
         }
