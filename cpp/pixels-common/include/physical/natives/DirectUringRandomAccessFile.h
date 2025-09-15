@@ -38,47 +38,40 @@
 class DirectUringRandomAccessFile : public DirectRandomAccessFile
 {
 public:
-    explicit DirectUringRandomAccessFile(const std::string &file);
+    explicit DirectUringRandomAccessFile(const std::string& file);
 
-    static void RegisterBuffer(std::vector <std::shared_ptr<ByteBuffer>> buffers);
+    static void RegisterBuffer(std::vector<std::shared_ptr<ByteBuffer>> buffers);
 
-    static void RegisterBufferFromPool(std::vector <uint32_t> colIds);
+    static void RegisterBufferFromPool(std::vector<uint32_t> colIds);
 
     static void Initialize();
 
     static void Reset();
 
-    static bool RegisterMoreBuffer(int index,std::vector<std::shared_ptr<ByteBuffer>> buffers);
+    static bool RegisterMoreBuffer(int index, std::vector<std::shared_ptr<ByteBuffer>> buffers);
 
-    std::shared_ptr <ByteBuffer> readAsync(int length, std::shared_ptr <ByteBuffer> buffer, int index,int ring_index,int start_offset);
+    std::shared_ptr<ByteBuffer> readAsync(int length, std::shared_ptr<ByteBuffer> buffer, int index, int ring_index,
+                                          int start_offset);
 
-    void readAsyncSubmit(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ring_indexs);
+    void readAsyncSubmit(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ring_indexs);
 
-    void readAsyncComplete(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ring_indexs);
+    void readAsyncComplete(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ring_indexs);
 
-    void seekByIndex(long offset,int index);
+    void seekByIndex(long offset, int index);
 
     static struct io_uring* getRing(int index);
 
     ~DirectUringRandomAccessFile();
 
 private:
-  // global isRegistered
-  // static bool isRegistered;
-  // static MutexTracker g_mutex_tracker;
-  // static TrackedMutex g_mutex;
-  // static std::vector<struct io_uring*> ring_vector;
-  // static std::vector<struct iovec*> iovecs_vector;
-  // static uint32_t iovecSize;
-  // static std::vector<long> offsets_vector;
-  // thread_local
-  static std::mutex mutex_;
-  static thread_local bool isRegistered;
-  // static MutexTracker g_mutex_tracker;
-  // static TrackedMutex g_mutex;
-  static thread_local std::vector<struct io_uring*> ring_vector;
-  static thread_local  std::vector<struct iovec*> iovecs_vector;
-  static thread_local uint32_t iovecSize;
-  static thread_local std::vector<long> offsets_vector;
+    // thread_local
+    static std::mutex mutex_;
+    static thread_local bool isRegistered;
+    // static MutexTracker g_mutex_tracker;
+    // static TrackedMutex g_mutex;
+    static thread_local std::vector<struct io_uring*> ring_vector;
+    static thread_local std::vector<struct iovec*> iovecs_vector;
+    static thread_local uint32_t iovecSize;
+    static thread_local std::vector<long> offsets_vector;
 };
 #endif // DUCKDB_DIRECTURINGRANDOMACCESSFILE_H

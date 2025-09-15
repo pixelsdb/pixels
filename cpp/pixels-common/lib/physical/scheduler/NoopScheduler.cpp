@@ -27,9 +27,9 @@
 #include "physical/io/PhysicalLocalReader.h"
 #include <unordered_set>
 
-Scheduler *NoopScheduler::instance = nullptr;
+Scheduler* NoopScheduler::instance = nullptr;
 
-Scheduler *NoopScheduler::Instance()
+Scheduler* NoopScheduler::Instance()
 {
     if (instance == nullptr)
     {
@@ -38,42 +38,40 @@ Scheduler *NoopScheduler::Instance()
     return instance;
 }
 
-std::vector <std::shared_ptr<ByteBuffer>> NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader,
-                                                                      RequestBatch batch, long queryId)
+std::vector<std::shared_ptr<ByteBuffer>>
+NoopScheduler::executeBatch(std::shared_ptr<PhysicalReader> reader,
+                            RequestBatch batch, long queryId)
 {
     return executeBatch(reader, batch, {}, queryId);
 }
 
-
-std::vector <std::shared_ptr<ByteBuffer>>
-NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatch batch,
-                            std::vector <std::shared_ptr<ByteBuffer>> reuseBuffers, long queryId)
+std::vector<std::shared_ptr<ByteBuffer>> NoopScheduler::executeBatch(
+    std::shared_ptr<PhysicalReader> reader, RequestBatch batch,
+    std::vector<std::shared_ptr<ByteBuffer>> reuseBuffers, long queryId)
 {
-
-    std::lock_guard<std::mutex> lock(mtx);  // 进入临界区，自动加锁
     auto requests = batch.getRequests();
-    std::vector <std::shared_ptr<ByteBuffer>> results;
+    std::vector<std::shared_ptr<ByteBuffer>> results;
     results.resize(batch.getSize());
-    if (ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io") && reuseBuffers.size() > 0)
+    if (ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io") &&
+        reuseBuffers.size() > 0)
     {
         // async read
         auto localReader = std::static_pointer_cast<PhysicalLocalReader>(reader);
-        std::unordered_set<int> ring_index_set=localReader->getRingIndexes();
+        std::unordered_set<int> ring_index_set = localReader->getRingIndexes();
         std::unordered_map<int, uint32_t> ringIndexCountMap;
 
         for (int i = 0; i < batch.getSize(); i++)
         {
             Request request = requests[i];
-            // localReader->seek(request.start);
-            if (request.length>reuseBuffers.at(i)->size()) {
-                throw InvalidArgumentException("说明出错的不是这个，需要关注之前的临界区\n");
-
+            if (request.length > reuseBuffers.at(i)->size())
+            {
+                throw InvalidArgumentException(
+                    "The error is not here; need to pay attention to the previous "
+                    "critical section\n");
             }
-            results.at(i) = localReader->readAsync(request.length, reuseBuffers.at(i), request.bufferId,request.ring_index,request.start);
-            // if (request.ring_index !=0) {
-            //     std::cout<<"notice readAsync"<<std::endl;
-            // }
-            // std::cout<<"i: "<<i<<" start:"<<request.start<<" resuseBuffers.size:"<<reuseBuffers.at(i)->size()<<std::endl;
+            results.at(i) = localReader->readAsync(request.length, reuseBuffers.at(i),
+                                                   request.bufferId,
+                                                   request.ring_index, request.start);
             if (ring_index_set.find(request.ring_index) == ring_index_set.end())
             {
                 ring_index_set.insert(request.ring_index);
@@ -81,9 +79,8 @@ NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatc
             }
             ringIndexCountMap[request.ring_index]++;
         }
-        localReader->readAsyncSubmit(ringIndexCountMap,ring_index_set);
+        localReader->readAsyncSubmit(ringIndexCountMap, ring_index_set);
         localReader->setRingIndexCountMap(ringIndexCountMap);
-
     }
     else
     {
@@ -100,13 +97,10 @@ NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatc
             {
                 results.at(i) = reader->readFully(request.length);
             }
-
         }
     }
     return results;
-
 }
-
 
 NoopScheduler::~NoopScheduler()
 {

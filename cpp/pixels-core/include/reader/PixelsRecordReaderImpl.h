@@ -98,7 +98,6 @@ private:
 
     void UpdateRowGroupInfo();
 
-
     static std::mutex mutex_;
     std::shared_ptr <PhysicalReader> physicalReader;
     pixels::proto::Footer footer;
