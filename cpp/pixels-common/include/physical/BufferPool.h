@@ -49,7 +49,6 @@ class DirectUringRandomAccessFile;
 class BufferPool
 {
 public:
-  // 嵌套子类，用于管理缓冲区池条目及其属性
   class BufferPoolManagedEntry {
   public:
     enum class State{
@@ -58,10 +57,10 @@ public:
       UselessButNotFree
     };
   private:
-    std::shared_ptr<BufferPoolEntry> bufferPoolEntry;  // 指向缓冲区池条目的智能指针
-    int ring_index;                                   // 环形缓冲区索引
-    size_t current_size;                              // 当前使用大小
-    int offset;                                     // 偏移量
+    std::shared_ptr<BufferPoolEntry> bufferPoolEntry;
+    int ring_index;
+    size_t current_size;
+    int offset;
     State state;
 
 
@@ -106,12 +105,10 @@ public:
       offset = off;
     }
 
-    // 获取当前状态
     State getStatus() const {
       return state;
     }
 
-    // 设置状态
     void setStatus(State newStatus) {
       state = newStatus;
     }
@@ -140,19 +137,22 @@ public:
     static std::shared_ptr<ByteBuffer> ReusePreviousBuffer(std::shared_ptr<BufferPoolManagedEntry> currentBufferManagedEntry,uint32_t colId,uint64_t byte,std::string columnName);
 
   static void PrintStats() {
-    // 打印当前线程 ID
+    // Get the ID of the current thread
     std::thread::id tid = std::this_thread::get_id();
 
-    printf("线程 %zu -> 全局缓冲区使用: %ld / %ld\n",
-           std::hash<std::thread::id>{}(tid), // 转换成整数便于阅读
+    // Print global buffer usage: used size / free size
+    // Convert thread ID to integer for readability using hash
+    printf("Thread %zu -> Global buffer usage: %ld / %ld\n",
+           std::hash<std::thread::id>{}(tid),
            global_used_size, global_free_size);
 
-    // 线程局部统计
-    printf("线程 %zu -> Buffer0使用: %zu, 缓冲区数量: %d\n",
+    // Print thread-local statistics for Buffer0
+    printf("Thread %zu -> Buffer0 usage: %zu, Buffer count: %d\n",
            std::hash<std::thread::id>{}(tid),
            thread_local_used_size[0], thread_local_buffer_count[0]);
 
-    printf("线程 %zu -> Buffer1使用: %zu, 缓冲区数量: %d\n",
+    // Print thread-local statistics for Buffer1
+    printf("Thread %zu -> Buffer1 usage: %zu, Buffer count: %d\n",
            std::hash<std::thread::id>{}(tid),
            thread_local_used_size[1], thread_local_buffer_count[1]);
   }
@@ -180,7 +180,7 @@ private:
 
 
 
-  static thread_local size_t thread_local_used_size[2];  // 线程已使用大小
-  static thread_local int thread_local_buffer_count[2];   // 线程持有的缓冲区数量
+  static thread_local size_t thread_local_used_size[2];
+  static thread_local int thread_local_buffer_count[2];
 };
 #endif // DUCKDB_BUFFERPOOL_H

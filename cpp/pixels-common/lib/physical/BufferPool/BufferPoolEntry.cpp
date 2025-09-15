@@ -16,9 +16,10 @@ BufferPoolEntry::BufferPoolEntry(size_t size, int slice_size, std::shared_ptr<Di
   }
 
   const int slice_count = static_cast<int>(size + slice_size-1/ slice_size);
-  bitmap_ = std::make_shared<Bitmap>(slice_count);
+  // bitmap_ = std::make_shared<Bitmap>(slice_count);
 
-  buffer_ = direct_lib->allocateDirectBuffer(size_);
+  buffer_ = direct_lib->allocateDirectBuffer(size_,false);
+  memset(buffer_->getPointer(), 0, buffer_->size());
   if (!buffer_) {
     throw std::runtime_error("Failed to allocate direct buffer");
   }
@@ -28,9 +29,9 @@ size_t BufferPoolEntry::getSize() const {
   return size_;
 }
 
-std::shared_ptr<Bitmap> BufferPoolEntry::getBitmap() const {
-  return bitmap_;
-}
+// std::shared_ptr<Bitmap> BufferPoolEntry::getBitmap() const {
+//   return bitmap_;
+// }
 
 
 std::shared_ptr<ByteBuffer> BufferPoolEntry::getBuffer() const {
@@ -102,9 +103,9 @@ void BufferPoolEntry::setRingIndex(int ring_index) {
 void BufferPoolEntry::reset() {
   is_full_ = false;
   next_free_=0;
-  if (bitmap_) {
-    bitmap_.reset();
-  }
+  // if (bitmap_) {
+  //   bitmap_.reset();
+  // }
   nr_bytes_.clear();
   is_in_use_ = false;
 // reset direct buffer?

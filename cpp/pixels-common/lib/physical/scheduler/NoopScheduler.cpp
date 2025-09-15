@@ -50,7 +50,6 @@ NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatc
                             std::vector <std::shared_ptr<ByteBuffer>> reuseBuffers, long queryId)
 {
 
-    std::lock_guard<std::mutex> lock(mtx);  // 进入临界区，自动加锁
     auto requests = batch.getRequests();
     std::vector <std::shared_ptr<ByteBuffer>> results;
     results.resize(batch.getSize());

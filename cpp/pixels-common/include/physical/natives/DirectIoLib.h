@@ -42,7 +42,11 @@
 #include <unistd.h>
 #include "liburing.h"
 #include "liburing/io_uring.h"
-
+#include <sys/mman.h>
+#include <errno.h>
+#include <string.h>
+#include <stdexcept>
+#include <memory>
 
 struct uringData
 {
@@ -59,7 +63,9 @@ public:
      */
     DirectIoLib(int fsBlockSize);
 
-    std::shared_ptr <ByteBuffer> allocateDirectBuffer(long size);
+    std::shared_ptr <ByteBuffer> allocateDirectBuffer(long size,bool isSmallBuffer);
+
+    int getToAllocate(int size);
 
     std::shared_ptr <ByteBuffer> read(int fd, long fileOffset, std::shared_ptr <ByteBuffer> directBuffer, long length);
 

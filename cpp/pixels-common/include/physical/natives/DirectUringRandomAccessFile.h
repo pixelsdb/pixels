@@ -63,14 +63,6 @@ public:
     ~DirectUringRandomAccessFile();
 
 private:
-  // global isRegistered
-  // static bool isRegistered;
-  // static MutexTracker g_mutex_tracker;
-  // static TrackedMutex g_mutex;
-  // static std::vector<struct io_uring*> ring_vector;
-  // static std::vector<struct iovec*> iovecs_vector;
-  // static uint32_t iovecSize;
-  // static std::vector<long> offsets_vector;
   // thread_local
   static std::mutex mutex_;
   static thread_local bool isRegistered;
