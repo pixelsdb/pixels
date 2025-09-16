@@ -32,7 +32,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * This http content queue orders the input http content by their part id in acceding order.
+ * This http content queue orders the input http content by their part id in ascending order.
  * And it ensures that the content being taken (poll, take, peek etc.) has continuous part id.
  * We define the content with a subsequent part id as the <b>legal head</b> of the queue.
  * If the current head content is not a legal head, the take methods will wait.
