@@ -30,27 +30,20 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.storage.http.io.HttpContentQueue.PART_ID;
 
 public class HttpOutputStream extends OutputStream
 {
     private static final Logger logger = LogManager.getLogger(HttpOutputStream.class);
 
     /**
-     * indicates whether the stream is still open / valid
-     */
-    private boolean open;
-
-    /**
      * The underlying protocol of http stream.
      * Default value is http.
      */
-    private final String protocol = "http";
-
-    /**
-     * The uri of http stream.
-     */
-    private final String uri;
+    private static final String protocol = "http";
 
     /**
      * The maximum retry count.
@@ -63,6 +56,21 @@ public class HttpOutputStream extends OutputStream
     private static final long RETRY_DELAY_MS = Constants.STREAM_DELAY_MS;
 
     /**
+     * The number of concurrent pending responses that are waiting for arrival.
+     */
+    private static final int PENDING_RESPONSES = 5;
+
+    /**
+     * indicates whether the stream is still open / valid
+     */
+    private boolean open;
+
+    /**
+     * The uri of http stream.
+     */
+    private final String uri;
+
+    /**
      * The temporary buffer used for storing the chunks.
      */
     private final byte[] buffer;
@@ -72,64 +80,25 @@ public class HttpOutputStream extends OutputStream
      */
     private int bufferPosition;
 
-    /**
-     * The capacity of buffer.
-     */
-    private int bufferCapacity;
+    private final PendingResponseSet pendingResponseSet = new PendingResponseSet(PENDING_RESPONSES);
 
     /**
-     * The background thread to send requests.
+     * valid part id starts from 0.
      */
-    private final ExecutorService executorService;
+    private final AtomicInteger partId = new AtomicInteger(0);
 
     /**
      * The http client.
      */
     private final AsyncHttpClient httpClient;
 
-    /**
-     * The queue to put pending requests.
-     */
-    private final BlockingQueue<byte[]> contentQueue;
-
     public HttpOutputStream(String host, int port, int bufferCapacity)
     {
         this.open = true;
-        this.uri = this.protocol + "://" + host + ":" + port;
-        this.bufferCapacity = bufferCapacity;
+        this.uri = protocol + "://" + host + ":" + port;
         this.buffer = new byte[bufferCapacity];
         this.bufferPosition = 0;
         this.httpClient = Dsl.asyncHttpClient();
-        this.executorService = Executors.newSingleThreadExecutor();
-        this.contentQueue = new LinkedBlockingQueue<>();
-
-        // Start background thread to send requests.
-        this.executorService.submit(() -> {
-            while (true)
-            {
-                try
-                {
-                    byte[] content = contentQueue.take();
-                    if (content.length == 0)
-                    {
-                        closeStreamReader();
-                        break;
-                    }
-                    sendContent(content);
-                } catch (InterruptedException e)
-                {
-                    logger.error("background thread interrupted", e);
-                    break;
-                }
-            }
-            try
-            {
-                this.httpClient.close();
-            } catch (IOException e)
-            {
-                throw new RuntimeException(e);
-            }
-        });
     }
 
     /**
@@ -178,22 +147,21 @@ public class HttpOutputStream extends OutputStream
     }
 
     @Override
-    public synchronized void flush()
+    public synchronized void flush() throws IOException
     {
         assertOpen();
         if (this.bufferPosition > 0)
         {
-            this.contentQueue.add(Arrays.copyOfRange(this.buffer, 0, this.bufferPosition));
-            this.bufferPosition = 0;
+            flushBufferAndRewind();
         }
     }
 
-    protected void flushBufferAndRewind() throws IOException
+    protected void flushBufferAndRewind()
     {
         logger.debug("Sending {} bytes to http stream", this.bufferPosition);
         byte[] content = Arrays.copyOfRange(this.buffer, 0, this.bufferPosition);
         this.bufferPosition = 0;
-        this.contentQueue.add(content);
+        sendContent(content);
     }
 
     @Override
@@ -201,23 +169,13 @@ public class HttpOutputStream extends OutputStream
     {
         if (this.open)
         {
-            this.open = false;
             if (this.bufferPosition > 0)
             {
                 flush();
             }
-            this.contentQueue.add(new byte[0]);
-            this.executorService.shutdown();
-            try
-            {
-                if (!this.executorService.awaitTermination(60, TimeUnit.SECONDS))
-                {
-                    this.executorService.shutdownNow();
-                }
-            } catch (InterruptedException e)
-            {
-                throw new IOException("Interrupted while waiting for termination", e);
-            }
+            this.open = false;
+            closeStreamReader();
+            this.httpClient.close();
         }
     }
 
@@ -228,26 +186,30 @@ public class HttpOutputStream extends OutputStream
         {
             try
             {
+                int currPartId = this.partId.getAndIncrement();
                 Request req = httpClient.preparePost(this.uri)
                         .setBody(ByteBuffer.wrap(content))
                         .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
                         .addHeader(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(content.length))
                         .addHeader(HttpHeaderNames.CONNECTION, "keep-alive")
+                        .addHeader(PART_ID, currPartId)
                         .build();
-                httpClient.executeRequest(req).get();
+                this.pendingResponseSet.pendForResponse(currPartId, httpClient.executeRequest(req));
                 break;
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 retry++;
                 if (!(e.getCause() instanceof java.net.ConnectException || e.getCause() instanceof java.io.IOException))
                 {
-                    logger.error("Failed to send content after {} retries, exception: {}", retry, e.getMessage());
+                    logger.error("Failed to send content after {} retries", retry, e);
                     break;
                 }
                 try
                 {
                     Thread.sleep(RETRY_DELAY_MS);
-                } catch (InterruptedException e1)
+                }
+                catch (InterruptedException e1)
                 {
                     logger.error("Retry interrupted", e1);
                     break;
@@ -257,7 +219,7 @@ public class HttpOutputStream extends OutputStream
     }
 
     /**
-     * Tell stream reader that this stream closes.
+     * Tell stream reader that this http stream closes.
      */
     private void closeStreamReader()
     {
@@ -271,20 +233,23 @@ public class HttpOutputStream extends OutputStream
         {
             try
             {
+                pendingResponseSet.waitAllComplete();
                 httpClient.executeRequest(req).get();
                 break;
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 retry++;
                 if (!(e.getCause() instanceof java.net.ConnectException))
                 {
-                    logger.error("Failed to close http output stream after {} retries, exception: {}", retry, e.getMessage());
+                    logger.error("Failed to close http output stream after {} retries", retry, e);
                     break;
                 }
                 try
                 {
                     Thread.sleep(RETRY_DELAY_MS);
-                } catch (InterruptedException e1)
+                }
+                catch (InterruptedException e1)
                 {
                     logger.error("Retry interrupted", e1);
                     break;
@@ -298,6 +263,101 @@ public class HttpOutputStream extends OutputStream
         if (!this.open)
         {
             throw new IllegalStateException("Closed");
+        }
+    }
+
+    /**
+     * The set to manage pending http future responses. It allows at most {@link #capacity()} asynchronous http
+     * request to be executed concurrently and waits for their responses.
+     */
+    public static class PendingResponseSet
+    {
+        private final int capacity;
+
+        private volatile int numPendingResponse;
+
+        private volatile boolean shutdown;
+
+        public PendingResponseSet(int capacity)
+        {
+            checkArgument(capacity > 0, "capacity must be greater than 0");
+            this.capacity = capacity;
+            this.numPendingResponse = 0;
+            this.shutdown = false;
+        }
+
+        public synchronized void pendForResponse(int partId, ListenableFuture<Response> response) throws InterruptedException
+        {
+            if (shutdown)
+            {
+                throw new IllegalStateException("pending response set is already shutdown");
+            }
+            while (this.numPendingResponse >= capacity)
+            {
+                this.wait();
+            }
+            this.numPendingResponse++;
+            response.addListener(new ResponseListener(partId, this), null);
+        }
+
+        /**
+         * This method should be called from a thread other than the thread which called
+         * {@link #pendForResponse(int, ListenableFuture)}.
+         * @param partId the part id of the completed response.
+         */
+        public synchronized void completeResponse(int partId)
+        {
+            this.numPendingResponse--;
+            this.notify();
+        }
+
+        public synchronized boolean isEmpty()
+        {
+            return this.numPendingResponse == 0;
+        }
+
+        public int capacity()
+        {
+            return this.capacity;
+        }
+
+        public synchronized void shutdown()
+        {
+            this.shutdown = true;
+        }
+
+        /**
+         * Shutdown this {@link PendingResponseSet} and wait for the pending responses to complete.
+         * This method is not synchronized, otherwise {@link #completeResponse(int)} can not be executed to clear the set.
+         * @throws InterruptedException
+         */
+        public void waitAllComplete() throws InterruptedException
+        {
+            shutdown();
+            // isEmpty is synchronized, so that it does not read the intermediate state of pendForResponse().
+            while (!isEmpty())
+            {
+                // loop and wait for the pending responses to complete.
+                Thread.sleep(1);
+            }
+        }
+    }
+
+    public static class ResponseListener implements Runnable
+    {
+        private final int partId;
+        private final PendingResponseSet responseSet;
+
+        public ResponseListener(int partId, PendingResponseSet responseSet)
+        {
+            this.partId = partId;
+            this.responseSet = responseSet;
+        }
+
+        @Override
+        public void run()
+        {
+            this.responseSet.completeResponse(this.partId);
         }
     }
 }

@@ -57,10 +57,11 @@ public final class HttpServer
         try
         {
             ServerBootstrap b = new ServerBootstrap();
-            b.option(ChannelOption.SO_BACKLOG, 1024);
+            b.option(ChannelOption.SO_BACKLOG, 1024)
+                    .childOption(ChannelOption.SO_KEEPALIVE, true);
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    .handler(new LoggingHandler(LogLevel.DEBUG))
+                    .handler(new LoggingHandler(LogLevel.INFO))
                     .childHandler(this.initializer);
 
             channel = b.bind(port).sync().channel();
