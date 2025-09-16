@@ -38,20 +38,6 @@
             <artifactId>amazon-sqs-java-extended-client-lib</artifactId>
             <version>${dep.aws.sqs.extend.lib.version}</version>
             <type>jar</type>
-            <exclusions>
-                <exclusion>
-                    <groupId>software.amazon.awssdk</groupId>
-                    <artifactId>s3</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>software.amazon.awssdk</groupId>
-                    <artifactId>sqs</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>software.amazon.awssdk</groupId>
-                    <artifactId>utils</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
     </dependencies>
 
