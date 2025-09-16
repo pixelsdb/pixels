@@ -45,8 +45,6 @@ public final class HttpServerUtil
             return null;
         }
         SelfSignedCertificate ssc = new SelfSignedCertificate();
-        return SslContextBuilder
-                .forServer(ssc.certificate(), ssc.privateKey())
-                .build();
+        return SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build();
     }
 }

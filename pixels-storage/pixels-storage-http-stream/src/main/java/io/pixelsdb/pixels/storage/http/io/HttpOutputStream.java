@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.storage.http.io.HttpContentQueue.PART_ID;
 
 public class HttpOutputStream extends OutputStream
 {
@@ -55,6 +56,11 @@ public class HttpOutputStream extends OutputStream
     private static final long RETRY_DELAY_MS = Constants.STREAM_DELAY_MS;
 
     /**
+     * The number of concurrent pending responses that are waiting for arrival.
+     */
+    private static final int PENDING_RESPONSES = 5;
+
+    /**
      * indicates whether the stream is still open / valid
      */
     private boolean open;
@@ -74,8 +80,11 @@ public class HttpOutputStream extends OutputStream
      */
     private int bufferPosition;
 
-    private final PendingResponseSet pendingResponseSet = new PendingResponseSet(3);
+    private final PendingResponseSet pendingResponseSet = new PendingResponseSet(PENDING_RESPONSES);
 
+    /**
+     * valid part id starts from 0.
+     */
     private final AtomicInteger partId = new AtomicInteger(0);
 
     /**
@@ -86,7 +95,7 @@ public class HttpOutputStream extends OutputStream
     public HttpOutputStream(String host, int port, int bufferCapacity)
     {
         this.open = true;
-        this.uri = this.protocol + "://" + host + ":" + port;
+        this.uri = protocol + "://" + host + ":" + port;
         this.buffer = new byte[bufferCapacity];
         this.bufferPosition = 0;
         this.httpClient = Dsl.asyncHttpClient();
@@ -177,15 +186,18 @@ public class HttpOutputStream extends OutputStream
         {
             try
             {
+                int currPartId = this.partId.getAndIncrement();
                 Request req = httpClient.preparePost(this.uri)
                         .setBody(ByteBuffer.wrap(content))
                         .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
                         .addHeader(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(content.length))
                         .addHeader(HttpHeaderNames.CONNECTION, "keep-alive")
+                        .addHeader(PART_ID, currPartId)
                         .build();
-                this.pendingResponseSet.pendForResponse(partId.getAndIncrement(), httpClient.executeRequest(req));
+                this.pendingResponseSet.pendForResponse(currPartId, httpClient.executeRequest(req));
                 break;
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 retry++;
                 if (!(e.getCause() instanceof java.net.ConnectException || e.getCause() instanceof java.io.IOException))
@@ -196,7 +208,8 @@ public class HttpOutputStream extends OutputStream
                 try
                 {
                     Thread.sleep(RETRY_DELAY_MS);
-                } catch (InterruptedException e1)
+                }
+                catch (InterruptedException e1)
                 {
                     logger.error("Retry interrupted", e1);
                     break;
@@ -223,7 +236,8 @@ public class HttpOutputStream extends OutputStream
                 pendingResponseSet.waitAllComplete();
                 httpClient.executeRequest(req).get();
                 break;
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 retry++;
                 if (!(e.getCause() instanceof java.net.ConnectException))
@@ -234,7 +248,8 @@ public class HttpOutputStream extends OutputStream
                 try
                 {
                     Thread.sleep(RETRY_DELAY_MS);
-                } catch (InterruptedException e1)
+                }
+                catch (InterruptedException e1)
                 {
                     logger.error("Retry interrupted", e1);
                     break;

@@ -124,7 +124,8 @@ public class TestHttpStream
                         fsWriter.flush();
                         Thread.sleep(1);
                     }
-                } catch (InterruptedException e)
+                }
+                catch (InterruptedException e)
                 {
                     throw new RuntimeException(e);
                 }
@@ -189,10 +190,12 @@ public class TestHttpStream
                     {
                         throw new IOException("failed");
                     }
-                } catch (InterruptedException e) {
+                }
+                catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 readerException = e;
                 throw new RuntimeException(e);
@@ -220,7 +223,8 @@ public class TestHttpStream
                         fsWriter.flush();
                     }
                 }
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 writerException = e;
                 throw new RuntimeException(e);
@@ -236,7 +240,8 @@ public class TestHttpStream
             {
                 throw new IOException();
             }
-        } catch (InterruptedException e) {
+        }
+        catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
@@ -261,11 +266,13 @@ public class TestHttpStream
                             }
                         }
                     }
-                } catch (IOException e)
+                }
+                catch (IOException e)
                 {
                     throw new RuntimeException(e);
                 }
-            } catch (CertificateException e)
+            }
+            catch (CertificateException e)
             {
                 throw new RuntimeException(e);
             }
@@ -281,7 +288,8 @@ public class TestHttpStream
                 {
                     outputStream.write(buffer);
                 }
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 throw new RuntimeException(e);
             }
@@ -293,7 +301,8 @@ public class TestHttpStream
         {
             inputThread.join();
             outputThread.join();
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             throw new RuntimeException(e);
         }
@@ -322,11 +331,13 @@ public class TestHttpStream
                         }
                     }
                 }
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 throw new RuntimeException(e);
             }
         });
+
         Thread outputThread = new Thread(() -> {
             byte[] buffer = new byte[Constants.HTTP_STREAM_BUFFER_SIZE];
             for (int i = 0; i < Constants.HTTP_STREAM_BUFFER_SIZE; i++)
@@ -343,10 +354,12 @@ public class TestHttpStream
                 }
                 try {
                     Thread.sleep(2000);
-                } catch (InterruptedException e) {
+                }
+                catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 throw new RuntimeException(e);
             }
@@ -358,7 +371,8 @@ public class TestHttpStream
         {
             inputThread.join();
             outputThread.join();
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             throw new RuntimeException(e);
         }

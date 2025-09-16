@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.storage.http.io;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.*;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
@@ -32,7 +32,11 @@ import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.cert.CertificateException;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import static io.pixelsdb.pixels.storage.http.io.HttpContentQueue.PART_ID;
 
 public class HttpInputStream extends InputStream
 {
@@ -47,37 +51,22 @@ public class HttpInputStream extends InputStream
      * The schema of http stream.
      * Default value is http.
      */
-    private final String schema = "http";
-
-    /**
-     * The host of http stream.
-     */
-    private String host;
-
-    /**
-     * The port of http stream.
-     */
-    private int port;
+    private static final String protocol = "http";
 
     /**
      * The uri of http stream.
      */
-    private String uri;
+    private final String uri;
 
     /**
      * The temporary buffer used for storing the chunks.
      */
-    private final BlockingQueue<ByteBuf> contentQueue;
+    private final HttpContentQueue contentQueue;
 
     /**
      * The maximum tries to get data.
      */
     private final int MAX_TRIES = Constants.MAX_STREAM_RETRY_COUNT;
-
-    /**
-     * The milliseconds to sleep.
-     */
-    private final long DELAY_MS = Constants.STREAM_DELAY_MS;
 
     /**
      * The http server for receiving input stream.
@@ -97,16 +86,14 @@ public class HttpInputStream extends InputStream
     public HttpInputStream(String host, int port) throws CertificateException, SSLException
     {
         this.open = true;
-        this.contentQueue = new LinkedBlockingDeque<>();
-        this.host = host;
-        this.port = port;
-        this.uri = this.schema + "://" + host + ":" + port;
+        this.contentQueue = new HttpContentQueue();
+        this.uri = protocol + "://" + host + ":" + port;
         this.httpServer = new HttpServer(new HttpServerHandlerImpl(this.contentQueue));
         this.executorService = Executors.newFixedThreadPool(1);
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
             try
             {
-                this.httpServer.serve(this.port);
+                this.httpServer.serve(port);
             } catch (InterruptedException e)
             {
                 logger.error("http server interrupted", e);
@@ -123,14 +110,15 @@ public class HttpInputStream extends InputStream
             return -1;
         }
 
-        ByteBuf content = this.contentQueue.peek();
+        HttpContent content = this.contentQueue.peek();
         int b = -1;
         if (content != null)
         {
-            b = content.readUnsignedByte();
-            if (!content.isReadable())
+            ByteBuf contentBuf = content.getContent();
+            b = contentBuf.readUnsignedByte();
+            if (!contentBuf.isReadable())
             {
-                content.release();
+                contentBuf.release();
                 this.contentQueue.poll();
             }
         }
@@ -156,7 +144,7 @@ public class HttpInputStream extends InputStream
     {
         assertOpen();
 
-        ByteBuf content;
+        HttpContent content;
         int readBytes = 0;
         while (readBytes < len)
         {
@@ -169,24 +157,24 @@ public class HttpInputStream extends InputStream
             {
                 return readBytes > 0 ? readBytes : -1;
             }
-
+            ByteBuf contentBuf = content.getContent();
             try
             {
-                int readLen = Math.min(len - readBytes, content.readableBytes());
-                content.readBytes(buf, off + readBytes, readLen);
+                int readLen = Math.min(len - readBytes, contentBuf.readableBytes());
+                contentBuf.readBytes(buf, off + readBytes, readLen);
                 readBytes += readLen;
-                if (!content.isReadable())
+                if (!contentBuf.isReadable())
                 {
                     contentQueue.poll();
-                    content.release();
+                    contentBuf.release();
                 }
             }
             catch (Exception e)
             {
-                if (!content.isReadable())
+                if (!contentBuf.isReadable())
                 {
                     contentQueue.poll();
-                    content.release();
+                    contentBuf.release();
                 }
                 throw e;
             }
@@ -203,6 +191,8 @@ public class HttpInputStream extends InputStream
             this.open = false;
             this.httpServerFuture.complete(null);
             this.httpServer.close();
+            this.executorService.shutdown();
+            this.contentQueue.clear();
         }
     }
 
@@ -220,7 +210,7 @@ public class HttpInputStream extends InputStream
             try
             {
                 tries++;
-                Thread.sleep(this.DELAY_MS);
+                Thread.sleep(Constants.STREAM_DELAY_MS);
             }
             catch (InterruptedException e)
             {
@@ -244,11 +234,16 @@ public class HttpInputStream extends InputStream
         }
     }
 
+    public String getUri()
+    {
+        return uri;
+    }
+
     public static class HttpServerHandlerImpl extends HttpServerHandler
     {
-        private final BlockingQueue<ByteBuf> contentQueue;
+        private final HttpContentQueue contentQueue;
 
-        public HttpServerHandlerImpl(BlockingQueue<ByteBuf> contentQueue)
+        public HttpServerHandlerImpl(HttpContentQueue contentQueue)
         {
             this.contentQueue = contentQueue;
         }
@@ -271,11 +266,15 @@ public class HttpInputStream extends InputStream
             {
                 return;
             }
-            ByteBuf content = req.content();
-            if (content.isReadable())
+            String partId = req.headers().get(PART_ID);
+            if (partId != null)
             {
-                content.retain();
-                this.contentQueue.add(content);
+                ByteBuf content = req.content();
+                if (content.isReadable())
+                {
+                    content.retain();
+                    this.contentQueue.add(new HttpContent(Integer.parseInt(partId), content));
+                }
             }
             sendResponse(ctx, req, HttpResponseStatus.OK);
         }
