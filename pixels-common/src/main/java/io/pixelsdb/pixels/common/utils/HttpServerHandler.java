@@ -19,8 +19,10 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
+import io.netty.util.CharsetUtil;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
 
@@ -43,7 +45,8 @@ public abstract class HttpServerHandler extends SimpleChannelInboundHandler<Http
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
     {
-        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, INTERNAL_SERVER_ERROR);
+        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, INTERNAL_SERVER_ERROR,
+                cause != null ? Unpooled.copiedBuffer(cause.toString(), CharsetUtil.UTF_8) : Unpooled.buffer(0));
         response.headers()
                 .set(HttpHeaderNames.CONTENT_TYPE, "text/plain")
                 .set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
@@ -53,7 +56,8 @@ public abstract class HttpServerHandler extends SimpleChannelInboundHandler<Http
         ctx.close();
     }
 
-    public void setServerCloser(Runnable serverCloser) {
+    public void setServerCloser(Runnable serverCloser)
+    {
         this.serverCloser = serverCloser;
     }
 }

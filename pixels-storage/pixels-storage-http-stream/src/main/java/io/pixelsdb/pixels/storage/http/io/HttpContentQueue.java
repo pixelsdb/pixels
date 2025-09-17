@@ -36,6 +36,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * And it ensures that the content being taken (poll, take, peek etc.) has continuous part id.
  * We define the content with a subsequent part id as the <b>legal head</b> of the queue.
  * If the current head content is not a legal head, the take methods will wait.
+ * <p/>
+ * <b>Note: the content should be retained and released outside this queue.</b>
+ *
  * @author hank
  * @create 2025-09-16
  */
@@ -68,7 +71,10 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
         try
         {
             this.queue.put(httpContent);
-            this.notLegalFirst.signal();
+            if (httpContent.getPartId() == this.headPartId.get())
+            {
+                this.notLegalFirst.signal();
+            }
         }
         finally
         {
@@ -83,7 +89,10 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
         try
         {
             boolean ret = this.queue.offer(httpContent, timeout, unit);
-            this.notLegalFirst.signal();
+            if (httpContent.getPartId() == this.headPartId.get())
+            {
+                this.notLegalFirst.signal();
+            }
             return ret;
         }
         finally
@@ -99,7 +108,10 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
         try
         {
             boolean ret = this.queue.offer(httpContent);
-            this.notLegalFirst.signal();
+            if (httpContent.getPartId() == this.headPartId.get())
+            {
+                this.notLegalFirst.signal();
+            }
             return ret;
         }
         finally
@@ -160,7 +172,7 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
         }
         catch (InterruptedException e)
         {
-            throw new RuntimeException("interrupted when waiting for the next legal first content to arrive", e);
+            throw new InterruptedException("interrupted when waiting for the next legal first content to arrive");
         }
         finally
         {
@@ -215,7 +227,7 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
         }
         catch (InterruptedException e)
         {
-            throw new RuntimeException("interrupted when waiting for the next legal first content to arrive", e);
+            throw new InterruptedException("interrupted when waiting for the next legal first content to arrive");
         }
         finally
         {
@@ -265,7 +277,7 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
         }
         catch (InterruptedException e)
         {
-            throw new RuntimeException("interrupted when waiting for the next legal first content to arrive", e);
+            throw new IllegalStateException("interrupted when waiting for the next legal first content to arrive", e);
         }
         finally
         {
@@ -312,7 +324,7 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
         }
         catch (InterruptedException e)
         {
-            throw new RuntimeException("interrupted when waiting for the next legal first content to arrive", e);
+            throw new IllegalStateException("interrupted when waiting for the next legal first content to arrive", e);
         }
         finally
         {

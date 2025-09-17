@@ -230,7 +230,7 @@ public class HttpInputStream extends InputStream
     {
         if (!this.open)
         {
-            throw new IllegalStateException("Closed");
+            throw new IllegalStateException("http input stream is closed");
         }
     }
 
@@ -261,7 +261,6 @@ public class HttpInputStream extends InputStream
                 sendResponse(ctx, req, HttpResponseStatus.OK);
                 return;
             }
-
             if (!req.headers().get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-protobuf"))
             {
                 return;
@@ -273,6 +272,8 @@ public class HttpInputStream extends InputStream
                 if (content.isReadable())
                 {
                     content.retain();
+                    // FIXME: exception might be caught on a previous content that is processed by this method, causing
+                    //  the client to retry sending the content, leading to the content being added to the queue again.
                     this.contentQueue.add(new HttpContent(Integer.parseInt(partId), content));
                 }
             }
