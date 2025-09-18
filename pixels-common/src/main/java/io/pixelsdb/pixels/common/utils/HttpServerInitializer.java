@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -36,9 +37,9 @@ public class HttpServerInitializer extends ChannelInitializer<SocketChannel>
 {
 
     private final SslContext sslCtx;
-    private final HttpServerHandler handler;
+    private final ChannelHandler handler;
 
-    public HttpServerInitializer(SslContext sslCtx, HttpServerHandler handler)
+    public HttpServerInitializer(SslContext sslCtx, ChannelHandler handler)
     {
         this.sslCtx = sslCtx;
         this.handler = handler;

@@ -182,8 +182,7 @@ public class HttpOutputStream extends OutputStream
 
     private void sendContent(ContentRequest request)
     {
-        int retry = 0;
-        while (retry <= MAX_RETRIES)
+        while (request.getRetries() <= MAX_RETRIES)
         {
             try
             {
@@ -200,10 +199,11 @@ public class HttpOutputStream extends OutputStream
             }
             catch (Exception e)
             {
-                retry++;
+                request.incrementReties();
+                logger.warn("failed to send content {} and is retrying", request.partId, e);
                 if (!(e.getCause() instanceof java.net.ConnectException || e.getCause() instanceof java.io.IOException))
                 {
-                    logger.error("failed to send content after {} retries", retry, e);
+                    logger.error("failed to send content {} after {} retries", request.partId, request.getRetries(), e);
                     break;
                 }
                 try
@@ -241,9 +241,10 @@ public class HttpOutputStream extends OutputStream
             catch (Exception e)
             {
                 retries++;
+                logger.warn("failed to close and is retrying", e);
                 if (!(e.getCause() instanceof java.net.ConnectException))
                 {
-                    logger.error("Failed to close http output stream after {} retries", retries, e);
+                    logger.error("failed to close after {} retries", retries, e);
                     break;
                 }
                 try
@@ -252,7 +253,7 @@ public class HttpOutputStream extends OutputStream
                 }
                 catch (InterruptedException e1)
                 {
-                    logger.error("Retry interrupted", e1);
+                    logger.error("retry interrupted", e1);
                     break;
                 }
             }
@@ -303,7 +304,7 @@ public class HttpOutputStream extends OutputStream
                 {
                     if (request.getRetries() < MAX_RETRIES)
                     {
-                        logger.error("failed to send content {} and retrying", request.partId, err);
+                        logger.error("failed to send content {} and is retrying", request.partId, err);
                         request.incrementReties();
                         sendContent(request);
                     }

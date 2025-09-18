@@ -19,45 +19,14 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
-import io.netty.buffer.Unpooled;
-import io.netty.channel.*;
-import io.netty.handler.codec.http.*;
-import io.netty.util.CharsetUtil;
-
-import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
+import io.netty.channel.ChannelHandler;
 
 /**
- * @author jasha64
+ * @author jasha64, hank
  * @create 2023-07-27
+ * @update 2025-09-18 make this class an interface and clean other methods
  */
-@ChannelHandler.Sharable
-public abstract class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject>
+public interface HttpServerHandler extends ChannelHandler
 {
-    protected Runnable serverCloser;
-
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx)
-    {
-        ctx.flush();
-    }
-
-    // By default, response with 500 Internal Server Error and close the connection on exception.
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
-    {
-        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, INTERNAL_SERVER_ERROR,
-                cause != null ? Unpooled.copiedBuffer(cause.toString(), CharsetUtil.UTF_8) : Unpooled.buffer(0));
-        response.headers()
-                .set(HttpHeaderNames.CONTENT_TYPE, "text/plain")
-                .set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
-
-        ChannelFuture f = ctx.writeAndFlush(response);
-        f.addListener(ChannelFutureListener.CLOSE);
-        ctx.close();
-    }
-
-    public void setServerCloser(Runnable serverCloser)
-    {
-        this.serverCloser = serverCloser;
-    }
+    void setServerCloser(Runnable serverCloser);
 }

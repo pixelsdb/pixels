@@ -20,11 +20,8 @@
 package io.pixelsdb.pixels.storage.http.io;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.HttpServer;
-import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -35,8 +32,6 @@ import java.security.cert.CertificateException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import static io.pixelsdb.pixels.storage.http.io.HttpContentQueue.PART_ID;
 
 public class HttpInputStream extends InputStream
 {
@@ -237,68 +232,5 @@ public class HttpInputStream extends InputStream
     public String getUri()
     {
         return uri;
-    }
-
-    public static class HttpServerHandlerImpl extends HttpServerHandler
-    {
-        private final HttpContentQueue contentQueue;
-
-        public HttpServerHandlerImpl(HttpContentQueue contentQueue)
-        {
-            this.contentQueue = contentQueue;
-        }
-
-        @Override
-        public void channelRead0(ChannelHandlerContext ctx, HttpObject msg)
-        {
-            if (!(msg instanceof HttpRequest))
-            {
-                return;
-            }
-            FullHttpRequest req = (FullHttpRequest) msg;
-            if (req.method() != HttpMethod.POST)
-            {
-                sendResponse(ctx, req, HttpResponseStatus.OK);
-                return;
-            }
-            if (!req.headers().get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-protobuf"))
-            {
-                return;
-            }
-            String partId = req.headers().get(PART_ID);
-            if (partId != null)
-            {
-                ByteBuf content = req.content();
-                if (content.isReadable())
-                {
-                    content.retain();
-                    // FIXME: exception might be caught on a previous content that is processed by this method, causing
-                    //  the client to retry sending the content, leading to the content being added to the queue again.
-                    this.contentQueue.add(new HttpContent(Integer.parseInt(partId), content));
-                }
-            }
-            sendResponse(ctx, req, HttpResponseStatus.OK);
-        }
-
-        private void sendResponse(ChannelHandlerContext ctx, FullHttpRequest req, HttpResponseStatus status)
-        {
-            FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), status);
-            response.headers()
-                    .set(HttpHeaderNames.CONTENT_TYPE, "text/plain")
-                    .set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
-
-            if (req.headers().get(HttpHeaderNames.CONNECTION).equals(HttpHeaderValues.CLOSE.toString()))
-            {
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                response.setStatus(status);
-                ctx.writeAndFlush(response);
-                this.serverCloser.run();
-            } else
-            {
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-                response.setStatus(status);
-                ctx.writeAndFlush(response);
-            }
-        }
     }
 }
