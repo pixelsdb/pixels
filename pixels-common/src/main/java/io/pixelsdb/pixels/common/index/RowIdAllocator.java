@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.index.IndexProto;
 
@@ -76,14 +77,20 @@ public class RowIdAllocator
 
     private void fetchNewBatch() throws RetinaException
     {
-        IndexProto.RowIdBatch newBatch = this.indexService.allocateRowIdBatch(
-                this.tableId, this.batchSize);
-        if (newBatch == null || newBatch.getLength() <= 0)
+        try
         {
-            throw new RetinaException("failed to get row id batch");
+            IndexProto.RowIdBatch newBatch = this.indexService.allocateRowIdBatch(
+                    this.tableId, this.batchSize);
+            if (newBatch == null || newBatch.getLength() <= 0)
+            {
+                throw new RetinaException("failed to get row id batch");
+            }
+            this.currentBatchStart = newBatch.getRowIdStart();
+            this.currentBatchLength = newBatch.getLength();
+            this.allocatedCountInBatch = 0;
+        } catch (IndexException e)
+        {
+            throw new RetinaException(e);
         }
-        this.currentBatchStart = newBatch.getRowIdStart();
-        this.currentBatchLength = newBatch.getLength();
-        this.allocatedCountInBatch = 0;
     }
 }
