@@ -153,7 +153,7 @@ public class PixelsWriterBuffer
                 0, this.memTableSize * this.maxMemTableCount);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
-                TypeDescription.Mode.NONE, this.currentFileWriterManager.getFileId(),
+                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
                 0, this.memTableSize);
         this.idCounter++;
         this.currentMemTableCount = 1;
@@ -232,7 +232,7 @@ public class PixelsWriterBuffer
             SuperVersion oldVersion = this.currentVersion;
             this.immutableMemTables.add(this.activeMemTable);
             this.activeMemTable = new MemTable(this.idCounter, this.schema,
-                    this.memTableSize, TypeDescription.Mode.NONE,
+                    this.memTableSize, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
                     this.currentFileWriterManager.getFileId(),
                     this.currentMemTableCount * this.memTableSize,
                     this.memTableSize);
