@@ -153,20 +153,34 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                } catch (RetinaException | IndexException e)
+                } catch (RetinaException e)
                 {
-                    headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+                    headerBuilder.setErrorCode(1).setErrorMsg("Retina: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("error processing streaming update", e);
+                    logger.error("error processing streaming update (retina): {}", e);
+                } catch (IndexException e)
+                {
+                    headerBuilder.setErrorCode(2).setErrorMsg("Index: " + e.getMessage());
+                    responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
+                            .setHeader(headerBuilder.build())
+                            .build());
+                    logger.error("error processing streaming update (index): {}", e);
                 } catch (Exception e)
                 {
-                    headerBuilder.setErrorCode(2).setErrorMsg("Internal server error: " + e.getMessage());
+                    headerBuilder.setErrorCode(3).setErrorMsg("Internal error: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("unexpected error processing streaming update", e);
+                    logger.error("unexpected error processing streaming update: {}", e);
+                } catch (Throwable t)
+                {
+                    headerBuilder.setErrorCode(4).setErrorMsg("Fatal error: " + t.getMessage());
+                    responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
+                            .setHeader(headerBuilder.build())
+                            .build());
+                    logger.error("fatal error processing streaming update: {}", t);
                 }
             }
 

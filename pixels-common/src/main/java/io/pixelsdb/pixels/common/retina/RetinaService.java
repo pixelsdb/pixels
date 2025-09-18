@@ -211,8 +211,7 @@ public class RetinaService
             {
                 if (response.getHeader().getErrorCode() != 0)
                 {
-                    logger.error("Failed to update record: " + response.getHeader().getErrorCode()
-                            + " " + response.getHeader().getErrorMsg());
+                    logger.error("Stream update record failed: {}", response.getHeader().getErrorMsg());
                 }
             }
 
