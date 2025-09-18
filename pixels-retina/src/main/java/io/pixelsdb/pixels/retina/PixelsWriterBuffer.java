@@ -153,7 +153,7 @@ public class PixelsWriterBuffer
                 0, this.memTableSize * this.maxMemTableCount);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
-                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
+                TypeDescription.Mode.NONE, this.currentFileWriterManager.getFileId(),
                 0, this.memTableSize);
         this.idCounter++;
         this.currentMemTableCount = 1;
@@ -189,7 +189,11 @@ public class PixelsWriterBuffer
                 switchMemTable();
             }
         }
-        int rgRowOffset = (int) (currentMemTableCount * blockSize - blockSize + rowOffset);
+        int rgRowOffset = (int) (currentMemTableCount * memTableSize - memTableSize + rowOffset);
+        if(rgRowOffset < 0)
+        {
+            throw new RetinaException("Expect rgRowOffset >= 0, get " + rgRowOffset);
+        }
         builder.setFileId(activeMemTable.getFileId())
                 .setRgId(0)
                 .setRgRowOffset(rgRowOffset);
@@ -228,7 +232,7 @@ public class PixelsWriterBuffer
             SuperVersion oldVersion = this.currentVersion;
             this.immutableMemTables.add(this.activeMemTable);
             this.activeMemTable = new MemTable(this.idCounter, this.schema,
-                    this.memTableSize, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
+                    this.memTableSize, TypeDescription.Mode.NONE,
                     this.currentFileWriterManager.getFileId(),
                     this.currentMemTableCount * this.memTableSize,
                     this.memTableSize);
@@ -325,7 +329,7 @@ public class PixelsWriterBuffer
                     FileWriterManager fileWriterManager = iterator.next();
                     if (fileWriterManager.getLastBlockId() <= this.maxObjectKey.get())
                     {
-                        fileWriterManager.finish();
+                        CompletableFuture<Void> finished = fileWriterManager.finish();
                         iterator.remove();
 
                         // update super version
@@ -343,6 +347,7 @@ public class PixelsWriterBuffer
                         oldVersion.unref();
                         this.versionLock.writeLock().unlock();
 
+                        finished.get();
                         for (ObjectEntry objectEntry : toRemove)
                         {
                             if (objectEntry.unref())
@@ -391,6 +396,8 @@ public class PixelsWriterBuffer
         }
 
         SuperVersion sv = getCurrentVersion();
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
         try
         {
             long maxObjectKey = this.maxObjectKey.get();
@@ -409,7 +416,7 @@ public class PixelsWriterBuffer
                     iterator.remove();
                 }
             }
-            this.currentFileWriterManager.finish();
+            this.currentFileWriterManager.finish().get();
 
             // process the remaining fileWriterManager
             for (FileWriterManager fileWriterManager : this.fileWriterManagers)
@@ -420,7 +427,7 @@ public class PixelsWriterBuffer
                 // all written to minio
                 if (lastBlockId <= maxObjectKey)
                 {
-                    fileWriterManager.finish();
+                    futures.add(fileWriterManager.finish());
                 } else
                 {
                     // process elements in immutable memTable
@@ -438,7 +445,7 @@ public class PixelsWriterBuffer
 
                     // elements in minio will be processed in finish() later
                     fileWriterManager.setLastBlockId(maxObjectKey);
-                    fileWriterManager.finish();
+                    futures.add(fileWriterManager.finish());
                 }
             }
         } catch (Exception e)
@@ -453,6 +460,18 @@ public class PixelsWriterBuffer
             {
                 immutableMemTable.unref();
             }
+
+            CompletableFuture<Void> all = CompletableFuture.allOf(
+                    futures.toArray(new CompletableFuture[0])
+            );
+            try
+            {
+                all.get();
+            } catch (InterruptedException | ExecutionException e)
+            {
+                logger.error("Error in close: ", e);
+            }
+
             for (ObjectEntry objectEntry : sv.getObjectEntries())
             {
                 objectEntry.unref();

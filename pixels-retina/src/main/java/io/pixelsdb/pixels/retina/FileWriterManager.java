@@ -38,6 +38,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Responsible for several blocks of data and written to a file
@@ -152,13 +153,12 @@ public class FileWriterManager
     /**
      * Create a background thread to write the block of data responsible in minio to a file
      */
-    public void finish()
-    {
+    public CompletableFuture<Void> finish() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
         new Thread(() -> {
-            try
-            {
-                for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId)
-                {
+            try {
+                for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId) {
                     MinioManager minioManager = MinioManager.Instance();
                     byte[] data = minioManager.read(this.tableId, blockId);
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
@@ -169,10 +169,14 @@ public class FileWriterManager
                 this.file.setType(File.Type.REGULAR);
                 MetadataService metadataService = MetadataService.Instance();
                 metadataService.updateFile(this.file);
-            } catch (Exception e)
-            {
+
+                future.complete(null);
+            } catch (Exception e) {
                 logger.error("Failed to flush to disk file", e);
+                future.completeExceptionally(e);
             }
         }).start();
+
+        return future;
     }
 }

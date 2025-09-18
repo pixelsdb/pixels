@@ -31,6 +31,7 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.IntColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.core.writer.ColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
@@ -498,13 +499,28 @@ public class PixelsWriterImpl implements PixelsWriter
             CompletableFuture<Void> future = new CompletableFuture<>();
             ColumnWriter writer = columnWriters[i];
             ColumnVector columnVector = columnVectors[i];
+            int ii = i;
+            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
             columnWriterService.execute(() ->
             {
                 try
                 {
                     dataLength.addAndGet(writer.write(columnVector, rowBatchSize));
                     future.complete(null);
-                } catch (IOException e)
+                } catch (ClassCastException e)
+                {
+                    StringBuilder sb = new StringBuilder();
+                    for (StackTraceElement element : stackTrace) {
+                        sb.append("\n\tat ").append(element);
+                    }
+                    throw new CompletionException(
+                            "Failed to write column, writer=" + writer +
+                                    ", writerId=" + ii +
+                                    ", IntColumnVector[0]=" + ((IntColumnVector) columnVector).vector[0] +
+                                    "\nCall stack:" + sb,
+                            e);
+                }
+                catch (IOException e)
                 {
                     throw new CompletionException("failed to write column vector", e);
                 }

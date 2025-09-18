@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.Bitmap;
@@ -74,8 +75,9 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     private final PixelsReaderOption option;
     private final Storage storage;
 
-    private final String schemaName;
-    private final String tableName;
+    private final long tableId;
+    private final String minioPathPrefix;
+
     private final TypeDescription typeDescription;
     private final int colNum;
     private int includedColumnNum = 0;
@@ -104,16 +106,18 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
                                         byte[] activeMemtableData, List<Long> fileIds,  // read version
                                         List<RetinaProto.VisibilityBitmap> visibilityBitmap,
                                         Storage storage,
-                                        String schemaName, String tableName, // to locate file with file id
+                                        long tableId, // to locate file with file id
                                         TypeDescription typeDescription
     ) throws IOException
     {
+        ConfigFactory configFactory = ConfigFactory.Instance();
+        this.minioPathPrefix = configFactory.getProperty("minio.path.prefix");
+
         this.option = option;
         this.activeMemtableData = activeMemtableData;
         this.fileIds = fileIds;
         this.storage = storage;
-        this.schemaName = schemaName;
-        this.tableName = tableName;
+        this.tableId = tableId;
         this.typeDescription = typeDescription;
         this.colNum = typeDescription.getChildrenWithHiddenColumn().size();
         this.shouldReadHiddenColumn = option.hasValidTransTimestamp();
@@ -212,7 +216,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
             return false;
         }
 
-        String path = getMinioPathFromId(fileIdIndex++);
+        String path = getMinioPathFromId(fileIds.get(fileIdIndex++));
         getMemtableDataFromStorage(path);
         return true;
     }
@@ -341,9 +345,9 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         scheduler.shutdown();
     }
 
-    private String getMinioPathFromId(Integer id)
+    private String getMinioPathFromId(long entryId)
     {
-        return schemaName + '/' + tableName + '/' + id;
+        return this.minioPathPrefix + String.format("%d/%d", tableId, entryId);
     }
 
     private void getMemtableDataFromStorage(String path) throws IOException
