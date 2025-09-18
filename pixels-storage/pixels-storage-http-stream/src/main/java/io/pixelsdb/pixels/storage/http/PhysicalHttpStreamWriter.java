@@ -33,30 +33,28 @@ import java.nio.ByteBuffer;
  */
 public class PhysicalHttpStreamWriter implements PhysicalWriter
 {
-    private HttpStream httpStream;
-    private String path;
+    private final String path;
     private long position;
-    private DataOutputStream dataOutputStream;
+    private final DataOutputStream dataOutputStream;
 
     public PhysicalHttpStreamWriter(Storage storage, String path) throws IOException
     {
         if (storage instanceof HttpStream)
         {
-            this.httpStream = (HttpStream) storage;
+            this.path = path;
+            this.dataOutputStream = storage.create(path, false, Constants.HTTP_STREAM_BUFFER_SIZE);
         }
         else
         {
             throw new IOException("storage is not HttpStream");
         }
-        this.path = path;
-        this.dataOutputStream = storage.create(path, false, Constants.HTTP_STREAM_BUFFER_SIZE);
     }
 
     /**
      * Tell the writer the offset of next write.
      *
      * @param length length of content
-     * @return starting offset after preparing.
+     * @return starting offset after preparing
      */
     @Override
     public long prepare(int length) throws IOException
@@ -65,10 +63,10 @@ public class PhysicalHttpStreamWriter implements PhysicalWriter
     }
 
     /**
-     * Append content to the file.
+     * Append content to the stream.
      *
      * @param buffer content buffer
-     * @return start offset of content in the file.
+     * @return start offset of content in the stream
      */
     @Override
     public long append(ByteBuffer buffer) throws IOException
@@ -79,12 +77,12 @@ public class PhysicalHttpStreamWriter implements PhysicalWriter
     }
 
     /**
-     * Append content to the file.
+     * Append content to the stream.
      *
      * @param buffer content buffer container
      * @param offset start offset of actual content buffer
      * @param length length of actual content buffer
-     * @return start offset of content in the file.
+     * @return start offset of content in the stream
      */
     @Override
     public long append(byte[] buffer, int offset, int length) throws IOException
@@ -108,8 +106,14 @@ public class PhysicalHttpStreamWriter implements PhysicalWriter
     }
 
     @Override
-    public String getPath() { return path; }
+    public String getPath()
+    {
+        return path;
+    }
 
     @Override
-    public int getBufferSize() { return Constants.HTTP_STREAM_BUFFER_SIZE; }
+    public int getBufferSize()
+    {
+        return Constants.HTTP_STREAM_BUFFER_SIZE;
+    }
 }

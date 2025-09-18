@@ -44,7 +44,7 @@ public class PhysicalHttpStreamReader implements PhysicalReader
         }
         else
         {
-            throw new IOException("Storage is not LocalFS.");
+            throw new IOException("Storage is not HttpStream.");
         }
         this.path = path;
         this.dataInputStream = this.httpStream.open(path);
@@ -53,13 +53,13 @@ public class PhysicalHttpStreamReader implements PhysicalReader
     @Override
     public long getFileLength() throws IOException
     {
-        throw new UnsupportedOperationException("Can't get file length in PhysicalHttpStreamReader");
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public void seek(long desired) throws IOException
     {
-        throw new UnsupportedOperationException("Can't seek in PhysicalHttpStreamReader");
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -114,7 +114,7 @@ public class PhysicalHttpStreamReader implements PhysicalReader
     @Override
     public CompletableFuture<ByteBuffer> readAsync(long offset, int len) throws IOException
     {
-        throw new UnsupportedOperationException("Can't read async in PhysicalHttpStreamReader");
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -129,34 +129,41 @@ public class PhysicalHttpStreamReader implements PhysicalReader
     @Override
     public String getPathUri() throws IOException
     {
-        return httpStream.ensureSchemePrefix(path);
+        return this.httpStream.ensureSchemePrefix(path);
     }
 
     /**
-     * Get the port in path.
-     *
-     * @return
+     * @return the port in path
      */
     @Override
     public String getName()
     {
-        if (path == null)
+        if (this.path == null)
         {
             return null;
         }
-        int slash = path.lastIndexOf(":");
-        return path.substring(slash + 1);
+        int slash = this.path.lastIndexOf(":");
+        return this.path.substring(slash + 1);
     }
 
     @Override
     public long getBlockId() throws IOException
     {
-        throw new IOException("Can't get block id in PhysicalHttpStreamReader");
+        throw new UnsupportedOperationException();
     }
 
     @Override
-    public Storage.Scheme getStorageScheme() { return httpStream.getScheme(); }
+    public Storage.Scheme getStorageScheme()
+    {
+        return this.httpStream.getScheme();
+    }
 
+    /**
+     * @return always 0
+     */
     @Override
-    public int getNumReadRequests() { return 0; }
+    public int getNumReadRequests()
+    {
+        return 0;
+    }
 }

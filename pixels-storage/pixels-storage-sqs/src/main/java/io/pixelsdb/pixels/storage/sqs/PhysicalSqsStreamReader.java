@@ -22,103 +22,151 @@ package io.pixelsdb.pixels.storage.sqs;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.CompletableFuture;
 
+import static java.util.Objects.requireNonNull;
+
 public class PhysicalSqsStreamReader implements PhysicalReader
 {
+    private final SqsStream sqsStream;
+    private final String path;
+    private final DataInputStream dataInputStream;
+
+    public PhysicalSqsStreamReader(Storage storage, String path) throws IOException
+    {
+        if (storage instanceof SqsStream)
+        {
+            this.sqsStream = (SqsStream) storage;
+        }
+        else
+        {
+            throw new IOException("Storage is not SqsStream.");
+        }
+        this.path = path;
+        this.dataInputStream = this.sqsStream.open(path);
+    }
+
     @Override
     public long getFileLength() throws IOException
     {
-        return 0;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public void seek(long desired) throws IOException
     {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public ByteBuffer readFully(int length) throws IOException
     {
-        return null;
+        byte[] buffer = new byte[length];
+        dataInputStream.readFully(buffer);
+        return ByteBuffer.wrap(buffer);
     }
 
     @Override
     public void readFully(byte[] buffer) throws IOException
     {
-
+        dataInputStream.readFully(buffer);
     }
 
     @Override
     public void readFully(byte[] buffer, int offset, int length) throws IOException
     {
-
+        dataInputStream.readFully(buffer, offset, length);
     }
 
     @Override
     public boolean supportsAsync()
     {
-        return PhysicalReader.super.supportsAsync();
+        return false;
     }
 
     @Override
     public CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
     {
-        return PhysicalReader.super.readAsync(offset, length);
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public long readLong(ByteOrder byteOrder) throws IOException
     {
-        return 0;
+        if (requireNonNull(byteOrder).equals(ByteOrder.BIG_ENDIAN))
+        {
+            return dataInputStream.readLong();
+        }
+        else
+        {
+            return Long.reverseBytes(dataInputStream.readLong());
+        }
     }
 
     @Override
     public int readInt(ByteOrder byteOrder) throws IOException
     {
-        return 0;
+        if (requireNonNull(byteOrder).equals(ByteOrder.BIG_ENDIAN))
+        {
+            return dataInputStream.readInt();
+        }
+        else
+        {
+            return Integer.reverseBytes(dataInputStream.readInt());
+        }
     }
 
     @Override
     public void close() throws IOException
     {
-
+        this.dataInputStream.close();
     }
 
     @Override
     public String getPath()
     {
-        return "";
+        return this.path;
     }
 
     @Override
     public String getPathUri() throws IOException
     {
-        return "";
+        return this.sqsStream.ensureSchemePrefix(path);
     }
 
+    /**
+     * @return the port in path
+     */
     @Override
     public String getName()
     {
-        return "";
+        if (path == null)
+        {
+            return null;
+        }
+        int slash = path.lastIndexOf(":");
+        return path.substring(slash + 1);
     }
 
     @Override
     public long getBlockId() throws IOException
     {
-        return 0;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Storage.Scheme getStorageScheme()
     {
-        return null;
+        return this.sqsStream.getScheme();
     }
 
+    /**
+     * @return always 0
+     */
     @Override
     public int getNumReadRequests()
     {

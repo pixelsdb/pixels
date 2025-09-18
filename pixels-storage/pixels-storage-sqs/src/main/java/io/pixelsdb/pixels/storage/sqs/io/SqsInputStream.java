@@ -34,4 +34,30 @@ public class SqsInputStream extends InputStream
     {
         return 0;
     }
+
+    @Override
+    public int read(byte[] b) throws IOException
+    {
+        return read(b, 0, b.length);
+    }
+
+    /**
+     * Attempt to read data with a maximum length of len into the position off of the buffer.
+     * @param buf the buffer
+     * @param off the position in buffer
+     * @param len the length in bytes to read
+     * @return actual number of bytes read
+     * @throws IOException
+     */
+    @Override
+    public int read(byte[] buf, int off, int len) throws IOException
+    {
+        return 0;
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+
+    }
 }

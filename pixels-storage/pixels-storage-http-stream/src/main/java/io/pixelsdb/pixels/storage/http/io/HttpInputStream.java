@@ -43,17 +43,6 @@ public class HttpInputStream extends InputStream
     private boolean open;
 
     /**
-     * The schema of http stream.
-     * Default value is http.
-     */
-    private static final String protocol = "http";
-
-    /**
-     * The uri of http stream.
-     */
-    private final String uri;
-
-    /**
      * The temporary buffer used for storing the chunks.
      */
     private final HttpContentQueue contentQueue;
@@ -82,7 +71,6 @@ public class HttpInputStream extends InputStream
     {
         this.open = true;
         this.contentQueue = new HttpContentQueue();
-        this.uri = protocol + "://" + host + ":" + port;
         this.httpServer = new HttpServer(new HttpServerHandlerImpl(this.contentQueue));
         this.executorService = Executors.newFixedThreadPool(1);
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
@@ -127,11 +115,11 @@ public class HttpInputStream extends InputStream
     }
 
     /**
-     * Attempt to read data with a maximum length of len into the position off of buf.
-     * @param buf
-     * @param off
-     * @param len
-     * @return Actual number of bytes read
+     * Attempt to read data with a maximum length of len into the position off of the buffer.
+     * @param buf the buffer
+     * @param off the position in buffer
+     * @param len the length in bytes to read
+     * @return actual number of bytes read
      * @throws IOException
      */
     @Override
@@ -227,10 +215,5 @@ public class HttpInputStream extends InputStream
         {
             throw new IllegalStateException("http input stream is closed");
         }
-    }
-
-    public String getUri()
-    {
-        return uri;
     }
 }

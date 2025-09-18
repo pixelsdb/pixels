@@ -24,13 +24,11 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StreamPath;
 import io.pixelsdb.pixels.storage.http.io.HttpInputStream;
 import io.pixelsdb.pixels.storage.http.io.HttpOutputStream;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
-
 
 public final class HttpStream implements Storage
 {
@@ -76,7 +74,7 @@ public final class HttpStream implements Storage
             inputStream = new HttpInputStream(streamPath.getHostName(), streamPath.getPort());
         } catch (Exception e)
         {
-            throw new IOException("Failed to open streamInputStream, " + e.toString());
+            throw new IOException("Failed to open HttpInputStream.", e);
         }
         return new DataInputStream(inputStream);
     }
@@ -84,31 +82,31 @@ public final class HttpStream implements Storage
     @Override
     public List<Status> listStatus(String... path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public List<String> listPaths(String... path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Status getStatus(String path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public long getFileId(String path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public boolean mkdirs(String path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -128,7 +126,7 @@ public final class HttpStream implements Storage
     @Override
     public boolean delete(String path, boolean recursive)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -137,7 +135,7 @@ public final class HttpStream implements Storage
     @Override
     public boolean directCopy(String src, String dest)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -146,7 +144,7 @@ public final class HttpStream implements Storage
     @Override
     public boolean exists(String path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override

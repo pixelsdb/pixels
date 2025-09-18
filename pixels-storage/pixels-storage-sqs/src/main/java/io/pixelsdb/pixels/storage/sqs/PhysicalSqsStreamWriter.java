@@ -20,55 +20,100 @@
 package io.pixelsdb.pixels.storage.sqs;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.utils.Constants;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * @author huasiy
- * @create 2024-11-08
+ * @author hank
+ * @create 2025-09-17
  */
 public class PhysicalSqsStreamWriter implements PhysicalWriter
 {
+    private final String path;
+    private long position;
+    private final DataOutputStream dataOutputStream;
+
+    public PhysicalSqsStreamWriter(Storage storage, String path) throws IOException
+    {
+        if (storage instanceof SqsStream)
+        {
+            this.path = path;
+            this.dataOutputStream = storage.create(path, false, Constants.SQS_STREAM_BUFFER_SIZE);
+        }
+        else
+        {
+            throw new IOException("storage is not SqsStream");
+        }
+    }
+
+    /**
+     * Tell the writer the offset of next write.
+     *
+     * @param length length of content
+     * @return starting offset after preparing.
+     */
     @Override
     public long prepare(int length) throws IOException
     {
-        return 0;
+        return this.position;
     }
 
+    /**
+     * Append content to the stream.
+     *
+     * @param buffer content buffer
+     * @return start offset of content in the stream.
+     */
     @Override
     public long append(ByteBuffer buffer) throws IOException
     {
-        return 0;
+        buffer.flip();
+        int length = buffer.remaining();
+        return append(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
     }
 
+    /**
+     * Append content to the stream.
+     *
+     * @param buffer content buffer container
+     * @param offset start offset of actual content buffer
+     * @param length length of actual content buffer
+     * @return start offset of content in the stream
+     */
     @Override
     public long append(byte[] buffer, int offset, int length) throws IOException
     {
-        return 0;
+        long start = this.position;
+        dataOutputStream.write(buffer, offset, length);
+        position += length;
+        return start;
     }
 
     @Override
     public void close() throws IOException
     {
-
+        dataOutputStream.close();
     }
 
     @Override
     public void flush() throws IOException
     {
-
+        dataOutputStream.flush();
     }
 
     @Override
     public String getPath()
     {
-        return "";
+        return path;
     }
 
     @Override
     public int getBufferSize()
     {
-        return 0;
+        return Constants.SQS_STREAM_BUFFER_SIZE;
     }
 }

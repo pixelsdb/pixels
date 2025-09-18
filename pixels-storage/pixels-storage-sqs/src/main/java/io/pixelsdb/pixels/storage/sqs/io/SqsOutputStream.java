@@ -29,8 +29,38 @@ public class SqsOutputStream extends OutputStream
 {
     private static final Logger logger = LogManager.getLogger(SqsOutputStream.class);
 
+    /**
+     * Write a byte array to the http output stream.
+     *
+     * @param b the byte array to write
+     * @throws IOException
+     */
+    @Override
+    public void write(byte[] b) throws IOException
+    {
+        write(b, 0, b.length);
+    }
+
     @Override
     public void write(int b) throws IOException
+    {
+
+    }
+
+    @Override
+    public void write(final byte[] buf, final int off, final int len) throws IOException
+    {
+
+    }
+
+    @Override
+    public void flush() throws IOException
+    {
+
+    }
+
+    @Override
+    public void close() throws IOException
     {
 
     }
