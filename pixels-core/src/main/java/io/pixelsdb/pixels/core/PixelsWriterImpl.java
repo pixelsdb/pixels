@@ -516,7 +516,6 @@ public class PixelsWriterImpl implements PixelsWriter
                     throw new CompletionException(
                             "Failed to write column, writer=" + writer +
                                     ", writerId=" + ii +
-                                    ", IntColumnVector[0]=" + ((IntColumnVector) columnVector).vector[0] +
                                     "\nCall stack:" + sb,
                             e);
                 }

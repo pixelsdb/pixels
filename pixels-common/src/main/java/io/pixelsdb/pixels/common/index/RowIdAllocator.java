@@ -90,7 +90,7 @@ public class RowIdAllocator
             this.allocatedCountInBatch = 0;
         } catch (IndexException e)
         {
-            throw new RetinaException(e);
+            throw new RetinaException("failed to get row id batch", e);
         }
     }
 }
