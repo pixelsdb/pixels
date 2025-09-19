@@ -163,8 +163,9 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
                     }
                     if (partId > content.getPartId())
                     {
-                        throw new IllegalStateException("current part id " + partId +
-                                " is greater than content part id " + content.getPartId());
+                        // stale message received, drop it and continue
+                        this.queue.remove();
+                        continue;
                     }
                 }
                 this.notLegalFirst.await();
@@ -214,8 +215,9 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
                     }
                     if (partId > content.getPartId())
                     {
-                        throw new IllegalStateException("current part id " + partId +
-                                " is greater than content part id " + content.getPartId());
+                        // stale message received, drop it and continue
+                        this.queue.remove();
+                        continue;
                     }
                     this.notLegalFirst.await(timeout, unit);
                 }
@@ -264,8 +266,9 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
                     }
                     if (partId > content.getPartId())
                     {
-                        throw new IllegalStateException("current part id " + partId +
-                                " is greater than content part id " + content.getPartId());
+                        // stale message received, drop it and continue
+                        this.queue.remove();
+                        continue;
                     }
                     this.notLegalFirst.await();
                 }
@@ -311,8 +314,9 @@ public class HttpContentQueue extends AbstractQueue<HttpContent> implements Bloc
                     }
                     if (partId > content.getPartId())
                     {
-                        throw new IllegalStateException("current part id " + partId +
-                                " is greater than content part id " + content.getPartId());
+                        // stale message received, drop it and continue
+                        this.queue.remove();
+                        continue;
                     }
                     this.notLegalFirst.await();
                 }

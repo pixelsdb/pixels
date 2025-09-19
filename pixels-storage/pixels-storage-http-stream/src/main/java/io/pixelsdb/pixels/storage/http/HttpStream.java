@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.storage.http;
 
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StreamPath;
 import io.pixelsdb.pixels.storage.http.io.HttpInputStream;
 import io.pixelsdb.pixels.storage.http.io.HttpOutputStream;
 
@@ -62,8 +61,8 @@ public final class HttpStream implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        StreamPath streamPath = new StreamPath(path);
-        if (!streamPath.valid)
+        HttpStreamPath httpStreamPath = new HttpStreamPath(path);
+        if (!httpStreamPath.isValid())
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
@@ -71,7 +70,7 @@ public final class HttpStream implements Storage
         HttpInputStream inputStream;
         try
         {
-            inputStream = new HttpInputStream(streamPath.getHostName(), streamPath.getPort());
+            inputStream = new HttpInputStream(httpStreamPath.getHost(), httpStreamPath.getPort());
         } catch (Exception e)
         {
             throw new IOException("Failed to open HttpInputStream.", e);
@@ -115,12 +114,12 @@ public final class HttpStream implements Storage
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        StreamPath streamPath = new StreamPath(path);
-        if (!streamPath.valid)
+        HttpStreamPath httpStreamPath = new HttpStreamPath(path);
+        if (!httpStreamPath.isValid())
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        return new DataOutputStream(new HttpOutputStream(streamPath.getHostName(), streamPath.getPort(), bufferSize));
+        return new DataOutputStream(new HttpOutputStream(httpStreamPath.getHost(), httpStreamPath.getPort(), bufferSize));
     }
 
     @Override

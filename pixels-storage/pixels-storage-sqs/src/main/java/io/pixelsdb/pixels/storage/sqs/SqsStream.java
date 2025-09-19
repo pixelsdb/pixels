@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.storage.sqs;
 
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StreamPath;
 import io.pixelsdb.pixels.storage.sqs.io.SqsInputStream;
 import io.pixelsdb.pixels.storage.sqs.io.SqsOutputStream;
 
@@ -66,8 +65,8 @@ public final class SqsStream implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        StreamPath streamPath = new StreamPath(path);
-        if (!streamPath.valid)
+        SqsStreamPath sqsStreamPath = new SqsStreamPath(path);
+        if (!sqsStreamPath.isValid())
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
@@ -119,8 +118,8 @@ public final class SqsStream implements Storage
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        StreamPath streamPath = new StreamPath(path);
-        if (!streamPath.valid)
+        SqsStreamPath sqsStreamPath = new SqsStreamPath(path);
+        if (!sqsStreamPath.isValid())
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
