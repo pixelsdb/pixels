@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.IntColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
 import java.io.IOException;
@@ -40,7 +41,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
     private final boolean isLong;                                       // current column type is long or int, used for the first pixel
     private final boolean runlengthEncoding;
-
+    private int typeDescriptionMode;
     public IntegerColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
         super(type, writerOption);
@@ -55,8 +56,30 @@ public class IntegerColumnWriter extends BaseColumnWriter
     @Override
     public int write(ColumnVector vector, int size) throws IOException
     {
-        LongColumnVector columnVector = (LongColumnVector) vector;
-        long[] values = columnVector.vector;
+        if(vector instanceof LongColumnVector)
+        {
+            LongColumnVector longColumnVector = (LongColumnVector) vector;
+            typeDescriptionMode = TypeDescription.Mode.NONE;
+            writeVector(vector, size, (i, offset) -> longColumnVector.vector[i + offset]);
+        } else if (vector instanceof IntColumnVector)
+        {
+            IntColumnVector intColumnVector = (IntColumnVector) vector;
+            writeVector(vector, size, (i, offset) -> (long) intColumnVector.vector[i + offset]);
+        }  else
+        {
+            throw new IllegalArgumentException("Unsupported ColumnVector type: " + vector.getClass().getName());
+        }
+
+        return outputStream.size();
+    }
+
+    @FunctionalInterface
+    private interface ValueAccessor {
+        long get(int i, int offset);
+    }
+
+    private void writeVector(ColumnVector columnVector, int size, ValueAccessor accessor) throws IOException
+    {
         int curPartLength;           // size of the partition which belongs to current pixel
         int curPartOffset = 0;       // starting offset of the partition which belongs to current pixel
         int nextPartLength = size;   // size of the partition which belongs to next pixel
@@ -66,19 +89,17 @@ public class IntegerColumnWriter extends BaseColumnWriter
         while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
         {
             curPartLength = pixelStride - curPixelIsNullIndex;
-            writeCurPartLong(columnVector, values, curPartLength, curPartOffset);
+            writeCurPartLong(columnVector, accessor, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
 
         curPartLength = nextPartLength;
-        writeCurPartLong(columnVector, values, curPartLength, curPartOffset);
-
-        return outputStream.size();
+        writeCurPartLong(columnVector, accessor, curPartLength, curPartOffset);
     }
 
-    private void writeCurPartLong(ColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    private void writeCurPartLong(ColumnVector columnVector, ValueAccessor accessor, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -95,7 +116,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
             }
             else
             {
-                curPixelVector[curPixelVectorIndex++] = values[i + curPartOffset];
+                curPixelVector[curPixelVectorIndex++] = accessor.get(i, curPartOffset);
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
