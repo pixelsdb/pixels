@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.storage.http.io;
 
 import io.netty.buffer.ByteBuf;
 import io.pixelsdb.pixels.common.utils.Constants;
-import io.pixelsdb.pixels.common.utils.HttpServer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -71,7 +70,7 @@ public class HttpInputStream extends InputStream
     {
         this.open = true;
         this.contentQueue = new HttpContentQueue();
-        this.httpServer = new HttpServer(new HttpServerHandlerImpl(this.contentQueue));
+        this.httpServer = new HttpServer(new HttpServerHandler(this.contentQueue));
         this.executorService = Executors.newFixedThreadPool(1);
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
             try

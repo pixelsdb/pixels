@@ -24,22 +24,22 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
-import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
 import static io.pixelsdb.pixels.storage.http.io.HttpContentQueue.PART_ID;
 
 /**
- * @author hank
- * @create 2025-09-18
+ * @author jasha64, hank
+ *
+ * @create 2023-07-27
  */
 @ChannelHandler.Sharable
-public class HttpServerHandlerImpl extends SimpleChannelInboundHandler<HttpObject> implements HttpServerHandler
+public class HttpServerHandler extends SimpleChannelInboundHandler<HttpObject>
 {
     private Runnable serverCloser;
     private final HttpContentQueue contentQueue;
 
-    public HttpServerHandlerImpl(HttpContentQueue contentQueue)
+    public HttpServerHandler(HttpContentQueue contentQueue)
     {
         this.contentQueue = contentQueue;
     }
@@ -120,7 +120,6 @@ public class HttpServerHandlerImpl extends SimpleChannelInboundHandler<HttpObjec
         }
     }
 
-    @Override
     public void setServerCloser(Runnable serverCloser)
     {
         this.serverCloser = serverCloser;

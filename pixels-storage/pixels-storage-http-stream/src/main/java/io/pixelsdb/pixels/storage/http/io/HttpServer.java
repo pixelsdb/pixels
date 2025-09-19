@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.utils;
+package io.pixelsdb.pixels.storage.http.io;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -27,6 +27,9 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 import javax.net.ssl.SSLException;
 import java.security.cert.CertificateException;
@@ -39,14 +42,16 @@ import java.security.cert.CertificateException;
  */
 public final class HttpServer
 {
-    final HttpServerInitializer initializer;
+    private static final boolean SSL = System.getProperty("ssl") != null;
+
+    private final HttpServerInitializer initializer;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel channel;
 
     public HttpServer(HttpServerHandler handler) throws CertificateException, SSLException
     {
-        this.initializer = new HttpServerInitializer(HttpServerUtil.buildSslContext(), handler);
+        this.initializer = new HttpServerInitializer(buildSslContext(), handler);
         handler.setServerCloser(this::close);
     }
 
@@ -88,5 +93,15 @@ public final class HttpServer
         {
             workerGroup.shutdownGracefully();
         }
+    }
+
+    public static SslContext buildSslContext() throws CertificateException, SSLException
+    {
+        if (!SSL)
+        {
+            return null;
+        }
+        SelfSignedCertificate ssc = new SelfSignedCertificate();
+        return SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build();
     }
 }
