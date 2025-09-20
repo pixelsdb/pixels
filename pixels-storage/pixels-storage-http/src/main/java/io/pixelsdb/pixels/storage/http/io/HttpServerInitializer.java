@@ -17,8 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.utils;
+package io.pixelsdb.pixels.storage.http.io;
 
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -27,6 +28,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerExpectContinueHandler;
 import io.netty.handler.ssl.SslContext;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
  * @author jasha64
@@ -34,11 +36,10 @@ import io.netty.handler.ssl.SslContext;
  */
 public class HttpServerInitializer extends ChannelInitializer<SocketChannel>
 {
-
     private final SslContext sslCtx;
-    private final HttpServerHandler handler;
+    private final ChannelHandler handler;
 
-    public HttpServerInitializer(SslContext sslCtx, HttpServerHandler handler)
+    public HttpServerInitializer(SslContext sslCtx, ChannelHandler handler)
     {
         this.sslCtx = sslCtx;
         this.handler = handler;

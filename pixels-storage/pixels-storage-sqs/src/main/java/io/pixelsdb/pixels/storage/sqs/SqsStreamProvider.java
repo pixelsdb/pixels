@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.http;
+package io.pixelsdb.pixels.storage.sqs;
 
 import io.pixelsdb.pixels.common.physical.*;
 
@@ -26,10 +26,10 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
- * @author huasiy
- * @create 2024-11-05
+ * @author hank
+ * @create 2025-09-17
  */
-public class HttpStreamProvider implements StorageProvider
+public class SqsStreamProvider implements StorageProvider
 {
     @Override
     public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
@@ -38,29 +38,31 @@ public class HttpStreamProvider implements StorageProvider
         {
             throw new IOException("incompatible storage scheme: " + scheme);
         }
-        return new HttpStream();
+        return new SqsStream();
     }
 
     @Override
-    public PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path, @Nullable PhysicalReaderOption option) throws IOException
+    public PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nullable PhysicalReaderOption option) throws IOException
     {
         if (!this.compatibleWith(storage.getScheme()))
         {
             throw new IOException("incompatible storage scheme: " + storage.getScheme());
         }
-        return new PhysicalHttpStreamReader(storage, path);
+        return new PhysicalSqsStreamReader(storage, path);
     }
 
     @Override
-    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path, @Nonnull PhysicalWriterOption option) throws IOException
+    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nonnull PhysicalWriterOption option) throws IOException
     {
         if (!this.compatibleWith(storage.getScheme()))
         {
             throw new IOException("incompatible storage scheme: " + storage.getScheme());
         }
-        return new PhysicalHttpStreamWriter(storage, path);
+        return new PhysicalSqsStreamWriter(storage, path);
     }
 
     @Override
-    public boolean compatibleWith(@Nonnull Storage.Scheme scheme) { return scheme.equals(Storage.Scheme.httpstream); }
+    public boolean compatibleWith(@Nonnull Storage.Scheme scheme) { return scheme.equals(Storage.Scheme.sqsstream); }
 }

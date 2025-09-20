@@ -56,9 +56,9 @@ public class HttpOutputStream extends OutputStream
     private static final long RETRY_DELAY_MS = Constants.STREAM_DELAY_MS;
 
     /**
-     * The number of concurrent pending responses that are waiting for arrival.
+     * The number of concurrent http requests that are waiting for responses.
      */
-    private static final int PENDING_RESPONSES = 5;
+    private static final int NUM_CONCURRENT_REQUESTS = 5;
 
     /**
      * indicates whether the stream is still open / valid
@@ -80,12 +80,12 @@ public class HttpOutputStream extends OutputStream
      */
     private int bufferPosition;
 
-    private final PendingResponseSet pendingResponseSet = new PendingResponseSet(PENDING_RESPONSES);
+    private final RunningRequestSet runningRequestSet = new RunningRequestSet(NUM_CONCURRENT_REQUESTS);
 
     /**
      * valid part id starts from 0.
      */
-    private final AtomicInteger partId = new AtomicInteger(0);
+    private final AtomicInteger currPartId = new AtomicInteger(0);
 
     /**
      * The http client.
@@ -161,7 +161,8 @@ public class HttpOutputStream extends OutputStream
         logger.debug("Sending {} bytes to http stream", this.bufferPosition);
         byte[] content = Arrays.copyOfRange(this.buffer, 0, this.bufferPosition);
         this.bufferPosition = 0;
-        sendContent(content);
+        int partId = this.currPartId.getAndIncrement();
+        sendContent(new ContentRequest(partId, content));
     }
 
     @Override
@@ -179,30 +180,30 @@ public class HttpOutputStream extends OutputStream
         }
     }
 
-    private void sendContent(byte[] content)
+    private void sendContent(ContentRequest request)
     {
-        int retry = 0;
-        while (retry <= MAX_RETRIES)
+        while (request.getRetries() <= MAX_RETRIES)
         {
             try
             {
-                int currPartId = this.partId.getAndIncrement();
+                byte[] content = request.getContent();
                 Request req = httpClient.preparePost(this.uri)
                         .setBody(ByteBuffer.wrap(content))
                         .addHeader(HttpHeaderNames.CONTENT_TYPE, "application/x-protobuf")
                         .addHeader(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(content.length))
                         .addHeader(HttpHeaderNames.CONNECTION, "keep-alive")
-                        .addHeader(PART_ID, currPartId)
+                        .addHeader(PART_ID, request.partId)
                         .build();
-                this.pendingResponseSet.pendForResponse(currPartId, httpClient.executeRequest(req));
+                this.runningRequestSet.add(request, httpClient.executeRequest(req));
                 break;
             }
             catch (Exception e)
             {
-                retry++;
+                request.incrementReties();
+                logger.warn("failed to send content {} and is retrying", request.partId, e);
                 if (!(e.getCause() instanceof java.net.ConnectException || e.getCause() instanceof java.io.IOException))
                 {
-                    logger.error("Failed to send content after {} retries", retry, e);
+                    logger.error("failed to send content {} after {} retries", request.partId, request.getRetries(), e);
                     break;
                 }
                 try
@@ -211,7 +212,7 @@ public class HttpOutputStream extends OutputStream
                 }
                 catch (InterruptedException e1)
                 {
-                    logger.error("Retry interrupted", e1);
+                    logger.error("retry interrupted", e1);
                     break;
                 }
             }
@@ -228,21 +229,22 @@ public class HttpOutputStream extends OutputStream
                 .addHeader(HttpHeaderNames.CONTENT_LENGTH, "0")
                 .addHeader(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE)
                 .build();
-        int retry = 0;
-        while (retry <= MAX_RETRIES)
+        int retries = 0;
+        while (retries <= MAX_RETRIES)
         {
             try
             {
-                pendingResponseSet.waitAllComplete();
+                runningRequestSet.waitAllComplete();
                 httpClient.executeRequest(req).get();
                 break;
             }
             catch (Exception e)
             {
-                retry++;
+                retries++;
+                logger.warn("failed to close and is retrying", e);
                 if (!(e.getCause() instanceof java.net.ConnectException))
                 {
-                    logger.error("Failed to close http output stream after {} retries", retry, e);
+                    logger.error("failed to close after {} retries", retries, e);
                     break;
                 }
                 try
@@ -251,7 +253,7 @@ public class HttpOutputStream extends OutputStream
                 }
                 catch (InterruptedException e1)
                 {
-                    logger.error("Retry interrupted", e1);
+                    logger.error("retry interrupted", e1);
                     break;
                 }
             }
@@ -267,53 +269,72 @@ public class HttpOutputStream extends OutputStream
     }
 
     /**
-     * The set to manage pending http future responses. It allows at most {@link #capacity()} asynchronous http
-     * request to be executed concurrently and waits for their responses.
+     * The set to manage concurrent running http requests. It allows at most {@link #capacity()} asynchronous http
+     * requests to be executed concurrently and waits for their responses.
      */
-    public static class PendingResponseSet
+    public class RunningRequestSet
     {
         private final int capacity;
 
-        private volatile int numPendingResponse;
+        private volatile int numRunningRequests;
 
         private volatile boolean shutdown;
 
-        public PendingResponseSet(int capacity)
+        public RunningRequestSet(int capacity)
         {
             checkArgument(capacity > 0, "capacity must be greater than 0");
             this.capacity = capacity;
-            this.numPendingResponse = 0;
+            this.numRunningRequests = 0;
             this.shutdown = false;
         }
 
-        public synchronized void pendForResponse(int partId, ListenableFuture<Response> response) throws InterruptedException
+        public synchronized void add(ContentRequest request, ListenableFuture<Response> response) throws InterruptedException
         {
             if (shutdown)
             {
                 throw new IllegalStateException("pending response set is already shutdown");
             }
-            while (this.numPendingResponse >= capacity)
+            while (this.numRunningRequests >= capacity)
             {
                 this.wait();
             }
-            this.numPendingResponse++;
-            response.addListener(new ResponseListener(partId, this), null);
+            this.numRunningRequests++;
+            response.toCompletableFuture().whenComplete((resp, err) -> {
+                if (err != null)
+                {
+                    if (request.getRetries() < MAX_RETRIES)
+                    {
+                        logger.error("failed to send content {} and is retrying", request.partId, err);
+                        request.incrementReties();
+                        sendContent(request);
+                    }
+                    else
+                    {
+                        logger.error("failed to send content {} after {} retries",
+                                request.partId, request.getRetries(), err);
+                        complete();
+                    }
+                }
+                else
+                {
+                    complete();
+                }
+            });
         }
 
         /**
          * This method should be called from a thread other than the thread which called
-         * {@link #pendForResponse(int, ListenableFuture)}.
-         * @param partId the part id of the completed response.
+         * {@link #add(ContentRequest, ListenableFuture)}.
          */
-        public synchronized void completeResponse(int partId)
+        public synchronized void complete()
         {
-            this.numPendingResponse--;
+            this.numRunningRequests--;
             this.notify();
         }
 
         public synchronized boolean isEmpty()
         {
-            return this.numPendingResponse == 0;
+            return this.numRunningRequests == 0;
         }
 
         public int capacity()
@@ -327,8 +348,8 @@ public class HttpOutputStream extends OutputStream
         }
 
         /**
-         * Shutdown this {@link PendingResponseSet} and wait for the pending responses to complete.
-         * This method is not synchronized, otherwise {@link #completeResponse(int)} can not be executed to clear the set.
+         * Shutdown this {@link RunningRequestSet} and wait for the pending responses to complete.
+         * This method is not synchronized, otherwise {@link #complete()} can not be executed to clear the set.
          * @throws InterruptedException
          */
         public void waitAllComplete() throws InterruptedException
@@ -343,21 +364,37 @@ public class HttpOutputStream extends OutputStream
         }
     }
 
-    public static class ResponseListener implements Runnable
+    public static class ContentRequest
     {
         private final int partId;
-        private final PendingResponseSet responseSet;
+        private final byte[] content;
+        private final AtomicInteger retries;
 
-        public ResponseListener(int partId, PendingResponseSet responseSet)
+        public ContentRequest(int partId, byte[] content)
         {
             this.partId = partId;
-            this.responseSet = responseSet;
+            this.content = content;
+            this.retries = new AtomicInteger(0);
         }
 
-        @Override
-        public void run()
+        public int getPartId()
         {
-            this.responseSet.completeResponse(this.partId);
+            return partId;
+        }
+
+        public byte[] getContent()
+        {
+            return content;
+        }
+
+        public int getRetries()
+        {
+            return this.retries.get();
+        }
+
+        public void incrementReties()
+        {
+            this.retries.incrementAndGet();
         }
     }
 }

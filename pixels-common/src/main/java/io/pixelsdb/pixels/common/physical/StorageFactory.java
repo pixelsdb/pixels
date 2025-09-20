@@ -71,8 +71,7 @@ public class StorageFactory
             if (!providerExists)
             {
                 // only log a warning, do not throw exception.
-                logger.warn(String.format(
-                        "no storage provider exists for scheme: %s", scheme.name()));
+                logger.warn("no storage provider exists for scheme: {}", scheme.name());
             }
         }
         this.storageProviders = providersBuilder.build();

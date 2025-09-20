@@ -92,7 +92,7 @@
 
         <dependency>
             <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-storage-http-stream</artifactId>
+            <artifactId>pixels-storage-http</artifactId>
             <scope>test</scope>
             <optional>true</optional>
         </dependency>

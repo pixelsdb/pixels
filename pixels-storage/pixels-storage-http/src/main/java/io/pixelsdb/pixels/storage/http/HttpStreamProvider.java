@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2024 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.localfs;
+package io.pixelsdb.pixels.storage.http;
 
 import io.pixelsdb.pixels.common.physical.*;
 
@@ -26,10 +26,10 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
- * @author hank
- * @create 2023-04-15
+ * @author huasiy
+ * @create 2024-11-05
  */
-public class LocalFSProvider implements StorageProvider
+public class HttpStreamProvider implements StorageProvider
 {
     @Override
     public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
@@ -38,7 +38,7 @@ public class LocalFSProvider implements StorageProvider
         {
             throw new IOException("incompatible storage scheme: " + scheme);
         }
-        return new LocalFS();
+        return new HttpStream();
     }
 
     @Override
@@ -49,7 +49,7 @@ public class LocalFSProvider implements StorageProvider
         {
             throw new IOException("incompatible storage scheme: " + storage.getScheme());
         }
-        return new PhysicalLocalReader(storage, path);
+        return new PhysicalHttpStreamReader(storage, path);
     }
 
     @Override
@@ -60,12 +60,9 @@ public class LocalFSProvider implements StorageProvider
         {
             throw new IOException("incompatible storage scheme: " + storage.getScheme());
         }
-        return new PhysicalLocalWriter(storage, path, option.isOverwrite());
+        return new PhysicalHttpStreamWriter(storage, path);
     }
 
     @Override
-    public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
-    {
-        return scheme.equals(Storage.Scheme.file);
-    }
+    public boolean compatibleWith(@Nonnull Storage.Scheme scheme) { return scheme.equals(Storage.Scheme.httpstream); }
 }

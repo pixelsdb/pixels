@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.http;
+package io.pixelsdb.pixels.storage.sqs;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -28,28 +28,26 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * @author huasiy
- * @create 2024-11-08
+ * @author hank
+ * @create 2025-09-17
  */
-public class PhysicalHttpStreamWriter implements PhysicalWriter
+public class PhysicalSqsStreamWriter implements PhysicalWriter
 {
-    private HttpStream httpStream;
-    private String path;
+    private final String path;
     private long position;
-    private DataOutputStream dataOutputStream;
+    private final DataOutputStream dataOutputStream;
 
-    public PhysicalHttpStreamWriter(Storage storage, String path) throws IOException
+    public PhysicalSqsStreamWriter(Storage storage, String path) throws IOException
     {
-        if (storage instanceof HttpStream)
+        if (storage instanceof SqsStream)
         {
-            this.httpStream = (HttpStream) storage;
+            this.path = path;
+            this.dataOutputStream = storage.create(path, false, Constants.SQS_STREAM_BUFFER_SIZE);
         }
         else
         {
-            throw new IOException("storage is not HttpStream");
+            throw new IOException("storage is not SqsStream");
         }
-        this.path = path;
-        this.dataOutputStream = storage.create(path, false, Constants.HTTP_STREAM_BUFFER_SIZE);
     }
 
     /**
@@ -65,10 +63,10 @@ public class PhysicalHttpStreamWriter implements PhysicalWriter
     }
 
     /**
-     * Append content to the file.
+     * Append content to the stream.
      *
      * @param buffer content buffer
-     * @return start offset of content in the file.
+     * @return start offset of content in the stream.
      */
     @Override
     public long append(ByteBuffer buffer) throws IOException
@@ -79,12 +77,12 @@ public class PhysicalHttpStreamWriter implements PhysicalWriter
     }
 
     /**
-     * Append content to the file.
+     * Append content to the stream.
      *
      * @param buffer content buffer container
      * @param offset start offset of actual content buffer
      * @param length length of actual content buffer
-     * @return start offset of content in the file.
+     * @return start offset of content in the stream
      */
     @Override
     public long append(byte[] buffer, int offset, int length) throws IOException
@@ -108,8 +106,14 @@ public class PhysicalHttpStreamWriter implements PhysicalWriter
     }
 
     @Override
-    public String getPath() { return path; }
+    public String getPath()
+    {
+        return path;
+    }
 
     @Override
-    public int getBufferSize() { return Constants.HTTP_STREAM_BUFFER_SIZE; }
+    public int getBufferSize()
+    {
+        return Constants.SQS_STREAM_BUFFER_SIZE;
+    }
 }

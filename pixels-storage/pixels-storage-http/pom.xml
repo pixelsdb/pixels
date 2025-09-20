@@ -10,7 +10,7 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>pixels-storage-http-stream</artifactId>
+    <artifactId>pixels-storage-http</artifactId>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>

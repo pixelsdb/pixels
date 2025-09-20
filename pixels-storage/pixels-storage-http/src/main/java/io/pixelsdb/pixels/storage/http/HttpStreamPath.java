@@ -17,17 +17,17 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.storage.http;
 
 import static java.util.Objects.requireNonNull;
 
-public class StreamPath
+public class HttpStreamPath
 {
-    private String host;
-    private int port;
-    public boolean valid = false;
+    private final String host;
+    private final int port;
+    private final boolean valid;
 
-    public StreamPath(String path)
+    public HttpStreamPath(String path)
     {
         requireNonNull(path);
         if (path.contains("://"))
@@ -41,9 +41,15 @@ public class StreamPath
             port = Integer.parseInt(path.substring(colon + 1));
             this.valid = true;
         }
+        else
+        {
+            this.host = null;
+            this.port = -1;
+            this.valid = false;
+        }
     }
 
-    public String getHostName()
+    public String getHost()
     {
         return host;
     }
@@ -53,4 +59,8 @@ public class StreamPath
         return port;
     }
 
+    public boolean isValid()
+    {
+        return valid;
+    }
 }

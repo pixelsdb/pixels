@@ -20,11 +20,7 @@
 package io.pixelsdb.pixels.storage.http.io;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
 import io.pixelsdb.pixels.common.utils.Constants;
-import io.pixelsdb.pixels.common.utils.HttpServer;
-import io.pixelsdb.pixels.common.utils.HttpServerHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -36,8 +32,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static io.pixelsdb.pixels.storage.http.io.HttpContentQueue.PART_ID;
-
 public class HttpInputStream extends InputStream
 {
     private static final Logger logger = LogManager.getLogger(HttpInputStream.class);
@@ -46,17 +40,6 @@ public class HttpInputStream extends InputStream
      * indicates whether the stream is still open / valid
      */
     private boolean open;
-
-    /**
-     * The schema of http stream.
-     * Default value is http.
-     */
-    private static final String protocol = "http";
-
-    /**
-     * The uri of http stream.
-     */
-    private final String uri;
 
     /**
      * The temporary buffer used for storing the chunks.
@@ -87,8 +70,7 @@ public class HttpInputStream extends InputStream
     {
         this.open = true;
         this.contentQueue = new HttpContentQueue();
-        this.uri = protocol + "://" + host + ":" + port;
-        this.httpServer = new HttpServer(new HttpServerHandlerImpl(this.contentQueue));
+        this.httpServer = new HttpServer(new HttpServerHandler(this.contentQueue));
         this.executorService = Executors.newFixedThreadPool(1);
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
             try
@@ -132,11 +114,11 @@ public class HttpInputStream extends InputStream
     }
 
     /**
-     * Attempt to read data with a maximum length of len into the position off of buf.
-     * @param buf
-     * @param off
-     * @param len
-     * @return Actual number of bytes read
+     * Attempt to read data with a maximum length of len into the position off of the buffer.
+     * @param buf the buffer
+     * @param off the position in buffer
+     * @param len the length in bytes to read
+     * @return actual number of bytes read
      * @throws IOException
      */
     @Override
@@ -230,74 +212,7 @@ public class HttpInputStream extends InputStream
     {
         if (!this.open)
         {
-            throw new IllegalStateException("Closed");
-        }
-    }
-
-    public String getUri()
-    {
-        return uri;
-    }
-
-    public static class HttpServerHandlerImpl extends HttpServerHandler
-    {
-        private final HttpContentQueue contentQueue;
-
-        public HttpServerHandlerImpl(HttpContentQueue contentQueue)
-        {
-            this.contentQueue = contentQueue;
-        }
-
-        @Override
-        public void channelRead0(ChannelHandlerContext ctx, HttpObject msg)
-        {
-            if (!(msg instanceof HttpRequest))
-            {
-                return;
-            }
-            FullHttpRequest req = (FullHttpRequest) msg;
-            if (req.method() != HttpMethod.POST)
-            {
-                sendResponse(ctx, req, HttpResponseStatus.OK);
-                return;
-            }
-
-            if (!req.headers().get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-protobuf"))
-            {
-                return;
-            }
-            String partId = req.headers().get(PART_ID);
-            if (partId != null)
-            {
-                ByteBuf content = req.content();
-                if (content.isReadable())
-                {
-                    content.retain();
-                    this.contentQueue.add(new HttpContent(Integer.parseInt(partId), content));
-                }
-            }
-            sendResponse(ctx, req, HttpResponseStatus.OK);
-        }
-
-        private void sendResponse(ChannelHandlerContext ctx, FullHttpRequest req, HttpResponseStatus status)
-        {
-            FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), status);
-            response.headers()
-                    .set(HttpHeaderNames.CONTENT_TYPE, "text/plain")
-                    .set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
-
-            if (req.headers().get(HttpHeaderNames.CONNECTION).equals(HttpHeaderValues.CLOSE.toString()))
-            {
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                response.setStatus(status);
-                ctx.writeAndFlush(response);
-                this.serverCloser.run();
-            } else
-            {
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-                response.setStatus(status);
-                ctx.writeAndFlush(response);
-            }
+            throw new IllegalStateException("http input stream is closed");
         }
     }
 }

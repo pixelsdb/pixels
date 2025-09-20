@@ -21,16 +21,13 @@ package io.pixelsdb.pixels.storage.http;
 
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StreamPath;
 import io.pixelsdb.pixels.storage.http.io.HttpInputStream;
 import io.pixelsdb.pixels.storage.http.io.HttpOutputStream;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
-
 
 public final class HttpStream implements Storage
 {
@@ -64,8 +61,8 @@ public final class HttpStream implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        StreamPath streamPath = new StreamPath(path);
-        if (!streamPath.valid)
+        HttpStreamPath httpStreamPath = new HttpStreamPath(path);
+        if (!httpStreamPath.isValid())
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
@@ -73,10 +70,10 @@ public final class HttpStream implements Storage
         HttpInputStream inputStream;
         try
         {
-            inputStream = new HttpInputStream(streamPath.getHostName(), streamPath.getPort());
+            inputStream = new HttpInputStream(httpStreamPath.getHost(), httpStreamPath.getPort());
         } catch (Exception e)
         {
-            throw new IOException("Failed to open streamInputStream, " + e.toString());
+            throw new IOException("Failed to open HttpInputStream.", e);
         }
         return new DataInputStream(inputStream);
     }
@@ -84,31 +81,31 @@ public final class HttpStream implements Storage
     @Override
     public List<Status> listStatus(String... path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public List<String> listPaths(String... path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Status getStatus(String path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public long getFileId(String path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public boolean mkdirs(String path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -117,18 +114,18 @@ public final class HttpStream implements Storage
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        StreamPath streamPath = new StreamPath(path);
-        if (!streamPath.valid)
+        HttpStreamPath httpStreamPath = new HttpStreamPath(path);
+        if (!httpStreamPath.isValid())
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        return new DataOutputStream(new HttpOutputStream(streamPath.getHostName(), streamPath.getPort(), bufferSize));
+        return new DataOutputStream(new HttpOutputStream(httpStreamPath.getHost(), httpStreamPath.getPort(), bufferSize));
     }
 
     @Override
     public boolean delete(String path, boolean recursive)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -137,7 +134,7 @@ public final class HttpStream implements Storage
     @Override
     public boolean directCopy(String src, String dest)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -146,7 +143,7 @@ public final class HttpStream implements Storage
     @Override
     public boolean exists(String path)
     {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException();
     }
 
     @Override
