@@ -57,11 +57,6 @@ public class PhysicalWriterUtil
                 .createWriter(storage, path, option);
     }
 
-    public static PhysicalWriter newPhysicalWriter(Storage storage, String path) throws IOException
-    {
-        return newPhysicalWriter(storage, path, null);
-    }
-
     /**
      * Get a physical file system writer.
      *
@@ -122,6 +117,20 @@ public class PhysicalWriterUtil
     }
 
     /**
+     * Get a physical file system writer with overwrite=false.
+     * If the storage is HDFS, default blocks, one replication, and addBlockPadding=true are used by default.
+     *
+     * @param storage the storage to use
+     * @param path the path of the file to write
+     * @return the physical writer
+     */
+    public static PhysicalWriter newPhysicalWriter(Storage storage, String path) throws IOException
+    {
+        return newPhysicalWriter(storage, path, DEFAULT_HDFS_BLOCK_SIZE,
+                (short) 1, true, false);
+    }
+
+    /**
      * Get a physical file system writer.
      *
      * @param scheme          name of the scheme
@@ -179,5 +188,21 @@ public class PhysicalWriterUtil
         checkArgument(path != null, "path should not be null");
         return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path,
                 DEFAULT_HDFS_BLOCK_SIZE, (short) 1, true, overwrite);
+    }
+
+    /**
+     * Get a physical file system writer with overwrite=false.
+     * If the storage is HDFS, default blocks, one replication, and addBlockPadding=true are used by default.
+     *
+     * @param scheme name of the scheme
+     * @param path the path of the file to write
+     * @return the physical writer
+     */
+    public static PhysicalWriter newPhysicalWriter(Storage.Scheme scheme, String path) throws IOException
+    {
+        checkArgument(scheme != null, "scheme should not be null");
+        checkArgument(path != null, "path should not be null");
+        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path,
+                DEFAULT_HDFS_BLOCK_SIZE, (short) 1, true, false);
     }
 }
