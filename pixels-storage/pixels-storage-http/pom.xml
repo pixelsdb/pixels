@@ -25,21 +25,14 @@
             <optional>true</optional>
         </dependency>
 
-        <dependency>
-            <groupId>net.java.dev.jna</groupId>
-            <artifactId>jna</artifactId>
-        </dependency>
-
         <!-- asynchttpclient -->
         <dependency>
             <groupId>org.asynchttpclient</groupId>
             <artifactId>async-http-client</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <dependency>
