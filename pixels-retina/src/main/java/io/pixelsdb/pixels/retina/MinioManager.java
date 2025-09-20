@@ -33,7 +33,7 @@ import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 public class MinioManager
 {
     private final Storage minio;
-
+    private final String minioPathPrefix;
     public MinioManager()
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
@@ -48,6 +48,7 @@ public class MinioManager
         {
             throw new RuntimeException(e);
         }
+        this.minioPathPrefix = configFactory.getProperty("minio.path.prefix");
     }
 
     private static MinioManager instance = null;
@@ -63,7 +64,7 @@ public class MinioManager
 
     private String buildKey(long tableId, long entryId)
     {
-        return String.format("%d/%d", tableId, entryId);
+        return this.minioPathPrefix + String.format("%d/%d", tableId, entryId);
     }
 
     public void write(long tableId, long entryId, byte[] data) throws IOException

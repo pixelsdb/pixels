@@ -30,7 +30,10 @@ import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -47,9 +50,11 @@ public class RetinaService
         String retinaHost = ConfigFactory.Instance().getProperty("retina.server.host");
         int retinaPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
         defaultInstance = new RetinaService(retinaHost, retinaPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
             @Override
-            public void run() {
+            public void run()
+            {
                 try
                 {
                     defaultInstance.shutdown();
@@ -70,6 +75,7 @@ public class RetinaService
      * Get the default retina service instance connecting to the retina host:port configured in
      * PIXELS_HOME/pixels.properties. This default instance whill be automatically shut down when the process
      * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
+     *
      * @return
      */
     public static RetinaService Instance()
@@ -80,6 +86,7 @@ public class RetinaService
     /**
      * This method should only be used to connect to a retina server that is not configured through
      * PIXELS_HOME/pixels.properties. <b>No need</b> to manually shut down the returned retina service.
+     *
      * @param host the host name of the retina server
      * @param port the port of the retina server
      * @return the created retina service instance
@@ -92,7 +99,7 @@ public class RetinaService
                 addr -> new RetinaService(addr.getHostText(), addr.getPort())
         );
     }
-    
+
     private final ManagedChannel channel;
     private final RetinaWorkerServiceGrpc.RetinaWorkerServiceBlockingStub stub;
     private final RetinaWorkerServiceGrpc.RetinaWorkerServiceStub asyncStub;
@@ -102,7 +109,11 @@ public class RetinaService
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
-        this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+        this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext()
+//                .keepAliveTime(1, TimeUnit.SECONDS)
+//                .keepAliveTimeout(3, TimeUnit.SECONDS)
+//                .keepAliveWithoutCalls(true)
+                .build();
         this.stub = RetinaWorkerServiceGrpc.newBlockingStub(this.channel);
         this.asyncStub = RetinaWorkerServiceGrpc.newStub(this.channel);
         this.isShutdown = false;
@@ -211,8 +222,7 @@ public class RetinaService
             {
                 if (response.getHeader().getErrorCode() != 0)
                 {
-                    logger.error("Failed to update record: " + response.getHeader().getErrorCode()
-                            + " " + response.getHeader().getErrorMsg());
+                    logger.error("Stream update record failed: {}", response.getHeader().getErrorMsg());
                 }
             }
 

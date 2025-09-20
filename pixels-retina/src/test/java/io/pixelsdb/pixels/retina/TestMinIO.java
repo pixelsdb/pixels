@@ -59,4 +59,16 @@ public class TestMinIO
         minio.delete(file, false);
         assert(minio.exists(file));
     }
+
+    @Test
+    public void testMinioManager() throws IOException
+    {
+        MinioManager minioManager = new MinioManager();
+        long tableId = 0;
+        long entryId = 0;
+        byte[] buffer = new byte[]{2, 0, 2, 0, 2, 0, 1, 5, 4, 5};
+        minioManager.write(tableId, entryId, buffer);
+
+
+    }
 }

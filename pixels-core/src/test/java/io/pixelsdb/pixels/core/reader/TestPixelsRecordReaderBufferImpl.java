@@ -59,13 +59,5 @@ public class TestPixelsRecordReaderBufferImpl
                 .transTimestamp(timeStamp);
 
         com.google.protobuf.ByteString byteString = superVersion.getData();
-        PixelsRecordReaderBufferImpl recordReaderBuffer = new PixelsRecordReaderBufferImpl(
-                option,
-                byteString.toByteArray(), superVersion.getIdsList(),
-                superVersion.getBitmapsList(),
-                storage,
-                schemaName, tableName,
-                typeDescription
-        );
     }
 }
