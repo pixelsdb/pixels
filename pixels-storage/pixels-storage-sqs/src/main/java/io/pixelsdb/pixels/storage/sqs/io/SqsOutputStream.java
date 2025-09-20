@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.storage.sqs.io;
 
+import io.pixelsdb.pixels.storage.sqs.SqsStreamPath;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -28,6 +29,28 @@ import java.io.OutputStream;
 public class SqsOutputStream extends OutputStream
 {
     private static final Logger logger = LogManager.getLogger(SqsOutputStream.class);
+
+    /**
+     * The temporary buffer used for storing the chunks.
+     */
+    private final byte[] buffer;
+
+    /**
+     * The position in the buffer.
+     */
+    private int bufferPosition;
+
+    /**
+     * indicates whether the stream is still open / valid
+     */
+    private boolean open;
+
+    public SqsOutputStream(SqsStreamPath path, int bufferCapacity)
+    {
+        this.open = true;
+        this.buffer = new byte[bufferCapacity];
+        this.bufferPosition = 0;
+    }
 
     /**
      * Write a byte array to the http output stream.
@@ -44,24 +67,20 @@ public class SqsOutputStream extends OutputStream
     @Override
     public void write(int b) throws IOException
     {
-
     }
 
     @Override
     public void write(final byte[] buf, final int off, final int len) throws IOException
     {
-
     }
 
     @Override
     public void flush() throws IOException
     {
-
     }
 
     @Override
     public void close() throws IOException
     {
-
     }
 }

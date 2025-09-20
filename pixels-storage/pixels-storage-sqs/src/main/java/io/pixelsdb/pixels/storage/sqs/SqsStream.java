@@ -123,7 +123,7 @@ public final class SqsStream implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        return new DataOutputStream(new SqsOutputStream());
+        return new DataOutputStream(new SqsOutputStream(sqsStreamPath, bufferSize));
     }
 
     @Override

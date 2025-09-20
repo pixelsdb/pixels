@@ -52,7 +52,7 @@
         <module>pixels-storage/pixels-storage-redis</module>
         <module>pixels-storage/pixels-storage-localfs</module>
         <module>pixels-storage/pixels-storage-mock</module>
-        <module>pixels-storage/pixels-storage-http-stream</module>
+        <module>pixels-storage/pixels-storage-http</module>
         <module>pixels-storage/pixels-storage-sqs</module>
         <module>pixels-turbo/pixels-worker-common</module>
         <module>pixels-turbo/pixels-worker-lambda</module>
@@ -202,7 +202,7 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-storage-http-stream</artifactId>
+                <artifactId>pixels-storage-http</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
