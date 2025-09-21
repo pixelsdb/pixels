@@ -27,6 +27,7 @@ import org.apache.logging.log4j.Logger;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -75,10 +76,15 @@ public class HttpInputStream extends InputStream
         this.httpServerFuture = CompletableFuture.runAsync(() -> {
             try
             {
-                this.httpServer.serve(port);
-            } catch (InterruptedException e)
+                this.httpServer.serve(host, port);
+            }
+            catch (InterruptedException e)
             {
                 logger.error("http server interrupted", e);
+            }
+            catch (UnknownHostException e)
+            {
+                logger.error("unknown host for http server", e);
             }
         }, this.executorService);
     }
