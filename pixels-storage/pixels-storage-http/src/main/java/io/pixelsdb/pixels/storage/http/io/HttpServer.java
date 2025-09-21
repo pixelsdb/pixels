@@ -31,7 +31,10 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 
+import javax.annotation.Nonnull;
 import javax.net.ssl.SSLException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 
 /**
@@ -55,7 +58,7 @@ public final class HttpServer
         handler.setServerCloser(this::close);
     }
 
-    public void serve(int port) throws InterruptedException
+    public void serve(@Nonnull String host, int port) throws InterruptedException, UnknownHostException
     {
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
@@ -69,7 +72,7 @@ public final class HttpServer
                     .handler(new LoggingHandler(LogLevel.INFO))
                     .childHandler(this.initializer);
 
-            channel = b.bind(port).sync().channel();
+            channel = b.bind(InetAddress.getByName(host), port).sync().channel();
             channel.closeFuture().sync();
         }
         finally
