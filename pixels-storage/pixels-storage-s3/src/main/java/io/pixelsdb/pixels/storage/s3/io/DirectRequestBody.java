@@ -26,6 +26,10 @@ import software.amazon.awssdk.http.ContentStreamProvider;
 import java.io.ByteArrayInputStream;
 
 /**
+ * The request body of put object that directly passes a byte array to S3 without memory copying.
+ * The {@link #fromBytesDirect(byte[], int, int)} method does this, and this method should only be used if the
+ * byte array is not modified before it is fully send to S3.
+ *
  * @author hank
  * @create 2025-09-22
  */
@@ -36,6 +40,10 @@ public class DirectRequestBody extends RequestBody
         super(contentStreamProvider, contentLength, contentType);
     }
 
+    /**
+     * Construct a request body without memory copying.
+     * @return the request body
+     */
     public static RequestBody fromBytesDirect(byte[] bytes, int offset, int length)
     {
         return new DirectRequestBody(() ->

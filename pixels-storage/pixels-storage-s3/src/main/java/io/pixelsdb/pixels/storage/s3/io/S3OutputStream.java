@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.storage.s3.io;
 
+import io.pixelsdb.pixels.common.physical.FixSizedBuffers;
 import io.pixelsdb.pixels.common.physical.scheduler.RetryPolicy;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
@@ -108,7 +109,10 @@ public class S3OutputStream extends OutputStream
     private static final int maxConcurrency;
 
     private static final boolean enableRetry;
+
     private static final RetryPolicy retryPolicy;
+
+    private static final FixSizedBuffers fixSizedBuffers;
 
     static
     {
@@ -126,6 +130,9 @@ public class S3OutputStream extends OutputStream
         {
             retryPolicy = null;
         }
+
+        fixSizedBuffers = new FixSizedBuffers(S3_BUFFER_SIZE);
+        Runtime.getRuntime().addShutdownHook(new Thread(fixSizedBuffers::clear));
     }
 
     /**
@@ -153,7 +160,14 @@ public class S3OutputStream extends OutputStream
         this.s3Client = s3Client;
         this.bucket = bucket;
         this.key = key;
-        this.buffer = new byte[bufferSize];
+        if (fixSizedBuffers.getBufferSize() == bufferSize)
+        {
+            this.buffer = fixSizedBuffers.allocate();
+        }
+        else
+        {
+            this.buffer = new byte[bufferSize];
+        }
         this.position = 0;
         this.parts = new ConcurrentLinkedQueue<>();
         this.open = true;
@@ -303,6 +317,10 @@ public class S3OutputStream extends OutputStream
                         .acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
                 //this.s3Client.putObject(request, RequestBody.fromByteBuffer(ByteBuffer.wrap(buffer, 0, position)));
                 this.s3Client.putObject(request, DirectRequestBody.fromBytesDirect(buffer, 0, position));
+            }
+            if (this.buffer.length == fixSizedBuffers.getBufferSize())
+            {
+                fixSizedBuffers.free(this.buffer);
             }
         }
     }
