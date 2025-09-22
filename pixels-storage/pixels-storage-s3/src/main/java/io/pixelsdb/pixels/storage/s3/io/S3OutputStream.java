@@ -301,7 +301,8 @@ public class S3OutputStream extends OutputStream
             {
                 final PutObjectRequest request = PutObjectRequest.builder().bucket(this.bucket).key(this.key)
                         .acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-                this.s3Client.putObject(request, RequestBody.fromByteBuffer(ByteBuffer.wrap(buffer, 0, position)));
+                //this.s3Client.putObject(request, RequestBody.fromByteBuffer(ByteBuffer.wrap(buffer, 0, position)));
+                this.s3Client.putObject(request, DirectRequestBody.fromBytesDirect(buffer, 0, position));
             }
         }
     }
