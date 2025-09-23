@@ -178,18 +178,18 @@ public class PixelsWriterBuffer
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
+        MemTable currentMemTable = null;
         int rowOffset = -1;
         while (rowOffset < 0)
         {
-            this.versionLock.readLock().lock();
-            rowOffset = this.activeMemTable.add(values, timestamp);
-            this.versionLock.readLock().unlock();
+            currentMemTable = this.activeMemTable;
+            rowOffset = currentMemTable.add(values, timestamp);
             if (rowOffset < 0)  // active memTable is full
             {
                 switchMemTable();
             }
         }
-        int rgRowOffset = (int) (currentMemTableCount * memTableSize - memTableSize + rowOffset);
+        int rgRowOffset = (int) (currentMemTable.getStartIndex() + rowOffset);
         if(rgRowOffset < 0)
         {
             throw new RetinaException("Expect rgRowOffset >= 0, get " + rgRowOffset);
