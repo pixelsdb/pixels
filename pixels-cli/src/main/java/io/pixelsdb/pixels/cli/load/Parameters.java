@@ -23,9 +23,11 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -41,6 +43,7 @@ public class Parameters
     private String schema;
     private int[] orderMapping;
     private int[] pkMapping;
+    private TypeDescription pkTypeDescription;
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
     private final MetadataService metadataService;
@@ -106,6 +109,11 @@ public class Parameters
     public MetadataService getMetadataService()
     {
         return metadataService;
+    }
+
+    public TypeDescription getPkTypeDescription()
+    {
+        return pkTypeDescription;
     }
 
     public Parameters(String dbName, String tableName, int maxRowNum, String regex, EncodingLevel encodingLevel,
@@ -213,6 +221,8 @@ public class Parameters
         {
             rowIdAllocator = new RowIdAllocator(table.getId(), 1000);
             int[] orderKeyColIds = new int[index.getKeyColumns().getKeyColumnIds().size()];
+            List<String> orderKeyColNames = new LinkedList<>();
+            List<String> orderKeyColTypes = new LinkedList<>();
             if (!index.isUnique()) {
                 throw new MetadataException("Non Unique Index is not supported, Schema:" + dbName + " Table: " + tableName);
             }
@@ -229,7 +239,10 @@ public class Parameters
                             + table.getName() + " schema id is " + table.getSchemaId());
                 }
                 orderKeyColIds[keyColumnIdx++] = i;
+                orderKeyColTypes.add(columns.get(i).getName());
+                orderKeyColTypes.add(columns.get(i).getType());
             }
+            this.pkTypeDescription = TypeDescription.createSchemaFromStrings(orderKeyColNames, orderKeyColTypes);
             this.pkMapping = orderKeyColIds;
         }
 

@@ -81,9 +81,11 @@ public class ByteColumnVector extends ColumnVector
         }
         if (value.length != Byte.BYTES)
         {
-            throw new IllegalArgumentException("Only byte arrays of length 1 are supported, got length: " + value.length);
+            add(new String(value));
+        } else
+        {
+            add(value[0]);
         }
-        add(value[0]);
     }
 
     @Override
