@@ -183,7 +183,13 @@ public class PixelsWriterBuffer
         while (rowOffset < 0)
         {
             currentMemTable = this.activeMemTable;
-            rowOffset = currentMemTable.add(values, timestamp);
+            try
+            {
+                rowOffset = currentMemTable.add(values, timestamp);
+            } catch (NullPointerException e)
+            {
+                continue;
+            }
             if (rowOffset < 0)  // active memTable is full
             {
                 switchMemTable();
@@ -239,8 +245,7 @@ public class PixelsWriterBuffer
             this.currentMemTableCount += 1;
             this.idCounter++;
 
-            SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
-            this.currentVersion = newVersion;
+            this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
             oldVersion.unref();
 
             triggerFlushToMinio(oldMemTable);
