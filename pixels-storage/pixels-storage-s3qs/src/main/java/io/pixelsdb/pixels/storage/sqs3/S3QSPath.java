@@ -19,44 +19,60 @@
  */
 package io.pixelsdb.pixels.storage.sqs3;
 
+import io.pixelsdb.pixels.common.physical.Storage;
+
 import static java.util.Objects.requireNonNull;
 
 /**
  * An SQS stream path is in the format:
- * s3qs://s3_bucket_name:sqs_queue_name
+ * s3qs://s3_base_path:sqs_queue_url
+ *
+ *<p/>
+ * The s3_base_path is formed of s3_bucket_name/s3_key_prefix.
+ * The sqs_queue_url does not need to contain the https:// protocol prefix.
  *
  * @author hank
  * @create 2025-09-19
  */
 public class S3QSPath
 {
+    private static final String SchemePrefix = Storage.Scheme.s3qs.name() + "://";
     private final String bucketName;
-    private final String queueName;
+    private final String keyPrefix;
+    private final String queueUrl;
     private final boolean valid;
 
     public S3QSPath(String path)
     {
         requireNonNull(path);
-        if (path.contains("://"))
+        if (path.startsWith(SchemePrefix))
         {
-            path = path.substring(path.indexOf("://") + 3);
+            path = path.substring(SchemePrefix.length());
         }
         int colon = path.indexOf(':');
         if (colon > 0)
         {
-            String s3Prefix = path.substring(0, colon);
-            if (!s3Prefix.endsWith("/"))
+            String s3BasePath = path.substring(0, colon);
+            if (!s3BasePath.endsWith("/"))
             {
-                s3Prefix += "/";
+                s3BasePath += "/";
             }
-            this.bucketName = s3Prefix;
-            this.queueName = path.substring(colon + 1);
+            int slash = s3BasePath.lastIndexOf('/');
+            this.bucketName = s3BasePath.substring(0, slash);
+            this.keyPrefix = s3BasePath.substring(slash + 1);
+            String queueUrl = path.substring(colon + 1);
+            if (!queueUrl.startsWith("https://"))
+            {
+                queueUrl = "https://" + queueUrl;
+            }
+            this.queueUrl = queueUrl;
             this.valid = true;
         }
         else
         {
             this.bucketName = null;
-            this.queueName = null;
+            this.keyPrefix = null;
+            this.queueUrl = null;
             this.valid = false;
         }
     }
@@ -66,9 +82,14 @@ public class S3QSPath
         return bucketName;
     }
 
-    public String getQueueName()
+    public String getKeyPrefix()
     {
-        return queueName;
+        return keyPrefix;
+    }
+
+    public String getQueueUrl()
+    {
+        return queueUrl;
     }
 
     public boolean isValid()
