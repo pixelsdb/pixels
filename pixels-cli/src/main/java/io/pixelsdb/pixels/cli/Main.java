@@ -89,7 +89,7 @@ public class Main
                 continue;
             } catch (EndOfFileException e)
             {
-                // Ctrl+D
+                // Issue #631: in case of input from a file, exit at EOF.
                 System.out.println("Bye.");
                 break;
             }
