@@ -26,11 +26,14 @@ import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
+import org.jline.reader.EndOfFileException;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.UserInterruptException;
 
 import java.sql.*;
 import java.util.List;
 import java.util.Properties;
-import java.util.Scanner;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -69,21 +72,24 @@ import static java.util.Objects.requireNonNull;
  */
 public class Main
 {
-    public static void main(String args[])
+    public static void main(String[] args)
     {
-        Scanner scanner = new Scanner(System.in);
+        LineReader reader = LineReaderBuilder.builder().build();
+        String prompt = "pixels> ";
         String inputStr;
 
         while (true)
         {
-            System.out.print("pixels> ");
-            if (scanner.hasNextLine())
+            try
             {
-                inputStr = scanner.nextLine().trim();
-            }
-            else
+                inputStr = reader.readLine(prompt).trim();
+            } catch (UserInterruptException e)
             {
-                // Issue #631: in case of input from a file, exit at EOF.
+                // Ctrl+C
+                continue;
+            } catch (EndOfFileException e)
+            {
+                // Ctrl+D
                 System.out.println("Bye.");
                 break;
             }
@@ -378,7 +384,6 @@ public class Main
             }
         }
         // Use exit to terminate other threads and invoke the shutdown hooks.
-        scanner.close();
         System.exit(0);
     }
 
