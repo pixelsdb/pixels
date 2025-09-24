@@ -505,4 +505,22 @@ public abstract class ColumnVector implements AutoCloseable
         this.preFlattenIsRepeating = base.preFlattenIsRepeating();
         this.preFlattenNoNulls = base.preFlattenNoNulls();
     }
+
+    /**
+     * Check if the given byte array is null.
+     * If null, mark the current write index as null and ensure enough capacity.
+     *
+     * @param value the byte array to check
+     * @return true if the value is null and has been marked; false otherwise
+     */
+    protected boolean checkBytesNull(byte[] value)
+    {
+        if (value == null)
+        {
+            ensureSize(writeIndex + 1, true);
+            isNull[writeIndex++] = true;
+            return true;
+        }
+        return false;
+    }
 }

@@ -73,6 +73,20 @@ public class ByteColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(byte[] value)
+    {
+        if(checkBytesNull(value))
+        {
+            return;
+        }
+        if (value.length != Byte.BYTES)
+        {
+            throw new IllegalArgumentException("Only byte arrays of length 1 are supported, got length: " + value.length);
+        }
+        add(value[0]);
+    }
+
+    @Override
     public void add(String value)
     {
         assert value != null && value.length() > 0;

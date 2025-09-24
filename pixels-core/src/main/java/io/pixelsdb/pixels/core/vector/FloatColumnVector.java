@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.flat.FloatColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -114,31 +116,47 @@ public class FloatColumnVector extends ColumnVector
     }
 
     @Override
-    public void add(float value)
+    public void add(int value)
     {
         if (writeIndex >= getLength())
         {
             ensureSize(writeIndex * 2, true);
         }
         int index = writeIndex++;
-        vector[index] = Float.floatToIntBits(value);
+        vector[index] = value;
         isNull[index] = false;
+    }
+
+    @Override
+    public void add(byte[] value)
+    {
+        if(checkBytesNull(value))
+        {
+            return;
+        }
+
+        if (value.length != 4)
+        {
+            throw new IllegalArgumentException("Only byte[4] supported for serialization to int");
+        }
+        int intBits = ByteBuffer.wrap(value).getInt();
+        add(intBits);
+    }
+
+    @Override
+    public void add(float value)
+    {
+        add(Float.floatToIntBits(value));
     }
 
     @Override
     public void add(double value)
     {
-        if (writeIndex >= getLength())
-        {
-            ensureSize(writeIndex * 2, true);
-        }
         if (value < Float.MIN_VALUE || value > Float.MAX_VALUE)
         {
             throw new IllegalArgumentException("value " + value + " is out of the range of a float");
         }
-        int index = writeIndex++;
-        vector[index] = Float.floatToIntBits((float) value);
-        isNull[index] = false;
+        add(Float.floatToIntBits((float) value));
     }
 
     @Override

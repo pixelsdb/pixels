@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.flat.TimeColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import java.nio.ByteBuffer;
 import java.sql.Time;
 import java.util.Arrays;
 
@@ -400,6 +401,21 @@ public class TimeColumnVector extends ColumnVector
         }
         this.times[writeIndex] = millisInDay(value);
         this.isNull[writeIndex++] = false;
+    }
+
+    @Override
+    public void add(byte[] value)
+    {
+        if(checkBytesNull(value))
+        {
+            return;
+        }
+        if (value.length != Integer.BYTES)
+        {
+            throw new IllegalArgumentException("Only byte[4] supported for serialization to int for time");
+        }
+        int v = ByteBuffer.wrap(value).getInt();
+        add(v);
     }
 
     @Override
