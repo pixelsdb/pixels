@@ -17,12 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs;
+package io.pixelsdb.pixels.storage.sqs3;
 
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.storage.sqs.io.SqsInputStream;
-import io.pixelsdb.pixels.storage.sqs.io.SqsOutputStream;
+import io.pixelsdb.pixels.storage.sqs3.io.S3QSInputStream;
+import io.pixelsdb.pixels.storage.sqs3.io.S3QSOutputStream;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -33,14 +33,14 @@ import java.util.List;
  * @author hank
  * @create 2025-09-17
  */
-public final class SqsStream implements Storage
+public final class S3QS implements Storage
 {
-    private static final String SchemePrefix = Scheme.sqsstream.name() + "://";
+    private static final String SchemePrefix = Scheme.s3qs.name() + "://";
 
-    public SqsStream() { }
+    public S3QS() { }
 
     @Override
-    public Scheme getScheme() { return Scheme.sqsstream; }
+    public Scheme getScheme() { return Scheme.s3qs; }
 
     @Override
     public String ensureSchemePrefix(String path) throws IOException
@@ -65,16 +65,16 @@ public final class SqsStream implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        SqsStreamPath sqsStreamPath = new SqsStreamPath(path);
-        if (!sqsStreamPath.isValid())
+        S3QSPath s3qsPath = new S3QSPath(path);
+        if (!s3qsPath.isValid())
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
 
-        SqsInputStream inputStream;
+        S3QSInputStream inputStream;
         try
         {
-            inputStream = new SqsInputStream();
+            inputStream = new S3QSInputStream();
         } catch (Exception e)
         {
             throw new IOException("Failed to open sqsInputStream.", e);
@@ -118,12 +118,12 @@ public final class SqsStream implements Storage
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        SqsStreamPath sqsStreamPath = new SqsStreamPath(path);
-        if (!sqsStreamPath.isValid())
+        S3QSPath s3qsPath = new S3QSPath(path);
+        if (!s3qsPath.isValid())
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        return new DataOutputStream(new SqsOutputStream(sqsStreamPath, bufferSize));
+        return new DataOutputStream(new S3QSOutputStream(s3qsPath, bufferSize));
     }
 
     @Override

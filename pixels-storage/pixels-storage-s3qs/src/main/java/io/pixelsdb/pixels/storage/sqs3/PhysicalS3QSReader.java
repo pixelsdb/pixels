@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs;
+package io.pixelsdb.pixels.storage.sqs3;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -30,24 +30,24 @@ import java.util.concurrent.CompletableFuture;
 
 import static java.util.Objects.requireNonNull;
 
-public class PhysicalSqsStreamReader implements PhysicalReader
+public class PhysicalS3QSReader implements PhysicalReader
 {
-    private final SqsStream sqsStream;
+    private final S3QS s3qs;
     private final String path;
     private final DataInputStream dataInputStream;
 
-    public PhysicalSqsStreamReader(Storage storage, String path) throws IOException
+    public PhysicalS3QSReader(Storage storage, String path) throws IOException
     {
-        if (storage instanceof SqsStream)
+        if (storage instanceof S3QS)
         {
-            this.sqsStream = (SqsStream) storage;
+            this.s3qs = (S3QS) storage;
         }
         else
         {
-            throw new IOException("Storage is not SqsStream.");
+            throw new IOException("Storage is not S3QS.");
         }
         this.path = path;
-        this.dataInputStream = this.sqsStream.open(path);
+        this.dataInputStream = this.s3qs.open(path);
     }
 
     @Override
@@ -135,7 +135,7 @@ public class PhysicalSqsStreamReader implements PhysicalReader
     @Override
     public String getPathUri() throws IOException
     {
-        return this.sqsStream.ensureSchemePrefix(path);
+        return this.s3qs.ensureSchemePrefix(path);
     }
 
     /**
@@ -161,7 +161,7 @@ public class PhysicalSqsStreamReader implements PhysicalReader
     @Override
     public Storage.Scheme getStorageScheme()
     {
-        return this.sqsStream.getScheme();
+        return this.s3qs.getScheme();
     }
 
     /**

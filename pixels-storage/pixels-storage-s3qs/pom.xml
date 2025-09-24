@@ -10,7 +10,7 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>pixels-storage-sqs</artifactId>
+    <artifactId>pixels-storage-s3qs</artifactId>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>

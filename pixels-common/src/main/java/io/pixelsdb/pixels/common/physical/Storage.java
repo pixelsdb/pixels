@@ -47,7 +47,7 @@ public interface Storage
         redis, // Redis
         gcs,   // google cloud storage
         httpstream,  // http (netty) based stream storage
-        sqsstream,   // AWS SQS+S3 based stream storage
+        s3qs,   // AWS SQS+S3 based storage for intermediate data shuffle
         mock; // mock
 
         /**

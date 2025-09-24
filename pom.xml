@@ -53,7 +53,7 @@
         <module>pixels-storage/pixels-storage-localfs</module>
         <module>pixels-storage/pixels-storage-mock</module>
         <module>pixels-storage/pixels-storage-http</module>
-        <module>pixels-storage/pixels-storage-sqs</module>
+        <module>pixels-storage/pixels-storage-s3qs</module>
         <module>pixels-turbo/pixels-worker-common</module>
         <module>pixels-turbo/pixels-worker-lambda</module>
         <module>pixels-turbo/pixels-invoker-lambda</module>

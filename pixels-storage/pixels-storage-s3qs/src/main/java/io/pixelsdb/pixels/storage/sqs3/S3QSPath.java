@@ -17,24 +17,24 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs;
+package io.pixelsdb.pixels.storage.sqs3;
 
 import static java.util.Objects.requireNonNull;
 
 /**
  * An SQS stream path is in the format:
- * sqsstream://s3_bucket_name:sqs_queue_name
+ * s3qs://s3_bucket_name:sqs_queue_name
  *
  * @author hank
  * @create 2025-09-19
  */
-public class SqsStreamPath
+public class S3QSPath
 {
     private final String bucketName;
     private final String queueName;
     private final boolean valid;
 
-    public SqsStreamPath(String path)
+    public S3QSPath(String path)
     {
         requireNonNull(path);
         if (path.contains("://"))

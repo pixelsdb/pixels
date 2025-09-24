@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs.io;
+package io.pixelsdb.pixels.storage.sqs3.io;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,9 +25,9 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class SqsInputStream extends InputStream
+public class S3QSInputStream extends InputStream
 {
-    private static final Logger logger = LogManager.getLogger(SqsInputStream.class);
+    private static final Logger logger = LogManager.getLogger(S3QSInputStream.class);
 
     @Override
     public int read() throws IOException

@@ -17,18 +17,18 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs.io;
+package io.pixelsdb.pixels.storage.sqs3.io;
 
-import io.pixelsdb.pixels.storage.sqs.SqsStreamPath;
+import io.pixelsdb.pixels.storage.sqs3.S3QSPath;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.io.OutputStream;
 
-public class SqsOutputStream extends OutputStream
+public class S3QSOutputStream extends OutputStream
 {
-    private static final Logger logger = LogManager.getLogger(SqsOutputStream.class);
+    private static final Logger logger = LogManager.getLogger(S3QSOutputStream.class);
 
     /**
      * The temporary buffer used for storing the chunks.
@@ -45,7 +45,7 @@ public class SqsOutputStream extends OutputStream
      */
     private boolean open;
 
-    public SqsOutputStream(SqsStreamPath path, int bufferCapacity)
+    public S3QSOutputStream(S3QSPath path, int bufferCapacity)
     {
         this.open = true;
         this.buffer = new byte[bufferCapacity];

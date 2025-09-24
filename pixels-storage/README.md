@@ -11,7 +11,7 @@ Queries will load and call the providers to get access to the underlying storage
 - `pixels-storage-mock` provides a mock storage system for debugging.
 - `pixels-storage-redis` provides redis key-value storage.
 - `pixels-storage-http` provides a streaming storage based on http (netty).
-- `pixels-storage-sqs` provides a streaming storage based on AWS SQS and S3.
+- `pixels-storage-s3qs` provides a storage based on AWS SQS and S3 for intermediate data shuffle.
 
 ## Usage
 Storage provider can be used in either of the following ways:

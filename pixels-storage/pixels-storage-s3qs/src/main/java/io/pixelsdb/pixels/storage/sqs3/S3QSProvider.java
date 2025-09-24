@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs;
+package io.pixelsdb.pixels.storage.sqs3;
 
 import io.pixelsdb.pixels.common.physical.*;
 
@@ -29,7 +29,7 @@ import java.io.IOException;
  * @author hank
  * @create 2025-09-17
  */
-public class SqsStreamProvider implements StorageProvider
+public class S3QSProvider implements StorageProvider
 {
     @Override
     public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
@@ -38,7 +38,7 @@ public class SqsStreamProvider implements StorageProvider
         {
             throw new IOException("incompatible storage scheme: " + scheme);
         }
-        return new SqsStream();
+        return new S3QS();
     }
 
     @Override
@@ -49,7 +49,7 @@ public class SqsStreamProvider implements StorageProvider
         {
             throw new IOException("incompatible storage scheme: " + storage.getScheme());
         }
-        return new PhysicalSqsStreamReader(storage, path);
+        return new PhysicalS3QSReader(storage, path);
     }
 
     @Override
@@ -60,9 +60,9 @@ public class SqsStreamProvider implements StorageProvider
         {
             throw new IOException("incompatible storage scheme: " + storage.getScheme());
         }
-        return new PhysicalSqsStreamWriter(storage, path);
+        return new PhysicalS3QSWriter(storage, path);
     }
 
     @Override
-    public boolean compatibleWith(@Nonnull Storage.Scheme scheme) { return scheme.equals(Storage.Scheme.sqsstream); }
+    public boolean compatibleWith(@Nonnull Storage.Scheme scheme) { return scheme.equals(Storage.Scheme.s3qs); }
 }

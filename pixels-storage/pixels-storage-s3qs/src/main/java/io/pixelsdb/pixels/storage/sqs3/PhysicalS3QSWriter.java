@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs;
+package io.pixelsdb.pixels.storage.sqs3;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -31,22 +31,22 @@ import java.nio.ByteBuffer;
  * @author hank
  * @create 2025-09-17
  */
-public class PhysicalSqsStreamWriter implements PhysicalWriter
+public class PhysicalS3QSWriter implements PhysicalWriter
 {
     private final String path;
     private long position;
     private final DataOutputStream dataOutputStream;
 
-    public PhysicalSqsStreamWriter(Storage storage, String path) throws IOException
+    public PhysicalS3QSWriter(Storage storage, String path) throws IOException
     {
-        if (storage instanceof SqsStream)
+        if (storage instanceof S3QS)
         {
             this.path = path;
             this.dataOutputStream = storage.create(path, false, Constants.SQS_STREAM_BUFFER_SIZE);
         }
         else
         {
-            throw new IOException("storage is not SqsStream");
+            throw new IOException("storage is not S3QS");
         }
     }
 
