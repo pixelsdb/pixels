@@ -58,22 +58,25 @@ public class MemTable implements Referenceable
      * @return rowOffset
      * @throws RetinaException
      */
-    public synchronized int add(byte[][] values, long timestamp) throws RetinaException
+    public int add(byte[][] values, long timestamp) throws RetinaException
     {
-        if (isFull())
-        {
-            return -1;
-        }
         int columnCount = schema.getChildren().size();
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
-        for (int i = 0; i < values.length; ++i)
+        synchronized (this)
         {
-            this.rowBatch.cols[i].add(values[i]);
+            if (isFull())
+            {
+                return -1;
+            }
+            for (int i = 0; i < values.length; ++i)
+            {
+                this.rowBatch.cols[i].add(values[i]);
+            }
+            this.rowBatch.cols[columnCount].add(timestamp);
+            return this.rowBatch.size++;
         }
-        this.rowBatch.cols[columnCount].add(timestamp);
-        return this.rowBatch.size++;
     }
 
     public long getId()

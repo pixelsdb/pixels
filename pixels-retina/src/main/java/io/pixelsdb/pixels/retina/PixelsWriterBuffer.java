@@ -178,18 +178,24 @@ public class PixelsWriterBuffer
         checkArgument(values.length == columnCount,
                 "Column values count does not match schema column count");
 
+        MemTable currentMemTable = null;
         int rowOffset = -1;
         while (rowOffset < 0)
         {
-            this.versionLock.readLock().lock();
-            rowOffset = this.activeMemTable.add(values, timestamp);
-            this.versionLock.readLock().unlock();
+            currentMemTable = this.activeMemTable;
+            try
+            {
+                rowOffset = currentMemTable.add(values, timestamp);
+            } catch (NullPointerException e)
+            {
+                continue;
+            }
             if (rowOffset < 0)  // active memTable is full
             {
                 switchMemTable();
             }
         }
-        int rgRowOffset = (int) (currentMemTableCount * memTableSize - memTableSize + rowOffset);
+        int rgRowOffset = (int) (currentMemTable.getStartIndex() + rowOffset);
         if(rgRowOffset < 0)
         {
             throw new RetinaException("Expect rgRowOffset >= 0, get " + rgRowOffset);
@@ -239,8 +245,7 @@ public class PixelsWriterBuffer
             this.currentMemTableCount += 1;
             this.idCounter++;
 
-            SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
-            this.currentVersion = newVersion;
+            this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
             oldVersion.unref();
 
             triggerFlushToMinio(oldMemTable);
