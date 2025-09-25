@@ -21,8 +21,11 @@ package io.pixelsdb.pixels.storage.sqs3;
 
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.storage.s3.S3;
 import io.pixelsdb.pixels.storage.sqs3.io.S3QSInputStream;
 import io.pixelsdb.pixels.storage.sqs3.io.S3QSOutputStream;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -37,7 +40,14 @@ public final class S3QS implements Storage
 {
     private static final String SchemePrefix = Scheme.s3qs.name() + "://";
 
-    public S3QS() { }
+    private final SqsClient sqsClient;
+    private final S3 s3;
+
+    public S3QS() throws IOException
+    {
+        this.sqsClient = SqsClient.builder().build();
+        this.s3 = (S3) StorageFactory.Instance().getStorage(Scheme.s3);
+    }
 
     @Override
     public Scheme getScheme() { return Scheme.s3qs; }
@@ -49,8 +59,9 @@ public final class S3QS implements Storage
         {
             return path;
         }
-        if (path.contains("://"))
+        if (path.contains("://") && path.indexOf(":https://") > 0)
         {
+            // :https:// is a legal prefix of the sqs queue url
             throw new IOException("Path '" + path +
                     "' already has a different scheme prefix than '" + SchemePrefix + "'.");
         }
@@ -109,6 +120,7 @@ public final class S3QS implements Storage
     @Override
     public boolean mkdirs(String path)
     {
+        // TODO: implement
         throw new UnsupportedOperationException();
     }
 
@@ -129,6 +141,7 @@ public final class S3QS implements Storage
     @Override
     public boolean delete(String path, boolean recursive)
     {
+        // TODO: implement
         throw new UnsupportedOperationException();
     }
 
@@ -142,23 +155,29 @@ public final class S3QS implements Storage
     }
 
     @Override
-    public void close() throws IOException { }
+    public void close() throws IOException
+    {
+        this.sqsClient.close();
+    }
 
     @Override
     public boolean exists(String path)
     {
+        // TODO: implement
         throw new UnsupportedOperationException();
     }
 
     @Override
     public boolean isFile(String path)
     {
+        // TODO: implement
         return false;
     }
 
     @Override
     public boolean isDirectory(String path)
     {
+        // TODO: implement
         return false;
     }
 }

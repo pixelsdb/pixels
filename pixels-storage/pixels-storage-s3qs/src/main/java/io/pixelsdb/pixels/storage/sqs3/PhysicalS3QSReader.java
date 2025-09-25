@@ -53,12 +53,14 @@ public class PhysicalS3QSReader implements PhysicalReader
     @Override
     public long getFileLength() throws IOException
     {
+        // TODO: implement
         throw new UnsupportedOperationException();
     }
 
     @Override
     public void seek(long desired) throws IOException
     {
+        // TODO: implement
         throw new UnsupportedOperationException();
     }
 
