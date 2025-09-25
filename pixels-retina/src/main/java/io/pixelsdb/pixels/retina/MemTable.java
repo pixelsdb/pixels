@@ -58,7 +58,7 @@ public class MemTable implements Referenceable
      * @return rowOffset
      * @throws RetinaException
      */
-    public synchronized int add(byte[][] values, long timestamp) throws RetinaException
+    public int add(byte[][] values, long timestamp) throws RetinaException
     {
         int columnCount = schema.getChildren().size();
         checkArgument(values.length == columnCount,
