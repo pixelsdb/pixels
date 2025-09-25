@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.flat.DateColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.util.Arrays;
 
@@ -326,6 +327,24 @@ public class DateColumnVector extends ColumnVector
         // Issue #419: value is already the days since the Unix epoch, no need to convert.
         this.dates[writeIndex] = value;
         this.isNull[writeIndex++] = false;
+    }
+
+    @Override
+    public void add(byte[] value)
+    {
+        if(checkBytesNull(value))
+        {
+            return;
+        }
+        if (value.length != Integer.BYTES)
+        {
+            throw new IllegalArgumentException(
+                    "Only byte arrays of length " + Integer.BYTES + " are supported for DATE, got: " + value.length
+            );
+        }
+
+        int v = ByteBuffer.wrap(value).getInt();
+        add(v);
     }
 
     @Override

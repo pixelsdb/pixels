@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.core.utils.Integer128;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
@@ -172,6 +173,33 @@ public class LongDecimalColumnVector extends ColumnVector
         vector[index*2+1] = value.getLow();
         isNull[index] = false;
     }
+
+    @Override
+    public void add(byte[] bytes)
+    {
+        if (checkBytesNull(bytes))
+        {
+            return;
+        }
+        if (bytes.length != 16)
+        {
+            throw new IllegalArgumentException(
+                    "Decimal128 requires exactly 16 bytes, got: " + bytes.length);
+        }
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+
+        long high = ByteBuffer.wrap(bytes, 0, Long.BYTES).getLong();
+        long low  = ByteBuffer.wrap(bytes, Long.BYTES, Long.BYTES).getLong();
+
+        int index = writeIndex++;
+        vector[index * 2] = high;
+        vector[index * 2 + 1] = low;
+        isNull[index] = false;
+    }
+
 
     @Override
     public void add(String value)
