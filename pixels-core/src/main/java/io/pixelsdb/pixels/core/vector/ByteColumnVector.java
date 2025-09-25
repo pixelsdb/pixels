@@ -73,6 +73,22 @@ public class ByteColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(byte[] value)
+    {
+        if(checkBytesNull(value))
+        {
+            return;
+        }
+        if (value.length != Byte.BYTES)
+        {
+            add(new String(value));
+        } else
+        {
+            add(value[0]);
+        }
+    }
+
+    @Override
     public void add(String value)
     {
         assert value != null && value.length() > 0;

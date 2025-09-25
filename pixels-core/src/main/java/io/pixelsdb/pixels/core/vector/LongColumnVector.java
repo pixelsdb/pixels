@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.flat.LongColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -101,6 +102,23 @@ public class LongColumnVector extends ColumnVector
         vector[index] = v;
         isNull[index] = false;
     }
+
+    @Override
+    public void add(byte[] value)
+    {
+        if(checkBytesNull(value))
+        {
+            return;
+        }
+
+        if (value.length != Long.BYTES)
+        {
+            throw new IllegalArgumentException("Only byte[8] supported for serialization to long");
+        }
+        long v = ByteBuffer.wrap(value).getLong();
+        add(v);
+    }
+
 
     @Override
     public void add(int v)

@@ -43,10 +43,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
@@ -226,12 +223,21 @@ public class PixelsConsumer extends Consumer
                                 indexKeySize += colsInLine[pkColumnId].length();
                             }
                             indexKeySize += Long.BYTES + (pkMapping.length + 1) * 2; // table id + index key
-                            ByteBuffer indexKeyBuffer = ByteBuffer.allocate(indexKeySize);
 
-                            indexKeyBuffer.putLong(index.getTableId()).putChar(':');
-                            for(int pkColumnId : pkMapping)
+                            TypeDescription pkTypeDescription = parameters.getPkTypeDescription();
+                            List<byte[]> pkBytes = new LinkedList<>();
+                            for(int i = 0; i < pkMapping.length; i++)
                             {
-                                indexKeyBuffer.put(colsInLine[pkColumnId].getBytes());
+                                int pkColumnId = pkMapping[i];
+                                byte[] bytes = pkTypeDescription.getChildren().get(i).convertSqlStringToByte(colsInLine[pkColumnId]);
+                                pkBytes.add(bytes);
+                                indexKeySize += bytes.length;
+                            }
+                            ByteBuffer indexKeyBuffer = ByteBuffer.allocate(indexKeySize);
+                            indexKeyBuffer.putLong(index.getTableId()).putChar(':');
+                            for(byte[] pkByte : pkBytes)
+                            {
+                                indexKeyBuffer.put(pkByte);
                                 indexKeyBuffer.putChar(':');
                             }
                             IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();

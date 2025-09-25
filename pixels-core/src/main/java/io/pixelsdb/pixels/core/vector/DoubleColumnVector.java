@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.flat.DoubleColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -116,6 +117,27 @@ public class DoubleColumnVector extends ColumnVector
     public void add(float value)
     {
         add((double) value);
+    }
+
+    @Override
+    public void add(byte[] value)
+    {
+        if(checkBytesNull(value))
+        {
+            return;
+        }
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        int index = writeIndex++;
+        if (value.length != Double.BYTES)
+        {
+            throw new IllegalArgumentException("Expected " + Double.BYTES + " bytes for double, got " + value.length);
+        }
+        long longBits = ByteBuffer.wrap(value).getLong();
+        vector[index] = longBits;
+        isNull[index] = false;
     }
 
     @Override

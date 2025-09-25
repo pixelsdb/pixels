@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.flat.TimestampColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.Arrays;
 
@@ -376,6 +377,23 @@ public class TimestampColumnVector extends ColumnVector
         }
         set(writeIndex++, micros);
     }
+
+    @Override
+    public void add(byte[] value)
+    {
+        if(checkBytesNull(value))
+        {
+            return;
+        }
+
+        if (value.length != Long.BYTES)
+        {
+            throw new IllegalArgumentException("Only byte[8] supported for serialization to long for timestamp");
+        }
+        long v = ByteBuffer.wrap(value).getLong();
+        add(v);
+    }
+
 
     @Override
     public void add(Timestamp value)

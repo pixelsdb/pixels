@@ -26,6 +26,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
@@ -33,6 +38,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.*;
+import static java.math.BigDecimal.ROUND_HALF_UP;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -461,141 +468,148 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         TypeDescription schema = TypeDescription.createStruct();
         for (int i = 0; i < fieldNames.size(); i++)
         {
-            String typeName = typeNames.get(i).trim().toLowerCase();
-            TypeDescription fieldType;
-
-            if (typeName.startsWith("decimal"))
-            {
-                Matcher matcher = Pattern.compile("decimal\\((\\d+),(\\d+)\\)").matcher(typeName);
-                if (matcher.matches())
-                {
-                    int precision = Integer.parseInt(matcher.group(1));
-                    int scale = Integer.parseInt(matcher.group(2));
-                    fieldType = TypeDescription.createDecimal(precision, scale);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            } else if (typeName.startsWith("varchar"))
-            {
-                Matcher matchar = Pattern.compile("varchar\\((\\d+)\\)").matcher(typeName);
-                if (matchar.matches())
-                {
-                    int maxLength = Integer.parseInt(matchar.group(1));
-                    fieldType = TypeDescription.createVarchar(maxLength);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            } else if (typeName.startsWith("char"))
-            {
-                Matcher matcher = Pattern.compile("char\\((\\d+)\\)").matcher(typeName);
-                if (matcher.matches())
-                {
-                    int maxLength = Integer.parseInt(matcher.group(1));
-                    fieldType = TypeDescription.createChar(maxLength);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            } else if (typeName.startsWith("varbinary"))
-            {
-                Matcher matcher = Pattern.compile("varbinary\\((\\d+)\\)").matcher(typeName);
-                if (matcher.matches())
-                {
-                    int maxLength = Integer.parseInt(matcher.group(1));
-                    fieldType = TypeDescription.createVarbinary(maxLength);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            } else if (typeName.startsWith("binary"))
-            {
-                Matcher matcher = Pattern.compile("binary\\((\\d+)\\)").matcher(typeName);
-                if (matcher.matches())
-                {
-                    int maxLength = Integer.parseInt(matcher.group(1));
-                    fieldType = TypeDescription.createBinary(maxLength);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            } else if (typeName.startsWith("timestamp"))
-            {
-                Matcher matcher = Pattern.compile("timestamp\\((\\d+)\\)").matcher(typeName);
-                if (matcher.matches())
-                {
-                    int precision = Integer.parseInt(matcher.group(1));
-                    fieldType = TypeDescription.createTimestamp(precision);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            } else if (typeName.startsWith("time"))
-            {
-                Matcher matcher = Pattern.compile("time\\((\\d+)\\)").matcher(typeName);
-                if (matcher.matches())
-                {
-                    int precision = Integer.parseInt(matcher.group(1));
-                    fieldType = TypeDescription.createTime(precision);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            } else if (typeName.startsWith("vector") || typeName.startsWith("array"))
-            {
-                Matcher matcher = Pattern.compile("(vector|array)\\((\\d+)\\)").matcher(typeName);
-                if (matcher.matches())
-                {
-                    int dimension = Integer.parseInt(matcher.group(1));
-                    fieldType = TypeDescription.createVector(dimension);
-                } else
-                {
-                    throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            } else
-            {
-                switch (typeName)
-                {
-                    case "boolean":
-                        fieldType = TypeDescription.createBoolean();
-                        break;
-                    case "tinyint":
-                    case "byte":
-                        fieldType = TypeDescription.createByte();
-                        break;
-                    case "smallint":
-                    case "short":
-                        fieldType = TypeDescription.createShort();
-                        break;
-                    case "integer":
-                    case "int":
-                        fieldType = TypeDescription.createInt();
-                        break;
-                    case "bigint":
-                    case "long":
-                        fieldType = TypeDescription.createLong();
-                        break;
-                    case "float":
-                    case "real":
-                        fieldType = TypeDescription.createFloat();
-                        break;
-                    case "double":
-                        fieldType = TypeDescription.createDouble();
-                        break;
-                    case "string":
-                        fieldType = TypeDescription.createString();
-                        break;
-                    case "date":
-                        fieldType = TypeDescription.createDate();
-                        break;
-                    default:
-                        throw new IllegalArgumentException("Unknown type: " + typeName);
-                }
-            }
+            String typeName = typeNames.get(i);
+            TypeDescription fieldType = createFiledFromString(typeName);
             schema.addField(fieldNames.get(i), fieldType);
         }
         return schema;
+    }
+
+    public static TypeDescription createFiledFromString(String originTypeName)
+    {
+        TypeDescription fieldType;
+        String typeName = originTypeName.trim().toLowerCase();
+        if (typeName.startsWith("decimal"))
+        {
+            Matcher matcher = Pattern.compile("decimal\\((\\d+),(\\d+)\\)").matcher(typeName);
+            if (matcher.matches())
+            {
+                int precision = Integer.parseInt(matcher.group(1));
+                int scale = Integer.parseInt(matcher.group(2));
+                fieldType = TypeDescription.createDecimal(precision, scale);
+            } else
+            {
+                throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        } else if (typeName.startsWith("varchar"))
+        {
+            Matcher matchar = Pattern.compile("varchar\\((\\d+)\\)").matcher(typeName);
+            if (matchar.matches())
+            {
+                int maxLength = Integer.parseInt(matchar.group(1));
+                fieldType = TypeDescription.createVarchar(maxLength);
+            } else
+            {
+                throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        } else if (typeName.startsWith("char"))
+        {
+            Matcher matcher = Pattern.compile("char\\((\\d+)\\)").matcher(typeName);
+            if (matcher.matches())
+            {
+                int maxLength = Integer.parseInt(matcher.group(1));
+                fieldType = TypeDescription.createChar(maxLength);
+            } else
+            {
+                throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        } else if (typeName.startsWith("varbinary"))
+        {
+            Matcher matcher = Pattern.compile("varbinary\\((\\d+)\\)").matcher(typeName);
+            if (matcher.matches())
+            {
+                int maxLength = Integer.parseInt(matcher.group(1));
+                fieldType = TypeDescription.createVarbinary(maxLength);
+            } else
+            {
+                throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        } else if (typeName.startsWith("binary"))
+        {
+            Matcher matcher = Pattern.compile("binary\\((\\d+)\\)").matcher(typeName);
+            if (matcher.matches())
+            {
+                int maxLength = Integer.parseInt(matcher.group(1));
+                fieldType = TypeDescription.createBinary(maxLength);
+            } else
+            {
+                throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        } else if (typeName.startsWith("timestamp"))
+        {
+            Matcher matcher = Pattern.compile("timestamp\\((\\d+)\\)").matcher(typeName);
+            if (matcher.matches())
+            {
+                int precision = Integer.parseInt(matcher.group(1));
+                fieldType = TypeDescription.createTimestamp(precision);
+            } else
+            {
+                throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        } else if (typeName.startsWith("time"))
+        {
+            Matcher matcher = Pattern.compile("time\\((\\d+)\\)").matcher(typeName);
+            if (matcher.matches())
+            {
+                int precision = Integer.parseInt(matcher.group(1));
+                fieldType = TypeDescription.createTime(precision);
+            } else
+            {
+                throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        } else if (typeName.startsWith("vector") || typeName.startsWith("array"))
+        {
+            Matcher matcher = Pattern.compile("(vector|array)\\((\\d+)\\)").matcher(typeName);
+            if (matcher.matches())
+            {
+                int dimension = Integer.parseInt(matcher.group(1));
+                fieldType = TypeDescription.createVector(dimension);
+            } else
+            {
+                throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        } else
+        {
+            switch (typeName)
+            {
+                case "boolean":
+                    fieldType = TypeDescription.createBoolean();
+                    break;
+                case "tinyint":
+                case "byte":
+                    fieldType = TypeDescription.createByte();
+                    break;
+                case "smallint":
+                case "short":
+                    fieldType = TypeDescription.createShort();
+                    break;
+                case "integer":
+                case "int":
+                    fieldType = TypeDescription.createInt();
+                    break;
+                case "bigint":
+                case "long":
+                    fieldType = TypeDescription.createLong();
+                    break;
+                case "float":
+                case "real":
+                    fieldType = TypeDescription.createFloat();
+                    break;
+                case "double":
+                    fieldType = TypeDescription.createDouble();
+                    break;
+                case "string":
+                    fieldType = TypeDescription.createString();
+                    break;
+                case "date":
+                    fieldType = TypeDescription.createDate();
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown type: " + typeName);
+            }
+        }
+
+        return fieldType;
     }
 
     static class StringPosition
@@ -1796,5 +1810,133 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         {
             return (mode1 & mode2) != 0;
         }
+    }
+
+    public byte[] convertSqlStringToByte(String value)
+    {
+        if (value == null || value.isEmpty())
+        {
+            return null;
+        }
+
+        byte[] bytes;
+        value = value.trim();
+        switch (getCategory())
+        {
+            case BOOLEAN:
+            {
+                char c = value.charAt(0);
+                byte parsedByte;
+                if (c == '0' || c == '1')
+                {
+                    parsedByte = Byte.parseByte(value);
+                }
+                else
+                {
+                    parsedByte = Boolean.parseBoolean(value) ? (byte) 1 : (byte) 0;
+                }
+                return new byte[]{parsedByte};
+            }
+            case SHORT:
+            case INT:
+            {
+                int intValue = Integer.parseInt(value);
+                bytes = ByteBuffer.allocate(Integer.BYTES).putInt(intValue).array();
+                break;
+            }
+            case LONG:
+            {
+                long longValue = Long.parseLong(value);
+                bytes = ByteBuffer.allocate(Long.BYTES).putLong(longValue).array();
+                break;
+            }
+            case FLOAT:
+            {
+                float floatValue = Float.parseFloat(value.trim());
+                int intBits = Float.floatToIntBits(floatValue);
+                bytes = ByteBuffer.allocate(Integer.BYTES).putInt(intBits).array();
+                break;
+            }
+            case DOUBLE:
+            {
+                double doubleValue = Double.parseDouble(value.trim());
+                long longBits = Double.doubleToLongBits(doubleValue);
+                bytes = ByteBuffer.allocate(Long.BYTES).putLong(longBits).array();
+                break;
+            }
+            case DECIMAL:
+            {
+                if (getPrecision() <= MAX_SHORT_DECIMAL_PRECISION)
+                {
+                    BigDecimal decimal = new BigDecimal(value, MathContext.UNLIMITED);
+                    if (decimal.scale() != scale)
+                    {
+                        decimal = decimal.setScale(scale, ROUND_HALF_UP);
+                    }
+                    if (decimal.precision() > precision)
+                    {
+                        throw new IllegalArgumentException("value exceeds the allowed precision " + precision);
+                    }
+                    long longValue = decimal.unscaledValue().longValue();
+                    bytes = ByteBuffer.allocate(Long.BYTES).putLong(longValue).array();
+                    break;
+                } else // LongDecimal
+                {
+                    // Convert to a BigDecimal with unlimited precision and HALF_UP rounding.
+                    BigDecimal decimal = new BigDecimal(value, MathContext.UNLIMITED);
+                    if (decimal.scale() != scale)
+                    {
+                        decimal = decimal.setScale(scale, ROUND_HALF_UP);
+                    }
+                    if (decimal.precision() > precision)
+                    {
+                        throw new IllegalArgumentException("value exceeds the allowed precision " + precision);
+                    }
+                    // We use big endian.
+                    BigInteger unscaledValue = decimal.unscaledValue();
+                    long high = unscaledValue.shiftRight(64).longValue();
+                    long low  = unscaledValue.longValue();
+
+                    ByteBuffer buffer = ByteBuffer.allocate(16);
+                    buffer.putLong(high);
+                    buffer.putLong(low);
+                    return buffer.array();
+                }
+            }
+            case CHAR:
+            case VARCHAR:
+            case STRING:
+            case VARBINARY:
+            case BINARY:
+            {
+                bytes = value.getBytes(StandardCharsets.UTF_8);
+                break;
+            }
+            case DATE:
+            {
+                int days = stringDateToDay(value);
+                bytes = ByteBuffer.allocate(Integer.BYTES).putInt(days).array();
+                break;
+            }
+            case TIME:
+            {
+                int time = stringTimeToMillis(value);
+                bytes = ByteBuffer.allocate(Integer.BYTES).putInt(time).array();
+                break;
+            }
+            case TIMESTAMP:
+            {
+                long timestamp = stringTimestampToMicros(value);
+                bytes = ByteBuffer.allocate(Long.BYTES).putLong(timestamp).array();
+                break;
+            }
+            case STRUCT:
+            {
+                throw new UnsupportedOperationException("STRUCT parsing not implemented yet.");
+            }
+            default:
+                throw new IllegalArgumentException("Unsupported type: " + category);
+        }
+        return bytes;
     }
 }
