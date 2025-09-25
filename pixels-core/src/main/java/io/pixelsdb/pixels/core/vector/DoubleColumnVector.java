@@ -131,20 +131,13 @@ public class DoubleColumnVector extends ColumnVector
             ensureSize(writeIndex * 2, true);
         }
         int index = writeIndex++;
-        if (value == null)
+        if (value.length != Double.BYTES)
         {
-            isNull[index] = true;
+            throw new IllegalArgumentException("Expected " + Double.BYTES + " bytes for double, got " + value.length);
         }
-        else
-        {
-            if (value.length != Double.BYTES)
-            {
-                throw new IllegalArgumentException("Expected " + Double.BYTES + " bytes for double, got " + value.length);
-            }
-            long longBits = ByteBuffer.wrap(value).getLong();
-            vector[index] = longBits;
-            isNull[index] = false;
-        }
+        long longBits = ByteBuffer.wrap(value).getLong();
+        vector[index] = longBits;
+        isNull[index] = false;
     }
 
     @Override

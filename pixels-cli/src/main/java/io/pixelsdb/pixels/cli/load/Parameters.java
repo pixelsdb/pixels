@@ -239,7 +239,7 @@ public class Parameters
                             + table.getName() + " schema id is " + table.getSchemaId());
                 }
                 orderKeyColIds[keyColumnIdx++] = i;
-                orderKeyColTypes.add(columns.get(i).getName());
+                orderKeyColNames.add(columns.get(i).getName());
                 orderKeyColTypes.add(columns.get(i).getType());
             }
             this.pkTypeDescription = TypeDescription.createSchemaFromStrings(orderKeyColNames, orderKeyColTypes);
