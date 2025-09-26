@@ -28,7 +28,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Batch request row ids and return available row id
  */
-public class RowIdAllocator
+public class RPCRowIdAllocator
 {
     private final long tableId;
     private final int batchSize;
@@ -41,7 +41,7 @@ public class RowIdAllocator
 
     private final ReentrantLock lock = new ReentrantLock();
 
-    public RowIdAllocator(long tableId, int batchSize)
+    public RPCRowIdAllocator(long tableId, int batchSize)
     {
         if (batchSize <= 0)
         {
