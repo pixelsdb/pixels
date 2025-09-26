@@ -198,4 +198,9 @@ public class ConfigFactory
     {
         return this.prop.getProperty(key);
     }
+
+    public synchronized Properties getProperties()
+    {
+        return this.prop;
+    }
 }
