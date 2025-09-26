@@ -86,8 +86,9 @@ public final class S3QS implements Storage
         S3QSInputStream inputStream;
         try
         {
-            inputStream = new S3QSInputStream();
-        } catch (Exception e)
+            inputStream = new S3QSInputStream(this.s3.getClient(), objectPath.bucket, objectPath.key);
+        }
+        catch (Exception e)
         {
             throw new IOException("Failed to open sqsInputStream.", e);
         }

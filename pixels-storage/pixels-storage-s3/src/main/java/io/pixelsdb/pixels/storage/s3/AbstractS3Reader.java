@@ -137,8 +137,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
             position = desired;
             return;
         }
-        throw new IOException("Desired offset " + desired +
-                " is out of bound (" + 0 + "," + length + ")");
+        throw new IOException("Desired offset " + desired + " is out of bound (" + 0 + "," + length + ")");
     }
 
     @Override

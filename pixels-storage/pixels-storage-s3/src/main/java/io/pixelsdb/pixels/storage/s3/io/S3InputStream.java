@@ -118,7 +118,7 @@ public class S3InputStream extends InputStream
                 return -1;
             }
         }
-        return this.buffer[bufferPosition++];
+        return this.buffer[bufferPosition++] & 0xFF;
     }
 
     @Override
@@ -149,7 +149,6 @@ public class S3InputStream extends InputStream
                 System.arraycopy(this.buffer, this.bufferPosition, buf, offsetInBuf, remainToRead);
                 this.bufferPosition += remainToRead;
                 offsetInBuf += remainToRead;
-                remainToRead = 0;
                 break;
             }
             // Read the remaining bytes in buffer.
@@ -189,10 +188,10 @@ public class S3InputStream extends InputStream
         }
         GetObjectRequest request = GetObjectRequest.builder().bucket(this.bucket)
                 .key(this.key).range(toRange(this.position, bytesToRead)).build();
-        ResponseBytes<GetObjectResponse> future = this.s3Client.getObject(request, ResponseTransformer.toBytes());
+        ResponseBytes<GetObjectResponse> responseBytes = this.s3Client.getObject(request, ResponseTransformer.toBytes());
         try
         {
-            this.buffer = future.asByteArray();
+            this.buffer = responseBytes.asByteArray();
             this.bufferPosition = 0;
             this.position += this.buffer.length;
             return this.buffer.length;

@@ -35,6 +35,8 @@ public class PhysicalS3QSReader implements PhysicalReader
     private final S3QS s3qs;
     private final String path;
     private final DataInputStream dataInputStream;
+    private final long length;
+    private long position;
 
     public PhysicalS3QSReader(Storage storage, String path) throws IOException
     {
@@ -48,20 +50,25 @@ public class PhysicalS3QSReader implements PhysicalReader
         }
         this.path = path;
         this.dataInputStream = this.s3qs.open(path);
+        this.length = this.dataInputStream.available();
+        this.position = 0;
     }
 
     @Override
     public long getFileLength() throws IOException
     {
-        // TODO: implement
-        throw new UnsupportedOperationException();
+        return this.length;
     }
 
     @Override
     public void seek(long desired) throws IOException
     {
-        // TODO: implement
-        throw new UnsupportedOperationException();
+        if (0 <= desired && desired < length)
+        {
+            position = desired;
+            return;
+        }
+        throw new IOException("Desired offset " + desired + " is out of bound (" + 0 + "," + length + ")");
     }
 
     @Override
