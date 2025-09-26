@@ -69,9 +69,9 @@ public final class S3QS implements Storage
         return SchemePrefix + path;
     }
 
-    public ObjectQueue openQueue(String queueUrl)
+    public S3Queue openQueue(String queueUrl)
     {
-        return new ObjectQueue(queueUrl);
+        return new S3Queue(this, queueUrl);
     }
 
     @Override
@@ -177,5 +177,10 @@ public final class S3QS implements Storage
     {
         // TODO: implement
         return false;
+    }
+
+    public SqsClient getSqsClient()
+    {
+        return sqsClient;
     }
 }

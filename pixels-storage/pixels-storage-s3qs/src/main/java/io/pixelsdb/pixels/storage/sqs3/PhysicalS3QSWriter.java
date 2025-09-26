@@ -34,7 +34,8 @@ import java.nio.ByteBuffer;
 public class PhysicalS3QSWriter implements PhysicalWriter
 {
     private final String path;
-    private long position;
+    private long position = 0L;
+    private S3Queue queue = null;
     private final DataOutputStream dataOutputStream;
 
     public PhysicalS3QSWriter(Storage storage, String path) throws IOException
@@ -48,6 +49,11 @@ public class PhysicalS3QSWriter implements PhysicalWriter
         {
             throw new IOException("storage is not S3QS");
         }
+    }
+
+    protected void setQueue(S3Queue queue)
+    {
+        this.queue = queue;
     }
 
     /**
@@ -97,6 +103,10 @@ public class PhysicalS3QSWriter implements PhysicalWriter
     public void close() throws IOException
     {
         dataOutputStream.close();
+        if (this.queue != null && !this.queue.isClosed())
+        {
+            this.queue.push(this.path);
+        }
     }
 
     @Override
