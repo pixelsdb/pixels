@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.storage.sqs3.io;
 
-import io.pixelsdb.pixels.storage.sqs3.S3QSPath;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -45,7 +44,7 @@ public class S3QSOutputStream extends OutputStream
      */
     private boolean open;
 
-    public S3QSOutputStream(S3QSPath path, int bufferCapacity)
+    public S3QSOutputStream(int bufferCapacity)
     {
         this.open = true;
         this.buffer = new byte[bufferCapacity];

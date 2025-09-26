@@ -160,7 +160,7 @@ public interface Storage
      * By default, this method returns false.
      *
      * <p><b>Note:</b> if this method returns true, then getLocations
-     * and getHosts must be override to return the physical locality
+     * and getHosts must be overridden to return the physical locality
      * information of the given path.</p>
      * @return
      */

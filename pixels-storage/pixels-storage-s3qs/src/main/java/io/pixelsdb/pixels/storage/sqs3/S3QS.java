@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.storage.sqs3;
 
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
@@ -68,16 +69,16 @@ public final class S3QS implements Storage
         return SchemePrefix + path;
     }
 
-    /**
-     * This method is used for read content from http.
-     * @param path
-     * @return
-     */
+    public ObjectQueue openQueue(String queueUrl)
+    {
+        return new ObjectQueue(queueUrl);
+    }
+
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        S3QSPath s3qsPath = new S3QSPath(path);
-        if (!s3qsPath.isValid())
+        ObjectPath objectPath = new ObjectPath(path);
+        if (!objectPath.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
@@ -124,18 +125,15 @@ public final class S3QS implements Storage
         throw new UnsupportedOperationException();
     }
 
-    /**
-     * This method is used for write content to http stream.
-     */
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        S3QSPath s3qsPath = new S3QSPath(path);
-        if (!s3qsPath.isValid())
+        ObjectPath objectPath = new ObjectPath(path);
+        if (!objectPath.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        return new DataOutputStream(new S3QSOutputStream(s3qsPath, bufferSize));
+        return new DataOutputStream(new S3QSOutputStream(bufferSize));
     }
 
     @Override
