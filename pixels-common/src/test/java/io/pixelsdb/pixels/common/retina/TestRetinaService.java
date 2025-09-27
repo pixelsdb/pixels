@@ -135,8 +135,9 @@ public class TestRetinaService
                         .addIndexKeys(indexKey);
 
                 tableUpdateDataBuilder.addInsertData(insertDataBuilder.build());
+                tableUpdateDataBuilder.setTimestamp(0L);
                 tableUpdateData.add(tableUpdateDataBuilder.build());
-                streamHandle.updateRecord(schemaName, tableUpdateData, 0);
+                streamHandle.updateRecord(schemaName, tableUpdateData);
             }
         }
     }
