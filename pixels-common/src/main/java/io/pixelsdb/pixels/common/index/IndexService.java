@@ -184,5 +184,23 @@ public interface IndexService
      * @return true on success
      */
     boolean removeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
+
+    enum Scheme
+    {
+        rpc, local;
+
+        public static Scheme from(String name)
+        {
+            for (Scheme scheme : values())
+            {
+                if (scheme.name().equalsIgnoreCase(name))
+                {
+                    return scheme;
+                }
+            }
+            throw new IllegalArgumentException("Unsupported IndexService scheme: " + name);
+        }
+    }
+
 }
 

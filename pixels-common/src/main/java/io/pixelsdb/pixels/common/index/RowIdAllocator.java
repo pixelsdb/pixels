@@ -32,7 +32,7 @@ public class RowIdAllocator
 {
     private final long tableId;
     private final int batchSize;
-    private final RPCIndexService indexService;
+    private final IndexService indexService;
 
     // --- current batch status ---
     private long currentBatchStart = -1;
@@ -49,7 +49,7 @@ public class RowIdAllocator
         }
         this.tableId = tableId;
         this.batchSize = batchSize;
-        this.indexService = RPCIndexService.Instance();
+        this.indexService = IndexServiceFactory.Instance().createInstance();
     }
 
     /**
