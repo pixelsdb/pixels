@@ -191,7 +191,8 @@ public class S3InputStream extends InputStream
         ResponseBytes<GetObjectResponse> responseBytes = this.s3Client.getObject(request, ResponseTransformer.toBytes());
         try
         {
-            this.buffer = responseBytes.asByteArray();
+            // InputStream does not modify the buffer, thus it is safe to call asByteArrayUnsafe().
+            this.buffer = responseBytes.asByteArrayUnsafe();
             this.bufferPosition = 0;
             this.position += this.buffer.length;
             return this.buffer.length;

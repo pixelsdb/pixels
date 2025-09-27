@@ -28,32 +28,22 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * This is the input stream for the small intermediate files stored in S3.
+ * As the files are small (e.g, <= 8MB), we read all the file content at once into a buffer.
+ */
 public class S3QSInputStream extends InputStream
 {
-    /**
-     * The bucket-name on Amazon S3
-     */
-    private final String bucket;
-
-    /**
-     * The path (key) name within the bucket
-     */
-    private final String key;
 
     /**
      * The temporary buffer used for storing the chunks
      */
-    private byte[] buffer;
+    private final byte[] buffer;
 
     /**
      * The position in the buffer
      */
-    private int bufferPosition;
-
-    /**
-     * Amazon S3 client.
-     */
-    private final S3Client s3Client;
+    private int position;
 
     /**
      * indicates whether the stream is still open / valid
@@ -69,29 +59,34 @@ public class S3QSInputStream extends InputStream
      */
     public S3QSInputStream(S3Client s3Client, String bucket, String key) throws IOException
     {
-        this.s3Client = s3Client;
-        this.bucket = bucket;
-        this.key = key;
-        this.bufferPosition = 0;
+        this.position = 0;
         this.open = true;
+        // read data and populate buffer
+        GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
+        try
+        {
+            ResponseBytes<GetObjectResponse> responseBytes =
+                    s3Client.getObject(request, ResponseTransformer.toBytes());
+            // InputStream does not modify the buffer, thus it is safe to call asByteArrayUnsafe().
+            this.buffer = responseBytes.asByteArrayUnsafe();
+            this.position = 0;
+        } catch (Exception e)
+        {
+            this.position = 0;
+            throw new IOException("Failed to read object.", e);
+        }
     }
 
     @Override
     public int read() throws IOException
     {
         this.assertOpen();
-        if (this.buffer == null)
+        if (position >= this.buffer.length)
         {
-            if (populateBuffer() < 0)
-            {
-                return -1;
-            }
-        }
-        if (bufferPosition >= this.buffer.length)
-        {
+            // end of stream
             return -1;
         }
-        return this.buffer[bufferPosition++] & 0xFF;
+        return this.buffer[position++] & 0xFF;
     }
 
     @Override
@@ -101,71 +96,41 @@ public class S3QSInputStream extends InputStream
     }
 
     @Override
-    public int read(byte[] buf, int off, int len) throws IOException
+    public int read(byte[] buf, final int off, final int len) throws IOException
     {
         this.assertOpen();
-        if (this.buffer == null)
-        {
-            // try to populate the buffer for the first time or after exception or EOF.
-            if (populateBuffer() < 0)
-            {
-                return -1;
-            }
-        }
-        int offsetInBuf = off, remainToRead = len;
-        int remainInBuffer = this.buffer.length - bufferPosition;
-        if (remainInBuffer >= remainToRead)
+        int offsetInBuf = off;
+        int remainInBuffer = this.buffer.length - position;
+        if (remainInBuffer >= len)
         {
             // The read can be served in buffer.
-            System.arraycopy(this.buffer, this.bufferPosition, buf, offsetInBuf, remainToRead);
-            this.bufferPosition += remainToRead;
-            offsetInBuf += remainToRead;
+            System.arraycopy(this.buffer, this.position, buf, offsetInBuf, len);
+            this.position += len;
+            offsetInBuf += len;
         }
         else
         {
             // Read the remaining bytes in buffer.
-            System.arraycopy(this.buffer, this.bufferPosition, buf, offsetInBuf, remainInBuffer);
-            this.bufferPosition += remainInBuffer;
+            System.arraycopy(this.buffer, this.position, buf, offsetInBuf, remainInBuffer);
+            this.position += remainInBuffer;
             offsetInBuf += remainInBuffer;
         }
 
         return offsetInBuf - off;
     }
 
-    /**
-     * Populate the read buffer.
-     * @return the bytes been populated into the read buffer, -1 if reaches EOF.
-     * @throws IOException
-     */
-    protected int populateBuffer() throws IOException
-    {
-        GetObjectRequest request = GetObjectRequest.builder().bucket(this.bucket).key(this.key).build();
-        ResponseBytes<GetObjectResponse> responseBytes = this.s3Client.getObject(request, ResponseTransformer.toBytes());
-        try
-        {
-            this.buffer = responseBytes.asByteArray();
-            this.bufferPosition = 0;
-            return this.buffer.length;
-        } catch (Exception e)
-        {
-            this.buffer = null;
-            this.bufferPosition = 0;
-            throw new IOException("Failed to read object.", e);
-        }
-    }
-
     @Override
-    public int available() throws IOException
+    public int available()
     {
         if (this.buffer != null)
         {
-            return this.buffer.length - this.bufferPosition;
+            return this.buffer.length - this.position;
         }
         return 0;
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
     {
         if (this.open)
         {
@@ -174,11 +139,11 @@ public class S3QSInputStream extends InputStream
         }
     }
 
-    private void assertOpen()
+    private void assertOpen() throws IOException
     {
         if (!this.open)
         {
-            throw new IllegalStateException("Closed");
+            throw new IOException("Stream closed");
         }
     }
 }

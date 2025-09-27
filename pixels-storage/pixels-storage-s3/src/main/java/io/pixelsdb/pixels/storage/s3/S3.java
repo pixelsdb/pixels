@@ -124,13 +124,8 @@ public final class S3 extends AbstractS3
         }
     }
 
-    public S3AsyncClient getAsyncClient()
+    public S3AsyncClient getS3AsyncClient()
     {
         return s3Async;
-    }
-
-    public S3Client getClient()
-    {
-        return s3;
     }
 }

@@ -20,34 +20,56 @@
 package io.pixelsdb.pixels.storage.sqs3;
 
 import io.pixelsdb.pixels.common.physical.ObjectPath;
-import io.pixelsdb.pixels.common.physical.Status;
-import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.storage.s3.S3;
+import io.pixelsdb.pixels.storage.s3.AbstractS3;
 import io.pixelsdb.pixels.storage.sqs3.io.S3QSInputStream;
 import io.pixelsdb.pixels.storage.sqs3.io.S3QSOutputStream;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.List;
+import java.time.Duration;
 
 /**
+ * {@link S3QS} is to write and read the small intermediate files in data shuffling. It is compatible with S3, hence its
+ * methods accept the S3 object paths start with s3:// or s3qs://.
+ *
+ * The main differences from {@link io.pixelsdb.pixels.storage.s3.S3} are that {@link S3QS} only uses synchronous S3 client
+ * and creates {@link S3QSInputStream} and {@link S3QSOutputStream} in its open and create methods,
+ * and it initializes an SQS client for operating the sqs messages.
+ *
+ * The {@link #openQueue(String)} method in this class returns a queue backed by an SQS queue that stores the object paths
+ * of the intermediate files.
  * @author hank
  * @create 2025-09-17
  */
-public final class S3QS implements Storage
+public final class S3QS extends AbstractS3
 {
     private static final String SchemePrefix = Scheme.s3qs.name() + "://";
 
-    private final SqsClient sqsClient;
-    private final S3 s3;
+    private SqsClient sqs;
 
-    public S3QS() throws IOException
+    public S3QS()
     {
-        this.sqsClient = SqsClient.builder().build();
-        this.s3 = (S3) StorageFactory.Instance().getStorage(Scheme.s3);
+        this.connect();
+    }
+
+    private synchronized void connect()
+    {
+        sqs = SqsClient.builder().build();
+        s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
+                .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
+                .maxConnections(MaxRequestConcurrency)).build();
+    }
+
+    @Override
+    public void reconnect()
+    {
+        this.connect();
     }
 
     @Override
@@ -60,9 +82,8 @@ public final class S3QS implements Storage
         {
             return path;
         }
-        if (path.contains("://") && path.indexOf(":https://") > 0)
+        if (path.contains("://"))
         {
-            // :https:// is a legal prefix of the sqs queue url
             throw new IOException("Path '" + path +
                     "' already has a different scheme prefix than '" + SchemePrefix + "'.");
         }
@@ -77,8 +98,8 @@ public final class S3QS implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        ObjectPath objectPath = new ObjectPath(path);
-        if (!objectPath.valid)
+        ObjectPath p = new ObjectPath(path);
+        if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
@@ -86,7 +107,7 @@ public final class S3QS implements Storage
         S3QSInputStream inputStream;
         try
         {
-            inputStream = new S3QSInputStream(this.s3.getClient(), objectPath.bucket, objectPath.key);
+            inputStream = new S3QSInputStream(this.s3, p.bucket, p.key);
         }
         catch (Exception e)
         {
@@ -95,53 +116,25 @@ public final class S3QS implements Storage
         return new DataInputStream(inputStream);
     }
 
-    @Override
-    public List<Status> listStatus(String... path)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public List<String> listPaths(String... path)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Status getStatus(String path)
-    {
-        throw new UnsupportedOperationException();
-    }
-
+    /**
+     * @return -1 as we do not have a file id for intermediate files
+     */
     @Override
     public long getFileId(String path)
     {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean mkdirs(String path)
-    {
-        // TODO: implement
-        throw new UnsupportedOperationException();
+        // should not throw exception as this method is called in the constructor of PhysicalS3QSReader.supper.
+        return -1;
     }
 
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        ObjectPath objectPath = new ObjectPath(path);
-        if (!objectPath.valid)
+        ObjectPath p = new ObjectPath(path);
+        if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
         return new DataOutputStream(new S3QSOutputStream(bufferSize));
-    }
-
-    @Override
-    public boolean delete(String path, boolean recursive)
-    {
-        // TODO: implement
-        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -156,32 +149,18 @@ public final class S3QS implements Storage
     @Override
     public void close() throws IOException
     {
-        this.sqsClient.close();
-    }
-
-    @Override
-    public boolean exists(String path)
-    {
-        // TODO: implement
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean isFile(String path)
-    {
-        // TODO: implement
-        return false;
-    }
-
-    @Override
-    public boolean isDirectory(String path)
-    {
-        // TODO: implement
-        return false;
+        if (this.sqs != null)
+        {
+            this.sqs.close();
+        }
+        if (s3 != null)
+        {
+            s3.close();
+        }
     }
 
     public SqsClient getSqsClient()
     {
-        return sqsClient;
+        return sqs;
     }
 }

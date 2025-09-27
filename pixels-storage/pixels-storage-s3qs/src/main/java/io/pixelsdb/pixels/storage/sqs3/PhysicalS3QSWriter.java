@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.utils.Constants;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 /**
@@ -33,17 +34,23 @@ import java.nio.ByteBuffer;
  */
 public class PhysicalS3QSWriter implements PhysicalWriter
 {
-    private final String path;
-    private long position = 0L;
+    private final String pathStr;
+    private long position;
+    private final DataOutputStream out;
     private S3Queue queue = null;
-    private final DataOutputStream dataOutputStream;
 
     public PhysicalS3QSWriter(Storage storage, String path) throws IOException
     {
         if (storage instanceof S3QS)
         {
-            this.path = path;
-            this.dataOutputStream = storage.create(path, false, Constants.SQS_STREAM_BUFFER_SIZE);
+            if (path.contains("://"))
+            {
+                // remove the scheme.
+                path = path.substring(path.indexOf("://") + 3);
+            }
+            this.pathStr = path;
+            this.position = 0L;
+            this.out = storage.create(path, false, Constants.S3QS_BUFFER_SIZE);
         }
         else
         {
@@ -77,7 +84,14 @@ public class PhysicalS3QSWriter implements PhysicalWriter
     @Override
     public long append(ByteBuffer buffer) throws IOException
     {
-        buffer.flip();
+        /**
+         * Issue #217:
+         * For compatibility reasons if this code is compiled by jdk>=9 but executed in jvm8.
+         *
+         * In jdk8, ByteBuffer.flip() is extended from Buffer.flip(), but in jdk11, different kind of ByteBuffer
+         * has its own flip implementation and may lead to errors.
+         */
+        ((Buffer)buffer).flip();
         int length = buffer.remaining();
         return append(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
     }
@@ -94,36 +108,36 @@ public class PhysicalS3QSWriter implements PhysicalWriter
     public long append(byte[] buffer, int offset, int length) throws IOException
     {
         long start = this.position;
-        dataOutputStream.write(buffer, offset, length);
-        position += length;
+        this.out.write(buffer, offset, length);
+        this.position += length;
         return start;
     }
 
     @Override
     public void close() throws IOException
     {
-        dataOutputStream.close();
+        this.out.close();
         if (this.queue != null && !this.queue.isClosed())
         {
-            this.queue.push(this.path);
+            this.queue.push(this.pathStr);
         }
     }
 
     @Override
     public void flush() throws IOException
     {
-        dataOutputStream.flush();
+        this.out.flush();
     }
 
     @Override
     public String getPath()
     {
-        return path;
+        return this.pathStr;
     }
 
     @Override
     public int getBufferSize()
     {
-        return Constants.SQS_STREAM_BUFFER_SIZE;
+        return Constants.S3QS_BUFFER_SIZE;
     }
 }

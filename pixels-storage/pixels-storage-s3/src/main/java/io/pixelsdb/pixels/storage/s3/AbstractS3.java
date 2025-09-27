@@ -477,7 +477,7 @@ public abstract class AbstractS3 implements Storage
         return new ObjectPath(path).isFolder;
     }
 
-    public S3Client getClient()
+    public S3Client getS3Client()
     {
         return s3;
     }
