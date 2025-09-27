@@ -72,7 +72,7 @@ public class ObjectPath
             }
             this.valid = true;
         }
-        else if (path.length() > 0)
+        else if (!path.isEmpty())
         {
             // this is a bucket.
             this.bucket = path;

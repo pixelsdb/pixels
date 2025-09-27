@@ -47,7 +47,7 @@ public interface Storage
         redis, // Redis
         gcs,   // google cloud storage
         httpstream,  // http (netty) based stream storage
-        sqsstream,   // AWS SQS+S3 based stream storage
+        s3qs,   // AWS SQS+S3 based storage for intermediate data shuffle
         mock; // mock
 
         /**
@@ -160,7 +160,7 @@ public interface Storage
      * By default, this method returns false.
      *
      * <p><b>Note:</b> if this method returns true, then getLocations
-     * and getHosts must be override to return the physical locality
+     * and getHosts must be overridden to return the physical locality
      * information of the given path.</p>
      * @return
      */
@@ -228,8 +228,7 @@ public interface Storage
      * @return
      * @throws IOException if path is a directory.
      */
-    DataOutputStream create(String path, boolean overwrite,
-                            int bufferSize) throws IOException;
+    DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException;
 
     /**
      * For local fs, path is considered as local.
@@ -241,7 +240,7 @@ public interface Storage
      * @throws IOException if path is a directory.
      */
     default DataOutputStream create(String path, boolean overwrite,
-                            int bufferSize, short replication) throws IOException
+                                    int bufferSize, short replication) throws IOException
     {
         return create(path, overwrite, bufferSize);
     }

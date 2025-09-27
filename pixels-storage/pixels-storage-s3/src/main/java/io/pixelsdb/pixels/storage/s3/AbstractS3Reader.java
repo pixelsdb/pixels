@@ -108,7 +108,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
         this.length = this.s3.getStatus(path).getLength();
         this.numRequests = 1;
         this.position = 0L;
-        this.client = this.s3.getClient();
+        this.client = this.s3.getS3Client();
         this.enableAsync = Boolean.parseBoolean(ConfigFactory.Instance()
                 .getProperty("s3.enable.async"));
         this.useAsyncClient = Boolean.parseBoolean(ConfigFactory.Instance()
@@ -137,8 +137,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
             position = desired;
             return;
         }
-        throw new IOException("Desired offset " + desired +
-                " is out of bound (" + 0 + "," + length + ")");
+        throw new IOException("Desired offset " + desired + " is out of bound (" + 0 + "," + length + ")");
     }
 
     @Override
@@ -158,7 +157,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
                 client.getObject(request, ResponseTransformer.toBytes());
             this.numRequests++;
             this.position += len;
-            return ByteBuffer.wrap(response.asByteArrayUnsafe());
+            return response.asByteBuffer();
         } catch (Exception e)
         {
             throw new IOException("Failed to read object.", e);
@@ -168,15 +167,15 @@ public abstract class AbstractS3Reader implements PhysicalReader
     @Override
     public void readFully(byte[] buffer) throws IOException
     {
-        ByteBuffer byteBuffer = readFully(buffer.length);
-        System.arraycopy(byteBuffer.array(), 0, buffer, 0, buffer.length);
+        readFully(buffer, 0, buffer.length);
     }
 
     @Override
     public void readFully(byte[] buffer, int off, int len) throws IOException
     {
         ByteBuffer byteBuffer = readFully(len);
-        System.arraycopy(byteBuffer.array(), 0, buffer, off, len);
+        // This is more efficient than byteBuffer.put(buffer, off, len).
+        System.arraycopy(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(), buffer, off, len);
     }
 
     /**

@@ -118,7 +118,7 @@ public class S3InputStream extends InputStream
                 return -1;
             }
         }
-        return this.buffer[bufferPosition++];
+        return this.buffer[bufferPosition++] & 0xFF;
     }
 
     @Override
@@ -149,7 +149,6 @@ public class S3InputStream extends InputStream
                 System.arraycopy(this.buffer, this.bufferPosition, buf, offsetInBuf, remainToRead);
                 this.bufferPosition += remainToRead;
                 offsetInBuf += remainToRead;
-                remainToRead = 0;
                 break;
             }
             // Read the remaining bytes in buffer.
@@ -189,10 +188,11 @@ public class S3InputStream extends InputStream
         }
         GetObjectRequest request = GetObjectRequest.builder().bucket(this.bucket)
                 .key(this.key).range(toRange(this.position, bytesToRead)).build();
-        ResponseBytes<GetObjectResponse> future = this.s3Client.getObject(request, ResponseTransformer.toBytes());
+        ResponseBytes<GetObjectResponse> responseBytes = this.s3Client.getObject(request, ResponseTransformer.toBytes());
         try
         {
-            this.buffer = future.asByteArray();
+            // InputStream does not modify the buffer, thus it is safe to call asByteArrayUnsafe().
+            this.buffer = responseBytes.asByteArrayUnsafe();
             this.bufferPosition = 0;
             this.position += this.buffer.length;
             return this.buffer.length;
@@ -228,15 +228,16 @@ public class S3InputStream extends InputStream
         if (this.open)
         {
             this.open = false;
+            this.buffer = null;
             // Don't close s3Client as it is external.
         }
     }
 
-    private void assertOpen()
+    private void assertOpen() throws IOException
     {
         if (!this.open)
         {
-            throw new IllegalStateException("Closed");
+            throw new IOException("Stream closed");
         }
     }
 }

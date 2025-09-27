@@ -65,7 +65,7 @@ public class PhysicalS3Reader extends AbstractS3Reader
     private void initClients()
     {
         S3 s3 = (S3) this.s3;
-        this.asyncClient = s3.getAsyncClient();
+        this.asyncClient = s3.getS3AsyncClient();
 
         if (!useAsyncClient)
         {
@@ -111,8 +111,8 @@ public class PhysicalS3Reader extends AbstractS3Reader
             {
                 if (err != null)
                 {
-                    logger.error("Failed to complete the asynchronous read, range=" +
-                            request.range() + ", retrying with sync client.", err);
+                    logger.error("Failed to complete the asynchronous read, range={}, retrying with sync client.",
+                            request.range(), err);
                     // Issue #350: it is fine if multiple threads reconnect to S3 for multiple time.
                     s3.reconnect();
                     initClients();
