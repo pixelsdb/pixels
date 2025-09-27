@@ -17,12 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs3;
+package io.pixelsdb.pixels.storage.s3qs;
 
 import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.storage.s3.AbstractS3;
-import io.pixelsdb.pixels.storage.sqs3.io.S3QSInputStream;
-import io.pixelsdb.pixels.storage.sqs3.io.S3QSOutputStream;
+import io.pixelsdb.pixels.storage.s3qs.io.S3QSInputStream;
+import io.pixelsdb.pixels.storage.s3qs.io.S3QSOutputStream;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sqs.SqsClient;

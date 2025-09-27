@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.sqs3;
+package io.pixelsdb.pixels.storage.s3qs;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
@@ -38,6 +38,8 @@ import java.util.Queue;
  */
 public class S3Queue implements Closeable
 {
+    private static final int MAX_POLL_BATCH_SIZE = 10;
+    private static final int MAX_POLL_WAIT_SECS = 20;
     private static final int POLL_BATCH_SIZE;
 
     static
@@ -46,9 +48,10 @@ public class S3Queue implements Closeable
         if (batchSize < 1)
         {
             POLL_BATCH_SIZE = 1;
-        } else
+        }
+        else
         {
-            POLL_BATCH_SIZE = Math.min(batchSize, 10);
+            POLL_BATCH_SIZE = Math.min(batchSize, MAX_POLL_BATCH_SIZE);
         }
     }
 
@@ -72,7 +75,8 @@ public class S3Queue implements Closeable
     /**
      * Poll one object path from the SQS queue and create a physical reader for the object.
      *
-     * @param timeoutSec the max time in seconds to wait if the queue is currently empty
+     * @param timeoutSec the max time in seconds to wait if the queue is currently empty,
+     *                   a valid wait time should be between 1 and 20 seconds
      * @return null if the queue is still empty after timeout
      * @throws IOException if fails to create the physical reader for the path
      */
@@ -81,6 +85,14 @@ public class S3Queue implements Closeable
         String s3Path = this.s3PathQueue.poll();
         if (s3Path == null)
         {
+            if (timeoutSec < 1)
+            {
+                timeoutSec = 1;
+            }
+            else
+            {
+                timeoutSec = Math.min(timeoutSec, MAX_POLL_WAIT_SECS);
+            }
             ReceiveMessageRequest request = ReceiveMessageRequest.builder()
                     .queueUrl(queueUrl).maxNumberOfMessages(POLL_BATCH_SIZE).waitTimeSeconds(timeoutSec).build();
             ReceiveMessageResponse response = sqsClient.receiveMessage(request);
