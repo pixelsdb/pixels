@@ -44,11 +44,15 @@ public class IndexServiceFactory
      */
     public IndexService createInstance()
     {
-        return switch (this.enabledScheme) {
-            case rpc -> RPCIndexService.Instance();
-            case local -> LocalIndexService.Instance();
-            default -> throw new IllegalStateException("Unexpected scheme: " + this.enabledScheme);
-        };
+        switch (this.enabledScheme)
+        {
+            case rpc:
+                return RPCIndexService.Instance();
+            case local:
+                return LocalIndexService.Instance();
+            default:
+                throw new IllegalStateException("Unexpected scheme: " + this.enabledScheme);
+        }
     }
 
     public IndexService.Scheme getEnabledScheme()
