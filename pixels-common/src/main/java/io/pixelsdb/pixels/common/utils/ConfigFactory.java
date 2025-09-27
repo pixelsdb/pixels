@@ -19,10 +19,11 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -63,7 +64,7 @@ public class ConfigFactory
         void update(String value);
     }
 
-    private Map<String, UpdateCallback> callbacks;
+    private final Map<String, UpdateCallback> callbacks;
 
     private ConfigFactory()
     {
@@ -111,7 +112,7 @@ public class ConfigFactory
                 }
                 else
                 {
-                    in = new FileInputStream(pixelsConfig);
+                    in = Files.newInputStream(Paths.get(pixelsConfig));
                 }
             } catch (IOException e)
             {
@@ -153,7 +154,7 @@ public class ConfigFactory
             }
             else
             {
-                in = new FileInputStream(propFilePath);
+                in = Files.newInputStream(Paths.get(propFilePath));
             }
             this.prop.load(in);
             for (Map.Entry<String, UpdateCallback> entry : this.callbacks.entrySet())

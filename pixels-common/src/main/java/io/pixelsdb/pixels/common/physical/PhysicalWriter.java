@@ -48,6 +48,17 @@ public interface PhysicalWriter extends Closeable
 
     /**
      * Append content to the file.
+     * @param buffer content buffer
+     * @return start offset of content in the file.
+     * @throws IOException
+     */
+    default long append(byte[] buffer) throws IOException
+    {
+        return append(buffer, 0, buffer.length);
+    }
+
+    /**
+     * Append content to the file.
      *
      * @param buffer content buffer container
      * @param offset start offset of actual content buffer
