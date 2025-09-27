@@ -139,7 +139,7 @@
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <version>${maven.plugin.protobuf.version}</version>
                 <configuration>
-                    <protoSourceRoot>${project.parent.basedir}/proto</protoSourceRoot>
+                    <protoSourceRoot>../proto</protoSourceRoot>
                     <protocArtifact>com.google.protobuf:protoc:${dep.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
                     <pluginId>grpc-java</pluginId>
                     <pluginArtifact>io.grpc:protoc-gen-grpc-java:${dep.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>

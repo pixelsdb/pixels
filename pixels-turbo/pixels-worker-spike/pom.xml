@@ -93,7 +93,7 @@
                             <goal>copy-dependencies</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>${project.build.directory}</outputDirectory>
+                            <outputDirectory>target</outputDirectory>
                             <includeGroupIds>io.pixelsdb</includeGroupIds>
                             <includeArtifactIds>spike-java-handler</includeArtifactIds>
                         </configuration>

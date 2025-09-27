@@ -609,7 +609,6 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
-
     }
 
     @Override
@@ -645,7 +644,6 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
         }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
-
     }
 
     @Override
