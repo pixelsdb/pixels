@@ -199,8 +199,28 @@ public class ConfigFactory
         return this.prop.getProperty(key);
     }
 
-    public synchronized Properties getProperties()
+    /**
+     * Extracts properties that match the given prefix, with the option
+     * to strip the prefix from the keys in the returned {@link Properties}.
+     *
+     * @param prefix the prefix string (e.g., "debezium." or "retina.")
+     * @param stripPrefix whether to remove the prefix from the returned keys
+     * @return a {@link Properties} object containing only the matching entries
+     */
+    public synchronized Properties extractPropertiesByPrefix(String prefix, boolean stripPrefix)
     {
-        return this.prop;
+        Properties result = new Properties();
+
+        for (Map.Entry<Object, Object> entry : prop.entrySet()) {
+            String key = (String) entry.getKey();
+            String value = (String) entry.getValue();
+
+            if (key.startsWith(prefix)) {
+                String newKey = stripPrefix ? key.substring(prefix.length()) : key;
+                result.setProperty(newKey, value);
+            }
+        }
+
+        return result;
     }
 }
