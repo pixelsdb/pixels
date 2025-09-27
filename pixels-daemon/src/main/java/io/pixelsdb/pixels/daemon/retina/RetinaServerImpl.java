@@ -214,12 +214,12 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         String schemaName = request.getSchemaName();
         List<RetinaProto.TableUpdateData> tableUpdateDataList = request.getTableUpdateDataList();
-        long timestamp = request.getTimestamp();
         if (!tableUpdateDataList.isEmpty())
         {
             for (RetinaProto.TableUpdateData tableUpdateData : tableUpdateDataList)
             {
                 String tableName = tableUpdateData.getTableName();
+                long timestamp = tableUpdateData.getTimestamp();
                 ReentrantLock lock = tableLocks.computeIfAbsent(tableName, k -> new ReentrantLock());
                 lock.lock();
                 try

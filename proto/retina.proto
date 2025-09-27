@@ -74,6 +74,7 @@ message TableUpdateData {
     uint64 primaryIndexId = 2;
     repeated DeleteData deleteData = 3;
     repeated InsertData insertData = 4;
+    uint64 timestamp = 5;
 }
 
 // update
@@ -81,7 +82,6 @@ message UpdateRecordRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     repeated TableUpdateData tableUpdateData = 3;
-    uint64 timestamp = 4;
 }
 
 message UpdateRecordResponse {
