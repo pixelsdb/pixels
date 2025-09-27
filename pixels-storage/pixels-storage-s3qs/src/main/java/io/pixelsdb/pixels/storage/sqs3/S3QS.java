@@ -134,7 +134,7 @@ public final class S3QS extends AbstractS3
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        return new DataOutputStream(new S3QSOutputStream(bufferSize));
+        return new DataOutputStream(new S3QSOutputStream(this.s3, p.bucket, p.key, bufferSize));
     }
 
     @Override

@@ -67,7 +67,7 @@ public class S3OutputStream extends OutputStream
     /**
      * The temporary buffer used for storing the chunks
      */
-    private final byte[] buffer;
+    private byte[] buffer;
 
     /**
      * The position in the buffer
@@ -95,7 +95,7 @@ public class S3OutputStream extends OutputStream
     private final AtomicInteger numParts = new AtomicInteger(0);
 
     /**
-     * indicates whether the stream is still open / valid
+     * Indicates whether the stream is still open / valid
      */
     private boolean open;
 
@@ -184,6 +184,17 @@ public class S3OutputStream extends OutputStream
         write(buf, 0, buf.length);
     }
 
+    @Override
+    public void write(int b) throws IOException
+    {
+        this.assertOpen();
+        if (position >= this.buffer.length)
+        {
+            flushBufferAndRewind();
+        }
+        this.buffer[position++] = (byte) b;
+    }
+
     /**
      * Writes a byte array to the S3 Output Stream
      *
@@ -195,25 +206,25 @@ public class S3OutputStream extends OutputStream
     public void write(final byte[] buf, final int off, final int len) throws IOException
     {
         this.assertOpen();
-        int offsetInBuf = off, remainToRead = len;
+        int offsetInBuf = off, remainToWrite = len;
         int remainInBuffer;
-        while (remainToRead > (remainInBuffer = this.buffer.length - position))
+        while (remainToWrite > (remainInBuffer = this.buffer.length - position))
         {
             System.arraycopy(buf, offsetInBuf, this.buffer, this.position, remainInBuffer);
             this.position += remainInBuffer;
             flushBufferAndRewind();
             offsetInBuf += remainInBuffer;
-            remainToRead -= remainInBuffer;
+            remainToWrite -= remainInBuffer;
         }
-        System.arraycopy(buf, offsetInBuf, this.buffer, this.position, remainToRead);
-        this.position += remainToRead;
+        System.arraycopy(buf, offsetInBuf, this.buffer, this.position, remainToWrite);
+        this.position += remainToWrite;
     }
 
     /**
      * Flushes the buffer by uploading a part to S3.
      */
     @Override
-    public synchronized void flush()
+    public synchronized void flush() throws IOException
     {
         this.assertOpen();
     }
@@ -311,17 +322,19 @@ public class S3OutputStream extends OutputStream
                         CompleteMultipartUploadRequest.builder().bucket(this.bucket).key(this.key)
                                 .uploadId(uploadId).multipartUpload(completedMultipartUpload).build();
                 this.s3Client.completeMultipartUpload(completeMultipartUploadRequest);
-            } else
+            }
+            else
             {
                 final PutObjectRequest request = PutObjectRequest.builder().bucket(this.bucket).key(this.key)
                         .acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-                //this.s3Client.putObject(request, RequestBody.fromByteBuffer(ByteBuffer.wrap(buffer, 0, position)));
+                // Use DirectRequestBody instead of RequestBody to avoid memory copying
                 this.s3Client.putObject(request, DirectRequestBody.fromBytesDirect(buffer, 0, position));
             }
             if (this.buffer.length == fixSizedBuffers.getBufferSize())
             {
                 fixSizedBuffers.free(this.buffer);
             }
+            this.buffer = null;
         }
     }
 
@@ -339,22 +352,11 @@ public class S3OutputStream extends OutputStream
         }
     }
 
-    @Override
-    public void write(int b) throws IOException
-    {
-        this.assertOpen();
-        if (position >= this.buffer.length)
-        {
-            flushBufferAndRewind();
-        }
-        this.buffer[position++] = (byte) b;
-    }
-
-    private void assertOpen()
+    private void assertOpen() throws IOException
     {
         if (!this.open)
         {
-            throw new IllegalStateException("Closed");
+            throw new IOException("Stream closed");
         }
     }
 

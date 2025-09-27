@@ -19,36 +19,76 @@
  */
 package io.pixelsdb.pixels.storage.sqs3.io;
 
+import io.pixelsdb.pixels.common.physical.FixSizedBuffers;
+import io.pixelsdb.pixels.storage.s3.io.DirectRequestBody;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
 import java.io.OutputStream;
+
+import static io.pixelsdb.pixels.common.utils.Constants.S3QS_BUFFER_SIZE;
 
 public class S3QSOutputStream extends OutputStream
 {
     private static final Logger logger = LogManager.getLogger(S3QSOutputStream.class);
 
     /**
-     * The temporary buffer used for storing the chunks.
+     * The bucket-name on Amazon S3
      */
-    private final byte[] buffer;
+    private final String bucket;
 
     /**
-     * The position in the buffer.
+     * The path (key) name within the bucket
      */
-    private int bufferPosition;
+    private final String key;
+
+    /**
+     * The temporary buffer used for storing the chunks
+     */
+    private byte[] buffer;
+
+    /**
+     * The position in the buffer
+     */
+    private int position;
+
+    /**
+     * Amazon S3 client.
+     */
+    private final S3Client s3Client;
 
     /**
      * indicates whether the stream is still open / valid
      */
     private boolean open;
 
-    public S3QSOutputStream(int bufferCapacity)
+    private static final FixSizedBuffers fixSizedBuffers;
+
+    static
     {
+        fixSizedBuffers = new FixSizedBuffers(S3QS_BUFFER_SIZE);
+        Runtime.getRuntime().addShutdownHook(new Thread(fixSizedBuffers::clear));
+    }
+
+    public S3QSOutputStream(S3Client s3Client, String bucket, String key, int bufferSize)
+    {
+        this.s3Client = s3Client;
+        this.bucket = bucket;
+        this.key = key;
+        if (fixSizedBuffers.getBufferSize() == bufferSize)
+        {
+            this.buffer = fixSizedBuffers.allocate();
+        }
+        else
+        {
+            this.buffer = new byte[bufferSize];
+        }
+        this.position = 0;
         this.open = true;
-        this.buffer = new byte[bufferCapacity];
-        this.bufferPosition = 0;
     }
 
     /**
@@ -66,20 +106,57 @@ public class S3QSOutputStream extends OutputStream
     @Override
     public void write(int b) throws IOException
     {
+        this.assertOpen();
+        if (position >= this.buffer.length)
+        {
+            throw new IOException("Buffer is full");
+        }
+        this.buffer[position++] = (byte) b;
     }
 
     @Override
     public void write(final byte[] buf, final int off, final int len) throws IOException
     {
+        this.assertOpen();
+        int remainInBuffer = this.buffer.length - position;
+        if (len > remainInBuffer)
+        {
+            throw new IOException("Buffer is full");
+        }
+        System.arraycopy(buf, off, this.buffer, this.position, len);
+        this.position += len;
     }
 
     @Override
     public void flush() throws IOException
     {
+        this.assertOpen();
     }
 
     @Override
     public void close() throws IOException
     {
+        if (this.open)
+        {
+            this.open = false;
+            final PutObjectRequest request = PutObjectRequest.builder().bucket(this.bucket).key(this.key)
+                    .acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
+            // Use DirectRequestBody instead of RequestBody to avoid memory copying
+            this.s3Client.putObject(request, DirectRequestBody.fromBytesDirect(buffer, 0, position));
+            // release buffer
+            if (this.buffer.length == fixSizedBuffers.getBufferSize())
+            {
+                fixSizedBuffers.free(this.buffer);
+            }
+            this.buffer = null;
+        }
+    }
+
+    private void assertOpen() throws IOException
+    {
+        if (!this.open)
+        {
+            throw new IOException("Stream closed");
+        }
     }
 }

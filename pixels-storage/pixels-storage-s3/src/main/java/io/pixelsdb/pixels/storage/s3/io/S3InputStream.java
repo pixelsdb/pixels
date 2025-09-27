@@ -228,15 +228,16 @@ public class S3InputStream extends InputStream
         if (this.open)
         {
             this.open = false;
+            this.buffer = null;
             // Don't close s3Client as it is external.
         }
     }
 
-    private void assertOpen()
+    private void assertOpen() throws IOException
     {
         if (!this.open)
         {
-            throw new IllegalStateException("Closed");
+            throw new IOException("Stream closed");
         }
     }
 }

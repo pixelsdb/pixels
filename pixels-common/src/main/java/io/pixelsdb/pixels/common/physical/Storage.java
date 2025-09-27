@@ -228,8 +228,7 @@ public interface Storage
      * @return
      * @throws IOException if path is a directory.
      */
-    DataOutputStream create(String path, boolean overwrite,
-                            int bufferSize) throws IOException;
+    DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException;
 
     /**
      * For local fs, path is considered as local.
@@ -241,7 +240,7 @@ public interface Storage
      * @throws IOException if path is a directory.
      */
     default DataOutputStream create(String path, boolean overwrite,
-                            int bufferSize, short replication) throws IOException
+                                    int bufferSize, short replication) throws IOException
     {
         return create(path, overwrite, bufferSize);
     }

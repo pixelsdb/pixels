@@ -38,7 +38,7 @@ public class S3QSInputStream extends InputStream
     /**
      * The temporary buffer used for storing the chunks
      */
-    private final byte[] buffer;
+    private byte[] buffer;
 
     /**
      * The position in the buffer
@@ -135,6 +135,7 @@ public class S3QSInputStream extends InputStream
         if (this.open)
         {
             this.open = false;
+            this.buffer = null;
             // Don't close s3Client as it is external.
         }
     }
