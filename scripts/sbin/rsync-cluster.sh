@@ -23,14 +23,16 @@ sync_node_lib() {
     # Skip empty node
     [[ -z "$node" ]] && return
 
-    # Skip localhost (localhost, 127.0.0.1, or the same hostname)
-    if [[ "$node" == "localhost" || "$node" == "127.0.0.1" || "$node" == "$LOCAL_HOSTNAME" ]]; then
-        echo "[Info] Skipping localhost node: $node"
-        return
-    fi
-
     # Use default PIXELS_HOME if not specified
     home="${home:-${DEFAULT_PIXELS_HOME}}"
+
+    # Skip localhost (localhost, 127.0.0.1, or the same hostname)
+    if [[ "$node" == "localhost" || "$node" == "127.0.0.1" || "$node" == "$LOCAL_HOSTNAME" ]]; then
+        if [[ "$home" == "${DEFAULT_PIXELS_HOME}" ]]; then
+          echo "[Info] Skipping localhost node: $node"
+          return
+        fi
+    fi
 
     echo "[Info] Syncing lib to node: $node ($home)"
     rsync -az --delete --info=progress2 "${PIXELS_HOME}" "${node}:${home}"
