@@ -48,7 +48,7 @@ public class RowIdAllocator
         }
         this.tableId = tableId;
         this.batchSize = batchSize;
-        this.indexService = IndexServiceProvider.getInstance(IndexServiceProvider.ServiceMode.local);
+        this.indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
     }
 
     /**

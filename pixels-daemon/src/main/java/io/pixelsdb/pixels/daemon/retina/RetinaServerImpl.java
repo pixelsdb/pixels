@@ -65,7 +65,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     public RetinaServerImpl()
     {
         this.metadataService = MetadataService.Instance();
-        this.indexService = IndexServiceProvider.getInstance(IndexServiceProvider.ServiceMode.local);
+        this.indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
         this.retinaResourceManager = RetinaResourceManager.Instance();
         try
         {

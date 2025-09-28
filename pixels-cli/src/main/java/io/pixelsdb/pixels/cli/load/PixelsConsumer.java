@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -95,7 +95,7 @@ public class PixelsConsumer extends Consumer
             RowIdAllocator rowIdAllocator = parameters.getRowIdAllocator();
             int[] pkMapping = parameters.getPkMapping();
             SinglePointIndex index = parameters.getIndex();
-            IndexService indexService = IndexServiceProvider.getInstance(IndexServiceProvider.ServiceMode.local);
+            IndexService indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
 
             if (regex.equals("\\s"))
             {

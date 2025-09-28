@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,13 +19,6 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static java.util.Objects.requireNonNull;
-
 /**
  * Factory class for creating IndexService instances.
  * It chooses between RPCIndexService and LocalIndexService
@@ -33,17 +26,13 @@ import static java.util.Objects.requireNonNull;
  */
 public class IndexServiceProvider
 {
-    private static final Logger logger = LogManager.getLogger(IndexServiceProvider.class);
-
-    public static IndexService getInstance(ServiceMode mode)
+    public static IndexService getService(ServiceMode mode)
     {
         switch (mode)
         {
             case rpc:
-                logger.info("Creating RPCIndexService instance.");
                 return RPCIndexService.Instance();
             case local:
-                logger.info("Creating LocalIndexService instance.");
                 return LocalIndexService.Instance();
             default:
                 throw new IllegalStateException("Unexpected service mode: " + mode);
