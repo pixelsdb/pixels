@@ -25,14 +25,23 @@ import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.PhysicalWriterUtil;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import software.amazon.awssdk.services.sqs.SqsClient;
-import software.amazon.awssdk.services.sqs.model.*;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
+ * This is the queue to read from and write to s3+sqs.
+ * It is thread safe. Using multiple threads to poll and offer the queue can improve the data transfer throughput
+ * if not blocked by the network bandwidth.
+ *
  * @author hank
  * @create 2025-09-26
  */
@@ -55,13 +64,15 @@ public class S3Queue implements Closeable
         }
     }
 
-    private final Queue<String> s3PathQueue = new ArrayDeque<>();
+    private final Queue<String> s3PathQueue = new ConcurrentLinkedQueue<>();
 
     private final String queueUrl;
 
     private final SqsClient sqsClient;
 
     private final S3QS s3qs;
+
+    private final Lock lock = new ReentrantLock();
 
     private boolean closed = false;
 
@@ -74,13 +85,16 @@ public class S3Queue implements Closeable
 
     /**
      * Poll one object path from the SQS queue and create a physical reader for the object.
+     * Calling this method can receive a batch of object paths from SQS using long polling
+     * (the batch size is configured by s3qs.poll.batch.size in PIXELS_HOME/pixels.properties)
+     * and add the paths into a local in-memory queue. Thus reduces the receive-message requests sent to SQS.
      *
      * @param timeoutSec the max time in seconds to wait if the queue is currently empty,
      *                   a valid wait time should be between 1 and 20 seconds
      * @return null if the queue is still empty after timeout
      * @throws IOException if fails to create the physical reader for the path
      */
-    public synchronized PhysicalReader poll(int timeoutSec) throws IOException
+    public PhysicalReader poll(int timeoutSec) throws IOException
     {
         String s3Path = this.s3PathQueue.poll();
         if (s3Path == null)
@@ -93,20 +107,33 @@ public class S3Queue implements Closeable
             {
                 timeoutSec = Math.min(timeoutSec, MAX_POLL_WAIT_SECS);
             }
-            ReceiveMessageRequest request = ReceiveMessageRequest.builder()
-                    .queueUrl(queueUrl).maxNumberOfMessages(POLL_BATCH_SIZE).waitTimeSeconds(timeoutSec).build();
-            ReceiveMessageResponse response = sqsClient.receiveMessage(request);
-            if (response.hasMessages())
+            this.lock.lock();
+            try
             {
-                for (Message message : response.messages())
+                // try poll from queue again to see if another thread has received the messages from sqs
+                while ((s3Path = this.s3PathQueue.poll()) == null)
                 {
-                    String path = message.body();
-                    this.s3PathQueue.add(path);
+                    ReceiveMessageRequest request = ReceiveMessageRequest.builder()
+                            .queueUrl(queueUrl).maxNumberOfMessages(POLL_BATCH_SIZE).waitTimeSeconds(timeoutSec).build();
+                    ReceiveMessageResponse response = sqsClient.receiveMessage(request);
+                    if (response.hasMessages())
+                    {
+                        for (Message message : response.messages())
+                        {
+                            String path = message.body();
+                            this.s3PathQueue.add(path);
+                        }
+                    }
+                    else
+                    {
+                        // the sqs queue is also empty
+                        return null;
+                    }
                 }
-                s3Path = this.s3PathQueue.poll();
-            } else
+            }
+            finally
             {
-                return null;
+                this.lock.unlock();
             }
         }
 
@@ -120,6 +147,13 @@ public class S3Queue implements Closeable
         sqsClient.sendMessage(request);
     }
 
+    /**
+     * Create a physical writer for an object of the given path. When the object is written
+     * and the physical writer is closed successfully, the object path is sent to SQS.
+     * @param objectPath the path of the object
+     * @return the physical writer of the object
+     * @throws IOException if fails to create the physical writer for the path
+     */
     public PhysicalWriter offer(String objectPath) throws IOException
     {
         PhysicalS3QSWriter writer = (PhysicalS3QSWriter) PhysicalWriterUtil
