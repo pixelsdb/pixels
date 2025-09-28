@@ -38,6 +38,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
+ * This is the queue to read from and write to s3+sqs.
+ * It is thread safe. Using multiple threads to poll and offer the queue can improve the data transfer throughput
+ * if not blocked by the network bandwidth.
+ *
  * @author hank
  * @create 2025-09-26
  */
@@ -81,6 +85,9 @@ public class S3Queue implements Closeable
 
     /**
      * Poll one object path from the SQS queue and create a physical reader for the object.
+     * Calling this method can receive a batch of object paths from SQS using long polling
+     * (the batch size is configured by s3qs.poll.batch.size in PIXELS_HOME/pixels.properties)
+     * and add the paths into a local in-memory queue. Thus reduces the receive-message requests sent to SQS.
      *
      * @param timeoutSec the max time in seconds to wait if the queue is currently empty,
      *                   a valid wait time should be between 1 and 20 seconds
@@ -140,6 +147,13 @@ public class S3Queue implements Closeable
         sqsClient.sendMessage(request);
     }
 
+    /**
+     * Create a physical writer for an object of the given path. When the object is written
+     * and the physical writer is closed successfully, the object path is sent to SQS.
+     * @param objectPath the path of the object
+     * @return the physical writer of the object
+     * @throws IOException if fails to create the physical writer for the path
+     */
     public PhysicalWriter offer(String objectPath) throws IOException
     {
         PhysicalS3QSWriter writer = (PhysicalS3QSWriter) PhysicalWriterUtil
