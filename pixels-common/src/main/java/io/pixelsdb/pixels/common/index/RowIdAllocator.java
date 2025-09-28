@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.index.IndexProto;
 
@@ -49,7 +48,7 @@ public class RowIdAllocator
         }
         this.tableId = tableId;
         this.batchSize = batchSize;
-        this.indexService = IndexServiceFactory.Instance().createInstance();
+        this.indexService = IndexServiceProvider.getInstance(IndexServiceProvider.ServiceMode.local);
     }
 
     /**

@@ -157,7 +157,7 @@
                         </goals>
                         <configuration>
                             <finalName>pixels-cli</finalName>
-                            <outputDirectory>target</outputDirectory>
+                            <outputDirectory>${project.basedir}/target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>full</shadedClassifierName>
                             <filters>

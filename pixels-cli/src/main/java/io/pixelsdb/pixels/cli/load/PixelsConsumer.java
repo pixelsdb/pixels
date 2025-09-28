@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.cli.load;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.index.IndexService;
-import io.pixelsdb.pixels.common.index.IndexServiceFactory;
+import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
@@ -95,7 +95,7 @@ public class PixelsConsumer extends Consumer
             RowIdAllocator rowIdAllocator = parameters.getRowIdAllocator();
             int[] pkMapping = parameters.getPkMapping();
             SinglePointIndex index = parameters.getIndex();
-            IndexService indexService = IndexServiceFactory.Instance().createInstance();
+            IndexService indexService = IndexServiceProvider.getInstance(IndexServiceProvider.ServiceMode.local);
 
             if (regex.equals("\\s"))
             {
