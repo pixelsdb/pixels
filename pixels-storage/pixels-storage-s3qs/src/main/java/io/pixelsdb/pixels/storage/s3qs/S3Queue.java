@@ -25,12 +25,17 @@ import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.PhysicalWriterUtil;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import software.amazon.awssdk.services.sqs.SqsClient;
-import software.amazon.awssdk.services.sqs.model.*;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author hank
@@ -55,13 +60,15 @@ public class S3Queue implements Closeable
         }
     }
 
-    private final Queue<String> s3PathQueue = new ArrayDeque<>();
+    private final Queue<String> s3PathQueue = new ConcurrentLinkedQueue<>();
 
     private final String queueUrl;
 
     private final SqsClient sqsClient;
 
     private final S3QS s3qs;
+
+    private final Lock lock = new ReentrantLock();
 
     private boolean closed = false;
 
@@ -80,7 +87,7 @@ public class S3Queue implements Closeable
      * @return null if the queue is still empty after timeout
      * @throws IOException if fails to create the physical reader for the path
      */
-    public synchronized PhysicalReader poll(int timeoutSec) throws IOException
+    public PhysicalReader poll(int timeoutSec) throws IOException
     {
         String s3Path = this.s3PathQueue.poll();
         if (s3Path == null)
@@ -93,20 +100,33 @@ public class S3Queue implements Closeable
             {
                 timeoutSec = Math.min(timeoutSec, MAX_POLL_WAIT_SECS);
             }
-            ReceiveMessageRequest request = ReceiveMessageRequest.builder()
-                    .queueUrl(queueUrl).maxNumberOfMessages(POLL_BATCH_SIZE).waitTimeSeconds(timeoutSec).build();
-            ReceiveMessageResponse response = sqsClient.receiveMessage(request);
-            if (response.hasMessages())
+            this.lock.lock();
+            try
             {
-                for (Message message : response.messages())
+                // try poll from queue again to see if another thread has received the messages from sqs
+                while ((s3Path = this.s3PathQueue.poll()) == null)
                 {
-                    String path = message.body();
-                    this.s3PathQueue.add(path);
+                    ReceiveMessageRequest request = ReceiveMessageRequest.builder()
+                            .queueUrl(queueUrl).maxNumberOfMessages(POLL_BATCH_SIZE).waitTimeSeconds(timeoutSec).build();
+                    ReceiveMessageResponse response = sqsClient.receiveMessage(request);
+                    if (response.hasMessages())
+                    {
+                        for (Message message : response.messages())
+                        {
+                            String path = message.body();
+                            this.s3PathQueue.add(path);
+                        }
+                    }
+                    else
+                    {
+                        // the sqs queue is also empty
+                        return null;
+                    }
                 }
-                s3Path = this.s3PathQueue.poll();
-            } else
+            }
+            finally
             {
-                return null;
+                this.lock.unlock();
             }
         }
 
