@@ -136,9 +136,8 @@ public class S3Queue implements Closeable
     @Override
     public void close() throws IOException
     {
-        this.sqsClient.close();
         this.s3PathQueue.clear();
         this.closed = true;
-        // do not close the s3qs storage as it is cached
+        // do not close the s3qs storage and the sqs client as they are cached
     }
 }
