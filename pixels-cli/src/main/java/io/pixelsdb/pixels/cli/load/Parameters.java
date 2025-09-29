@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.cli.load;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
@@ -219,7 +220,7 @@ public class Parameters
 
         if(index != null)
         {
-            rowIdAllocator = new RowIdAllocator(table.getId(), 1000);
+            rowIdAllocator = new RowIdAllocator(table.getId(), 1000, IndexServiceProvider.ServiceMode.local);
             int[] orderKeyColIds = new int[index.getKeyColumns().getKeyColumnIds().size()];
             List<String> orderKeyColNames = new LinkedList<>();
             List<String> orderKeyColTypes = new LinkedList<>();

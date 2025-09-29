@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.retina;
 
 import com.google.protobuf.ByteString;
+import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -160,7 +161,7 @@ public class RetinaResourceManager
         }
     }
 
-    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
+    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException, IndexException
     {
         IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
         PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);

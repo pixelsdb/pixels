@@ -30,6 +30,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
+import io.pixelsdb.pixels.common.exception.IndexException;
+import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.*;
@@ -160,7 +162,7 @@ public class PixelsWriterBuffer
 
         // Initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
-        this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize);
+        this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize, IndexServiceProvider.ServiceMode.local);
 
         startFlushMinioToDiskScheduler();
     }
@@ -172,7 +174,7 @@ public class PixelsWriterBuffer
      * @param timestamp
      * @return RowID
      */
-    public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
+    public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException, IndexException
     {
         int columnCount = this.schema.getChildren().size();
         checkArgument(values.length == columnCount,

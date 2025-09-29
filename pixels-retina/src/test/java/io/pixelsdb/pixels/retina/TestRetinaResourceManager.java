@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.retina;
 
+import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
@@ -108,7 +109,7 @@ public class TestRetinaResourceManager
             visibility = retinaResourceManager.queryVisibility(fileId, rgId, 10);
             printVisibility(visibility);
             System.out.println(checkVisibility(visibility, rgRowId));
-        } catch (RetinaException e)
+        } catch (RetinaException | IndexException e)
         {
             throw new RuntimeException(e);
         }
