@@ -129,14 +129,13 @@ public class RetinaService
         }
     }
 
-    public boolean updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData, long timestamp) throws RetinaException
+    public boolean updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .addAllTableUpdateData(tableUpdateData)
-                .setTimestamp(timestamp)
                 .build();
         RetinaProto.UpdateRecordResponse response = this.stub.updateRecord(request);
         if (response.getHeader().getErrorCode() != 0)
@@ -164,7 +163,7 @@ public class RetinaService
             this.finishLatch = finishLatch;
         }
 
-        public void updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData, long timestamp)
+        public void updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData)
         {
             if (isClosed)
             {
@@ -176,7 +175,6 @@ public class RetinaService
                     .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                     .setSchemaName(schemaName)
                     .addAllTableUpdateData(tableUpdateData)
-                    .setTimestamp(timestamp)
                     .build();
             
             try
