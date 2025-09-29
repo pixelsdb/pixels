@@ -244,7 +244,6 @@ public class RetinaService
     public StreamHandle startUpdateStream()
     {
         CountDownLatch latch = new CountDownLatch(1);
-
         StreamHandle handle = new StreamHandle(latch);
 
         StreamObserver<RetinaProto.UpdateRecordResponse> responseObserver = new StreamObserver<RetinaProto.UpdateRecordResponse>()
@@ -275,7 +274,7 @@ public class RetinaService
 
         StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver = asyncStub.streamUpdateRecord(responseObserver);
         handle.setRequestObserver(requestObserver);
-        return new StreamHandle(latch);
+        return handle;
     }
 
     public boolean addVisibility(String filePath) throws RetinaException

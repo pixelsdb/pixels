@@ -32,6 +32,7 @@ public class TestRocksetIndex
         RocksetIndex rocksetIndex = (RocksetIndex) SinglePointIndexFactory.Instance().
                 getSinglePointIndex(new SinglePointIndexFactory.TableIndex(
                         1L, 1L, SinglePointIndex.Scheme.rockset, true));
+
         long dbHandle = 0;
 
         try
@@ -40,38 +41,73 @@ public class TestRocksetIndex
             dbHandle = rocksetIndex.getDbHandle();
             System.out.println("DB handle: " + dbHandle);
 
-            // 2. test write
-            byte[] testKey = "test_key".getBytes();
-            byte[] testValue = "test_value".getBytes();
+            // Prepare test keys/values
+            byte[] key1 = "key1".getBytes();
+            byte[] val1 = "val1".getBytes();
+            byte[] key2 = "key2".getBytes();
+            byte[] val2 = "val2".getBytes();
 
-            System.out.println("Putting key-value pair...");
-            rocksetIndex.DBput(dbHandle, testKey, testValue);
+            // 2. DB basic ops
+            System.out.println("=== Basic DB ops ===");
+            rocksetIndex.DBput(dbHandle, key1, val1);
+            rocksetIndex.DBput(dbHandle, key2, val2);
 
-            // 3. test read
-            System.out.println("Getting value...");
-            byte[] retrievedValue = rocksetIndex.DBget(dbHandle, testKey);
-            if (retrievedValue != null) 
+            byte[] got1 = rocksetIndex.DBget(dbHandle, key1);
+            System.out.println("Retrieved key1: " + (got1 == null ? "null" : new String(got1)));
+
+            rocksetIndex.DBdelete(dbHandle, key1);
+            byte[] deleted = rocksetIndex.DBget(dbHandle, key1);
+            System.out.println("After delete, key1: " + (deleted == null ? "null" : new String(deleted)));
+
+            // 3. Iterator test
+            System.out.println("=== Iterator ops ===");
+            long it = rocksetIndex.DBNewIterator(dbHandle);
+            byte[] seekKey = "zzzz".getBytes(); // seek for last key <= "zzzz"
+            rocksetIndex.IteratorSeekForPrev(it, seekKey);
+
+            while (rocksetIndex.IteratorIsValid(it))
             {
-                System.out.println("Retrieved value: " + new String(retrievedValue));
-            } 
-            else 
-            {
-                System.out.println("Key not found");
+                byte[] ikey = rocksetIndex.IteratorKey(it);
+                byte[] ival = rocksetIndex.IteratorValue(it);
+                System.out.println("Iter kv: " + new String(ikey) + " -> " + new String(ival));
+                rocksetIndex.IteratorPrev(it);
             }
+            rocksetIndex.IteratorClose(it);
 
-            // 4. test delete
-            System.out.println("Deleting key...");
-            rocksetIndex.DBdelete(dbHandle, testKey);
-            byte[] deletedValue = rocksetIndex.DBget(dbHandle, testKey);
-            if (deletedValue == null) 
-            {
-                System.out.println("Key successfully deleted");
-            }
+            // 4. WriteBatch test
+            System.out.println("=== WriteBatch ops ===");
+            long wb = rocksetIndex.WriteBatchCreate();
+
+            byte[] key3 = "key3".getBytes();
+            byte[] val3 = "val3".getBytes();
+            byte[] key4 = "key4".getBytes();
+            byte[] val4 = "val4".getBytes();
+
+            rocksetIndex.WriteBatchPut(wb, key3, val3);
+            rocksetIndex.WriteBatchPut(wb, key4, val4);
+
+            rocksetIndex.DBWrite(dbHandle, wb);
+
+            byte[] got3 = rocksetIndex.DBget(dbHandle, key3);
+            byte[] got4 = rocksetIndex.DBget(dbHandle, key4);
+            System.out.println("Retrieved key3: " + new String(got3));
+            System.out.println("Retrieved key4: " + new String(got4));
+
+            // Delete via batch
+            rocksetIndex.WriteBatchClear(wb);
+            rocksetIndex.WriteBatchDelete(wb, key3);
+            rocksetIndex.DBWrite(dbHandle, wb);
+
+            byte[] deleted3 = rocksetIndex.DBget(dbHandle, key3);
+            System.out.println("After batch delete, key3: " + (deleted3 == null ? "null" : new String(deleted3)));
+
+            // cleanup batch
+            rocksetIndex.WriteBatchDestroy(wb);
         }
         finally
         {
             // 5. confirm close
-            if (dbHandle != 0) 
+            if (dbHandle != 0)
             {
                 System.out.println("Closing DB...");
                 rocksetIndex.CloseDB(dbHandle);

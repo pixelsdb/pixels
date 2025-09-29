@@ -36,9 +36,11 @@ using ROCKSDB_NAMESPACE::FileSystem;
 using ROCKSDB_NAMESPACE::Options;
 using ROCKSDB_NAMESPACE::ReadOptions;
 using ROCKSDB_NAMESPACE::Slice;
+using ROCKSDB_NAMESPACE::Iterator;
 using ROCKSDB_NAMESPACE::Status;
 using ROCKSDB_NAMESPACE::WriteOptions;
 using ROCKSDB_NAMESPACE::FlushOptions;
+using ROCKSDB_NAMESPACE::WriteBatch;
 
 /**
  * @author hank, Rolland1944
@@ -71,8 +73,8 @@ bool check_env_vars(JNIEnv* env)
  * Method:    CreateCloudFileSystem0
  * Signature: (Ljava/lang/String;Ljava/lang/String;[J)J
  */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_CreateCloudFileSystem0(
-    JNIEnv* env, jobject obj, 
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_CreateCloudFileSystem0(
+    JNIEnv* env, jobject obj,
     jstring bucket_name, jstring s3_prefix)
 {
     if (!check_env_vars(env))
@@ -133,7 +135,7 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_Creat
  * Method:    OpenDBCloud0
  * Signature: (JLjava/lang/String;Ljava/lang/String;JZ)J
  */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_OpenDBCloud0(
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_OpenDBCloud0(
     JNIEnv* env, jobject obj,
     jlong cloud_env_ptr, jstring local_db_path,
     jstring persistent_cache_path, jlong persistent_cache_size_gb,
@@ -176,7 +178,7 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_OpenD
  * Method:    DBput0
  * Signature: (J[B[B)V
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBput0(
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_DBput0(
     JNIEnv* env, jobject obj,
     jlong db_ptr, jbyteArray key, jbyteArray value)
 {
@@ -205,7 +207,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBput0
  * Method:    DBget0
  * Signature: (J[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBget0(
+JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_DBget0(
     JNIEnv* env, jobject obj,
     jlong db_ptr, jbyteArray key)
 {
@@ -241,7 +243,7 @@ JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_
  * Method:    DBdelete0
  * Signature: (J[B)V
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBdelete0(
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_DBdelete0(
     JNIEnv* env, jobject obj,
     jlong db_ptr, jbyteArray key)
 {
@@ -265,7 +267,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_DBdele
  * Method:    CloseDB0
  * Signature: (JJ)V
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_CloseDB0(
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_CloseDB0(
     JNIEnv* env, jobject obj,
     jlong db_ptr)
 {
@@ -275,5 +277,247 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rocksdb_RocksetIndex_CloseD
         db->Flush(FlushOptions());  // convert pending writes to sst files
         delete db;
         db = nullptr;
+    }
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    DBNewIterator0
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_DBNewIterator0(
+    JNIEnv* env, jobject obj, jlong db_ptr)
+{
+    DBCloud* db = reinterpret_cast<DBCloud*>(db_ptr);
+    if (!db) {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "DB handle is null");
+        return 0;
+    }
+
+    Iterator* it = db->NewIterator(ReadOptions());
+
+    return reinterpret_cast<jlong>(it);
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    IteratorSeekForPrev0
+ * Signature: (J[B)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_IteratorSeekForPrev0(
+    JNIEnv* env, jobject obj, jlong it_ptr, jbyteArray targetKey)
+{
+    Iterator* it = reinterpret_cast<Iterator*>(it_ptr);
+    if (!it) {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Iterator handle is null in SeekForPrev");
+        return;
+    }
+
+    jbyte* key_data = env->GetByteArrayElements(targetKey, nullptr);
+    jsize key_len = env->GetArrayLength(targetKey);
+
+    Slice target(reinterpret_cast<char*>(key_data), key_len);
+
+    it->SeekForPrev(target);
+
+    env->ReleaseByteArrayElements(targetKey, key_data, JNI_ABORT);
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    IteratorKey0
+ * Signature: (J)[B
+ */
+ JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_IteratorKey0(
+    JNIEnv* env, jobject obj, jlong it_ptr)
+{
+    Iterator* it = reinterpret_cast<Iterator*>(it_ptr);
+    if (it == nullptr || !it->Valid())
+    {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Iterator handle is null in IteratorKey");
+        return nullptr;
+    }
+
+    Slice key = it->key();
+    jbyteArray jkey = env->NewByteArray(static_cast<jsize>(key.size()));
+    env->SetByteArrayRegion(jkey, 0, static_cast<jsize>(key.size()),
+                            reinterpret_cast<const jbyte*>(key.data()));
+    return jkey;
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    IteratorValue0
+ * Signature: (J)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_IteratorValue0(
+    JNIEnv * env, jobject obj, jlong it_ptr)
+{
+    Iterator* it = reinterpret_cast<Iterator*>(it_ptr);
+    if (it == nullptr || !it->Valid())
+    {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Iterator handle is null in IteratorValue");
+        return nullptr;
+    }
+
+    Slice value = it->value();
+    jbyteArray jvalue = env->NewByteArray(static_cast<jsize>(value.size()));
+    env->SetByteArrayRegion(jvalue, 0, static_cast<jsize>(value.size()),
+                            reinterpret_cast<const jbyte*>(value.data()));
+    return jvalue;
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    IteratorIsValid0
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_IteratorIsValid0(
+    JNIEnv* env, jobject obj, jlong it_ptr)
+{
+    Iterator* it = reinterpret_cast<Iterator*>(it_ptr);
+    if (!it) {
+        return JNI_FALSE;
+    }
+    return it->Valid() ? JNI_TRUE : JNI_FALSE;
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    IteratorPrev0
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_IteratorPrev0
+  (JNIEnv* env, jobject obj, jlong it_ptr)
+{
+    Iterator* it = reinterpret_cast<Iterator*>(it_ptr);
+    if (it == nullptr) {
+        env->ThrowNew(env->FindClass("java/lang/NullPointerException"),
+                      "Iterator handle is null in IteratorPrev");
+        return;
+    }
+    it->Prev();
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    IteratorClose0
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_IteratorClose0
+  (JNIEnv* env, jobject obj, jlong it_ptr)
+{
+    Iterator* it = reinterpret_cast<Iterator*>(it_ptr);
+    if (it == nullptr) {
+        return;
+    }
+    delete it;
+    it = nullptr;
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    WriteBatchCreate0
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_WriteBatchCreate0
+  (JNIEnv * env, jobject obj)
+{
+    auto* wb = new WriteBatch();
+    return reinterpret_cast<jlong>(wb);
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    WriteBatchPut0
+ * Signature: (J[B[B)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_WriteBatchPut0
+  (JNIEnv* env, jobject obj, jlong wb_handle, jbyteArray jkey, jbyteArray jvalue)
+{
+    auto* wb = reinterpret_cast<WriteBatch*>(wb_handle);
+    if (wb == nullptr) return;
+
+    // Convert Java byte[] key to Slice
+    jsize key_len = env->GetArrayLength(jkey);
+    jbyte* key_bytes = env->GetByteArrayElements(jkey, nullptr);
+    Slice key(reinterpret_cast<char*>(key_bytes), key_len);
+
+    // Convert Java byte[] value to Slice
+    jsize val_len = env->GetArrayLength(jvalue);
+    jbyte* val_bytes = env->GetByteArrayElements(jvalue, nullptr);
+    Slice value(reinterpret_cast<char*>(val_bytes), val_len);
+
+    wb->Put(key, value);
+
+    // Release resources
+    env->ReleaseByteArrayElements(jkey, key_bytes, JNI_ABORT);
+    env->ReleaseByteArrayElements(jvalue, val_bytes, JNI_ABORT);
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    WriteBatchDelete0
+ * Signature: (J[B)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_WriteBatchDelete0
+  (JNIEnv* env, jobject obj, jlong wb_handle, jbyteArray jkey)
+{
+    auto* wb = reinterpret_cast<WriteBatch*>(wb_handle);
+    if (wb == nullptr) return;
+
+    // Convert Java byte[] key to Slice
+    jsize key_len = env->GetArrayLength(jkey);
+    jbyte* key_bytes = env->GetByteArrayElements(jkey, nullptr);
+    Slice key(reinterpret_cast<char*>(key_bytes), key_len);
+
+    wb->Delete(key);
+
+    // Release resources
+    env->ReleaseByteArrayElements(jkey, key_bytes, JNI_ABORT);
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    DBWrite0
+ * Signature: (JJ)Z
+ */
+JNIEXPORT jboolean JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_DBWrite0
+  (JNIEnv * env, jobject obj, jlong db_handle, jlong wb_handle)
+{
+    auto* db = reinterpret_cast<DBCloud*>(db_handle);
+    auto* wb = reinterpret_cast<WriteBatch*>(wb_handle);
+    if (db == nullptr || wb == nullptr) return JNI_FALSE;
+
+    WriteOptions write_options;
+    Status s = db->Write(write_options, wb);
+    return s.ok() ? JNI_TRUE : JNI_FALSE;
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    WriteBatchClear0
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_WriteBatchClear0
+  (JNIEnv * env, jobject obj, jlong wb_handle)
+{
+    auto* wb = reinterpret_cast<WriteBatch*>(wb_handle);
+    if (wb != nullptr) {
+        wb->Clear();
+    }
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_RocksetIndexStub
+ * Method:    WriteBatchDestroy0
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_RocksetIndexStub_WriteBatchDestroy0
+  (JNIEnv * env, jobject obj, jlong wb_handle)
+{
+    auto* wb = reinterpret_cast<WriteBatch*>(wb_handle);
+    if (wb != nullptr) {
+        delete wb;
     }
 }
