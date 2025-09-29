@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -153,17 +154,23 @@ public class RetinaService
     public static class StreamHandle implements AutoCloseable
     {
         private final Logger logger = LogManager.getLogger(StreamHandle.class);
-        private final StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver;
+        private StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver;
         private final CountDownLatch finishLatch;
         private volatile boolean isClosed = false;
+        protected final Map<String, CompletableFuture<RetinaProto.UpdateRecordResponse>> pendingRequests =
+                new ConcurrentHashMap<>();
 
-        StreamHandle(StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver, CountDownLatch finishLatch)
+        StreamHandle(CountDownLatch finishLatch)
         {
-            this.requestObserver = requestObserver;
             this.finishLatch = finishLatch;
         }
 
-        public void updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData)
+        void setRequestObserver(StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver)
+        {
+            this.requestObserver = requestObserver;
+        }
+
+        public CompletableFuture<RetinaProto.UpdateRecordResponse> updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData)
         {
             if (isClosed)
             {
@@ -171,6 +178,9 @@ public class RetinaService
             }
             
             String token = UUID.randomUUID().toString();
+            CompletableFuture<RetinaProto.UpdateRecordResponse> future = new CompletableFuture<>();
+            pendingRequests.put(token, future);
+
             RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                     .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                     .setSchemaName(schemaName)
@@ -184,6 +194,28 @@ public class RetinaService
             {
                 logger.error("Failed to send update record request", e);
                 throw new RuntimeException("Failed to send update record request", e);
+            }
+
+            return future;
+        }
+
+        public void completeResponse(RetinaProto.UpdateRecordResponse response)
+        {
+            String token = response.getHeader().getToken();
+            CompletableFuture<RetinaProto.UpdateRecordResponse> future = pendingRequests.remove(token);
+            if (future != null)
+            {
+                if (response.getHeader().getErrorCode() == 0)
+                {
+                    future.complete(response);
+                } else
+                {
+                    future.completeExceptionally(
+                            new RuntimeException("Server error: " + response.getHeader().getErrorMsg()));
+                }
+            } else
+            {
+                logger.warn("Received response for unknown token: {}", token);
             }
         }
 
@@ -213,6 +245,8 @@ public class RetinaService
     {
         CountDownLatch latch = new CountDownLatch(1);
 
+        StreamHandle handle = new StreamHandle(latch);
+
         StreamObserver<RetinaProto.UpdateRecordResponse> responseObserver = new StreamObserver<RetinaProto.UpdateRecordResponse>()
         {
             @Override
@@ -222,6 +256,7 @@ public class RetinaService
                 {
                     logger.error("Stream update record failed: {}", response.getHeader().getErrorMsg());
                 }
+                handle.completeResponse(response);
             }
 
             @Override
@@ -239,8 +274,8 @@ public class RetinaService
         };
 
         StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver = asyncStub.streamUpdateRecord(responseObserver);
-
-        return new StreamHandle(requestObserver, latch);
+        handle.setRequestObserver(requestObserver);
+        return new StreamHandle(latch);
     }
 
     public boolean addVisibility(String filePath) throws RetinaException
