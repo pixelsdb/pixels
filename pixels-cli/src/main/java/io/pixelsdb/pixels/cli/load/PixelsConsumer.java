@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.cli.load;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.index.IndexService;
+import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
@@ -94,7 +95,7 @@ public class PixelsConsumer extends Consumer
             RowIdAllocator rowIdAllocator = parameters.getRowIdAllocator();
             int[] pkMapping = parameters.getPkMapping();
             SinglePointIndex index = parameters.getIndex();
-            IndexService indexService = IndexService.Instance();
+            IndexService indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.rpc);
 
             if (regex.equals("\\s"))
             {

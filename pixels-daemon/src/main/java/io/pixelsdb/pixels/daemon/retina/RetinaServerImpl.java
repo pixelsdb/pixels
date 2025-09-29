@@ -24,6 +24,7 @@ import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.index.IndexService;
+import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -64,7 +65,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     public RetinaServerImpl()
     {
         this.metadataService = MetadataService.Instance();
-        this.indexService = IndexService.Instance();
+        this.indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
         this.retinaResourceManager = RetinaResourceManager.Instance();
         try
         {
