@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -45,11 +46,11 @@ public class TestPixelsWriterBuffer
     public void setup()
     {
         targetOrderDirPath = new Path();
-        targetOrderDirPath.setUri("file:///home/gengdy/data/test/v-0-ordered");
-        targetOrderDirPath.setId(21);
+        targetOrderDirPath.setUri("file:///home/gengdy/data/tpch/1g/customer/v-0-ordered");
+        targetOrderDirPath.setId(1);
         targetCompactDirPath = new Path();
-        targetCompactDirPath.setUri("file:///home/gengdy/data/test/v-0-compact");
-        targetCompactDirPath.setId(22);
+        targetCompactDirPath.setUri("file:///home/gengdy/data/tpch/1g/customer/v-0-compact");
+        targetCompactDirPath.setId(2);
         try
         {
             columnNames.add("id");
@@ -69,8 +70,19 @@ public class TestPixelsWriterBuffer
     @Test
     public void testConcurrentWriteOperations()
     {
-        int numThreads = 1;
-        int numRowsPerThread = 10241;
+
+//        // print pid if you want to attach a profiler like async-profiler or YourKit
+//        try
+//        {
+//            System.out.println(Long.parseLong(ManagementFactory.getRuntimeMXBean().getName().split("@")[0]));
+//            Thread.sleep(10000);
+//        } catch (InterruptedException e)
+//        {
+//            throw new RuntimeException(e);
+//        }
+
+        int numThreads = 1000;
+        int numRowsPerThread = 100000;
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch completionLatch = new CountDownLatch(numThreads);
         AtomicBoolean hasError = new AtomicBoolean(false);
@@ -106,7 +118,7 @@ public class TestPixelsWriterBuffer
         try
         {
             completionLatch.await();
-            Thread.sleep(10000);
+            Thread.sleep(30000);
             buffer.close();
         } catch (Exception e)
         {
