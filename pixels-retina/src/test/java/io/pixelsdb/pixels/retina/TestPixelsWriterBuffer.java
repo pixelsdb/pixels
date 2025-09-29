@@ -47,10 +47,10 @@ public class TestPixelsWriterBuffer
     {
         targetOrderDirPath = new Path();
         targetOrderDirPath.setUri("file:///home/gengdy/data/tpch/1g/customer/v-0-ordered");
-        targetOrderDirPath.setId(1);
+        targetOrderDirPath.setId(1);    // path id get from mysql `PATHS` table
         targetCompactDirPath = new Path();
         targetCompactDirPath.setUri("file:///home/gengdy/data/tpch/1g/customer/v-0-compact");
-        targetCompactDirPath.setId(2);
+        targetCompactDirPath.setId(2);  // get from mysql `PATHS` table
         try
         {
             columnNames.add("id");
@@ -60,7 +60,7 @@ public class TestPixelsWriterBuffer
             columnTypes.add("int");
 
             schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
-            buffer = new PixelsWriterBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath);
+            buffer = new PixelsWriterBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath);  // table id get from mysql `TBLS` table
         } catch (Exception e)
         {
             System.out.println("setup error: " + e);
