@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.retina;
 
-import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;

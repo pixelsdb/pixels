@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.retina;
 
 import com.google.protobuf.ByteString;
-import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
