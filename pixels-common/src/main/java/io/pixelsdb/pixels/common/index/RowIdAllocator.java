@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.common.index;
 
 import io.pixelsdb.pixels.common.exception.IndexException;
-import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.concurrent.locks.ReentrantLock;
@@ -41,7 +40,7 @@ public class RowIdAllocator
 
     private final ReentrantLock lock = new ReentrantLock();
 
-    public RowIdAllocator(long tableId, int batchSize)
+    public RowIdAllocator(long tableId, int batchSize, IndexServiceProvider.ServiceMode mode)
     {
         if (batchSize <= 0)
         {
@@ -49,15 +48,15 @@ public class RowIdAllocator
         }
         this.tableId = tableId;
         this.batchSize = batchSize;
-        this.indexService = IndexService.Instance();
+        this.indexService = IndexServiceProvider.getService(mode);
     }
 
     /**
      * get a unique rowId
      * @return
-     * @throws RetinaException
+     * @throws IndexException
      */
-    public long getRowId() throws RetinaException
+    public long getRowId() throws IndexException
     {
         this.lock.lock();
         try
@@ -75,22 +74,16 @@ public class RowIdAllocator
         }
     }
 
-    private void fetchNewBatch() throws RetinaException
+    private void fetchNewBatch() throws IndexException
     {
-        try
+        IndexProto.RowIdBatch newBatch = this.indexService.allocateRowIdBatch(
+                this.tableId, this.batchSize);
+        if (newBatch == null || newBatch.getLength() <= 0)
         {
-            IndexProto.RowIdBatch newBatch = this.indexService.allocateRowIdBatch(
-                    this.tableId, this.batchSize);
-            if (newBatch == null || newBatch.getLength() <= 0)
-            {
-                throw new RetinaException("failed to get row id batch");
-            }
-            this.currentBatchStart = newBatch.getRowIdStart();
-            this.currentBatchLength = newBatch.getLength();
-            this.allocatedCountInBatch = 0;
-        } catch (IndexException e)
-        {
-            throw new RetinaException("failed to get row id batch", e);
+            throw new IndexException("failed to get row id batch");
         }
+        this.currentBatchStart = newBatch.getRowIdStart();
+        this.currentBatchLength = newBatch.getLength();
+        this.allocatedCountInBatch = 0;
     }
 }

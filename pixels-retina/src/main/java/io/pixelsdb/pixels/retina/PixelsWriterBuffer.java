@@ -30,6 +30,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
+import io.pixelsdb.pixels.common.exception.IndexException;
+import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.*;
@@ -160,7 +162,7 @@ public class PixelsWriterBuffer
 
         // Initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
-        this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize);
+        this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize, IndexServiceProvider.ServiceMode.local);
 
         startFlushMinioToDiskScheduler();
     }
@@ -203,8 +205,13 @@ public class PixelsWriterBuffer
         builder.setFileId(activeMemTable.getFileId())
                 .setRgId(0)
                 .setRgRowOffset(rgRowOffset);
-
-        return rowIdAllocator.getRowId();
+        try
+        {
+            return rowIdAllocator.getRowId();
+        } catch (IndexException e)
+        {
+            throw new RetinaException("Fail to get rowId from rowIdAllocator");
+        }
     }
 
     private void switchMemTable()

@@ -19,112 +19,12 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.StatusRuntimeException;
-import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.IndexException;
-import io.pixelsdb.pixels.common.server.HostAddress;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
-import io.pixelsdb.pixels.index.IndexServiceGrpc;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
-/**
- * @author hank, Rolland1944
- * @create 2025-02-16
- */
-public class IndexService
+public interface IndexService
 {
-    private static final Logger logger = LogManager.getLogger(IndexService.class);
-    private static final IndexService defaultInstance;
-    private static final Map<HostAddress, IndexService> otherInstances = new HashMap<>();
-
-    static
-    {
-        String indexHost = ConfigFactory.Instance().getProperty("index.server.host");
-        int indexPort = Integer.parseInt(ConfigFactory.Instance().getProperty("index.server.port"));
-        defaultInstance = new IndexService(indexHost, indexPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run() {
-                try
-                {
-                    defaultInstance.shutdown();
-                    for (IndexService otherTransService : otherInstances.values())
-                    {
-                        otherTransService.shutdown();
-                    }
-                    otherInstances.clear();
-                } catch (InterruptedException e)
-                {
-                    logger.error("failed to shut down index service", e);
-                }
-            }
-        }));
-    }
-
-    /**
-     * Get the default index service instance connecting to the index host:port configured in
-     * PIXELS_HOME/etc/pixels.properties. This default instance will be automatically shut down when the process
-     * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
-     * @return
-     */
-    public static IndexService Instance()
-    {
-        return defaultInstance;
-    }
-
-    /**
-     * This method should only be used to connect to a index server that is not configured through
-     * PIXELS_HOME/etc/pixels.properties. <b>No need</b> to manually shut down the returned index service.
-     * @param host the host name of the index server
-     * @param port the port of the index server
-     * @return the created index service instance
-     */
-    public static IndexService CreateInstance(String host, int port)
-    {
-        HostAddress address = HostAddress.fromParts(host, port);
-        IndexService indexService = otherInstances.get(address);
-        if (indexService != null)
-        {
-            return indexService;
-        }
-        indexService = new IndexService(host, port);
-        otherInstances.put(address, indexService);
-        return indexService;
-    }
-
-    private final ManagedChannel channel;
-    private final IndexServiceGrpc.IndexServiceBlockingStub stub;
-    private boolean isShutDown;
-
-    private IndexService(String host, int port)
-    {
-        assert (host != null);
-        assert (port > 0 && port <= 65535);
-        this.channel = ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext().build();
-        this.stub = IndexServiceGrpc.newBlockingStub(channel);
-        this.isShutDown = false;
-    }
-
-    private synchronized void shutdown() throws InterruptedException
-    {
-        if (!this.isShutDown)
-        {
-            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
-            this.isShutDown = true;
-        }
-    }
-
     /**
      * Allocate a batch of continuous row ids for the primary index on a table.
      * These row ids are to be put into the primary index by the client (e.g., retina or sink)
@@ -132,155 +32,35 @@ public class IndexService
      * @param numRowIds the number of row ids to allocate
      * @return the allocated row ids
      */
-    public IndexProto.RowIdBatch allocateRowIdBatch (long tableId, int numRowIds) throws IndexException
-    {
-        IndexProto.AllocateRowIdBatchRequest request = IndexProto.AllocateRowIdBatchRequest.newBuilder()
-                .setTableId(tableId).setNumRowIds(numRowIds).build();
-
-        try
-        {
-            IndexProto.AllocateRowIdBatchResponse response = stub.allocateRowIdBatch(request);
-            if (response.getErrorCode() == ErrorCode.SUCCESS)
-            {
-                return response.getRowIdBatch();
-            }
-            else if (response.getErrorCode() == ErrorCode.INDEX_GET_ROW_ID_FAIL)
-            {
-                return null;
-            } else
-            {
-                throw new IndexException("failed to allocate row id batch, error code=" + response.getErrorCode());
-            }
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while allocating row ID batch");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds);
 
     /**
      * Lookup a unique index.
      * @param key the index key
      * @return the row location or null if the index entry is not found.
      */
-    public IndexProto.RowLocation lookupUniqueIndex (IndexProto.IndexKey key) throws IndexException
-    {
-        IndexProto.LookupUniqueIndexRequest request = IndexProto.LookupUniqueIndexRequest.newBuilder()
-                .setIndexKey(key).build();
-
-        try
-        {
-            IndexProto.LookupUniqueIndexResponse response = stub.lookupUniqueIndex(request);
-            if (response.getErrorCode() == ErrorCode.SUCCESS)
-            {
-                return response.getRowLocation();
-            }
-            else if (response.getErrorCode() == ErrorCode.INDEX_ENTRY_NOT_FOUND)
-            {
-                return null;
-            }
-            else
-            {
-                throw new IndexException("failed to lookup unique index, error code=" + response.getErrorCode());
-            }
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while looking up unique index");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key) throws IndexException;
 
     /**
      * Lookup a non-unique index.
      * @param key the index key
      * @return the row locations or null if the index entry is not found.
      */
-    public List<IndexProto.RowLocation> lookupNonUniqueIndex (IndexProto.IndexKey key) throws IndexException
-    {
-        IndexProto.LookupNonUniqueIndexRequest request = IndexProto.LookupNonUniqueIndexRequest.newBuilder()
-                .setIndexKey(key).build();
-
-        try
-        {
-            IndexProto.LookupNonUniqueIndexResponse response = stub.lookupNonUniqueIndex(request);
-            if (response.getErrorCode() == ErrorCode.INDEX_ENTRY_NOT_FOUND)
-            {
-                return null;
-            }
-            else if (response.getErrorCode() == ErrorCode.SUCCESS)
-            {
-                return response.getRowLocationsList();
-            }
-            else
-            {
-                throw new IndexException("failed to lookup non-unique index, error code=" + response.getErrorCode());
-            }
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while looking up non unique index");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    List<IndexProto.RowLocation> lookupNonUniqueIndex(IndexProto.IndexKey key) throws IndexException;
 
     /**
      * Put an index entry into the primary index.
      * @param entry the index entry
      * @return true on success
      */
-    public boolean putPrimaryIndexEntry (IndexProto.PrimaryIndexEntry entry) throws IndexException
-    {
-        IndexProto.PutPrimaryIndexEntryRequest request = IndexProto.PutPrimaryIndexEntryRequest.newBuilder()
-                .setIndexEntry(entry).build();
-
-        try
-        {
-            IndexProto.PutPrimaryIndexEntryResponse response = stub.putPrimaryIndexEntry(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to put primary index entry, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while putting primary index entry");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    boolean putPrimaryIndexEntry(IndexProto.PrimaryIndexEntry entry) throws IndexException;
 
     /**
      * Put an index entry into the secondary index.
      * @param entry the index entry
      * @return true on success
      */
-    public boolean putSecondaryIndexEntry (IndexProto.SecondaryIndexEntry entry) throws IndexException
-    {
-        IndexProto.PutSecondaryIndexEntryRequest request = IndexProto.PutSecondaryIndexEntryRequest.newBuilder()
-                .setIndexEntry(entry).build();
-
-        try
-        {
-            IndexProto.PutSecondaryIndexEntryResponse response = stub.putSecondaryIndexEntry(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to put secondary index entry, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while putting secondary index entry");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    boolean putSecondaryIndexEntry(IndexProto.SecondaryIndexEntry entry) throws IndexException;
 
     /**
      * Put a batch of index entries into the primary index.
@@ -289,28 +69,8 @@ public class IndexService
      * @param entries the index entries
      * @return true on success
      */
-    public boolean putPrimaryIndexEntries (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> entries)
-            throws IndexException
-    {
-        IndexProto.PutPrimaryIndexEntriesRequest request = IndexProto.PutPrimaryIndexEntriesRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(entries).build();
-
-        try
-        {
-            IndexProto.PutPrimaryIndexEntriesResponse response = stub.putPrimaryIndexEntries(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to put primary index entries, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while putting primary index entries");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    boolean putPrimaryIndexEntries(long tableId, long indexId,
+                                   List<IndexProto.PrimaryIndexEntry> entries) throws IndexException;
 
     /**
      * Put a batch of index entries into the secondary index.
@@ -319,82 +79,22 @@ public class IndexService
      * @param entries the index entries
      * @return true on success
      */
-    public boolean putSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> entries)
-            throws IndexException
-    {
-        IndexProto.PutSecondaryIndexEntriesRequest request = IndexProto.PutSecondaryIndexEntriesRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(entries).build();
-
-        try
-        {
-            IndexProto.PutSecondaryIndexEntriesResponse response = stub.putSecondaryIndexEntries(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to put secondary index entries, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while putting secondary index entries");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    boolean putSecondaryIndexEntries(long tableId, long indexId,
+                                     List<IndexProto.SecondaryIndexEntry> entries) throws IndexException;
 
     /**
      * Delete an entry from the primary index. The deleted index entry is marked as deleted using a tombstone.
      * @param key the index key
      * @return the row location of the deleted index entry
      */
-    public IndexProto.RowLocation deletePrimaryIndexEntry (IndexProto.IndexKey key) throws IndexException
-    {
-        IndexProto.DeletePrimaryIndexEntryRequest request = IndexProto.DeletePrimaryIndexEntryRequest.newBuilder()
-                .setIndexKey(key).build();
-
-        try
-        {
-            IndexProto.DeletePrimaryIndexEntryResponse response = stub.deletePrimaryIndexEntry(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to delete primary index entry, error code=" + response.getErrorCode());
-            }
-            return response.getRowLocation();
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while deleting primary index entry");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    IndexProto.RowLocation deletePrimaryIndexEntry(IndexProto.IndexKey key) throws IndexException;
 
     /**
      * Delete entry(ies) from the secondary index. Each deleted index entry is marked as deleted using a tombstone.
      * @param key the index key
      * @return the row id(s) of the deleted index entry(ies)
      */
-    public List<Long> deleteSecondaryIndexEntry (IndexProto.IndexKey key) throws IndexException
-    {
-        IndexProto.DeleteSecondaryIndexEntryRequest request = IndexProto.DeleteSecondaryIndexEntryRequest.newBuilder()
-                .setIndexKey(key).build();
-
-        try
-        {
-            IndexProto.DeleteSecondaryIndexEntryResponse response = stub.deleteSecondaryIndexEntry(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to delete secondary index entry, error code=" + response.getErrorCode());
-            }
-            return response.getRowIdsList();
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while deleting secondary index entry");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    List<Long> deleteSecondaryIndexEntry(IndexProto.IndexKey key) throws IndexException;
 
     /**
      * Delete entries from the primary index. Each deleted index entry is marked as deleted using a tombstone.
@@ -403,28 +103,8 @@ public class IndexService
      * @param keys the keys of the entries to delete
      * @return the row locations of the deleted index entries
      */
-    public List<IndexProto.RowLocation> deletePrimaryIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> keys)
-            throws IndexException
-    {
-        IndexProto.DeletePrimaryIndexEntriesRequest request = IndexProto.DeletePrimaryIndexEntriesRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(keys).build();
-
-        try
-        {
-            IndexProto.DeletePrimaryIndexEntriesResponse response = stub.deletePrimaryIndexEntries(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to delete primary index entries, error code=" + response.getErrorCode());
-            }
-            return response.getRowLocationsList();
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while deleting primary index entries");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    List<IndexProto.RowLocation> deletePrimaryIndexEntries(long tableId, long indexId,
+                                                           List<IndexProto.IndexKey> keys) throws IndexException;
 
     /**
      * Delete entries from the secondary index. Each deleted index entry is marked as deleted using a tombstone.
@@ -433,82 +113,22 @@ public class IndexService
      * @param keys the keys of the entries to delete
      * @return the row ids of the deleted index entries
      */
-    public List<Long> deleteSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> keys)
-            throws IndexException
-    {
-        IndexProto.DeleteSecondaryIndexEntriesRequest request = IndexProto.DeleteSecondaryIndexEntriesRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(keys).build();
-
-        try
-        {
-            IndexProto.DeleteSecondaryIndexEntriesResponse response = stub.deleteSecondaryIndexEntries(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to delete secondary index entries, error code=" + response.getErrorCode());
-            }
-            return response.getRowIdsList();
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while deleting secondary index entries");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    List<Long> deleteSecondaryIndexEntries(long tableId, long indexId,
+                                           List<IndexProto.IndexKey> keys) throws IndexException;
 
     /**
      * Update the entry of a primary index.
      * @param indexEntry the index entry to update
      * @return the previous row location of the index entry
      */
-    public IndexProto.RowLocation updatePrimaryIndexEntry (IndexProto.PrimaryIndexEntry indexEntry) throws IndexException
-    {
-        IndexProto.UpdatePrimaryIndexEntryRequest request = IndexProto.UpdatePrimaryIndexEntryRequest.newBuilder()
-                .setIndexEntry(indexEntry).build();
-
-        try
-        {
-            IndexProto.UpdatePrimaryIndexEntryResponse response = stub.updatePrimaryIndexEntry(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to update primary index entry, error code=" + response.getErrorCode());
-            }
-            return response.getPrevRowLocation();
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while updating primary index entry");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    IndexProto.RowLocation updatePrimaryIndexEntry(IndexProto.PrimaryIndexEntry indexEntry) throws IndexException;
 
     /**
      * Update the entry of a secondary index.
      * @param indexEntry the index entry to update
      * @return the previous row id(s) of the index entry
      */
-    public List<Long> updateSecondaryIndexEntry (IndexProto.SecondaryIndexEntry indexEntry) throws IndexException
-    {
-        IndexProto.UpdateSecondaryIndexEntryRequest request = IndexProto.UpdateSecondaryIndexEntryRequest.newBuilder()
-                .setIndexEntry(indexEntry).build();
-
-        try
-        {
-            IndexProto.UpdateSecondaryIndexEntryResponse response = stub.updateSecondaryIndexEntry(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to update secondary index entry, error code=" + response.getErrorCode());
-            }
-            return response.getPrevRowIdsList();
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while updating secondary index entry");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    List<Long> updateSecondaryIndexEntry(IndexProto.SecondaryIndexEntry indexEntry) throws IndexException;
 
     /**
      * Update the entries of a primary index.
@@ -517,28 +137,8 @@ public class IndexService
      * @param indexEntries the index entries to update
      * @return the previous row locations of the index entries
      */
-    public List<IndexProto.RowLocation> updatePrimaryIndexEntries (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> indexEntries)
-            throws IndexException
-    {
-        IndexProto.UpdatePrimaryIndexEntriesRequest request = IndexProto.UpdatePrimaryIndexEntriesRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(indexEntries).build();
-
-        try
-        {
-            IndexProto.UpdatePrimaryIndexEntriesResponse response = stub.updatePrimaryIndexEntries(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to update primary index entries, error code=" + response.getErrorCode());
-            }
-            return response.getPrevRowLocationsList();
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while updating primary index entries");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    List<IndexProto.RowLocation> updatePrimaryIndexEntries(long tableId, long indexId,
+                                                           List<IndexProto.PrimaryIndexEntry> indexEntries) throws IndexException;
 
     /**
      * Update the entries of a secondary index.
@@ -547,28 +147,8 @@ public class IndexService
      * @param indexEntries the index entries to update
      * @return the previous row ids of the index entries
      */
-    public List<Long> updateSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> indexEntries)
-            throws IndexException
-    {
-        IndexProto.UpdateSecondaryIndexEntriesRequest request = IndexProto.UpdateSecondaryIndexEntriesRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(indexEntries).build();
-
-        try
-        {
-            IndexProto.UpdateSecondaryIndexEntriesResponse response = stub.updateSecondaryIndexEntries(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to update secondary index entries, error code=" + response.getErrorCode());
-            }
-            return response.getPrevRowIdsList();
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while updating secondary index entries");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    List<Long> updateSecondaryIndexEntries(long tableId, long indexId,
+                                           List<IndexProto.SecondaryIndexEntry> indexEntries) throws IndexException;
 
     /**
      * Purge (remove) the index entries of an index permanently. This should only be done asynchronously by the garbage
@@ -579,28 +159,8 @@ public class IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean purgeIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> indexKeys, boolean isPrimary)
-            throws IndexException
-    {
-        IndexProto.PurgeIndexEntriesRequest request = IndexProto.PurgeIndexEntriesRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(indexKeys).setIsPrimary(isPrimary).build();
-
-        try
-        {
-            IndexProto.PurgeIndexEntriesResponse response = stub.purgeIndexEntries(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to purge index entries, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while purging index entries");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    boolean purgeIndexEntries(long tableId, long indexId,
+                              List<IndexProto.IndexKey> indexKeys, boolean isPrimary) throws IndexException;
 
     /**
      * Flush the index entries of an index corresponding to a buffered Pixels data file.
@@ -613,27 +173,8 @@ public class IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean flushIndexEntriesOfFile (long tableId, long indexId, long fileId, boolean isPrimary) throws IndexException
-    {
-        IndexProto.FlushIndexEntriesOfFileRequest request = IndexProto.FlushIndexEntriesOfFileRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).setFileId(fileId).setIsPrimary(isPrimary).build();
-
-        try
-        {
-            IndexProto.FlushIndexEntriesOfFileResponse response = stub.flushIndexEntriesOfFile(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to flush index entries of file, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while flushing index entries of file");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    boolean flushIndexEntriesOfFile(long tableId, long indexId,
+                                    long fileId, boolean isPrimary) throws IndexException;
 
     /**
      * Open an index in the index server. This method is optional and is used to pre-warm an index instance in
@@ -643,27 +184,7 @@ public class IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean openIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
-    {
-        IndexProto.OpenIndexRequest request = IndexProto.OpenIndexRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
-
-        try
-        {
-            IndexProto.OpenIndexResponse response = stub.openIndex(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to open index, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while openning index");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    boolean openIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
 
     /**
      * Close an index in the index server.
@@ -672,27 +193,7 @@ public class IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean closeIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
-    {
-        IndexProto.CloseIndexRequest request = IndexProto.CloseIndexRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
-
-        try
-        {
-            IndexProto.CloseIndexResponse response = stub.closeIndex(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to close index, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while closing index");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
+    boolean closeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
 
     /**
      * Close an index and remove its persistent storage content in the index server.
@@ -701,25 +202,7 @@ public class IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean removeIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
-    {
-        IndexProto.RemoveIndexRequest request = IndexProto.RemoveIndexRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
+    boolean removeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
 
-        try
-        {
-            IndexProto.RemoveIndexResponse response = stub.removeIndex(request);
-            if (response.getErrorCode() != ErrorCode.SUCCESS)
-            {
-                throw new IndexException("failed to remove index, error code=" + response.getErrorCode());
-            }
-            return true;
-        } catch (StatusRuntimeException e)
-        {
-            throw new IndexException("gRPC error while removing index");
-        } catch (RuntimeException e)
-        {
-            throw new IndexException("an unexpected error occurred", e);
-        }
-    }
 }
+
