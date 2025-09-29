@@ -118,7 +118,7 @@ public class TestPixelsWriterBuffer
         try
         {
             completionLatch.await();
-            Thread.sleep(30000);
+            Thread.sleep(10000);    // wait for async flush to complete
             buffer.close();
         } catch (Exception e)
         {
