@@ -220,7 +220,7 @@ public class Parameters
 
         if(index != null)
         {
-            rowIdAllocator = new RowIdAllocator(table.getId(), 1000, IndexServiceProvider.ServiceMode.local);
+            rowIdAllocator = new RowIdAllocator(table.getId(), 1000, IndexServiceProvider.ServiceMode.rpc);
             int[] orderKeyColIds = new int[index.getKeyColumns().getKeyColumnIds().size()];
             List<String> orderKeyColNames = new LinkedList<>();
             List<String> orderKeyColTypes = new LinkedList<>();

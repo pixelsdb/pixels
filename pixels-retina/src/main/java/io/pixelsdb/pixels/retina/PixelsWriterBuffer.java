@@ -174,7 +174,7 @@ public class PixelsWriterBuffer
      * @param timestamp
      * @return RowID
      */
-    public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException, IndexException
+    public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
     {
         int columnCount = this.schema.getChildren().size();
         checkArgument(values.length == columnCount,
@@ -205,8 +205,13 @@ public class PixelsWriterBuffer
         builder.setFileId(activeMemTable.getFileId())
                 .setRgId(0)
                 .setRgRowOffset(rgRowOffset);
-
-        return rowIdAllocator.getRowId();
+        try
+        {
+            return rowIdAllocator.getRowId();
+        } catch (IndexException e)
+        {
+            throw new RetinaException("Fail to get rowId from rowIdAllocator");
+        }
     }
 
     private void switchMemTable()

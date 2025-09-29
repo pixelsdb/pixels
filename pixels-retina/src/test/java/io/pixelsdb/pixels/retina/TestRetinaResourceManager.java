@@ -109,7 +109,7 @@ public class TestRetinaResourceManager
             visibility = retinaResourceManager.queryVisibility(fileId, rgId, 10);
             printVisibility(visibility);
             System.out.println(checkVisibility(visibility, rgRowId));
-        } catch (RetinaException | IndexException e)
+        } catch (RetinaException e)
         {
             throw new RuntimeException(e);
         }

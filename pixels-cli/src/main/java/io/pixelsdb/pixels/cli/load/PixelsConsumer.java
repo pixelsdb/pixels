@@ -95,7 +95,7 @@ public class PixelsConsumer extends Consumer
             RowIdAllocator rowIdAllocator = parameters.getRowIdAllocator();
             int[] pkMapping = parameters.getPkMapping();
             SinglePointIndex index = parameters.getIndex();
-            IndexService indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
+            IndexService indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.rpc);
 
             if (regex.equals("\\s"))
             {

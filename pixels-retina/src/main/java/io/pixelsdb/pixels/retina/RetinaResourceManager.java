@@ -161,7 +161,7 @@ public class RetinaResourceManager
         }
     }
 
-    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException, IndexException
+    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
     {
         IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
         PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
