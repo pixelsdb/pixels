@@ -151,16 +151,16 @@ public class RetinaService
         return true;
     }
 
-    public static class StreamHandle implements AutoCloseable
+    public static class StreamHandler implements AutoCloseable
     {
-        private final Logger logger = LogManager.getLogger(StreamHandle.class);
+        private final Logger logger = LogManager.getLogger(StreamHandler.class);
         private StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver;
         private final CountDownLatch finishLatch;
         private volatile boolean isClosed = false;
         protected final Map<String, CompletableFuture<RetinaProto.UpdateRecordResponse>> pendingRequests =
                 new ConcurrentHashMap<>();
 
-        StreamHandle(CountDownLatch finishLatch)
+        StreamHandler(CountDownLatch finishLatch)
         {
             this.finishLatch = finishLatch;
         }
@@ -241,10 +241,10 @@ public class RetinaService
         }
     }
 
-    public StreamHandle startUpdateStream()
+    public StreamHandler startUpdateStream()
     {
         CountDownLatch latch = new CountDownLatch(1);
-        StreamHandle handle = new StreamHandle(latch);
+        StreamHandler handler = new StreamHandler(latch);
 
         StreamObserver<RetinaProto.UpdateRecordResponse> responseObserver = new StreamObserver<RetinaProto.UpdateRecordResponse>()
         {
@@ -255,7 +255,7 @@ public class RetinaService
                 {
                     logger.error("Stream update record failed: {}", response.getHeader().getErrorMsg());
                 }
-                handle.completeResponse(response);
+                handler.completeResponse(response);
             }
 
             @Override
@@ -273,8 +273,8 @@ public class RetinaService
         };
 
         StreamObserver<RetinaProto.UpdateRecordRequest> requestObserver = asyncStub.streamUpdateRecord(responseObserver);
-        handle.setRequestObserver(requestObserver);
-        return handle;
+        handler.setRequestObserver(requestObserver);
+        return handler;
     }
 
     public boolean addVisibility(String filePath) throws RetinaException

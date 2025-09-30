@@ -75,7 +75,7 @@ public class TestRetinaService
     public void testStreamUpdateRecord()
     {
         String[] colNames = {"key", "name", "region", "comment"};
-        try (RetinaService.StreamHandle streamHandle = RetinaService.Instance().startUpdateStream())
+        try (RetinaService.StreamHandler streamHandler = RetinaService.Instance().startUpdateStream())
         {
             for (int i = 0; i < 10; ++i)
             {
@@ -137,7 +137,7 @@ public class TestRetinaService
                 tableUpdateDataBuilder.addInsertData(insertDataBuilder.build());
                 tableUpdateDataBuilder.setTimestamp(0L);
                 tableUpdateData.add(tableUpdateDataBuilder.build());
-                streamHandle.updateRecord(schemaName, tableUpdateData);
+                streamHandler.updateRecord(schemaName, tableUpdateData);
             }
         }
     }
