@@ -207,7 +207,7 @@ public class TransService
         TransProto.CommitTransBatchRequest request = TransProto.CommitTransBatchRequest.newBuilder()
                 .addAllTransIds(transIds).addAllTimestamps(timestamps).build();
         TransProto.CommitTransBatchResponse response = this.stub.commitTransBatch(request);
-        if (response.getErrorCode() == ErrorCode.TRANS_INVALID_ARGUMENT)
+        if (response.getErrorCode() == ErrorCode.TRANS_INVALID_ARGUMENT) // other error codes are not thrown as exceptions
         {
             throw new TransException("transaction ids and timestamps size mismatch");
         }
