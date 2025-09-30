@@ -105,6 +105,9 @@ public class ErrorCode
     public static final int TRANS_COMMIT_FAILED = (ERROR_TRANS + 5);
     public static final int TRANS_ROLLBACK_FAILED = (ERROR_TRANS + 6);
     public static final int TRANS_GENERATE_ID_OR_TS_FAILED = (ERROR_TRANS + 7);
+    public static final int TRANS_INVALID_ARGUMENT = (ERROR_TRANS + 8);
+    public static final int TRANS_BATCH_PARTIAL_ID_NOT_EXIST = (ERROR_TRANS + 9);
+    public static final int TRANS_BATCH_PARTIAL_COMMIT_FAILED = (ERROR_TRANS + 10);
 
     // begin error code for query schedule
     private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;

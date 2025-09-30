@@ -190,6 +190,61 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     }
 
     @Override
+    public void commitTransBatch(TransProto.CommitTransBatchRequest request,
+                                 StreamObserver<TransProto.CommitTransBatchResponse> responseObserver)
+    {
+        TransProto.CommitTransBatchResponse.Builder responseBuilder =
+                TransProto.CommitTransBatchResponse.newBuilder();
+
+        int transCount = request.getTransIdsCount();
+        if (transCount != request.getTimestampsCount())
+        {
+            logger.error(String.format("the count of transaction ids %d does not match the count of timestamps %d",
+                    transCount, request.getTimestampsCount()));
+            responseBuilder.setErrorCode(ErrorCode.TRANS_INVALID_ARGUMENT);
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+            return;
+        }
+
+        boolean allSuccess = true;
+        for (int i = 0; i < request.getTransIdsCount(); ++i)
+        {
+            long transId = request.getTransIds(i);
+            boolean commitSuccess = false;
+
+            if (TransContextManager.Instance().isTransExist(transId))
+            {
+                boolean readOnly = TransContextManager.Instance().getTransContext(transId).isReadOnly();
+                pushWatermarks(readOnly);
+                if (TransContextManager.Instance().setTransCommit(transId))
+                {
+                    commitSuccess = true;
+                } else
+                {
+                    allSuccess = false;
+                    responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_COMMIT_FAILED);
+                    logger.error("failed to commit transaction id " + transId);
+                }
+            }
+            else
+            {
+                allSuccess = false;
+                responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST);
+                logger.error(String.format("transaction id %d does not exist in the context manager", transId));
+            }
+            responseBuilder.addResults(commitSuccess);
+        }
+        if (allSuccess)
+        {
+            responseBuilder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+    }
+
+
+    @Override
     public void rollbackTrans(TransProto.RollbackTransRequest request,
                               StreamObserver<TransProto.RollbackTransResponse> responseObserver)
     {
