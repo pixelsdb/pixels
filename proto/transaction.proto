@@ -33,6 +33,7 @@ service TransService {
     rpc BeginTrans (BeginTransRequest) returns (BeginTransResponse);
     rpc BeginTransBatch (BeginTransBatchRequest) returns (BeginTransBatchResponse);
     rpc CommitTrans (CommitTransRequest) returns (CommitTransResponse);
+    rpc CommitTransBatch (CommitTransBatchRequest) returns (CommitTransBatchResponse);
     rpc RollbackTrans (RollbackTransRequest) returns (RollbackTransResponse);
     rpc GetTransContext (GetTransContextRequest) returns (GetTransContextResponse);
     rpc SetTransProperty (SetTransPropertyRequest) returns (SetTransPropertyResponse);
@@ -90,6 +91,16 @@ message CommitTransRequest {
 
 message CommitTransResponse {
     int32 errorCode = 1;
+}
+
+message CommitTransBatchRequest {
+    repeated uint64 transIds = 1;
+    repeated uint64 timestamps = 2;
+}
+
+message CommitTransBatchResponse {
+    int32 errorCode = 1;
+    repeated bool results = 2;
 }
 
 message RollbackTransRequest {

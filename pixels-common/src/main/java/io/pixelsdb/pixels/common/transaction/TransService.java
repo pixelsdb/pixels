@@ -189,6 +189,36 @@ public class TransService
         return true;
     }
 
+    /**
+     * Commit a batch of transactions and return whether the execution succeeded.
+     * If execution fails, specific error logs can be obtained from the transService logs,
+     * such as the transaction does not exist or the commit fails.
+     * @param transIds
+     * @param timestamps
+     * @return Whether each transaction was successfully committed.
+     * @throws TransException
+     */
+    public List<Boolean> commitTransBatch(List<Long> transIds, List<Long> timestamps) throws TransException
+    {
+        if (transIds == null || timestamps == null || transIds.size() != timestamps.size())
+        {
+            throw new IllegalArgumentException("invalid transaction ids or timestamps");
+        }
+        TransProto.CommitTransBatchRequest request = TransProto.CommitTransBatchRequest.newBuilder()
+                .addAllTransIds(transIds).addAllTimestamps(timestamps).build();
+        TransProto.CommitTransBatchResponse response = this.stub.commitTransBatch(request);
+        if (response.getErrorCode() == ErrorCode.TRANS_INVALID_ARGUMENT) // other error codes are not thrown as exceptions
+        {
+            throw new TransException("transaction ids and timestamps size mismatch");
+        }
+        for (long transId : transIds)
+        {
+            TransContextCache.Instance().setTransCommit(transId);
+            MetadataCache.Instance().dropCache(transId);
+        }
+        return response.getResultsList();
+    }
+
     public boolean rollbackTrans(long transId) throws TransException
     {
         TransProto.RollbackTransRequest request = TransProto.RollbackTransRequest.newBuilder()
