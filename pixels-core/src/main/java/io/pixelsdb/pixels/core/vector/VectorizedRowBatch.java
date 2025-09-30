@@ -367,6 +367,19 @@ public class VectorizedRowBatch implements AutoCloseable
     public static VectorizedRowBatch deserialize(byte[] data)
     {
         ByteBuffer buffer = ByteBuffer.wrap(data);
+        return deserialize(buffer);
+    }
+
+    /** Issue-1078:
+     * This method can directly read data from the {@code ByteBuffer} without
+     * requiring access to its backing array. It supports both regular and
+     * read-only {@code ByteBuffer} instances.
+     *
+     * @param buffer the ByteBuffer containing serialized batch data
+     * @return the deserialized VectorizedRowBatch
+     */
+    public static VectorizedRowBatch deserialize(ByteBuffer buffer)
+    {
         VectorizedRowBatchFlat batchFlat = VectorizedRowBatchFlat.getRootAsVectorizedRowBatchFlat(buffer);
 
         VectorizedRowBatch batch = new VectorizedRowBatch(batchFlat.numCols());

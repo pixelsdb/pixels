@@ -46,7 +46,7 @@ import io.pixelsdb.pixels.retina.RetinaProto;
 public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 {
 
-    private byte[] data;
+    private ByteBuffer data;
     private final byte[] activeMemtableData;
     private VectorizedRowBatch curRowBatch = null;
 
@@ -205,7 +205,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
             activeMemtableDataEverRead = true;
             if (activeMemtableData != null && activeMemtableData.length != 0)
             {
-                data = activeMemtableData;
+                data = ByteBuffer.wrap(activeMemtableData);
                 return true;
             }
         }
@@ -273,7 +273,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
             }
         }
         curRowBatch.applyFilter(selectedRows);
-        dataReadBytes += data.length;
+        dataReadBytes += data.limit();
         dataReadRow += curRowBatch.size;
         return curRowBatch;
     }
@@ -383,13 +383,11 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
                 throw new IOException("Can't get Retina File: " + path);
             }
             // Create Physical Reader & read this object fully
-            ByteBuffer buffer;
             try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path))
             {
                 int length = (int) reader.getFileLength();
-                buffer = reader.readFully(length);
+                data = reader.readFully(length);
             }
-            data = buffer.array();
         } catch (InterruptedException e)
         {
             throw new RuntimeException("failed to sleep for retry to get retina file", e);
