@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 
@@ -75,14 +76,12 @@ public class MinioManager
         writer.close();
     }
 
-    public byte[] read(long tableId, long entryId) throws IOException
+    public ByteBuffer read(long tableId, long entryId) throws IOException
     {
         String key = buildKey(tableId, entryId);
         PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.minio, key);
         int length = (int) reader.getFileLength();
-        byte[] data = new byte[length];
-        reader.readFully(data, 0, length);
-        return data;
+        return reader.readFully(length);
     }
 
     public boolean exist(long tableId, long entryId) throws IOException
