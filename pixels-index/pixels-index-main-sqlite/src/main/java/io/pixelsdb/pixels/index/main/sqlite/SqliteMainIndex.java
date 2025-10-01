@@ -36,6 +36,8 @@ import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -46,7 +48,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class SqliteMainIndex implements MainIndex
 {
     private static final Logger logger = LogManager.getLogger(SqliteMainIndex.class);
-    private static final HashMap<Long, PersistentAutoIncrement> persistentAIMap = new HashMap<>();
+    /**
+     * Issue-1085: Use ConcurrentHashMap to avoid
+     * <code>ConcurrentModificationException</code> when allocating row IDs under high load.
+     */
+    private static final Map<Long, PersistentAutoIncrement> persistentAIMap = new ConcurrentHashMap<>();
 
     /**
      * The SQL statement to create the row id range table.
