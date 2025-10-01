@@ -25,13 +25,14 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.lang.management.ManagementFactory;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 public class TestPixelsWriterBuffer
 {
     private List<String> columnNames = new ArrayList<>();
@@ -40,41 +41,48 @@ public class TestPixelsWriterBuffer
     Path targetOrderDirPath;
     Path targetCompactDirPath;
     PixelsWriterBuffer buffer;
-
     @Before
     public void setup()
     {
         targetOrderDirPath = new Path();
-        targetOrderDirPath.setUri("file:///home/gengdy/data/test/v-0-ordered");
-        targetOrderDirPath.setId(21);
+        targetOrderDirPath.setUri("file:///home/gengdy/data/tpch/1g/customer/v-0-ordered");
+        targetOrderDirPath.setId(1);    // path id get from mysql `PATHS` table
         targetCompactDirPath = new Path();
-        targetCompactDirPath.setUri("file:///home/gengdy/data/test/v-0-compact");
-        targetCompactDirPath.setId(22);
+        targetCompactDirPath.setUri("file:///home/gengdy/data/tpch/1g/customer/v-0-compact");
+        targetCompactDirPath.setId(2);  // get from mysql `PATHS` table
         try
         {
             columnNames.add("id");
             columnNames.add("name");
-
             columnTypes.add("int");
             columnTypes.add("int");
 
             schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
-            buffer = new PixelsWriterBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath);
+            buffer = new PixelsWriterBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath);  // table id get from mysql `TBLS` table
         } catch (Exception e)
         {
             System.out.println("setup error: " + e);
         }
     }
-
     @Test
     public void testConcurrentWriteOperations()
     {
-        int numThreads = 1;
-        int numRowsPerThread = 10241;
+
+//        // print pid if you want to attach a profiler like async-profiler or YourKit
+//        try
+//        {
+//            System.out.println(Long.parseLong(ManagementFactory.getRuntimeMXBean().getName().split("@")[0]));
+//            Thread.sleep(10000);
+//        } catch (InterruptedException e)
+//        {
+//            throw new RuntimeException(e);
+//        }
+
+        int numThreads = 1000;
+        int numRowsPerThread = 100000;
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch completionLatch = new CountDownLatch(numThreads);
         AtomicBoolean hasError = new AtomicBoolean(false);
-
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
         for (int t = 0; t < numThreads; ++t)
         {
@@ -87,8 +95,8 @@ public class TestPixelsWriterBuffer
                     for (int i = 0; i < numRowsPerThread; ++i)
                     {
                         IndexProto.RowLocation.Builder builder = IndexProto.RowLocation.newBuilder();
-                        values[0] = String.valueOf(threadId * numRowsPerThread + i).getBytes();
-                        values[1] = String.valueOf(threadId * numRowsPerThread + i + 1).getBytes();
+                        values[0] = ByteBuffer.allocate(4).putInt(threadId * numRowsPerThread + i).array();
+                        values[1] = ByteBuffer.allocate(4).putInt(threadId * numRowsPerThread + i + 1).array();
                         buffer.addRow(values, threadId, builder);
                     }
                 } catch (Exception e)
@@ -101,16 +109,15 @@ public class TestPixelsWriterBuffer
                 }
             });
         }
-
         startLatch.countDown();
         try
         {
             completionLatch.await();
-            Thread.sleep(10000);
-            buffer.close();
-        } catch (Exception e)
-        {
-            System.out.println("error: " + e);
+            Thread.sleep(10000);    // wait for async flush to complete
+                buffer.close();
+            } catch (Exception e)
+            {
+                System.out.println("error: " + e);
+            }
         }
     }
-}
