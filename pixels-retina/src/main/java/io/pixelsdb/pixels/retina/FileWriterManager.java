@@ -37,6 +37,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
@@ -160,7 +161,12 @@ public class FileWriterManager
             try {
                 for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId) {
                     MinioManager minioManager = MinioManager.Instance();
-                    byte[] data = minioManager.read(this.tableId, blockId);
+                    /**
+                     * Issue-1083: Since we obtain a read-only ByteBuffer from the S3 Reader,
+                     * we cannot read a byte[]. Instead, we should return the ByteBuffer directly.
+                     *
+                     */
+                    ByteBuffer data = minioManager.read(this.tableId, blockId);
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();
