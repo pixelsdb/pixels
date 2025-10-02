@@ -630,6 +630,11 @@
             </dependency>
             <dependency>
                 <groupId>io.grpc</groupId>
+                <artifactId>grpc-api</artifactId>
+                <version>${dep.grpc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
                 <artifactId>grpc-core</artifactId>
                 <version>${dep.grpc.version}</version>
             </dependency>
