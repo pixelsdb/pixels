@@ -51,6 +51,17 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-amphi</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-common</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-common</artifactId>
         </dependency>
 
         <!-- trino-jdbc -->
