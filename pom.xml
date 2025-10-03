@@ -88,7 +88,7 @@
 
         <!-- query engines -->
         <dep.presto.version>0.279</dep.presto.version>
-        <dep.trino.version>405</dep.trino.version>
+        <dep.trino.version>466</dep.trino.version>
 
         <!-- storage systems -->
         <dep.hadoop.version>3.4.2</dep.hadoop.version>
@@ -101,20 +101,28 @@
         <!-- common libraries -->
         <dep.spike.java.version>0.1.1</dep.spike.java.version>
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
+        <!-- netty-4.1.118-Final is used by hadoop-client-3.4.2 and is compatible with grpc-1.74.0,
+        async-http-client-2.12.4, and jetcd-0.7.7.
+        This version also fixes the problem in Pixels#935 caused by Netty#14479 -->
         <dep.netty.version>4.1.118.Final</dep.netty.version>
         <dep.asynchttpclient.version>2.12.4</dep.asynchttpclient.version>
         <dep.fastjson.version>1.2.83</dep.fastjson.version>
         <dep.commons-cli.version>1.5.0</dep.commons-cli.version>
         <dep.commons-io.version>2.16.1</dep.commons-io.version>
+        <!-- guava-33.3.1 is the version used by grpc-1.74.0 -->
         <dep.guava.version>33.3.1-jre</dep.guava.version>
+        <!-- protobuf-3.25.5 is the version used by grpc-1.74.0 -->
         <dep.protobuf.version>3.25.5</dep.protobuf.version>
         <dep.grpc.version>1.74.0</dep.grpc.version>
         <dep.flatbuffers.version>2.0.8</dep.flatbuffers.version>
+        <!-- jetcd-core-0.7.7 uses grpc-1.60.0 and netty-4.1.100-Final,
+        however it is tested to be compatible with grpc-1.74.0 and netty-4.1.118-Final -->
         <dep.jetcd.version>0.7.7</dep.jetcd.version>
         <dep.jna.version>5.13.0</dep.jna.version>
         <dep.javax.annotation.version>1.3.2</dep.javax.annotation.version>
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
-        <dep.apache-httpclient.version>4.5.14</dep.apache-httpclient.version>
+        <!-- http-client-4.5.13 is the version used by awssdk:apache-client-2.30.17 -->
+        <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
         <dep.apache-calcite.version>1.32.0</dep.apache-calcite.version>
         <dep.apache-parquet.version>1.13.0</dep.apache-parquet.version>
 
@@ -452,8 +460,16 @@
                         <artifactId>slf4j-reload4j</artifactId>
                     </exclusion>
                     <exclusion>
+                        <groupId>ch.qos.reload4j</groupId>
+                        <artifactId>reload4j</artifactId>
+                    </exclusion>
+                    <exclusion>
                         <groupId>org.slf4j</groupId>
                         <artifactId>slf4j-api</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>log4j</groupId>
+                        <artifactId>log4j</artifactId>
                     </exclusion>
                     <exclusion>
                         <groupId>org.eclipse.jetty</groupId>
@@ -744,6 +760,12 @@
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
                 <version>${dep.apache-httpclient.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>log4jj</groupId>
+                        <artifactId>log4j</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- apache-calcite -->
