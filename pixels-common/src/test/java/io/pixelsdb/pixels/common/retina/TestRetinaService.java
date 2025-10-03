@@ -39,6 +39,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 public class TestRetinaService
 {
@@ -134,65 +135,84 @@ public class TestRetinaService
         return indexKey;
     }
 
+    /**
+     * Update records
+     * @param insertKeys : parameter for constructing the insert data
+     * @param indexKeys : parameter for constructing the delete data
+     * @return IndexKey of the inserted record
+     */
+    public List<IndexProto.IndexKey> updateRecords(List<Long> insertKeys, List<IndexProto.IndexKey> indexKeys)
+    {
+        List<IndexProto.IndexKey> result = new ArrayList<>();
+
+        List<RetinaProto.TableUpdateData> tableUpdateData = new ArrayList<>();
+        RetinaProto.TableUpdateData.Builder tableUpdateDataBuilder = RetinaProto.TableUpdateData.newBuilder()
+                .setTableName(tableName).setPrimaryIndexId(index.getId()).setTimestamp(0L);
+
+        if (insertKeys != null)
+        {
+            for (Long insertKey : insertKeys)
+            {
+                RetinaProto.InsertData.Builder insertDataBuilder = RetinaProto.InsertData.newBuilder();
+                IndexProto.IndexKey indexKey = constructInsertData(insertKey, insertDataBuilder);
+                result.add(indexKey);
+                tableUpdateDataBuilder.addInsertData(insertDataBuilder.build());
+            }
+        }
+
+        if (indexKeys != null)
+        {
+            for (IndexProto.IndexKey indexKey : indexKeys)
+            {
+                RetinaProto.DeleteData.Builder deleteDataBuilder = RetinaProto.DeleteData.newBuilder();
+                deleteDataBuilder.addIndexKeys(indexKey);
+                tableUpdateDataBuilder.addDeleteData(deleteDataBuilder.build());
+            }
+        }
+
+        tableUpdateData.add(tableUpdateDataBuilder.build());
+
+        try (RetinaService.StreamHandler streamHandler = RetinaService.Instance().startUpdateStream())
+        {
+            streamHandler.updateRecord(schemaName, tableUpdateData);
+        }
+        return result;
+    }
+
     @Test
     public void testStreamUpdateRecord()
     {
-        try (RetinaService.StreamHandler streamHandler = RetinaService.Instance().startUpdateStream())
+        // Insert 10 rows of data.
+        List<Long> insertData = LongStream.range(0, 10).boxed().collect(Collectors.toList());
+        List<IndexProto.IndexKey> indexKeys = updateRecords(insertData, null);
+        System.out.println("You can use trino-cli to query newly inserted data.");
+
+        // Delete these inserted data after 10 seconds.
+        try
         {
-            for (int i = 0; i < 10; ++i)
-            {
-                List<RetinaProto.TableUpdateData> tableUpdateData = new ArrayList<>();
-                RetinaProto.TableUpdateData.Builder tableUpdateDataBuilder = RetinaProto.TableUpdateData.newBuilder()
-                        .setTableName(tableName).setPrimaryIndexId(index.getId());
-
-                RetinaProto.InsertData.Builder insertDataBuilder = RetinaProto.InsertData.newBuilder();
-                IndexProto.IndexKey indexKey = constructInsertData(i, insertDataBuilder);
-
-                tableUpdateDataBuilder.addInsertData(insertDataBuilder.build());
-                tableUpdateDataBuilder.setTimestamp(0L);
-                tableUpdateData.add(tableUpdateDataBuilder.build());
-                streamHandler.updateRecord(schemaName, tableUpdateData);
-            }
+            System.out.println("The inserted data will be deleted after 10 seconds.");
+            Thread.sleep(10000);
+        } catch (InterruptedException e)
+        {
+            throw new RuntimeException(e);
         }
-        /**
-         * Data inserted can be queried from trino-cli.
-         */
+        updateRecords(null, indexKeys);
     }
 
     @Test
     public void testUpdateSingleRecord()
     {
-        try (RetinaService.StreamHandler streamHandler = RetinaService.Instance().startUpdateStream())
+        // Insert a row of data.
+        List<Long> initData = new ArrayList<>();
+        initData.add(0L);
+        List<IndexProto.IndexKey>indexKeys =  updateRecords(initData, null);
+
+        for (int i = 1; i < 2; ++i)
         {
-            // insert single record
-            List<RetinaProto.TableUpdateData> tableUpdateData1 = new ArrayList<>();
-            RetinaProto.TableUpdateData.Builder tableUpdateDataBuilder1 = RetinaProto.TableUpdateData.newBuilder()
-                    .setTableName(tableName).setPrimaryIndexId(index.getId());
-
-            RetinaProto.InsertData.Builder insertDataBuilder1 = RetinaProto.InsertData.newBuilder();
-            constructInsertData(0, insertDataBuilder1);
-
-            tableUpdateDataBuilder1.addInsertData(insertDataBuilder1.build());
-            tableUpdateDataBuilder1.setTimestamp(0L);
-            tableUpdateData1.add(tableUpdateDataBuilder1.build());
-
-            streamHandler.updateRecord(schemaName, tableUpdateData1);
-
-            // update the record
-            List<RetinaProto.TableUpdateData> tableUpdateData2 = new ArrayList<>();
-            RetinaProto.TableUpdateData.Builder tableUpdateDataBuilder2 = RetinaProto.TableUpdateData.newBuilder()
-                    .setTableName(tableName).setPrimaryIndexId(index.getId());
-
-            RetinaProto.InsertData.Builder insertDataBuilder2 = RetinaProto.InsertData.newBuilder();
-            IndexProto.IndexKey indexKey = constructInsertData(1, insertDataBuilder2);
-
-            tableUpdateDataBuilder2.addInsertData(insertDataBuilder2.build());
-            tableUpdateDataBuilder2.addDeleteData(RetinaProto.DeleteData.newBuilder().addIndexKeys(indexKey).build());
-            tableUpdateDataBuilder2.setTimestamp(0L);
-            tableUpdateData2.add(tableUpdateDataBuilder2.build());
-
-
-            streamHandler.updateRecord(schemaName, tableUpdateData2);
+            List<Long> insertData = new ArrayList<>();
+            insertData.add((long) i);
+            System.out.println("update from" + (i - 1) + " to " + i);
+            indexKeys = updateRecords(insertData, indexKeys);
         }
     }
 }
