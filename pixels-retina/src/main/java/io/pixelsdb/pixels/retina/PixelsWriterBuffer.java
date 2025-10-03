@@ -176,8 +176,7 @@ public class PixelsWriterBuffer
      */
     public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
     {
-        int columnCount = this.schema.getChildren().size();
-        checkArgument(values.length == columnCount,
+        checkArgument(values.length == this.schema.getChildren().size(),
                 "Column values count does not match schema column count");
 
         MemTable currentMemTable = null;
@@ -197,7 +196,7 @@ public class PixelsWriterBuffer
                 switchMemTable();
             }
         }
-        int rgRowOffset = (int) (currentMemTable.getStartIndex() + rowOffset);
+        int rgRowOffset = currentMemTable.getStartIndex() + rowOffset;
         if(rgRowOffset < 0)
         {
             throw new RetinaException("Expect rgRowOffset >= 0, get " + rgRowOffset);
