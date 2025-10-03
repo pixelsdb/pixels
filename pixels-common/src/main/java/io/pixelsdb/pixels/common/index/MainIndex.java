@@ -29,7 +29,7 @@ import java.io.IOException;
 /**
  * The main index of a table is the mapping from row id to the row offset in the data file.
  * Each version of each row has a unique row id.
- * The row id of each table is an unsigned int_64 increases from zero.
+ * The row id of each table is an unsigned int_64 increases monotonically starting from zero.
  *
  * @author hank
  * @create 2025-02-10
@@ -46,7 +46,7 @@ public interface MainIndex extends Closeable
         /**
          * Case-insensitive parsing from String name to enum value.
          * @param value the name of main index scheme.
-         * @return
+         * @return the main index scheme if the value is valid
          */
         public static Scheme from(String value)
         {
@@ -54,9 +54,8 @@ public interface MainIndex extends Closeable
         }
 
         /**
-         * Whether the value is a valid main index scheme.
-         * @param value
-         * @return
+         * @param value name of the main index scheme
+         * @return true of the value is a valid main index scheme
          */
         public static boolean isValid(String value)
         {
@@ -83,8 +82,7 @@ public interface MainIndex extends Closeable
     }
 
     /**
-     * Get the tableId of this mainIndex.
-     * @return the tableId
+     * @return the tableId of this mainIndex
      */
     long getTableId();
 
@@ -107,7 +105,7 @@ public interface MainIndex extends Closeable
     IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws RowIdException;
 
     /**
-     * Get the physical location of a row given the row id
+     * Get the physical location of a row given the row id.
      * @param rowId the row id
      * @return the row location, or null if not found
      */
