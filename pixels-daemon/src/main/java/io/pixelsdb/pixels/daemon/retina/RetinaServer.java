@@ -114,7 +114,7 @@ public class RetinaServer implements Server
                 HealthCheckResponse response = stub.check(HealthCheckRequest.newBuilder().setService("metadata").build());
                 if (response.getStatus() == HealthCheckResponse.ServingStatus.SERVING)
                 {
-                    log.info("metadata server if ready.");
+                    log.info("metadata server is ready.");
                     channel.shutdown();
                     return;
                 }
