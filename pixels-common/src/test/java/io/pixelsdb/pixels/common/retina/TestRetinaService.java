@@ -207,12 +207,23 @@ public class TestRetinaService
         initData.add(0L);
         List<IndexProto.IndexKey>indexKeys =  updateRecords(initData, null);
 
-        for (int i = 1; i < 2; ++i)
+        for (int i = 1; i < 1000; ++i)
         {
             List<Long> insertData = new ArrayList<>();
             insertData.add((long) i);
             System.out.println("update from" + (i - 1) + " to " + i);
             indexKeys = updateRecords(insertData, indexKeys);
         }
+
+        // Delete the last inserted data.
+        try
+        {
+            System.out.println("The last inserted data will be deleted after 10 seconds.");
+            Thread.sleep(10000);
+        } catch (InterruptedException e)
+        {
+            throw new RuntimeException(e);
+        }
+        updateRecords(null, indexKeys);
     }
 }
