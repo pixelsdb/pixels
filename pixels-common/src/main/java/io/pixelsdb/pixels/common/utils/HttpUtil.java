@@ -61,7 +61,7 @@ public class HttpUtil
                 httpPost.setHeader(header.getKey(), header.getValue());
             }
 
-            List<NameValuePair> nvps = new ArrayList<NameValuePair>();
+            List<NameValuePair> nvps = new ArrayList<>();
             for (Map.Entry<String, String> parameter : parameters.entrySet())
             {
                 nvps.add(new BasicNameValuePair(parameter.getKey(), parameter.getValue()));
