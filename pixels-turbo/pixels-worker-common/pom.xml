@@ -50,28 +50,6 @@
             <artifactId>pixels-storage-redis</artifactId>
             <optional>true</optional>
         </dependency>
-
-        <!-- TODO: remove netty-buffer dependency from pixels-core -->
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-buffer</artifactId>
-        </dependency>
-
-        <!-- google -->
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-        </dependency>
-
-        <!-- alibaba -->
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
-        </dependency>
     </dependencies>
 
     <build>

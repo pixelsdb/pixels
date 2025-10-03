@@ -46,8 +46,7 @@ public class EtcdUtil
 {
     private static final Logger logger = LogManager.getLogger(EtcdUtil.class);
     private static final EtcdUtil instance = new EtcdUtil();
-    private Client client = null;
-    private boolean lockHeld;
+    private final Client client;
 
     private EtcdUtil()
     {
@@ -55,7 +54,7 @@ public class EtcdUtil
         Random random = new Random(System.nanoTime());
         String host = hosts[random.nextInt(hosts.length)];
         System.out.println(host);
-        logger.info("Using etcd host: " + host);
+        logger.info("Using etcd host: {}", host);
         String port = ConfigFactory.Instance().getProperty("etcd.port");
 
         this.client = Client.builder().endpoints("http://" + host + ":" + port).build();

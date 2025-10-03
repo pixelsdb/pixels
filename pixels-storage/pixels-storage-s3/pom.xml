@@ -22,33 +22,28 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- aws sdk -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
+            <exclusions>
+                <!-- We use aws-crt-client instead of netty-nio-client. -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>apache-client</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
-
-        <!-- we use apache-client and aws-crt-client instead
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>netty-nio-client</artifactId>
-        </dependency>
-        -->
-
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>apache-client</artifactId>
         </dependency>
-
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>aws-crt-client</artifactId>

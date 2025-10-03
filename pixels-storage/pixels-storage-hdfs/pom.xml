@@ -22,19 +22,6 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>io.etcd</groupId>
-            <artifactId>jetcd-core</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- hadoop -->
@@ -42,14 +29,6 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-client</artifactId>
         </dependency>
-
-        <!-- ozone, if it is enabled,
-        make sure that it is compatible with hadoop libs. -->
-        <!--<dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-ozone-client</artifactId>
-            <optional>true</optional>
-        </dependency>-->
     </dependencies>
 
     <build>

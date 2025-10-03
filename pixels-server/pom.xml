@@ -51,18 +51,23 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-amphi</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-common</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-common</artifactId>
         </dependency>
 
         <!-- trino-jdbc -->
         <dependency>
             <groupId>io.trino</groupId>
             <artifactId>trino-jdbc</artifactId>
-        </dependency>
-
-        <!-- protobuf -->
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
         </dependency>
 
         <!-- grpc -->
@@ -76,41 +81,11 @@
         </dependency>
         <dependency>
             <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf-lite</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
-        </dependency>
-
-        <!-- fastjson -->
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
-        </dependency>
-
-        <!-- guava -->
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-
-        <!-- jetcd -->
-        <dependency>
-            <groupId>io.etcd</groupId>
-            <artifactId>jetcd-core</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>io.grpc</groupId>
-                    <artifactId>grpc-core</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <!-- prometheus -->
-        <dependency>
-            <groupId>io.prometheus</groupId>
-            <artifactId>simpleclient</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.prometheus</groupId>
-            <artifactId>simpleclient_pushgateway</artifactId>
         </dependency>
 
         <dependency>
@@ -128,12 +103,10 @@
         <dependency>
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-core</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-plus</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- spring boot -->
@@ -141,7 +114,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

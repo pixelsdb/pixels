@@ -23,14 +23,13 @@ import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.storage.http.io.HttpInputStream;
 import io.pixelsdb.pixels.storage.http.io.HttpOutputStream;
-import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
 
@@ -40,18 +39,6 @@ public class TestHttpStream
     private volatile Exception writerException = null;
     private final int sendLimit = 8*1024*1024;
     private final int sendNum = 1600;
-
-    @Test
-    public void testStorage() throws IOException
-    {
-        Storage httpStream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
-        InputStream fileInput = Files.newInputStream(Paths.get("/tmp/test1"));
-        OutputStream outputStream = httpStream.create("httpstream://localhost:29920", false, 4096);
-        InputStream inputStream = httpStream.open("httpstream://localhost:29920");
-        OutputStream fileOutput = Files.newOutputStream(Paths.get("/tmp/test2"));
-        IOUtils.copyBytes(fileInput, outputStream, 4096, true);
-        IOUtils.copyBytes(inputStream, fileOutput, 4096, true);
-    }
 
     @Test
     public void testPhysicalReaderAndWriter() throws IOException

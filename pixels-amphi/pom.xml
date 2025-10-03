@@ -24,12 +24,10 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-core</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
@@ -44,25 +42,16 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-parser</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- apache calcite -->
         <dependency>
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-core</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-plus</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- apache-parquet -->
@@ -95,25 +84,8 @@
         <!-- hadoop -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
+            <artifactId>hadoop-client</artifactId>
             <optional>true</optional>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-mapreduce-client-core</artifactId>
-            <optional>true</optional>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <!-- grpc -->
@@ -129,22 +101,13 @@
         </dependency>
         <dependency>
             <groupId>io.grpc</groupId>
-            <artifactId>grpc-stub</artifactId>
+            <artifactId>grpc-protobuf-lite</artifactId>
             <optional>true</optional>
         </dependency>
-
-        <!-- aws sdk -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>apache-client</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>aws-crt-client</artifactId>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 

@@ -22,22 +22,23 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
-            <optional>true</optional>
         </dependency>
+
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-netty-shaded</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-protobuf</artifactId>
-            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf-lite</artifactId>
         </dependency>
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
-            <optional>true</optional>
         </dependency>
     </dependencies>
 

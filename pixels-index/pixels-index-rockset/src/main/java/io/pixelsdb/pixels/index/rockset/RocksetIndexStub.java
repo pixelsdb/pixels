@@ -20,12 +20,7 @@
 package io.pixelsdb.pixels.index.rockset;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Paths;
-import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.ArrayList;
-import java.util.List;
 
 public class RocksetIndexStub
 {

@@ -14,15 +14,11 @@
  * limitations under the License.
  *
  */
-
-
 package io.pixelsdb.pixels.index.rocksdb;
-
 
 import org.rocksdb.*;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;

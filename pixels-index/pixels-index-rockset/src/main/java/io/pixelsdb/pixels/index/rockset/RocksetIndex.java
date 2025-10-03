@@ -26,17 +26,12 @@ import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
-import io.pixelsdb.pixels.index.rockset.RocksetIndexStub;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.ArrayList;
 import java.util.List;
 
 public class RocksetIndex implements SinglePointIndex

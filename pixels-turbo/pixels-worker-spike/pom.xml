@@ -21,54 +21,37 @@
     <dependencies>
         <dependency>
             <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-common</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-core</artifactId>
-            <optional>true</optional>
+            <artifactId>pixels-worker-common</artifactId>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-s3</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-storage-redis</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-localfs</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-worker-common</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-planner</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-executor</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>spike-java-handler</artifactId>
-            <optional>true</optional>
         </dependency>
 
+        <!-- grpc -->
         <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
-            <optional>true</optional>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf-lite</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
         </dependency>
 
         <dependency>

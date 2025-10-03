@@ -24,37 +24,26 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-core</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-cache</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-daemon</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-localfs</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-hdfs</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-s3</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <dependency>
@@ -67,41 +56,34 @@
             <artifactId>trino-jdbc</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
-            <optional>true</optional>
-        </dependency>
-
         <!-- grpc -->
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-netty-shaded</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-protobuf</artifactId>
-            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf-lite</artifactId>
         </dependency>
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- netty -->
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <dependency>
             <!-- this is only for third-party libs that use slf4j -->
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j-impl</artifactId>
-            <optional>true</optional>
         </dependency>
     </dependencies>
 
