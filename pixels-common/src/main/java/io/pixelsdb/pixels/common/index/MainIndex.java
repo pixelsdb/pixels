@@ -122,9 +122,9 @@ public interface MainIndex extends Closeable
     boolean putEntry(long rowId, IndexProto.RowLocation rowLocation);
 
     /**
-     * Delete range of row ids from the main index. This method only has effect on the persistent storage
-     * of the main index. If there is a
-     * {@link #getLocation(long)} of a row id within a deleted range should return null.
+     * Delete a range of row ids from the main index. This method only has effect on the persistent storage
+     * of the main index.
+     * {@link #getLocation(long)} of a row id within a deleted range returns null.
      * @param rowIdRange the row id range to be deleted
      * @return true on success
      */
