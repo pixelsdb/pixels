@@ -86,7 +86,6 @@ message BeginTransBatchResponse {
 
 message CommitTransRequest {
     uint64 transId = 1;
-    uint64 timestamp = 2;
 }
 
 message CommitTransResponse {
@@ -95,7 +94,6 @@ message CommitTransResponse {
 
 message CommitTransBatchRequest {
     repeated uint64 transIds = 1;
-    repeated uint64 timestamps = 2;
 }
 
 message CommitTransBatchResponse {
