@@ -39,9 +39,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * @author hank
+ * @author hank, gengdy
  * @create 2022-02-20
  * @update 2022-05-02 update protocol to support transaction context operations
+ * @update 2025-06-07 support begin transactions in batch
+ * @update 2025-09-30 support commit transactions in batch (gengdy)
+ * @update 2025-10-04 remove transaction timestamp in commit and commit-batch
  */
 public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {
@@ -179,7 +182,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
         else
         {
-            logger.error(String.format("transaction id %d does not exist in the context manager", request.getTransId()));
+            logger.error("transaction id {} does not exist in the context manager", request.getTransId());
             error = ErrorCode.TRANS_ID_NOT_EXIST;
         }
 
@@ -196,11 +199,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         TransProto.CommitTransBatchResponse.Builder responseBuilder =
                 TransProto.CommitTransBatchResponse.newBuilder();
 
-        int transCount = request.getTransIdsCount();
-        if (transCount != request.getTimestampsCount())
+        if (request.getTransIdsCount() == 0)
         {
-            logger.error(String.format("the count of transaction ids %d does not match the count of timestamps %d",
-                    transCount, request.getTimestampsCount()));
+            logger.error("the count of transaction ids is zero, no transactions to commit");
             responseBuilder.setErrorCode(ErrorCode.TRANS_INVALID_ARGUMENT);
             responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
@@ -224,14 +225,14 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 {
                     allSuccess = false;
                     responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_COMMIT_FAILED);
-                    logger.error("failed to commit transaction id " + transId);
+                    logger.error("failed to commit transaction id {}", transId);
                 }
             }
             else
             {
                 allSuccess = false;
                 responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST);
-                logger.error(String.format("transaction id %d does not exist in the context manager", transId));
+                logger.error("transaction id {} does not exist in the context manager", transId);
             }
             responseBuilder.addResults(commitSuccess);
         }
@@ -262,7 +263,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
         else
         {
-            logger.error(String.format("transaction id %d does not exist in the context manager", request.getTransId()));
+            logger.error("transaction id {} does not exist in the context manager", request.getTransId());
             error = ErrorCode.TRANS_ID_NOT_EXIST;
         }
 
@@ -409,7 +410,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 
     @Override
     public void getTransConcurrency(TransProto.GetTransConcurrencyRequest request,
-                                    StreamObserver<TransProto.GetTransConcurrencyResponse> responseObserver) {
+                                    StreamObserver<TransProto.GetTransConcurrencyResponse> responseObserver)
+    {
         int concurrency = TransContextManager.Instance().getQueryConcurrency(request.getReadOnly());
         TransProto.GetTransConcurrencyResponse response = TransProto.GetTransConcurrencyResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS).setConcurrency(concurrency).build();
@@ -419,7 +421,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 
     @Override
     public void bindExternalTraceId(TransProto.BindExternalTraceIdRequest request,
-                                    StreamObserver<TransProto.BindExternalTraceIdResponse> responseObserver) {
+                                    StreamObserver<TransProto.BindExternalTraceIdResponse> responseObserver)
+    {
         boolean success = TransContextManager.Instance().bindExternalTraceId(
                 request.getTransId(), request.getExternalTraceId());
         TransProto.BindExternalTraceIdResponse response = TransProto.BindExternalTraceIdResponse.newBuilder()
@@ -430,7 +433,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 
     @Override
     public void dumpTrans(TransProto.DumpTransRequest request,
-                          StreamObserver<TransProto.DumpTransResponse> responseObserver) {
+                          StreamObserver<TransProto.DumpTransResponse> responseObserver)
+    {
         boolean success = TransContextManager.Instance().dumpTransContext(request.getTimestamp());
         TransProto.DumpTransResponse response = TransProto.DumpTransResponse.newBuilder()
                 .setErrorCode(success ? ErrorCode.SUCCESS : ErrorCode.TRANS_ID_NOT_EXIST).build();

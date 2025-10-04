@@ -175,10 +175,10 @@ public class TransService
         return contexts.build();
     }
 
-    public boolean commitTrans(long transId, long timestamp) throws TransException
+    public boolean commitTrans(long transId) throws TransException
     {
         TransProto.CommitTransRequest request = TransProto.CommitTransRequest.newBuilder()
-                .setTransId(transId).setTimestamp(timestamp).build();
+                .setTransId(transId).build();
         TransProto.CommitTransResponse response = this.stub.commitTrans(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
@@ -193,19 +193,18 @@ public class TransService
      * Commit a batch of transactions and return whether the execution succeeded.
      * If execution fails, specific error logs can be obtained from the transService logs,
      * such as the transaction does not exist or the commit fails.
-     * @param transIds
-     * @param timestamps
-     * @return Whether each transaction was successfully committed.
+     * @param transIds transaction ids of the transactions to commit
+     * @return Whether each transaction was successfully committed
      * @throws TransException
      */
-    public List<Boolean> commitTransBatch(List<Long> transIds, List<Long> timestamps) throws TransException
+    public List<Boolean> commitTransBatch(List<Long> transIds) throws TransException
     {
-        if (transIds == null || timestamps == null || transIds.size() != timestamps.size())
+        if (transIds == null || transIds.isEmpty())
         {
-            throw new IllegalArgumentException("invalid transaction ids or timestamps");
+            throw new IllegalArgumentException("transIds is null or empty");
         }
         TransProto.CommitTransBatchRequest request = TransProto.CommitTransBatchRequest.newBuilder()
-                .addAllTransIds(transIds).addAllTimestamps(timestamps).build();
+                .addAllTransIds(transIds).build();
         TransProto.CommitTransBatchResponse response = this.stub.commitTransBatch(request);
         if (response.getErrorCode() == ErrorCode.TRANS_INVALID_ARGUMENT) // other error codes are not thrown as exceptions
         {
