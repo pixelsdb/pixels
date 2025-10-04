@@ -244,7 +244,6 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         responseObserver.onCompleted();
     }
 
-
     @Override
     public void rollbackTrans(TransProto.RollbackTransRequest request,
                               StreamObserver<TransProto.RollbackTransResponse> responseObserver)
