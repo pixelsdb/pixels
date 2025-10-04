@@ -168,7 +168,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         {
             // must get transaction context before setTransCommit()
             boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
-            /**
+            /*
              * Issue #755:
              * push the watermarks before setTransCommit()
              * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
@@ -290,7 +290,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                     }
                 }
             }
-        } else
+        }
+        else
         {
             long value = highWatermark.get();
             if (timestamp > value)
@@ -392,7 +393,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             {
                 context.getProperties().setProperty(Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY,
                         String.valueOf(request.getVmCostCents()));
-            } else if (request.hasCfCostCents())
+            }
+            else if (request.hasCfCostCents())
             {
                 context.getProperties().setProperty(Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY,
                         String.valueOf(request.getCfCostCents()));

@@ -60,7 +60,7 @@ public class EtcdMutex implements InterProcessLock
     {
         this.threadData = Maps.newConcurrentMap();
         this.basePath = StringUtil.validatePath(path);
-        internals = new LockInternals(client, path, lockName);
+        this.internals = new LockInternals(client, path, lockName);
     }
 
     public EtcdMutex verbose(boolean verbose)

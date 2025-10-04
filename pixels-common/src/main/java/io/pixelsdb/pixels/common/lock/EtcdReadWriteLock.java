@@ -44,7 +44,7 @@ public class EtcdReadWriteLock
      */
     public EtcdReadWriteLock(Client client, String basePath)
     {
-        this(client, basePath, (byte[]) null);
+        this(client, basePath, null);
     }
 
     /**

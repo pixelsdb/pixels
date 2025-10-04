@@ -300,7 +300,7 @@ public class LockInternals
      */
     private boolean canGetWriteLock(String path) throws EtcdException
     {
-        List<KeyValue> children = null;
+        List<KeyValue> children;
         try
         {
             children = this.getSortedChildren();

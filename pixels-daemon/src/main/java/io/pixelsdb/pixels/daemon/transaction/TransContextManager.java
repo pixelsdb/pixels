@@ -122,20 +122,21 @@ public class TransContextManager
         }
         return true;
     }
-//    private static final Logger logger = LogManager.getLogger(TransContextManager.class);
+
     public synchronized boolean dumpTransContext(long timestamp)
     {
         //dump metrics to file
         ConfigFactory config = ConfigFactory.Instance();
         String path = config.getProperty("pixels.historyData.dir") + timestamp + ".csv";
         File file = new File(path);
-        boolean newfile = !file.exists();
+        boolean newFile = !file.exists();
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(path, true))) {
-            if(newfile) {
+            if(newFile) {
                 bw.write("createdTime,memoryUsed,cpuTimeTotal,endTime");
                 bw.newLine();
             }
-            for (Long transId : transIdToContext.keySet()) {
+            for (Long transId : transIdToContext.keySet())
+            {
                 TransContext context = getTransContext(transId);
                 if (context.getStatus() == TransProto.TransStatus.COMMIT)
                 {
@@ -143,7 +144,8 @@ public class TransContextManager
                     for (Map.Entry<Object, Object> entry : properties.entrySet())
                     {
                         String e = (String) entry.getKey();
-                        if (Objects.equals(e, "queryinfo")) {
+                        if (Objects.equals(e, "queryinfo"))
+                        {
                             String v = (String) entry.getValue();
                             bw.write(v);
                             bw.newLine();
@@ -152,7 +154,9 @@ public class TransContextManager
                 }
             }
             transIdToContext.entrySet().removeIf(entry -> entry.getValue().getStatus()==TransProto.TransStatus.COMMIT);
-        } catch(IOException e) {
+        }
+        catch(IOException e)
+        {
             System.err.println("An error occurred: " + e.getMessage());
         }
         return true;
