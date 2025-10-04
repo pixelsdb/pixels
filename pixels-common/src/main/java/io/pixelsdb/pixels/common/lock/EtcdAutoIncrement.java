@@ -23,8 +23,9 @@ import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -39,8 +40,12 @@ public class EtcdAutoIncrement
 {
     private EtcdAutoIncrement() { }
 
+    private static final Map<String, AtomicLong> intraProcAICurrValues = new ConcurrentHashMap<>();
+
     /**
      * Initialize the id (set init value to '1') by the id key. This method is idempotent.
+     * <p/>
+     * <b>Note: the caller must ensure interProc is always consistent for the same idKey.</b>
      * @param idKey the key of the auto-increment id
      * @param interProc true if the backed key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
@@ -53,10 +58,20 @@ public class EtcdAutoIncrement
         {
             aiLock.lock();
             KeyValue idKV = etcd.getKeyValue(idKey);
+            long currValue;
             if (idKV == null)
             {
                 // Issue #729: set init value to 1 instead of 0.
                 etcd.putKeyValue(idKey, "1");
+                currValue = 1;
+            }
+            else
+            {
+                currValue = Long.parseLong(new String(idKV.getValue().getBytes()));
+            }
+            if (!interProc)
+            {
+                intraProcAICurrValues.put(idKey, new AtomicLong(currValue));
             }
         }
         catch (EtcdException e)
@@ -78,6 +93,8 @@ public class EtcdAutoIncrement
 
     /**
      * Get a new incremental id and increase the id in etcd by 1.
+     * <p/>
+     * <b>Note: the caller must ensure interProc is always consistent for the same idKey.</b>
      * @param idKey the key of the auto-increment id
      * @param interProc true if the backed key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
@@ -96,6 +113,8 @@ public class EtcdAutoIncrement
 
     /**
      * Get a new segment of incremental ids and increase the id in etcd by the step.
+     * <p/>
+     * <b>Note: the caller must ensure interProc is always consistent for the same idKey.</b>
      * @param idKey the key of the auto-increment id
      * @param step the step, i.e., the number of ids to get
      * @param interProc true if the backed key-value of this increment id in etcd
@@ -111,20 +130,34 @@ public class EtcdAutoIncrement
         try
         {
             aiLock.lock();
-            KeyValue idKV = etcd.getKeyValue(idKey);
-            if (idKV != null)
+            if (interProc)
             {
-                long start = Long.parseLong(new String(idKV.getValue().getBytes()));
+                KeyValue idKV = etcd.getKeyValue(idKey);
+                if (idKV != null)
+                {
+                    long start = Long.parseLong(new String(idKV.getValue().getBytes()));
+                    etcd.putKeyValue(idKey, String.valueOf(start + step));
+                    segment = new Segment(start, step);
+                    if (!segment.isValid())
+                    {
+                        throw new EtcdException("invalid segment for id key " + idKey + " from etcd");
+                    }
+                }
+                else
+                {
+                    throw new EtcdException("the key value of the id " + idKey + " does not exist in etcd");
+                }
+            }
+            else
+            {
+                long start = intraProcAICurrValues.get(idKey).get();
                 etcd.putKeyValue(idKey, String.valueOf(start + step));
+                intraProcAICurrValues.get(idKey).getAndAdd(step); // increase after etcd put success
                 segment = new Segment(start, step);
                 if (!segment.isValid())
                 {
                     throw new EtcdException("invalid segment for id key " + idKey + " from etcd");
                 }
-            }
-            else
-            {
-                throw new EtcdException("the key value of the id " + idKey + " does not exist in etcd");
             }
         }
         catch (EtcdException e)
@@ -146,6 +179,8 @@ public class EtcdAutoIncrement
 
     /**
      * Get a new segment of incremental ids and increase the id in etcd by the step.
+     * <p/>
+     * <b>Note: the caller must ensure interProc is always consistent for the same idKey.</b>
      * @param idKey the key of the auto-increment id
      * @param step the step, i.e., the number of ids to get
      * @param interProc true if the backed key-value of this increment id in etcd
@@ -160,21 +195,35 @@ public class EtcdAutoIncrement
         try
         {
             aiLock.lock();
-            KeyValue idKV = etcd.getKeyValue(idKey);
-            if (idKV != null)
+            if (interProc)
             {
-                long start = Long.parseLong(new String(idKV.getValue().getBytes()));
+                KeyValue idKV = etcd.getKeyValue(idKey);
+                if (idKV != null)
+                {
+                    long start = Long.parseLong(new String(idKV.getValue().getBytes()));
+                    etcd.putKeyValue(idKey, String.valueOf(start + step));
+                    Segment segment = new Segment(start, step);
+                    if (!segment.isValid())
+                    {
+                        throw new EtcdException("invalid segment for id key " + idKey + " from etcd");
+                    }
+                    processor.process(segment);
+                } else
+                {
+                    throw new EtcdException("the key value of the id " + idKey + " does not exist in etcd");
+                }
+            }
+            else
+            {
+                long start = intraProcAICurrValues.get(idKey).get();
                 etcd.putKeyValue(idKey, String.valueOf(start + step));
+                intraProcAICurrValues.get(idKey).getAndAdd(step); // increase after etcd put success
                 Segment segment = new Segment(start, step);
                 if (!segment.isValid())
                 {
                     throw new EtcdException("invalid segment for id key " + idKey + " from etcd");
                 }
                 processor.process(segment);
-            }
-            else
-            {
-                throw new EtcdException("the key value of the id " + idKey + " does not exist in etcd");
             }
         }
         catch (EtcdException e)
@@ -195,8 +244,8 @@ public class EtcdAutoIncrement
 
     public static class AdaptiveAILock
     {
-        private static final Map<String, Lock> intraProcLocks = new HashMap<>();
-        private static final Map<String, EtcdMutex> interProcLocks = new HashMap<>();
+        private static final Map<String, Lock> intraProcLocks = new ConcurrentHashMap<>();
+        private static final Map<String, EtcdMutex> interProcLocks = new ConcurrentHashMap<>();
 
         private final Lock intraProcLock;
         private final EtcdMutex interProcLock;
