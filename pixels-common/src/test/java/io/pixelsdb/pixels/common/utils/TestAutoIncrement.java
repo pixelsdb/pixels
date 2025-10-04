@@ -33,13 +33,13 @@ public class TestAutoIncrement
     @Test
     public void testEtcdAutoIncrement() throws EtcdException
     {
-        long id = GenerateId("test-id");
+        long id = GenerateId("test-id", true);
         System.out.println(id);
-        id = GenerateId("test-id");
+        id = GenerateId("test-id", true);
         System.out.println(id);
-        id = GenerateId("test-id");
+        id = GenerateId("test-id", false);
         System.out.println(id);
-        id = GenerateId("test-id");
+        id = GenerateId("test-id", false);
         System.out.println(id);
     }
 }

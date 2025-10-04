@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexBuffer;
 import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
+import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
@@ -142,7 +143,7 @@ public class SqliteMainIndex implements MainIndex
                      * We use numRowIds * 10L as the step for etcd auto-increment generation, reducing the etcd-overhead
                      * to less than 10%.
                      */
-                    return new PersistentAutoIncrement("rowid-" + tblId, numRowIds * 10L); // key in etcd
+                    return new PersistentAutoIncrement(Constants.AI_ROW_ID_PREFIX + tblId, numRowIds * 10L, false);
                 }
                 catch (EtcdException e)
                 {

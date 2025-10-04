@@ -38,35 +38,42 @@ public class PersistentAutoIncrement
     private final String idKey;
     private final Lock lock = new ReentrantLock();
     private final long etcdAIStep;
+    private final boolean interProc;
     private volatile long id;
     private volatile long count;
 
     /**
-     * @param idKey the key of this auto increment id in etcd.
-     * @throws EtcdException when fail to interact with the backed etcd instance.
+     * @param idKey the key of this auto increment id in etcd
+     * @param interProc true if the backed key-value of this increment id in etcd
+     *                  may be simultaneously accessed by multiple processes
+     * @throws EtcdException when fail to interact with the backed etcd instance
      */
-    public PersistentAutoIncrement(String idKey) throws EtcdException
+    public PersistentAutoIncrement(String idKey, boolean interProc) throws EtcdException
     {
         this.idKey = idKey;
         this.etcdAIStep = Constants.AI_DEFAULT_STEP;
+        this.interProc = interProc;
         EtcdAutoIncrement.InitId(idKey);
-        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep);
+        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep, interProc);
         this.id = segment.getStart();
         this.count = segment.getLength();
     }
 
     /**
-     * @param idKey the key of this auto increment id in etcd.
-     * @param etcdStep the step for allocating row ids in etcd, determining the frequency of updating the backed key-value
-     *             of this auto increment id in etcd.
-     * @throws EtcdException when fail to interact with the backed etcd instance.
+     * @param idKey the key of this auto increment id in etcd
+     * @param etcdStep the step for allocating row ids in etcd, determining the frequency of updating the
+     *                 backed key-value of this auto increment id in etcd
+     * @param interProc interProc true if the backed key-value of this increment id in etcd
+     *                  may be simultaneously accessed by multiple processes
+     * @throws EtcdException when fail to interact with the backed etcd instance
      */
-    public PersistentAutoIncrement(String idKey, long etcdStep) throws EtcdException
+    public PersistentAutoIncrement(String idKey, long etcdStep, boolean interProc) throws EtcdException
     {
         this.idKey = idKey;
         this.etcdAIStep = etcdStep;
+        this.interProc = interProc;
         EtcdAutoIncrement.InitId(idKey);
-        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep);
+        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep, interProc);
         this.id = segment.getStart();
         this.count = segment.getLength();
     }
@@ -89,7 +96,7 @@ public class PersistentAutoIncrement
             }
             else
             {
-                EtcdAutoIncrement.GenerateId(this.idKey, this.etcdAIStep, segment -> {
+                EtcdAutoIncrement.GenerateId(this.idKey, this.etcdAIStep, this.interProc, segment -> {
                     this.id = segment.getStart();
                     this.count = segment.getLength();
                 });
@@ -132,7 +139,7 @@ public class PersistentAutoIncrement
                     // Issue #986: avoid infinite recursion by ensuring step >= batchSize.
                     step = batchSize;
                 }
-                EtcdAutoIncrement.GenerateId(this.idKey, step, segment -> {
+                EtcdAutoIncrement.GenerateId(this.idKey, step, this.interProc, segment -> {
                     this.id = segment.getStart();
                     this.count = segment.getLength();
                 });

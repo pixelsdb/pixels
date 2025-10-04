@@ -130,8 +130,10 @@ public class TransContextManager
         String path = config.getProperty("pixels.historyData.dir") + timestamp + ".csv";
         File file = new File(path);
         boolean newFile = !file.exists();
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(path, true))) {
-            if(newFile) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(path, true)))
+        {
+            if(newFile)
+            {
                 bw.write("createdTime,memoryUsed,cpuTimeTotal,endTime");
                 bw.newLine();
             }
