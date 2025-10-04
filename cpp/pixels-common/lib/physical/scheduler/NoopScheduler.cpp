@@ -64,15 +64,10 @@ NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatc
         {
             Request request = requests[i];
             // localReader->seek(request.start);
-            if (request.length>reuseBuffers.at(i)->size()) {
-                throw InvalidArgumentException("说明出错的不是这个，需要关注之前的临界区\n");
-
+            if (request.length > reuseBuffers.at(i)->size()) {
+                throw InvalidArgumentException("The error is not here; need to pay attention to the previous critical section\n");
             }
             results.at(i) = localReader->readAsync(request.length, reuseBuffers.at(i), request.bufferId,request.ring_index,request.start);
-            // if (request.ring_index !=0) {
-            //     std::cout<<"notice readAsync"<<std::endl;
-            // }
-            // std::cout<<"i: "<<i<<" start:"<<request.start<<" resuseBuffers.size:"<<reuseBuffers.at(i)->size()<<std::endl;
             if (ring_index_set.find(request.ring_index) == ring_index_set.end())
             {
                 ring_index_set.insert(request.ring_index);

@@ -488,7 +488,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsR
               "PhysicalLocalReader::readAsync: We don't support aio for our async read yet.");
         }
       }
-      parallel_state.all_done = true;  // 标记已完成，避免重复调用
+      parallel_state.all_done = true;  
     }
     parallel_lock.unlock();
     return false;
