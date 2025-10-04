@@ -152,7 +152,8 @@ public class SqliteMainIndex implements MainIndex
                 }
             });
             // 2. allocate numRowIds
-            long start = autoIncrement.getAndIncrement(numRowIds);
+            // Issue #1099: auto increment starts from 1, whereas row id starts from 0, so we use auto increment minus 1 as the row id start.
+            long start = autoIncrement.getAndIncrement(numRowIds) - 1;
             return IndexProto.RowIdBatch.newBuilder().setRowIdStart(start).setLength(numRowIds).build();
         }
         catch (RuntimeException | EtcdException e)
