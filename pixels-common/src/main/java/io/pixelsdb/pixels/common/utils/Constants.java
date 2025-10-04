@@ -81,7 +81,7 @@ public final class Constants
      * Issue #108:
      * The prefix for read-write lock used in etcd auto-increment id.
      */
-    public static final String AI_LOCK_PATH_PREFIX = "ai_lock_";
+    public static final String AI_LOCK_PATH_PREFIX = "/ai_lock/";
     // Issue #1099: increase from 1000 to 10000 to improve transaction-begin throughput
     public static final long AI_DEFAULT_STEP = 10000;
     public static final String AI_TRANS_ID_KEY = "trans_id";

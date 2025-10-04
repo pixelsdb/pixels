@@ -40,19 +40,18 @@ public class EtcdAutoIncrement
     private EtcdAutoIncrement() { }
 
     /**
-     * Initialize the id (set init value to '1') by the id key.
-     * This method is idempotent.
+     * Initialize the id (set init value to '1') by the id key. This method is idempotent.
      * @param idKey the key of the auto-increment id
+     * @param interProc true if the backed key-value of this increment id in etcd
+     *                  may be simultaneously accessed by multiple processes
      */
-    public static void InitId(String idKey) throws EtcdException
+    public static void InitId(String idKey, boolean interProc) throws EtcdException
     {
         EtcdUtil etcd = EtcdUtil.Instance();
-        EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
-                AI_LOCK_PATH_PREFIX + idKey);
-        EtcdMutex writeLock = readWriteLock.writeLock();
+        AdaptiveAILock aiLock = new AdaptiveAILock(idKey, interProc);
         try
         {
-            writeLock.acquire();
+            aiLock.lock();
             KeyValue idKV = etcd.getKeyValue(idKey);
             if (idKV == null)
             {
@@ -68,7 +67,7 @@ public class EtcdAutoIncrement
         {
             try
             {
-                writeLock.release();
+                aiLock.unlock();
             }
             catch (EtcdException e)
             {

@@ -53,7 +53,7 @@ public class PersistentAutoIncrement
         this.idKey = idKey;
         this.etcdAIStep = Constants.AI_DEFAULT_STEP;
         this.interProc = interProc;
-        EtcdAutoIncrement.InitId(idKey);
+        EtcdAutoIncrement.InitId(idKey, interProc);
         EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep, interProc);
         this.id = segment.getStart();
         this.count = segment.getLength();
@@ -72,7 +72,7 @@ public class PersistentAutoIncrement
         this.idKey = idKey;
         this.etcdAIStep = etcdStep;
         this.interProc = interProc;
-        EtcdAutoIncrement.InitId(idKey);
+        EtcdAutoIncrement.InitId(idKey, interProc);
         EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep, interProc);
         this.id = segment.getStart();
         this.count = segment.getLength();
