@@ -63,7 +63,7 @@ public class PersistentAutoIncrement
      * @param idKey the key of this auto increment id in etcd
      * @param etcdStep the step for allocating row ids in etcd, determining the frequency of updating the
      *                 backed key-value of this auto increment id in etcd
-     * @param interProc interProc true if the backed key-value of this increment id in etcd
+     * @param interProc true if the backed key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
      * @throws EtcdException when fail to interact with the backed etcd instance
      */

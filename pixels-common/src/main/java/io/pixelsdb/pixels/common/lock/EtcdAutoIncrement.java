@@ -80,7 +80,7 @@ public class EtcdAutoIncrement
     /**
      * Get a new incremental id and increase the id in etcd by 1.
      * @param idKey the key of the auto-increment id
-     * @param interProc interProc true if the backed key-value of this increment id in etcd
+     * @param interProc true if the backed key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
      * @return the new id
      * @throws EtcdException if failed to interact with etcd
@@ -99,7 +99,7 @@ public class EtcdAutoIncrement
      * Get a new segment of incremental ids and increase the id in etcd by the step.
      * @param idKey the key of the auto-increment id
      * @param step the step, i.e., the number of ids to get
-     * @param interProc interProc true if the backed key-value of this increment id in etcd
+     * @param interProc true if the backed key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
      * @return the segment of auto-increment ids
      * @throws EtcdException if failed to interact with etcd
@@ -149,7 +149,7 @@ public class EtcdAutoIncrement
      * Get a new segment of incremental ids and increase the id in etcd by the step.
      * @param idKey the key of the auto-increment id
      * @param step the step, i.e., the number of ids to get
-     * @param interProc interProc true if the backed key-value of this increment id in etcd
+     * @param interProc true if the backed key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
      * @param processor the processor of the segment acquired from etcd
      * @throws EtcdException if failed to interact with etcd
