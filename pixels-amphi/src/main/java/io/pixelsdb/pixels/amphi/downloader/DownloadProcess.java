@@ -42,7 +42,8 @@ import java.util.stream.Collectors;
 /**
  * Built as the main method to download partial data to the local storage.
  */
-public class DownloadProcess {
+public class DownloadProcess
+{
     public static void main(String[] args) throws IOException, IllegalArgumentException, MetadataException
     {
         // Load configuration
@@ -180,8 +181,7 @@ public class DownloadProcess {
         }
     }
 
-    private static String readConfigFile(String filePath)
-            throws IOException
+    private static String readConfigFile(String filePath) throws IOException
     {
         try
         {

@@ -38,6 +38,16 @@
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-plus</artifactId>
         </dependency>
+
+        <!-- use the unified versions of commons-logging and slf4j for calcite-core -->
+        <dependency>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

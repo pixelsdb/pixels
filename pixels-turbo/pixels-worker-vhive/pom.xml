@@ -106,7 +106,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>pixels-worker-vhive-jar-with-dependencies</finalName>
+                            <finalName>pixels-worker-vhive-with-deps</finalName>
                             <transformers>
                                 <!-- ServicesResourceTransformer merges the resources in META-INF/services -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>

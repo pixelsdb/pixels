@@ -18,7 +18,7 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mainClass>io.pixelsdb.pixels.cli.Main</mainClass>
+        <main.class>io.pixelsdb.pixels.cli.Main</main.class>
         <maven.deploy.skip>true</maven.deploy.skip>
         <maven.install.skip>true</maven.install.skip>
 
@@ -105,7 +105,7 @@
     </dependencies>
 
     <build>
-        <finalName>pixels-cli</finalName>
+        <finalName>pixels-cli-${project.version}</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -124,7 +124,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>pixels-cli</finalName>
+                            <finalName>pixels-cli-${project.version}</finalName>
                             <outputDirectory>${project.basedir}/target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>full</shadedClassifierName>
@@ -142,7 +142,7 @@
                                 <!-- ServicesResourceTransformer merges the resources in META-INF/services -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>${mainClass}</mainClass>
+                                    <mainClass>${main.class}</mainClass>
                                     <manifestEntries>
                                         <Add-Opens>java.base/sun.nio.ch java.base/java.nio</Add-Opens>
                                         <Multi-Release>true</Multi-Release>

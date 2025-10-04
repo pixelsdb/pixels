@@ -22,9 +22,10 @@
         <maven.deploy.skip>true</maven.deploy.skip>
         <maven.install.skip>true</maven.install.skip>
 
+        <maven.plugin.asciidoctor.version>2.2.1</maven.plugin.asciidoctor.version>
+
         <!-- web frameworks and packaging -->
         <dep.spring.boot.version>2.7.10</dep.spring.boot.version>
-        <dep.asciidoctor.version>2.2.1</dep.asciidoctor.version>
         <dep.grpc.spring.boot.starter.version>2.14.0.RELEASE</dep.grpc.spring.boot.starter.version>
         <!-- this is from spring-boot-dependencies-2.7.10.pom -->
         <dep.spring-restdocs.version>2.0.7.RELEASE</dep.spring-restdocs.version>
@@ -53,15 +54,11 @@
             <artifactId>pixels-amphi</artifactId>
             <exclusions>
                 <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty-common</artifactId>
+                    <!-- log4j-slf4j-impl conflicts with the log4j-to-slf4j used by spring boot-->
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j-impl</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-common</artifactId>
         </dependency>
 
         <!-- trino-jdbc -->
@@ -115,6 +112,7 @@
             <artifactId>spring-boot-starter-tomcat</artifactId>
             <scope>provided</scope>
         </dependency>
+
         <!-- rest and security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -124,6 +122,18 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- specify the unified versions of slf4j and log4j for spring-boot-starter-web -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jul-to-slf4j</artifactId>
+            <version>${dep.slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-to-slf4j</artifactId>
+            <version>${dep.log4j.version}</version>
+        </dependency>
+
         <!-- grpc -->
         <dependency>
             <groupId>net.devh</groupId>
@@ -176,7 +186,7 @@
             <plugin>
                 <groupId>org.asciidoctor</groupId>
                 <artifactId>asciidoctor-maven-plugin</artifactId>
-                <version>${dep.asciidoctor.version}</version>
+                <version>${maven.plugin.asciidoctor.version}</version>
                 <executions>
                     <execution>
                         <id>generate-docs</id>

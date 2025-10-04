@@ -135,7 +135,7 @@ The `SchemaData` field comes from the cache plan generated in the previous step.
 
 To start the download process, simply run the following command:
 ```bash
-java -jar pixels-amphi-*.jar --config <config_file_path>
+java -jar pixels-amphi-*-full.jar --config <config_file_path>
 ```
 
 Please note that depended on the network bandwidth, the download process may take a while. To quickly test the system, you can also directly download the full dataset and skip this step. The system will still work as if only the cached columns are stored in the local storage.
@@ -147,7 +147,7 @@ After the preparations in the previous steps, now we have:
 - pixels server running in the cloud
 - pixels amphi worker to perform adaptive query processing
 
-We have add the executable to run the benchmark task ([benchmark source code](../cpp/pixels-amphi-worker/benchmark/benchmark.cpp)). We can now perform the task by running: 
+We have added the executable to run the benchmark task ([benchmark source code](../cpp/pixels-amphi-worker/benchmark/benchmark.cpp)). We can now perform the task by running: 
 ```bash
 ./benchmark <worker_config_path> <experiment_config_path>
 ```
