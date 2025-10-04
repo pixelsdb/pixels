@@ -131,14 +131,16 @@
         <dep.commons-net.version>3.9.0</dep.commons-net.version>
 
         <!-- logging -->
-        <dep.log4j.version>2.17.1</dep.log4j.version>
-        <!-- we only use log4j in pixels, the following are for third-party libs -->
+        <!-- log4j-2.18.0 is compatible with slf4j-1.7.36 -->
+        <dep.log4j.version>2.18.0</dep.log4j.version>
+        <!-- we only use log4j in pixels, the following are for third-party libraries -->
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
-        <dep.slf4j.version>1.7.25</dep.slf4j.version>
+        <!-- slf4j-1.7.36 is compatible with 1.7.x that is widely used in third-party libraries -->
+        <dep.slf4j.version>1.7.36</dep.slf4j.version>
 
         <!-- testing -->
-        <dep.junit.version>4.13.1</dep.junit.version>
-        <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
+        <dep.junit4.version>4.13.2</dep.junit4.version>
+        <dep.junit.platform.version>1.8.2</dep.junit.platform.version>
         <dep.mockito.version>4.5.1</dep.mockito.version>
         <dep.junit.jupiter.version>5.8.2</dep.junit.jupiter.version>
     </properties>
@@ -832,6 +834,7 @@
                 <artifactId>log4j-api</artifactId>
                 <version>${dep.log4j.version}</version>
             </dependency>
+            <!-- the following logging libraries are only used for third-party libraries when needed -->
             <dependency>
                 <!-- the default binding from slf4j to log4j-2, be careful of other conflict bindings -->
                 <groupId>org.apache.logging.log4j</groupId>
@@ -843,6 +846,16 @@
                 <groupId>org.slf4j</groupId>
                 <artifactId>log4j-over-slf4j</artifactId>
                 <version>${dep.slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${dep.slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+                <version>${dep.commons-logging.version}</version>
             </dependency>
 
             <!--profiling-->
@@ -861,7 +874,7 @@
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
-                <version>${dep.junit.version}</version>
+                <version>${dep.junit4.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
