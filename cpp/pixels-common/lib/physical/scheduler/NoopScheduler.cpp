@@ -29,81 +29,68 @@
 
 Scheduler *NoopScheduler::instance = nullptr;
 
-Scheduler *NoopScheduler::Instance()
-{
-    if (instance == nullptr)
-    {
-        instance = new NoopScheduler();
-    }
-    return instance;
+Scheduler *NoopScheduler::Instance() {
+  if (instance == nullptr) {
+    instance = new NoopScheduler();
+  }
+  return instance;
 }
 
-std::vector <std::shared_ptr<ByteBuffer>> NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader,
-                                                                      RequestBatch batch, long queryId)
-{
-    return executeBatch(reader, batch, {}, queryId);
+std::vector<std::shared_ptr<ByteBuffer>>
+NoopScheduler::executeBatch(std::shared_ptr<PhysicalReader> reader,
+                            RequestBatch batch, long queryId) {
+  return executeBatch(reader, batch, {}, queryId);
 }
 
+std::vector<std::shared_ptr<ByteBuffer>> NoopScheduler::executeBatch(
+    std::shared_ptr<PhysicalReader> reader, RequestBatch batch,
+    std::vector<std::shared_ptr<ByteBuffer>> reuseBuffers, long queryId) {
 
-std::vector <std::shared_ptr<ByteBuffer>>
-NoopScheduler::executeBatch(std::shared_ptr <PhysicalReader> reader, RequestBatch batch,
-                            std::vector <std::shared_ptr<ByteBuffer>> reuseBuffers, long queryId)
-{
+  auto requests = batch.getRequests();
+  std::vector<std::shared_ptr<ByteBuffer>> results;
+  results.resize(batch.getSize());
+  if (ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io") &&
+      reuseBuffers.size() > 0) {
+    // async read
+    auto localReader = std::static_pointer_cast<PhysicalLocalReader>(reader);
+    std::unordered_set<int> ring_index_set = localReader->getRingIndexes();
+    std::unordered_map<int, uint32_t> ringIndexCountMap;
 
-    auto requests = batch.getRequests();
-    std::vector <std::shared_ptr<ByteBuffer>> results;
-    results.resize(batch.getSize());
-    if (ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io") && reuseBuffers.size() > 0)
-    {
-        // async read
-        auto localReader = std::static_pointer_cast<PhysicalLocalReader>(reader);
-        std::unordered_set<int> ring_index_set=localReader->getRingIndexes();
-        std::unordered_map<int, uint32_t> ringIndexCountMap;
-
-        for (int i = 0; i < batch.getSize(); i++)
-        {
-            Request request = requests[i];
-            // localReader->seek(request.start);
-            if (request.length > reuseBuffers.at(i)->size()) {
-                throw InvalidArgumentException("The error is not here; need to pay attention to the previous critical section\n");
-            }
-            results.at(i) = localReader->readAsync(request.length, reuseBuffers.at(i), request.bufferId,request.ring_index,request.start);
-            if (ring_index_set.find(request.ring_index) == ring_index_set.end())
-            {
-                ring_index_set.insert(request.ring_index);
-                localReader->addRingIndex(request.ring_index);
-            }
-            ringIndexCountMap[request.ring_index]++;
-        }
-        localReader->readAsyncSubmit(ringIndexCountMap,ring_index_set);
-        localReader->setRingIndexCountMap(ringIndexCountMap);
-
+    for (int i = 0; i < batch.getSize(); i++) {
+      Request request = requests[i];
+      if (request.length > reuseBuffers.at(i)->size()) {
+        throw InvalidArgumentException(
+            "The error is not here; need to pay attention to the previous "
+            "critical section\n");
+      }
+      results.at(i) = localReader->readAsync(request.length, reuseBuffers.at(i),
+                                             request.bufferId,
+                                             request.ring_index, request.start);
+      if (ring_index_set.find(request.ring_index) == ring_index_set.end()) {
+        ring_index_set.insert(request.ring_index);
+        localReader->addRingIndex(request.ring_index);
+      }
+      ringIndexCountMap[request.ring_index]++;
     }
-    else
-    {
-        // sync read
-        for (int i = 0; i < batch.getSize(); i++)
-        {
-            Request request = requests[i];
-            reader->seek(request.start);
-            if (reuseBuffers.size() > 0)
-            {
-                results.at(i) = reader->readFully(request.length, reuseBuffers.at(i));
-            }
-            else
-            {
-                results.at(i) = reader->readFully(request.length);
-            }
+    localReader->readAsyncSubmit(ringIndexCountMap, ring_index_set);
+    localReader->setRingIndexCountMap(ringIndexCountMap);
 
-        }
+  } else {
+    // sync read
+    for (int i = 0; i < batch.getSize(); i++) {
+      Request request = requests[i];
+      reader->seek(request.start);
+      if (reuseBuffers.size() > 0) {
+        results.at(i) = reader->readFully(request.length, reuseBuffers.at(i));
+      } else {
+        results.at(i) = reader->readFully(request.length);
+      }
     }
-    return results;
-
+  }
+  return results;
 }
 
-
-NoopScheduler::~NoopScheduler()
-{
-    delete instance;
-    instance = nullptr;
+NoopScheduler::~NoopScheduler() {
+  delete instance;
+  instance = nullptr;
 }

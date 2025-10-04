@@ -1,5 +1,5 @@
 /*
-* Copyright 2023 PixelsDB.
+* Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -18,21 +18,22 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-
 /*
-/* @author whz 
-/* @create 7/30/25.
-*/
+ * @author whz
+ * @create 2025-07-30
+ */
 
 #ifndef BUFFERPOOLENTRY_H
 #define BUFFERPOOLENTRY_H
+#include "physical/BufferPool/Bitmap.h"
 #include <memory>
 #include <physical/natives/ByteBuffer.h>
 #include <physical/natives/DirectIoLib.h>
-#include "physical/BufferPool/Bitmap.h"
 class BufferPoolEntry {
 public:
-explicit BufferPoolEntry(size_t size,int slice_size,std::shared_ptr<DirectIoLib> direct_lib,int offset,int ring_index);
+  explicit BufferPoolEntry(size_t size, int slice_size,
+                           std::shared_ptr<DirectIoLib> direct_lib, int offset,
+                           int ring_index);
   size_t getSize() const;
   std::shared_ptr<Bitmap> getBitmap() const;
   std::shared_ptr<ByteBuffer> getBuffer() const;
@@ -41,7 +42,7 @@ explicit BufferPoolEntry(size_t size,int slice_size,std::shared_ptr<DirectIoLib>
   int setNextFreeIndex(int index);
   ~BufferPoolEntry();
   uint64_t checkCol(uint32_t) const;
-  void addCol(uint32_t colId,uint64_t bytes);
+  void addCol(uint32_t colId, uint64_t bytes);
   bool isInUse() const;
   void setInUse(bool in_use);
   int getOffsetInBuffers() const;
@@ -51,10 +52,11 @@ explicit BufferPoolEntry(size_t size,int slice_size,std::shared_ptr<DirectIoLib>
   int getRingIndex() const;
   void setRingIndex(int ring_index);
   void reset();
+
 private:
-size_t size_;
-std::shared_ptr<Bitmap> bitmap_;
-std::shared_ptr<ByteBuffer> buffer_;
+  size_t size_;
+  std::shared_ptr<Bitmap> bitmap_;
+  std::shared_ptr<ByteBuffer> buffer_;
   bool is_full_;
   int next_free_;
   std::map<uint32_t, uint64_t> nr_bytes_;
@@ -64,4 +66,4 @@ std::shared_ptr<ByteBuffer> buffer_;
   int ring_index;
 };
 
-#endif //BUFFERPOOLENTRY_H
+#endif // BUFFERPOOLENTRY_H

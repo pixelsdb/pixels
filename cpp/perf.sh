@@ -1,73 +1,73 @@
 #!/bin/bash
 
-# 检查参数数量
+# Check number of arguments
 if [ $# -ne 2 ]; then
-    echo "用法: $0 <查询文件> <输出文件前缀>"
-    echo "示例: $0 test_q01.sql query_1"
+    echo "Usage: $0 <query_file> <output_file_prefix>"
+    echo "Example: $0 test_q01.sql query_1"
     exit 1
 fi
 
-# 赋值参数
+# Assign parameters
 QUERY_FILE="$1"
 OUTPUT_PREFIX="$2"
 
-# 记录开始时间
+# Record start time (nanoseconds)
 START_TIME=$(date +%s%N)
 PREVIOUS_TIME=$START_TIME
 
-# 显示时间的函数
+# Function to display time duration
 show_time() {
     local start=$1
     local end=$2
     local stage=$3
 
-    # 计算毫秒数（bash中整数运算）
+    # Calculate duration in milliseconds (integer arithmetic in bash)
     local duration=$(( (end - start) / 1000000 ))
-    echo "阶段 '$stage' 耗时: ${duration}ms"
+    echo "Stage '$stage' duration: ${duration}ms"
 }
 
-echo "开始执行性能分析..."
+echo "Starting performance analysis..."
 
-# 运行perf记录
-echo "1. 运行perf记录..."
+# Run perf recording
+echo "1. Running perf record..."
 sudo -E perf record -F 1 --call-graph=dwarf -g ./build/release/duckdb < "$QUERY_FILE"
 CURRENT_TIME=$(date +%s%N)
-show_time $PREVIOUS_TIME $CURRENT_TIME "运行perf record"
+show_time $PREVIOUS_TIME $CURRENT_TIME "Running perf record"
 PREVIOUS_TIME=$CURRENT_TIME
 
-# 生成perf脚本输出
-echo "2. 生成perf脚本输出..."
+# Generate perf script output
+echo "2. Generating perf script output..."
 sudo perf script -i perf.data > "${OUTPUT_PREFIX}.perf"
 CURRENT_TIME=$(date +%s%N)
-show_time $PREVIOUS_TIME $CURRENT_TIME "生成perf脚本输出"
+show_time $PREVIOUS_TIME $CURRENT_TIME "Generating perf script output"
 PREVIOUS_TIME=$CURRENT_TIME
 
-# 折叠调用栈
-echo "3. 折叠调用栈..."
+# Collapse call stacks
+echo "3. Collapsing call stacks..."
 stackcollapse-perf.pl "${OUTPUT_PREFIX}.perf" > "${OUTPUT_PREFIX}.folded"
 CURRENT_TIME=$(date +%s%N)
-show_time $PREVIOUS_TIME $CURRENT_TIME "折叠调用栈"
+show_time $PREVIOUS_TIME $CURRENT_TIME "Collapsing call stacks"
 PREVIOUS_TIME=$CURRENT_TIME
 
-# 生成火焰图
-echo "4. 生成火焰图..."
+# Generate flame graph
+echo "4. Generating flame graph..."
 flamegraph.pl "${OUTPUT_PREFIX}.folded" > "${OUTPUT_PREFIX}-cpu.svg"
 CURRENT_TIME=$(date +%s%N)
-show_time $PREVIOUS_TIME $CURRENT_TIME "生成火焰图"
+show_time $PREVIOUS_TIME $CURRENT_TIME "Generating flame graph"
 PREVIOUS_TIME=$CURRENT_TIME
 
-# 重命名perf数据文件
-echo "5. 重命名perf数据文件..."
+# Rename perf data file
+echo "5. Renaming perf data file..."
 mv perf.data "${OUTPUT_PREFIX}-perf.data"
 CURRENT_TIME=$(date +%s%N)
-show_time $PREVIOUS_TIME $CURRENT_TIME "重命名文件"
+show_time $PREVIOUS_TIME $CURRENT_TIME "Renaming files"
 PREVIOUS_TIME=$CURRENT_TIME
 
-# 计算总时间
+# Calculate total duration
 TOTAL_DURATION=$(( (CURRENT_TIME - START_TIME) / 1000000 ))
-echo "总耗时: ${TOTAL_DURATION}ms"
+echo "Total duration: ${TOTAL_DURATION}ms"
 
-echo "操作完成，生成的文件："
+echo "Operation completed. Generated files:"
 echo "${OUTPUT_PREFIX}.perf"
 echo "${OUTPUT_PREFIX}.folded"
 echo "${OUTPUT_PREFIX}-cpu.svg"

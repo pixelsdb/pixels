@@ -1,5 +1,5 @@
 /*
-* Copyright 2023 PixelsDB.
+* Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -20,9 +20,9 @@
 
 
 /*
-/* @author whz 
-/* @create 7/30/25.
-*/
+ * @author whz
+ * @create 2025-07-30
+ */
 #include "physical/BufferPool/BufferPoolEntry.h"
 #include "physical/BufferPool/Bitmap.h"
 

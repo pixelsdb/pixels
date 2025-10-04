@@ -1,5 +1,5 @@
 /*
-* Copyright 2023 PixelsDB.
+* Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,7 +19,7 @@
  */
 
 /*
-/* @author whz
-/* @create 8/23/25.
-*/
+ * @author whz
+ * @create 2025-08-23
+ */
 #include "utils/MutexTracker.h"
