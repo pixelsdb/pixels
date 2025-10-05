@@ -35,6 +35,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * @author hank
  * @create 2021-08-29
+ * @update 2025-10-05 add interProc to all methods to eliminate etcd locks for auto-increment ids operated by a single process
  */
 public class EtcdAutoIncrement
 {

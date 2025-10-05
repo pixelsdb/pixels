@@ -40,7 +40,8 @@ import static java.util.Objects.requireNonNull;
  * This context manager of the transactions.
  *
  * @author hank
- * @update 2023-05-02
+ * @create 2023-05-02
+ * @update 2025-10-05 replace synchronized methods with read-write lock to improve performance
  */
 public class TransContextManager
 {
