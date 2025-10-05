@@ -129,7 +129,7 @@ public interface PhysicalReader extends Closeable
     long getBlockId() throws IOException;
 
     /**
-     * @return the scheme of the backed physical storage.
+     * @return the scheme of the backing physical storage.
      */
     Storage.Scheme getStorageScheme();
 

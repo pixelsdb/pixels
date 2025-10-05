@@ -8,7 +8,7 @@ ARG IMPL_JAR_FILE
 WORKDIR /app
 RUN mkdir -p /app/etc
 ENV PIXELS_HOME=/app/
-COPY pixels.properties /app/etc/pixels.properties
+COPY ../../pixels-common/src/main/resources/pixels.properties /app/etc/pixels.properties
 # Copy JAR files to the image
 COPY ${HANDLER_JAR_FILE} /app/spike-java-handler.jar
 COPY ${IMPL_JAR_FILE} /app/spike-java-handler-impl.jar

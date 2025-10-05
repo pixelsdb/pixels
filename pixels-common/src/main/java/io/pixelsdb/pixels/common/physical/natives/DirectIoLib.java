@@ -363,9 +363,9 @@ public class DirectIoLib
 
     /**
      * Create a shared virtual address mapping that is backed by the file at the given path. Updates to the mapping are
-     * visible to other processes mapping the same region, and are carried through to the backed file. This method can
+     * visible to other processes mapping the same region, and are carried through to the backing file. This method can
      * be used to build shared memory between processes.
-     * @param path the backed file path
+     * @param path the backing file path
      * @param length the length of the memory mapping
      * @param offset the offset in the file where the mapping starts
      * @param readOnly whether the memory region is mapped as read only

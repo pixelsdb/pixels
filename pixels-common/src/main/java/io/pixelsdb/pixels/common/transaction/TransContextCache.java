@@ -21,8 +21,9 @@ package io.pixelsdb.pixels.common.transaction;
 
 import io.pixelsdb.pixels.daemon.TransProto;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Objects.requireNonNull;
 
@@ -33,6 +34,7 @@ import static java.util.Objects.requireNonNull;
  *
  * @create 2022-02-20
  * @update 2023-05-02 turn this class from trans context to the local trans context cache.
+ * @update 2025-10-05 remove synchronized from all methods to improve performance.
  * @author hank
  */
 public class TransContextCache
@@ -48,22 +50,22 @@ public class TransContextCache
         return instance;
     }
 
-    private final Map<Long, TransContext> transIdToContext = new HashMap<>();;
-    private volatile int readOnlyConcurrency;
+    private final Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();
+    private final AtomicInteger readOnlyConcurrency = new AtomicInteger(0);
 
     private TransContextCache() { }
 
-    protected synchronized void addTransContext(TransContext context)
+    protected void addTransContext(TransContext context)
     {
         requireNonNull(context, "transaction context is null");
         this.transIdToContext.put(context.getTransId(), context);
         if (context.isReadOnly())
         {
-            this.readOnlyConcurrency++;
+            this.readOnlyConcurrency.getAndIncrement();
         }
     }
 
-    protected synchronized void setTransCommit(long transId)
+    protected void setTransCommit(long transId)
     {
         TransContext context = this.transIdToContext.remove(transId);
         if (context != null)
@@ -71,12 +73,12 @@ public class TransContextCache
             context.setStatus(TransProto.TransStatus.COMMIT);
             if (context.isReadOnly())
             {
-                this.readOnlyConcurrency--;
+                this.readOnlyConcurrency.getAndDecrement();
             }
         }
     }
 
-    protected synchronized void setTransRollback(long transId)
+    protected void setTransRollback(long transId)
     {
         TransContext context = this.transIdToContext.remove(transId);
         if (context != null)
@@ -84,12 +86,12 @@ public class TransContextCache
             context.setStatus(TransProto.TransStatus.ROLLBACK);
             if (context.isReadOnly())
             {
-                this.readOnlyConcurrency--;
+                this.readOnlyConcurrency.getAndDecrement();
             }
         }
     }
 
-    public synchronized boolean isTerminated(long transId)
+    public boolean isTerminated(long transId)
     {
         TransContext info =  this.transIdToContext.get(transId);
         return info == null || info.getStatus() == TransProto.TransStatus.COMMIT ||
@@ -99,8 +101,8 @@ public class TransContextCache
     /**
      * @return the number of concurrent queries at this moment.
      */
-    public synchronized int getQueryConcurrency()
+    public int getQueryConcurrency()
     {
-        return this.readOnlyConcurrency;
+        return this.readOnlyConcurrency.get();
     }
 }

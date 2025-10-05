@@ -32,7 +32,7 @@ public class TestPersistentAutoIncrement
     @Test
     public void test() throws EtcdException
     {
-        PersistentAutoIncrement pai = new PersistentAutoIncrement(Constants.AI_TRANS_TS_KEY);
+        PersistentAutoIncrement pai = new PersistentAutoIncrement(Constants.AI_TRANS_TS_KEY, true);
         for (int i = 0; i < 2048; ++i)
         {
             System.out.println(pai.getAndIncrement());

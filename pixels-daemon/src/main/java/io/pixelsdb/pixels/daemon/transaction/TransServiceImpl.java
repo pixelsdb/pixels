@@ -54,15 +54,15 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
      * transId and transTimestamp are monotonically increasing.
      * However, we do not ensure a transaction with larger transId must have a larger transTimestamp.
      */
-    public static final PersistentAutoIncrement transId;
-    public static final PersistentAutoIncrement transTimestamp;
+    private static final PersistentAutoIncrement transId;
+    private static final PersistentAutoIncrement transTimestamp;
     /**
      * Issue #174:
      * In this issue, we have not fully implemented the logic related to the watermarks.
      * So we use two atomic longs to simulate the watermarks.
      */
-    public static final AtomicLong lowWatermark;
-    public static final AtomicLong highWatermark;
+    private static final AtomicLong lowWatermark;
+    private static final AtomicLong highWatermark;
 
     private static final ScheduledExecutorService watermarksCheckpoint;
 
@@ -70,8 +70,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     {
         try
         {
-            transId = new PersistentAutoIncrement(Constants.AI_TRANS_ID_KEY);
-            transTimestamp = new PersistentAutoIncrement(Constants.AI_TRANS_TS_KEY);
+            transId = new PersistentAutoIncrement(Constants.AI_TRANS_ID_KEY, false);
+            transTimestamp = new PersistentAutoIncrement(Constants.AI_TRANS_TS_KEY, false);
             KeyValue lowWatermarkKv = EtcdUtil.Instance().getKeyValue(Constants.TRANS_LOW_WATERMARK_KEY);
             if (lowWatermarkKv == null)
             {
@@ -105,7 +105,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
     }
 
-    public TransServiceImpl () { }
+    public TransServiceImpl() { }
 
     @Override
     public void beginTrans(TransProto.BeginTransRequest request,
@@ -168,7 +168,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         {
             // must get transaction context before setTransCommit()
             boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
-            /**
+            /*
              * Issue #755:
              * push the watermarks before setTransCommit()
              * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
@@ -290,7 +290,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                     }
                 }
             }
-        } else
+        }
+        else
         {
             long value = highWatermark.get();
             if (timestamp > value)
@@ -392,7 +393,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             {
                 context.getProperties().setProperty(Constants.TRANS_CONTEXT_VM_COST_CENTS_KEY,
                         String.valueOf(request.getVmCostCents()));
-            } else if (request.hasCfCostCents())
+            }
+            else if (request.hasCfCostCents())
             {
                 context.getProperties().setProperty(Constants.TRANS_CONTEXT_CF_COST_CENTS_KEY,
                         String.valueOf(request.getCfCostCents()));

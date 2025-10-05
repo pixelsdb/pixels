@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexBuffer;
 import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
+import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
@@ -142,7 +143,8 @@ public class SqliteMainIndex implements MainIndex
                      * We use numRowIds * 10L as the step for etcd auto-increment generation, reducing the etcd-overhead
                      * to less than 10%.
                      */
-                    return new PersistentAutoIncrement("rowid-" + tblId, numRowIds * 10L); // key in etcd
+                    long step = Math.max(Constants.AI_DEFAULT_STEP, numRowIds * 10L);
+                    return new PersistentAutoIncrement(Constants.AI_ROW_ID_PREFIX + tblId, step, false);
                 }
                 catch (EtcdException e)
                 {
@@ -151,7 +153,8 @@ public class SqliteMainIndex implements MainIndex
                 }
             });
             // 2. allocate numRowIds
-            long start = autoIncrement.getAndIncrement(numRowIds);
+            // Issue #1099: auto increment starts from 1, whereas row id starts from 0, so we use auto increment minus 1 as the row id start.
+            long start = autoIncrement.getAndIncrement(numRowIds) - 1;
             return IndexProto.RowIdBatch.newBuilder().setRowIdStart(start).setLength(numRowIds).build();
         }
         catch (RuntimeException | EtcdException e)
