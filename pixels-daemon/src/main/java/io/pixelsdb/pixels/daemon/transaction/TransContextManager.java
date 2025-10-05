@@ -203,27 +203,19 @@ public class TransContextManager
 
     public long getMinRunningTransTimestamp(boolean readOnly)
     {
-        try
+        Iterator<TransContext> iterator;
+        if (readOnly)
         {
-            this.contextLock.writeLock().lock();
-            Iterator<TransContext> iterator;
-            if (readOnly)
-            {
-                iterator = this.runningReadOnlyTrans.iterator();
-            } else
-            {
-                iterator = this.runningWriteTrans.iterator();
-            }
-            if (iterator.hasNext())
-            {
-                return iterator.next().getTimestamp();
-            }
-            return 0;
-        }
-        finally
+            iterator = this.runningReadOnlyTrans.iterator();
+        } else
         {
-            this.contextLock.writeLock().unlock();
+            iterator = this.runningWriteTrans.iterator();
         }
+        if (iterator.hasNext())
+        {
+            return iterator.next().getTimestamp();
+        }
+        return 0;
     }
 
     public TransContext getTransContext(long transId)
