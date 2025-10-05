@@ -232,7 +232,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             {
                 allSuccess = false;
                 responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST);
-                logger.error("transaction id {} does not exist in the context manager", transId);
+                logger.error("haha, transaction id {} does not exist in the context manager", transId);
             }
             responseBuilder.addResults(commitSuccess);
         }

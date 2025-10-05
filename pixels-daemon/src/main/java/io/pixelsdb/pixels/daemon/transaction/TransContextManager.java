@@ -69,13 +69,7 @@ public class TransContextManager
 
     private final StampedLock contextLock = new StampedLock();
 
-    private TransContextManager()
-    {
-        for (long i = 0; i < 1000; ++i)
-        {
-            this.transIdToContext.put(i, new TransContext(i, i, false));
-        }
-    }
+    private TransContextManager() { }
 
     /**
      * Add a trans context when a new transaction begins.
