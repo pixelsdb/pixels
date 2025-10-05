@@ -128,8 +128,9 @@ public class TransService
     }
 
     /**
-     * @param readOnly true if the transaction is determined to be read only, false otherwise.
-     * @return the initialized context of the transaction, containing the allocated trans id and timestamp.
+     * Begin a transaction.
+     * @param readOnly true if the transaction is determined to be read only, false otherwise
+     * @return the initialized context of the transaction, containing the allocated trans id and timestamp
      * @throws TransException
      */
     public TransContext beginTrans(boolean readOnly) throws TransException
@@ -143,14 +144,19 @@ public class TransService
         }
         TransContext context = new TransContext(response.getTransId(), response.getTimestamp(), readOnly);
         TransContextCache.Instance().addTransContext(context);
-        MetadataCache.Instance().initCache(context.getTransId());
+        if (readOnly)
+        {
+            // Issue #1099: only use metadata cache for read only queries.
+            MetadataCache.Instance().initCache(context.getTransId());
+        }
         return context;
     }
 
     /**
+     * Begin a batch of transactions.
      * @param numTrans the number of transaction to begin as a batch
-     * @param readOnly true if the transaction is determined to be read only, false otherwise.
-     * @return the initialized contexts of the transactions in the batch.
+     * @param readOnly true if the transaction is determined to be read only, false otherwise
+     * @return the initialized contexts of the transactions in the batch
      * @throws TransException
      */
     public List<TransContext> beginTransBatch(int numTrans, boolean readOnly) throws TransException
@@ -169,13 +175,24 @@ public class TransService
             long timestamp = response.getTimestamps(i);
             TransContext context = new TransContext(transId, timestamp, readOnly);
             TransContextCache.Instance().addTransContext(context);
-            MetadataCache.Instance().initCache(context.getTransId());
+            if (readOnly)
+            {
+                // Issue #1099: only use metadata cache for read only queries.
+                MetadataCache.Instance().initCache(context.getTransId());
+            }
             contexts.add(context);
         }
         return contexts.build();
     }
 
-    public boolean commitTrans(long transId) throws TransException
+    /**
+     * Commit a transaction.
+     * @param transId the transaction id
+     * @param readOnly true if the transaction is readonly
+     * @return true on success
+     * @throws TransException
+     */
+    public boolean commitTrans(long transId , boolean readOnly) throws TransException
     {
         TransProto.CommitTransRequest request = TransProto.CommitTransRequest.newBuilder()
                 .setTransId(transId).build();
@@ -185,7 +202,11 @@ public class TransService
             throw new TransException("failed to commit transaction, error code=" + response.getErrorCode());
         }
         TransContextCache.Instance().setTransCommit(transId);
-        MetadataCache.Instance().dropCache(transId);
+        if (readOnly)
+        {
+            // Issue #1099: only use metadata cache for read only queries.
+            MetadataCache.Instance().dropCache(transId);
+        }
         return true;
     }
 
@@ -194,10 +215,11 @@ public class TransService
      * If execution fails, specific error logs can be obtained from the transService logs,
      * such as the transaction does not exist or the commit fails.
      * @param transIds transaction ids of the transactions to commit
-     * @return Whether each transaction was successfully committed
+     * @param readOnly true if the transactions are readonly
+     * @return whether each transaction was successfully committed
      * @throws TransException
      */
-    public List<Boolean> commitTransBatch(List<Long> transIds) throws TransException
+    public List<Boolean> commitTransBatch(List<Long> transIds, boolean readOnly) throws TransException
     {
         if (transIds == null || transIds.isEmpty())
         {
@@ -213,12 +235,23 @@ public class TransService
         for (long transId : transIds)
         {
             TransContextCache.Instance().setTransCommit(transId);
-            MetadataCache.Instance().dropCache(transId);
+            if (readOnly)
+            {
+                // Issue #1099: only use metadata cache for read only queries.
+                MetadataCache.Instance().dropCache(transId);
+            }
         }
         return response.getResultsList();
     }
 
-    public boolean rollbackTrans(long transId) throws TransException
+    /**
+     * Rollback a transaction.
+     * @param transId the transaction id
+     * @param readOnly true if the transaction is readonly
+     * @return true on success
+     * @throws TransException
+     */
+    public boolean rollbackTrans(long transId, boolean readOnly) throws TransException
     {
         TransProto.RollbackTransRequest request = TransProto.RollbackTransRequest.newBuilder()
                 .setTransId(transId).build();
@@ -228,7 +261,11 @@ public class TransService
             throw new TransException("failed to rollback transaction, error code=" + response.getErrorCode());
         }
         TransContextCache.Instance().setTransRollback(transId);
-        MetadataCache.Instance().dropCache(transId);
+        if (readOnly)
+        {
+            // Issue #1099: only use metadata cache for read only queries.
+            MetadataCache.Instance().dropCache(transId);
+        }
         return true;
     }
 

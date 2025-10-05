@@ -111,7 +111,7 @@ public class LoadExecutor implements CommandExecutor
             System.err.println(command + " failed");
         }
 
-        transService.commitTrans(context.getTransId());
+        transService.commitTrans(context.getTransId(), false);
 
         long endTime = System.currentTimeMillis();
         System.out.println("Text files in '" + origin + "' are loaded by " + threadNum +
