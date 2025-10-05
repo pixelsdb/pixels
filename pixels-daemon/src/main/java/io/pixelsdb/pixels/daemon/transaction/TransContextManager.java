@@ -159,7 +159,7 @@ public class TransContextManager
             this.contextLock.writeLock().lock();
             //dump metrics to file
             ConfigFactory config = ConfigFactory.Instance();
-            String path = config.getProperty("pixels.historyData.dir") + timestamp + ".csv";
+            String path = config.getProperty("pixels.history.data.dir") + timestamp + ".csv";
             File file = new File(path);
             boolean newFile = !file.exists();
             try (BufferedWriter bw = new BufferedWriter(new FileWriter(path, true)))
@@ -169,9 +169,8 @@ public class TransContextManager
                     bw.write("createdTime,memoryUsed,cpuTimeTotal,endTime");
                     bw.newLine();
                 }
-                for (Long transId : transIdToContext.keySet())
+                for (TransContext context : this.transIdToContext.values())
                 {
-                    TransContext context = getTransContext(transId);
                     if (context.getStatus() == TransProto.TransStatus.COMMIT)
                     {
                         Properties properties = context.getProperties();

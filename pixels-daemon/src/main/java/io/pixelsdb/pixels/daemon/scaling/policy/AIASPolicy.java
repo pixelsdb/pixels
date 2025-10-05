@@ -73,8 +73,8 @@ public class AIASPolicy extends Policy
             // forecast according to history data
             String[] cmd = {config.getProperty("python.env.path"),
                             config.getProperty("forecast.code.path"),
-                            config.getProperty("pixels.historyData.dir")+ timestamp + ".csv",
-                            config.getProperty("pixels.historyData.dir")+ (timestamp-1) + ".csv",
+                            config.getProperty("pixels.history.data.dir")+ timestamp + ".csv",
+                            config.getProperty("pixels.history.data.dir")+ (timestamp-1) + ".csv",
                             config.getProperty("cpuspl"),
                             config.getProperty("memspl")
                             };
