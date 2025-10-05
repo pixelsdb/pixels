@@ -143,7 +143,8 @@ public class SqliteMainIndex implements MainIndex
                      * We use numRowIds * 10L as the step for etcd auto-increment generation, reducing the etcd-overhead
                      * to less than 10%.
                      */
-                    return new PersistentAutoIncrement(Constants.AI_ROW_ID_PREFIX + tblId, numRowIds * 10L, false);
+                    long step = Math.max(Constants.AI_DEFAULT_STEP, numRowIds * 10L);
+                    return new PersistentAutoIncrement(Constants.AI_ROW_ID_PREFIX + tblId, step, false);
                 }
                 catch (EtcdException e)
                 {

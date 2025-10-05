@@ -37,7 +37,7 @@ public class PersistentAutoIncrement
 {
     private final String idKey;
     private final Lock lock = new ReentrantLock();
-    private final long etcdAIStep;
+    private final long defaultStep;
     private final boolean interProc;
     private volatile long id;
     private volatile long count;
@@ -51,29 +51,29 @@ public class PersistentAutoIncrement
     public PersistentAutoIncrement(String idKey, boolean interProc) throws EtcdException
     {
         this.idKey = idKey;
-        this.etcdAIStep = Constants.AI_DEFAULT_STEP;
+        this.defaultStep = Constants.AI_DEFAULT_STEP;
         this.interProc = interProc;
         EtcdAutoIncrement.InitId(idKey, interProc);
-        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep, interProc);
+        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.defaultStep, interProc);
         this.id = segment.getStart();
         this.count = segment.getLength();
     }
 
     /**
      * @param idKey the key of this auto increment id in etcd
-     * @param etcdStep the step for allocating row ids in etcd, determining the frequency of updating the
-     *                 backed key-value of this auto increment id in etcd
+     * @param defaultStep the default step for allocating row ids from etcd, determining the frequency of updating the
+     *                    backed key-value of this auto increment id in etcd
      * @param interProc true if the backed key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
      * @throws EtcdException when fail to interact with the backed etcd instance
      */
-    public PersistentAutoIncrement(String idKey, long etcdStep, boolean interProc) throws EtcdException
+    public PersistentAutoIncrement(String idKey, long defaultStep, boolean interProc) throws EtcdException
     {
         this.idKey = idKey;
-        this.etcdAIStep = etcdStep;
+        this.defaultStep = defaultStep;
         this.interProc = interProc;
         EtcdAutoIncrement.InitId(idKey, interProc);
-        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.etcdAIStep, interProc);
+        EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.defaultStep, interProc);
         this.id = segment.getStart();
         this.count = segment.getLength();
     }
@@ -96,7 +96,7 @@ public class PersistentAutoIncrement
             }
             else
             {
-                EtcdAutoIncrement.GenerateId(this.idKey, this.etcdAIStep, this.interProc, segment -> {
+                EtcdAutoIncrement.GenerateId(this.idKey, this.defaultStep, this.interProc, segment -> {
                     this.id = segment.getStart();
                     this.count = segment.getLength();
                 });
@@ -133,12 +133,9 @@ public class PersistentAutoIncrement
             }
             else
             {
-                long step = this.etcdAIStep;
-                if (batchSize > step)
-                {
-                    // Issue #986: avoid infinite recursion by ensuring step >= batchSize.
-                    step = batchSize;
-                }
+                // Issue #986: avoid infinite recursion by ensuring step >= batchSize.
+                // Issue #1099: ensure better performance by setting the step to >= batchSize * 10L.
+                long step = Math.max(this.defaultStep, batchSize * 10L);
                 EtcdAutoIncrement.GenerateId(this.idKey, step, this.interProc, segment -> {
                     this.id = segment.getStart();
                     this.count = segment.getLength();
