@@ -57,6 +57,7 @@ public class PersistentAutoIncrement
         EtcdAutoIncrement.InitId(idKey, interProc);
         EtcdAutoIncrement.Segment segment = EtcdAutoIncrement.GenerateId(idKey, this.defaultStep, interProc);
         this.id = segment.getStart();
+        System.out.println(idKey + " starts from " + segment.getStart() + ", length " + segment.getLength());
         this.count = segment.getLength();
     }
 
