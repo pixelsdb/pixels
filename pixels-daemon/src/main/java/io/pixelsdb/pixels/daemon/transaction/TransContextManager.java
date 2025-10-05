@@ -31,6 +31,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static java.util.Objects.requireNonNull;
 
@@ -65,43 +67,68 @@ public class TransContextManager
     private final Map<Long, String> transIdToTraceId = new ConcurrentHashMap<>();
     private final AtomicInteger readOnlyConcurrency = new AtomicInteger(0);
 
+    private final ReadWriteLock contextLock = new ReentrantReadWriteLock();
+
     private TransContextManager() { }
 
-    public synchronized void addTransContext(TransContext context)
+    public void addTransContext(TransContext context)
     {
         requireNonNull(context, "transaction context is null");
-        this.transIdToContext.put(context.getTransId(), context);
-        if (context.isReadOnly())
+        try
         {
-            this.readOnlyConcurrency.incrementAndGet();
-            this.runningReadOnlyTrans.add(context);
+            this.contextLock.readLock().lock();
+            this.transIdToContext.put(context.getTransId(), context);
+            if (context.isReadOnly())
+            {
+                this.readOnlyConcurrency.incrementAndGet();
+                this.runningReadOnlyTrans.add(context);
+            } else
+            {
+                this.runningWriteTrans.add(context);
+            }
         }
-        else
+        finally
         {
-            this.runningWriteTrans.add(context);
+            this.contextLock.readLock().unlock();
         }
     }
 
-    public synchronized boolean setTransCommit(long transId)
+    public boolean setTransCommit(long transId)
     {
-        TransContext context = this.transIdToContext.get(transId);
-        if (context != null)
+        try
         {
-            context.setStatus(TransProto.TransStatus.COMMIT);
-            return terminateTrans(context);
+            this.contextLock.readLock().lock();
+            TransContext context = this.transIdToContext.get(transId);
+            if (context != null)
+            {
+                context.setStatus(TransProto.TransStatus.COMMIT);
+                return terminateTrans(context);
+            }
+            return false;
         }
-        return false;
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
     }
 
-    public synchronized boolean setTransRollback(long transId)
+    public boolean setTransRollback(long transId)
     {
-        TransContext context = this.transIdToContext.get(transId);
-        if (context != null)
+        try
         {
-            context.setStatus(TransProto.TransStatus.ROLLBACK);
-            return terminateTrans(context);
+            this.contextLock.readLock().lock();
+            TransContext context = this.transIdToContext.get(transId);
+            if (context != null)
+            {
+                context.setStatus(TransProto.TransStatus.ROLLBACK);
+                return terminateTrans(context);
+            }
+            return false;
         }
-        return false;
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
     }
 
     private boolean terminateTrans(TransContext context)
@@ -125,76 +152,91 @@ public class TransContextManager
         return true;
     }
 
-    public synchronized boolean dumpTransContext(long timestamp)
+    public boolean dumpTransContext(long timestamp)
     {
-        //dump metrics to file
-        ConfigFactory config = ConfigFactory.Instance();
-        String path = config.getProperty("pixels.historyData.dir") + timestamp + ".csv";
-        File file = new File(path);
-        boolean newFile = !file.exists();
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(path, true)))
+        try
         {
-            if(newFile)
+            this.contextLock.writeLock().lock();
+            //dump metrics to file
+            ConfigFactory config = ConfigFactory.Instance();
+            String path = config.getProperty("pixels.historyData.dir") + timestamp + ".csv";
+            File file = new File(path);
+            boolean newFile = !file.exists();
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(path, true)))
             {
-                bw.write("createdTime,memoryUsed,cpuTimeTotal,endTime");
-                bw.newLine();
-            }
-            for (Long transId : transIdToContext.keySet())
-            {
-                TransContext context = getTransContext(transId);
-                if (context.getStatus() == TransProto.TransStatus.COMMIT)
+                if (newFile)
                 {
-                    Properties properties = context.getProperties();
-                    for (Map.Entry<Object, Object> entry : properties.entrySet())
+                    bw.write("createdTime,memoryUsed,cpuTimeTotal,endTime");
+                    bw.newLine();
+                }
+                for (Long transId : transIdToContext.keySet())
+                {
+                    TransContext context = getTransContext(transId);
+                    if (context.getStatus() == TransProto.TransStatus.COMMIT)
                     {
-                        String e = (String) entry.getKey();
-                        if (Objects.equals(e, "queryinfo"))
+                        Properties properties = context.getProperties();
+                        for (Map.Entry<Object, Object> entry : properties.entrySet())
                         {
-                            String v = (String) entry.getValue();
-                            bw.write(v);
-                            bw.newLine();
+                            String e = (String) entry.getKey();
+                            if (Objects.equals(e, "queryinfo"))
+                            {
+                                String v = (String) entry.getValue();
+                                bw.write(v);
+                                bw.newLine();
+                            }
                         }
                     }
                 }
+                transIdToContext.entrySet().removeIf(entry ->
+                        entry.getValue().getStatus() == TransProto.TransStatus.COMMIT);
+            } catch (IOException e)
+            {
+                System.err.println("An error occurred: " + e.getMessage());
             }
-            transIdToContext.entrySet().removeIf(entry -> entry.getValue().getStatus()==TransProto.TransStatus.COMMIT);
+            return true;
         }
-        catch(IOException e)
+        finally
         {
-            System.err.println("An error occurred: " + e.getMessage());
+            this.contextLock.writeLock().unlock();
         }
-        return true;
     }
 
-    public synchronized TransContext getTransContext(long transId)
+    public long getMinRunningTransTimestamp(boolean readOnly)
+    {
+        try
+        {
+            this.contextLock.writeLock().lock();
+            Iterator<TransContext> iterator;
+            if (readOnly)
+            {
+                iterator = this.runningReadOnlyTrans.iterator();
+            } else
+            {
+                iterator = this.runningWriteTrans.iterator();
+            }
+            if (iterator.hasNext())
+            {
+                return iterator.next().getTimestamp();
+            }
+            return 0;
+        }
+        finally
+        {
+            this.contextLock.writeLock().unlock();
+        }
+    }
+
+    public TransContext getTransContext(long transId)
     {
         return this.transIdToContext.get(transId);
     }
 
-    public synchronized long getMinRunningTransTimestamp(boolean readOnly)
-    {
-        Iterator<TransContext> iterator;
-        if (readOnly)
-        {
-            iterator = this.runningReadOnlyTrans.iterator();
-        }
-        else
-        {
-            iterator = this.runningWriteTrans.iterator();
-        }
-        if (iterator.hasNext())
-        {
-            return iterator.next().getTimestamp();
-        }
-        return 0;
-    }
-
-    public synchronized boolean isTransExist(long transId)
+    public boolean isTransExist(long transId)
     {
         return this.transIdToContext.containsKey(transId);
     }
 
-    public synchronized TransContext getTransContext(String externalTraceId)
+    public TransContext getTransContext(String externalTraceId)
     {
         Long transId = this.traceIdToTransId.get(externalTraceId);
         if (transId != null)
@@ -204,15 +246,23 @@ public class TransContextManager
         return null;
     }
 
-    public synchronized boolean bindExternalTraceId(long transId, String externalTraceId)
+    public boolean bindExternalTraceId(long transId, String externalTraceId)
     {
-        if (this.transIdToContext.containsKey(transId))
+        try
         {
-            this.transIdToTraceId.put(transId, externalTraceId);
-            this.traceIdToTransId.put(externalTraceId, transId);
-            return true;
+            this.contextLock.writeLock().lock();
+            if (this.transIdToContext.containsKey(transId))
+            {
+                this.transIdToTraceId.put(transId, externalTraceId);
+                this.traceIdToTransId.put(externalTraceId, transId);
+                return true;
+            }
+            return false;
         }
-        return false;
+        finally
+        {
+            this.contextLock.writeLock().unlock();
+        }
     }
 
     /**
@@ -220,12 +270,20 @@ public class TransContextManager
      *                 false to get the concurrency of write transactions.
      * @return the concurrency of the type of transactions.
      */
-    public synchronized int getQueryConcurrency(boolean readOnly)
+    public int getQueryConcurrency(boolean readOnly)
     {
         if (readOnly)
         {
             return this.readOnlyConcurrency.get();
         }
-        return this.transIdToContext.size() - this.readOnlyConcurrency.get();
+        try
+        {
+            this.contextLock.writeLock().lock();
+            return this.transIdToContext.size() - this.readOnlyConcurrency.get();
+        }
+        finally
+        {
+            this.contextLock.writeLock().unlock();
+        }
     }
 }
