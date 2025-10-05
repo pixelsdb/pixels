@@ -25,4 +25,3 @@
  */
 #include "physical/BufferPool/BufferPoolEntry.h"
 #include "physical/BufferPool/Bitmap.h"
-

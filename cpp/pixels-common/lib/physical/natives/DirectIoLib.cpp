@@ -24,9 +24,9 @@
  */
 #include "physical/natives/DirectIoLib.h"
 #include <sys/mman.h>  // mmap, munmap, madvise
-#include <new>         // 对于std::bad_alloc
-#include <cstring>     // 对于strerror
-#include <errno.h>     // 对于errno
+#include <new>
+#include <cstring>
+#include <errno.h>
 
 
 DirectIoLib::DirectIoLib(int fsBlockSize)

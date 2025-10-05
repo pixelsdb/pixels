@@ -27,9 +27,11 @@
 
 /**
  * Mapping Linux I/O functions to native methods.
- * Partially referenced the implementation of Jaydio
- * (https://github.com/smacke/jaydio), which is implemented by Stephen Macke and
- * licensed under Apache 2.0. <p> Created at: 02/02/2023 Author: Liangyong Yu
+ * Partially referenced the implementation of Jaydio(https://github.com/smacke/jaydio),
+ * which is implemented by Stephen Macke and
+ * licensed under Apache 2.0. <p>
+ * Created at: 02/02/2023
+ * Author: Liangyong Yu
  */
 
 #include "liburing.h"
@@ -46,36 +48,41 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-struct uringData {
-  int idx;
-  ByteBuffer *bb;
+struct uringData
+{
+    int idx;
+    ByteBuffer* bb;
 };
 
-class DirectIoLib {
+class DirectIoLib
+{
 public:
-  /**
-   * the start address/size of direct buffer is the multiple of block Size
-   */
-  DirectIoLib(int fsBlockSize);
+    /**
+     * the start address/size of direct buffer is the multiple of block Size
+     */
+    DirectIoLib(int fsBlockSize);
 
-  std::shared_ptr<ByteBuffer> allocateDirectBuffer(long size,
-                                                   bool isSmallBuffer);
+    std::shared_ptr<ByteBuffer> allocateDirectBuffer(long size,
+                                                     bool isSmallBuffer);
 
-  int getToAllocate(int size);
+    int getToAllocate(int size);
 
-  std::shared_ptr<ByteBuffer> read(int fd, long fileOffset,
-                                   std::shared_ptr<ByteBuffer> directBuffer,
-                                   long length);
+    std::shared_ptr<ByteBuffer> read(int fd, long fileOffset,
+                                     std::shared_ptr<ByteBuffer> directBuffer,
+                                     long length);
 
-  long blockStart(long value);
+    long blockStart(long value);
 
-  long blockEnd(long value);
+    long blockEnd(long value);
 
-  int getBlockSize() const { return fsBlockSize; };
+    int getBlockSize() const
+    {
+        return fsBlockSize;
+    };
 
 private:
-  int fsBlockSize;
-  long fsBlockNotMask;
+    int fsBlockSize;
+    long fsBlockNotMask;
 };
 
 #endif // DUCKDB_DIRECTIOLIB_H
