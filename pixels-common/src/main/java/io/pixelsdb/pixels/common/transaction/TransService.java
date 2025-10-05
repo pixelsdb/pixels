@@ -38,9 +38,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * @author hank
  * @create 2022-02-20
  * @update 2023-05-02 merge transaction context management into trans service.
- * @author hank
+ * @update 2025-10-05 eliminate transaction context cache and metadata cache for non-readonly transactions.
  */
 public class TransService
 {
@@ -77,7 +78,7 @@ public class TransService
      * Get the default trans service instance connecting to the trans host:port configured in
      * PIXELS_HOME/etc/pixels.properties. This default instance will be automatically shut down when the process
      * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
-     * @return
+     * @return the default trans service instance
      */
     public static TransService Instance()
     {

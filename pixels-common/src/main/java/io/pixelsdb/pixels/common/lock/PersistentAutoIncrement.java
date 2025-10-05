@@ -32,7 +32,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * @author hank
  * @create 2024-09-27
- * @update 2025-10-05 add {@link #interProc} to eliminate etcd locks for auto-increment ids operated by a single process
+ * @update 2025-10-05 add {@link #interProc} to eliminate etcd locks for auto-increment ids operated by a single process.
  */
 public class PersistentAutoIncrement
 {
