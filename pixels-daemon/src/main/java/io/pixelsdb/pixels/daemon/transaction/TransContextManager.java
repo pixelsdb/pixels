@@ -180,7 +180,7 @@ public class TransContextManager
         else
         {
             // only clear the context of write transactions
-            this.transIdToContext.remove(context.getTransId());
+            //this.transIdToContext.remove(context.getTransId());
             this.runningWriteTrans.remove(context);
             String traceId = this.transIdToTraceId.remove(context.getTransId());
             if (traceId != null)
