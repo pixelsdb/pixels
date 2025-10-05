@@ -87,7 +87,7 @@ public class MemoryMappedFile
         }
         catch (Throwable e)
         {
-            throw new IOException("failed to the backed file to virtual memory", e);
+            throw new IOException("failed to the backing file to virtual memory", e);
         }
     }
 
@@ -164,7 +164,7 @@ public class MemoryMappedFile
         }
         catch (Throwable e)
         {
-            throw new IOException("failed to unmap the backed file from virtual memory", e);
+            throw new IOException("failed to unmap the backing file from virtual memory", e);
         }
     }
 

@@ -252,8 +252,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
     }
 
     /**
-     * Get the scheme of the backed physical storage.
-     *
+     * Get the scheme of the backing physical storage.
      * @return
      */
     @Override

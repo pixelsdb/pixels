@@ -28,6 +28,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Objects.requireNonNull;
@@ -51,16 +53,16 @@ public class TransContextManager
         return instance;
     }
 
-    private final Map<Long, TransContext> transIdToContext = new HashMap<>();
+    private final Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();
     /**
-     * Two different transactions will not have the same transaction id, so we can store the running transactions
-     * using a tree set and sort the transaction contexts by transaction timestamp and id.
+     * Two different transactions will not have the same transaction id, so we can store the running transactions using
+     * a sorted set that sorts the transaction contexts by transaction timestamp and id. This is important for watermark pushing
      */
-    private final Set<TransContext> runningReadOnlyTrans = new TreeSet<>();
-    private final Set<TransContext> runningWriteTrans = new TreeSet<>();
+    private final Set<TransContext> runningReadOnlyTrans = new ConcurrentSkipListSet<>();
+    private final Set<TransContext> runningWriteTrans = new ConcurrentSkipListSet<>();
 
-    private final Map<String, Long> traceIdToTransId = new HashMap<>();
-    private final Map<Long, String> transIdToTraceId = new HashMap<>();
+    private final Map<String, Long> traceIdToTransId = new ConcurrentHashMap<>();
+    private final Map<Long, String> transIdToTraceId = new ConcurrentHashMap<>();
     private final AtomicInteger readOnlyConcurrency = new AtomicInteger(0);
 
     private TransContextManager() { }

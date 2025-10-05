@@ -44,9 +44,9 @@ public class PersistentAutoIncrement
 
     /**
      * @param idKey the key of this auto increment id in etcd
-     * @param interProc true if the backed key-value of this increment id in etcd
+     * @param interProc true if the backing key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
-     * @throws EtcdException when fail to interact with the backed etcd instance
+     * @throws EtcdException when fail to interact with the backing etcd instance
      */
     public PersistentAutoIncrement(String idKey, boolean interProc) throws EtcdException
     {
@@ -62,10 +62,10 @@ public class PersistentAutoIncrement
     /**
      * @param idKey the key of this auto increment id in etcd
      * @param defaultStep the default step for allocating row ids from etcd, determining the frequency of updating the
-     *                    backed key-value of this auto increment id in etcd
-     * @param interProc true if the backed key-value of this increment id in etcd
+     *                    backing key-value of this auto increment id in etcd
+     * @param interProc true if the backing key-value of this increment id in etcd
      *                  may be simultaneously accessed by multiple processes
-     * @throws EtcdException when fail to interact with the backed etcd instance
+     * @throws EtcdException when fail to interact with the backing etcd instance
      */
     public PersistentAutoIncrement(String idKey, long defaultStep, boolean interProc) throws EtcdException
     {
@@ -81,7 +81,7 @@ public class PersistentAutoIncrement
     /**
      * Get the current value of this auto increment and increase it by one.
      * @return the current value of this auto increment.
-     * @throws EtcdException when fail to interact with the backed etcd instance.
+     * @throws EtcdException when fail to interact with the backing etcd instance.
      */
     public long getAndIncrement() throws EtcdException
     {
@@ -117,7 +117,7 @@ public class PersistentAutoIncrement
      * the batchSize here. Thus, the etcd overhead would not be significant.</b>
      * @param batchSize the given batch size
      * @return the current value of this auto increment.
-     * @throws EtcdException when fail to interact with the backed etcd instance.
+     * @throws EtcdException when fail to interact with the backing etcd instance.
      */
     public long getAndIncrement(int batchSize) throws EtcdException
     {

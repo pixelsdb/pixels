@@ -24,7 +24,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 /**
- * This input stream does not modify the current position in the backed byte buffer.
+ * This input stream does not modify the current position in the backing byte buffer.
  * This class is not thread safe.
  * Created at: 20-1-1
  * Author: hank
@@ -38,8 +38,8 @@ public class ByteBufferInputStream extends InputStream
 
     /**
      * Create an input stream backed by the byteBuffer.
-     * position in the backed byte buffer will not be modified.
-     * @param byteBuffer the backed byte buffer.
+     * position in the backing byte buffer will not be modified.
+     * @param byteBuffer the backing byte buffer.
      * @param position start offset in the byteBuffer.
      * @param limit end offset in the byteBuffer.
      */
