@@ -143,10 +143,10 @@ public class TransService
             throw new TransException("failed to begin transaction, error code=" + response.getErrorCode());
         }
         TransContext context = new TransContext(response.getTransId(), response.getTimestamp(), readOnly);
-        TransContextCache.Instance().addTransContext(context);
         if (readOnly)
         {
-            // Issue #1099: only use metadata cache for read only queries.
+            // Issue #1099: only use trans context cache and metadata cache for read only queries.
+            TransContextCache.Instance().addTransContext(context);
             MetadataCache.Instance().initCache(context.getTransId());
         }
         return context;
@@ -174,10 +174,11 @@ public class TransService
             long transId = response.getTransIds(i);
             long timestamp = response.getTimestamps(i);
             TransContext context = new TransContext(transId, timestamp, readOnly);
-            TransContextCache.Instance().addTransContext(context);
+
             if (readOnly)
             {
-                // Issue #1099: only use metadata cache for read only queries.
+                // Issue #1099: only use trans context cache and metadata cache for read only queries.
+                TransContextCache.Instance().addTransContext(context);
                 MetadataCache.Instance().initCache(context.getTransId());
             }
             contexts.add(context);
@@ -201,10 +202,10 @@ public class TransService
         {
             throw new TransException("failed to commit transaction, error code=" + response.getErrorCode());
         }
-        TransContextCache.Instance().setTransCommit(transId);
         if (readOnly)
         {
-            // Issue #1099: only use metadata cache for read only queries.
+            // Issue #1099: only use trans context cache and metadata cache for read only queries.
+            TransContextCache.Instance().setTransCommit(transId);
             MetadataCache.Instance().dropCache(transId);
         }
         return true;
@@ -232,12 +233,12 @@ public class TransService
         {
             throw new TransException("transaction ids and timestamps size mismatch");
         }
-        for (long transId : transIds)
+        if (readOnly)
         {
-            TransContextCache.Instance().setTransCommit(transId);
-            if (readOnly)
+            // Issue #1099: only use trans context cache and metadata cache for read only queries.
+            for (long transId : transIds)
             {
-                // Issue #1099: only use metadata cache for read only queries.
+                TransContextCache.Instance().setTransCommit(transId);
                 MetadataCache.Instance().dropCache(transId);
             }
         }
@@ -260,10 +261,10 @@ public class TransService
         {
             throw new TransException("failed to rollback transaction, error code=" + response.getErrorCode());
         }
-        TransContextCache.Instance().setTransRollback(transId);
         if (readOnly)
         {
-            // Issue #1099: only use metadata cache for read only queries.
+            // Issue #1099: only use trans context cache and metadata cache for read only queries.
+            TransContextCache.Instance().setTransRollback(transId);
             MetadataCache.Instance().dropCache(transId);
         }
         return true;
