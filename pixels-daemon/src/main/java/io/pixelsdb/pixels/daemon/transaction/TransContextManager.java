@@ -40,7 +40,7 @@ import static java.util.Objects.requireNonNull;
  *
  * @author hank
  * @create 2023-05-02
- * @update 2025-10-05 replace synchronized methods with read-write lock to improve performance
+ * @update 2025-10-05 replace synchronized methods with stamped (optimistic) read-write lock to improve performance
  */
 public class TransContextManager
 {
