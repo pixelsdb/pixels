@@ -34,10 +34,11 @@ import java.util.List;
  */
 public class RdbSchemaDao extends SchemaDao
 {
+    private static final Logger log = LogManager.getLogger(RdbSchemaDao.class);
+
     public RdbSchemaDao() {}
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
-    private static final Logger log = LogManager.getLogger(RdbSchemaDao.class);
 
     @Override
     public MetadataProto.Schema getById(long id)

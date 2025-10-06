@@ -34,10 +34,11 @@ import java.util.List;
  */
 public class RdbViewDao extends ViewDao
 {
+    private static final Logger log = LogManager.getLogger(RdbViewDao.class);
+
     public RdbViewDao() {}
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
-    private static final Logger log = LogManager.getLogger(RdbViewDao.class);
 
     @Override
     public MetadataProto.View getById(long id)
