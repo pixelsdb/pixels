@@ -48,18 +48,14 @@ public class TransContextManager
 {
     private static final Logger log = LogManager.getLogger(TransContextManager.class);
 
-    private static TransContextManager instance;
+    private static final TransContextManager instance = new TransContextManager();
 
     protected static TransContextManager Instance()
     {
-        if (instance == null)
-        {
-            instance = new TransContextManager();
-        }
         return instance;
     }
 
-    private volatile Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();
+    private final Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();
     /**
      * Two different transactions will not have the same transaction id, so we can store the running transactions using
      * a sorted set that sorts the transaction contexts by transaction timestamp and id. This is important for watermark pushing
