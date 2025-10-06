@@ -27,11 +27,14 @@ import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
  */
 public class CloudWatch
 {
-    private static final CloudWatch instance = new CloudWatch();
+    private static final class InstanceHolder
+    {
+        private static final CloudWatch instance = new CloudWatch();
+    }
 
     public static CloudWatch Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final CloudWatchClient client;

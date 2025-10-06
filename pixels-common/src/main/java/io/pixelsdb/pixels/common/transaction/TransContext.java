@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.transaction;
 import io.pixelsdb.pixels.daemon.TransProto;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -108,6 +109,23 @@ public class TransContext implements Comparable<TransContext>
             builder.putProperties((String) entry.getKey(), (String) entry.getValue());
         }
         return builder.build();
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(transId);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof TransContext)
+        {
+            TransContext that = (TransContext) obj;
+            return this.transId == that.transId;
+        }
+        return false;
     }
 
     @Override

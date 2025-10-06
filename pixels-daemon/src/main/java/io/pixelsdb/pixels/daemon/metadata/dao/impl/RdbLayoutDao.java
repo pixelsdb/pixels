@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
-import io.pixelsdb.pixels.daemon.metadata.dao.DaoFactory;
 import io.pixelsdb.pixels.daemon.metadata.dao.LayoutDao;
 import io.pixelsdb.pixels.daemon.metadata.dao.PathDao;
 import org.apache.logging.log4j.LogManager;
@@ -38,13 +37,14 @@ import static io.pixelsdb.pixels.common.metadata.domain.Permission.convertPermis
  */
 public class RdbLayoutDao extends LayoutDao
 {
-    public RdbLayoutDao() {}
-
     private static final Logger log = LogManager.getLogger(RdbLayoutDao.class);
+
+    public RdbLayoutDao() {}
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
 
-    private static final PathDao pathDao = DaoFactory.Instance().getPathDao();
+    // Issue #1105: do not get pathDao from DaoFactory, otherwise it leads to recursive initialization of DaoFactory.
+    private static final PathDao pathDao = new RdbPathDao();
 
     @Override
     public MetadataProto.Layout getById(long id)

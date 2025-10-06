@@ -30,15 +30,14 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
  */
 public class SchedulerFactory
 {
-    private static SchedulerFactory instance;
+    private static final class InstanceHolder
+    {
+        private static final SchedulerFactory instance = new SchedulerFactory();
+    }
 
     public static SchedulerFactory Instance()
     {
-        if (instance == null)
-        {
-            instance = new SchedulerFactory();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final Scheduler scheduler;

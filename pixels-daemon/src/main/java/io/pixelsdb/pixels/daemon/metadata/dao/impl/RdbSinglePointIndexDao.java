@@ -35,9 +35,9 @@ import java.util.List;
  */
 public class RdbSinglePointIndexDao extends SinglePointIndexDao
 {
-    public RdbSinglePointIndexDao() { }
-
     private static final Logger log = LogManager.getLogger(RdbSinglePointIndexDao.class);
+
+    public RdbSinglePointIndexDao() { }
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
 

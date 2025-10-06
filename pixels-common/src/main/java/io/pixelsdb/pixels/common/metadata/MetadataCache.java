@@ -35,11 +35,14 @@ import static java.util.Objects.requireNonNull;
  */
 public class MetadataCache
 {
-    private static final MetadataCache instance = new MetadataCache();
+    private static final class InstanceHolder
+    {
+        private static final MetadataCache instance = new MetadataCache();
+    }
 
     public static MetadataCache Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private class TransMetadata

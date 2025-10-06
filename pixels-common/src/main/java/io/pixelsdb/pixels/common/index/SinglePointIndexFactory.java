@@ -82,25 +82,31 @@ public class SinglePointIndexFactory
         this.singlePointIndexProviders = providersBuilder.build();
     }
 
-    private static SinglePointIndexFactory instance = null;
+    private static volatile SinglePointIndexFactory instance = null;
 
     public static SinglePointIndexFactory Instance()
     {
         if (instance == null)
         {
-            instance = new SinglePointIndexFactory();
-            Runtime.getRuntime().addShutdownHook(new Thread(()->
+            synchronized (SinglePointIndexFactory.class)
             {
-                try
+                if (instance == null)
                 {
-                    instance.closeAll();
+                    instance = new SinglePointIndexFactory();
+                    Runtime.getRuntime().addShutdownHook(new Thread(()->
+                    {
+                        try
+                        {
+                            instance.closeAll();
+                        }
+                        catch (SinglePointIndexException e)
+                        {
+                            logger.error("Failed to close all single point index instances.", e);
+                            e.printStackTrace();
+                        }
+                    }));
                 }
-                catch (SinglePointIndexException e)
-                {
-                    logger.error("Failed to close all single point index instances.", e);
-                    e.printStackTrace();
-                }
-            }));
+            }
         }
         return instance;
     }

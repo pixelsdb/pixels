@@ -31,11 +31,14 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class CFWorkerManager
 {
-    private static final CFWorkerManager instance = new CFWorkerManager();
+    private static final class InstanceHolder
+    {
+        private static final CFWorkerManager instance = new CFWorkerManager();
+    }
 
     public static CFWorkerManager Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorker;

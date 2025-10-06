@@ -77,24 +77,30 @@ public class StorageFactory
         this.storageProviders = providersBuilder.build();
     }
 
-    private static StorageFactory instance = null;
+    private static volatile StorageFactory instance = null;
 
     public static StorageFactory Instance()
     {
         if (instance == null)
         {
-            instance = new StorageFactory();
-            Runtime.getRuntime().addShutdownHook(new Thread(()->
+            synchronized (StorageFactory.class)
             {
-                try
+                if (instance == null)
                 {
-                    instance.closeAll();
-                } catch (IOException e)
-                {
-                    logger.error("Failed to close all storage instances.", e);
-                    e.printStackTrace();
+                    instance = new StorageFactory();
+                    Runtime.getRuntime().addShutdownHook(new Thread(() ->
+                    {
+                        try
+                        {
+                            instance.closeAll();
+                        } catch (IOException e)
+                        {
+                            logger.error("Failed to close all storage instances.", e);
+                            e.printStackTrace();
+                        }
+                    }));
                 }
-            }));
+            }
         }
         return instance;
     }

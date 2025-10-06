@@ -42,16 +42,16 @@ import java.util.concurrent.CompletableFuture;
 public class SortMergeScheduler implements Scheduler
 {
     private static final Logger logger = LogManager.getLogger(SortMergeScheduler.class);
-    private static SortMergeScheduler instance;
+
+    private static final class InstanceHolder
+    {
+        private static final SortMergeScheduler instance = new SortMergeScheduler();
+    }
     private static int MaxGap;
 
     public static Scheduler Instance()
     {
-        if (instance == null)
-        {
-            instance = new SortMergeScheduler();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     protected RetryPolicy retryPolicy;

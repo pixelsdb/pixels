@@ -94,13 +94,12 @@ public class PixelsTable extends AbstractQueryableTable
         TypeDescription.Category category = typeDesc.getCategory();
 
         SqlTypeName typeName= toSqlTypeName(category);
-        RelDataType sqlType = typeName.allowsPrecScale(true, true)
+
+        return typeName.allowsPrecScale(true, true)
                 ? typeFactory.createSqlType(typeName, typeDesc.getPrecision(), typeDesc.getScale())
                 : typeName.allowsPrecScale(true, false)
                 ? typeFactory.createSqlType(typeName, typeDesc.getPrecision())
                 : typeFactory.createSqlType(typeName);
-
-        return sqlType;
     }
 
     private static SqlTypeName toSqlTypeName(TypeDescription.Category category) {

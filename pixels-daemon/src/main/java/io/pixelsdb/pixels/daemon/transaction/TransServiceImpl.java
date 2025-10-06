@@ -221,7 +221,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 if (TransContextManager.Instance().setTransCommit(transId))
                 {
                     commitSuccess = true;
-                } else
+                }
+                else
                 {
                     allSuccess = false;
                     responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_COMMIT_FAILED);

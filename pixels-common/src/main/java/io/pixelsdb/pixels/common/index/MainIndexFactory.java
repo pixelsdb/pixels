@@ -70,25 +70,30 @@ public class MainIndexFactory
         }
     }
 
-    private static MainIndexFactory instance = null;
+    private static volatile MainIndexFactory instance = null;
 
     public static MainIndexFactory Instance() throws MainIndexException
     {
         if (instance == null)
         {
-            instance = new MainIndexFactory();
-            Runtime.getRuntime().addShutdownHook(new Thread(()->
+            synchronized (MainIndexFactory.class)
             {
-                try
+                if (instance == null)
                 {
-                    instance.closeAll();
+                    instance = new MainIndexFactory();
+                    Runtime.getRuntime().addShutdownHook(new Thread(() ->
+                    {
+                        try
+                        {
+                            instance.closeAll();
+                        } catch (MainIndexException e)
+                        {
+                            logger.error("Failed to close all main index instances.", e);
+                            e.printStackTrace();
+                        }
+                    }));
                 }
-                catch (MainIndexException e)
-                {
-                    logger.error("Failed to close all main index instances.", e);
-                    e.printStackTrace();
-                }
-            }));
+            }
         }
         return instance;
     }

@@ -39,9 +39,9 @@ import java.util.List;
  */
 public class RdbPeerDao extends PeerDao
 {
-    public RdbPeerDao() {}
-
     private static final Logger log = LogManager.getLogger(RdbPeerDao.class);
+
+    public RdbPeerDao() {}
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
 

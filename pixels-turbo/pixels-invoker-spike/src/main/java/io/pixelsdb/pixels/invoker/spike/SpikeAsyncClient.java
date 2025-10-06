@@ -33,7 +33,12 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class SpikeAsyncClient
 {
     private static final ConfigFactory config = ConfigFactory.Instance();
-    private static SpikeAsyncClient instance;
+
+    private static final class InstanceHolder
+    {
+        private static final SpikeAsyncClient instance = new SpikeAsyncClient();
+    }
+
     private final ManagedChannel channel;
     private final SpikeServiceGrpc.SpikeServiceFutureStub stub;
     private final int cpu;
@@ -54,13 +59,9 @@ public class SpikeAsyncClient
         this.stub = SpikeServiceGrpc.newFutureStub(channel);
     }
 
-    public static synchronized SpikeAsyncClient getInstance()
+    public static synchronized SpikeAsyncClient Instance()
     {
-        if (instance == null)
-        {
-            instance = new SpikeAsyncClient();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     @Override

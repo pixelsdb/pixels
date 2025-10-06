@@ -92,12 +92,11 @@ public class RetinaService
      * @param port the port of the retina server
      * @return the created retina service instance
      */
-    public static RetinaService CreateInstance(String host, int port)
+    public static synchronized RetinaService CreateInstance(String host, int port)
     {
         HostAddress address = HostAddress.fromParts(host, port);
         return otherInstances.computeIfAbsent(
-                address,
-                addr -> new RetinaService(addr.getHostText(), addr.getPort())
+                address, addr -> new RetinaService(addr.getHostText(), addr.getPort())
         );
     }
 

@@ -31,11 +31,14 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class PlanCoordinatorFactory
 {
-    private static final PlanCoordinatorFactory instance = new PlanCoordinatorFactory();
+    private static final class InstanceHolder
+    {
+        private static final PlanCoordinatorFactory instance = new PlanCoordinatorFactory();
+    }
 
     public static PlanCoordinatorFactory Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final Map<Long, PlanCoordinator> transIdToPlanCoordinator;

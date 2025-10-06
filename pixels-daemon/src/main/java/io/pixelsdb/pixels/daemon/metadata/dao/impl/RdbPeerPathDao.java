@@ -23,16 +23,11 @@ import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.metadata.dao.ColumnDao;
-import io.pixelsdb.pixels.daemon.metadata.dao.DaoFactory;
 import io.pixelsdb.pixels.daemon.metadata.dao.PeerPathDao;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.PreparedStatement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,12 +37,14 @@ import java.util.List;
  */
 public class RdbPeerPathDao extends PeerPathDao
 {
-    public RdbPeerPathDao() {}
-
     private static final Logger log = LogManager.getLogger(RdbPeerPathDao.class);
 
+    public RdbPeerPathDao() {}
+
     private static final MetaDBUtil db = MetaDBUtil.Instance();
-    private static final ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
+
+    // Issue #1105: do not get columnDao from DaoFactory, otherwise it leads to recursive initialization of DaoFactory.
+    private static final ColumnDao columnDao = new RdbColumnDao();
 
     @Override
     public MetadataProto.PeerPath getById(long id)

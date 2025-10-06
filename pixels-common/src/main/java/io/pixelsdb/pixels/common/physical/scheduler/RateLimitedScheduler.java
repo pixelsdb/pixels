@@ -48,16 +48,16 @@ import java.util.Random;
  */
 public class RateLimitedScheduler extends SortMergeScheduler
 {
-    private static Logger logger = LogManager.getLogger(RateLimitedScheduler.class);
-    private static RateLimitedScheduler instance;
+    private static final Logger logger = LogManager.getLogger(RateLimitedScheduler.class);
+
+    private static final class InstanceHolder
+    {
+        private static final RateLimitedScheduler instance = new RateLimitedScheduler();
+    }
 
     public static Scheduler Instance()
     {
-        if (instance == null)
-        {
-            instance = new RateLimitedScheduler();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private RateLimiter mbpsRateLimiter;

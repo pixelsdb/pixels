@@ -34,9 +34,7 @@ public class RocksDBFactory
     private static RocksDB instance;
     private static String dbPath;
 
-    private RocksDBFactory()
-    {
-    }
+    private RocksDBFactory() { }
 
     private static RocksDB createRocksDB(String path) throws RocksDBException
     {

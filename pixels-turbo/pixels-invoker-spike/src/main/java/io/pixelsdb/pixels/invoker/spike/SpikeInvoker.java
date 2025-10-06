@@ -79,7 +79,7 @@ public abstract class SpikeInvoker implements Invoker
     {
         SpikeWorkerRequest workerRequest = new SpikeWorkerRequest(this.workerType,
                 JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect));
-        ListenableFuture<SpikeServiceProto.CallFunctionResponse> future = SpikeAsyncClient.getInstance().invoke(
+        ListenableFuture<SpikeServiceProto.CallFunctionResponse> future = SpikeAsyncClient.Instance().invoke(
                 this.functionName,
                 JSON.toJSONString(workerRequest, SerializerFeature.DisableCircularReferenceDetect),
                 input.getRequiredCpu(), input.getRequiredMemory());
