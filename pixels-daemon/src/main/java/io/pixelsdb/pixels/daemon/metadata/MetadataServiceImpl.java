@@ -646,6 +646,30 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void getTableById(MetadataProto.GetTableByIdRequest request, StreamObserver<MetadataProto.GetTableByIdResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.ResponseHeader header;
+        MetadataProto.GetTableByIdResponse response;
+        MetadataProto.Table table = tableDao.getById(request.getTableId());
+
+        if (table == null)
+        {
+            header = headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND)
+                    .setErrorMsg("metadata server failed to get table").build();
+            response = MetadataProto.GetTableByIdResponse.newBuilder()
+                    .setHeader(header).build();
+        } else
+        {
+            header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+            response = MetadataProto.GetTableByIdResponse.newBuilder().setHeader(header).setTable(table).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void getLayouts(MetadataProto.GetLayoutsRequest request,
                            StreamObserver<MetadataProto.GetLayoutsResponse> responseObserver)
     {
