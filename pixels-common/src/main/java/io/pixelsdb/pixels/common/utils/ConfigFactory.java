@@ -33,20 +33,18 @@ import java.util.Properties;
  */
 public class ConfigFactory
 {
-    private static ConfigFactory instance = null;
+    private static final class InstanceHolder
+    {
+        private static final ConfigFactory instance = new ConfigFactory();
+    }
 
     /**
-     * Injected classes in pixels-presto should not use this method to get ConfigFactory Instance.
-     *
+     * Injected classes in pixels-presto and pixels-trino should not use this method to get ConfigFactory Instance.
      * @return
      */
     public static ConfigFactory Instance()
     {
-        if (instance == null)
-        {
-            instance = new ConfigFactory();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     // Properties is thread safe, so we do not add synchronization to it.

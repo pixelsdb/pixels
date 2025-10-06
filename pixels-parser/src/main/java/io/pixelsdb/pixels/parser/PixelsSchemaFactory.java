@@ -36,13 +36,12 @@ public class PixelsSchemaFactory implements SchemaFactory
 
     public PixelsSchemaFactory(MetadataService metadataService)
     {
-        this.metadataService = metadataService;
+        PixelsSchemaFactory.metadataService = metadataService;
     }
 
     @Override
-    public Schema create(
-            SchemaPlus parentSchema, String name, Map<String, Object> operand)
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand)
     {
-        return new PixelsSchema(name, this.metadataService);
+        return new PixelsSchema(name, metadataService);
     }
 }

@@ -54,11 +54,15 @@ import static io.pixelsdb.pixels.planner.plan.logical.Table.TableType.JOINED;
 public class PlanOptimizer
 {
     private static final Logger logger = LogManager.getLogger(PlanOptimizer.class);
-    private static final PlanOptimizer instance = new PlanOptimizer();
+
+    private static final class InstanceHolder
+    {
+        private static final PlanOptimizer instance = new PlanOptimizer();
+    }
 
     public static PlanOptimizer Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final MetadataService metadataService;

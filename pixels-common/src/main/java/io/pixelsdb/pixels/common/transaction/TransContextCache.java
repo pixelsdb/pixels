@@ -39,15 +39,14 @@ import static java.util.Objects.requireNonNull;
  */
 public class TransContextCache
 {
-    private static TransContextCache instance;
+    private static final class InstanceHolder
+    {
+        private static final TransContextCache instance = new TransContextCache();
+    }
 
     public static TransContextCache Instance()
     {
-        if (instance == null)
-        {
-            instance = new TransContextCache();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();

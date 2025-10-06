@@ -38,7 +38,7 @@ public class Main
                 .build());
 
         CommandLineParser parser = new DefaultParser();
-        CommandLine cmd = null;
+        CommandLine cmd;
         try
         {
             cmd = parser.parse(options, args);
@@ -54,6 +54,5 @@ public class Main
             formatter.printHelp("Log messages to sequence diagrams converter", options);
             System.exit(1);
         }
-
     }
 }

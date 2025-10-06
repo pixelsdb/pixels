@@ -35,6 +35,7 @@ public class MinioManager
 {
     private final Storage minio;
     private final String minioPathPrefix;
+
     public MinioManager()
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
@@ -52,15 +53,14 @@ public class MinioManager
         this.minioPathPrefix = configFactory.getProperty("minio.path.prefix");
     }
 
-    private static MinioManager instance = null;
+    private static final class InstanceHolder
+    {
+        private static final MinioManager instance = new MinioManager();
+    }
 
     public static MinioManager Instance()
     {
-        if (instance == null)
-        {
-            instance = new MinioManager();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private String buildKey(long tableId, long entryId)

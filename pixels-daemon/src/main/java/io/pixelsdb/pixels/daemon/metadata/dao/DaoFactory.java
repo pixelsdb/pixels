@@ -8,15 +8,14 @@ import io.pixelsdb.pixels.daemon.metadata.dao.impl.*;
  */
 public class DaoFactory
 {
-    private static DaoFactory instance = null;
+    private static final class InstanceHolder
+    {
+        private static final DaoFactory instance = new DaoFactory();
+    }
 
     public static DaoFactory Instance ()
     {
-        if (instance == null)
-        {
-            instance = new DaoFactory();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final ColumnDao columnDao;

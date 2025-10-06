@@ -32,9 +32,9 @@ import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -47,7 +47,7 @@ public class TransService
 {
     private static final Logger logger = LogManager.getLogger(TransService.class);
     private static final TransService defaultInstance;
-    private static final Map<HostAddress, TransService> otherInstances = new HashMap<>();
+    private static final Map<HostAddress, TransService> otherInstances = new ConcurrentHashMap<>();
 
     static
     {
@@ -92,7 +92,7 @@ public class TransService
      * @param port the port of the trans server
      * @return the created trans service instance
      */
-    public static TransService CreateInstance(String host, int port)
+    public static synchronized TransService CreateInstance(String host, int port)
     {
         HostAddress address = HostAddress.fromParts(host, port);
         TransService transService = otherInstances.get(address);

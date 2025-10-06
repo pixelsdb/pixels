@@ -26,15 +26,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class IndexFactory
 {
-    private static IndexFactory instance = null;
+    private static final class InstanceHolder
+    {
+        private static final IndexFactory instance = new IndexFactory();
+    }
 
     public static IndexFactory Instance()
     {
-        if (instance == null)
-        {
-            instance = new IndexFactory();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final Map<SchemaTableName, SplitsIndex> splitsIndexes;

@@ -235,7 +235,7 @@ public class TransContextManager
                                 entry.getValue().getStatus() == TransProto.TransStatus.ROLLBACK);
             } catch (IOException e)
             {
-                log.error("failed to dump transaction context", e);
+                log.error("failed to dump transaction contexts", e);
                 return false;
             }
             return true;
