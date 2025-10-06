@@ -59,7 +59,7 @@ public class TransContextManager
         return instance;
     }
 
-    static private final Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();
+    private volatile Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();
     /**
      * Two different transactions will not have the same transaction id, so we can store the running transactions using
      * a sorted set that sorts the transaction contexts by transaction timestamp and id. This is important for watermark pushing
