@@ -34,11 +34,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Assertions;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.*;
 
 public class TestRetinaService
 {
@@ -92,12 +88,13 @@ public class TestRetinaService
                 for (int j = 0; j < 4; ++j)
                 {
                     SinkProto.ColumnValue.Builder columnValueBuilder = SinkProto.ColumnValue.newBuilder()
-                            .setName(colNames[j])
                             .setValue(ByteString.copyFrom(cols[j]));
                     valueBuilder.addValues(columnValueBuilder.build());
                 }
-                Map<String, SinkProto.ColumnValue> valueMap = valueBuilder.getValuesList()
-                        .stream().collect(Collectors.toMap(SinkProto.ColumnValue::getName, v -> v));
+                Map<String, SinkProto.ColumnValue> valueMap = new HashMap<>();
+                for (int j = 0; j < colNames.length; j++) {
+                    valueMap.put(colNames[i], valueBuilder.getValues(j));
+                }
 
                 List<String> keyColumnNames = new LinkedList<>();
                 keyColumnNames.add("key"); // 'key' is the primary key's name
