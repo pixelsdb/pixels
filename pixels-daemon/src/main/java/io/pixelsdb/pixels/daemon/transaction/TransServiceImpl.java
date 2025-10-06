@@ -173,7 +173,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
              * push the watermarks before setTransCommit()
              * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
              */
-            // pushWatermarks(readOnly);
+            pushWatermarks(readOnly);
             boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
             if (!success)
             {
@@ -212,6 +212,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         for (int i = 0; i < request.getTransIdsCount(); ++i)
         {
             long transId = request.getTransIds(i);
+            System.out.println("thread " + Thread.currentThread().getName() + " get trans id " + transId);
             boolean commitSuccess = false;
 
             if (TransContextManager.Instance().isTransExist(transId))
