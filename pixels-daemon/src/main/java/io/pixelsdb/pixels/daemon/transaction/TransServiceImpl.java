@@ -212,7 +212,6 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         for (int i = 0; i < request.getTransIdsCount(); ++i)
         {
             long transId = request.getTransIds(i);
-            System.out.println("thread " + Thread.currentThread().getName() + " get trans id " + transId);
             boolean commitSuccess = false;
 
             if (TransContextManager.Instance().isTransExist(transId))
