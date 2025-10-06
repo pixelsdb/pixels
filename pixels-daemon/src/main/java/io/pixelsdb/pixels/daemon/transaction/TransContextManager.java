@@ -97,7 +97,6 @@ public class TransContextManager
     private void _addTransContext(TransContext context)
     {
         this.transIdToContext.put(context.getTransId(), context);
-        System.out.println("thread " + Thread.currentThread().getName() + " add trans id " + context.getTransId());
         if (context.isReadOnly())
         {
             this.readOnlyConcurrency.incrementAndGet();
@@ -175,7 +174,6 @@ public class TransContextManager
             {
                 // only clear the context of write transactions
                 this.transIdToContext.remove(context.getTransId());
-                System.out.println("thread " + Thread.currentThread().getName() + " remove trans id " + context.getTransId());
                 this.runningWriteTrans.remove(context);
                 String traceId = this.transIdToTraceId.remove(context.getTransId());
                 if (traceId != null)
@@ -274,8 +272,6 @@ public class TransContextManager
 
     public boolean isTransExist(long transId)
     {
-        System.out.println("thread " + Thread.currentThread().getName() + " check trans id " + transId + " exists " +
-                this.transIdToContext.containsKey(transId));
         return this.transIdToContext.containsKey(transId);
     }
 
