@@ -217,7 +217,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             if (TransContextManager.Instance().isTransExist(transId))
             {
                 boolean readOnly = TransContextManager.Instance().getTransContext(transId).isReadOnly();
-                // pushWatermarks(readOnly);
+                pushWatermarks(readOnly);
                 if (TransContextManager.Instance().setTransCommit(transId))
                 {
                     commitSuccess = true;
@@ -232,7 +232,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             {
                 allSuccess = false;
                 responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST);
-                logger.error("haha, transaction id {} does not exist in the context manager", transId);
+                logger.error("transaction id {} does not exist in the context manager", transId);
             }
             responseBuilder.addResults(commitSuccess);
         }
