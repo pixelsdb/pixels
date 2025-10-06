@@ -48,10 +48,14 @@ public class TransContextManager
 {
     private static final Logger log = LogManager.getLogger(TransContextManager.class);
 
-    private static final TransContextManager instance = new TransContextManager();
+    private static TransContextManager instance;
 
     protected static TransContextManager Instance()
     {
+        if (instance == null)
+        {
+            instance = new TransContextManager();
+        }
         return instance;
     }
 
@@ -69,7 +73,10 @@ public class TransContextManager
 
     private final StampedLock contextLock = new StampedLock();
 
-    private TransContextManager() { }
+    private TransContextManager()
+    {
+        System.out.println("TransContextManager constructed");
+    }
 
     /**
      * Add a trans context when a new transaction begins.
