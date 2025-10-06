@@ -97,6 +97,7 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     {
         try
         {
+            checkRemaining(len);
             DirectBuffer buffer = DirectIoLib.allocateBuffer(len);
             DirectIoLib.read(this.fd, this.offset, buffer, len);
             this.seek(this.offset + len);
@@ -113,6 +114,7 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     {
         try
         {
+            checkRemaining(off, len);
             DirectBuffer buffer = DirectIoLib.allocateBuffer(len);
             DirectIoLib.read(this.fd, off, buffer, len);
             this.largeBuffers.add(buffer);
@@ -138,7 +140,8 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
 
     private void populateBuffer() throws IOException
     {
-        DirectIoLib.read(this.fd, this.offset, this.smallBuffer, this.blockSize);
+        int bytesToRead = Math.min((int)(this.length - this.offset), this.blockSize);
+        DirectIoLib.read(this.fd, this.offset, this.smallBuffer, bytesToRead);
         this.bufferValid = true;
     }
 
@@ -271,5 +274,19 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     public long length()
     {
         return this.length;
+    }
+
+    private void checkRemaining(long offset, long length) throws IOException
+    {
+        if (offset + length > this.length)
+        {
+            throw new IOException("Not enough bytes to read: requested " + length +
+                    ", available " + (this.length - this.offset));
+        }
+    }
+
+    private void checkRemaining(long length) throws IOException
+    {
+        checkRemaining(this.offset, length);
     }
 }
