@@ -295,6 +295,34 @@ public class MetadataService
         return table;
     }
 
+    public Table getTableById(long tableId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetTableByIdRequest request = MetadataProto.GetTableByIdRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTableId(tableId).build();
+        Table table = null;
+        try
+        {
+            MetadataProto.GetTableByIdResponse response = this.stub.getTableById(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            table = new Table(response.getTable());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get tables from metadata", e);
+        }
+        return table;
+    }
+
     public List<Table> getTables(String schemaName) throws MetadataException
     {
         ImmutableList.Builder<Table> tablesBuilder = ImmutableList.builder();
