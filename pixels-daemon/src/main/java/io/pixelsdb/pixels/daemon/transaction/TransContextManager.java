@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.daemon.transaction;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -44,6 +46,8 @@ import static java.util.Objects.requireNonNull;
  */
 public class TransContextManager
 {
+    private static final Logger log = LogManager.getLogger(TransContextManager.class);
+
     private static TransContextManager instance;
 
     protected static TransContextManager Instance()
@@ -232,7 +236,8 @@ public class TransContextManager
                                 entry.getValue().getStatus() == TransProto.TransStatus.ROLLBACK);
             } catch (IOException e)
             {
-                System.err.println("An error occurred: " + e.getMessage());
+                log.error("failed to dump transaction context", e);
+                return false;
             }
             return true;
         }
