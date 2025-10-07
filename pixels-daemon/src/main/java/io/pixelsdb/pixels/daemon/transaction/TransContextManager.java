@@ -165,7 +165,7 @@ public class TransContextManager
 
     private boolean _terminateTrans(long transId, TransProto.TransStatus status)
     {
-        System.out.println("thread " + Thread.currentThread().getName() + " terminate trans " + context.getTransId());
+        System.out.println("thread " + Thread.currentThread().getName() + " terminate trans " + transId);
         TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
