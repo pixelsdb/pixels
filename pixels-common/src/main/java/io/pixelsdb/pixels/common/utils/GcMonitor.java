@@ -32,6 +32,7 @@ public class GcMonitor
 
     public static GcMonitor Instance()
     {
+        // no need to create instance lazily.
         return instance;
     }
 

@@ -30,11 +30,14 @@ import java.time.Duration;
  */
 public class Lambda
 {
-    private static final Lambda instance = new Lambda();
+    private static final class InstanceHolder
+    {
+        private static final Lambda instance = new Lambda();
+    }
 
     public static Lambda Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final LambdaAsyncClient asyncClient;

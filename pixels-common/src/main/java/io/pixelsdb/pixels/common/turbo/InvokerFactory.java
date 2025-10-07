@@ -31,11 +31,14 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class InvokerFactory
 {
-    private static final InvokerFactory instance = new InvokerFactory();
+    private static final class InstanceHolder
+    {
+        private static final InvokerFactory instance = new InvokerFactory();
+    }
 
     public static InvokerFactory Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     /**

@@ -58,15 +58,14 @@ public class RetinaResourceManager
         this.pixelsWriterBufferMap = new ConcurrentHashMap<>();
     }
 
-    private static RetinaResourceManager instance = null;
+    private static final class InstanceHolder
+    {
+        private static final RetinaResourceManager instance = new RetinaResourceManager();
+    }
 
     public static RetinaResourceManager Instance()
     {
-        if (instance == null)
-        {
-            instance = new RetinaResourceManager();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     public void addVisibility(long fileId, int rgId, int recordNum)

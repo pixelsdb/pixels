@@ -45,7 +45,12 @@ import java.util.concurrent.ExecutionException;
 public class EtcdUtil
 {
     private static final Logger logger = LogManager.getLogger(EtcdUtil.class);
-    private static final EtcdUtil instance = new EtcdUtil();
+
+    private static final class InstanceHolder
+    {
+        private static final EtcdUtil instance = new EtcdUtil();
+    }
+
     private final Client client;
 
     private EtcdUtil()
@@ -71,7 +76,7 @@ public class EtcdUtil
 
     public static EtcdUtil Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     /**

@@ -35,9 +35,9 @@ import java.util.List;
  */
 public class RdbFileDao extends FileDao
 {
-    public RdbFileDao() { }
+    private static final Logger log = LogManager.getLogger(RdbFileDao.class);
 
-    private static final Logger log = LogManager.getLogger(RdbPathDao.class);
+    public RdbFileDao() { }
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
 

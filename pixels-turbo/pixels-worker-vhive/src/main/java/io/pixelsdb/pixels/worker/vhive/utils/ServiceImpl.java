@@ -41,9 +41,7 @@ public class ServiceImpl<T extends RequestHandler<I, O>, I extends Input, O exte
     final Class<T> handlerClass;
     final Class<I> typeParameterClass;
 
-    public ServiceImpl(
-            Class<T> handlerClass,
-            Class<I> typeParameterClass)
+    public ServiceImpl(Class<T> handlerClass, Class<I> typeParameterClass)
     {
         this.handlerClass = handlerClass;
         this.typeParameterClass = typeParameterClass;

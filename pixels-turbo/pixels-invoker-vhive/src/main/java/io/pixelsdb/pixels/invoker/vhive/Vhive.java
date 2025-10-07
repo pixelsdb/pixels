@@ -24,7 +24,12 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 public class Vhive
 {
     private static final ConfigFactory config = ConfigFactory.Instance();
-    private static final Vhive instance = new Vhive();
+
+    private static final class InstanceHolder
+    {
+        private static final Vhive instance = new Vhive();
+    }
+
     private final WorkerAsyncClient asyncClient;
 
     private Vhive()
@@ -36,7 +41,7 @@ public class Vhive
 
     public static Vhive Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     public WorkerAsyncClient getAsyncClient()

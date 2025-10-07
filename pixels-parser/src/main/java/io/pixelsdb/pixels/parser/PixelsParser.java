@@ -65,7 +65,6 @@ public class PixelsParser
 
     private final MetadataService metadataService;
     private final SqlParser.Config parserConfig;
-    private final RexBuilder rexBuilder;
     private final CalciteSchema schema;
     private final String schemaName;
     private final CalciteCatalogReader catalogReader;
@@ -81,7 +80,7 @@ public class PixelsParser
         this.metadataService = ms;
         this.parserConfig = parserConfig;
         SqlTypeFactoryImpl typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
-        this.rexBuilder = new RexBuilder(typeFactory);
+        RexBuilder rexBuilder = new RexBuilder(typeFactory);
 
         this.schema = CalciteSchema.createRootSchema(true);
         this.schema.add(schemaName, new PixelsSchema(schemaName, metadataService));

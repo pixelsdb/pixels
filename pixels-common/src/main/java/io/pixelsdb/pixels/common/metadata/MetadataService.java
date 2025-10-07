@@ -34,6 +34,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -48,7 +49,7 @@ public class MetadataService
 {
     private static final Logger logger = LogManager.getLogger(MetadataService.class);
     private static final MetadataService defaultInstance;
-    private static final Map<HostAddress, MetadataService> otherInstances = new HashMap<>();
+    private static final Map<HostAddress, MetadataService> otherInstances = new ConcurrentHashMap<>();
 
     static
     {
@@ -94,7 +95,7 @@ public class MetadataService
      * @param port the port of the metadata server
      * @return the created metadata service instance
      */
-    public static MetadataService CreateInstance(String host, int port)
+    public static synchronized MetadataService CreateInstance(String host, int port)
     {
         HostAddress address = HostAddress.fromParts(host, port);
         MetadataService metadataService = otherInstances.get(address);

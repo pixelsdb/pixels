@@ -23,7 +23,6 @@ import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.metadata.dao.ColumnDao;
-import io.pixelsdb.pixels.daemon.metadata.dao.DaoFactory;
 import io.pixelsdb.pixels.daemon.metadata.dao.SchemaVersionDao;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,7 +40,9 @@ public class RdbSchemaVersionDao extends SchemaVersionDao
     public RdbSchemaVersionDao() {}
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
-    private static final ColumnDao columnDao = DaoFactory.Instance().getColumnDao();
+
+    // Issue #1105: do not get columnDao from DaoFactory, otherwise it leads to recursive initialization of DaoFactory.
+    private static final ColumnDao columnDao = new RdbColumnDao();
 
     @Override
     public MetadataProto.SchemaVersion getById(long id)

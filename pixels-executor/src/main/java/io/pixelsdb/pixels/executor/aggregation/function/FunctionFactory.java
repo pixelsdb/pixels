@@ -28,11 +28,14 @@ import io.pixelsdb.pixels.executor.aggregation.FunctionType;
  */
 public class FunctionFactory
 {
-    private static final FunctionFactory instance = new FunctionFactory();
+    private static final class InstanceHolder
+    {
+        private static final FunctionFactory instance = new FunctionFactory();
+    }
 
     public static FunctionFactory Instance()
     {
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private FunctionFactory() { }

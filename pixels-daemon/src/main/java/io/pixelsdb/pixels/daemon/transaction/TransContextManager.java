@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.daemon.transaction;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -44,15 +46,16 @@ import static java.util.Objects.requireNonNull;
  */
 public class TransContextManager
 {
-    private static TransContextManager instance;
+    private static final Logger log = LogManager.getLogger(TransContextManager.class);
+
+    private static final class InstanceHolder
+    {
+        static final TransContextManager instance = new TransContextManager();
+    }
 
     protected static TransContextManager Instance()
     {
-        if (instance == null)
-        {
-            instance = new TransContextManager();
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     private final Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();
@@ -117,13 +120,13 @@ public class TransContextManager
     public boolean setTransCommit(long transId)
     {
         long stamp = this.contextLock.tryOptimisticRead();
-        boolean res = _setTransStatus(transId, TransProto.TransStatus.COMMIT);
+        boolean res = _terminateTrans(transId, TransProto.TransStatus.COMMIT);
         if (!this.contextLock.validate(stamp))
         {
             stamp = this.contextLock.readLock();
             try
             {
-                res = _setTransStatus(transId, TransProto.TransStatus.COMMIT);
+                res = _terminateTrans(transId, TransProto.TransStatus.COMMIT);
             }
             finally
             {
@@ -143,13 +146,13 @@ public class TransContextManager
     public boolean setTransRollback(long transId)
     {
         long stamp = this.contextLock.tryOptimisticRead();
-        boolean res = _setTransStatus(transId, TransProto.TransStatus.ROLLBACK);
+        boolean res = _terminateTrans(transId, TransProto.TransStatus.ROLLBACK);
         if (!this.contextLock.validate(stamp))
         {
             stamp = this.contextLock.readLock();
             try
             {
-                res = _setTransStatus(transId, TransProto.TransStatus.ROLLBACK);
+                res = _terminateTrans(transId, TransProto.TransStatus.ROLLBACK);
             }
             finally
             {
@@ -159,36 +162,31 @@ public class TransContextManager
         return res;
     }
 
-    private boolean _setTransStatus(long transId, TransProto.TransStatus status)
+    private boolean _terminateTrans(long transId, TransProto.TransStatus status)
     {
         TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
             context.setStatus(status);
-            return _terminateTrans(context);
+            if (context.isReadOnly())
+            {
+                this.readOnlyConcurrency.decrementAndGet();
+                this.runningReadOnlyTrans.remove(context);
+            }
+            else
+            {
+                // only clear the context of write transactions
+                this.transIdToContext.remove(context.getTransId());
+                this.runningWriteTrans.remove(context);
+                String traceId = this.transIdToTraceId.remove(context.getTransId());
+                if (traceId != null)
+                {
+                    this.traceIdToTransId.remove(traceId);
+                }
+            }
+            return true;
         }
         return false;
-    }
-
-    private boolean _terminateTrans(TransContext context)
-    {
-        if (context.isReadOnly())
-        {
-            this.readOnlyConcurrency.decrementAndGet();
-            this.runningReadOnlyTrans.remove(context);
-        }
-        else
-        {
-            // only clear the context of write transactions
-            this.transIdToContext.remove(context.getTransId());
-            this.runningWriteTrans.remove(context);
-            String traceId = this.transIdToTraceId.remove(context.getTransId());
-            if (traceId != null)
-            {
-                this.traceIdToTransId.remove(traceId);
-            }
-        }
-        return true;
     }
 
     /**
@@ -237,7 +235,8 @@ public class TransContextManager
                                 entry.getValue().getStatus() == TransProto.TransStatus.ROLLBACK);
             } catch (IOException e)
             {
-                System.err.println("An error occurred: " + e.getMessage());
+                log.error("failed to dump transaction contexts", e);
+                return false;
             }
             return true;
         }

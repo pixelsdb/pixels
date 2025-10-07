@@ -40,15 +40,12 @@ import java.util.concurrent.CompletableFuture;
  */
 public class NoopScheduler implements Scheduler
 {
-    private static Logger logger = LogManager.getLogger(NoopScheduler.class);
-    private static NoopScheduler instance;
+    private static final Logger logger = LogManager.getLogger(NoopScheduler.class);
+    private static final NoopScheduler instance = new NoopScheduler();
 
     public static Scheduler Instance()
     {
-        if (instance == null)
-        {
-            instance = new NoopScheduler();
-        }
+        // no need to create instance lazily.
         return instance;
     }
 

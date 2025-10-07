@@ -33,11 +33,15 @@ public class MetaDBUtil
 {
     private static final Logger log = LogManager.getLogger(MetaDBUtil.class);
 
-    private static final MetaDBUtil Instance = new MetaDBUtil();
+    private static final class InstanceHolder
+    {
+        private static final MetaDBUtil instance = new MetaDBUtil();
+    }
 
     public static MetaDBUtil Instance()
     {
-        return Instance;
+        // instance is to be closed in MetadataServer.shutdown().
+        return InstanceHolder.instance;
     }
 
     private Connection connection = null;

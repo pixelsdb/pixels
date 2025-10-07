@@ -36,9 +36,9 @@ import java.util.List;
  */
 public class RdbRangeDao extends RangeDao
 {
-    public RdbRangeDao() {}
-
     private static final Logger log = LogManager.getLogger(RdbRangeDao.class);
+
+    public RdbRangeDao() {}
 
     private static final MetaDBUtil db = MetaDBUtil.Instance();
 
