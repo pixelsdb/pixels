@@ -97,6 +97,7 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     {
         try
         {
+            checkRemaining(len);
             DirectBuffer buffer = DirectIoLib.allocateBuffer(len);
             DirectIoLib.read(this.fd, this.offset, buffer, len);
             this.seek(this.offset + len);
@@ -113,6 +114,7 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     {
         try
         {
+            checkRemaining(off, len);
             DirectBuffer buffer = DirectIoLib.allocateBuffer(len);
             DirectIoLib.read(this.fd, off, buffer, len);
             this.largeBuffers.add(buffer);
@@ -138,16 +140,32 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
 
     private void populateBuffer() throws IOException
     {
-        DirectIoLib.read(this.fd, this.offset, this.smallBuffer, this.blockSize);
+        int bytesToRead = Math.min((int)(this.length - this.offset), this.blockSize);
+        int read = DirectIoLib.read(this.fd, this.offset, this.smallBuffer, bytesToRead);
+        if (read < 0)
+        {
+            throw new IOException("Failed to read from fd=" + fd + " at offset=" + offset);
+        }
+        if (read == 0)
+        {
+            this.bufferValid = false;
+            this.smallBuffer.getBuffer().limit(0);
+            return;
+        }
+        this.smallBuffer.getBuffer().limit(read);
         this.bufferValid = true;
     }
 
     @Override
     public boolean readBoolean() throws IOException
     {
-        if (!this.bufferValid || this.smallBuffer.hasRemaining())
+        if (!this.bufferValid || !this.smallBuffer.hasRemaining())
         {
             this.populateBuffer();
+            if (!this.bufferValid || !this.smallBuffer.hasRemaining())
+            {
+                throw new IOException("Failed to read boolean: buffer is empty");
+            }
         }
         this.offset++;
         return this.smallBuffer.get() != 0;
@@ -156,9 +174,13 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     @Override
     public byte readByte() throws IOException
     {
-        if (!this.bufferValid || this.smallBuffer.hasRemaining())
+        if (!this.bufferValid || !this.smallBuffer.hasRemaining())
         {
             this.populateBuffer();
+            if (!this.bufferValid || !this.smallBuffer.hasRemaining())
+            {
+                throw new IOException("Failed to read byte: buffer is empty");
+            }
         }
         this.offset++;
         return this.smallBuffer.get();
@@ -167,9 +189,13 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     @Override
     public int readUnsignedByte() throws IOException
     {
-        if (!this.bufferValid || this.smallBuffer.hasRemaining())
+        if (!this.bufferValid || !this.smallBuffer.hasRemaining())
         {
             this.populateBuffer();
+            if (!this.bufferValid || !this.smallBuffer.hasRemaining())
+            {
+                throw new IOException("Failed to read unsigned byte: buffer is empty");
+            }
         }
         this.offset++;
         return this.smallBuffer.get() & 0xff;
@@ -181,6 +207,10 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
         if (!this.bufferValid || this.smallBuffer.remaining() < Short.BYTES)
         {
             this.populateBuffer();
+            if (!this.bufferValid || this.smallBuffer.remaining() < Short.BYTES)
+            {
+                throw new IOException("Failed to read short: not enough bytes");
+            }
         }
         this.offset += Short.BYTES;
         return this.smallBuffer.getShort();
@@ -192,6 +222,10 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
         if (!this.bufferValid || this.smallBuffer.remaining() < Short.BYTES)
         {
             this.populateBuffer();
+            if (!this.bufferValid || this.smallBuffer.remaining() < Short.BYTES)
+            {
+                throw new IOException("Failed to read unsigned short: not enough bytes");
+            }
         }
         this.offset += Short.BYTES;
         return this.smallBuffer.getShort() & 0xffff;
@@ -203,6 +237,10 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
         if (!this.bufferValid || this.smallBuffer.remaining() < Character.BYTES)
         {
             this.populateBuffer();
+            if (!this.bufferValid || this.smallBuffer.remaining() < Character.BYTES)
+            {
+                throw new IOException("Failed to read char: not enough bytes");
+            }
         }
         this.offset += Character.BYTES;
         return this.smallBuffer.getChar();
@@ -214,6 +252,10 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
         if (!this.bufferValid || this.smallBuffer.remaining() < Integer.BYTES)
         {
             this.populateBuffer();
+            if (!this.bufferValid || this.smallBuffer.remaining() < Integer.BYTES)
+            {
+                throw new IOException("Failed to read int: not enough bytes");
+            }
         }
         this.offset += Integer.BYTES;
         return this.smallBuffer.getInt();
@@ -225,6 +267,10 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
         if (!this.bufferValid || this.smallBuffer.remaining() < Long.BYTES)
         {
             this.populateBuffer();
+            if (!this.bufferValid || this.smallBuffer.remaining() < Long.BYTES)
+            {
+                throw new IOException("Failed to read long: not enough bytes");
+            }
         }
         this.offset += Long.BYTES;
         return this.smallBuffer.getLong();
@@ -236,6 +282,10 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
         if (!this.bufferValid || this.smallBuffer.remaining() < Float.BYTES)
         {
             this.populateBuffer();
+            if (!this.bufferValid || this.smallBuffer.remaining() < Float.BYTES)
+            {
+                throw new IOException("Failed to read float: not enough bytes");
+            }
         }
         this.offset += Float.BYTES;
         return this.smallBuffer.getFloat();
@@ -247,6 +297,10 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
         if (!this.bufferValid || this.smallBuffer.remaining() < Double.BYTES)
         {
             this.populateBuffer();
+            if (!this.bufferValid || this.smallBuffer.remaining() < Double.BYTES)
+            {
+                throw new IOException("Failed to read double: not enough bytes");
+            }
         }
         this.offset += Double.BYTES;
         return this.smallBuffer.getDouble();
@@ -271,5 +325,19 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     public long length()
     {
         return this.length;
+    }
+
+    private void checkRemaining(long offset, long length) throws IOException
+    {
+        if (offset + length > this.length)
+        {
+            throw new IOException("Not enough bytes to read: requested " + length +
+                    ", available " + (this.length - this.offset));
+        }
+    }
+
+    private void checkRemaining(long length) throws IOException
+    {
+        checkRemaining(this.offset, length);
     }
 }
