@@ -33,6 +33,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -142,6 +143,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         {
             final int numTrans = request.getExpectNumTrans();
             long transId = TransServiceImpl.transId.getAndIncrement(numTrans);
+            TransContext[] contexts = new TransContext[numTrans];
             if (request.getReadOnly())
             {
                 long timestamp = highWatermark.get();
@@ -149,7 +151,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 {
                     response.addTransIds(transId).addTimestamps(timestamp);
                     TransContext context = new TransContext(transId, timestamp, true);
-                    TransContextManager.Instance().addTransContext(context);
+                    contexts[i] = context;
                 }
             }
             else
@@ -159,9 +161,10 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 {
                     response.addTransIds(transId).addTimestamps(timestamp);
                     TransContext context = new TransContext(transId, timestamp, false);
-                    TransContextManager.Instance().addTransContext(context);
+                    contexts[i] = context;
                 }
             }
+            TransContextManager.Instance().addTransContextBatch(contexts);
             response.setExactNumTrans(request.getExpectNumTrans());
             response.setErrorCode(ErrorCode.SUCCESS);
         }
@@ -179,16 +182,15 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                             StreamObserver<TransProto.CommitTransResponse> responseObserver)
     {
         int error = ErrorCode.SUCCESS;
-        if (TransContextManager.Instance().isTransExist(request.getTransId()))
+        TransContext context = TransContextManager.Instance().getTransContext(request.getTransId());
+        if (context != null)
         {
-            // must get transaction context before setTransCommit()
-            boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
             /*
              * Issue #755:
              * push the watermarks before setTransCommit()
              * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
              */
-            pushWatermarks(readOnly);
+            pushWatermarks(context.isReadOnly());
             boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
             if (!success)
             {
@@ -223,39 +225,47 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             return;
         }
 
-        boolean allSuccess = true;
-        final int transCount = request.getTransIdsCount();
-        for (int i = 0; i < transCount; ++i)
+        final int numTrans = request.getTransIdsCount();
+        long[] transIds = new long[numTrans];
+        int errorCode = ErrorCode.SUCCESS;
+        for (int i = 0; i < numTrans; ++i)
         {
             long transId = request.getTransIds(i);
-            boolean commitSuccess = false;
-
-            if (TransContextManager.Instance().isTransExist(transId))
+            transIds[i] = transId;
+            TransContext context = TransContextManager.Instance().getTransContext(transId);
+            if (context != null)
             {
-                boolean readOnly = TransContextManager.Instance().getTransContext(transId).isReadOnly();
-                pushWatermarks(readOnly);
-                if (TransContextManager.Instance().setTransCommit(transId))
-                {
-                    commitSuccess = true;
-                }
-                else
-                {
-                    allSuccess = false;
-                    responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_COMMIT_FAILED);
-                    logger.error("failed to commit transaction id {}", transId);
-                }
+                /*
+                 * Issue #755:
+                 * push the watermarks before setTransCommit()
+                 * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
+                 */
+                pushWatermarks(context.isReadOnly());
             }
             else
             {
-                allSuccess = false;
-                responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST);
                 logger.error("transaction id {} does not exist in the context manager", transId);
+                errorCode = ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST;
             }
-            responseBuilder.addResults(commitSuccess);
         }
+        Boolean[] success = new Boolean[numTrans];
+        boolean allSuccess = TransContextManager.Instance().setTransCommitBatch(transIds, success);
+        responseBuilder.addAllResults(Arrays.asList(success));
         if (allSuccess)
         {
             responseBuilder.setErrorCode(ErrorCode.SUCCESS);
+        }
+        else
+        {
+            if (errorCode != ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST)
+            {
+                // other errors occurred
+                responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_COMMIT_FAILED);
+            }
+            else
+            {
+                responseBuilder.setErrorCode(errorCode);
+            }
         }
         responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();

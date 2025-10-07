@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -81,7 +82,7 @@ public class TransContextManager
      */
     public void addTransContext(TransContext context)
     {
-        requireNonNull(context, "transaction context is null");
+        requireNonNull(context, "context is null");
         this.contextLock.readLock().lock();
         try
         {
@@ -102,6 +103,35 @@ public class TransContextManager
     }
 
     /**
+     * Add a batch of trans contexts when new transactions begin.
+     * @param contexts the batch of trans contexts
+     */
+    public void addTransContextBatch(TransContext[] contexts)
+    {
+        requireNonNull(contexts, "contexts is null");
+        this.contextLock.readLock().lock();
+        try
+        {
+            for (TransContext context : contexts)
+            {
+                this.transIdToContext.put(context.getTransId(), context);
+                if (context.isReadOnly())
+                {
+                    this.readOnlyConcurrency.incrementAndGet();
+                    this.runningReadOnlyTrans.add(context);
+                } else
+                {
+                    this.runningWriteTrans.add(context);
+                }
+            }
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
      * Set the transaction to commit and remove it from this manager.
      * This should be only called when the transaction is about to commit. This method does not block
      * {@link #addTransContext(TransContext)} as the same transaction can only commit after begin.
@@ -113,7 +143,42 @@ public class TransContextManager
         this.contextLock.readLock().lock();
         try
         {
-            return  terminateTrans(transId, TransProto.TransStatus.COMMIT);
+            return terminateTrans(transId, TransProto.TransStatus.COMMIT);
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Set a batch of transactions to commit and remove them from this manager.
+     * This should be only called when the transactions are about to commit. This method does not block
+     * {@link #addTransContext(TransContext)} as the same transaction can only commit after begin.
+     * @param transIds the trans ids
+     * @param success whether each transaction commits successfully
+     * @return true if all transactions commit successfully
+     */
+    public boolean setTransCommitBatch(long[] transIds, Boolean[] success)
+    {
+        requireNonNull(transIds, "transIds is null");
+        requireNonNull(success, "success is null");
+        checkArgument(transIds.length == success.length,
+                "transIds and success have different length");
+        this.contextLock.readLock().lock();
+        try
+        {
+            boolean allSuccess = true;
+            for (int i = 0; i < transIds.length; i++)
+            {
+                success[i] = terminateTrans(transIds[i], TransProto.TransStatus.COMMIT);
+                if(!success[i])
+                {
+                    allSuccess = false;
+                    log.error("failed to commit transaction id {}", transIds[i]);
+                }
+            }
+            return allSuccess;
         }
         finally
         {
