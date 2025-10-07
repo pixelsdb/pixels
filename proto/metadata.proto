@@ -38,6 +38,7 @@ service MetadataService {
     rpc ExistTable (ExistTableRequest) returns (ExistTableResponse);
     rpc GetTable (GetTableRequest) returns (GetTableResponse);
     rpc GetTables (GetTablesRequest) returns (GetTablesResponse);
+    rpc GetTableById (GetTableByIdRequest) returns (GetTableByIdResponse);
     rpc UpdateRowCount (UpdateRowCountRequest) returns (UpdateRowCountResponse);
     rpc DropTable (DropTableRequest) returns (DropTableResponse);
     rpc AddLayout (AddLayoutRequest) returns (AddLayoutResponse);
@@ -307,6 +308,16 @@ message GetTablesRequest {
 message GetTablesResponse {
     ResponseHeader header = 1;
     repeated Table tables = 2;
+}
+
+message GetTableByIdRequest {
+    RequestHeader header = 1;
+    uint64 tableId = 2;
+}
+
+message GetTableByIdResponse {
+    ResponseHeader header = 1;
+    Table table = 2;
 }
 
 message ExistTableRequest {
