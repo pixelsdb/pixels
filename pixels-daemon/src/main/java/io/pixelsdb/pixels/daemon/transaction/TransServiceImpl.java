@@ -52,6 +52,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 
     /**
      * transId is monotonically increasing.
+     * <br/>
+     * Issue #1099:
      * For non-readonly transactions, transId is also used as the transaction timestamp.
      * For readonly transactions, the current high watermark is used as the transaction timestamp.
      */
