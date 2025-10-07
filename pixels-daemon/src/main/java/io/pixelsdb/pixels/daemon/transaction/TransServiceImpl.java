@@ -51,11 +51,11 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     private static final Logger logger = LogManager.getLogger(TransServiceImpl.class);
 
     /**
-     * transId and transTimestamp are monotonically increasing.
-     * However, we do not ensure a transaction with larger transId must have a larger transTimestamp.
+     * transId is monotonically increasing.
+     * For non-readonly transactions, transId is also used as the transaction timestamp.
+     * For readonly transactions, the current high watermark is used as the transaction timestamp.
      */
     private static final PersistentAutoIncrement transId;
-    private static final PersistentAutoIncrement transTimestamp;
     /**
      * Issue #174:
      * In this issue, we have not fully implemented the logic related to the watermarks.
@@ -71,7 +71,6 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         try
         {
             transId = new PersistentAutoIncrement(Constants.AI_TRANS_ID_KEY, false);
-            transTimestamp = new PersistentAutoIncrement(Constants.AI_TRANS_TS_KEY, false);
             KeyValue lowWatermarkKv = EtcdUtil.Instance().getKeyValue(Constants.TRANS_LOW_WATERMARK_KEY);
             if (lowWatermarkKv == null)
             {
@@ -114,12 +113,12 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         TransProto.BeginTransResponse response;
         try
         {
-            long id = TransServiceImpl.transId.getAndIncrement();
-            long timestamp = request.getReadOnly() ? highWatermark.get() : transTimestamp.getAndIncrement();
+            long transId = TransServiceImpl.transId.getAndIncrement();
+            long timestamp = request.getReadOnly() ? highWatermark.get() : transId;
             response = TransProto.BeginTransResponse.newBuilder()
                     .setErrorCode(ErrorCode.SUCCESS)
-                    .setTransId(id).setTimestamp(timestamp).build();
-            TransContext context = new TransContext(id, timestamp, request.getReadOnly());
+                    .setTransId(transId).setTimestamp(timestamp).build();
+            TransContext context = new TransContext(transId, timestamp, request.getReadOnly());
             TransContextManager.Instance().addTransContext(context);
         } catch (EtcdException e)
         {
@@ -153,7 +152,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             }
             else
             {
-                long timestamp = transTimestamp.getAndIncrement(numTrans);
+                long timestamp = transId;
                 for (int i = 0; i < numTrans; i++, transId++, timestamp++)
                 {
                     response.addTransIds(transId).addTimestamps(timestamp);
