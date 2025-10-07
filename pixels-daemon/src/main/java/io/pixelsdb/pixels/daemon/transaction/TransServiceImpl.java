@@ -144,9 +144,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             if (request.getReadOnly())
             {
                 long timestamp = highWatermark.get();
-                for (int i = 0; i < numTrans; i++)
+                for (int i = 0; i < numTrans; i++, transId++)
                 {
-                    response.addTransIds(transId++).addTimestamps(timestamp);
+                    response.addTransIds(transId).addTimestamps(timestamp);
                     TransContext context = new TransContext(transId, timestamp, true);
                     TransContextManager.Instance().addTransContext(context);
                 }
@@ -154,16 +154,17 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             else
             {
                 long timestamp = transTimestamp.getAndIncrement(numTrans);
-                for (int i = 0; i < numTrans; i++)
+                for (int i = 0; i < numTrans; i++, transId++, timestamp++)
                 {
-                    response.addTransIds(transId++).addTimestamps(timestamp++);
+                    response.addTransIds(transId).addTimestamps(timestamp);
                     TransContext context = new TransContext(transId, timestamp, false);
                     TransContextManager.Instance().addTransContext(context);
                 }
             }
             response.setExactNumTrans(request.getExpectNumTrans());
             response.setErrorCode(ErrorCode.SUCCESS);
-        } catch (EtcdException e)
+        }
+        catch (EtcdException e)
         {
             response.setErrorCode(ErrorCode.TRANS_GENERATE_ID_OR_TS_FAILED);
             logger.error("failed to generate transaction id or timestamp", e);
