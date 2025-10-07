@@ -33,8 +33,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.StampedLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -61,7 +63,7 @@ public class TransContextManager
     private final Map<Long, TransContext> transIdToContext = new ConcurrentHashMap<>();
     /**
      * Two different transactions will not have the same transaction id, so we can store the running transactions using
-     * a sorted set that sorts the transaction contexts by transaction timestamp and id. This is important for watermark pushing
+     * a sorted set that sorts the transaction contexts by transaction timestamp and id. This is important for watermark pushing.
      */
     private final Set<TransContext> runningReadOnlyTrans = new ConcurrentSkipListSet<>();
     private final Set<TransContext> runningWriteTrans = new ConcurrentSkipListSet<>();
@@ -70,7 +72,7 @@ public class TransContextManager
     private final Map<Long, String> transIdToTraceId = new ConcurrentHashMap<>();
     private final AtomicInteger readOnlyConcurrency = new AtomicInteger(0);
 
-    private final StampedLock contextLock = new StampedLock();
+    private final ReadWriteLock contextLock = new ReentrantReadWriteLock();
 
     private TransContextManager() { }
 
@@ -80,33 +82,52 @@ public class TransContextManager
      */
     public void addTransContext(TransContext context)
     {
-        requireNonNull(context, "transaction context is null");
-        long stamp = this.contextLock.tryOptimisticRead();
-        _addTransContext(context);
-        if (!this.contextLock.validate(stamp))
+        requireNonNull(context, "context is null");
+        this.contextLock.readLock().lock();
+        try
         {
-            stamp = this.contextLock.readLock();
-            try
+            this.transIdToContext.put(context.getTransId(), context);
+            if (context.isReadOnly())
             {
-                _addTransContext(context);
-            }
-            finally
+                this.readOnlyConcurrency.incrementAndGet();
+                this.runningReadOnlyTrans.add(context);
+            } else
             {
-                this.contextLock.unlockRead(stamp);
+                this.runningWriteTrans.add(context);
             }
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
         }
     }
 
-    private void _addTransContext(TransContext context)
+    /**
+     * Add a batch of trans contexts when new transactions begin.
+     * @param contexts the batch of trans contexts
+     */
+    public void addTransContextBatch(TransContext[] contexts)
     {
-        this.transIdToContext.put(context.getTransId(), context);
-        if (context.isReadOnly())
+        requireNonNull(contexts, "contexts is null");
+        this.contextLock.readLock().lock();
+        try
         {
-            this.readOnlyConcurrency.incrementAndGet();
-            this.runningReadOnlyTrans.add(context);
-        } else
+            for (TransContext context : contexts)
+            {
+                this.transIdToContext.put(context.getTransId(), context);
+                if (context.isReadOnly())
+                {
+                    this.readOnlyConcurrency.incrementAndGet();
+                    this.runningReadOnlyTrans.add(context);
+                } else
+                {
+                    this.runningWriteTrans.add(context);
+                }
+            }
+        }
+        finally
         {
-            this.runningWriteTrans.add(context);
+            this.contextLock.readLock().unlock();
         }
     }
 
@@ -119,21 +140,50 @@ public class TransContextManager
      */
     public boolean setTransCommit(long transId)
     {
-        long stamp = this.contextLock.tryOptimisticRead();
-        boolean res = _terminateTrans(transId, TransProto.TransStatus.COMMIT);
-        if (!this.contextLock.validate(stamp))
+        this.contextLock.readLock().lock();
+        try
         {
-            stamp = this.contextLock.readLock();
-            try
-            {
-                res = _terminateTrans(transId, TransProto.TransStatus.COMMIT);
-            }
-            finally
-            {
-                this.contextLock.unlockRead(stamp);
-            }
+            return terminateTrans(transId, TransProto.TransStatus.COMMIT);
         }
-        return res;
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Set a batch of transactions to commit and remove them from this manager.
+     * This should be only called when the transactions are about to commit. This method does not block
+     * {@link #addTransContext(TransContext)} as the same transaction can only commit after begin.
+     * @param transIds the trans ids
+     * @param success whether each transaction commits successfully
+     * @return true if all transactions commit successfully
+     */
+    public boolean setTransCommitBatch(long[] transIds, Boolean[] success)
+    {
+        requireNonNull(transIds, "transIds is null");
+        requireNonNull(success, "success is null");
+        checkArgument(transIds.length == success.length,
+                "transIds and success have different length");
+        this.contextLock.readLock().lock();
+        try
+        {
+            boolean allSuccess = true;
+            for (int i = 0; i < transIds.length; i++)
+            {
+                success[i] = terminateTrans(transIds[i], TransProto.TransStatus.COMMIT);
+                if(!success[i])
+                {
+                    allSuccess = false;
+                    log.error("failed to commit transaction id {}", transIds[i]);
+                }
+            }
+            return allSuccess;
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
     }
 
     /**
@@ -145,24 +195,18 @@ public class TransContextManager
      */
     public boolean setTransRollback(long transId)
     {
-        long stamp = this.contextLock.tryOptimisticRead();
-        boolean res = _terminateTrans(transId, TransProto.TransStatus.ROLLBACK);
-        if (!this.contextLock.validate(stamp))
+        this.contextLock.readLock().lock();
+        try
         {
-            stamp = this.contextLock.readLock();
-            try
-            {
-                res = _terminateTrans(transId, TransProto.TransStatus.ROLLBACK);
-            }
-            finally
-            {
-                this.contextLock.unlockRead(stamp);
-            }
+            return terminateTrans(transId, TransProto.TransStatus.ROLLBACK);
         }
-        return res;
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
     }
 
-    private boolean _terminateTrans(long transId, TransProto.TransStatus status)
+    private boolean terminateTrans(long transId, TransProto.TransStatus status)
     {
         TransContext context = this.transIdToContext.get(transId);
         if (context != null)
@@ -198,7 +242,7 @@ public class TransContextManager
      */
     public boolean dumpTransContext(long timestamp)
     {
-        long stamp = this.contextLock.writeLock();
+        this.contextLock.writeLock();
         try
         {
             //dump metrics to file
@@ -242,7 +286,7 @@ public class TransContextManager
         }
         finally
         {
-            this.contextLock.unlockWrite(stamp);
+            this.contextLock.writeLock().unlock();
         }
     }
 
@@ -292,7 +336,7 @@ public class TransContextManager
 
     public boolean bindExternalTraceId(long transId, String externalTraceId)
     {
-        long stamp = this.contextLock.writeLock();
+        this.contextLock.writeLock();
         try
         {
             // Issue #1099: write lock needed to block concurrent transaction commit/rollback.
@@ -306,7 +350,7 @@ public class TransContextManager
         }
         finally
         {
-            this.contextLock.unlockWrite(stamp);
+            this.contextLock.writeLock().unlock();
         }
     }
 
@@ -322,14 +366,14 @@ public class TransContextManager
             return this.readOnlyConcurrency.get();
         }
         // Issue #1099: write lock is needed to block concurrent transaction begin/commit/rollback.
-        long stamp = this.contextLock.writeLock();
+        this.contextLock.writeLock();
         try
         {
             return this.transIdToContext.size() - this.readOnlyConcurrency.get();
         }
         finally
         {
-            this.contextLock.unlockWrite(stamp);
+            this.contextLock.writeLock().unlock();
         }
     }
 }

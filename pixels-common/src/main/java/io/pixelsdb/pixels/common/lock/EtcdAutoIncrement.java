@@ -209,7 +209,8 @@ public class EtcdAutoIncrement
                         throw new EtcdException("invalid segment for id key " + idKey + " from etcd");
                     }
                     processor.process(segment);
-                } else
+                }
+                else
                 {
                     throw new EtcdException("the key value of the id " + idKey + " does not exist in etcd");
                 }
@@ -236,7 +237,8 @@ public class EtcdAutoIncrement
             try
             {
                 aiLock.unlock();
-            } catch (EtcdException e)
+            }
+            catch (EtcdException e)
             {
                 throw new EtcdException("failed to release write lock", e);
             }
