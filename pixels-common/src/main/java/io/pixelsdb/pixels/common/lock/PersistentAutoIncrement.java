@@ -113,9 +113,6 @@ public class PersistentAutoIncrement
 
     /**
      * Get the current value of this auto increment and increase it by the given batch size.
-     * <br/>
-     * <b>Note: It is recommended that the etcdStep in the constructor of this class is significantly larger than
-     * the batchSize here. Thus, the etcd overhead would not be significant.</b>
      * @param batchSize the given batch size
      * @return the current value of this auto increment.
      * @throws EtcdException when fail to interact with the backing etcd instance.

@@ -139,14 +139,27 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         TransProto.BeginTransBatchResponse.Builder response = TransProto.BeginTransBatchResponse.newBuilder();
         try
         {
-            int numTrans = request.getExpectNumTrans();
-            while (numTrans-- > 0)
+            final int numTrans = request.getExpectNumTrans();
+            long transId = TransServiceImpl.transId.getAndIncrement(numTrans);
+            if (request.getReadOnly())
             {
-                long transId = TransServiceImpl.transId.getAndIncrement();
-                long timestamp = request.getReadOnly() ? highWatermark.get() : transTimestamp.getAndIncrement();
-                response.addTransIds(transId).addTimestamps(timestamp);
-                TransContext context = new TransContext(transId, timestamp, request.getReadOnly());
-                TransContextManager.Instance().addTransContext(context);
+                long timestamp = highWatermark.get();
+                for (int i = 0; i < numTrans; i++)
+                {
+                    response.addTransIds(transId++).addTimestamps(timestamp);
+                    TransContext context = new TransContext(transId, timestamp, true);
+                    TransContextManager.Instance().addTransContext(context);
+                }
+            }
+            else
+            {
+                long timestamp = transTimestamp.getAndIncrement(numTrans);
+                for (int i = 0; i < numTrans; i++)
+                {
+                    response.addTransIds(transId++).addTimestamps(timestamp++);
+                    TransContext context = new TransContext(transId, timestamp, false);
+                    TransContextManager.Instance().addTransContext(context);
+                }
             }
             response.setExactNumTrans(request.getExpectNumTrans());
             response.setErrorCode(ErrorCode.SUCCESS);
@@ -209,7 +222,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
 
         boolean allSuccess = true;
-        for (int i = 0; i < request.getTransIdsCount(); ++i)
+        final int transCount = request.getTransIdsCount();
+        for (int i = 0; i < transCount; ++i)
         {
             long transId = request.getTransIds(i);
             boolean commitSuccess = false;
