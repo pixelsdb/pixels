@@ -85,7 +85,6 @@ public final class Constants
     // Issue #1099: increase from 1000 to 10000 to improve transaction-begin throughput
     public static final long AI_DEFAULT_STEP = 10000;
     public static final String AI_TRANS_ID_KEY = "trans_id";
-    public static final String AI_TRANS_TS_KEY = "trans_ts";
     public static final String AI_ROW_ID_PREFIX = "row_id_";
 
     public static final String CF_OUTPUT_STATE_KEY_PREFIX = "pixels_turbo_cf_output";

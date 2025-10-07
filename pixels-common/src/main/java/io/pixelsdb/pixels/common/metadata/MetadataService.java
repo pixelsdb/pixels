@@ -295,7 +295,7 @@ public class MetadataService
         return table;
     }
 
-    public Table getTable(long tableId) throws MetadataException
+    public Table getTableById(long tableId) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.GetTableByIdRequest request = MetadataProto.GetTableByIdRequest.newBuilder()
