@@ -99,7 +99,6 @@ public class TransContextManager
 
     private void _addTransContext(TransContext context)
     {
-        //System.out.println("thread " + Thread.currentThread().getName() + " add trans " + context.getTransId());
         this.transIdToContext.put(context.getTransId(), context);
         if (context.isReadOnly())
         {
@@ -165,7 +164,6 @@ public class TransContextManager
 
     private boolean _terminateTrans(long transId, TransProto.TransStatus status)
     {
-        // System.out.println("thread " + Thread.currentThread().getName() + " terminate trans " + transId);
         TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
@@ -278,7 +276,6 @@ public class TransContextManager
 
     public boolean isTransExist(long transId)
     {
-        //System.out.println("thread " + Thread.currentThread().getName() + " check trans " + transId + " exists " + this.transIdToContext.containsKey(transId));
         return this.transIdToContext.containsKey(transId);
     }
 
