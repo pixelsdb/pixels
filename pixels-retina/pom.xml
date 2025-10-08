@@ -87,6 +87,12 @@
             <artifactId>log4j-over-slf4j</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
