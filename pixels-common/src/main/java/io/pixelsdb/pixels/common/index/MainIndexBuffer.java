@@ -114,10 +114,13 @@ public class MainIndexBuffer implements Closeable
         long prevRowId = Long.MIN_VALUE;
         int prevRgId = Integer.MIN_VALUE;
         int prevRgRowOffset = Integer.MIN_VALUE;
-        /* Issue #1115: do post-sorting, build a tree set with the row ids sorted in ascending order.
-         * This consumes less memory and is slightly faster than building a tree map from fileBuffer.
+        /* Issue #1115: do post-sorting, build a row id array and sorted it in ascending order.
+         * This consumes less memory and is much faster than building a tree map from fileBuffer.
          */
-        SortedSet<Long> sortedRowIds = new TreeSet<>(fileBuffer.keySet());
+        Long[] rowIds = new Long[fileBuffer.size()];
+        rowIds = fileBuffer.keySet().toArray(rowIds);
+        List<Long> sortedRowIds = Arrays.asList(rowIds);
+        Collections.sort(sortedRowIds);
         for (long rowId : sortedRowIds)
         {
             IndexProto.RowLocation location = fileBuffer.get(rowId);
