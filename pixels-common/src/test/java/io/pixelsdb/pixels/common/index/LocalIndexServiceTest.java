@@ -40,7 +40,8 @@ class LocalIndexServiceTest {
     private static IndexProto.SecondaryIndexEntry secondaryEntry;
 
     @BeforeAll
-    static void setup() throws Exception {
+    static void setup() throws Exception
+    {
         indexService = new LocalIndexService();
 
         // open index
@@ -79,14 +80,16 @@ class LocalIndexServiceTest {
 
     @Test
     @Order(1)
-    void testPutPrimaryAndSecondaryIndex() throws Exception {
+    void testPutPrimaryAndSecondaryIndex() throws Exception
+    {
         assertTrue(indexService.putPrimaryIndexEntry(primaryEntry));
         assertTrue(indexService.putSecondaryIndexEntry(secondaryEntry));
     }
 
     @Test
     @Order(2)
-    void testLookupIndex() throws Exception {
+    void testLookupIndex() throws Exception
+    {
         // lookup primary
         IndexProto.RowLocation primaryLocation = indexService.lookupUniqueIndex(primaryEntry.getIndexKey());
         assertNotNull(primaryLocation);
@@ -100,7 +103,8 @@ class LocalIndexServiceTest {
 
     @Test
     @Order(3)
-    void testUpdateIndex() throws Exception {
+    void testUpdateIndex() throws Exception
+    {
         long newRowId = primaryEntry.getRowId() + 1;
         IndexProto.PrimaryIndexEntry updatedPrimary = primaryEntry.toBuilder()
                 .setRowId(newRowId)
@@ -114,7 +118,8 @@ class LocalIndexServiceTest {
 
     @Test
     @Order(4)
-    void testDeleteIndex() throws Exception {
+    void testDeleteIndex() throws Exception
+    {
         // delete primary
         IndexProto.RowLocation deletedPrimaryLocation = indexService.deletePrimaryIndexEntry(primaryEntry.getIndexKey());
         assertNotNull(deletedPrimaryLocation);
@@ -126,7 +131,8 @@ class LocalIndexServiceTest {
 
     @Test
     @Order(5)
-    void testPurgeAndFlush() throws Exception {
+    void testPurgeAndFlush() throws Exception
+    {
         assertTrue(indexService.putPrimaryIndexEntry(primaryEntry));
         assertTrue(indexService.putSecondaryIndexEntry(secondaryEntry));
 
@@ -141,7 +147,8 @@ class LocalIndexServiceTest {
 
     @Test
     @Order(6)
-    void testCloseAndRemoveIndex() throws Exception {
+    void testCloseAndRemoveIndex() throws Exception
+    {
         // close
         assertTrue(indexService.closeIndex(TABLE_ID, PRIMARY_INDEX_ID, true));
         assertTrue(indexService.closeIndex(TABLE_ID, SECONDARY_INDEX_ID, false));
