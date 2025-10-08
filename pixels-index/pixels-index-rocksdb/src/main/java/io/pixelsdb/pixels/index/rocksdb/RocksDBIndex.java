@@ -167,7 +167,7 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        try(WriteBatch writeBatch = new WriteBatch())
+        try
         {
             // Convert IndexKey to byte array
             byte[] keyBytes = toByteArray(key);
@@ -176,16 +176,15 @@ public class RocksDBIndex implements SinglePointIndex
             if (unique)
             {
                 // Write to RocksDB
-                writeBatch.put(keyBytes, valueBytes);
+                rocksDB.put(keyBytes, valueBytes);
             }
             else
             {
                 // Create composite key
                 byte[] nonUniqueKey = toNonUniqueKey(key, rowId);
                 // Store in RocksDB
-                writeBatch.put(nonUniqueKey, new byte[0]);
+                rocksDB.put(nonUniqueKey, new byte[0]);
             }
-            rocksDB.write(writeOptions, writeBatch);
             return true;
         }
         catch (RocksDBException e)
@@ -266,7 +265,7 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public long updatePrimaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        try(WriteBatch writeBatch = new WriteBatch())
+        try
         {
             // Get previous rowId and rowLocation
             long prevRowId = getUniqueRowId(key);
@@ -274,8 +273,7 @@ public class RocksDBIndex implements SinglePointIndex
             byte[] keyBytes = toByteArray(key);
             byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
             // Write to RocksDB
-            writeBatch.put(keyBytes,valueBytes);
-            rocksDB.write(writeOptions, writeBatch);
+            rocksDB.put(keyBytes, valueBytes);
             return prevRowId;
         }
         catch (RocksDBException e)
@@ -288,7 +286,7 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        try(WriteBatch writeBatch = new WriteBatch())
+        try
         {
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
             // Convert key and new rowId to bytes
@@ -300,7 +298,7 @@ public class RocksDBIndex implements SinglePointIndex
                 // Get previous rowIds
                 builder.add(this.getUniqueRowId(key));
                 // Write to RocksDB
-                writeBatch.put(keyBytes, valueBytes);
+                rocksDB.put(keyBytes, valueBytes);
             }
             else
             {
@@ -308,10 +306,8 @@ public class RocksDBIndex implements SinglePointIndex
                 builder.addAll(this.getRowIds(key));
                 // Write to RocksDB
                 byte[] nonUniqueKey = toNonUniqueKey(key, rowId);
-                writeBatch.put(nonUniqueKey, new byte[0]);
+                rocksDB.put(nonUniqueKey, new byte[0]);
             }
-            // Write to RocksDB
-            rocksDB.write(writeOptions, writeBatch);
             return builder.build();
         }
         catch (RocksDBException e)
@@ -398,13 +394,11 @@ public class RocksDBIndex implements SinglePointIndex
     public long deleteUniqueEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         long rowId = getUniqueRowId(key);
-        try(WriteBatch writeBatch = new WriteBatch())
+        try
         {
             byte[] keyBytes = toByteArray(key);
             byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array(); // -1 means a tombstone
-
-            writeBatch.put(keyBytes,newValue);
-            rocksDB.write(writeOptions, writeBatch);
+            rocksDB.put(keyBytes, newValue);
             return rowId;
         }
         catch (RocksDBException e)
@@ -418,7 +412,7 @@ public class RocksDBIndex implements SinglePointIndex
     public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
-        try(WriteBatch writeBatch = new WriteBatch())
+        try
         {
             byte[] keyBytes = toByteArray(key);
             byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array(); // -1 means a tombstone
@@ -432,7 +426,7 @@ public class RocksDBIndex implements SinglePointIndex
                     return ImmutableList.of();
                 }
                 builder.add(rowId);
-                writeBatch.put(keyBytes,newValue);
+                rocksDB.put(keyBytes, newValue);
             }
             else
             {
@@ -444,9 +438,8 @@ public class RocksDBIndex implements SinglePointIndex
                 }
                 builder.addAll(rowIds);
                 byte[] nonUniqueKey = toNonUniqueKey(key, -1L);
-                writeBatch.put(nonUniqueKey, new byte[0]);
+                rocksDB.put(nonUniqueKey, new byte[0]);
             }
-            rocksDB.write(writeOptions, writeBatch);
             return builder.build();
         }
         catch (RocksDBException e)
@@ -572,7 +565,8 @@ public class RocksDBIndex implements SinglePointIndex
             try
             {
                 FileUtils.deleteDirectory(new File(rocksDBPath));
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 throw new SinglePointIndexException("failed to clean up RocksDB directory: " + e);
             }
@@ -659,12 +653,14 @@ public class RocksDBIndex implements SinglePointIndex
     {
         // Build lower bound (timestamp = 0)
         int offset = keyBytes.length - 8;
-        for (int i = 0; i < Long.BYTES; i++) {
+        for (int i = 0; i < Long.BYTES; i++)
+        {
             keyBytes[offset + i] = 0;
         }
         Slice lowerBound = new Slice(keyBytes);
         // Build upper bound (timestamp = timestamp + 1)
-        for (int i = 7; i >= 0; i--) {
+        for (int i = 7; i >= 0; i--)
+        {
             keyBytes[offset + i] = (byte)(timestamp & 0xFF);
             timestamp >>>= 8;
         }
