@@ -43,8 +43,8 @@ import java.util.stream.LongStream;
 
 public class TestRetinaService
 {
-    private static final int NUM_THREADS = 10; // Number of concurrent threads
-    private static final double RPC_PER_SECOND = 1000.0; // Desired RPCs per second
+    private static final int NUM_THREADS = 100; // Number of concurrent threads
+    private static final double RPC_PER_SECOND = 5000.0; // Desired RPCs per second
     private static final int ROWS_PER_RPC = 10; // Number of rows per RPC
     private static final double UPDATE_RATIO = 0.8; // Ratio of updates to total operations
     private static final int TEST_DURATION_SECONDS = 60; // Total test duration in seconds
@@ -276,7 +276,6 @@ public class TestRetinaService
         System.out.println("------------------------------------------------------");
         System.out.printf(" - Total rows inserted: %d\n", insertCount.get());
         System.out.printf(" - Total rows deleted: %d\n", deleteCount.get());
-        System.out.printf(" - An UPDATE operation consists of 1 DELETE and 1 INSERT.\n");
         System.out.println("======================================================");
     }
 }
