@@ -42,6 +42,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.index.rocksdb.RocksDBIndex.toKeyBytes;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TestRocksDBIndex
@@ -94,7 +95,7 @@ public class TestRocksDBIndex
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-        byte[] keyBytes = toByteArray(keyProto);
+        byte[] keyBytes = toKeyBytes(keyProto);
         boolean success = rocksDBIndex.putEntry(keyProto, rowId);
         assertTrue(success, "putEntry should return true");
 
@@ -140,7 +141,7 @@ public class TestRocksDBIndex
         for (int i = 0; i < entries.size(); i++)
         {
             IndexProto.PrimaryIndexEntry entry = entries.get(i);
-            byte[] keyBytes = toByteArray(entry.getIndexKey());
+            byte[] keyBytes = toKeyBytes(entry.getIndexKey());
             byte[] storedValue = rocksDB.get(keyBytes);
             assertNotNull(storedValue);
             long storedRowId = ByteBuffer.wrap(storedValue).getLong();
@@ -432,40 +433,5 @@ public class TestRocksDBIndex
         {
             System.err.println("Failed to clean up SQLite test directory: " + e.getMessage());
         }
-    }
-
-    private static void writeLongBE(byte[] buf, int offset, long value)
-    {
-        buf[offset]     = (byte)(value >>> 56);
-        buf[offset + 1] = (byte)(value >>> 48);
-        buf[offset + 2] = (byte)(value >>> 40);
-        buf[offset + 3] = (byte)(value >>> 32);
-        buf[offset + 4] = (byte)(value >>> 24);
-        buf[offset + 5] = (byte)(value >>> 16);
-        buf[offset + 6] = (byte)(value >>> 8);
-        buf[offset + 7] = (byte)(value);
-    }
-
-    // Convert IndexKey to byte array
-    private static byte[] toByteArray(IndexProto.IndexKey key)
-    {
-        byte[] keyBytes = key.getKey().toByteArray();
-        int totalLength = Long.BYTES + keyBytes.length + Long.BYTES;
-
-        byte[] compositeKey = new byte[totalLength];
-        int pos = 0;
-
-        // Write indexId (8 bytes, big endian)
-        long indexId = key.getIndexId();
-        writeLongBE(compositeKey, pos, indexId);
-        pos += 8;
-        // Write key bytes (variable length)
-        System.arraycopy(keyBytes, 0, compositeKey, pos, keyBytes.length);
-        pos += keyBytes.length;
-        // Write timestamp (8 bytes, big endian)
-        long timestamp = key.getTimestamp();
-        writeLongBE(compositeKey, pos, timestamp);
-
-        return compositeKey;
     }
 }
