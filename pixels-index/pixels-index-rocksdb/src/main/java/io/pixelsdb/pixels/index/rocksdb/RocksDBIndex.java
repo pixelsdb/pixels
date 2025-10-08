@@ -318,8 +318,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
-            throws SinglePointIndexException
+    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         try (WriteBatch writeBatch = new WriteBatch())
         {
@@ -464,18 +463,18 @@ public class RocksDBIndex implements SinglePointIndex
                 if(unique)
                 {
                     long rowId = getUniqueRowId(key);
-                    if(rowId < 0)   // indicates there is a transaction error, delete invalid index entry
+                    if(rowId < 0)  // indicates there is a transaction error, delete invalid index entry
                     {
                         // Return empty array if entry not found
                         return ImmutableList.of();
                     }
                     builder.add(rowId);
-                    writeBatch.put(keyBytes,newValue);
+                    writeBatch.put(keyBytes, newValue);
                 }
                 else
                 {
                     List<Long> rowIds = getRowIds(key);
-                    if(rowIds.isEmpty())    // indicates there is a transaction error, delete invalid index entry
+                    if(rowIds.isEmpty())  // indicates there is a transaction error, delete invalid index entry
                     {
                         // Return empty array if entry not found
                         return ImmutableList.of();
