@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.index.main.sqlite;
 
-import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexFactory;
@@ -47,7 +46,7 @@ public class TestSqliteMainIndex
     MainIndex mainIndex;
 
     @BeforeEach
-    public void setUp() throws EtcdException, MainIndexException
+    public void setUp() throws MainIndexException
     {
         // Create SQLite Directory
         try
@@ -131,18 +130,30 @@ public class TestSqliteMainIndex
     }
 
     @Test
-    public void testPutPerformance() throws MainIndexException
+    public void testPutAndGetPerformance() throws MainIndexException
     {
-        long rowIdBase = 0L;
+        final long rowIdBase = 0L;
         IndexProto.RowLocation.Builder locationBuilder = IndexProto.RowLocation.newBuilder()
                 .setFileId(1L).setRgId(0);
+        long start = System.currentTimeMillis();
         for (int i = 0; i < 10000000; i++)
         {
             mainIndex.putEntry(rowIdBase + i, locationBuilder.setRgRowOffset(i).build());
         }
+        System.out.println(System.currentTimeMillis() - start);
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 10000000; i++)
+        {
+            mainIndex.getLocation(rowIdBase + i);
+        }
+        System.out.println(System.currentTimeMillis() - start);
+        start = System.currentTimeMillis();
         mainIndex.flushCache(1);
+        System.out.println(System.currentTimeMillis() - start);
+        start = System.currentTimeMillis();
         mainIndex.deleteRowIdRange(new RowIdRange(
                 0L, 10_000_000L, 1L, 0, 0, 10_000_000));
+        System.out.println(System.currentTimeMillis() - start);
     }
 
     @Test

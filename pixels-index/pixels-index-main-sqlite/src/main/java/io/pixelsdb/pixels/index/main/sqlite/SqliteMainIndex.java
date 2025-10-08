@@ -153,7 +153,9 @@ public class SqliteMainIndex implements MainIndex
                 }
             });
             // 2. allocate numRowIds
-            // Issue #1099: auto increment starts from 1, whereas row id starts from 0, so we use auto increment minus 1 as the row id start.
+            /* Issue #1099: auto increment starts from 1, whereas row id starts from 0,
+             * so we use auto increment minus 1 as the row id start.
+             */
             long start = autoIncrement.getAndIncrement(numRowIds) - 1;
             return IndexProto.RowIdBatch.newBuilder().setRowIdStart(start).setLength(numRowIds).build();
         }
@@ -167,14 +169,21 @@ public class SqliteMainIndex implements MainIndex
     public IndexProto.RowLocation getLocation(long rowId) throws MainIndexException
     {
         this.cacheRwLock.readLock().lock();
-        /*
-         * Issue #916:
-         * cache-read lock and db-read lock are not acquired together before reading cache.
-         * Thus putEntry() does not block db-read in this method. It is fine that deleteRowIdRange(rowIdRange)
-         * happen between cache-read and db-read of this method.
-         */
-        IndexProto.RowLocation location = this.indexBuffer.lookup(rowId);
-        this.cacheRwLock.readLock().unlock();
+        IndexProto.RowLocation location;
+        try
+        {
+            /*
+             * Issue #916:
+             * cache-read lock and db-read lock are not acquired together before reading cache.
+             * Thus putEntry() does not block db-read in this method. It is fine that deleteRowIdRange(rowIdRange)
+             * happen between cache-read and db-read of this method.
+             */
+            location = this.indexBuffer.lookup(rowId);
+        }
+        finally
+        {
+            this.cacheRwLock.readLock().unlock();
+        }
         if (location == null)
         {
             /*
@@ -184,9 +193,9 @@ public class SqliteMainIndex implements MainIndex
              * otherwise, if cache misses, cache-flushing in flushCache(fileId) and close() has the same effect
              * as flushing the cache before read it.
              */
+            this.dbRwLock.readLock().lock();
             try
             {
-                this.dbRwLock.readLock().lock();
                 RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
                 if (rowIdRange != null)
                 {
@@ -198,12 +207,14 @@ public class SqliteMainIndex implements MainIndex
                     location = IndexProto.RowLocation.newBuilder()
                             .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
                 }
-                this.dbRwLock.readLock().unlock();
             }
             catch (RowIdException e)
             {
-                this.dbRwLock.readLock().unlock();
                 throw new MainIndexException("failed to query row location from sqlite", e);
+            }
+            finally
+            {
+                this.dbRwLock.readLock().unlock();
             }
         }
         return location;
@@ -213,8 +224,15 @@ public class SqliteMainIndex implements MainIndex
     public boolean putEntry(long rowId, IndexProto.RowLocation rowLocation)
     {
         this.cacheRwLock.writeLock().lock();
-        boolean res = this.indexBuffer.insert(rowId, rowLocation);
-        this.cacheRwLock.writeLock().unlock();
+        boolean res;
+        try
+        {
+            res = this.indexBuffer.insert(rowId, rowLocation);
+        }
+        finally
+        {
+            this.cacheRwLock.writeLock().unlock();
+        }
         return res;
     }
 
@@ -247,13 +265,15 @@ public class SqliteMainIndex implements MainIndex
                         .setRowIdStart(rowIdEnd).setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd() - width).build();
                 res &= updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
             }
-            this.dbRwLock.writeLock().unlock();
             return res;
         }
         catch (SQLException | RowIdException e)
         {
-            this.dbRwLock.writeLock().unlock();
             throw new MainIndexException("failed to delete row id ranges from sqlite", e);
+        }
+        finally
+        {
+            this.dbRwLock.writeLock().unlock();
         }
     }
 
@@ -345,16 +365,17 @@ public class SqliteMainIndex implements MainIndex
                     pst.addBatch();
                 }
                 pst.executeBatch();
-                this.cacheRwLock.writeLock().unlock();
-                this.dbRwLock.writeLock().unlock();
                 return true;
             }
         }
         catch (MainIndexException | SQLException e)
         {
+            throw new MainIndexException("failed to flush index cache into sqlite", e);
+        }
+        finally
+        {
             this.cacheRwLock.writeLock().unlock();
             this.dbRwLock.writeLock().unlock();
-            throw new MainIndexException("failed to flush index cache into sqlite", e);
         }
     }
 
@@ -366,32 +387,35 @@ public class SqliteMainIndex implements MainIndex
             this.closed = true;
             this.cacheRwLock.writeLock().lock();
             this.dbRwLock.writeLock().lock();
-            List<Long> cachedFileIds = this.indexBuffer.cachedFileIds();
-            for (long fileId : cachedFileIds)
-            {
-                try
-                {
-                    // the locks are reentrant, no deadlocking problem
-                    this.flushCache(fileId);
-                } catch (MainIndexException e)
-                {
-                    this.cacheRwLock.writeLock().unlock();
-                    this.dbRwLock.writeLock().unlock();
-                    throw new IOException("failed to flush main index cache of file id " + fileId, e);
-                }
-            }
-            this.indexBuffer.close();
             try
             {
-                this.connection.close();
-            } catch (SQLException e)
+                List<Long> cachedFileIds = this.indexBuffer.cachedFileIds();
+                for (long fileId : cachedFileIds)
+                {
+                    try
+                    {
+                        // the locks are reentrant, no deadlocking problem
+                        this.flushCache(fileId);
+                    } catch (MainIndexException e)
+                    {
+                        throw new IOException("failed to flush main index cache of file id " + fileId, e);
+                    }
+                }
+                this.indexBuffer.close();
+                try
+                {
+                    this.connection.close();
+                } catch (SQLException e)
+                {
+                    throw new IOException("failed to close sqlite connection", e);
+                }
+            }
+            finally
             {
                 this.cacheRwLock.writeLock().unlock();
                 this.dbRwLock.writeLock().unlock();
-                throw new IOException("failed to close sqlite connection", e);
             }
-            this.cacheRwLock.writeLock().unlock();
-            this.dbRwLock.writeLock().unlock();
+
         }
     }
 

@@ -25,17 +25,13 @@ import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.stream.Collectors;
+import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * This is the index buffer for a main index.
- * It is to be used inside the main index implementations and protected by the concurrent control in the main index,
+ * It is to be used inside the main index implementations and protected by the concurrency control in the main index,
  * thus it is not necessary to be thread-safe.
  * @author hank
  * @create 2025-07-17
@@ -63,7 +59,8 @@ public class MainIndexBuffer implements Closeable
         Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(location.getFileId());
         if (fileBuffer == null)
         {
-            fileBuffer = new TreeMap<>();
+            // Issue #1115: use HashMap for better performance and do post-sorting in flush().
+            fileBuffer = new HashMap<>();
             fileBuffer.put(rowId, location);
             indexBuffer.put(location.getFileId(), fileBuffer);
             return true;
@@ -117,11 +114,16 @@ public class MainIndexBuffer implements Closeable
         long prevRowId = Long.MIN_VALUE;
         int prevRgId = Integer.MIN_VALUE;
         int prevRgRowOffset = Integer.MIN_VALUE;
-        for (Map.Entry<Long, IndexProto.RowLocation> entry : fileBuffer.entrySet())
+        /* Issue #1115: do post-sorting, build a row id array and sorted it in ascending order.
+         * This consumes less memory and is much faster than building a tree map from fileBuffer.
+         */
+        Long[] rowIds = new Long[fileBuffer.size()];
+        rowIds = fileBuffer.keySet().toArray(rowIds);
+        List<Long> sortedRowIds = Arrays.asList(rowIds);
+        Collections.sort(sortedRowIds);
+        for (long rowId : sortedRowIds)
         {
-            // file buffer is a tree map, its entries are sorted in ascending order
-            long rowId = entry.getKey();
-            IndexProto.RowLocation location = entry.getValue();
+            IndexProto.RowLocation location = fileBuffer.get(rowId);
             checkArgument(fileId == location.getFileId());
             int rgId = location.getRgId();
             int rgRowOffset = location.getRgRowOffset();
@@ -162,7 +164,7 @@ public class MainIndexBuffer implements Closeable
 
     public List<Long> cachedFileIds()
     {
-        return indexBuffer.keySet().stream().map(id -> id).collect(Collectors.toList());
+        return new ArrayList<>(indexBuffer.keySet());
     }
 
     @Override
