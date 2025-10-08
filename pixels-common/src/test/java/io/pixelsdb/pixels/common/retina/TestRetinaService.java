@@ -34,10 +34,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Assertions;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
@@ -91,12 +88,14 @@ public class TestRetinaService
         for (int j = 0; j < 4; ++j)
         {
             SinkProto.ColumnValue.Builder columnValueBuilder = SinkProto.ColumnValue.newBuilder()
-                    .setName(colNames[j])
                     .setValue(ByteString.copyFrom(cols[j]));
             valueBuilder.addValues(columnValueBuilder.build());
         }
-        Map<String, SinkProto.ColumnValue> valueMap = valueBuilder.getValuesList()
-                .stream().collect(Collectors.toMap(SinkProto.ColumnValue::getName, v -> v));
+        Map<String, SinkProto.ColumnValue> valueMap = new HashMap<>();
+        for (int j = 0; j < colNames.length; j++)
+        {
+            valueMap.put(colNames[j], valueBuilder.getValues(j));
+        }
 
         List<String> keyColumnNames = new LinkedList<>();
         keyColumnNames.add("key"); // 'key' is the primary key's name
@@ -225,5 +224,51 @@ public class TestRetinaService
             throw new RuntimeException(e);
         }
         updateRecords(null, indexKeys);
+    }
+
+    @Test
+    public void testInsertAndDeleteMultipleRecords()
+    {
+        long testSize = 10000;
+
+        List<Long> insertedKeys = new ArrayList<>();
+        List<IndexProto.IndexKey> indexKeys = new ArrayList<>();
+
+        // Insert initial data 0-99
+        for (long i = 0; i < testSize * 2; ++i)
+        {
+            RetinaProto.InsertData.Builder insertDataBuilder = RetinaProto.InsertData.newBuilder();
+            IndexProto.IndexKey key = constructInsertData(i, insertDataBuilder);
+            insertedKeys.add(i);
+            indexKeys.add(key);
+        }
+        updateRecords(insertedKeys, null);
+
+        // insert one record and delete three record each time
+        long startTime = System.currentTimeMillis();
+        for (long i = testSize * 2; i < testSize * 3; ++i)
+        {
+            List<Long> insertList = new ArrayList<>();
+            insertList.add(i);
+
+            List<IndexProto.IndexKey> deleteList = new ArrayList<>();
+            if (indexKeys.size() >= 3)
+            {
+                deleteList.add(indexKeys.get(0));
+                deleteList.add(indexKeys.get(1));
+                deleteList.add(indexKeys.get(2));
+            }
+
+            List<IndexProto.IndexKey> newKeys = updateRecords(insertList, deleteList);
+
+            indexKeys.addAll(newKeys);
+            if (indexKeys.size() >= 3)
+            {
+                indexKeys.subList(0, 3).clear();
+            }
+        }
+        long endTime = System.currentTimeMillis();
+        System.out.println("TestInsertAndDeleteMultipleRecords time cost: " + (endTime - startTime) + " ms");
+        System.out.println("TestInsertAndDeleteMultipleRecords TPS: " + testSize * 1000.0 / (endTime - startTime) + " ops/s");
     }
 }
