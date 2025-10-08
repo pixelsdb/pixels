@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.index.main.sqlite;
 
-import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexFactory;
@@ -47,7 +46,7 @@ public class TestSqliteMainIndex
     MainIndex mainIndex;
 
     @BeforeEach
-    public void setUp() throws EtcdException, MainIndexException
+    public void setUp() throws MainIndexException
     {
         // Create SQLite Directory
         try
