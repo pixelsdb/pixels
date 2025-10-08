@@ -29,17 +29,28 @@ import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.sink.SinkProto;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.RateLimiter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Assertions;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 public class TestRetinaService
 {
+    private static final int NUM_THREADS = 10; // Number of concurrent threads
+    private static final double RPC_PER_SECOND = 1000.0; // Desired RPCs per second
+    private static final int ROWS_PER_RPC = 10; // Number of rows per RPC
+    private static final double UPDATE_RATIO = 0.8; // Ratio of updates to total operations
+    private static final int TEST_DURATION_SECONDS = 60; // Total test duration in seconds
+    private static final AtomicLong primaryKeyCounter = new AtomicLong(0); // Counter for generating unique primary keys
+    private static final ConcurrentLinkedDeque<IndexProto.IndexKey> existingKeys = new ConcurrentLinkedDeque<>(); // Thread-safe deque to store existing keys
+
     private static String schemaName;
     private static String tableName;
     private static String[] colNames;
@@ -69,6 +80,16 @@ public class TestRetinaService
         boolean result = metadataService.createSinglePointIndex(singlePointIndex);
         Assertions.assertTrue(result);
         index = metadataService.getPrimaryIndex(table.getId());
+
+        //
+        System.out.println("Pre-populating data for UPDATE operations...");
+        List<Long> initialKeys = LongStream.range(0, NUM_THREADS * ROWS_PER_RPC * 10)
+                .map(i -> primaryKeyCounter.getAndIncrement())
+                .boxed()
+                .collect(Collectors.toList());
+        List<IndexProto.IndexKey> initialIndexKeys = new TestRetinaService().updateRecords(initialKeys, null);
+        existingKeys.addAll(initialIndexKeys);
+        System.out.println("Pre-population complete.");
     }
 
     /**
@@ -179,96 +200,83 @@ public class TestRetinaService
     }
 
     @Test
-    public void testStreamUpdateRecord()
+    public void configurableLoadTest() throws InterruptedException
     {
-        // Insert 10 rows of data.
-        List<Long> insertData = LongStream.range(0, 10).boxed().collect(Collectors.toList());
-        List<IndexProto.IndexKey> indexKeys = updateRecords(insertData, null);
-        System.out.println("You can use trino-cli to query newly inserted data.");
+        System.out.println("======================================================");
+        System.out.printf("Starting Load Test with configuration:\n");
+        System.out.printf(" - Threads: %d\n", NUM_THREADS);
+        System.out.printf(" - Target RPCs/sec: %.2f\n", RPC_PER_SECOND);
+        System.out.printf(" - Rows per RPC: %d\n", ROWS_PER_RPC);
+        System.out.printf(" - Update Ratio: %.2f\n", UPDATE_RATIO);
+        System.out.printf(" - Duration: %d seconds\n", TEST_DURATION_SECONDS);
+        System.out.println("======================================================");
 
-        // Delete these inserted data after 10 seconds.
-        try
-        {
-            System.out.println("The inserted data will be deleted after 10 seconds.");
-            Thread.sleep(10000);
-        } catch (InterruptedException e)
-        {
-            throw new RuntimeException(e);
-        }
-        updateRecords(null, indexKeys);
-    }
+        ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
+        final RateLimiter rateLimiter = RateLimiter.create(RPC_PER_SECOND);
+        final AtomicLong totalOperations = new AtomicLong(0);
+        final AtomicLong insertCount = new AtomicLong(0);
+        final AtomicLong deleteCount = new AtomicLong(0);
+        final CountDownLatch latch = new CountDownLatch(NUM_THREADS);
+        final long testEndTime = System.currentTimeMillis() + TEST_DURATION_SECONDS * 1000L;
 
-    @Test
-    public void testUpdateSingleRecord()
-    {
-        // Insert a row of data.
-        List<Long> initData = new ArrayList<>();
-        initData.add(0L);
-        List<IndexProto.IndexKey>indexKeys =  updateRecords(initData, null);
-
-        for (int i = 1; i < 1000; ++i)
-        {
-            List<Long> insertData = new ArrayList<>();
-            insertData.add((long) i);
-            System.out.println("update from" + (i - 1) + " to " + i);
-            indexKeys = updateRecords(insertData, indexKeys);
-        }
-
-        // Delete the last inserted data.
-        try
-        {
-            System.out.println("The last inserted data will be deleted after 10 seconds.");
-            Thread.sleep(10000);
-        } catch (InterruptedException e)
-        {
-            throw new RuntimeException(e);
-        }
-        updateRecords(null, indexKeys);
-    }
-
-    @Test
-    public void testInsertAndDeleteMultipleRecords()
-    {
-        long testSize = 10000;
-
-        List<Long> insertedKeys = new ArrayList<>();
-        List<IndexProto.IndexKey> indexKeys = new ArrayList<>();
-
-        // Insert initial data 0-99
-        for (long i = 0; i < testSize * 2; ++i)
-        {
-            RetinaProto.InsertData.Builder insertDataBuilder = RetinaProto.InsertData.newBuilder();
-            IndexProto.IndexKey key = constructInsertData(i, insertDataBuilder);
-            insertedKeys.add(i);
-            indexKeys.add(key);
-        }
-        updateRecords(insertedKeys, null);
-
-        // insert one record and delete three record each time
         long startTime = System.currentTimeMillis();
-        for (long i = testSize * 2; i < testSize * 3; ++i)
+
+        for (int i = 0; i < NUM_THREADS; i++)
         {
-            List<Long> insertList = new ArrayList<>();
-            insertList.add(i);
+            executor.submit(() -> {
+                try {
+                    while (System.currentTimeMillis() < testEndTime) {
+                        rateLimiter.acquire(); // 等待令牌
 
-            List<IndexProto.IndexKey> deleteList = new ArrayList<>();
-            if (indexKeys.size() >= 3)
-            {
-                deleteList.add(indexKeys.get(0));
-                deleteList.add(indexKeys.get(1));
-                deleteList.add(indexKeys.get(2));
-            }
+                        List<Long> keysToInsert = new ArrayList<>();
+                        List<IndexProto.IndexKey> keysToDelete = new ArrayList<>();
 
-            List<IndexProto.IndexKey> newKeys = updateRecords(insertList, deleteList);
+                        for (int j = 0; j < ROWS_PER_RPC; j++) {
+                            // 根据比例决定是执行更新还是插入
+                            if (ThreadLocalRandom.current().nextDouble() < UPDATE_RATIO && !existingKeys.isEmpty()) {
+                                // 执行更新操作: 从队列中取一个旧key来删除，并生成一个新key来插入
+                                IndexProto.IndexKey keyToDelete = existingKeys.poll();
+                                if (keyToDelete != null) {
+                                    keysToDelete.add(keyToDelete);
+                                    keysToInsert.add(primaryKeyCounter.getAndIncrement());
+                                } else {
+                                    // 如果没取到（例如队列暂时为空），则本次操作转为纯插入
+                                    keysToInsert.add(primaryKeyCounter.getAndIncrement());
+                                }
+                            } else {
+                                // 执行纯插入操作
+                                keysToInsert.add(primaryKeyCounter.getAndIncrement());
+                            }
+                        }
 
-            indexKeys.addAll(newKeys);
-            if (indexKeys.size() >= 3)
-            {
-                indexKeys.subList(0, 3).clear();
-            }
+                        if (!keysToInsert.isEmpty() || !keysToDelete.isEmpty()) {
+                            List<IndexProto.IndexKey> newKeys = updateRecords(keysToInsert, keysToDelete);
+                            existingKeys.addAll(newKeys); // 将新生成的key放回队列
+                            totalOperations.incrementAndGet();
+                            insertCount.addAndGet(keysToInsert.size());
+                            deleteCount.addAndGet(keysToDelete.size());
+                        }
+                    }
+                } finally {
+                    latch.countDown();
+                }
+            });
         }
+
+        latch.await(); // 等待所有线程完成
+        executor.shutdown();
         long endTime = System.currentTimeMillis();
-        System.out.println("TestInsertAndDeleteMultipleRecords time cost: " + (endTime - startTime) + " ms");
-        System.out.println("TestInsertAndDeleteMultipleRecords TPS: " + testSize * 1000.0 / (endTime - startTime) + " ops/s");
+        long durationMillis = endTime - startTime;
+
+        System.out.println("======================================================");
+        System.out.println("Test Finished.");
+        System.out.printf(" - Total execution time: %.3f seconds\n", durationMillis / 1000.0);
+        System.out.printf(" - Total RPC calls: %d\n", totalOperations.get());
+        System.out.printf(" - Actual TPS (RPCs/sec): %.2f\n", totalOperations.get() / (durationMillis / 1000.0));
+        System.out.println("------------------------------------------------------");
+        System.out.printf(" - Total rows inserted: %d\n", insertCount.get());
+        System.out.printf(" - Total rows deleted: %d\n", deleteCount.get());
+        System.out.printf(" - An UPDATE operation consists of 1 DELETE and 1 INSERT.\n");
+        System.out.println("======================================================");
     }
 }
