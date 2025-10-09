@@ -35,6 +35,7 @@ import org.rocksdb.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -109,7 +110,8 @@ public class RocksDBIndex implements SinglePointIndex
         // Get prefix
         byte[] keyBytes = toKeyBytes(key);
         long timestamp = key.getTimestamp();
-        setIteratorBounds(readOptions, keyBytes, timestamp+1);
+        byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+        setIteratorBounds(readOptions, copyBytes, timestamp+1);
         long rowId = -1L;
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
@@ -133,7 +135,8 @@ public class RocksDBIndex implements SinglePointIndex
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         byte[] keyBytes = toKeyBytes(key);
         long timestamp = key.getTimestamp();
-        setIteratorBounds(readOptions, keyBytes, timestamp+1);
+        byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+        setIteratorBounds(readOptions, copyBytes, timestamp+1);
         // Use RocksDB iterator for prefix search
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
@@ -499,29 +502,37 @@ public class RocksDBIndex implements SinglePointIndex
     public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
-        try(WriteBatch writeBatch = new WriteBatch())
+
+        try (WriteBatch writeBatch = new WriteBatch())
         {
-            // Delete from RocksDB
-            for(IndexProto.IndexKey key : indexKeys)
+            for (IndexProto.IndexKey key : indexKeys)
             {
                 byte[] keyBytes = toKeyBytes(key);
-
-                if(unique)  // only unique may be primary index
+                long timestamp = key.getTimestamp();
+                byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+                setIteratorBounds(readOptions, copyBytes, timestamp+1);
+                try (RocksIterator iterator = rocksDB.newIterator(readOptions))
                 {
-                    long rowId = getUniqueRowId(key);
-                    if(rowId < 0)   // indicates there is a transaction error, delete invalid index entry
+                    iterator.seekForPrev(keyBytes);
+                    while (iterator.isValid())
                     {
-                        // Return empty array if entry not found
-                        return ImmutableList.of();
+                        byte[] currentKeyBytes = iterator.key();
+                        if (startsWith(currentKeyBytes, keyBytes))
+                        {
+                            if(unique)
+                            {
+                                long rowId = ByteBuffer.wrap(iterator.value()).getLong();
+                                if(rowId > 0)
+                                    builder.add(rowId);
+                            }
+                            writeBatch.delete(currentKeyBytes);
+                            iterator.prev();
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
-                    builder.add(rowId);
-                    writeBatch.delete(keyBytes);
-                }
-                else
-                {
-                    // Purged Index entries must be deleted first
-                    byte[] nonUniqueKey = toNonUniqueKeyBytes(key, -1L);
-                    writeBatch.delete(nonUniqueKey);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -529,10 +540,11 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to purge entries", e);
-            throw new SinglePointIndexException("failed to purge entries", e);
+            LOGGER.error("failed to purge entries by prefix", e);
+            throw new SinglePointIndexException("failed to purge entries by prefix", e);
         }
     }
+
 
     @Override
     public void close() throws IOException

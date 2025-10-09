@@ -312,6 +312,70 @@ public class TestRocksDBIndex
         assertEquals(updatedRowId, actualRowId);
     }
 
+    @Test
+    public void testPurgeEntries() throws Exception
+    {
+        long indexId = 1L;
+        byte[] key = "purgeKey".getBytes();
+
+        // create three version with different timestamp
+        long baseTime = System.currentTimeMillis();
+        long[] timestamps = {baseTime, baseTime + 1000, baseTime + 2000};
+        long[] rowIds = {11L, 22L, 33L};
+
+        // putEntry
+        for (int i = 0; i < 3; i++)
+        {
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                    .setIndexId(indexId)
+                    .setKey(ByteString.copyFrom(key))
+                    .setTimestamp(timestamps[i])
+                    .build();
+            rocksDBIndex.putEntry(keyProto, rowIds[i]);
+        }
+
+        // check entry exist
+        for (int i = 0; i < 3; i++)
+        {
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                    .setIndexId(indexId)
+                    .setKey(ByteString.copyFrom(key))
+                    .setTimestamp(timestamps[i])
+                    .build();
+
+            byte[] storedValue = rocksDB.get(toKeyBytes(keyProto));
+            assertNotNull(storedValue, "Before purge: key version " + i + " should exist");
+        }
+
+        // use latest version to purge
+        IndexProto.IndexKey purgeKey = IndexProto.IndexKey.newBuilder()
+                .setIndexId(indexId)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamps[2]) // latest timestamp
+                .build();
+
+        List<IndexProto.IndexKey> purgeList = new ArrayList<>();
+        purgeList.add(purgeKey);
+
+        List<Long> purgedRowIds = rocksDBIndex.purgeEntries(purgeList);
+
+        assertEquals(3, purgedRowIds.size(), "All three versions should be purged");
+
+        for (int i = 0; i < 3; i++)
+        {
+            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+                    .setIndexId(indexId)
+                    .setKey(ByteString.copyFrom(key))
+                    .setTimestamp(timestamps[i])
+                    .build();
+            byte[] storedValue = rocksDB.get(toKeyBytes(keyProto));
+            assertNull(storedValue, "After purge: key version " + i + " should be deleted");
+        }
+
+        System.out.println("Purged RowIds: " + purgedRowIds);
+    }
+
+
     @Disabled("Performance test, run manually")
     @Test
     public void benchmarkGetUniqueRowId() throws SinglePointIndexException

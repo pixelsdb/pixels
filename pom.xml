@@ -997,7 +997,7 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven.plugin.surefire.version}</version>
                     <configuration>
-                        <skipTests>true</skipTests>
+<!--                        <skipTests>true</skipTests>-->
                     </configuration>
                 </plugin>
 
