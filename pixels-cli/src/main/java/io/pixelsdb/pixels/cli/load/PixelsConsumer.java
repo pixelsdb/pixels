@@ -219,11 +219,6 @@ public class PixelsConsumer extends Consumer
                         {
                             // TODO: Support Secondary Index
                             int indexKeySize = 0;
-                            for(int pkColumnId : pkMapping)
-                            {
-                                indexKeySize += colsInLine[pkColumnId].length();
-                            }
-                            indexKeySize += Long.BYTES + (pkMapping.length + 1) * 2; // table id + index key
 
                             TypeDescription pkTypeDescription = parameters.getPkTypeDescription();
                             List<byte[]> pkBytes = new LinkedList<>();
@@ -235,12 +230,11 @@ public class PixelsConsumer extends Consumer
                                 indexKeySize += bytes.length;
                             }
                             ByteBuffer indexKeyBuffer = ByteBuffer.allocate(indexKeySize);
-                            indexKeyBuffer.putLong(index.getTableId()).putChar(':');
                             for(byte[] pkByte : pkBytes)
                             {
                                 indexKeyBuffer.put(pkByte);
-                                indexKeyBuffer.putChar(':');
                             }
+
                             IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
                             builder.getIndexKeyBuilder()
                                     .setTimestamp(parameters.getTimestamp())
