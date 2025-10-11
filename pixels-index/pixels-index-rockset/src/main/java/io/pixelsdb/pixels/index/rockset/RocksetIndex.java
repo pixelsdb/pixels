@@ -32,6 +32,7 @@ import org.apache.logging.log4j.Logger;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 
 public class RocksetIndex implements SinglePointIndex
@@ -593,38 +594,59 @@ public class RocksetIndex implements SinglePointIndex
     @Override
     public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
+        ImmutableList.Builder<Long> builder = ImmutableList.builder();
         long wb = 0;
         try
         {
             wb = WriteBatchCreate();
-            ImmutableList.Builder<Long> out = ImmutableList.builder();
             for (IndexProto.IndexKey key : indexKeys)
             {
-                if (unique)
+                byte[] prefix = toByteArray(key); // indexId + key (NO timestamp)
+                long ts = key.getTimestamp();
+                byte[] upperKey = concat(prefix, writeLongBE(ts + 1));
+                long it = 0;
+                try
                 {
-                    long rowId = getUniqueRowId(key);
-                    if (rowId < 0) return ImmutableList.of();
-                    out.add(rowId);
-                    byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                    WriteBatchDelete(wb, fullKey);
+                    it = DBNewIterator(this.dbHandle);
+                    IteratorSeekForPrev(it, upperKey);
+                    while (IteratorIsValid(it))
+                    {
+                        byte[] k = IteratorKey(it);
+                        if (startsWith(k, prefix))
+                        {
+                            if(unique)
+                            {
+                                long rowId = ByteBuffer.wrap(IteratorValue(it)).getLong();
+                                if(rowId > 0)
+                                    builder.add(rowId);
+                            }
+                            WriteBatchDelete(wb, k);
+                            IteratorPrev(it);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
                 }
-                else
+                catch (Throwable t)
                 {
-                    List<Long> rowIds = getRowIds(key);
-                    if (rowIds.isEmpty()) return ImmutableList.of();
-                    out.addAll(rowIds);
-                    // delete the tombstone entry
-                    byte[] nonUniqueKeyTomb = toNonUniqueKey(key, -1L);
-                    WriteBatchDelete(wb, nonUniqueKeyTomb);
+                    LOGGER.error("purgeEntries failed", t);
+                    return ImmutableList.of();
+                }
+                finally
+                {
+                    if (it != 0)
+                        IteratorClose(it);
                 }
             }
             DBWrite(this.dbHandle, wb);
-            return out.build();
+            return builder.build();
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to purge entries", e);
-            throw new SinglePointIndexException("failed to purge entries", e);
+            LOGGER.error("failed to purge entries by prefix", e);
+            throw new SinglePointIndexException("failed to purge entries by prefix", e);
         }
         finally
         {
