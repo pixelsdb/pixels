@@ -419,6 +419,31 @@ public class MemoryIndex implements SinglePointIndex
     }
 
     /**
+     * Get the current size of the index (for testing and monitoring)
+     */
+    public int size()
+    {
+        if (unique)
+        {
+            return this.uniqueIndex.values().stream().mapToInt(ConcurrentSkipListMap::size).sum();
+        }
+        else
+        {
+            return this.nonUniqueIndex.values().stream().mapToInt(rowIdToVersions ->
+                            rowIdToVersions.values().stream().mapToInt(ConcurrentSkipListSet::size).sum()).sum();
+        }
+
+    }
+
+    /**
+     * Get the number of tombstones (for testing and monitoring)
+     */
+    public int tombstonesSize()
+    {
+        return tombstones.size();
+    }
+
+    /**
      * Check if the index is closed and throw exception if it is
      */
     private void checkClosed() throws SinglePointIndexException
