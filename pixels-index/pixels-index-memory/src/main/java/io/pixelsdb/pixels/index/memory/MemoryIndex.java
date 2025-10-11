@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.index.memory;
 
 import com.google.common.collect.ImmutableList;
-import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.MainIndex;
@@ -59,14 +58,14 @@ public class MemoryIndex implements SinglePointIndex
     /**
      * For unique indexes: baseKey -> (timestamp -> rowId)
      */
-    private final ConcurrentHashMap<ByteString, ConcurrentSkipListMap<Long, Long>> uniqueIndex;
+    private final ConcurrentHashMap<CompositeKey, ConcurrentSkipListMap<Long, Long>> uniqueIndex;
     /**
      * For non-unique indexes: baseKey -> (rowId -> timestamps)
      */
-    private final ConcurrentHashMap<ByteString, ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>>> nonUniqueIndex;
+    private final ConcurrentHashMap<CompositeKey, ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>>> nonUniqueIndex;
 
     // Tombstones: baseKey -> tombstone timestamp, the transactions with timestamp >= tombstone timestamp can not see the deleted versions
-    private final ConcurrentHashMap<ByteString, Long> tombstones;
+    private final ConcurrentHashMap<CompositeKey, Long> tombstones;
 
     public MemoryIndex(long tableId, long indexId, boolean unique)
     {
@@ -104,7 +103,7 @@ public class MemoryIndex implements SinglePointIndex
         {
             throw new SinglePointIndexException("getUniqueRowId can only be called on unique indexes");
         }
-        ByteString baseKey = extractBaseKey(key);
+        CompositeKey baseKey = extractBaseKey(key);
         long snapshotTimestamp = key.getTimestamp();
         // Find the latest version visible at the snapshot timestamp
         return findUniqueRowId(baseKey, snapshotTimestamp);
@@ -114,7 +113,7 @@ public class MemoryIndex implements SinglePointIndex
     public List<Long> getRowIds(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         checkClosed();
-        ByteString baseKey = extractBaseKey(key);
+        CompositeKey baseKey = extractBaseKey(key);
         long snapshotTimestamp = key.getTimestamp();
         if (unique)
         {
@@ -131,7 +130,7 @@ public class MemoryIndex implements SinglePointIndex
     public boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         checkClosed();
-        ByteString baseKey = extractBaseKey(key);
+        CompositeKey baseKey = extractBaseKey(key);
         long timestamp = key.getTimestamp();
         internalPutEntry(rowId, baseKey, timestamp);
         return true;
@@ -148,7 +147,7 @@ public class MemoryIndex implements SinglePointIndex
         MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
         for (IndexProto.PrimaryIndexEntry entry : entries)
         {
-            ByteString baseKey = extractBaseKey(entry.getIndexKey());
+            CompositeKey baseKey = extractBaseKey(entry.getIndexKey());
             long timestamp = entry.getIndexKey().getTimestamp();
             ConcurrentSkipListMap<Long, Long> versions =
                     this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
@@ -168,14 +167,14 @@ public class MemoryIndex implements SinglePointIndex
         {
             IndexProto.IndexKey key = entry.getIndexKey();
             long rowId = entry.getRowId();
-            ByteString baseKey = extractBaseKey(key);
+            CompositeKey baseKey = extractBaseKey(key);
             long timestamp = key.getTimestamp();
             internalPutEntry(rowId, baseKey, timestamp);
         }
         return true;
     }
 
-    private void internalPutEntry(long rowId, ByteString baseKey, long timestamp)
+    private void internalPutEntry(long rowId, CompositeKey baseKey, long timestamp)
     {
         if (unique)
         {
@@ -199,7 +198,7 @@ public class MemoryIndex implements SinglePointIndex
         {
             throw new SinglePointIndexException("updatePrimaryEntry can only be called on unique indexes");
         }
-        ByteString baseKey = extractBaseKey(key);
+        CompositeKey baseKey = extractBaseKey(key);
         long timestamp = key.getTimestamp();
         long prevRowId = getUniqueRowId(key);
         ConcurrentSkipListMap<Long, Long> versions =
@@ -212,7 +211,7 @@ public class MemoryIndex implements SinglePointIndex
     public List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         checkClosed();
-        ByteString baseKey = extractBaseKey(key);
+        CompositeKey baseKey = extractBaseKey(key);
         long timestamp = key.getTimestamp();
         if (unique)
         {
@@ -242,7 +241,7 @@ public class MemoryIndex implements SinglePointIndex
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         for (IndexProto.PrimaryIndexEntry entry : entries)
         {
-            ByteString baseKey = extractBaseKey(entry.getIndexKey());
+            CompositeKey baseKey = extractBaseKey(entry.getIndexKey());
             long timestamp = entry.getIndexKey().getTimestamp();
             long prevRowId = getUniqueRowId(entry.getIndexKey());
             builder.add(prevRowId);
@@ -262,7 +261,7 @@ public class MemoryIndex implements SinglePointIndex
         {
             IndexProto.IndexKey key = entry.getIndexKey();
             long rowId = entry.getRowId();
-            ByteString baseKey = extractBaseKey(key);
+            CompositeKey baseKey = extractBaseKey(key);
             long timestamp = key.getTimestamp();
             if (unique)
             {
@@ -282,7 +281,7 @@ public class MemoryIndex implements SinglePointIndex
         return builder.build();
     }
 
-    private void putNonUniqueNewVersion(long rowId, ByteString baseKey, long timestamp)
+    private void putNonUniqueNewVersion(long rowId, CompositeKey baseKey, long timestamp)
     {
         ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>> rowIds =
                 this.nonUniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentHashMap<>());
@@ -309,7 +308,7 @@ public class MemoryIndex implements SinglePointIndex
         {
             throw new SinglePointIndexException("deleteUniqueEntry can only be called on unique indexes");
         }
-        ByteString baseKey = extractBaseKey(key);
+        CompositeKey baseKey = extractBaseKey(key);
         long rowId = getUniqueRowId(key);
         if (rowId < 0)
         {
@@ -325,7 +324,7 @@ public class MemoryIndex implements SinglePointIndex
     public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         checkClosed();
-        ByteString baseKey = extractBaseKey(key);
+        CompositeKey baseKey = extractBaseKey(key);
         if (unique)
         {
             long rowId = getUniqueRowId(key);
@@ -367,7 +366,7 @@ public class MemoryIndex implements SinglePointIndex
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         for (IndexProto.IndexKey key : indexKeys)
         {
-            ByteString baseKey = extractBaseKey(key);
+            CompositeKey baseKey = extractBaseKey(key);
             // Remove all versions with timestamp <= purgeTimestamp
             Long tombstone = this.tombstones.get(baseKey);
             if (tombstone != null && tombstone <= key.getTimestamp())
@@ -469,25 +468,9 @@ public class MemoryIndex implements SinglePointIndex
     /**
      * Extract base key (without timestamp) from IndexKey
      */
-    private ByteString extractBaseKey(IndexProto.IndexKey key)
+    private CompositeKey extractBaseKey(IndexProto.IndexKey key)
     {
-        byte[] keyBytes = toKeyBytesWithoutTimestamp(key);
-        return ByteString.copyFrom(keyBytes);
-    }
-
-    /**
-     * Convert IndexKey to byte array without timestamp (for base key)
-     */
-    private byte[] toKeyBytesWithoutTimestamp(IndexProto.IndexKey key)
-    {
-        // Same as RocksDBIndex but without the timestamp part
-        int keySize = key.getKey().size();
-        byte[] baseKeyBytes = new byte[Long.BYTES + keySize];
-        // Write indexId (8 bytes, big endian)
-        writeLongBE(baseKeyBytes, 0, key.getIndexId());
-        // Write key bytes (variable length)
-        key.getKey().copyTo(baseKeyBytes, Long.BYTES);
-        return baseKeyBytes;
+        return new CompositeKey(key.getIndexId(), key.getKey());
     }
 
     /**
@@ -496,7 +479,7 @@ public class MemoryIndex implements SinglePointIndex
      * @param snapshotTimestamp the snapshot timestamp
      * @return the latest visible row id, or -1 if no row id is visible
      */
-    private long findUniqueRowId(ByteString baseKey, long snapshotTimestamp)
+    private long findUniqueRowId(CompositeKey baseKey, long snapshotTimestamp)
     {
         // Check if this version is visible (not deleted by a tombstone)
         if (!isVersionVisible(baseKey, snapshotTimestamp))
@@ -520,7 +503,7 @@ public class MemoryIndex implements SinglePointIndex
     /**
      * Find the latest visible version for a non-unique index.
      */
-    private List<Long> findNonUniqueRowIds(ByteString baseKey, long snapshotTimestamp)
+    private List<Long> findNonUniqueRowIds(CompositeKey baseKey, long snapshotTimestamp)
     {
         ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>> rowIds = this.nonUniqueIndex.get(baseKey);
         if (rowIds == null || !isVersionVisible(baseKey, snapshotTimestamp))
@@ -539,7 +522,7 @@ public class MemoryIndex implements SinglePointIndex
         return builder.build();
     }
 
-    private boolean isVersionVisible(ByteString baseKey, long snapshotTimestamp)
+    private boolean isVersionVisible(CompositeKey baseKey, long snapshotTimestamp)
     {
         Long tombstone = tombstones.get(baseKey);
         if (tombstone == null)
@@ -547,20 +530,5 @@ public class MemoryIndex implements SinglePointIndex
             return true;
         }
         return tombstone > snapshotTimestamp;
-    }
-
-    /**
-     * Write long value in big-endian format
-     */
-    protected static void writeLongBE(byte[] buf, int offset, long value)
-    {
-        buf[offset]     = (byte)(value >>> 56);
-        buf[offset + 1] = (byte)(value >>> 48);
-        buf[offset + 2] = (byte)(value >>> 40);
-        buf[offset + 3] = (byte)(value >>> 32);
-        buf[offset + 4] = (byte)(value >>> 24);
-        buf[offset + 5] = (byte)(value >>> 16);
-        buf[offset + 6] = (byte)(value >>> 8);
-        buf[offset + 7] = (byte)(value);
     }
 }
