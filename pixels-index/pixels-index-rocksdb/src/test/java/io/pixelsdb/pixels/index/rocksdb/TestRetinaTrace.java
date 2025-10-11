@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.index.IndexService;
 import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.index.IndexProto;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 
 import java.io.BufferedReader;
@@ -39,7 +40,22 @@ import java.util.List;
  * Primarily uses the LocalIndexService's deletePrimaryIndexEntry and putPrimaryIndexEntry interfaces.
  * PUT format: tableId, indexId, key, timestamp, rowId, fileId, rgId, rgRowOffset
  * DEL format: tableId, indexId, key, timestamp
- * Note that the key is an integer here.
+ * *****************************************************************************
+ * Note
+ * 1. The key is an integer here.
+ * 2. Launching the metadataService separately in tests is cumbersome;
+ *    it's best to start the pixels-related services externally.
+ * 3. Insert records used for tracing into the SINGLE_POINT_INDICES table
+ *    in MySQL pixels_metadata.
+ *    e.g.,
+ *    ```sql
+ *    INSERT INTO SINGLE_POINT_INDICES
+ *      (SPI_ID, SPI_KEY_COLUMNS, SPI_PRIMARY, SPI_UNIQUE, SPI_INDEX_SCHEME, TBLS_TBL_ID, SCHEMA_VERSIONS_SV_ID)
+ *    VALUES
+ *      (403, '{"keyColumnIds":[403]}', 1, 1, 'rocksdb', 3, 3),
+ *      (404, '{"keyColumnIds":[404]}', 1, 1, 'rocksdb', 3, 3);
+ *    ```
+ * *****************************************************************************
  */
 public class TestRetinaTrace
 {
@@ -51,16 +67,21 @@ public class TestRetinaTrace
 
     private static final IndexService indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
 
+    /**
+     * Load the initial data into the index
+     */
     @BeforeAll
-    public static void dataPrepare()
+    public static void prepare()
     {
+        System.out.println("Preparing data from loadPath into index...");
+        long count = 0;
         try (BufferedReader reader = Files.newBufferedReader(Paths.get(loadPath)))
         {
             String line;
             while ((line = reader.readLine()) != null)
             {
+                count++;
                 String[] parts = line.split("\\t");
-
                 PutOperation putOperation = new PutOperation(parts);
                 putOperation.execute();
             }
@@ -71,6 +92,7 @@ public class TestRetinaTrace
         {
             throw new RuntimeException("Malformed number in load trace", e);
         }
+        System.out.println("Finished preparing " + count + " records into index.");
     }
 
     private interface TraceOperation
@@ -171,6 +193,7 @@ public class TestRetinaTrace
         }
     }
 
+    @Test
     public void testIndex()
     {
         System.out.println("Loading trace file into memory...");
@@ -219,7 +242,7 @@ public class TestRetinaTrace
         long endTime = System.currentTimeMillis();
 
         long totalDurationNanos = endTime - startTime;
-        double totalDurationSeconds = totalDurationNanos / 1_000_000_000.0;
+        double totalDurationSeconds = totalDurationNanos / 1000.0;
         long totalOps = putCount + delCount;
 
         double putThroughput = (totalDurationSeconds > 0) ? (putCount / totalDurationSeconds) : 0;
