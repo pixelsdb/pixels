@@ -32,6 +32,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -118,6 +119,41 @@ public class TestMemoryIndex
                 .setIndexKey(createIndexKey(keyValue, timestamp))
                 .setRowId(rowId)
                 .build();
+    }
+
+    @Test
+    public void testPerformance() throws SinglePointIndexException
+    {
+        long startTime = System.currentTimeMillis();
+        for (long i = 0; i < 1000000L; ++i)
+        {
+            IndexProto.IndexKey key = createIndexKey("key" + i, 1000L);
+            uniqueIndex.putEntry(key, i);
+        }
+        System.out.println(System.currentTimeMillis() - startTime);
+        startTime = System.currentTimeMillis();
+        for (long i = 0; i < 1000000L; ++i)
+        {
+            IndexProto.IndexKey key = createIndexKey("key" + i, 1001L);
+            uniqueIndex.updatePrimaryEntry(key, i+1);
+        }
+        System.out.println(System.currentTimeMillis() - startTime);
+        assertEquals(2000000L, uniqueIndex.size());
+        assertEquals(0L, uniqueIndex.tombstonesSize());
+        List<IndexProto.IndexKey> indexKeys = new ArrayList<>(1000000);
+        startTime = System.currentTimeMillis();
+        for (long i = 0; i < 1000000L; ++i)
+        {
+            IndexProto.IndexKey key = createIndexKey("key" + i, 1002L);
+            indexKeys.add(key);
+            uniqueIndex.deleteEntry(key);
+        }
+        System.out.println(System.currentTimeMillis() - startTime);
+        assertEquals(2000000L, uniqueIndex.size());
+        assertEquals(1000000L, uniqueIndex.tombstonesSize());
+        uniqueIndex.purgeEntries(indexKeys);
+        assertEquals(0L, uniqueIndex.size());
+        assertEquals(0L, uniqueIndex.tombstonesSize());
     }
 
     // Test basic properties
