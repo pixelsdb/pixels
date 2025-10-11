@@ -28,8 +28,6 @@ import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.rocksdb.*;
 
 import java.io.File;
@@ -44,8 +42,6 @@ import java.util.List;
  */
 public class RocksDBIndex implements SinglePointIndex
 {
-    public static final Logger LOGGER = LogManager.getLogger(RocksDBIndex.class);
-
     private final RocksDB rocksDB;
     private final String rocksDBPath;
     private final WriteOptions writeOptions;
@@ -105,26 +101,22 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long getUniqueRowId(IndexProto.IndexKey key)
+    public long getUniqueRowId(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         // Get prefix
         byte[] keyBytes = toKeyBytes(key);
         long timestamp = key.getTimestamp();
         byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
-        setIteratorBounds(readOptions, copyBytes, timestamp+1);
+        setIteratorBounds(readOptions, copyBytes, timestamp + 1);
         long rowId = -1L;
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
             iterator.seekForPrev(keyBytes);
-            if(iterator.isValid())
+            if (iterator.isValid())
             {
                 byte[] valueBytes = iterator.value();
                 rowId = ByteBuffer.wrap(valueBytes).getLong();
             }
-        }
-        catch (Exception e)
-        {
-            LOGGER.error("Failed to get unique row ID by prefix for key: {}", key, e);
         }
         return rowId;
     }
@@ -159,12 +151,6 @@ public class RocksDBIndex implements SinglePointIndex
                 }
             }
         }
-        catch (Exception e)
-        {
-            LOGGER.error("Failed to get row IDs for key: {}", key, e);
-            // Return empty array if key doesn't exist or exception occurs
-            return ImmutableList.of();
-        }
         return builder.build();
     }
 
@@ -173,12 +159,12 @@ public class RocksDBIndex implements SinglePointIndex
     {
         try
         {
-            // Convert IndexKey to byte array
-            byte[] keyBytes = toKeyBytes(key);
-            // Convert rowId to byte array
-            byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
             if (unique)
             {
+                // Convert IndexKey to byte array
+                byte[] keyBytes = toKeyBytes(key);
+                // Convert rowId to byte array
+                byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
                 // Write to RocksDB
                 rocksDB.put(keyBytes, valueBytes);
             }
@@ -193,7 +179,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to put rocksdb index entry", e);
             throw new SinglePointIndexException("failed to put rocksdb index entry", e);
         }
     }
@@ -225,7 +210,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to put rocksdb index entries", e);
             throw new SinglePointIndexException("failed to put rocksdb index entries", e);
         }
     }
@@ -241,12 +225,12 @@ public class RocksDBIndex implements SinglePointIndex
                 // Extract key and rowId from Entry object
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-                // Convert IndexKey to byte array
-                byte[] keyBytes = toKeyBytes(key);
-                // Convert rowId to byte array
-                byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
                 if(unique)
                 {
+                    // Convert IndexKey to byte array
+                    byte[] keyBytes = toKeyBytes(key);
+                    // Convert rowId to byte array
+                    byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
                     // Write to RocksDB
                     writeBatch.put(keyBytes, valueBytes);
                 }
@@ -261,7 +245,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to put secondary entries", e);
             throw new SinglePointIndexException("failed to put secondary entries", e);
         }
     }
@@ -282,7 +265,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to update primary entry", e);
             throw new SinglePointIndexException("failed to update primary entry", e);
         }
     }
@@ -293,12 +275,12 @@ public class RocksDBIndex implements SinglePointIndex
         try
         {
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
-            // Convert key and new rowId to bytes
-            byte[] keyBytes = toKeyBytes(key);
-            byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
 
             if(unique)
             {
+                // Convert key and new rowId to bytes
+                byte[] keyBytes = toKeyBytes(key);
+                byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
                 // Get previous rowIds
                 builder.add(this.getUniqueRowId(key));
                 // Write to RocksDB
@@ -316,7 +298,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to update secondary entry", e);
             throw new SinglePointIndexException("failed to update secondary entry", e);
         }
     }
@@ -346,7 +327,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to update primary index entries", e);
             throw new SinglePointIndexException("failed to update primary index entries", e);
         }
     }
@@ -363,12 +343,12 @@ public class RocksDBIndex implements SinglePointIndex
                 // Extract key and new rowId from Entry object
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-                // Convert IndexKey and new rowId to byte array
-                byte[] keyBytes = toKeyBytes(key);
-                byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
 
                 if(unique)
                 {
+                    // Convert IndexKey and new rowId to byte array
+                    byte[] keyBytes = toKeyBytes(key);
+                    byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
                     // Get old rowIds from index
                     builder.add(this.getUniqueRowId(key));
                     // Write to RocksDB
@@ -388,7 +368,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to put secondary entries", e);
             throw new SinglePointIndexException("failed to put secondary entries", e);
         }
     }
@@ -406,7 +385,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to delete unique entry", e);
             throw new SinglePointIndexException("failed to delete unique entry", e);
         }
     }
@@ -417,11 +395,10 @@ public class RocksDBIndex implements SinglePointIndex
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try
         {
-            byte[] keyBytes = toKeyBytes(key);
-            byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array(); // -1 means a tombstone
-
             if(unique)
             {
+                byte[] keyBytes = toKeyBytes(key);
+                byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array(); // -1 means a tombstone
                 long rowId = getUniqueRowId(key);
                 if(rowId < 0)   // indicates there is a transaction error, delete invalid index entry
                 {
@@ -447,7 +424,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to delete entry", e);
             throw new SinglePointIndexException("failed to delete entry", e);
         }
     }
@@ -461,11 +437,10 @@ public class RocksDBIndex implements SinglePointIndex
             // Delete single point index
             for(IndexProto.IndexKey key : keys)
             {
-                byte[] keyBytes = toKeyBytes(key);
-                byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array(); // -1 means a tombstone
-
                 if(unique)
                 {
+                    byte[] keyBytes = toKeyBytes(key);
+                    byte[] newValue = ByteBuffer.allocate(Long.BYTES).putLong(-1L).array(); // -1 means a tombstone
                     long rowId = getUniqueRowId(key);
                     if(rowId < 0)  // indicates there is a transaction error, delete invalid index entry
                     {
@@ -493,7 +468,6 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to delete entries", e);
             throw new SinglePointIndexException("failed to delete entries", e);
         }
     }
@@ -540,11 +514,9 @@ public class RocksDBIndex implements SinglePointIndex
         }
         catch (RocksDBException e)
         {
-            LOGGER.error("failed to purge entries by prefix", e);
             throw new SinglePointIndexException("failed to purge entries by prefix", e);
         }
     }
-
 
     @Override
     public void close() throws IOException

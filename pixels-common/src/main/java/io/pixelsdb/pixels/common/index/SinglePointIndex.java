@@ -42,7 +42,8 @@ public interface SinglePointIndex extends Closeable
     enum Scheme
     {
         rocksdb,  // single point index stored in rocksdb
-        rockset;  // single point index stored in rockset (rocksdb-cloud)
+        rockset,  // single point index stored in rockset (rocksdb-cloud)
+        memory;   // single point index stored in memory
 
         /**
          * Case-insensitive parsing from String name to enum value.

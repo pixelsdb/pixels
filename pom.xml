@@ -65,6 +65,7 @@
         <module>pixels-turbo/pixels-worker-spike</module>
         <module>pixels-index/pixels-index-rocksdb</module>
         <module>pixels-index/pixels-index-rockset</module>
+        <module>pixels-index/pixels-index-memory</module>
         <module>pixels-index/pixels-index-main-sqlite</module>
     </modules>
 
