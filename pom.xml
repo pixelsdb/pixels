@@ -101,7 +101,7 @@
         <!-- common libraries -->
         <dep.spike.java.version>0.1.1</dep.spike.java.version>
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
-        <!-- netty-4.1.118-Final is used by hadoop-client-3.4.2 and is compatible with grpc-1.74.0,
+        <!-- netty-4.1.118-Final is used by awssdk-2.30.17 and hadoop-client-3.4.2. And it is compatible with grpc-1.74.0,
         async-http-client-2.12.4, and jetcd-0.7.7.
         This version also fixes the problem in Pixels#935 caused by Netty#14479 -->
         <dep.netty.version>4.1.118.Final</dep.netty.version>
@@ -121,8 +121,10 @@
         <dep.jna.version>5.13.0</dep.jna.version>
         <dep.javax.annotation.version>1.3.2</dep.javax.annotation.version>
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
-        <!-- http-client-4.5.13 is the version used by awssdk:apache-client-2.30.17 -->
+        <!-- http-client-4.5.13 is the version used by awssdk:apache-client-2.30.17 and hadoop-3.4.2 -->
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
+        <!-- apache httpclient-4.5.13 uses httpcore-4.4.13, however, awssdk:apache-client-2.30.17 uses httpcore-4.4.16 -->
+        <dep.apache-httpcore.version>4.4.16</dep.apache-httpcore.version>
         <dep.apache-calcite.version>1.32.0</dep.apache-calcite.version>
         <dep.apache-parquet.version>1.13.0</dep.apache-parquet.version>
 
@@ -757,11 +759,27 @@
                 <version>${dep.jna.version}</version>
             </dependency>
 
-            <!-- apache-httpclient -->
+            <!-- apache-httpcomponents -->
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
                 <version>${dep.apache-httpclient.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>log4jj</groupId>
+                        <artifactId>log4j</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <!-- exclude the default httpcore-4.4.13 -->
+                        <groupId>org.apache.httpcomponents</groupId>
+                        <artifactId>httpcore</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpcore</artifactId>
+                <version>${dep.apache-httpcore.version}</version>
                 <exclusions>
                     <exclusion>
                         <groupId>log4jj</groupId>

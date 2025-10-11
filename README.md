@@ -6,9 +6,9 @@ It is optimized for analytical tables stored in on-premises and cloud-native sto
 including S3, GCS, HDFS, Redis, HTTP (Netty), and local file systems.
 Pixels outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to two orders of magnitude.
 
-We have integrated Pixels with popular query engines including DuckDB (1.1.0), Trino (405 and 466), StarRocks (3.3.5), PrestoDB (0.279), and Hive (2.3+).
+We have integrated Pixels with popular query engines including DuckDB (1.3.0), Trino (405 and 466), StarRocks (3.3.5), PrestoDB (0.279), and Hive (2.3+).
 
-The DuckDB integration and the C++ implementation of Pixels Reader are in the [cpp](cpp) folder.
+The DuckDB integration and the C++ implementation of Pixels are in the [cpp](cpp) folder.
 The other integrations are opensourced in separate repositories:
 * [Pixels Connector for Trino](https://github.com/pixelsdb/pixels-trino)
 * [Pixels Connector for PrestoDB](https://github.com/pixelsdb/pixels-presto)
