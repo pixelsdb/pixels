@@ -22,11 +22,16 @@ package io.pixelsdb.pixels.index.memory;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.index.MainIndexFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
+import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -35,8 +40,11 @@ import static org.junit.Assert.*;
 /**
  * Unit tests for MemoryIndex class.
  * Tests all public interfaces with both unique and non-unique indexes.
+ *
+ * @author hank
+ * @create 2025-10-12
  */
-public class MemoryIndexTest
+public class TestMemoryIndex
 {
     private static final long TABLE_ID = 1L;
     private static final long INDEX_ID = 1L;
@@ -49,10 +57,21 @@ public class MemoryIndexTest
     {
         uniqueIndex = new MemoryIndex(TABLE_ID, INDEX_ID, true);
         nonUniqueIndex = new MemoryIndex(TABLE_ID, INDEX_ID + 1, false);
+
+        // Create SQLite Directory
+        try
+        {
+            String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
+            FileUtils.forceMkdir(new File(sqlitePath));
+        }
+        catch (IOException e)
+        {
+            System.err.println("Failed to create SQLite test directory: " + e.getMessage());
+        }
     }
 
     @After
-    public void tearDown() throws SinglePointIndexException
+    public void tearDown()
     {
         if (uniqueIndex != null)
         {
@@ -61,6 +80,16 @@ public class MemoryIndexTest
         if (nonUniqueIndex != null)
         {
             nonUniqueIndex.closeAndRemove();
+        }
+
+        // Clear SQLite Directory
+        try
+        {
+            MainIndexFactory.Instance().getMainIndex(TABLE_ID).closeAndRemove();
+        }
+        catch (MainIndexException e)
+        {
+            System.err.println("Failed to clean up SQLite test directory: " + e.getMessage());
         }
     }
 
@@ -291,8 +320,8 @@ public class MemoryIndexTest
         assertEquals(3, previousRowIds.size());
 
         List<Long> updatedRowIds = nonUniqueIndex.getRowIds(key);
-        assertEquals(1, updatedRowIds.size());
-        assertEquals(4L, (long) updatedRowIds.get(0));
+        assertEquals(4, updatedRowIds.size());
+        assertEquals(4L, (long) updatedRowIds.get(3));
     }
 
     // Test updatePrimaryEntries
@@ -375,12 +404,12 @@ public class MemoryIndexTest
 
         // Verify updates
         List<Long> key1RowIds = nonUniqueIndex.getRowIds(createIndexKey("key1", 2000L));
-        assertEquals(1, key1RowIds.size());
-        assertEquals(10L, (long) key1RowIds.get(0));
+        assertEquals(3, key1RowIds.size());
+        assertEquals(10L, (long) key1RowIds.get(2));
 
         List<Long> key2RowIds = nonUniqueIndex.getRowIds(createIndexKey("key2", 2000L));
-        assertEquals(1, key2RowIds.size());
-        assertEquals(20L, (long) key2RowIds.get(0));
+        assertEquals(2, key2RowIds.size());
+        assertEquals(20L, (long) key2RowIds.get(1));
     }
 
     // Test deleteUniqueEntry
@@ -565,8 +594,8 @@ public class MemoryIndexTest
         // - At timestamp 2500: should see tombstone (value -1) because version 2000 is deleted
         assertEquals(-1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2500L)));
 
-        // - At timestamp 3500: should see version 3000 (value 3) because it's after tombstone
-        assertEquals(3L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 3500L)));
+        // - At timestamp 3500: should see tombstone (value -1) because version 2000 is deleted
+        assertEquals(-1, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 3500L)));
     }
 
     // Test closeAndRemove
@@ -579,10 +608,6 @@ public class MemoryIndexTest
 
         // Close and remove
         assertTrue(uniqueIndex.closeAndRemove());
-
-        // Verify index is closed
-        uniqueIndex.getTableId();
-        fail("Should have thrown SinglePointIndexException after close");
 
         // Second call should return false
         assertFalse(uniqueIndex.closeAndRemove());

@@ -32,7 +32,9 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -373,18 +375,28 @@ public class MemoryIndex implements SinglePointIndex
                 if (unique)
                 {
                     // timestamp -> row id
-                    ConcurrentSkipListMap<Long, Long> versions = this.uniqueIndex.remove(baseKey);
-                    if (versions != null)
+                    ConcurrentNavigableMap<Long, Long> versions = this.uniqueIndex.get(baseKey).headMap(key.getTimestamp(), true);
+                    if (!versions.isEmpty())
                     {
                         builder.addAll(versions.values());
+                        versions.clear();
                     }
                 }
                 else
                 {
                     // row id -> timestamps
-                    ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>> rowIds = this.nonUniqueIndex.remove(baseKey);
+                    ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>> rowIds = this.nonUniqueIndex.get(baseKey);
                     if (rowIds != null)
                     {
+                        for (Map.Entry<Long, ConcurrentSkipListSet<Long>> entry : rowIds.entrySet())
+                        {
+                            NavigableSet<Long> versions = entry.getValue().headSet(key.getTimestamp(), true);
+                            if (!versions.isEmpty())
+                            {
+                                builder.add(entry.getKey());
+                                versions.clear();
+                            }
+                        }
                         builder.addAll(rowIds.keySet());
                     }
                 }
