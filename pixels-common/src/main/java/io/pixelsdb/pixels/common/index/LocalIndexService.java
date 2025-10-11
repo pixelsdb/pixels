@@ -262,7 +262,7 @@ public class LocalIndexService implements IndexService
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
 
             long rowId = singlePointIndex.deleteUniqueEntry(key);
-            if (rowId <= 0)
+            if (rowId < 0)
             {
                 throw new IndexException("Primary index entry not found for tableId=" + tableId + ", indexId=" + indexId);
             }
