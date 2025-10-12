@@ -58,7 +58,6 @@ public class EtcdUtil
         String[] hosts = ConfigFactory.Instance().getProperty("etcd.hosts").split(",");
         Random random = new Random(System.nanoTime());
         String host = hosts[random.nextInt(hosts.length)];
-        System.out.println(host);
         logger.info("Using etcd host: {}", host);
         String port = ConfigFactory.Instance().getProperty("etcd.port");
 

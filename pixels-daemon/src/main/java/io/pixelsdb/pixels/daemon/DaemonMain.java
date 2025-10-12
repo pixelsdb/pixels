@@ -291,7 +291,7 @@ public class DaemonMain
                         int pid = Integer.parseInt(splits[0]);
                         if (roleFound && isStartOperation)
                         {
-                            System.out.println("killing " + role + ", pid (" + pid + ")");
+                            System.out.println("Killing " + role + ", pid (" + pid + ")");
                             // Terminate the daemon gracefully by sending SIGTERM(15) signal.
                             Runtime.getRuntime().exec("kill -15 " + pid);
                         }

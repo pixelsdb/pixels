@@ -23,7 +23,8 @@ package io.pixelsdb.pixels.common.exception;
  * @author Rolland1944
  * @create 2025-03-01
  */
-public class IndexException extends Exception {
+public class IndexException extends Exception
+{
     public IndexException()
     {
         super();

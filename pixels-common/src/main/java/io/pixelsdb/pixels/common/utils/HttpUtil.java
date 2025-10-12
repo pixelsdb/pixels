@@ -42,8 +42,7 @@ import java.util.Map;
 public class HttpUtil
 {
     /**
-     * get the content from baseUrl by post method with given headers and parameters.
-     *
+     * Get the content from baseUrl by post method with given headers and parameters.
      * @param baseUrl
      * @param headers
      * @param parameters
@@ -77,8 +76,7 @@ public class HttpUtil
     }
 
     /**
-     * get the content from url by get method.
-     *
+     * Get the content from url by get method.
      * @param url
      * @return
      * @throws IOException
