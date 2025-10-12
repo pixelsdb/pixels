@@ -53,20 +53,20 @@ public class HeartbeatWorker implements Server
     public HeartbeatWorker()
     {
         this.hostName = System.getenv("HOSTNAME");
-        logger.debug("HostName from system env: " + hostName);
+        logger.debug("HostName from system env: {}", hostName);
         if (hostName == null)
         {
             try
             {
                 this.hostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: " + hostName);
+                logger.debug("HostName from InetAddress: {}", hostName);
             } catch (UnknownHostException e)
             {
                 logger.debug("Hostname is null. Exit");
                 return;
             }
         }
-        logger.debug("HostName: " + hostName);
+        logger.debug("HostName: {}", hostName);
         initialize();
     }
 
@@ -99,7 +99,7 @@ public class HeartbeatWorker implements Server
                     0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
             currentStatus.set(NodeStatus.READY.StatusCode);
-            logger.info("Heartbeat worker on " + hostName + " is initialized");
+            logger.info("Heartbeat worker on {} is initialized", hostName);
         } catch (Exception e)
         {
             logger.error("failed to initialize heartbeat worker", e);
@@ -129,7 +129,7 @@ public class HeartbeatWorker implements Server
             runningLatch.countDown();
         }
         EtcdUtil.Instance().getClient().close();
-        logger.info("Heartbeat worker on '" + hostName + "' is shutdown.");
+        logger.info("Heartbeat worker on '{}' is shutdown.", hostName);
     }
 
     @Override

@@ -56,13 +56,13 @@ public class HeartbeatCoordinator implements Server
     public HeartbeatCoordinator()
     {
         this.hostName = System.getenv("HOSTNAME");
-        logger.debug("HostName from system env: " + hostName);
+        logger.debug("HostName from system env: {}", hostName);
         if (hostName == null)
         {
             try
             {
                 this.hostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: " + hostName);
+                logger.debug("HostName from InetAddress: {}", hostName);
             }
             catch (UnknownHostException e)
             {
@@ -117,7 +117,7 @@ public class HeartbeatCoordinator implements Server
                     0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
             currentStatus.set(NodeStatus.READY.StatusCode);
-            logger.info("Heartbeat coordinator on " + hostName + " is initialized");
+            logger.info("Heartbeat coordinator on {} is initialized", hostName);
         } catch (Exception e)
         {
             logger.error("failed to initialize heartbeat coordinator", e);
@@ -147,7 +147,7 @@ public class HeartbeatCoordinator implements Server
             runningLatch.countDown();
         }
         EtcdUtil.Instance().getClient().close();
-        logger.info("Heartbeat coordinator on '" + hostName + "' is shutdown");
+        logger.info("Heartbeat coordinator on '{}' is shutdown", hostName);
     }
 
     @Override
