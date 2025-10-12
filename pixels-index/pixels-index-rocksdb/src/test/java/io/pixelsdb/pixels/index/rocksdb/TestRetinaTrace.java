@@ -34,6 +34,11 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Test using the actual index load and update during Retina runtime.
@@ -59,6 +64,12 @@ import java.util.List;
  */
 public class TestRetinaTrace
 {
+    /**
+     * The number of concurrent threads to use for the test.
+     * Each thread will operate on a different tableId and indexId (base_id + 1000 * thread_index).
+     */
+    private static final int THREAD_COUNT = 20;
+
     // Trace load path: only put operations
     private static final String loadPath = "/home/gengdy/data/index/index.load.trace";
 
@@ -83,21 +94,26 @@ public class TestRetinaTrace
                 count++;
                 String[] parts = line.split("\\t");
                 PutOperation putOperation = new PutOperation(parts);
-                putOperation.execute();
+                for (int i = 0; i < THREAD_COUNT; i++)
+                {
+                    IndexProto.PrimaryIndexEntry entry = (IndexProto.PrimaryIndexEntry) putOperation.withIndexIdOffset(i).toProto();
+                    indexService.putPrimaryIndexEntry(entry);
+                }
             }
         } catch (IOException e)
         {
             throw new RuntimeException("Failed to prepare data from loadPath", e);
-        } catch (NumberFormatException e)
+        } catch (IndexException e)
         {
-            throw new RuntimeException("Malformed number in load trace", e);
+            throw new RuntimeException("Failed to put index entry during prepare", e);
         }
-        System.out.println("Finished preparing " + count + " records into index.");
+        System.out.println("Finished preparing " + count * THREAD_COUNT + " records into index.");
     }
 
     private interface TraceOperation
     {
-        void execute();
+        TraceOperation withIndexIdOffset(long offset);
+        Object toProto();
     }
 
     private static class PutOperation implements TraceOperation
@@ -123,8 +139,27 @@ public class TestRetinaTrace
             this.rgRowOffset = Integer.parseInt(parts[8]);
         }
 
+        private PutOperation(long tableId, long indexId, ByteString key, long timestamp,
+                             long rowId, long fileId, int rgId, int rgRowOffset)
+        {
+            this.tableId = tableId;
+            this.indexId = indexId;
+            this.key = key;
+            this.timestamp = timestamp;
+            this.rowId = rowId;
+            this.fileId = fileId;
+            this.rgId = rgId;
+            this.rgRowOffset = rgRowOffset;
+        }
+
         @Override
-        public void execute()
+        public PutOperation withIndexIdOffset(long offset)
+        {
+            return new PutOperation(tableId + 1000 * offset, indexId + 1000 * offset, key, timestamp, rowId, fileId, rgId, rgRowOffset);
+        }
+
+        @Override
+        public Object toProto()
         {
             IndexProto.IndexKey indexKey = IndexProto.IndexKey.newBuilder()
                     .setTableId(tableId)
@@ -139,19 +174,11 @@ public class TestRetinaTrace
                     .setRgRowOffset(rgRowOffset)
                     .build();
 
-            IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
+            return IndexProto.PrimaryIndexEntry.newBuilder()
                     .setIndexKey(indexKey)
                     .setRowId(rowId)
                     .setRowLocation(rowLocation)
                     .build();
-
-            try
-            {
-                indexService.putPrimaryIndexEntry(entry);
-            } catch (IndexException e)
-            {
-                throw new RuntimeException(e);
-            }
         }
     }
 
@@ -173,22 +200,92 @@ public class TestRetinaTrace
             this.timestamp = Long.parseLong(parts[4]);
         }
 
-        @Override
-        public void execute()
+        private DeleteOperation(long tableId, long indexId, ByteString key, long timestamp)
         {
-            IndexProto.IndexKey indexKey = IndexProto.IndexKey.newBuilder()
+            this.tableId = tableId;
+            this.indexId = indexId;
+            this.key = key;
+            this.timestamp = timestamp;
+        }
+
+        @Override
+        public DeleteOperation withIndexIdOffset(long offset)
+        {
+            return new DeleteOperation(tableId + 1000 * offset, indexId + 1000 * offset, key, timestamp);
+        }
+
+        @Override
+        public Object toProto()
+        {
+            return IndexProto.IndexKey.newBuilder()
                     .setTableId(tableId)
                     .setIndexId(indexId)
                     .setKey(key)
                     .setTimestamp(timestamp)
                     .build();
+        }
+    }
 
+    private static List<TraceOperation> loadTraceOperations(String path)
+    {
+        List<TraceOperation> ops = new ArrayList<>();
+        try (BufferedReader reader = Files.newBufferedReader(Paths.get(path)))
+        {
+            String line;
+            while ((line = reader.readLine()) != null)
+            {
+                String[] parts = line.split("\\t");
+                if (parts.length < 1)
+                {
+                    throw new RuntimeException("Invalid operation: " + line);
+                }
+                switch (parts[0])
+                {
+                    case "P":
+                        ops.add(new PutOperation(parts));
+                        break;
+                    case "D":
+                        ops.add(new DeleteOperation(parts));
+                        break;
+                    default:
+                        throw new RuntimeException("Unknown operation type: " + parts[0]);
+                }
+
+            }
+        } catch (IOException e)
+        {
+            throw new RuntimeException("Failed to read trace file: " + path, e);
+        }
+        return ops;
+    }
+
+    private static class IndexWorker implements Runnable
+    {
+        private final List<Object> protoOperations;
+
+        public IndexWorker(List<Object> protoOperations)
+        {
+            this.protoOperations = protoOperations;
+        }
+
+        @Override
+        public void run()
+        {
             try
             {
-                indexService.deletePrimaryIndexEntry(indexKey);
+                for (Object proto : protoOperations)
+                {
+                    if (proto instanceof IndexProto.PrimaryIndexEntry)
+                    {
+                        indexService.putPrimaryIndexEntry((IndexProto.PrimaryIndexEntry) proto);
+                    } else
+                    {
+                        indexService.deletePrimaryIndexEntry((IndexProto.IndexKey) proto);
+                    }
+                }
             } catch (IndexException e)
             {
-                throw new RuntimeException(e);
+                throw new RuntimeException("Index operation failed in worker thread", e);
             }
         }
     }
@@ -196,8 +293,8 @@ public class TestRetinaTrace
     @Test
     public void testIndex()
     {
-        System.out.println("Loading trace file into memory...");
-        List<TraceOperation> operations = new ArrayList<>();
+        System.out.println("Loading baseTrace...");
+        List<TraceOperation> baseOperations = new ArrayList<>();
         long putCount = 0, delCount = 0;
         try (BufferedReader reader = Files.newBufferedReader(Paths.get(updatePath)))
         {
@@ -213,11 +310,11 @@ public class TestRetinaTrace
                 if (opType.equals("P"))
                 {
                     putCount++;
-                    operations.add(new PutOperation(parts));
+                    baseOperations.add(new PutOperation(parts));
                 } else if (opType.equals("D"))
                 {
                     delCount++;
-                    operations.add(new DeleteOperation(parts));
+                    baseOperations.add(new DeleteOperation(parts));
                 } else
                 {
                     throw new RuntimeException("Unknown operation type: " + opType);
@@ -230,17 +327,45 @@ public class TestRetinaTrace
         {
             throw new RuntimeException("Malformed number in update trace", e);
         }
+        System.out.println("Loaded " + baseOperations.size() + " operations from update trace.");
 
-        System.out.println("Finished loading " + operations.size() + " operations.");
+        System.out.println("Generating workloads for " + THREAD_COUNT + " threads...");
+        List<List<TraceOperation>> threadOperations = IntStream.range(0, THREAD_COUNT)
+                        .mapToObj(i -> baseOperations.stream()
+                                .map(op -> op.withIndexIdOffset(i))
+                                .collect(Collectors.toList()))
+                        .collect(Collectors.toList());
 
-        System.out.println("\nStarting index performance test...");
+        System.out.println("Pre-building all protobuf objects to avoid measuring serialization time...");
+        List<List<Object>> threadProtoOperations =  threadOperations.stream()
+                        .map(opsList -> opsList.stream()
+                                .map(TraceOperation::toProto)
+                                .collect(Collectors.toList()))
+                        .collect(Collectors.toList());
+        System.out.println("Finished pre-building protobuf objects.");
+
+        System.out.println("Starting index performance test with " + THREAD_COUNT + " threads...");
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+        List<Future<?>> futures = new ArrayList<>();
         long startTime = System.currentTimeMillis();
-        for (TraceOperation op : operations)
+        for (List<Object> threadProtoOps : threadProtoOperations)
         {
-            op.execute();
+           futures.add(executor.submit(new IndexWorker(threadProtoOps)));
+        }
+        for (Future<?> f : futures)
+        {
+            try
+            {
+                f.get();
+            } catch (Exception e)
+            {
+                throw new RuntimeException("Thread execution failed", e);
+            }
         }
         long endTime = System.currentTimeMillis();
 
+        putCount *= THREAD_COUNT;
+        delCount *= THREAD_COUNT;
         long totalDurationNanos = endTime - startTime;
         double totalDurationSeconds = totalDurationNanos / 1000.0;
         long totalOps = putCount + delCount;
@@ -250,6 +375,7 @@ public class TestRetinaTrace
         double totalThroughput = (totalDurationSeconds > 0) ? (totalOps / totalDurationSeconds) : 0;
 
         System.out.println("\n--- Index Performance Test Results ---");
+        System.out.printf("Thread Count: %d, Mode: Single Entry\n", THREAD_COUNT);
         System.out.printf("Total test time: %.3f seconds\n", totalDurationSeconds);
         System.out.println("------------------------------------");
         System.out.printf("Total PUT operations:    %,d\n", putCount);
