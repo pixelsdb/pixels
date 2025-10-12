@@ -51,5 +51,4 @@ public class DateUtil
         SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmss");//set the style
         return df.format(new Date()) + "_" + count.getAndIncrement();
     }
-
 }
