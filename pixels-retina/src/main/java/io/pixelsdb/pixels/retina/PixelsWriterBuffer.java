@@ -372,7 +372,7 @@ public class PixelsWriterBuffer
             {
                 throw new RuntimeException(e);
             }
-        }, 0, 5, TimeUnit.SECONDS);
+        }, 0, 30, TimeUnit.SECONDS);
     }
 
     /**
