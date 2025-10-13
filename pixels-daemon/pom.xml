@@ -67,6 +67,10 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-index-main-sqlite</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-memory</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>io.prometheus</groupId>

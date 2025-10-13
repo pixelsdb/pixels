@@ -297,6 +297,11 @@
                 <artifactId>pixels-index-main-sqlite</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-index-memory</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <dependency>
                 <groupId>io.pixelsdb</groupId>
