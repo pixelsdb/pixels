@@ -48,6 +48,7 @@ public class TestRetinaService
     private static final int ROWS_PER_RPC = 10; // Number of rows per RPC
     private static final double UPDATE_RATIO = 0.8; // Ratio of updates to total operations
     private static final int TEST_DURATION_SECONDS = 60; // Total test duration in seconds
+    private static final int INITIAL_KEYS = NUM_THREADS * ROWS_PER_RPC * 10; // Initial keys to pre-populate for updates
     private static final AtomicLong primaryKeyCounter = new AtomicLong(0); // Counter for generating unique primary keys
     private static final ConcurrentLinkedDeque<IndexProto.IndexKey> existingKeys = new ConcurrentLinkedDeque<>(); // Thread-safe deque to store existing keys
 
@@ -81,9 +82,8 @@ public class TestRetinaService
         Assertions.assertTrue(result);
         index = metadataService.getPrimaryIndex(table.getId());
 
-        //
         System.out.println("Pre-populating data for UPDATE operations...");
-        List<Long> initialKeys = LongStream.range(0, NUM_THREADS * ROWS_PER_RPC * 10)
+        List<Long> initialKeys = LongStream.range(0, INITIAL_KEYS)
                 .map(i -> primaryKeyCounter.getAndIncrement())
                 .boxed()
                 .collect(Collectors.toList());
@@ -226,32 +226,32 @@ public class TestRetinaService
             executor.submit(() -> {
                 try {
                     while (System.currentTimeMillis() < testEndTime) {
-                        rateLimiter.acquire(); // 等待令牌
+                        rateLimiter.acquire(); // Wait for token
 
                         List<Long> keysToInsert = new ArrayList<>();
                         List<IndexProto.IndexKey> keysToDelete = new ArrayList<>();
 
                         for (int j = 0; j < ROWS_PER_RPC; j++) {
-                            // 根据比例决定是执行更新还是插入
+                            // Decide whether to perform update or insert based on ratio
                             if (ThreadLocalRandom.current().nextDouble() < UPDATE_RATIO && !existingKeys.isEmpty()) {
-                                // 执行更新操作: 从队列中取一个旧key来删除，并生成一个新key来插入
+                                // Perform update: delete an old key and insert a new key
                                 IndexProto.IndexKey keyToDelete = existingKeys.poll();
                                 if (keyToDelete != null) {
                                     keysToDelete.add(keyToDelete);
                                     keysToInsert.add(primaryKeyCounter.getAndIncrement());
                                 } else {
-                                    // 如果没取到（例如队列暂时为空），则本次操作转为纯插入
+                                    // If no key is available, perform pure insert
                                     keysToInsert.add(primaryKeyCounter.getAndIncrement());
                                 }
                             } else {
-                                // 执行纯插入操作
+                                // Perform pure insert
                                 keysToInsert.add(primaryKeyCounter.getAndIncrement());
                             }
                         }
 
                         if (!keysToInsert.isEmpty() || !keysToDelete.isEmpty()) {
                             List<IndexProto.IndexKey> newKeys = updateRecords(keysToInsert, keysToDelete);
-                            existingKeys.addAll(newKeys); // 将新生成的key放回队列
+                            existingKeys.addAll(newKeys); // Add new keys back to the deque
                             totalOperations.incrementAndGet();
                             insertCount.addAndGet(keysToInsert.size());
                             deleteCount.addAndGet(keysToDelete.size());
@@ -263,7 +263,7 @@ public class TestRetinaService
             });
         }
 
-        latch.await(); // 等待所有线程完成
+        latch.await(); // Wait for all threads to finish
         executor.shutdown();
         long endTime = System.currentTimeMillis();
         long durationMillis = endTime - startTime;
