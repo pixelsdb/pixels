@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.retina;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;

@@ -38,19 +38,22 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 public class TestRetinaService
 {
-    private static final int NUM_THREADS = 100; // Number of concurrent threads
-    private static final double RPC_PER_SECOND = 5000.0; // Desired RPCs per second
-    private static final int ROWS_PER_RPC = 10; // Number of rows per RPC
+    private static final int NUM_THREADS = 16; // Number of concurrent threads
+    private static final double RPC_PER_SECOND = 1000.0; // Desired RPCs per second
+    private static final int ROWS_PER_RPC = 200; // Number of rows per RPC
     private static final double UPDATE_RATIO = 0.8; // Ratio of updates to total operations
-    private static final int TEST_DURATION_SECONDS = 60; // Total test duration in seconds
-    private static final int INITIAL_KEYS = NUM_THREADS * ROWS_PER_RPC * 10; // Initial keys to pre-populate for updates
+    private static final int TEST_DURATION_SECONDS = 180; // Total test duration in seconds
+    private static final int INITIAL_KEYS = 0; // Initial keys to pre-populate for updates
     private static final AtomicLong primaryKeyCounter = new AtomicLong(0); // Counter for generating unique primary keys
-    private static final ConcurrentLinkedDeque<IndexProto.IndexKey> existingKeys = new ConcurrentLinkedDeque<>(); // Thread-safe deque to store existing keys
+    private static final List<ConcurrentLinkedDeque<IndexProto.IndexKey>> threadLocalKeyDeques = new ArrayList<>(NUM_THREADS);
+    private static final ThreadLocal<RetinaService.StreamHandler> threadLocalStreamHandler =
+            ThreadLocal.withInitial(() -> RetinaService.Instance().startUpdateStream());
 
     private static String schemaName;
     private static String tableName;
@@ -58,7 +61,7 @@ public class TestRetinaService
     private static SinglePointIndex index;
 
     @BeforeAll
-    public static void setUp() throws MetadataException
+    public static void setUp() throws MetadataException, InterruptedException
     {
         schemaName = "tpch";
         tableName = "nation";
@@ -73,7 +76,7 @@ public class TestRetinaService
                 .setKeyColumns(keyColumn)
                 .setPrimary(true)
                 .setUnique(true)
-                .setIndexScheme("rocksdb")
+                .setIndexScheme("memory")
                 .setTableId(table.getId())
                 .setSchemaVersionId(layout.getSchemaVersionId());
 
@@ -87,8 +90,23 @@ public class TestRetinaService
                 .map(i -> primaryKeyCounter.getAndIncrement())
                 .boxed()
                 .collect(Collectors.toList());
-        List<IndexProto.IndexKey> initialIndexKeys = new TestRetinaService().updateRecords(initialKeys, null);
-        existingKeys.addAll(initialIndexKeys);
+
+        final CountDownLatch setupLatch = new CountDownLatch(1);
+        final List<IndexProto.IndexKey> allIndexKeys = Collections.synchronizedList(new ArrayList<>());
+        updateRecords(initialKeys, null, initialIndexKeys -> {
+            allIndexKeys.addAll(initialIndexKeys);
+            setupLatch.countDown();
+        });
+        setupLatch.await();
+
+        int keysPerThread = INITIAL_KEYS / NUM_THREADS;
+        for (int i = 0; i < NUM_THREADS; i++)
+        {
+            int startIndex = i * keysPerThread;
+            int endIndex = (i == NUM_THREADS - 1) ? INITIAL_KEYS : startIndex + keysPerThread;
+            ConcurrentLinkedDeque<IndexProto.IndexKey> threadDeque = new ConcurrentLinkedDeque<>(allIndexKeys.subList(startIndex, endIndex));
+            threadLocalKeyDeques.add(threadDeque);
+        }
         System.out.println("Pre-population complete.");
     }
 
@@ -97,7 +115,7 @@ public class TestRetinaService
      * @param i For example, when i = 0, insert: 0 | name_0 | 0 | comment_0
      * @return IndexKey of the inserted record
      */
-    public IndexProto.IndexKey constructInsertData(long i, RetinaProto.InsertData.Builder insertDataBuilder)
+    public static IndexProto.IndexKey constructInsertData(long i, RetinaProto.InsertData.Builder insertDataBuilder)
     {
         byte[][] cols = new byte[4][];
         cols[0] = ByteBuffer.allocate(8).putLong(i).array();
@@ -159,9 +177,9 @@ public class TestRetinaService
      * Update records
      * @param insertKeys : parameter for constructing the insert data
      * @param indexKeys : parameter for constructing the delete data
-     * @return IndexKey of the inserted record
      */
-    public List<IndexProto.IndexKey> updateRecords(List<Long> insertKeys, List<IndexProto.IndexKey> indexKeys)
+    public static void updateRecords(List<Long> insertKeys, List<IndexProto.IndexKey> indexKeys,
+                              Consumer<List<IndexProto.IndexKey>> onCompleteCallback)
     {
         List<IndexProto.IndexKey> result = new ArrayList<>();
 
@@ -192,11 +210,19 @@ public class TestRetinaService
 
         tableUpdateData.add(tableUpdateDataBuilder.build());
 
-        try (RetinaService.StreamHandler streamHandler = RetinaService.Instance().startUpdateStream())
+        RetinaService.StreamHandler streamHandler = threadLocalStreamHandler.get();
+        CompletableFuture<RetinaProto.UpdateRecordResponse> future = streamHandler.updateRecord(schemaName, tableUpdateData);
+
+        future.whenComplete(((response, throwable) ->
         {
-            streamHandler.updateRecord(schemaName, tableUpdateData);
-        }
-        return result;
+            if (throwable == null)
+            {
+                onCompleteCallback.accept(result);
+            } else
+            {
+                System.err.println("Update failed: " + throwable);
+            }
+        }));
     }
 
     @Test
@@ -223,6 +249,8 @@ public class TestRetinaService
 
         for (int i = 0; i < NUM_THREADS; i++)
         {
+            final ConcurrentLinkedDeque<IndexProto.IndexKey> myKeys = threadLocalKeyDeques.get(i);
+
             executor.submit(() -> {
                 try {
                     while (System.currentTimeMillis() < testEndTime) {
@@ -233,9 +261,9 @@ public class TestRetinaService
 
                         for (int j = 0; j < ROWS_PER_RPC; j++) {
                             // Decide whether to perform update or insert based on ratio
-                            if (ThreadLocalRandom.current().nextDouble() < UPDATE_RATIO && !existingKeys.isEmpty()) {
+                            if (ThreadLocalRandom.current().nextDouble() < UPDATE_RATIO && !myKeys.isEmpty()) {
                                 // Perform update: delete an old key and insert a new key
-                                IndexProto.IndexKey keyToDelete = existingKeys.poll();
+                                IndexProto.IndexKey keyToDelete = myKeys.poll();
                                 if (keyToDelete != null) {
                                     keysToDelete.add(keyToDelete);
                                     keysToInsert.add(primaryKeyCounter.getAndIncrement());
@@ -250,11 +278,12 @@ public class TestRetinaService
                         }
 
                         if (!keysToInsert.isEmpty() || !keysToDelete.isEmpty()) {
-                            List<IndexProto.IndexKey> newKeys = updateRecords(keysToInsert, keysToDelete);
-                            existingKeys.addAll(newKeys); // Add new keys back to the deque
-                            totalOperations.incrementAndGet();
-                            insertCount.addAndGet(keysToInsert.size());
-                            deleteCount.addAndGet(keysToDelete.size());
+                            updateRecords(keysToInsert, keysToDelete, newKeys -> {
+                                myKeys.addAll(newKeys); // Add new keys back to the deque
+                                totalOperations.incrementAndGet();
+                                insertCount.addAndGet(keysToInsert.size());
+                                deleteCount.addAndGet(keysToDelete.size());
+                            });
                         }
                     }
                 } finally {
@@ -264,9 +293,9 @@ public class TestRetinaService
         }
 
         latch.await(); // Wait for all threads to finish
-        executor.shutdown();
         long endTime = System.currentTimeMillis();
         long durationMillis = endTime - startTime;
+        executor.shutdown();
 
         System.out.println("======================================================");
         System.out.println("Test Finished.");
