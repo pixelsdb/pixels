@@ -153,6 +153,7 @@ public class MemoryIndex implements SinglePointIndex
                     this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
             versions.put(timestamp, entry.getRowId());
             mainIndex.putEntry(entry.getRowId(), entry.getRowLocation());
+            tombstones.remove(baseKey);
         }
         return true;
     }
@@ -182,6 +183,7 @@ public class MemoryIndex implements SinglePointIndex
             ConcurrentSkipListMap<Long, Long> versions =
                     this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
             versions.put(timestamp, rowId);
+            tombstones.remove(baseKey);
         }
         else
         {
