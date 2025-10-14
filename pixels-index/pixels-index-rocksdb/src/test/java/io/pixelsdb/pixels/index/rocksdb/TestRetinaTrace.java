@@ -64,11 +64,7 @@ import java.util.stream.IntStream;
  */
 public class TestRetinaTrace
 {
-    /**
-     * The number of concurrent threads to use for the test.
-     * Each thread will operate on a different tableId and indexId (base_id + 1000 * thread_index).
-     */
-    private static final int THREAD_COUNT = 20;
+    private static final int THREAD_COUNT = 16;
 
     // Trace load path: only put operations
     private static final String loadPath = "/home/gengdy/data/index/index.load.trace";
@@ -94,11 +90,8 @@ public class TestRetinaTrace
                 count++;
                 String[] parts = line.split("\\t");
                 PutOperation putOperation = new PutOperation(parts);
-                for (int i = 0; i < THREAD_COUNT; i++)
-                {
-                    IndexProto.PrimaryIndexEntry entry = (IndexProto.PrimaryIndexEntry) putOperation.withIndexIdOffset(i).toProto();
-                    indexService.putPrimaryIndexEntry(entry);
-                }
+                IndexProto.PrimaryIndexEntry entry = (IndexProto.PrimaryIndexEntry) putOperation.toProto();
+                indexService.putPrimaryIndexEntry(entry);
             }
         } catch (IOException e)
         {
@@ -112,7 +105,7 @@ public class TestRetinaTrace
 
     private interface TraceOperation
     {
-        TraceOperation withIndexIdOffset(long offset);
+        int getBucket();
         Object toProto();
     }
 
@@ -121,6 +114,7 @@ public class TestRetinaTrace
         final long tableId, indexId, timestamp, rowId, fileId;
         final ByteString key;
         final int rgId, rgRowOffset;
+        final int bucket;
 
         PutOperation(String[] parts)
         {
@@ -130,32 +124,21 @@ public class TestRetinaTrace
             }
             this.tableId = Long.parseLong(parts[1]);
             this.indexId = Long.parseLong(parts[2]);
+            int keyInt = Integer.parseInt(parts[3]);
             this.key = ByteString.copyFrom(ByteBuffer.allocate(Integer.BYTES)
-                    .putInt(Integer.parseInt(parts[3])).array());
+                    .putInt(keyInt).array());
             this.timestamp = Long.parseLong(parts[4]);
             this.rowId = Long.parseLong(parts[5]);
             this.fileId = Long.parseLong(parts[6]);
             this.rgId = Integer.parseInt(parts[7]);
             this.rgRowOffset = Integer.parseInt(parts[8]);
-        }
-
-        private PutOperation(long tableId, long indexId, ByteString key, long timestamp,
-                             long rowId, long fileId, int rgId, int rgRowOffset)
-        {
-            this.tableId = tableId;
-            this.indexId = indexId;
-            this.key = key;
-            this.timestamp = timestamp;
-            this.rowId = rowId;
-            this.fileId = fileId;
-            this.rgId = rgId;
-            this.rgRowOffset = rgRowOffset;
+            this.bucket = keyInt % THREAD_COUNT;
         }
 
         @Override
-        public PutOperation withIndexIdOffset(long offset)
+        public int getBucket()
         {
-            return new PutOperation(tableId + 1000 * offset, indexId + 1000 * offset, key, timestamp, rowId, fileId, rgId, rgRowOffset);
+            return bucket;
         }
 
         @Override
@@ -186,6 +169,7 @@ public class TestRetinaTrace
     {
         final long tableId, indexId, timestamp;
         final ByteString key;
+        final int bucket;
 
         DeleteOperation(String[] parts)
         {
@@ -195,23 +179,17 @@ public class TestRetinaTrace
             }
             this.tableId = Long.parseLong(parts[1]);
             this.indexId = Long.parseLong(parts[2]);
+            int keyInt = Integer.parseInt(parts[3]);
             this.key = ByteString.copyFrom(ByteBuffer.allocate(Integer.BYTES)
-                    .putInt(Integer.parseInt(parts[3])).array());
+                    .putInt(keyInt).array());
             this.timestamp = Long.parseLong(parts[4]);
-        }
-
-        private DeleteOperation(long tableId, long indexId, ByteString key, long timestamp)
-        {
-            this.tableId = tableId;
-            this.indexId = indexId;
-            this.key = key;
-            this.timestamp = timestamp;
+            this.bucket = keyInt % THREAD_COUNT;
         }
 
         @Override
-        public DeleteOperation withIndexIdOffset(long offset)
+        public int getBucket()
         {
-            return new DeleteOperation(tableId + 1000 * offset, indexId + 1000 * offset, key, timestamp);
+            return bucket;
         }
 
         @Override
@@ -224,39 +202,6 @@ public class TestRetinaTrace
                     .setTimestamp(timestamp)
                     .build();
         }
-    }
-
-    private static List<TraceOperation> loadTraceOperations(String path)
-    {
-        List<TraceOperation> ops = new ArrayList<>();
-        try (BufferedReader reader = Files.newBufferedReader(Paths.get(path)))
-        {
-            String line;
-            while ((line = reader.readLine()) != null)
-            {
-                String[] parts = line.split("\\t");
-                if (parts.length < 1)
-                {
-                    throw new RuntimeException("Invalid operation: " + line);
-                }
-                switch (parts[0])
-                {
-                    case "P":
-                        ops.add(new PutOperation(parts));
-                        break;
-                    case "D":
-                        ops.add(new DeleteOperation(parts));
-                        break;
-                    default:
-                        throw new RuntimeException("Unknown operation type: " + parts[0]);
-                }
-
-            }
-        } catch (IOException e)
-        {
-            throw new RuntimeException("Failed to read trace file: " + path, e);
-        }
-        return ops;
     }
 
     private static class IndexWorker implements Runnable
@@ -294,7 +239,7 @@ public class TestRetinaTrace
     public void testIndex()
     {
         System.out.println("Loading baseTrace...");
-        List<TraceOperation> baseOperations = new ArrayList<>();
+        List<TraceOperation> operations = new ArrayList<>();
         long putCount = 0, delCount = 0;
         try (BufferedReader reader = Files.newBufferedReader(Paths.get(updatePath)))
         {
@@ -310,11 +255,11 @@ public class TestRetinaTrace
                 if (opType.equals("P"))
                 {
                     putCount++;
-                    baseOperations.add(new PutOperation(parts));
+                    operations.add(new PutOperation(parts));
                 } else if (opType.equals("D"))
                 {
                     delCount++;
-                    baseOperations.add(new DeleteOperation(parts));
+                    operations.add(new DeleteOperation(parts));
                 } else
                 {
                     throw new RuntimeException("Unknown operation type: " + opType);
@@ -327,21 +272,17 @@ public class TestRetinaTrace
         {
             throw new RuntimeException("Malformed number in update trace", e);
         }
-        System.out.println("Loaded " + baseOperations.size() + " operations from update trace.");
+        System.out.println("Loaded " + operations.size() + " operations from update trace.");
 
         System.out.println("Generating workloads for " + THREAD_COUNT + " threads...");
-        List<List<TraceOperation>> threadOperations = IntStream.range(0, THREAD_COUNT)
-                        .mapToObj(i -> baseOperations.stream()
-                                .map(op -> op.withIndexIdOffset(i))
-                                .collect(Collectors.toList()))
-                        .collect(Collectors.toList());
+        List<List<Object>> threadProtoOperations = IntStream.range(0, THREAD_COUNT)
+                .mapToObj(i -> new ArrayList<Object>())
+                .collect(Collectors.toList());
 
-        System.out.println("Pre-building all protobuf objects to avoid measuring serialization time...");
-        List<List<Object>> threadProtoOperations =  threadOperations.stream()
-                        .map(opsList -> opsList.stream()
-                                .map(TraceOperation::toProto)
-                                .collect(Collectors.toList()))
-                        .collect(Collectors.toList());
+        for (TraceOperation op : operations)
+        {
+            threadProtoOperations.get(op.getBucket()).add(op.toProto());
+        }
         System.out.println("Finished pre-building protobuf objects.");
 
         System.out.println("Starting index performance test with " + THREAD_COUNT + " threads...");
@@ -364,8 +305,6 @@ public class TestRetinaTrace
         }
         long endTime = System.currentTimeMillis();
 
-        putCount *= THREAD_COUNT;
-        delCount *= THREAD_COUNT;
         long totalDurationNanos = endTime - startTime;
         double totalDurationSeconds = totalDurationNanos / 1000.0;
         long totalOps = putCount + delCount;
