@@ -19,9 +19,12 @@
  */
 package io.pixelsdb.pixels.common.retina;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
@@ -55,21 +58,28 @@ public class TestRetinaService
     private static final ThreadLocal<RetinaService.StreamHandler> threadLocalStreamHandler =
             ThreadLocal.withInitial(() -> RetinaService.Instance().startUpdateStream());
 
-    private static String schemaName;
-    private static String tableName;
-    private static String[] colNames;
+    private static String schemaName = "tpch";
+    private static String tableName = "nation";
+    private static String keyColumn = "n_nationkey";
+    private static List<String> colNames = new ArrayList<>();
     private static SinglePointIndex index;
 
     @BeforeAll
-    public static void setUp() throws MetadataException, InterruptedException
+    public static void setUp() throws MetadataException, InterruptedException, JsonProcessingException
     {
-        schemaName = "tpch";
-        tableName = "nation";
-        colNames = new String[]{"key", "name", "region", "comment"};
         MetadataService metadataService = MetadataService.Instance();
-
-        String keyColumn = "{\"keyColumnIds\":[25]}";   // Retrieve the primary key column ID from `COLS` table.
         Table table = metadataService.getTable(schemaName, tableName);
+        List<Column> columns = metadataService.getColumns(schemaName, tableName, false);
+        List<Integer> keyColumnIds = new ArrayList<>();
+        for (Column column : columns)
+        {
+            colNames.add(column.getName());
+            if (column.getName().equals(keyColumn))
+            {
+                keyColumnIds.add((int) column.getId());
+            }
+        }
+        String keyColumn = new ObjectMapper().writeValueAsString(keyColumnIds);
         Layout layout = metadataService.getLatestLayout(schemaName, tableName);
         MetadataProto.SinglePointIndex.Builder singlePointIndexBuilder = MetadataProto.SinglePointIndex.newBuilder()
                 .setId(0L)
@@ -131,9 +141,9 @@ public class TestRetinaService
             valueBuilder.addValues(columnValueBuilder.build());
         }
         Map<String, SinkProto.ColumnValue> valueMap = new HashMap<>();
-        for (int j = 0; j < colNames.length; j++)
+        for (int j = 0; j < colNames.size(); j++)
         {
-            valueMap.put(colNames[j], valueBuilder.getValues(j));
+            valueMap.put(colNames.get(j), valueBuilder.getValues(j));
         }
 
         List<String> keyColumnNames = new LinkedList<>();
