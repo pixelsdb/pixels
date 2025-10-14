@@ -24,10 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.metadata.domain.Column;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Table;
-import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
+import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.RetinaProto;
@@ -50,7 +47,7 @@ public class TestRetinaService
     private static final int NUM_THREADS = 16; // Number of concurrent threads
     private static final double RPC_PER_SECOND = 1000.0; // Desired RPCs per second
     private static final int ROWS_PER_RPC = 200; // Number of rows per RPC
-    private static final double UPDATE_RATIO = 0.8; // Ratio of updates to total operations
+    private static final double UPDATE_RATIO = 1; // Ratio of updates to total operations
     private static final int TEST_DURATION_SECONDS = 180; // Total test duration in seconds
     private static final int INITIAL_KEYS = 0; // Initial keys to pre-populate for updates
     private static final AtomicLong primaryKeyCounter = new AtomicLong(0); // Counter for generating unique primary keys
@@ -70,16 +67,16 @@ public class TestRetinaService
         MetadataService metadataService = MetadataService.Instance();
         Table table = metadataService.getTable(schemaName, tableName);
         List<Column> columns = metadataService.getColumns(schemaName, tableName, false);
-        List<Integer> keyColumnIds = new ArrayList<>();
+        KeyColumns keyColumns = new KeyColumns();
         for (Column column : columns)
         {
             colNames.add(column.getName());
             if (column.getName().equals(keyColumn))
             {
-                keyColumnIds.add((int) column.getId());
+                keyColumns.addKeyColumnIds((int) column.getId());
             }
         }
-        String keyColumn = new ObjectMapper().writeValueAsString(keyColumnIds);
+        String keyColumn = new ObjectMapper().writeValueAsString(keyColumns);
         Layout layout = metadataService.getLatestLayout(schemaName, tableName);
         MetadataProto.SinglePointIndex.Builder singlePointIndexBuilder = MetadataProto.SinglePointIndex.newBuilder()
                 .setId(0L)
