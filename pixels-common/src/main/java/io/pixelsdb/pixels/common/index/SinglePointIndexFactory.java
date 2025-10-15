@@ -30,6 +30,10 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -41,9 +45,10 @@ import static java.util.Objects.requireNonNull;
 public class SinglePointIndexFactory
 {
     private static final Logger logger = LogManager.getLogger(SinglePointIndexFactory.class);
-    private final Map<TableIndex, SinglePointIndex> singlePointIndexImpls = new HashMap<>();
-    private final Set<SinglePointIndex.Scheme> enabledSchemes = new TreeSet<>();
-    private final Map<Long, TableIndex> indexIdToTableIndex = new HashMap<>();
+    private final Map<TableIndex, SinglePointIndex> singlePointIndexImpls = new ConcurrentHashMap<>();
+    private final Set<SinglePointIndex.Scheme> enabledSchemes = new ConcurrentSkipListSet<>();
+    private final Map<Long, TableIndex> indexIdToTableIndex = new ConcurrentHashMap<>();
+    private final Lock lock = new ReentrantLock();
     /**
      * The providers of the enabled single point index schemes.
      */
@@ -128,27 +133,36 @@ public class SinglePointIndexFactory
      * @return the single point index instance
      * @throws SinglePointIndexException
      */
-    public synchronized SinglePointIndex getSinglePointIndex(long tableId, long indexId) throws SinglePointIndexException
+    public SinglePointIndex getSinglePointIndex(long tableId, long indexId) throws SinglePointIndexException
     {
         TableIndex tableIndex = indexIdToTableIndex.get(indexId);
         if (tableIndex == null)
         {
+            this.lock.lock();
             try
             {
-                io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex singlePointIndex =
-                        MetadataService.Instance().getSinglePointIndex(indexId);
-                if (singlePointIndex == null)
+                // double check to avoid redundant tableIndex creation
+                tableIndex = indexIdToTableIndex.get(indexId);
+                if (tableIndex == null)
                 {
-                    throw new SinglePointIndexException("single point index with id " + indexId + " does not exist");
+                    io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex spi =
+                            MetadataService.Instance().getSinglePointIndex(indexId);
+                    if (spi == null)
+                    {
+                        throw new SinglePointIndexException("single point index with id " + indexId + " does not exist");
+                    }
+                    tableIndex = new TableIndex(tableId, indexId, spi.getIndexScheme(), spi.isUnique());
+                    indexIdToTableIndex.put(indexId, tableIndex);
                 }
-                tableIndex = new TableIndex(tableId, indexId, singlePointIndex.getIndexScheme(), singlePointIndex.isUnique());
-                indexIdToTableIndex.put(indexId, tableIndex);
             } catch (MetadataException e)
             {
                 throw new SinglePointIndexException("failed to query single point index information from metadata", e);
             }
+            finally
+            {
+                this.lock.unlock();
+            }
         }
-        // 'synchronized' in Java is reentrant,  it is fine to call the other getSinglePointIndex() from here.
         return getSinglePointIndex(tableIndex);
     }
 
@@ -158,26 +172,34 @@ public class SinglePointIndexFactory
      * @return the single point index instance
      * @throws SinglePointIndexException
      */
-    public synchronized SinglePointIndex getSinglePointIndex(TableIndex tableIndex) throws SinglePointIndexException
+    public SinglePointIndex getSinglePointIndex(TableIndex tableIndex) throws SinglePointIndexException
     {
         requireNonNull(tableIndex, "tableIndex is null");
         checkArgument(this.enabledSchemes.contains(tableIndex.scheme), "single point index scheme '" +
                 tableIndex.scheme.toString() + "' is not enabled.");
 
-        if (!indexIdToTableIndex.containsKey(tableIndex.indexId))
+        this.indexIdToTableIndex.putIfAbsent(tableIndex.indexId, tableIndex);
+
+        SinglePointIndex singlePointIndex = this.singlePointIndexImpls.get(tableIndex);
+        if (singlePointIndex == null)
         {
-            indexIdToTableIndex.put(tableIndex.indexId, tableIndex);
+            this.lock.lock();
+            try
+            {
+                // double check to avoid redundant creation of singlePointIndex
+                singlePointIndex = this.singlePointIndexImpls.get(tableIndex);
+                if (singlePointIndex == null)
+                {
+                    singlePointIndex = this.singlePointIndexProviders.get(tableIndex.getScheme()).createInstance(
+                            tableIndex.tableId, tableIndex.indexId, tableIndex.scheme, tableIndex.isUnique());
+                    singlePointIndexImpls.put(tableIndex, singlePointIndex);
+                }
+            }
+            finally
+            {
+                this.lock.unlock();
+            }
         }
-
-        if (singlePointIndexImpls.containsKey(tableIndex))
-        {
-            return singlePointIndexImpls.get(tableIndex);
-        }
-
-        SinglePointIndex singlePointIndex = this.singlePointIndexProviders.get(tableIndex.getScheme())
-                .createInstance(tableIndex.tableId, tableIndex.indexId, tableIndex.scheme, tableIndex.isUnique());
-        singlePointIndexImpls.put(tableIndex, singlePointIndex);
-
         return singlePointIndex;
     }
 
@@ -185,26 +207,33 @@ public class SinglePointIndexFactory
      * Close all the opened single point index instances.
      * @throws IOException
      */
-    public synchronized void closeAll() throws SinglePointIndexException
+    public void closeAll() throws SinglePointIndexException
     {
-        for (TableIndex tableIndex : singlePointIndexImpls.keySet())
+        this.lock.lock();
+        try
         {
-            try
+            for (TableIndex tableIndex : singlePointIndexImpls.keySet())
             {
-                SinglePointIndex removing = singlePointIndexImpls.get(tableIndex);
-                if (removing != null)
+                try
                 {
-                    removing.close();
+                    SinglePointIndex removing = singlePointIndexImpls.get(tableIndex);
+                    if (removing != null)
+                    {
+                        removing.close();
+                    }
+                } catch (IOException e)
+                {
+                    throw new SinglePointIndexException(
+                            "failed to close single point index with id " + tableIndex.indexId, e);
                 }
             }
-            catch (IOException e)
-            {
-                throw new SinglePointIndexException(
-                        "failed to close single point index with id " + tableIndex.indexId, e);
-            }
+            singlePointIndexImpls.clear();
+            indexIdToTableIndex.clear();
         }
-        singlePointIndexImpls.clear();
-        indexIdToTableIndex.clear();
+        finally
+        {
+            this.lock.unlock();
+        }
     }
 
     /**
@@ -214,60 +243,62 @@ public class SinglePointIndexFactory
      * @param closeAndRemove remove the index storage after closing if true
      * @throws SinglePointIndexException
      */
-    public synchronized void closeIndex(long tableId, long indexId, boolean closeAndRemove) throws SinglePointIndexException
+    public void closeIndex(long tableId, long indexId, boolean closeAndRemove) throws SinglePointIndexException
     {
-        TableIndex tableIndex = indexIdToTableIndex.remove(indexId);
-        if (tableIndex != null)
+        this.lock.lock();
+        try
         {
-            SinglePointIndex removed = singlePointIndexImpls.remove(tableIndex);
-            if (removed != null)
+            TableIndex tableIndex = indexIdToTableIndex.remove(indexId);
+            if (tableIndex != null)
             {
-                try
+                SinglePointIndex removed = singlePointIndexImpls.remove(tableIndex);
+                if (removed != null)
                 {
-                    if (closeAndRemove)
+                    try
                     {
-                        removed.closeAndRemove();
-                    }
-                    else
+                        if (closeAndRemove)
+                        {
+                            removed.closeAndRemove();
+                        } else
+                        {
+                            removed.close();
+                        }
+                    } catch (IOException e)
                     {
-                        removed.close();
+                        throw new SinglePointIndexException(
+                                "failed to close single point index with id " + tableIndex.indexId, e);
                     }
-                }
-                catch (IOException e)
+                } else
                 {
-                    throw new SinglePointIndexException(
-                            "failed to close single point index with id " + tableIndex.indexId, e);
+                    logger.warn("index with id {} once opened but not found", indexId);
                 }
-            }
-            else
+            } else
             {
-                logger.warn("index with id {} once opened but not found", indexId);
+                TableIndex tableIndex1 = new TableIndex(tableId, indexId, null, false);
+                SinglePointIndex removed = singlePointIndexImpls.remove(tableIndex1);
+                if (removed != null)
+                {
+                    try
+                    {
+                        if (closeAndRemove)
+                        {
+                            removed.closeAndRemove();
+                        } else
+                        {
+                            removed.close();
+                        }
+                    } catch (IOException e)
+                    {
+                        throw new SinglePointIndexException(
+                                "failed to close single point index with id " + tableIndex.indexId, e);
+                    }
+                    logger.warn("index with id {} is found but not opened properly", indexId);
+                }
             }
         }
-        else
+        finally
         {
-            TableIndex tableIndex1 = new TableIndex(tableId, indexId, null, false);
-            SinglePointIndex removed = singlePointIndexImpls.remove(tableIndex1);
-            if (removed != null)
-            {
-                try
-                {
-                    if (closeAndRemove)
-                    {
-                        removed.closeAndRemove();
-                    }
-                    else
-                    {
-                        removed.close();
-                    }
-                }
-                catch (IOException e)
-                {
-                    throw new SinglePointIndexException(
-                            "failed to close single point index with id " + tableIndex.indexId, e);
-                }
-                logger.warn("index with id {} is found but not opened properly", indexId);
-            }
+            this.lock.unlock();
         }
     }
 
