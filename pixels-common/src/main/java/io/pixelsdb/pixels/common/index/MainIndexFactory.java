@@ -26,9 +26,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
 
@@ -40,7 +40,7 @@ import static java.util.Objects.requireNonNull;
 public class MainIndexFactory
 {
     private static final Logger logger = LogManager.getLogger(MainIndexFactory.class);
-    private final Map<Long, MainIndex> mainIndexImpls = new HashMap<>();
+    private final Map<Long, MainIndex> mainIndexImpls = new ConcurrentHashMap<>();
     private final MainIndex.Scheme enabledScheme;
     /**
      * The providers of the enabled main index schemes.
@@ -114,16 +114,22 @@ public class MainIndexFactory
      * @return the main index instance
      * @throws SinglePointIndexException
      */
-    public synchronized MainIndex getMainIndex(long tableId) throws MainIndexException
+    public MainIndex getMainIndex(long tableId) throws MainIndexException
     {
-        if (mainIndexImpls.containsKey(tableId))
+        MainIndex mainIndex = this.mainIndexImpls.get(tableId);
+        if (mainIndex == null)
         {
-            return mainIndexImpls.get(tableId);
+            synchronized (this)
+            {
+                // double check to avoid redundant creation of mainIndex
+                mainIndex = this.mainIndexImpls.get(tableId);
+                if (mainIndex == null)
+                {
+                    mainIndex = this.mainIndexProvider.createInstance(tableId, this.enabledScheme);
+                    this.mainIndexImpls.put(tableId, mainIndex);
+                }
+            }
         }
-
-        MainIndex mainIndex = this.mainIndexProvider.createInstance(tableId, enabledScheme);
-        mainIndexImpls.put(tableId, mainIndex);
-
         return mainIndex;
     }
 
