@@ -135,14 +135,14 @@ public class SinglePointIndexFactory
      */
     public SinglePointIndex getSinglePointIndex(long tableId, long indexId) throws SinglePointIndexException
     {
-        TableIndex tableIndex = indexIdToTableIndex.get(indexId);
+        TableIndex tableIndex = this.indexIdToTableIndex.get(indexId);
         if (tableIndex == null)
         {
             this.lock.lock();
             try
             {
                 // double check to avoid redundant tableIndex creation
-                tableIndex = indexIdToTableIndex.get(indexId);
+                tableIndex = this.indexIdToTableIndex.get(indexId);
                 if (tableIndex == null)
                 {
                     io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex spi =
@@ -152,7 +152,7 @@ public class SinglePointIndexFactory
                         throw new SinglePointIndexException("single point index with id " + indexId + " does not exist");
                     }
                     tableIndex = new TableIndex(tableId, indexId, spi.getIndexScheme(), spi.isUnique());
-                    indexIdToTableIndex.put(indexId, tableIndex);
+                    this.indexIdToTableIndex.put(indexId, tableIndex);
                 }
             } catch (MetadataException e)
             {
@@ -192,7 +192,7 @@ public class SinglePointIndexFactory
                 {
                     singlePointIndex = this.singlePointIndexProviders.get(tableIndex.getScheme()).createInstance(
                             tableIndex.tableId, tableIndex.indexId, tableIndex.scheme, tableIndex.isUnique());
-                    singlePointIndexImpls.put(tableIndex, singlePointIndex);
+                    this.singlePointIndexImpls.put(tableIndex, singlePointIndex);
                 }
             }
             finally
@@ -212,11 +212,11 @@ public class SinglePointIndexFactory
         this.lock.lock();
         try
         {
-            for (TableIndex tableIndex : singlePointIndexImpls.keySet())
+            for (TableIndex tableIndex : this.singlePointIndexImpls.keySet())
             {
                 try
                 {
-                    SinglePointIndex removing = singlePointIndexImpls.get(tableIndex);
+                    SinglePointIndex removing = this.singlePointIndexImpls.get(tableIndex);
                     if (removing != null)
                     {
                         removing.close();
@@ -227,8 +227,8 @@ public class SinglePointIndexFactory
                             "failed to close single point index with id " + tableIndex.indexId, e);
                 }
             }
-            singlePointIndexImpls.clear();
-            indexIdToTableIndex.clear();
+            this.singlePointIndexImpls.clear();
+            this.indexIdToTableIndex.clear();
         }
         finally
         {
@@ -248,10 +248,10 @@ public class SinglePointIndexFactory
         this.lock.lock();
         try
         {
-            TableIndex tableIndex = indexIdToTableIndex.remove(indexId);
+            TableIndex tableIndex = this.indexIdToTableIndex.remove(indexId);
             if (tableIndex != null)
             {
-                SinglePointIndex removed = singlePointIndexImpls.remove(tableIndex);
+                SinglePointIndex removed = this.singlePointIndexImpls.remove(tableIndex);
                 if (removed != null)
                 {
                     try
@@ -275,7 +275,7 @@ public class SinglePointIndexFactory
             } else
             {
                 TableIndex tableIndex1 = new TableIndex(tableId, indexId, null, false);
-                SinglePointIndex removed = singlePointIndexImpls.remove(tableIndex1);
+                SinglePointIndex removed = this.singlePointIndexImpls.remove(tableIndex1);
                 if (removed != null)
                 {
                     try
