@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * The main index of a table is the mapping from row id to the row offset in the data file.
@@ -112,12 +113,26 @@ public interface MainIndex extends Closeable
     IndexProto.RowLocation getLocation(long rowId) throws MainIndexException;
 
     /**
+     * Get the physical locations of a batch of rows given the row ids.
+     * @param rowIds the row ids
+     * @return the row locations, empty if not found
+     */
+    List<IndexProto.RowLocation> getLocations(List<Long> rowIds) throws MainIndexException;
+
+    /**
      * Put a single row id into the main index.
      * @param rowId the row id
      * @param rowLocation the location of the row id
      * @return true on success
      */
     boolean putEntry(long rowId, IndexProto.RowLocation rowLocation);
+
+    /**
+     * Put a batch of row ids into the main index given the primary index entries.
+     * @param primaryEntries the primary index entries that contain the row ids and row locations
+     * @return true on success for each entry
+     */
+    List<Boolean> putEntries(List<IndexProto.PrimaryIndexEntry> primaryEntries);
 
     /**
      * Delete a range of row ids from the main index. This method only has effect on the persistent storage
