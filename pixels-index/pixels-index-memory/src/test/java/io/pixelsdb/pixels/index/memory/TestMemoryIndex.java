@@ -130,14 +130,14 @@ public class TestMemoryIndex
             IndexProto.IndexKey key = createIndexKey("key" + i, 1000L);
             uniqueIndex.putEntry(key, i);
         }
-        System.out.println(System.currentTimeMillis() - startTime);
+        System.out.println("put 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
         startTime = System.currentTimeMillis();
         for (long i = 0; i < 1000000L; ++i)
         {
             IndexProto.IndexKey key = createIndexKey("key" + i, 1001L);
             uniqueIndex.updatePrimaryEntry(key, i+1);
         }
-        System.out.println(System.currentTimeMillis() - startTime);
+        System.out.println("update 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
         assertEquals(2000000L, uniqueIndex.size());
         assertEquals(0L, uniqueIndex.tombstonesSize());
         List<IndexProto.IndexKey> indexKeys = new ArrayList<>(1000000);
@@ -148,7 +148,7 @@ public class TestMemoryIndex
             indexKeys.add(key);
             uniqueIndex.deleteEntry(key);
         }
-        System.out.println(System.currentTimeMillis() - startTime);
+        System.out.println("delete 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
         assertEquals(2000000L, uniqueIndex.size());
         assertEquals(1000000L, uniqueIndex.tombstonesSize());
         uniqueIndex.purgeEntries(indexKeys);
@@ -630,8 +630,8 @@ public class TestMemoryIndex
         // - At timestamp 2500: should see tombstone (value -1) because version 2000 is deleted
         assertEquals(-1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2500L)));
 
-        // - At timestamp 3500: should see tombstone (value -1) because version 2000 is deleted
-        assertEquals(-1, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 3500L)));
+        // - At timestamp 3500: should see version 3000 (value 3) because it's after tombstone
+        assertEquals(3L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 3500L)));
     }
 
     // Test closeAndRemove
@@ -777,5 +777,356 @@ public class TestMemoryIndex
         {
             fail("Index should still be functional after concurrent operations: " + e.getMessage());
         }
+    }
+
+    /**
+     * Test case for issue #1141: Verify that tombstone correctly hides all versions
+     * at and after the tombstone timestamp, but allows access to earlier versions.
+     */
+    @Test
+    public void testIssue1141_TombstoneHidesCorrectVersions() throws SinglePointIndexException
+    {
+        String keyValue = "test_key";
+
+        // Create multiple versions of the same key
+        IndexProto.IndexKey keyV1 = createIndexKey(keyValue, 1000L);
+        IndexProto.IndexKey keyV2 = createIndexKey(keyValue, 2000L);
+        IndexProto.IndexKey keyV3 = createIndexKey(keyValue, 3000L);
+
+        // Put values at different timestamps
+        uniqueIndex.putEntry(keyV1, 1L);
+        uniqueIndex.putEntry(keyV2, 2L);
+        uniqueIndex.putEntry(keyV3, 3L);
+
+        // Delete at timestamp 2000 (creates tombstone)
+        uniqueIndex.deleteEntry(keyV2);
+
+        // Test visibility at different query timestamps:
+
+        // At timestamp 1500: should see version 1000 (value 1) - before tombstone
+        assertEquals("Should see version 1000 at timestamp 1500",
+                1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 1500L)));
+
+        // At timestamp 2000: should see tombstone (value -1) - at tombstone timestamp
+        assertEquals("Should see tombstone at timestamp 2000",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2000L)));
+
+        // At timestamp 2500: should see tombstone (value -1) - after tombstone but before next version
+        assertEquals("Should see tombstone at timestamp 2500",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2500L)));
+
+        // At timestamp 3000: should see version 3000 (value 3) - new version after tombstone
+        assertEquals("Should see version 3000 at timestamp 3000",
+                3L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 3000L)));
+
+        // At timestamp 3500: should see version 3000 (value 3) - after new version
+        assertEquals("Should see version 3000 at timestamp 3500",
+                3L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 3500L)));
+    }
+
+    /**
+     * Test case for issue #1141: Verify that multiple tombstones work correctly
+     * when there are multiple delete operations.
+     */
+    @Test
+    public void testIssue1141_MultipleTombstones() throws SinglePointIndexException
+    {
+        String keyValue = "multi_tombstone_key";
+
+        // Create versions and multiple delete operations
+        uniqueIndex.putEntry(createIndexKey(keyValue, 1000L), 1L);
+        uniqueIndex.putEntry(createIndexKey(keyValue, 2000L), 2L);
+
+        // First delete at timestamp 1500
+        uniqueIndex.deleteEntry(createIndexKey(keyValue, 1500L));
+
+        // Put another version after first delete
+        uniqueIndex.putEntry(createIndexKey(keyValue, 3000L), 3L);
+
+        // Second delete at timestamp 2500
+        uniqueIndex.deleteEntry(createIndexKey(keyValue, 2500L));
+
+        // Put another version after second delete
+        uniqueIndex.putEntry(createIndexKey(keyValue, 4000L), 4L);
+
+        // Test visibility:
+
+        // Before first tombstone
+        assertEquals("Should see version 1000 at timestamp 1200",
+                1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 1200L)));
+
+        // Between first and second tombstone - should see first tombstone
+        assertEquals("Should see first tombstone at timestamp 1500",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 1800L)));
+
+        // Between second version and second tombstone - should see second version
+        assertEquals("Should see first tombstone at timestamp 1500",
+                2L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2200L)));
+
+        // Between second tombstone and third version - should see second tombstone
+        assertEquals("Should see second tombstone at timestamp 2800",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2800L)));
+
+        // After last version
+        assertEquals("Should see version 4000 at timestamp 4500",
+                4L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 4500L)));
+    }
+
+    /**
+     * Test case for issue #1141: Verify that purge operations correctly remove
+     * tombstones and don't affect visibility of newer versions.
+     */
+    @Test
+    public void testIssue1141_PurgeWithTombstones() throws SinglePointIndexException
+    {
+        String keyValue = "purge_test_key";
+
+        // Create multiple versions with tombstones
+        uniqueIndex.putEntry(createIndexKey(keyValue, 1000L), 1L);
+        uniqueIndex.putEntry(createIndexKey(keyValue, 2000L), 2L);
+        uniqueIndex.deleteEntry(createIndexKey(keyValue, 1500L)); // Tombstone at 1500
+        uniqueIndex.putEntry(createIndexKey(keyValue, 3000L), 3L);
+        uniqueIndex.deleteEntry(createIndexKey(keyValue, 2500L)); // Tombstone at 2500
+        uniqueIndex.putEntry(createIndexKey(keyValue, 4000L), 4L);
+
+        // Purge up to timestamp 2000
+        List<Long> purged = uniqueIndex.purgeEntries(Arrays.asList(createIndexKey(keyValue, 2000L)));
+
+        // Should have purged version 1000, and tombstone at 1500
+        assertEquals("Should have purged 1 version", 1, purged.size());
+        assertEquals("Should have 1 tombstone remaining", 1, uniqueIndex.tombstonesSize());
+
+        // Test visibility after purge:
+
+        // Before original first tombstone - should not find anything (purged)
+        assertEquals("Should not find version before purge timestamp",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 1200L)));
+
+        // At original first tombstone timestamp - should not find anything (purged)
+        assertEquals("Should not find tombstone at purged timestamp",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 1500L)));
+
+        // At original second version - should still see second version (not purged)
+        assertEquals("Should still see second tombstone",
+                2L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2000L)));
+
+        // At original second tombstone timestamp - should still see tombstone (not purged)
+        assertEquals("Should still see second tombstone",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2500L)));
+
+        // After last version - should see version 4000
+        assertEquals("Should see version 4000 after purge",
+                4L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 4500L)));
+    }
+
+    /**
+     * Test case for issue #1141: Verify non-unique index behavior with tombstones.
+     */
+    @Test
+    public void testIssue1141_NonUniqueIndexTombstones() throws SinglePointIndexException
+    {
+        String keyValue = "non_unique_key";
+
+        // Put multiple values for same key at different timestamps
+        nonUniqueIndex.putEntry(createIndexKey(keyValue, 1000L), 1L);
+        nonUniqueIndex.putEntry(createIndexKey(keyValue, 1000L), 2L); // Same timestamp, different rowId
+        nonUniqueIndex.putEntry(createIndexKey(keyValue, 2000L), 3L);
+        nonUniqueIndex.putEntry(createIndexKey(keyValue, 2000L), 4L);
+
+        // Delete at timestamp 1500
+        nonUniqueIndex.deleteEntry(createIndexKey(keyValue, 1500L));
+
+        // Put more values after tombstone
+        nonUniqueIndex.putEntry(createIndexKey(keyValue, 3000L), 5L);
+        nonUniqueIndex.putEntry(createIndexKey(keyValue, 3000L), 6L);
+
+        // Test visibility:
+
+        // Before tombstone - should see versions 1000
+        List<Long> beforeTombstone = nonUniqueIndex.getRowIds(createIndexKey(keyValue, 1200L));
+        assertEquals("Should see 2 values before tombstone", 2, beforeTombstone.size());
+        assertTrue("Should contain value 1", beforeTombstone.contains(1L));
+        assertTrue("Should contain value 2", beforeTombstone.contains(2L));
+
+        // At tombstone timestamp - should see empty (tombstone hides everything)
+        List<Long> atTombstone = nonUniqueIndex.getRowIds(createIndexKey(keyValue, 1500L));
+        assertTrue("Should see empty at tombstone timestamp", atTombstone.isEmpty());
+
+        // Between tombstone and next version - should see empty
+        List<Long> between = nonUniqueIndex.getRowIds(createIndexKey(keyValue, 1800L));
+        assertTrue("Should see empty between tombstone and next version", between.isEmpty());
+
+        // After new versions - should see versions 2000 and 3000
+        List<Long> after = nonUniqueIndex.getRowIds(createIndexKey(keyValue, 3500L));
+        assertEquals("Should see 4 values after tombstone", 4, after.size());
+        assertTrue("Should contain value 3", after.contains(3L));
+        assertTrue("Should contain value 4", after.contains(4L));
+        assertTrue("Should contain value 5", after.contains(5L));
+        assertTrue("Should contain value 6", after.contains(6L));
+    }
+
+    /**
+     * Test case for issue #1141: Verify that update operations work correctly
+     * with existing tombstones.
+     */
+    @Test
+    public void testIssue1141_UpdateWithTombstones() throws SinglePointIndexException
+    {
+        String keyValue = "update_tombstone_key";
+
+        // Create initial version and then delete
+        uniqueIndex.putEntry(createIndexKey(keyValue, 1000L), 1L);
+        uniqueIndex.deleteEntry(createIndexKey(keyValue, 1500L));
+
+        // Update at timestamp 2000 (should work despite tombstone)
+        List<Long> previous = uniqueIndex.updateSecondaryEntry(createIndexKey(keyValue, 2000L), 2L);
+
+        // Previous should be tombstoned
+        assertEquals("Should return no previous value", 0, previous.size());
+
+        // Test visibility:
+
+        // Before tombstone - should see original value
+        assertEquals("Should see original value before tombstone",
+                1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 1200L)));
+
+        // At tombstone - should see tombstone
+        assertEquals("Should see tombstone at tombstone timestamp",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 1500L)));
+
+        // After update - should see new value
+        assertEquals("Should see updated value after tombstone",
+                2L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2500L)));
+    }
+
+    /**
+     * Test case for issue #1141: Verify edge case where tombstone is at the exact
+     * same timestamp as a version.
+     */
+    @Test
+    public void testIssue1141_TombstoneAtSameTimestamp() throws SinglePointIndexException
+    {
+        String keyValue = "same_timestamp_key";
+
+        // Put value and immediately delete at same timestamp
+        uniqueIndex.putEntry(createIndexKey(keyValue, 1000L), 1L);
+        uniqueIndex.deleteEntry(createIndexKey(keyValue, 1000L));
+
+        // Put another value later
+        uniqueIndex.putEntry(createIndexKey(keyValue, 2000L), 2L);
+
+        // Test visibility:
+
+        // At the timestamp with both put and delete - should see tombstone
+        assertEquals("Should see tombstone at same timestamp",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 1000L)));
+
+        // Before the timestamp - should not find anything (no earlier version)
+        assertEquals("Should not find anything before the timestamp",
+                -1L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 500L)));
+
+        // After the timestamp - should see new value
+        assertEquals("Should see new value after timestamp",
+                2L, uniqueIndex.getUniqueRowId(createIndexKey(keyValue, 2500L)));
+    }
+
+    /**
+     * Test case for issue #1141: Verify complex scenario with multiple keys
+     * and interleaved operations.
+     */
+    @Test
+    public void testIssue1141_ComplexMultiKeyScenario() throws SinglePointIndexException
+    {
+        // Key 1 operations
+        uniqueIndex.putEntry(createIndexKey("key1", 1000L), 1L);
+        uniqueIndex.deleteEntry(createIndexKey("key1", 1500L));
+        uniqueIndex.putEntry(createIndexKey("key1", 2000L), 2L);
+
+        // Key 2 operations (different pattern)
+        uniqueIndex.putEntry(createIndexKey("key2", 1200L), 3L);
+        uniqueIndex.putEntry(createIndexKey("key2", 1800L), 4L);
+        uniqueIndex.deleteEntry(createIndexKey("key2", 2200L));
+
+        // Key 3 operations (no deletions)
+        uniqueIndex.putEntry(createIndexKey("key3", 1300L), 5L);
+        uniqueIndex.putEntry(createIndexKey("key3", 1900L), 6L);
+
+        // Test visibility at timestamp 1700:
+        assertEquals("key1 should be tombstoned at 1700", -1L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key1", 1700L)));
+        assertEquals("key2 should see version 1200 at 1700", 3L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key2", 1700L)));
+        assertEquals("key3 should see version 1300 at 1700", 5L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key3", 1700L)));
+
+        // Test visibility at timestamp 2100:
+        assertEquals("key1 should see version 2000 at 2100", 2L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key1", 2100L)));
+        assertEquals("key2 should see version 1800 at 2100", 4L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key2", 2100L)));
+        assertEquals("key3 should see version 1900 at 2100", 6L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key3", 2100L)));
+
+        // Test visibility at timestamp 2300:
+        assertEquals("key1 should see version 2000 at 2300", 2L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key1", 2300L)));
+        assertEquals("key2 should be tombstoned at 2300", -1L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key2", 2300L)));
+        assertEquals("key3 should see version 1900 at 2300", 6L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key3", 2300L)));
+    }
+
+    /**
+     * Test case for issue #1141: Verify that batch operations work correctly
+     * with MVCC and tombstones.
+     */
+    @Test
+    public void testIssue1141_BatchOperationsWithMVCC() throws SinglePointIndexException
+    {
+        // Batch put entries with different timestamps
+        List<IndexProto.SecondaryIndexEntry> batch1 = Arrays.asList(
+                createSecondaryEntry("key1", 1000L, 1L),
+                createSecondaryEntry("key2", 1000L, 2L),
+                createSecondaryEntry("key3", 1000L, 3L)
+        );
+
+        uniqueIndex.putSecondaryEntries(batch1);
+
+        // Batch delete some entries
+        List<IndexProto.IndexKey> deleteKeys = Arrays.asList(
+                createIndexKey("key1", 1500L),
+                createIndexKey("key2", 1500L)
+        );
+
+        uniqueIndex.deleteEntries(deleteKeys);
+
+        // Batch put new versions
+        List<IndexProto.SecondaryIndexEntry> batch2 = Arrays.asList(
+                createSecondaryEntry("key1", 2000L, 4L),
+                createSecondaryEntry("key2", 2000L, 5L),
+                createSecondaryEntry("key4", 2000L, 6L)
+        );
+
+        uniqueIndex.putSecondaryEntries(batch2);
+
+        // Test visibility at timestamp 1700:
+        assertEquals("key1 should be tombstoned at 1700", -1L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key1", 1700L)));
+        assertEquals("key2 should be tombstoned at 1700", -1L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key2", 1700L)));
+        assertEquals("key3 should see original value at 1700", 3L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key3", 1700L)));
+        assertEquals("key4 should not exist at 1700", -1L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key4", 1700L)));
+
+        // Test visibility at timestamp 2500:
+        assertEquals("key1 should see new value at 2500", 4L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key1", 2500L)));
+        assertEquals("key2 should see new value at 2500", 5L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key2", 2500L)));
+        assertEquals("key3 should see original value at 2500", 3L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key3", 2500L)));
+        assertEquals("key4 should see new value at 2500", 6L,
+                uniqueIndex.getUniqueRowId(createIndexKey("key4", 2500L)));
     }
 }
