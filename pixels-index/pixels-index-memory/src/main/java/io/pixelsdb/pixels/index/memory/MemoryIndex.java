@@ -29,6 +29,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -56,16 +57,18 @@ public class MemoryIndex implements SinglePointIndex
     private final AtomicBoolean removed = new AtomicBoolean(false);
 
     /**
-     * For unique indexes: baseKey -> (timestamp -> rowId)
+     * For unique indexes: baseKey -> (timestamp -> rowId).
      */
     private final ConcurrentHashMap<CompositeKey, ConcurrentSkipListMap<Long, Long>> uniqueIndex;
     /**
-     * For non-unique indexes: baseKey -> (rowId -> timestamps)
+     * For non-unique indexes: baseKey -> (rowId -> timestamps).
      */
     private final ConcurrentHashMap<CompositeKey, ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>>> nonUniqueIndex;
 
-    // Tombstones: baseKey -> tombstone timestamp, the transactions with timestamp >= tombstone timestamp can not see the deleted versions
-    private final ConcurrentHashMap<CompositeKey, Long> tombstones;
+    /**
+     * Tombstones: baseKey -> tombstone timestamps.
+     */
+    private final ConcurrentHashMap<CompositeKey, ConcurrentSkipListSet<Long>> tombstones;
 
     public MemoryIndex(long tableId, long indexId, boolean unique)
     {
@@ -153,7 +156,6 @@ public class MemoryIndex implements SinglePointIndex
                     this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
             versions.put(timestamp, entry.getRowId());
             mainIndex.putEntry(entry.getRowId(), entry.getRowLocation());
-            tombstones.remove(baseKey);
         }
         return true;
     }
@@ -183,7 +185,6 @@ public class MemoryIndex implements SinglePointIndex
             ConcurrentSkipListMap<Long, Long> versions =
                     this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
             versions.put(timestamp, rowId);
-            tombstones.remove(baseKey);
         }
         else
         {
@@ -317,8 +318,9 @@ public class MemoryIndex implements SinglePointIndex
             return -1L;
         }
         // Add tombstone instead of removing the entry
-        this.tombstones.put(baseKey, key.getTimestamp());
-
+        ConcurrentSkipListSet<Long> existingTombstones =
+                this.tombstones.computeIfAbsent(baseKey, k -> new ConcurrentSkipListSet<>());
+        existingTombstones.add(key.getTimestamp());
         return rowId;
     }
 
@@ -326,26 +328,32 @@ public class MemoryIndex implements SinglePointIndex
     public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         checkClosed();
-        CompositeKey baseKey = extractBaseKey(key);
-        if (unique)
+        try
         {
-            long rowId = getUniqueRowId(key);
-            if (rowId < 0)
+            if (unique)
             {
-                return ImmutableList.of();
+                long rowId = getUniqueRowId(key);
+                if (rowId < 0)
+                {
+                    return ImmutableList.of();
+                }
+                return ImmutableList.of(rowId);
+            } else
+            {
+                List<Long> rowIds = getRowIds(key);
+                if (rowIds.isEmpty())
+                {
+                    return ImmutableList.of();
+                }
+                return rowIds;
             }
-            this.tombstones.put(baseKey, key.getTimestamp());
-            return ImmutableList.of(rowId);
         }
-        else
+        finally
         {
-            List<Long> rowIds = getRowIds(key);
-            if (rowIds.isEmpty())
-            {
-                return ImmutableList.of();
-            }
-            tombstones.put(baseKey, key.getTimestamp());
-            return rowIds;
+            CompositeKey baseKey = extractBaseKey(key);
+            ConcurrentSkipListSet<Long> existingTombstones =
+                    this.tombstones.computeIfAbsent(baseKey, k -> new ConcurrentSkipListSet<>());
+            existingTombstones.add(key.getTimestamp());
         }
     }
 
@@ -369,18 +377,31 @@ public class MemoryIndex implements SinglePointIndex
         for (IndexProto.IndexKey key : indexKeys)
         {
             CompositeKey baseKey = extractBaseKey(key);
+            ConcurrentSkipListSet<Long> existingTombstones = this.tombstones.get(baseKey);
+            if (existingTombstones == null)
+            {
+                continue;
+            }
             // Remove all versions with timestamp <= purgeTimestamp
-            Long tombstone = this.tombstones.get(baseKey);
+            Long tombstone = existingTombstones.floor(key.getTimestamp());
             if (tombstone != null && tombstone <= key.getTimestamp())
             {
                 if (unique)
                 {
                     // timestamp -> row id
-                    ConcurrentNavigableMap<Long, Long> versions = this.uniqueIndex.get(baseKey).headMap(key.getTimestamp(), true);
-                    if (!versions.isEmpty())
+                    ConcurrentSkipListMap<Long, Long> versions = this.uniqueIndex.get(baseKey);
+                    if (versions != null)
                     {
-                        builder.addAll(versions.values());
-                        versions.clear();
+                        ConcurrentNavigableMap<Long, Long> purging = versions.headMap(tombstone, true);
+                        if (!purging.isEmpty())
+                        {
+                            builder.addAll(purging.values());
+                            purging.clear();
+                        }
+                        if (versions.isEmpty())
+                        {
+                            this.uniqueIndex.remove(baseKey);
+                        }
                     }
                 }
                 else
@@ -389,20 +410,33 @@ public class MemoryIndex implements SinglePointIndex
                     ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>> rowIds = this.nonUniqueIndex.get(baseKey);
                     if (rowIds != null)
                     {
-                        for (Map.Entry<Long, ConcurrentSkipListSet<Long>> entry : rowIds.entrySet())
+                        for (Iterator<Map.Entry<Long, ConcurrentSkipListSet<Long>>> it = rowIds.entrySet().iterator(); it.hasNext(); )
                         {
-                            NavigableSet<Long> versions = entry.getValue().headSet(key.getTimestamp(), true);
+                            Map.Entry<Long, ConcurrentSkipListSet<Long>> entry = it.next();
+                            NavigableSet<Long> versions = entry.getValue().headSet(tombstone, true);
                             if (!versions.isEmpty())
                             {
                                 builder.add(entry.getKey());
                                 versions.clear();
                             }
+                            if (entry.getValue().isEmpty())
+                            {
+                                it.remove();
+                            }
                         }
                         builder.addAll(rowIds.keySet());
+                        if (rowIds.isEmpty())
+                        {
+                            this.nonUniqueIndex.remove(baseKey);
+                        }
                     }
                 }
+                existingTombstones.headSet(key.getTimestamp(), true).clear();
+                if (existingTombstones.isEmpty())
+                {
+                    this.tombstones.remove(baseKey);
+                }
             }
-            tombstones.remove(baseKey);
         }
         return builder.build();
     }
@@ -478,16 +512,11 @@ public class MemoryIndex implements SinglePointIndex
     /**
      * Find the latest visible version for a unique index.
      * @param baseKey the base key of the index entry
-     * @param snapshotTimestamp the snapshot timestamp
+     * @param snapshotTimestamp the snapshot timestamp of the transaction
      * @return the latest visible row id, or -1 if no row id is visible
      */
     private long findUniqueRowId(CompositeKey baseKey, long snapshotTimestamp)
     {
-        // Check if this version is visible (not deleted by a tombstone)
-        if (!isVersionVisible(baseKey, snapshotTimestamp))
-        {
-            return -1;
-        }
         ConcurrentSkipListMap<Long, Long> versions = this.uniqueIndex.get(baseKey);
         if (versions == null)
         {
@@ -499,16 +528,24 @@ public class MemoryIndex implements SinglePointIndex
         {
             return -1;
         }
+        // Check if this version is visible (not deleted by a tombstone)
+        if (!isVersionVisible(baseKey, versionEntry.getKey(), snapshotTimestamp))
+        {
+            return -1;
+        }
         return versionEntry.getValue();
     }
 
     /**
      * Find the latest visible version for a non-unique index.
+     * @param baseKey the base key of the index entry
+     * @param snapshotTimestamp the snapshot timestamp of the transaction
+     * @return the latest visible row ids, or empty if no row id is visible
      */
     private List<Long> findNonUniqueRowIds(CompositeKey baseKey, long snapshotTimestamp)
     {
         ConcurrentHashMap<Long, ConcurrentSkipListSet<Long>> rowIds = this.nonUniqueIndex.get(baseKey);
-        if (rowIds == null || !isVersionVisible(baseKey, snapshotTimestamp))
+        if (rowIds == null)
         {
             return ImmutableList.of();
         }
@@ -516,7 +553,7 @@ public class MemoryIndex implements SinglePointIndex
         for (Map.Entry<Long, ConcurrentSkipListSet<Long>> entry : rowIds.entrySet())
         {
             Long version = entry.getValue().floor(snapshotTimestamp);
-            if (version != null)
+            if (version != null && isVersionVisible(baseKey, version, snapshotTimestamp))
             {
                 builder.add(entry.getKey());
             }
@@ -524,13 +561,26 @@ public class MemoryIndex implements SinglePointIndex
         return builder.build();
     }
 
-    private boolean isVersionVisible(CompositeKey baseKey, long snapshotTimestamp)
+    /**
+     * Check is this version of index record is visible (i.e., not marked deleted by a tombstone
+     * with timestamp >= the version's timestamp)
+     * @param baseKey the key of the index record
+     * @param versionTimestamp the version of the index record
+     * @param snapshotTimestamp the snapshot timestamp of the transaction
+     * @return true if this index record version is visible
+     */
+    private boolean isVersionVisible(CompositeKey baseKey, long versionTimestamp, long snapshotTimestamp)
     {
-        Long tombstone = tombstones.get(baseKey);
+        ConcurrentSkipListSet<Long> existingTombstones = tombstones.get(baseKey);
+        if (existingTombstones == null)
+        {
+            return true;
+        }
+        Long tombstone = existingTombstones.floor(snapshotTimestamp);
         if (tombstone == null)
         {
             return true;
         }
-        return tombstone > snapshotTimestamp;
+        return tombstone < versionTimestamp || snapshotTimestamp < tombstone;
     }
 }
