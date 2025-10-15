@@ -44,12 +44,12 @@ import java.util.stream.LongStream;
 
 public class TestRetinaService
 {
-    private static final int NUM_THREADS = 16; // Number of concurrent threads
+    private static final int NUM_THREADS = 1; // Number of concurrent threads
     private static final double RPC_PER_SECOND = 1000.0; // Desired RPCs per second
     private static final int ROWS_PER_RPC = 200; // Number of rows per RPC
     private static final double UPDATE_RATIO = 1; // Ratio of updates to total operations
     private static final int TEST_DURATION_SECONDS = 180; // Total test duration in seconds
-    private static final int INITIAL_KEYS = 0; // Initial keys to pre-populate for updates
+    private static final int INITIAL_KEYS = 20000; // Initial keys to pre-populate for updates
     private static final AtomicLong primaryKeyCounter = new AtomicLong(0); // Counter for generating unique primary keys
     private static final List<ConcurrentLinkedDeque<IndexProto.IndexKey>> threadLocalKeyDeques = new ArrayList<>(NUM_THREADS);
     private static final ThreadLocal<RetinaService.StreamHandler> threadLocalStreamHandler =
@@ -57,7 +57,7 @@ public class TestRetinaService
 
     private static String schemaName = "tpch";
     private static String tableName = "nation";
-    private static String keyColumn = "n_nationkey";
+    private static String[] keyColumnNames = {"n_nationkey"};
     private static List<String> colNames = new ArrayList<>();
     private static SinglePointIndex index;
 
@@ -71,9 +71,12 @@ public class TestRetinaService
         for (Column column : columns)
         {
             colNames.add(column.getName());
-            if (column.getName().equals(keyColumn))
+            for (String keyColumn : keyColumnNames)
             {
-                keyColumns.addKeyColumnIds((int) column.getId());
+                if (column.getName().equals(keyColumn))
+                {
+                    keyColumns.addKeyColumnIds((int) column.getId());
+                }
             }
         }
         String keyColumn = new ObjectMapper().writeValueAsString(keyColumns);
@@ -83,7 +86,7 @@ public class TestRetinaService
                 .setKeyColumns(keyColumn)
                 .setPrimary(true)
                 .setUnique(true)
-                .setIndexScheme("memory")
+                .setIndexScheme("rocksdb")
                 .setTableId(table.getId())
                 .setSchemaVersionId(layout.getSchemaVersionId());
 
@@ -143,9 +146,7 @@ public class TestRetinaService
             valueMap.put(colNames.get(j), valueBuilder.getValues(j));
         }
 
-        List<String> keyColumnNames = new LinkedList<>();
-        keyColumnNames.add("key"); // 'key' is the primary key's name
-        int len = keyColumnNames.size();
+        int len = keyColumnNames.length;
         List<ByteString> keyColumnValues = new ArrayList<>(len);
         int keySize = 0;
         for (String keyColumnName : keyColumnNames)
@@ -259,32 +260,40 @@ public class TestRetinaService
             final ConcurrentLinkedDeque<IndexProto.IndexKey> myKeys = threadLocalKeyDeques.get(i);
 
             executor.submit(() -> {
-                try {
-                    while (System.currentTimeMillis() < testEndTime) {
+                try
+                {
+                    while (System.currentTimeMillis() < testEndTime)
+                    {
                         rateLimiter.acquire(); // Wait for token
 
                         List<Long> keysToInsert = new ArrayList<>();
                         List<IndexProto.IndexKey> keysToDelete = new ArrayList<>();
 
-                        for (int j = 0; j < ROWS_PER_RPC; j++) {
+                        for (int j = 0; j < ROWS_PER_RPC; j++)
+                        {
                             // Decide whether to perform update or insert based on ratio
-                            if (ThreadLocalRandom.current().nextDouble() < UPDATE_RATIO && !myKeys.isEmpty()) {
+                            if (ThreadLocalRandom.current().nextDouble() <= UPDATE_RATIO && !myKeys.isEmpty())
+                            {
                                 // Perform update: delete an old key and insert a new key
                                 IndexProto.IndexKey keyToDelete = myKeys.poll();
-                                if (keyToDelete != null) {
+                                if (keyToDelete != null)
+                                {
                                     keysToDelete.add(keyToDelete);
                                     keysToInsert.add(primaryKeyCounter.getAndIncrement());
-                                } else {
+                                } else
+                                {
                                     // If no key is available, perform pure insert
                                     keysToInsert.add(primaryKeyCounter.getAndIncrement());
                                 }
-                            } else {
+                            } else
+                            {
                                 // Perform pure insert
                                 keysToInsert.add(primaryKeyCounter.getAndIncrement());
                             }
                         }
 
-                        if (!keysToInsert.isEmpty() || !keysToDelete.isEmpty()) {
+                        if (!keysToInsert.isEmpty() || !keysToDelete.isEmpty())
+                        {
                             updateRecords(keysToInsert, keysToDelete, newKeys -> {
                                 myKeys.addAll(newKeys); // Add new keys back to the deque
                                 totalOperations.incrementAndGet();
@@ -293,7 +302,8 @@ public class TestRetinaService
                             });
                         }
                     }
-                } finally {
+                } finally
+                {
                     latch.countDown();
                 }
             });
