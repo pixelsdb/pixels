@@ -1,0 +1,70 @@
+name: Pixels Daily Build and Release
+
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  remove:
+    uses: ./.github/workflows/remove-daily-latest.yml
+    secrets:
+      gh_token: ${{ secrets.PIXELS_DEVELOP }}
+
+  build:
+    uses: ./.github/workflows/build-pixels.yml
+    with:
+      build_type: "daily"
+      skip_package: false
+
+  release:
+    needs: [remove, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: pixels-package
+          path: ./downloaded_package
+
+      - name: Update daily-latest tag to latest commit
+        run: |
+          git tag -d daily-latest || true
+          git push origin --delete daily-latest || true
+          git tag daily-latest
+          git push origin daily-latest
+        env:
+          GH_TOKEN: ${{ secrets.PIXELS_DEVELOP }}
+
+      - name: Create or Update Daily Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: daily-latest
+          name: "Pixels Daily Build ${{ needs.build.outputs.build_date }}"
+          body: |
+            Automated daily build created at ${{ needs.build.outputs.build_date }}.
+            Environment:
+            - Commit: ${{ needs.build.outputs.commit_hash }}
+            - Java: ${{ needs.build.outputs.java_version }}
+            - CMake: ${{ needs.build.outputs.cmake_version }}
+            - C++: ${{ needs.build.outputs.cxx_version }}
+          files: ./downloaded_package/pixels-*.tar.gz
+          prerelease: true
+          draft: false
+        env:
+          GH_TOKEN: ${{ secrets.PIXELS_DEVELOP }}
+
+  cleanup-artifact:
+    needs: [release]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Remove old artifacts
+        uses: c-hive/gha-remove-artifacts@v1
+        with:
+          github_token: ${{ secrets.PIXELS_DEVELOP }}
+          age: '1 day'

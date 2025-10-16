@@ -1,0 +1,117 @@
+name: Build Pixels
+
+on:
+  workflow_call:
+    inputs:
+      build_type:
+        required: false
+        default: "default"
+        type: string
+      skip_package:
+        required: false
+        default: false
+        type: boolean
+    outputs:
+      package_path:
+        description: "The tar.gz package path"
+        value: ${{ jobs.build.outputs.package_path }}
+      commit_hash:
+        description: "Commit hash of the build"
+        value: ${{ jobs.build.outputs.commit_hash }}
+      java_version:
+        description: "Java version"
+        value: ${{ jobs.build.outputs.java_version }}
+      cmake_version:
+        description: "CMake version"
+        value: ${{ jobs.build.outputs.cmake_version }}
+      cxx_version:
+        description: "C++ version"
+        value: ${{ jobs.build.outputs.cxx_version }}
+      build_date:
+        description: "Build date"
+        value: ${{ jobs.build.outputs.build_date }}
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      package_path: ${{ steps.package.outputs.package_path }}
+      commit_hash: ${{ steps.env_info.outputs.commit_hash }}
+      java_version: ${{ steps.env_info.outputs.java_version }}
+      cmake_version: ${{ steps.env_info.outputs.cmake_version }}
+      cxx_version: ${{ steps.env_info.outputs.cxx_version }}
+      build_date: ${{ steps.env_info.outputs.build_date }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+
+      - name: Set PIXELS_HOME
+        run: |
+          export PIXELS_HOME="${{ github.workspace }}/pixels_home"
+          mkdir -p "$PIXELS_HOME/lib"
+          echo "PIXELS_HOME=$PIXELS_HOME" >> $GITHUB_ENV
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Cache MySQL Connector/J
+        id: cache-mysql
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/mysql-connector
+          key: mysql-connector-j-9.1.0
+
+      - name: Download MySQL Connector/J
+        if: ${{ steps.cache-mysql.outputs.cache-hit != 'true' && !inputs.skip_package }}
+        run: |
+          mkdir -p "${{ github.workspace }}/mysql-connector"
+          wget -q https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-j-9.1.0.tar.gz -O "${{ github.workspace }}/mysql-connector/mysql.tar.gz"
+          tar -xzf "${{ github.workspace }}/mysql-connector/mysql.tar.gz" -C "${{ github.workspace }}/mysql-connector"
+
+      - name: Prepare Pixels Lib
+        if: ${{ !inputs.skip_package }}
+        run: |
+          MYSQL_JAR=$(find "${{ github.workspace }}/mysql-connector" -maxdepth 2 -name "mysql-connector-j-*.jar" | head -n 1)
+          cp "$MYSQL_JAR" "$PIXELS_HOME/lib/"
+
+      - name: Build Pixels
+        run: bash ./install.sh
+
+      - name: Get environment info
+        id: env_info
+        run: |
+          BUILD_DATE=$(date -u +'%Y-%m-%d')
+          echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "java_version=$(java -version 2>&1 | head -n 1)" >> $GITHUB_OUTPUT
+          echo "cmake_version=$(cmake --version | head -n 1)" >> $GITHUB_OUTPUT
+          echo "cxx_version=$(g++ --version | head -n 1)" >> $GITHUB_OUTPUT
+          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
+
+      - name: Prepare release package
+        id: package
+        if: ${{ !inputs.skip_package }}
+        run: |
+          cd "${PIXELS_HOME}/.."
+          PACKAGE_PATH="pixels-${{ steps.env_info.outputs.build_date }}.tar.gz"
+          tar czf "${PACKAGE_PATH}" "$(basename $PIXELS_HOME)"
+          echo "package_path=${PACKAGE_PATH}" >> $GITHUB_OUTPUT
+
+      - name: Upload build artifact
+        if: ${{ !inputs.skip_package }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixels-package
+          path: ${{ steps.package.outputs.package_path }}
