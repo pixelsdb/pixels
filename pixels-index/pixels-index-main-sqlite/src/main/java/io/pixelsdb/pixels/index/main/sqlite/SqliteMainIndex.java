@@ -188,6 +188,11 @@ public class SqliteMainIndex implements MainIndex
         if (location == null)
         {
             location = getRowLocationFromSqlite(rowId);
+            if (location == null)
+            {
+                throw new MainIndexException("Failed to get row location for rowId=" + rowId
+                        + " (tableId=" + tableId + ")");
+            }
         }
         return location;
     }
@@ -206,6 +211,11 @@ public class SqliteMainIndex implements MainIndex
                 if (location == null)
                 {
                     location = getRowLocationFromSqlite(rowId);
+                    if (location == null)
+                    {
+                        throw new MainIndexException("Failed to get row location for rowId=" + rowId
+                                + " (tableId=" + tableId + ")");
+                    }
                 }
                 builder.add(location);
             }
