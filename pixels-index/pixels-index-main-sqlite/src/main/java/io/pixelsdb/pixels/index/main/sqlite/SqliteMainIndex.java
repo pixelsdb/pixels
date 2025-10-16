@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.main.sqlite;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.EtcdException;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
@@ -186,36 +187,78 @@ public class SqliteMainIndex implements MainIndex
         }
         if (location == null)
         {
-            /*
-             * Issue #916:
-             * There is a gap between cache-read unlocking and db-read locking, and flushCache(fileId) and close()
-             * may happen in this gap. This is OK, because if the cache is hit, this method will not read db;
-             * otherwise, if cache misses, cache-flushing in flushCache(fileId) and close() has the same effect
-             * as flushing the cache before read it.
-             */
-            this.dbRwLock.readLock().lock();
-            try
+            location = getRowLocationFromSqlite(rowId);
+            if (location == null)
             {
-                RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
-                if (rowIdRange != null)
+                throw new MainIndexException("Failed to get row location for rowId=" + rowId
+                        + " (tableId=" + tableId + ")");
+            }
+        }
+        return location;
+    }
+
+    @Override
+    public List<IndexProto.RowLocation> getLocations(List<Long> rowIds) throws MainIndexException
+    {
+        ImmutableList.Builder<IndexProto.RowLocation> builder = ImmutableList.builder();
+        this.cacheRwLock.readLock().lock();
+        try
+        {
+            for (long rowId : rowIds)
+            {
+                IndexProto.RowLocation location;
+                location = this.indexBuffer.lookup(rowId);
+                if (location == null)
                 {
-                    long rowIdStart = rowIdRange.getRowIdStart();
-                    long fileId = rowIdRange.getFileId();
-                    int rgId = rowIdRange.getRgId();
-                    int rgRowOffsetStart = rowIdRange.getRgRowOffsetStart();
-                    int offset = (int) (rowId - rowIdStart);
-                    location = IndexProto.RowLocation.newBuilder()
-                            .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
+                    location = getRowLocationFromSqlite(rowId);
+                    if (location == null)
+                    {
+                        throw new MainIndexException("Failed to get row location for rowId=" + rowId
+                                + " (tableId=" + tableId + ")");
+                    }
                 }
+                builder.add(location);
             }
-            catch (RowIdException e)
+        }
+        finally
+        {
+            this.cacheRwLock.readLock().unlock();
+        }
+        return builder.build();
+    }
+
+    private IndexProto.RowLocation getRowLocationFromSqlite(long rowId) throws MainIndexException
+    {
+        /*
+         * Issue #916:
+         * There is a gap between cache-read unlocking and db-read locking, and flushCache(fileId) and close()
+         * may happen in this gap. This is OK, because if the cache is hit, this method will not read db;
+         * otherwise, if cache misses, cache-flushing in flushCache(fileId) and close() has the same effect
+         * as flushing the cache before read it.
+         */
+        this.dbRwLock.readLock().lock();
+        IndexProto.RowLocation location = null;
+        try
+        {
+            RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
+            if (rowIdRange != null)
             {
-                throw new MainIndexException("failed to query row location from sqlite", e);
+                long rowIdStart = rowIdRange.getRowIdStart();
+                long fileId = rowIdRange.getFileId();
+                int rgId = rowIdRange.getRgId();
+                int rgRowOffsetStart = rowIdRange.getRgRowOffsetStart();
+                int offset = (int) (rowId - rowIdStart);
+                location = IndexProto.RowLocation.newBuilder()
+                        .setFileId(fileId).setRgId(rgId).setRgRowOffset(rgRowOffsetStart + offset).build();
             }
-            finally
-            {
-                this.dbRwLock.readLock().unlock();
-            }
+        }
+        catch (RowIdException e)
+        {
+            throw new MainIndexException("failed to query row location from sqlite", e);
+        }
+        finally
+        {
+            this.dbRwLock.readLock().unlock();
         }
         return location;
     }
@@ -234,6 +277,26 @@ public class SqliteMainIndex implements MainIndex
             this.cacheRwLock.writeLock().unlock();
         }
         return res;
+    }
+
+    @Override
+    public List<Boolean> putEntries(List<IndexProto.PrimaryIndexEntry> primaryEntries)
+    {
+        ImmutableList.Builder<Boolean> builder = ImmutableList.builder();
+        this.cacheRwLock.writeLock().lock();
+        try
+        {
+            for (IndexProto.PrimaryIndexEntry entry : primaryEntries)
+            {
+                boolean res = this.indexBuffer.insert(entry.getRowId(), entry.getRowLocation());
+                builder.add(res);
+            }
+        }
+        finally
+        {
+            this.cacheRwLock.writeLock().unlock();
+        }
+        return builder.build();
     }
 
     @Override

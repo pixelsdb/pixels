@@ -297,18 +297,12 @@ public class LocalIndexService implements IndexService
                         + tableId + ", indexId=" + indexId);
             }
 
-            List<IndexProto.RowLocation> locations = new ArrayList<>();
-            for (long rowId : rowIds)
+            List<IndexProto.RowLocation> locations = mainIndex.getLocations(rowIds);
+            if (locations == null || locations.isEmpty())
             {
-                IndexProto.RowLocation location = mainIndex.getLocation(rowId);
-                if (location == null)
-                {
-                    throw new IndexException("Failed to get row location for rowId=" + rowId
-                            + " (tableId=" + tableId + ", indexId=" + indexId + ")");
-                }
-                locations.add(location);
+                throw new IndexException("Failed to get row locations for tableId=" +
+                        tableId + ", indexId=" + indexId);
             }
-
             return locations;
         }
         catch (MainIndexException | SinglePointIndexException e)
@@ -416,19 +410,11 @@ public class LocalIndexService implements IndexService
                 return Collections.emptyList(); // no entries found
             }
 
-            List<IndexProto.RowLocation> prevRowLocations = new ArrayList<>(prevRowIds.size());
-            for (long rowId : prevRowIds)
+            List<IndexProto.RowLocation> prevRowLocations = mainIndex.getLocations(prevRowIds);
+            if (prevRowLocations == null || prevRowLocations.isEmpty())
             {
-                // Retrieve previous RowLocation from the main index
-                IndexProto.RowLocation location = mainIndex.getLocation(rowId);
-                if (location != null)
-                {
-                    prevRowLocations.add(location);
-                }
-                else
-                {
-                    throw new IndexException("Failed to get previous row location for rowId=" + rowId);
-                }
+                throw new IndexException("Failed to get previous row locations for tableId=" +
+                        tableId + ", indexId=" + indexId);
             }
             return prevRowLocations;
         }

@@ -345,12 +345,16 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             List<Long> rowIds = singlePointIndex.deleteEntries(keys);
             if (rowIds != null && !rowIds.isEmpty())
             {
-                for (long rowId : rowIds)
-                {
-                    IndexProto.RowLocation location = mainIndex.getLocation(rowId);
-                    builder.addRowLocations(location);
-                }
                 builder.setErrorCode(ErrorCode.SUCCESS);
+                List<IndexProto.RowLocation> locations = mainIndex.getLocations(rowIds);
+                if (locations == null || locations.isEmpty())
+                {
+                    builder.setErrorCode(ErrorCode.INDEX_GET_ROW_LOCATION_FAIL);
+                }
+                else
+                {
+                    builder.addAllRowLocations(locations);
+                }
             }
             else
             {
@@ -436,10 +440,10 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             long prevRowId = singlePointIndex.updatePrimaryEntry(entry.getIndexKey(), entry.getRowId());
             if (prevRowId > 0)
             {
-                IndexProto.RowLocation location = mainIndex.getLocation(prevRowId);
-                if (location != null)
+                IndexProto.RowLocation prevLocation = mainIndex.getLocation(prevRowId);
+                if (prevLocation != null)
                 {
-                    builder.setErrorCode(ErrorCode.SUCCESS).setPrevRowLocation(location);
+                    builder.setErrorCode(ErrorCode.SUCCESS).setPrevRowLocation(prevLocation);
                 }
                 else
                 {
@@ -475,19 +479,18 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             long indexId = request.getIndexId();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-            List<Long> rowIds = singlePointIndex.updatePrimaryEntries(entries);
-            if (rowIds != null && !rowIds.isEmpty())
+            List<Long> prevRowIds = singlePointIndex.updatePrimaryEntries(entries);
+            if (prevRowIds != null && !prevRowIds.isEmpty())
             {
                 builder.setErrorCode(ErrorCode.SUCCESS);
-                for (long rowId : rowIds)
+                List<IndexProto.RowLocation> prevRowLocations = mainIndex.getLocations(prevRowIds);
+                if (prevRowLocations == null || prevRowLocations.isEmpty())
                 {
-                    IndexProto.RowLocation location = mainIndex.getLocation(rowId);
-                    if(location == null)
-                    {
-                        builder.setErrorCode(ErrorCode.INDEX_GET_ROW_LOCATION_FAIL);
-                        continue;
-                    }
-                    builder.addPrevRowLocations(location);
+                    builder.setErrorCode(ErrorCode.INDEX_GET_ROW_LOCATION_FAIL);
+                }
+                else
+                {
+                    builder.addAllPrevRowLocations(prevRowLocations);
                 }
             }
             else

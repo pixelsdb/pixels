@@ -32,7 +32,6 @@ import org.apache.logging.log4j.Logger;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 
 public class RocksetIndex implements SinglePointIndex
@@ -292,6 +291,7 @@ public class RocksetIndex implements SinglePointIndex
         {
             wb = WriteBatchCreate();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            mainIndex.putEntries(entries);
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
@@ -299,7 +299,6 @@ public class RocksetIndex implements SinglePointIndex
                 byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
                 byte[] val = writeLongBE(rowId);
                 WriteBatchPut(wb, fullKey, val);
-                mainIndex.putEntry(rowId, entry.getRowLocation());
             }
             DBWrite(this.dbHandle, wb);
             return true;

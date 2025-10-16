@@ -189,7 +189,6 @@ public class RocksDBIndex implements SinglePointIndex
     {
         try (WriteBatch writeBatch = new WriteBatch())
         {
-            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             // Process each Entry object
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
@@ -202,9 +201,9 @@ public class RocksDBIndex implements SinglePointIndex
                 byte[] valueBytes = ByteBuffer.allocate(Long.BYTES).putLong(rowId).array();
                 // Write to RocksDB
                 writeBatch.put(keyBytes, valueBytes);
-                // Put main index
-                mainIndex.putEntry(entry.getRowId(), entry.getRowLocation());
             }
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            mainIndex.putEntries(entries);
             rocksDB.write(writeOptions, writeBatch);
             return true;
         }
