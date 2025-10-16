@@ -62,6 +62,16 @@ and build it using `mvn package` in the local git repository.
 > a later JDK (e.g., Trino 405/466 requires JDK17.0.3+/23.0.0+) and Maven.
 > It is fine to build the query engine integration (e.g., `pixels-trino`) with the same or higher versions of JDK and Maven than Pixels.
 
+### Daily Build Release
+
+If you want to try the latest daily build of Pixels without building from source, you can download it from the automated daily releases:
+
+[![Pixels Daily Build](https://github.com/pixelsdb/pixels/actions/workflows/daily-build.yml/badge.svg)](https://github.com/pixelsdb/pixels/releases/tag/daily-latest)
+
+- The daily build includes the latest changes from the repository.  
+- Suitable for testing and early feedback, not recommended for production use.  
+- Contains pre-built `pixels-daemon` and `pixels-cli` jar files, ready to use.
+
 
 ## Develop Pixels in IntelliJ
 

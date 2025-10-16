@@ -1,0 +1,14 @@
+name: Pull Request Build Check
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  verify:
+    uses: ./.github/workflows/build-pixels.yml
+    with:
+      build_type: "pr"
+      skip_package: true

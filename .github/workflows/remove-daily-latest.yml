@@ -1,0 +1,26 @@
+name: Remove daily-latest release
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      gh_token:
+        required: true
+
+jobs:
+  remove-daily-latest-assets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Remove old assets from daily-latest
+        run: |
+          assets=$(gh release view daily-latest --json assets --jq '.assets[].name')
+          for a in $assets; do
+            gh release delete-asset daily-latest "$a" -y
+          done
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
