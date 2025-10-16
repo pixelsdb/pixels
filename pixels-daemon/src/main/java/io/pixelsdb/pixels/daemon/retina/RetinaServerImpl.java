@@ -200,6 +200,75 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     /**
+     * A memory-efficient, read-only view that represents the transposed version of a list of objects.
+     * This class implements the List interface but does not store the transposed data explicitly.
+     * Instead, it computes the transposed data on-the-fly when accessed.
+     */
+    private static class TransposedIndexKeyView<T> extends AbstractList<List<IndexProto.IndexKey>>
+    {
+        private final List<T> originalData;
+        private final Function<T, List<IndexProto.IndexKey>> indexExtractor;
+        private final int columnCount;
+
+        public TransposedIndexKeyView(List<T> originalData,
+                Function<T, List<IndexProto.IndexKey>> indexExtractor)
+        {
+            this.originalData = originalData;
+            this.indexExtractor = indexExtractor;
+            if (originalData == null || originalData.isEmpty())
+            {
+                this.columnCount = 0;
+            } else
+            {
+                this.columnCount = indexExtractor.apply(originalData.get(0)).size();
+            }
+        }
+
+        @Override
+        public List<IndexProto.IndexKey> get(int columnIndex)
+        {
+            if (columnIndex < 0 || columnIndex >= columnCount)
+            {
+                throw new IndexOutOfBoundsException("Column index out of bounds: " + columnIndex);
+            }
+            return new ColumnView(columnIndex);
+        }
+
+        @Override
+        public int size()
+        {
+            return columnCount;
+        }
+
+        private class ColumnView extends AbstractList<IndexProto.IndexKey>
+        {
+            private final int columnIndex;
+
+            public ColumnView(int columnIndex)
+            {
+                this.columnIndex = columnIndex;
+            }
+
+            @Override
+            public IndexProto.IndexKey get(int rowIndex)
+            {
+                if (rowIndex < 0 || rowIndex >= originalData.size())
+                {
+                    throw new IndexOutOfBoundsException("Row index out of bounds: " + rowIndex);
+                }
+                return indexExtractor.apply(originalData.get(rowIndex)).get(columnIndex);
+            }
+
+            @Override
+            public int size()
+            {
+                return originalData.size();
+            }
+        }
+    }
+
+
+    /**
      * Transpose the index keys from a row set to a column set.
      * @param dataList
      * @param indexExtractor
@@ -214,17 +283,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             return Collections.emptyList();
         }
 
-        int indexNum = indexExtractor.apply(dataList.get(0)).size();
-        if (indexNum == 0)
-        {
-            return Collections.emptyList();
-        }
-
-        return IntStream.range(0, indexNum)
-                .mapToObj(i -> dataList.stream()
-                        .map(data -> indexExtractor.apply(data).get(i))
-                        .collect(Collectors.toList()))
-                .collect(Collectors.toList());
+        return new TransposedIndexKeyView<>(dataList, indexExtractor);
     }
 
     /**
