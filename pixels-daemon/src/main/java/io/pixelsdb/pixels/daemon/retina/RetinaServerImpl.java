@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.retina;
 
+import com.google.common.base.Function;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.IndexException;
@@ -35,10 +36,7 @@ import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -202,6 +200,34 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     /**
+     * Transpose the index keys from a row set to a column set.
+     * @param dataList
+     * @param indexExtractor
+     * @return
+     * @param <T>
+     */
+    private <T> List<List<IndexProto.IndexKey>> transposeIndexKeys(List<T> dataList,
+            Function<T, List<IndexProto.IndexKey>> indexExtractor)
+    {
+        if (dataList == null || dataList.isEmpty())
+        {
+            return Collections.emptyList();
+        }
+
+        int indexNum = indexExtractor.apply(dataList.get(0)).size();
+        if (indexNum == 0)
+        {
+            return Collections.emptyList();
+        }
+
+        return IntStream.range(0, indexNum)
+                .mapToObj(i -> dataList.stream()
+                        .map(data -> indexExtractor.apply(data).get(i))
+                        .collect(Collectors.toList()))
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Common method to process updates for both normal and streaming rpc.
      *
      * @param request
@@ -217,76 +243,107 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             for (RetinaProto.TableUpdateData tableUpdateData : tableUpdateDataList)
             {
                 String tableName = tableUpdateData.getTableName();
-                long timestamp = tableUpdateData.getTimestamp();
-                boolean init = true;
-                List<RetinaProto.DeleteData> deleteDataList = tableUpdateData.getDeleteDataList();
                 long primaryIndexId = tableUpdateData.getPrimaryIndexId();
+                long timestamp = tableUpdateData.getTimestamp();
+
+                // =================================================================
+                // 1. Process Delete Data
+                // =================================================================
+                List<RetinaProto.DeleteData> deleteDataList = tableUpdateData.getDeleteDataList();
                 if (!deleteDataList.isEmpty())
                 {
+                    // 1a. Validate the delete data
                     int indexNum = deleteDataList.get(0).getIndexKeysList().size();
-                    List<List<IndexProto.IndexKey>> indexKeysList = new ArrayList<>(indexNum);
-                    for (RetinaProto.DeleteData deleteData : deleteDataList)
+                    if (indexNum == 0)
                     {
-                        List<IndexProto.IndexKey> deleteDataIndexKeysList = deleteData.getIndexKeysList();
-                        if (deleteDataIndexKeysList.isEmpty())
-                        {
-                            throw new RetinaException("Delete index key list is empty");
-                        }
-                        extractIndexKeys(primaryIndexId, indexKeysList, deleteDataIndexKeysList, init);
+                        throw new RetinaException("Delete index key list is empty");
                     }
 
+                    boolean allRecordsValid = deleteDataList.stream().allMatch(deleteData ->
+                            deleteData.getIndexKeysCount() == indexNum &&
+                            deleteData.getIndexKeys(0).getIndexId() == primaryIndexId);
+                    if (!allRecordsValid)
+                    {
+                        throw new RetinaException("Primary index id mismatch or inconsistent index key list size");
+                    }
+
+                    // 1b. Transpose the index keys from row set to column set
+                    List<List<IndexProto.IndexKey>> indexKeysList = transposeIndexKeys(
+                            deleteDataList, RetinaProto.DeleteData::getIndexKeysList);
+
+                    // 1c. Delete the primary index entries and get the row locations
                     List<IndexProto.IndexKey> primaryIndexKeys = indexKeysList.get(0);
                     long tableId = primaryIndexKeys.get(0).getTableId();
                     List<IndexProto.RowLocation> rowLocations = indexService.deletePrimaryIndexEntries
                             (tableId, primaryIndexId, primaryIndexKeys);
+
+                    // 1d. Delete the records
                     for (IndexProto.RowLocation rowLocation : rowLocations)
                     {
                         this.retinaResourceManager.deleteRecord(rowLocation, timestamp);
                     }
 
-                    for (int i = 1; i < indexNum; i++)
+                    // 1e. Delete the secondary index entries
+                    for (int i = 1; i < indexNum; ++i)
                     {
                         List<IndexProto.IndexKey> indexKeys = indexKeysList.get(i);
-                        indexService.deleteSecondaryIndexEntries
-                                (indexKeys.get(0).getTableId(), indexKeys.get(0).getIndexId(), indexKeys);
+                        indexService.deleteSecondaryIndexEntries(indexKeys.get(0).getTableId(),
+                                indexKeys.get(0).getIndexId(), indexKeys);
                     }
                 }
 
+                // =================================================================
+                // 2. Process Insert Data
+                // =================================================================
                 List<RetinaProto.InsertData> insertDataList = tableUpdateData.getInsertDataList();
                 if (!insertDataList.isEmpty())
                 {
+                    // 2a. Validate the insert data
                     int indexNum = insertDataList.get(0).getIndexKeysList().size();
-                    List<List<IndexProto.IndexKey>> indexKeysList = new ArrayList<>(indexNum);
+                    if (indexNum == 0)
+                    {
+                        throw new RetinaException("Insert index key list is empty");
+                    }
+
+                    boolean allRecordValid = insertDataList.stream().allMatch(insertData ->
+                            insertData.getIndexKeysCount() == indexNum &&
+                            insertData.getIndexKeys(0).getIndexId() == primaryIndexId);
+                    if (!allRecordValid)
+                    {
+                        throw new RetinaException("Primary index id mismatch or inconsistent index key list size");
+                    }
+
+                    // 2b. Transpose the index keys from row set to column set
+                    List<List<IndexProto.IndexKey>> indexKeysList = transposeIndexKeys(
+                            insertDataList, RetinaProto.InsertData::getIndexKeysList);
+
+                    // 2c. Insert the records and get the primary index entries
                     List<IndexProto.PrimaryIndexEntry> primaryIndexEntries = new ArrayList<>(insertDataList.size());
                     List<Long> rowIdList = new ArrayList<>(insertDataList.size());
+
                     for (RetinaProto.InsertData insertData : insertDataList)
                     {
-                        List<IndexProto.IndexKey> insertDataIndexKeysList = insertData.getIndexKeysList();
-                        if (insertDataIndexKeysList.isEmpty())
-                        {
-                            throw new RetinaException("Insert index key list is empty");
-                        }
-                        extractIndexKeys(primaryIndexId, indexKeysList, insertDataIndexKeysList, init);
+                        byte[][] colValuesByteArray = insertData.getColValuesList().stream()
+                                .map(ByteString::toByteArray)
+                                .toArray(byte[][]::new);
 
-                        List<ByteString> colValuesList = insertData.getColValuesList();
-                        byte[][] colValuesByteArray = new byte[colValuesList.size()][];
-                        for (int i = 0; i < colValuesList.size(); ++i)
-                        {
-                            colValuesByteArray[i] = colValuesList.get(i).toByteArray();
-                        }
-                        IndexProto.PrimaryIndexEntry.Builder primaryIndexEntryBuilder =
+                        IndexProto.PrimaryIndexEntry.Builder builder =
                                 this.retinaResourceManager.insertRecord(schemaName, tableName,
                                         colValuesByteArray, timestamp);
-                        primaryIndexEntryBuilder.setIndexKey(insertData.getIndexKeys(0));
-                        rowIdList.add(primaryIndexEntryBuilder.getRowId());
-                        primaryIndexEntries.add(primaryIndexEntryBuilder.build());
+                        builder.setIndexKey(insertData.getIndexKeys(0));
+                        IndexProto.PrimaryIndexEntry entry = builder.build();
+                        primaryIndexEntries.add(entry);
+                        rowIdList.add(entry.getRowId());
                     }
+
+                    // 2d. Put the primary index entries
                     long tableId = primaryIndexEntries.get(0).getIndexKey().getTableId();
                     indexService.putPrimaryIndexEntries(tableId, primaryIndexId, primaryIndexEntries);
-                    for (int i = 1; i < indexNum; i++)
+
+                    // 2e. Put the secondary index entries
+                    for (int i = 1; i < indexNum; ++i)
                     {
                         List<IndexProto.IndexKey> indexKeys = indexKeysList.get(i);
-                        long indexId = indexKeys.get(0).getIndexId();
                         List<IndexProto.SecondaryIndexEntry> secondaryIndexEntries =
                                 IntStream.range(0, indexKeys.size())
                                         .mapToObj(j -> IndexProto.SecondaryIndexEntry.newBuilder()
@@ -294,43 +351,84 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                                                 .setIndexKey(indexKeys.get(j))
                                                 .build())
                                         .collect(Collectors.toList());
-                        indexService.putSecondaryIndexEntries
-                                (indexKeys.get(0).getTableId(), indexId, secondaryIndexEntries);
+                        indexService.putSecondaryIndexEntries(indexKeys.get(0).getTableId(),
+                                indexKeys.get(0).getIndexId(), secondaryIndexEntries);
+                    }
+                }
+
+                // =================================================================
+                // 3. Process Update Data
+                // =================================================================
+                List<RetinaProto.UpdateData> updateDataList = tableUpdateData.getUpdateDataList();
+                if (!updateDataList.isEmpty())
+                {
+                    // 3a. Validate the update data
+                    int indexNum = updateDataList.get(0).getIndexKeysList().size();
+                    if (indexNum == 0)
+                    {
+                        throw new RetinaException("Update index key list is empty");
+                    }
+
+                    boolean allRecordsValid = updateDataList.stream().allMatch(updateData ->
+                            updateData.getIndexKeysCount() == indexNum &&
+                            updateData.getIndexKeys(0).getIndexId() == primaryIndexId);
+                    if (!allRecordsValid)
+                    {
+                        throw new RetinaException("Primary index id mismatch or inconsistent index key list size");
+                    }
+
+                    // 3b. Transpose the index keys from row set to column set
+                    List<List<IndexProto.IndexKey>> indexKeysList = transposeIndexKeys(
+                            updateDataList, RetinaProto.UpdateData::getIndexKeysList);
+
+                    // 3c. Insert the records and get the primary index entries
+                    List<IndexProto.PrimaryIndexEntry> primaryIndexEntries = new ArrayList<>(updateDataList.size());
+                    List<Long> rowIdList = new ArrayList<>(updateDataList.size());
+
+                    for (RetinaProto.UpdateData updateData : updateDataList)
+                    {
+                        byte[][] colValuesByteArray = updateData.getColValuesList().stream()
+                                .map(ByteString::toByteArray)
+                                .toArray(byte[][]::new);
+
+                        IndexProto.PrimaryIndexEntry.Builder builder =
+                                this.retinaResourceManager.insertRecord(schemaName, tableName,
+                                        colValuesByteArray, timestamp);
+
+                        builder.setIndexKey(updateData.getIndexKeys(0));
+                        IndexProto.PrimaryIndexEntry entry = builder.build();
+                        primaryIndexEntries.add(entry);
+                        rowIdList.add(entry.getRowId());
+                    }
+
+                    // 3d. Update the primary index entries and get the previous row locations
+                    long tableId = primaryIndexEntries.get(0).getIndexKey().getTableId();
+                    List<IndexProto.RowLocation> previousRowLocations = indexService.updatePrimaryIndexEntries
+                            (tableId, primaryIndexId, primaryIndexEntries);
+
+                    // 3e. Delete the previous records
+                    for (IndexProto.RowLocation location : previousRowLocations)
+                    {
+                        this.retinaResourceManager.deleteRecord(location, timestamp);
+                    }
+
+                    // 3f. Update the secondary index entries
+                    for (int i = 1; i < indexNum; ++i)
+                    {
+                        List<IndexProto.IndexKey> indexKeys = indexKeysList.get(i);
+                        List<IndexProto.SecondaryIndexEntry> secondaryIndexEntries =
+                                IntStream.range(0, indexKeys.size())
+                                        .mapToObj(j -> IndexProto.SecondaryIndexEntry.newBuilder()
+                                                .setRowId(rowIdList.get(j))
+                                                .setIndexKey(indexKeys.get(j))
+                                                .build())
+                                        .collect(Collectors.toList());
+
+                        indexService.updateSecondaryIndexEntries(indexKeys.get(0).getTableId(),
+                                indexKeys.get(0).getIndexId(), secondaryIndexEntries);
                     }
                 }
             }
-        }
-    }
-
-    private void extractIndexKeys(long primaryIndexId, List<List<IndexProto.IndexKey>> indexKeysList,
-                                  List<IndexProto.IndexKey> allIndexKeysList, boolean init) throws RetinaException
-    {
-        IndexProto.IndexKey primaryIndexKey = allIndexKeysList.get(0);
-        if (primaryIndexKey.getIndexId() != primaryIndexId)
-        {
-            throw new RetinaException("Primary index id mismatch");
-        }
-
-        for (int i = 0; i < allIndexKeysList.size(); ++i)
-        {
-            IndexProto.IndexKey currIndexKey = allIndexKeysList.get(i);
-            if (init)
-            {
-                indexKeysList.add(new ArrayList<>());
-            } else
-            {
-                // check if indexId or tableId is mismatch
-                IndexProto.IndexKey baseIndexKey = indexKeysList.get(i).get(0);
-                if (baseIndexKey.getIndexId() != currIndexKey.getIndexId())
-                {
-                    throw new RetinaException("Index id mismatch");
-                }
-                if (baseIndexKey.getTableId() != currIndexKey.getTableId())
-                {
-                    throw new RetinaException("Table id mismatch");
-                }
-            }
-            indexKeysList.get(i).add(currIndexKey);
         }
     }
 
