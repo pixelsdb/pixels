@@ -75,6 +75,8 @@ message TableUpdateData {
     repeated DeleteData deleteData = 3;
     repeated InsertData insertData = 4;
     uint64 timestamp = 5;
+    int32 bucketId = 6;
+    string txId = 7;
 }
 
 // update
