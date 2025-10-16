@@ -24,16 +24,12 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class LocalIndexService implements IndexService
 {
-    private static final Logger logger = LogManager.getLogger(LocalIndexService.class);
     private static final LocalIndexService defaultInstance = new LocalIndexService();
 
     public static LocalIndexService Instance()
@@ -42,18 +38,15 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds)
+    public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws IndexException
     {
         try
         {
-            return MainIndexFactory.Instance()
-                    .getMainIndex(tableId)
-                    .allocateRowIdBatch(tableId, numRowIds);
+            return MainIndexFactory.Instance().getMainIndex(tableId).allocateRowIdBatch(tableId, numRowIds);
         }
         catch (RowIdException | MainIndexException e)
         {
-            logger.error("failed to allocate row ids for tableId={}", tableId, e);
-            return null;
+            throw new IndexException("failed to allocate row ids for tableId=" + tableId, e);
         }
     }
 
@@ -99,14 +92,11 @@ public class LocalIndexService implements IndexService
         {
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
-
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Get all row IDs for the given index key
             List<Long> rowIds = singlePointIndex.getRowIds(key);
             List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
-
             if (!rowIds.isEmpty())
             {
                 // Iterate and resolve each rowId into a RowLocation
@@ -127,8 +117,7 @@ public class LocalIndexService implements IndexService
             }
             else
             {
-                // No entries found for this index key
-                return Collections.emptyList();
+                return null;
             }
         }
         catch (SinglePointIndexException | MainIndexException e)
@@ -148,21 +137,18 @@ public class LocalIndexService implements IndexService
 
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Insert into single point index
             boolean spSuccess = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
             if (!spSuccess)
             {
                 throw new IndexException("failed to put entry into single point index for key=" + key);
             }
-
             // Insert into main index
             boolean mainSuccess = mainIndex.putEntry(entry.getRowId(), entry.getRowLocation());
             if (!mainSuccess)
             {
                 throw new IndexException("failed to put entry into main index for rowId=" + entry.getRowId());
             }
-
             return true;
         }
         catch (SinglePointIndexException e)
@@ -181,18 +167,14 @@ public class LocalIndexService implements IndexService
         try
         {
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Batch insert into single point index
             boolean success = singlePointIndex.putPrimaryEntries(entries);
-
             if (!success)
             {
                 throw new IndexException("failed to put primary entries into single point index, tableId="
                         + tableId + ", indexId=" + indexId);
             }
-
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-
             for (Boolean mainSuccess : mainIndex.putEntries(entries))
             {
                 if(!mainSuccess)
@@ -223,16 +205,13 @@ public class LocalIndexService implements IndexService
             IndexProto.IndexKey key = entry.getIndexKey();
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
-
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Insert into secondary index
             boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
             if (!success)
             {
                 throw new IndexException("failed to put entry into secondary index for key=" + key);
             }
-
             return true;
         }
         catch (SinglePointIndexException e)
@@ -267,22 +246,18 @@ public class LocalIndexService implements IndexService
         {
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
-
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
-            long rowId = singlePointIndex.deleteUniqueEntry(key);
-            if (rowId < 0)
+            long prevRowId = singlePointIndex.deleteUniqueEntry(key);
+            if (prevRowId < 0)
             {
                 throw new IndexException("Primary index entry not found for tableId=" + tableId + ", indexId=" + indexId);
             }
-
-            IndexProto.RowLocation location = mainIndex.getLocation(rowId);
+            IndexProto.RowLocation location = mainIndex.getLocation(prevRowId);
             if (location == null)
             {
-                throw new IndexException("Failed to get row location for rowId=" + rowId + " (tableId=" + tableId + ")");
+                throw new IndexException("Failed to get row location for rowId=" + prevRowId + " (tableId=" + tableId + ")");
             }
-
             return location;
         }
         catch (MainIndexException | SinglePointIndexException e)
@@ -293,25 +268,23 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public List<IndexProto.RowLocation> deletePrimaryIndexEntries(long tableId, long indexId, List<IndexProto.IndexKey> keys) throws IndexException
+    public List<IndexProto.RowLocation> deletePrimaryIndexEntries(
+            long tableId, long indexId, List<IndexProto.IndexKey> keys) throws IndexException
     {
         try
         {
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
-            List<Long> rowIds = singlePointIndex.deleteEntries(keys);
-            if (rowIds == null || rowIds.isEmpty())
+            List<Long> prevRowIds = singlePointIndex.deleteEntries(keys);
+            if (prevRowIds == null || prevRowIds.isEmpty())
             {
                 throw new IndexException("Primary index entries not found for tableId="
                         + tableId + ", indexId=" + indexId);
             }
-
-            List<IndexProto.RowLocation> locations = mainIndex.getLocations(rowIds);
+            List<IndexProto.RowLocation> locations = mainIndex.getLocations(prevRowIds);
             if (locations == null || locations.isEmpty())
             {
-                throw new IndexException("Failed to get row locations for tableId=" +
-                        tableId + ", indexId=" + indexId);
+                throw new IndexException("Failed to get row locations for tableId=" + tableId + ", indexId=" + indexId);
             }
             return locations;
         }
@@ -329,11 +302,13 @@ public class LocalIndexService implements IndexService
         {
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
-
-            SinglePointIndex singlePointIndex =
-                    SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
-            return singlePointIndex.deleteEntry(key);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            List<Long> prevRowIds = singlePointIndex.deleteEntry(key);
+            if (prevRowIds == null || prevRowIds.isEmpty())
+            {
+                throw new IndexException("Failed to get previous row ids for tableId=" + tableId + ", indexId=" + indexId);
+            }
+            return prevRowIds;
         }
         catch (SinglePointIndexException e)
         {
@@ -346,10 +321,13 @@ public class LocalIndexService implements IndexService
     {
         try
         {
-            SinglePointIndex singlePointIndex =
-                    SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
-            return singlePointIndex.deleteEntries(keys);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            List<Long> prevRowIds = singlePointIndex.deleteEntries(keys);
+            if (prevRowIds == null || prevRowIds.isEmpty())
+            {
+                throw new IndexException("Failed to get previous row ids for tableId=" + tableId + ", indexId=" + indexId);
+            }
+            return prevRowIds;
         }
         catch (SinglePointIndexException e)
         {
@@ -364,12 +342,10 @@ public class LocalIndexService implements IndexService
         IndexProto.IndexKey key = indexEntry.getIndexKey();
         long tableId = key.getTableId();
         long indexId = key.getIndexId();
-
         try
         {
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Update the entry in the single point index and get the previous row ID
             long prevRowId = singlePointIndex.updatePrimaryEntry(key, indexEntry.getRowId());
             IndexProto.RowLocation prevLocation;
@@ -379,13 +355,12 @@ public class LocalIndexService implements IndexService
                 prevLocation = mainIndex.getLocation(prevRowId);
                 if (prevLocation == null)
                 {
-                    throw new IndexException(
-                            "Failed to get previous row location for rowId=" + prevRowId);
+                    throw new IndexException("Failed to get previous row location for rowId=" + prevRowId);
                 }
             }
             else
             {
-                return null; // entry not found
+                throw new IndexException("Failed to get previous row id for tableId=" + tableId + ", indexId=" + indexId);
             }
             boolean mainSuccess = mainIndex.putEntry(indexEntry.getRowId(), indexEntry.getRowLocation());
             if (!mainSuccess)
@@ -413,23 +388,18 @@ public class LocalIndexService implements IndexService
         {
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Update multiple entries in the single point index, returning previous row IDs
             List<Long> prevRowIds = singlePointIndex.updatePrimaryEntries(indexEntries);
-
             if (prevRowIds == null || prevRowIds.isEmpty())
             {
-                return Collections.emptyList(); // no entries found
+                throw new IndexException("Failed to get previous row ids for tableId=" + tableId + ", indexId=" + indexId);
             }
-
             List<IndexProto.RowLocation> prevRowLocations = mainIndex.getLocations(prevRowIds);
             if (prevRowLocations == null || prevRowLocations.isEmpty())
             {
                 throw new IndexException("Failed to get previous row locations for tableId=" +
                         tableId + ", indexId=" + indexId);
             }
-
-
             for (Boolean mainSuccess : mainIndex.putEntries(indexEntries))
             {
                 if(!mainSuccess)
@@ -437,18 +407,16 @@ public class LocalIndexService implements IndexService
                     throw new MainIndexException("failed to update entries in main index: " + tableId);
                 }
             }
-
             return prevRowLocations;
         }
         catch (MainIndexException e)
         {
-            throw new IndexException(
-                    "Failed to update primary index entries in main index for tableId=" + tableId, e);
+            throw new IndexException("Failed to update primary index entries in main index for tableId=" + tableId, e);
         }
         catch (SinglePointIndexException e)
         {
-            throw new IndexException(
-                    "Failed to update primary index entries in single point index for tableId=" + tableId + ", indexId=" + indexId, e);
+            throw new IndexException("Failed to update primary index entries in single point index for tableId=" +
+                    tableId + ", indexId=" + indexId, e);
         }
     }
 
@@ -458,16 +426,17 @@ public class LocalIndexService implements IndexService
         IndexProto.IndexKey key = indexEntry.getIndexKey();
         long tableId = key.getTableId();
         long indexId = key.getIndexId();
-
         try
         {
             // Get the single point index for the table and index ID
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Update the secondary index entry and return previous row IDs
             List<Long> prevRowIds = singlePointIndex.updateSecondaryEntry(key, indexEntry.getRowId());
-
-            return prevRowIds != null ? prevRowIds : Collections.emptyList();
+            if (prevRowIds == null || prevRowIds.isEmpty())
+            {
+                throw new IndexException("Failed to get previous row ids for tableId=" + tableId + ", indexId=" + indexId);
+            }
+            return prevRowIds;
         }
         catch (SinglePointIndexException e)
         {
@@ -483,12 +452,13 @@ public class LocalIndexService implements IndexService
         {
             // Get the single point index for the table and index ID
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Update all secondary index entries and return previous row IDs
             List<Long> prevRowIds = singlePointIndex.updateSecondaryEntries(indexEntries);
-
-            // Return the list, or empty if null/empty
-            return prevRowIds != null ? prevRowIds : Collections.emptyList();
+            if (prevRowIds == null || prevRowIds.isEmpty())
+            {
+                throw new IndexException("Failed to get previous row ids for tableId=" + tableId + ", indexId=" + indexId);
+            }
+            return prevRowIds;
         }
         catch (SinglePointIndexException e)
         {
@@ -504,16 +474,13 @@ public class LocalIndexService implements IndexService
         {
             // Get the single point index for the table and index
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             // Purge the entries from the index
             List<Long> rowIds = singlePointIndex.purgeEntries(indexKeys);
-
             if (rowIds == null || rowIds.isEmpty())
             {
                 // No entries found to purge
                 return false;
             }
-
             if (isPrimary)
             {
                 // If primary index, delete corresponding rows from MainIndex
@@ -531,7 +498,6 @@ public class LocalIndexService implements IndexService
                 );
                 mainIndex.deleteRowIdRange(rowIdRange);
             }
-
             return true;
         }
         catch (MainIndexException e)
@@ -558,11 +524,9 @@ public class LocalIndexService implements IndexService
                     // MainIndex not found
                     return false;
                 }
-
                 // Flush cache of the specified file
                 mainIndex.flushCache(fileId);
             }
-            // If secondary index or flush succeeded
             return true;
         }
         catch (MainIndexException e)
@@ -591,7 +555,6 @@ public class LocalIndexService implements IndexService
                     throw new IndexException("Failed to open main index for tableId=" + tableId);
                 }
             }
-            // Success
             return true;
         }
         catch (SinglePointIndexException | MainIndexException e)
@@ -612,7 +575,6 @@ public class LocalIndexService implements IndexService
             {
                 MainIndexFactory.Instance().closeIndex(tableId, false);
             }
-            // Success
             return true;
         }
         catch (SinglePointIndexException | MainIndexException e)
@@ -633,7 +595,6 @@ public class LocalIndexService implements IndexService
             {
                 MainIndexFactory.Instance().closeIndex(tableId, true);
             }
-            // Success
             return true;
         }
         catch (SinglePointIndexException | MainIndexException e)

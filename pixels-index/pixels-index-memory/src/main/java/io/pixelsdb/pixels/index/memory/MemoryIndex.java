@@ -362,7 +362,12 @@ public class MemoryIndex implements SinglePointIndex
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         for (IndexProto.IndexKey key : keys)
         {
-            builder.addAll(deleteEntry(key));
+            List<Long> prevRowIds = deleteEntry(key);
+            if (prevRowIds.isEmpty())
+            {
+                return ImmutableList.of();
+            }
+            builder.addAll(prevRowIds);
         }
         return builder.build();
     }
