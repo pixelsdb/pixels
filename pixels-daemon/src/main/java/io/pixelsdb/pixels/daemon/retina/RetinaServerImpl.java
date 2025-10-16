@@ -52,6 +52,7 @@ import static java.util.Objects.requireNonNull;
 public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServiceImplBase
 {
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
+    private static final Logger retinaLogger = LogManager.getLogger("retina");
     private final MetadataService metadataService;
     private final IndexService indexService;
     private final RetinaResourceManager retinaResourceManager;
@@ -244,6 +245,20 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         this.retinaResourceManager.deleteRecord(rowLocation, timestamp);
                     }
 
+                    long indexId = primaryIndexKeys.get(0).getIndexId();
+
+                    for (IndexProto.IndexKey indexKey : primaryIndexKeys)
+                    {
+                        retinaLogger.info("D\t{}\t{}\t{}\t{}\t{}\t{}",
+                                tableId,
+                                indexId,
+                                indexKey.getKey().asReadOnlyByteBuffer().getInt(),
+                                indexKey.getTimestamp(),
+                                tableUpdateData.getBucketId(),
+                                tableUpdateData.getTxIdBytes().toString()
+                        );
+                    }
+
                     for (int i = 1; i < indexNum; i++)
                     {
                         List<IndexProto.IndexKey> indexKeys = indexKeysList.get(i);
@@ -283,6 +298,24 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     }
                     long tableId = primaryIndexEntries.get(0).getIndexKey().getTableId();
                     indexService.putPrimaryIndexEntries(tableId, primaryIndexId, primaryIndexEntries);
+
+                    for(IndexProto.PrimaryIndexEntry entry: primaryIndexEntries)
+                    {
+                        long indexId = entry.getIndexKey().getIndexId();
+                        retinaLogger.info("P\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                                tableId,
+                                indexId,
+                                entry.getIndexKey().getKey().asReadOnlyByteBuffer().getInt(),
+                                entry.getIndexKey().getTimestamp(),
+                                entry.getRowId(),
+                                entry.getRowLocation().getFileId(),
+                                entry.getRowLocation().getRgId(),
+                                entry.getRowLocation().getRgRowOffset(),
+                                tableUpdateData.getBucketId(),
+                                tableUpdateData.getTxIdBytes().toString()
+                        );
+                    }
+
                     for (int i = 1; i < indexNum; i++)
                     {
                         List<IndexProto.IndexKey> indexKeys = indexKeysList.get(i);
