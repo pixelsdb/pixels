@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.retina;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -58,25 +56,18 @@ public class MemTable implements Referenceable
      * @return rowOffset
      * @throws RetinaException
      */
-    public int add(byte[][] values, long timestamp) throws RetinaException
+    public synchronized int add(byte[][] values, long timestamp) throws RetinaException
     {
-        int columnCount = schema.getChildren().size();
-        checkArgument(values.length == columnCount,
-                "Column values count does not match schema column count");
-
-        synchronized (this)
+        if (isFull())
         {
-            if (isFull())
-            {
-                return -1;
-            }
-            for (int i = 0; i < values.length; ++i)
-            {
-                this.rowBatch.cols[i].add(values[i]);
-            }
-            this.rowBatch.cols[columnCount].add(timestamp);
-            return this.rowBatch.size++;
+            return -1;
         }
+        for (int i = 0; i < values.length; ++i)
+        {
+            this.rowBatch.cols[i].add(values[i]);
+        }
+        this.rowBatch.cols[schema.getChildren().size()].add(timestamp);
+        return this.rowBatch.size++;
     }
 
     public long getId()

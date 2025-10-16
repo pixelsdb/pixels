@@ -51,6 +51,11 @@
             <artifactId>pixels-index-rockset</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-memory</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>net.java.dev.jna</groupId>
