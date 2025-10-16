@@ -60,13 +60,32 @@ message VisibilityBitmap {
     repeated uint64 bitmap = 1;
 }
 
+// DeleteData: describes the deleted rows in a table
+// - Each DeleteData entry groups index keys that belong to the same row
+// - `indexKeys[0]` must be the primary index key
+// - `indexKeys[1..n]` are the secondary index keys
+message DeleteData {
+    repeated index.proto.IndexKey indexKeys = 1;
+}
+
+// InsertData: describes the inserted rows in a table
+// - Each InsertData entry groups index keys that belong to the same row
+// - `indexKeys[0]` must be the primary index key
+// - `indexKeys[1..n]` are the secondary index keys
+// - `colValues` are the column values of the inserted row, in the order defined by the table schema
 message InsertData {
     repeated index.proto.IndexKey indexKeys = 1;
     repeated bytes colValues = 2;
 }
 
-message DeleteData {
+// UpdateData: describes the updated rows in a table
+// - Each UpdateData entry groups index keys that belong to the same row
+// - `indexKeys[0]` must be the primary index key
+// - `indexKeys[1..n]` are the secondary index keys
+// - `colValues` are the new column values of the updated row, in the order defined by the table schema
+message UpdateData {
     repeated index.proto.IndexKey indexKeys = 1;
+    repeated bytes colValues = 2;
 }
 
 message TableUpdateData {
@@ -74,7 +93,8 @@ message TableUpdateData {
     uint64 primaryIndexId = 2;
     repeated DeleteData deleteData = 3;
     repeated InsertData insertData = 4;
-    uint64 timestamp = 5;
+    repeated UpdateData updateData = 5;
+    uint64 timestamp = 6;
 }
 
 // update
