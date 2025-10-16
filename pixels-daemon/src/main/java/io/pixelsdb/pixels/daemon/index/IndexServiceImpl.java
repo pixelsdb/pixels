@@ -216,6 +216,15 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             {
                 builder.setErrorCode(ErrorCode.INDEX_PUT_SINGLE_POINT_INDEX_FAIL);
             }
+
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            for (Boolean mainSuccess : mainIndex.putEntries(entries))
+            {
+                if(!mainSuccess)
+                {
+                    throw new MainIndexException("failed to put entry into main index");
+                }
+            }
         }
         catch (MainIndexException e)
         {
@@ -449,6 +458,10 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                 {
                     builder.setErrorCode(ErrorCode.INDEX_GET_ROW_LOCATION_FAIL);
                 }
+                if(!mainIndex.putEntry(entry.getRowId(), entry.getRowLocation()))
+                {
+                    throw new MainIndexException("Can't update main index, table id: " + tableId);
+                }
             }
             else
             {
@@ -497,6 +510,15 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             {
                 builder.setErrorCode(ErrorCode.INDEX_ENTRY_NOT_FOUND);
             }
+
+            for (Boolean mainSuccess : mainIndex.putEntries(entries))
+            {
+                if(!mainSuccess)
+                {
+                    throw new MainIndexException("failed to put entry into main index");
+                }
+            }
+
         }
         catch (MainIndexException e)
         {
