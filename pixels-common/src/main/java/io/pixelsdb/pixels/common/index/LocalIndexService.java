@@ -174,6 +174,14 @@ public class LocalIndexService implements IndexService
                 throw new IndexException("failed to put primary entries into single point index, tableId="
                         + tableId + ", indexId=" + indexId);
             }
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            for (Boolean mainSuccess : mainIndex.putEntries(entries))
+            {
+                if(!mainSuccess)
+                {
+                    throw new MainIndexException("failed to put entry into main index, tableId: " + tableId);
+                }
+            }
             return true;
         }
         catch (SinglePointIndexException e)
@@ -340,15 +348,12 @@ public class LocalIndexService implements IndexService
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
             // Update the entry in the single point index and get the previous row ID
             long prevRowId = singlePointIndex.updatePrimaryEntry(key, indexEntry.getRowId());
+            IndexProto.RowLocation prevLocation;
             if (prevRowId > 0)
             {
                 // Retrieve the previous RowLocation from the main index
-                IndexProto.RowLocation prevLocation = mainIndex.getLocation(prevRowId);
-                if (prevLocation != null)
-                {
-                    return prevLocation;
-                }
-                else
+                prevLocation = mainIndex.getLocation(prevRowId);
+                if (prevLocation == null)
                 {
                     throw new IndexException("Failed to get previous row location for rowId=" + prevRowId);
                 }
@@ -357,6 +362,12 @@ public class LocalIndexService implements IndexService
             {
                 throw new IndexException("Failed to get previous row id for tableId=" + tableId + ", indexId=" + indexId);
             }
+            boolean mainSuccess = mainIndex.putEntry(indexEntry.getRowId(), indexEntry.getRowLocation());
+            if (!mainSuccess)
+            {
+                throw new MainIndexException("failed to put entry into main index for rowId=" + indexEntry.getRowId());
+            }
+            return prevLocation;
         }
         catch (MainIndexException e)
         {
@@ -388,6 +399,13 @@ public class LocalIndexService implements IndexService
             {
                 throw new IndexException("Failed to get previous row locations for tableId=" +
                         tableId + ", indexId=" + indexId);
+            }
+            for (Boolean mainSuccess : mainIndex.putEntries(indexEntries))
+            {
+                if(!mainSuccess)
+                {
+                    throw new MainIndexException("failed to update entries in main index: " + tableId);
+                }
             }
             return prevRowLocations;
         }
