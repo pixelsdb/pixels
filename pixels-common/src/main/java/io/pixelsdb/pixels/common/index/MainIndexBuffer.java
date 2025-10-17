@@ -79,6 +79,7 @@ public class MainIndexBuffer implements Closeable
             if (!fileBuffer.containsKey(rowId))
             {
                 fileBuffer.put(rowId, location);
+                this.indexCache.insert(rowId, location);
                 return true;
             }
             return false;
