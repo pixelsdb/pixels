@@ -54,23 +54,19 @@ public class RocksDBFactory
             // For new database, return list containing only default column family
             existingColumnFamilies = Collections.singletonList(RocksDB.DEFAULT_COLUMN_FAMILY);
         }
-
         // 2. Ensure default column family is included
         if (!existingColumnFamilies.contains(RocksDB.DEFAULT_COLUMN_FAMILY))
         {
             existingColumnFamilies = new ArrayList<>(existingColumnFamilies);
             existingColumnFamilies.add(RocksDB.DEFAULT_COLUMN_FAMILY);
         }
-
         // 3. Prepare column family descriptors
         List<ColumnFamilyDescriptor> descriptors = existingColumnFamilies.stream()
                 .map(name -> new ColumnFamilyDescriptor(name, new ColumnFamilyOptions()))
                 .collect(Collectors.toList());
-
         // 4. Open database
         List<ColumnFamilyHandle> handles = new ArrayList<>();
         DBOptions dbOptions = new DBOptions().setCreateIfMissing(true);
-
         return RocksDB.open(dbOptions, dbPath, descriptors, handles);
     }
 
