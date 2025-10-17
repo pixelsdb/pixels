@@ -49,13 +49,13 @@ public class RocksDBIndex implements SinglePointIndex
     private boolean closed = false;
     private boolean removed = false;
 
-    public RocksDBIndex(long tableId, long indexId, String rocksDBPath, boolean unique) throws RocksDBException
+    public RocksDBIndex(long tableId, long indexId, boolean unique) throws RocksDBException
     {
         this.tableId = tableId;
         this.indexId = indexId;
         // Initialize RocksDB instance
-        this.rocksDBPath = rocksDBPath;
-        this.rocksDB = RocksDBFactory.getRocksDB(rocksDBPath);
+        this.rocksDBPath = RocksDBFactory.getDbPath();
+        this.rocksDB = RocksDBFactory.getRocksDB();
         this.unique = unique;
         this.writeOptions = new WriteOptions();
         this.readOptions = new ReadOptions();
@@ -63,11 +63,11 @@ public class RocksDBIndex implements SinglePointIndex
 
     /**
      * The constructor only for testing (direct RocksDB injection)
-     *
      * @param tableId the table id
      * @param indexId the index id
      * @param rocksDB the rocksdb instance
      */
+    @Deprecated
     protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB, String rocksDBPath, boolean unique)
     {
         this.tableId = tableId;
@@ -518,10 +518,8 @@ public class RocksDBIndex implements SinglePointIndex
         if (!closed)
         {
             closed = true;
-            if (rocksDB != null)
-            {
-                rocksDB.close(); // Close RocksDB instance
-            }
+            // Issue #1158: do not directly close the rocksDB instance as it is shared by other indexes
+            RocksDBFactory.close();
         }
     }
 
