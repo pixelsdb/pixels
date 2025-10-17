@@ -92,7 +92,7 @@ public class Main
         reader.setOpt(LineReader.Option.BRACKETED_PASTE);
 
         String prompt = "pixels> ";
-        String multiLineInput;
+        String multiLineInput = "";
 
         while (true)
         {
@@ -102,7 +102,7 @@ public class Main
             } catch (UserInterruptException e)
             {
                 // Ctrl+C
-                continue;
+                System.exit(130);
             } catch (EndOfFileException e)
             {
                 // Issue #631: in case of input from a file, exit at EOF.
@@ -128,7 +128,7 @@ public class Main
                         inputStr.equalsIgnoreCase("-q"))
                 {
                     System.out.println("Bye.");
-                    break;
+                    return;
                 }
 
                 if (inputStr.equalsIgnoreCase("help") || inputStr.equalsIgnoreCase("-h"))
