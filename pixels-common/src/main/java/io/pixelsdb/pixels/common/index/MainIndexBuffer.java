@@ -42,7 +42,7 @@ public class MainIndexBuffer implements Closeable
     /**
      * If the number of files in this buffer is over this threshold, index cache is enabled.
      */
-    private static final int CACHE_ENABLE_THRESHOLD = 3;
+    private static final int CACHE_ENABLE_THRESHOLD = 8;
     /**
      * fileId -> {tableRowId -> rowLocation}.
      */
