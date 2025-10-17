@@ -52,7 +52,7 @@ public class MainIndexBuffer implements Closeable
      */
     public MainIndexBuffer(MainIndexCache indexCache)
     {
-        this.indexCache = requireNonNull(indexCache, "mainIndexCache is null");
+        this.indexCache = requireNonNull(indexCache, "indexCache is null");
         this.indexBuffer = new HashMap<>();
     }
 
@@ -70,6 +70,7 @@ public class MainIndexBuffer implements Closeable
             // Issue #1115: use HashMap for better performance and do post-sorting in flush().
             fileBuffer = new HashMap<>();
             fileBuffer.put(rowId, location);
+            this.indexCache.insert(rowId, location);
             this.indexBuffer.put(location.getFileId(), fileBuffer);
             return true;
         }
@@ -115,7 +116,7 @@ public class MainIndexBuffer implements Closeable
                 if (location != null)
                 {
                     checkArgument(fileId == location.getFileId());
-                    break;
+                    return location;
                 }
             }
         }
