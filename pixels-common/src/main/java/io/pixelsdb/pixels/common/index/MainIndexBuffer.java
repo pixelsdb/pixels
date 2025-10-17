@@ -115,6 +115,7 @@ public class MainIndexBuffer implements Closeable
                 if (location != null)
                 {
                     checkArgument(fileId == location.getFileId());
+                    break;
                 }
             }
         }
