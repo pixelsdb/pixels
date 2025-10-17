@@ -37,7 +37,7 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
  */
 public class HashTableDictionary implements Dictionary
 {
-    private final int NUM_DICTIONARIES = 41;
+    private static final int NUM_DICTIONARIES = 41;
     private final List<LinkedHashMap<KeyBuffer, Integer>> dictionaries;
     /**
      * The counter to generate the position (i.e., encoded id) for the distinct keys.

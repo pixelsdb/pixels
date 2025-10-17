@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.index.MainIndex;
 import io.pixelsdb.pixels.common.index.MainIndexBuffer;
+import io.pixelsdb.pixels.common.index.MainIndexCache;
 import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
 import io.pixelsdb.pixels.common.utils.Constants;
@@ -85,7 +86,8 @@ public class SqliteMainIndex implements MainIndex
 
     private final long tableId;
     private final String sqlitePath;
-    private final MainIndexBuffer indexBuffer = new MainIndexBuffer();
+    private final MainIndexBuffer indexBuffer;
+    private final MainIndexCache indexCache;
     private final Connection connection;
     private final ReentrantReadWriteLock cacheRwLock = new ReentrantReadWriteLock();
     private final ReentrantReadWriteLock dbRwLock = new ReentrantReadWriteLock();
@@ -95,6 +97,8 @@ public class SqliteMainIndex implements MainIndex
     public SqliteMainIndex(long tableId, String sqlitePath) throws MainIndexException
     {
         this.tableId = tableId;
+        this.indexCache = new MainIndexCache();
+        this.indexBuffer = new MainIndexBuffer(this.indexCache);
         if (sqlitePath == null || sqlitePath.isEmpty())
         {
             throw new MainIndexException("invalid sqlite path");

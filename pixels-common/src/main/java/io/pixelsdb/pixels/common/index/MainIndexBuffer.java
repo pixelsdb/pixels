@@ -28,9 +28,10 @@ import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
- * This is the index buffer for a main index.
+ * This is the index buffer for a main index to accelerate main index writes.
  * It is to be used inside the main index implementations and protected by the concurrency control in the main index,
  * thus it is not necessary to be thread-safe.
  * @author hank
@@ -39,13 +40,28 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class MainIndexBuffer implements Closeable
 {
     /**
+     * Issue #1150:
+     * If the number of files in this buffer is over this threshold, index cache is enabled. 6-8 are tested to be good
+     * settings. This threshold avoids redundant cache+buffer when the number of files is small (i.e., buffer can provide
+     * good lookup performance).
+     */
+    private static final int CACHE_ENABLE_THRESHOLD = 6;
+    /**
      * fileId -> {tableRowId -> rowLocation}.
      */
     private final Map<Long, Map<Long, IndexProto.RowLocation>> indexBuffer;
+    private final MainIndexCache indexCache;
+    private boolean enableCache = false;
 
-    public MainIndexBuffer()
+    /**
+     * Create a main index buffer and bind the main index cache to it.
+     * Entries put into this buffer will also be put into the cache.
+     * @param indexCache the main index cache to bind
+     */
+    public MainIndexBuffer(MainIndexCache indexCache)
     {
-        indexBuffer = new HashMap<>();
+        this.indexCache = requireNonNull(indexCache, "indexCache is null");
+        this.indexBuffer = new HashMap<>();
     }
 
     /**
@@ -56,13 +72,21 @@ public class MainIndexBuffer implements Closeable
      */
     public boolean insert(long rowId, IndexProto.RowLocation location)
     {
-        Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(location.getFileId());
+        Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(location.getFileId());
         if (fileBuffer == null)
         {
+            if (this.indexBuffer.size() > CACHE_ENABLE_THRESHOLD)
+            {
+                this.enableCache = true;
+            }
             // Issue #1115: use HashMap for better performance and do post-sorting in flush().
             fileBuffer = new HashMap<>();
             fileBuffer.put(rowId, location);
-            indexBuffer.put(location.getFileId(), fileBuffer);
+            if (this.enableCache)
+            {
+                this.indexCache.insert(rowId, location);
+            }
+            this.indexBuffer.put(location.getFileId(), fileBuffer);
             return true;
         }
         else
@@ -70,6 +94,10 @@ public class MainIndexBuffer implements Closeable
             if (!fileBuffer.containsKey(rowId))
             {
                 fileBuffer.put(rowId, location);
+                if (this.enableCache)
+                {
+                    this.indexCache.insert(rowId, location);
+                }
                 return true;
             }
             return false;
@@ -78,32 +106,49 @@ public class MainIndexBuffer implements Closeable
 
     protected IndexProto.RowLocation lookup(long fileId, long rowId)
     {
-        Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(fileId);
+        Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(fileId);
         if (fileBuffer == null)
         {
             return null;
         }
-        return fileBuffer.get(rowId);
+        IndexProto.RowLocation location = fileBuffer.get(rowId);
+        if (location == null && !this.enableCache)
+        {
+            location = this.indexCache.lookup(rowId);
+        }
+        return location;
     }
 
+    /**
+     * @param rowId the row id of the table
+     * @return the buffered or cached row location, or null if not found
+     */
     public IndexProto.RowLocation lookup(long rowId)
     {
-        for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : indexBuffer.entrySet())
+        IndexProto.RowLocation location = null;
+        if (this.enableCache)
         {
-            long fileId = entry.getKey();
-            IndexProto.RowLocation location = entry.getValue().get(rowId);
-            if (location != null)
+            location = this.indexCache.lookup(rowId);
+        }
+        if (location == null)
+        {
+            for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : this.indexBuffer.entrySet())
             {
-                checkArgument(fileId == location.getFileId());
-                return location;
+                long fileId = entry.getKey();
+                location = entry.getValue().get(rowId);
+                if (location != null)
+                {
+                    checkArgument(fileId == location.getFileId());
+                    break;
+                }
             }
         }
-        return null;
+        return location;
     }
 
     public List<RowIdRange> flush(long fileId) throws MainIndexException
     {
-        Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(fileId);
+        Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(fileId);
         if (fileBuffer == null)
         {
             return null;
@@ -158,13 +203,13 @@ public class MainIndexBuffer implements Closeable
         }
         // release the flushed file index buffer
         fileBuffer.clear();
-        indexBuffer.remove(fileId);
+        this.indexBuffer.remove(fileId);
         return ranges.build();
     }
 
     public List<Long> cachedFileIds()
     {
-        return new ArrayList<>(indexBuffer.keySet());
+        return new ArrayList<>(this.indexBuffer.keySet());
     }
 
     @Override
