@@ -30,7 +30,10 @@ import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 
+import java.io.IOException;
 import java.sql.*;
 import java.util.List;
 import java.util.Properties;
@@ -74,19 +77,32 @@ public class Main
 {
     public static void main(String[] args)
     {
-        LineReader reader = LineReaderBuilder.builder().build();
+        Terminal terminal = null;
+        try
+        {
+            terminal = TerminalBuilder.builder().system(true).build();
+        } catch (IOException e)
+        {
+            System.out.println("Error initializing terminal: " + e.getMessage());
+            System.exit(1);
+        }
+        LineReader reader = LineReaderBuilder.builder()
+                .terminal(terminal)
+                .build();
+        reader.setOpt(LineReader.Option.BRACKETED_PASTE);
+
         String prompt = "pixels> ";
-        String inputStr;
+        String multiLineInput = "";
 
         while (true)
         {
             try
             {
-                inputStr = reader.readLine(prompt).trim();
+                multiLineInput = reader.readLine(prompt);
             } catch (UserInterruptException e)
             {
                 // Ctrl+C
-                continue;
+                System.exit(130);
             } catch (EndOfFileException e)
             {
                 // Issue #631: in case of input from a file, exit at EOF.
@@ -94,293 +110,298 @@ public class Main
                 break;
             }
 
-            if (inputStr.isEmpty() || inputStr.equals(";"))
+            String[] intputStrs = multiLineInput.split("\\r?\\n");
+
+            for (String inputStr : intputStrs)
             {
-                continue;
-            }
-
-            if (inputStr.endsWith(";"))
-            {
-                inputStr = inputStr.substring(0, inputStr.length() - 1);
-            }
-
-            if (inputStr.equalsIgnoreCase("exit") || inputStr.equalsIgnoreCase("quit") ||
-                    inputStr.equalsIgnoreCase("-q"))
-            {
-                System.out.println("Bye.");
-                break;
-            }
-
-            if (inputStr.equalsIgnoreCase("help") || inputStr.equalsIgnoreCase("-h"))
-            {
-                System.out.println("Supported commands:\n" +
-                        "LOAD\n" +
-                        "COMPACT\n" +
-                        "IMPORT\n" +
-                        "STAT\n" +
-                        "QUERY\n" +
-                        "COPY\n" +
-                        "FILE_META");
-                System.out.println("{command} -h to show the usage of a command.\nexit / quit / -q to exit.\n");
-                continue;
-            }
-
-            String command = inputStr.trim().split("\\s+")[0].toUpperCase();
-
-            if (command.equals("LOAD"))
-            {
-                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL LOAD")
-                        .defaultHelp(true);
-
-                argumentParser.addArgument("-o", "--origin").required(true)
-                        .help("specify the path of original data files");
-                argumentParser.addArgument("-s", "--schema").required(true)
-                        .help("specify the name of database");
-                argumentParser.addArgument("-t", "--table").required(true)
-                        .help("specify the name of table");
-                argumentParser.addArgument("-n", "--row_num").required(true)
-                        .help("specify the max number of rows to write in a file");
-                argumentParser.addArgument("-r", "--row_regex").required(true)
-                        .help("specify the split regex of each row in a file");
-                argumentParser.addArgument("-c", "--consumer_thread_num").setDefault("4").required(true)
-                        .help("specify the number of consumer threads used for data generation");
-                argumentParser.addArgument("-e", "--encoding_level").setDefault("2")
-                        .help("specify the encoding level for data loading");
-                argumentParser.addArgument("-p", "--nulls_padding").setDefault(false)
-                        .help("specify whether nulls padding is enabled");
-
-                Namespace ns;
-                try
+                if (inputStr.isEmpty() || inputStr.equals(";"))
                 {
-                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                } catch (ArgumentParserException e)
-                {
-                    argumentParser.handleError(e);
                     continue;
                 }
 
-                try
+                if (inputStr.endsWith(";"))
                 {
-                    LoadExecutor loadExecutor = new LoadExecutor();
-                    loadExecutor.execute(ns, command);
-                } catch (Exception e)
-                {
-                    e.printStackTrace();
+                    inputStr = inputStr.substring(0, inputStr.length() - 1);
                 }
-            }
 
-            if (command.equals("QUERY"))
-            {
-                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels QUERY")
-                        .defaultHelp(true);
-
-                argumentParser.addArgument("-w", "--workload").required(true)
-                        .help("specify the path of workload file");
-                argumentParser.addArgument("-l", "--log").required(true)
-                        .help("specify the path of query log files");
-                argumentParser.addArgument("-r", "--rate_limited").required(false).setDefault(false)
-                        .help("specify whether the queries are executed in a rate-limited manner");
-                argumentParser.addArgument("-d", "--drop_cache").required(false)
-                        .help("specify the path of the script file that is used to drop cache after each query");
-                argumentParser.addArgument("-q", "--query_per_minute").required(false).setDefault(0)
-                        .help("specify the number of queries to execute if rate_limited is true");
-
-                Namespace ns;
-                try
+                if (inputStr.equalsIgnoreCase("exit") || inputStr.equalsIgnoreCase("quit") ||
+                        inputStr.equalsIgnoreCase("-q"))
                 {
-                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                } catch (ArgumentParserException e)
+                    System.out.println("Bye.");
+                    return;
+                }
+
+                if (inputStr.equalsIgnoreCase("help") || inputStr.equalsIgnoreCase("-h"))
                 {
-                    argumentParser.handleError(e);
+                    System.out.println("Supported commands:\n" +
+                            "LOAD\n" +
+                            "COMPACT\n" +
+                            "IMPORT\n" +
+                            "STAT\n" +
+                            "QUERY\n" +
+                            "COPY\n" +
+                            "FILE_META");
+                    System.out.println("{command} -h to show the usage of a command.\nexit / quit / -q to exit.\n");
                     continue;
                 }
 
-                try
-                {
-                    QueryExecutor queryExecutor = new QueryExecutor();
-                    queryExecutor.execute(ns, command);
-                } catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-            }
+                String command = inputStr.trim().split("\\s+")[0].toUpperCase();
 
-            if (command.equals("COPY"))
-            {
-                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL COPY")
-                        .defaultHelp(true);
-
-                argumentParser.addArgument("-p", "--postfix").required(true)
-                        .help("specify the postfix of files to be copied");
-                argumentParser.addArgument("-s", "--source").required(true)
-                        .help("specify the source directory");
-                argumentParser.addArgument("-d", "--destination").required(true)
-                        .help("specify the destination directory");
-                argumentParser.addArgument("-n", "--number").required(true)
-                        .help("specify the number of copies");
-                argumentParser.addArgument("-c", "--concurrency")
-                        .setDefault("4").required(true)
-                        .help("specify the number of threads used for data compaction");
-
-                Namespace ns;
-                try
+                if (command.equals("LOAD"))
                 {
-                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                } catch (ArgumentParserException e)
-                {
-                    argumentParser.handleError(e);
-                    continue;
-                }
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL LOAD")
+                            .defaultHelp(true);
 
-                try
-                {
-                    CopyExecutor copyExecutor = new CopyExecutor();
-                    copyExecutor.execute(ns, command);
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-            }
+                    argumentParser.addArgument("-o", "--origin").required(true)
+                            .help("specify the path of original data files");
+                    argumentParser.addArgument("-s", "--schema").required(true)
+                            .help("specify the name of database");
+                    argumentParser.addArgument("-t", "--table").required(true)
+                            .help("specify the name of table");
+                    argumentParser.addArgument("-n", "--row_num").required(true)
+                            .help("specify the max number of rows to write in a file");
+                    argumentParser.addArgument("-r", "--row_regex").required(true)
+                            .help("specify the split regex of each row in a file");
+                    argumentParser.addArgument("-c", "--consumer_thread_num").setDefault("4").required(true)
+                            .help("specify the number of consumer threads used for data generation");
+                    argumentParser.addArgument("-e", "--encoding_level").setDefault("2")
+                            .help("specify the encoding level for data loading");
+                    argumentParser.addArgument("-p", "--nulls_padding").setDefault(false)
+                            .help("specify whether nulls padding is enabled");
 
-            if (command.equals("COMPACT"))
-            {
-                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL COMPACT")
-                        .defaultHelp(true);
+                    Namespace ns;
+                    try
+                    {
+                        ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    } catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
 
-                argumentParser.addArgument("-s", "--schema").required(true)
-                        .help("specify the name of schema.");
-                argumentParser.addArgument("-t", "--table").required(true)
-                        .help("specify the name of table.");
-                argumentParser.addArgument("-n", "--naive").required(true)
-                        .help("specify whether or not to create naive compact layout.");
-                argumentParser.addArgument("-c", "--concurrency")
-                        .setDefault("4").required(true)
-                        .help("specify the number of threads used for data compaction");
-
-                Namespace ns;
-                try
-                {
-                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                } catch (ArgumentParserException e)
-                {
-                    argumentParser.handleError(e);
-                    continue;
+                    try
+                    {
+                        LoadExecutor loadExecutor = new LoadExecutor();
+                        loadExecutor.execute(ns, command);
+                    } catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
                 }
 
-                try
+                if (command.equals("QUERY"))
                 {
-                    CompactExecutor compactExecutor = new CompactExecutor();
-                    compactExecutor.execute(ns, command);
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-            }
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels QUERY")
+                            .defaultHelp(true);
 
-            if (command.equals("STAT"))
-            {
-                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels Update Statistics")
-                        .defaultHelp(true);
+                    argumentParser.addArgument("-w", "--workload").required(true)
+                            .help("specify the path of workload file");
+                    argumentParser.addArgument("-l", "--log").required(true)
+                            .help("specify the path of query log files");
+                    argumentParser.addArgument("-r", "--rate_limited").required(false).setDefault(false)
+                            .help("specify whether the queries are executed in a rate-limited manner");
+                    argumentParser.addArgument("-d", "--drop_cache").required(false)
+                            .help("specify the path of the script file that is used to drop cache after each query");
+                    argumentParser.addArgument("-q", "--query_per_minute").required(false).setDefault(0)
+                            .help("specify the number of queries to execute if rate_limited is true");
 
-                argumentParser.addArgument("-s", "--schema").required(true)
-                        .help("specify the schema name");
-                argumentParser.addArgument("-t", "--table").required(true)
-                        .help("specify the table name");
+                    Namespace ns;
+                    try
+                    {
+                        ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    } catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
 
-                Namespace ns;
-                try
-                {
-                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                } catch (ArgumentParserException e)
-                {
-                    argumentParser.handleError(e);
-                    continue;
-                }
-
-                try
-                {
-                    StatExecutor statExecutor = new StatExecutor();
-                    statExecutor.execute(ns, command);
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-            }
-
-            if (command.equals("IMPORT"))
-            {
-                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL IMPORT")
-                        .defaultHelp(true);
-
-                argumentParser.addArgument("-s", "--schema").required(true)
-                        .help("specify the schema name");
-                argumentParser.addArgument("-t", "--table").required(true)
-                        .help("specify the table name");
-                argumentParser.addArgument("-l", "--layout").required(true)
-                        .help("specify the layout of the files, can be 'ordered' or 'compact'");
-
-                Namespace ns;
-                try
-                {
-                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                } catch (ArgumentParserException e)
-                {
-                    argumentParser.handleError(e);
-                    continue;
+                    try
+                    {
+                        QueryExecutor queryExecutor = new QueryExecutor();
+                        queryExecutor.execute(ns, command);
+                    } catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
                 }
 
-                try
+                if (command.equals("COPY"))
                 {
-                    ImportExecutor statExecutor = new ImportExecutor();
-                    statExecutor.execute(ns, command);
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-            }
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL COPY")
+                            .defaultHelp(true);
 
-            if (command.equals("FILE_META"))
-            {
-                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels File Metadata Explorer")
-                        .defaultHelp(true);
+                    argumentParser.addArgument("-p", "--postfix").required(true)
+                            .help("specify the postfix of files to be copied");
+                    argumentParser.addArgument("-s", "--source").required(true)
+                            .help("specify the source directory");
+                    argumentParser.addArgument("-d", "--destination").required(true)
+                            .help("specify the destination directory");
+                    argumentParser.addArgument("-n", "--number").required(true)
+                            .help("specify the number of copies");
+                    argumentParser.addArgument("-c", "--concurrency")
+                            .setDefault("4").required(true)
+                            .help("specify the number of threads used for data compaction");
 
-                argumentParser.addArgument("-f", "--file").required(true)
-                        .help("specify the full path of the file, containing the storage scheme");
+                    Namespace ns;
+                    try
+                    {
+                        ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    } catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
 
-                Namespace ns;
-                try
-                {
-                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                } catch (ArgumentParserException e)
-                {
-                    argumentParser.handleError(e);
-                    continue;
+                    try
+                    {
+                        CopyExecutor copyExecutor = new CopyExecutor();
+                        copyExecutor.execute(ns, command);
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
                 }
 
-                try
+                if (command.equals("COMPACT"))
                 {
-                    FileMetaExecutor statExecutor = new FileMetaExecutor();
-                    statExecutor.execute(ns, command);
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-            }
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL COMPACT")
+                            .defaultHelp(true);
 
-            if (!command.equals("QUERY") &&
-                    !command.equals("LOAD") &&
-                    !command.equals("COPY") &&
-                    !command.equals("COMPACT") &&
-                    !command.equals("STAT") &&
-                    !command.equals("IMPORT") &&
-                    !command.equals("FILE_META"))
-            {
-                System.out.println("Command '" + command + "' not found");
+                    argumentParser.addArgument("-s", "--schema").required(true)
+                            .help("specify the name of schema.");
+                    argumentParser.addArgument("-t", "--table").required(true)
+                            .help("specify the name of table.");
+                    argumentParser.addArgument("-n", "--naive").required(true)
+                            .help("specify whether or not to create naive compact layout.");
+                    argumentParser.addArgument("-c", "--concurrency")
+                            .setDefault("4").required(true)
+                            .help("specify the number of threads used for data compaction");
+
+                    Namespace ns;
+                    try
+                    {
+                        ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    } catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
+
+                    try
+                    {
+                        CompactExecutor compactExecutor = new CompactExecutor();
+                        compactExecutor.execute(ns, command);
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+
+                if (command.equals("STAT"))
+                {
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels Update Statistics")
+                            .defaultHelp(true);
+
+                    argumentParser.addArgument("-s", "--schema").required(true)
+                            .help("specify the schema name");
+                    argumentParser.addArgument("-t", "--table").required(true)
+                            .help("specify the table name");
+
+                    Namespace ns;
+                    try
+                    {
+                        ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    } catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
+
+                    try
+                    {
+                        StatExecutor statExecutor = new StatExecutor();
+                        statExecutor.execute(ns, command);
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+
+                if (command.equals("IMPORT"))
+                {
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL IMPORT")
+                            .defaultHelp(true);
+
+                    argumentParser.addArgument("-s", "--schema").required(true)
+                            .help("specify the schema name");
+                    argumentParser.addArgument("-t", "--table").required(true)
+                            .help("specify the table name");
+                    argumentParser.addArgument("-l", "--layout").required(true)
+                            .help("specify the layout of the files, can be 'ordered' or 'compact'");
+
+                    Namespace ns;
+                    try
+                    {
+                        ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    } catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
+
+                    try
+                    {
+                        ImportExecutor statExecutor = new ImportExecutor();
+                        statExecutor.execute(ns, command);
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+
+                if (command.equals("FILE_META"))
+                {
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels File Metadata Explorer")
+                            .defaultHelp(true);
+
+                    argumentParser.addArgument("-f", "--file").required(true)
+                            .help("specify the full path of the file, containing the storage scheme");
+
+                    Namespace ns;
+                    try
+                    {
+                        ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    } catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
+
+                    try
+                    {
+                        FileMetaExecutor statExecutor = new FileMetaExecutor();
+                        statExecutor.execute(ns, command);
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+
+                if (!command.equals("QUERY") &&
+                        !command.equals("LOAD") &&
+                        !command.equals("COPY") &&
+                        !command.equals("COMPACT") &&
+                        !command.equals("STAT") &&
+                        !command.equals("IMPORT") &&
+                        !command.equals("FILE_META"))
+                {
+                    System.out.println("Command '" + command + "' not found");
+                }
             }
         }
         // Use exit to terminate other threads and invoke the shutdown hooks.
