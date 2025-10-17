@@ -40,10 +40,15 @@ import static java.util.Objects.requireNonNull;
 public class MainIndexBuffer implements Closeable
 {
     /**
+     * If the number of files in this buffer is over this threshold, index cache is enabled.
+     */
+    private static final int CACHE_ENABLE_THRESHOLD = 3;
+    /**
      * fileId -> {tableRowId -> rowLocation}.
      */
     private final Map<Long, Map<Long, IndexProto.RowLocation>> indexBuffer;
     private final MainIndexCache indexCache;
+    private boolean enableCache = false;
 
     /**
      * Create a main index buffer and bind the main index cache to it.
@@ -64,13 +69,20 @@ public class MainIndexBuffer implements Closeable
      */
     public boolean insert(long rowId, IndexProto.RowLocation location)
     {
-        Map<Long, IndexProto.RowLocation> fileBuffer = indexBuffer.get(location.getFileId());
+        Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(location.getFileId());
         if (fileBuffer == null)
         {
+            if (this.indexBuffer.size() > CACHE_ENABLE_THRESHOLD)
+            {
+                this.enableCache = true;
+            }
             // Issue #1115: use HashMap for better performance and do post-sorting in flush().
             fileBuffer = new HashMap<>();
             fileBuffer.put(rowId, location);
-            this.indexCache.insert(rowId, location);
+            if (this.enableCache)
+            {
+                this.indexCache.insert(rowId, location);
+            }
             this.indexBuffer.put(location.getFileId(), fileBuffer);
             return true;
         }
@@ -79,7 +91,10 @@ public class MainIndexBuffer implements Closeable
             if (!fileBuffer.containsKey(rowId))
             {
                 fileBuffer.put(rowId, location);
-                this.indexCache.insert(rowId, location);
+                if (this.enableCache)
+                {
+                    this.indexCache.insert(rowId, location);
+                }
                 return true;
             }
             return false;
@@ -94,7 +109,7 @@ public class MainIndexBuffer implements Closeable
             return null;
         }
         IndexProto.RowLocation location = fileBuffer.get(rowId);
-        if (location == null)
+        if (location == null && !this.enableCache)
         {
             location = this.indexCache.lookup(rowId);
         }
@@ -107,7 +122,11 @@ public class MainIndexBuffer implements Closeable
      */
     public IndexProto.RowLocation lookup(long rowId)
     {
-        IndexProto.RowLocation location = this.indexCache.lookup(rowId);
+        IndexProto.RowLocation location = null;
+        if (this.enableCache)
+        {
+            location = this.indexCache.lookup(rowId);
+        }
         if (location == null)
         {
             for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : this.indexBuffer.entrySet())
