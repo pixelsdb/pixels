@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-mvn install
+# three threads is the best parallelism
+mvn -T 3 clean install
 
 if [ $? -ne 0 ]; then
   echo "ERROR: Maven package failed. Stop installing Pixels."
