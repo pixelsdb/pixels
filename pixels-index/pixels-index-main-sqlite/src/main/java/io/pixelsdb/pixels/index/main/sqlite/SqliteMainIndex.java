@@ -183,7 +183,7 @@ public class SqliteMainIndex implements MainIndex
              * Thus putEntry() does not block db-read in this method. It is fine that deleteRowIdRange(rowIdRange)
              * happen between cache-read and db-read of this method.
              */
-            location = this.indexCache.lookup(rowId);
+            location = this.indexBuffer.lookup(rowId);
         }
         finally
         {
@@ -211,7 +211,7 @@ public class SqliteMainIndex implements MainIndex
             for (long rowId : rowIds)
             {
                 IndexProto.RowLocation location;
-                location = this.indexCache.lookup(rowId);
+                location = this.indexBuffer.lookup(rowId);
                 if (location == null)
                 {
                     location = getRowLocationFromSqlite(rowId);
