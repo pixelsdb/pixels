@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.index.rocksdb;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.rocksdb.RocksDBException;
 
 import javax.annotation.Nonnull;
@@ -33,8 +32,6 @@ import javax.annotation.Nonnull;
  */
 public class RocksDBIndexProvider implements SinglePointIndexProvider
 {
-    private static final String rocksdbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
-
     @Override
     public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme,
                                            boolean unique) throws SinglePointIndexException
@@ -43,7 +40,7 @@ public class RocksDBIndexProvider implements SinglePointIndexProvider
         {
             try
             {
-                return new RocksDBIndex(tableId, indexId, rocksdbPath, unique);
+                return new RocksDBIndex(tableId, indexId, unique);
             }
             catch (RocksDBException e)
             {

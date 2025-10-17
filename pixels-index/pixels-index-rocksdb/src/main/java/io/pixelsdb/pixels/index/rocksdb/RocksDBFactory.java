@@ -16,11 +16,13 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.rocksdb.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -31,18 +33,22 @@ import java.util.stream.Collectors;
  */
 public class RocksDBFactory
 {
+    private static final String dbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
     private static RocksDB instance;
-    private static String dbPath;
+    /**
+     * The reference counter.
+     */
+    private static AtomicInteger reference = new AtomicInteger(0);
 
     private RocksDBFactory() { }
 
-    private static RocksDB createRocksDB(String path) throws RocksDBException
+    private static RocksDB createRocksDB() throws RocksDBException
     {
         // 1. Get existing column families (returns empty list for new database)
         List<byte[]> existingColumnFamilies;
         try
         {
-            existingColumnFamilies = RocksDB.listColumnFamilies(new Options(), path);
+            existingColumnFamilies = RocksDB.listColumnFamilies(new Options(), dbPath);
         } catch (RocksDBException e)
         {
             // For new database, return list containing only default column family
@@ -65,30 +71,25 @@ public class RocksDBFactory
         List<ColumnFamilyHandle> handles = new ArrayList<>();
         DBOptions dbOptions = new DBOptions().setCreateIfMissing(true);
 
-        return RocksDB.open(dbOptions, path, descriptors, handles);
+        return RocksDB.open(dbOptions, dbPath, descriptors, handles);
     }
 
-    public static synchronized RocksDB getRocksDB(String rocksDBPath) throws RocksDBException
+    public static synchronized RocksDB getRocksDB() throws RocksDBException
     {
-        if (instance == null)
+        if (instance == null || instance.isClosed())
         {
-            dbPath = rocksDBPath;
-            instance = createRocksDB(rocksDBPath);
-        } else if (!dbPath.equals(rocksDBPath))
-        {
-            throw new RocksDBException("RocksDB already initialized with path: "
-                    + dbPath + ", cannot reinitialize with: " + rocksDBPath);
+            instance = createRocksDB();
         }
+        reference.incrementAndGet();
         return instance;
     }
 
     public static synchronized void close()
     {
-        if (instance != null)
+        if (instance != null && reference.decrementAndGet() == 0)
         {
             instance.close();
             instance = null;
-            dbPath = null;
         }
     }
 
