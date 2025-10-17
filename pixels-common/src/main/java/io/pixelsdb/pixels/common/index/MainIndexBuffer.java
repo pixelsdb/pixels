@@ -40,9 +40,12 @@ import static java.util.Objects.requireNonNull;
 public class MainIndexBuffer implements Closeable
 {
     /**
-     * If the number of files in this buffer is over this threshold, index cache is enabled.
+     * Issue #1150:
+     * If the number of files in this buffer is over this threshold, index cache is enabled. 6-8 are tested to be good
+     * settings. This threshold avoid redundant cache+buffer when the number of files is small (i.e., buffer can provide
+     * good lookup performance).
      */
-    private static final int CACHE_ENABLE_THRESHOLD = 8;
+    private static final int CACHE_ENABLE_THRESHOLD = 6;
     /**
      * fileId -> {tableRowId -> rowLocation}.
      */
