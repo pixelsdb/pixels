@@ -28,9 +28,10 @@ import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
- * This is the index buffer for a main index.
+ * This is the index buffer for a main index to accelerate main index writes.
  * It is to be used inside the main index implementations and protected by the concurrency control in the main index,
  * thus it is not necessary to be thread-safe.
  * @author hank
@@ -42,10 +43,17 @@ public class MainIndexBuffer implements Closeable
      * fileId -> {tableRowId -> rowLocation}.
      */
     private final Map<Long, Map<Long, IndexProto.RowLocation>> indexBuffer;
+    private final MainIndexCache mainIndexCache;
 
-    public MainIndexBuffer()
+    /**
+     * Create a main index buffer and bind the main index cache to it.
+     * Entries put into this buffer will also be put into the cache.
+     * @param mainIndexCache the main index cache to bind
+     */
+    public MainIndexBuffer(MainIndexCache mainIndexCache)
     {
-        indexBuffer = new HashMap<>();
+        this.mainIndexCache = requireNonNull(mainIndexCache, "mainIndexCache is null");
+        this.indexBuffer = new HashMap<>();
     }
 
     /**
@@ -86,7 +94,13 @@ public class MainIndexBuffer implements Closeable
         return fileBuffer.get(rowId);
     }
 
-    public IndexProto.RowLocation lookup(long rowId)
+    /**
+     * This look up method is not efficient and should only be used for debugging purpose.
+     * @param rowId the row id of the table
+     * @return
+     */
+    @Deprecated
+    protected IndexProto.RowLocation lookup(long rowId)
     {
         for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : indexBuffer.entrySet())
         {
