@@ -49,6 +49,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
 /**
  * @author: tao
@@ -190,7 +191,7 @@ public class PixelsConsumer extends Consumer
                         rowBatch.size++;
                         rowCounter++;
 
-                        String[] colsInLine = line.split(regex);
+                        String[] colsInLine = line.split(Pattern.quote(regex));
                         for (int i = 0; i < columnVectors.length - 1; i++)
                         {
                             try
