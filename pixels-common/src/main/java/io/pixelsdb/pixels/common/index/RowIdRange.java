@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import javax.annotation.Nonnull;
 import java.util.Objects;
 
 /**
@@ -30,7 +31,6 @@ import java.util.Objects;
  */
 public class RowIdRange implements Comparable<RowIdRange>
 {
-    // rowIdStart and rowIdEnd are the keys
     /**
      * inclusive
      */
@@ -94,7 +94,10 @@ public class RowIdRange implements Comparable<RowIdRange>
     @Override
     public boolean equals(Object o)
     {
-        if (!(o instanceof RowIdRange)) return false;
+        if (!(o instanceof RowIdRange))
+        {
+            return false;
+        }
         RowIdRange that = (RowIdRange) o;
         return rowIdStart == that.rowIdStart && rowIdEnd == that.rowIdEnd;
     }
@@ -106,13 +109,13 @@ public class RowIdRange implements Comparable<RowIdRange>
     }
 
     @Override
-    public int compareTo(RowIdRange o)
+    public int compareTo(@Nonnull RowIdRange that)
     {
-        if (this.rowIdStart != o.rowIdStart)
+        if (this.rowIdStart != that.rowIdStart)
         {
-            return this.rowIdStart < o.rowIdStart ? -1 : 1;
+            return this.rowIdStart < that.rowIdStart ? -1 : 1;
         }
-        return this.rowIdEnd < o.rowIdEnd ? -1 : 1;
+        return Long.compare(this.rowIdEnd, that.rowIdEnd);
     }
 
     public Builder toBuilder ()

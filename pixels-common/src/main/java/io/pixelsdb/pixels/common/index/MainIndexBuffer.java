@@ -84,7 +84,7 @@ public class MainIndexBuffer implements Closeable
             fileBuffer.put(rowId, location);
             if (this.enableCache)
             {
-                this.indexCache.insert(rowId, location);
+                this.indexCache.admit(rowId, location);
             }
             this.indexBuffer.put(location.getFileId(), fileBuffer);
             return true;
@@ -96,7 +96,7 @@ public class MainIndexBuffer implements Closeable
                 fileBuffer.put(rowId, location);
                 if (this.enableCache)
                 {
-                    this.indexCache.insert(rowId, location);
+                    this.indexCache.admit(rowId, location);
                 }
                 return true;
             }
@@ -104,7 +104,7 @@ public class MainIndexBuffer implements Closeable
         }
     }
 
-    protected IndexProto.RowLocation lookup(long fileId, long rowId)
+    protected IndexProto.RowLocation lookup(long fileId, long rowId) throws MainIndexException
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(fileId);
         if (fileBuffer == null)
@@ -123,7 +123,7 @@ public class MainIndexBuffer implements Closeable
      * @param rowId the row id of the table
      * @return the buffered or cached row location, or null if not found
      */
-    public IndexProto.RowLocation lookup(long rowId)
+    public IndexProto.RowLocation lookup(long rowId) throws MainIndexException
     {
         IndexProto.RowLocation location = null;
         if (this.enableCache)
@@ -146,6 +146,15 @@ public class MainIndexBuffer implements Closeable
         return location;
     }
 
+    /**
+     * Flush the (row id -> row location) mappings of the given file id into ranges and remove them from the buffer.
+     * This method does not evict the main index cache bind to this buffer as the cached entries are not out of date.
+     * However, this method may disable and clear the cache if remaining file ids in the buffer is below or equals to
+     * the {@link #CACHE_ENABLE_THRESHOLD}.
+     * @param fileId the given file id to flush
+     * @return the flushed row id ranges to be persisited into the storage
+     * @throws MainIndexException
+     */
     public List<RowIdRange> flush(long fileId) throws MainIndexException
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(fileId);
@@ -204,6 +213,11 @@ public class MainIndexBuffer implements Closeable
         // release the flushed file index buffer
         fileBuffer.clear();
         this.indexBuffer.remove(fileId);
+        if (this.indexBuffer.size() <= CACHE_ENABLE_THRESHOLD)
+        {
+            this.enableCache = false;
+            this.indexCache.evictAllEntries();
+        }
         return ranges.build();
     }
 
