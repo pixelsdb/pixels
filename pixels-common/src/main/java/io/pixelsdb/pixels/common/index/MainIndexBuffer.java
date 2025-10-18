@@ -41,17 +41,17 @@ public class MainIndexBuffer implements Closeable
 {
     /**
      * Issue #1150:
-     * If the number of files in this buffer is over this threshold, index cache is enabled. 6-8 are tested to be good
-     * settings. This threshold avoids redundant cache+buffer when the number of files is small (i.e., buffer can provide
-     * good lookup performance).
+     * If the number of files in this buffer is over this threshold, synchronous cache population is enabled.
+     * 6-8 are tested to be good settings. This threshold avoids redundant cache population when the number of files
+     * is small (i.e., the buffer can be used as a cache and provide good lookup performance).
      */
-    private static final int CACHE_ENABLE_THRESHOLD = 6;
+    private static final int CACHE_POP_ENABLE_THRESHOLD = 6;
     /**
      * fileId -> {tableRowId -> rowLocation}.
      */
     private final Map<Long, Map<Long, IndexProto.RowLocation>> indexBuffer;
     private final MainIndexCache indexCache;
-    private boolean enableCache = false;
+    private boolean populateCache = false;
 
     /**
      * Create a main index buffer and bind the main index cache to it.
@@ -75,14 +75,14 @@ public class MainIndexBuffer implements Closeable
         Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(location.getFileId());
         if (fileBuffer == null)
         {
-            if (this.indexBuffer.size() > CACHE_ENABLE_THRESHOLD)
+            if (this.indexBuffer.size() > CACHE_POP_ENABLE_THRESHOLD)
             {
-                this.enableCache = true;
+                this.populateCache = true;
             }
             // Issue #1115: use HashMap for better performance and do post-sorting in flush().
             fileBuffer = new HashMap<>();
             fileBuffer.put(rowId, location);
-            if (this.enableCache)
+            if (this.populateCache)
             {
                 this.indexCache.admit(rowId, location);
             }
@@ -94,7 +94,7 @@ public class MainIndexBuffer implements Closeable
             if (!fileBuffer.containsKey(rowId))
             {
                 fileBuffer.put(rowId, location);
-                if (this.enableCache)
+                if (this.populateCache)
                 {
                     this.indexCache.admit(rowId, location);
                 }
@@ -112,7 +112,7 @@ public class MainIndexBuffer implements Closeable
             return null;
         }
         IndexProto.RowLocation location = fileBuffer.get(rowId);
-        if (location == null && !this.enableCache)
+        if (location == null)
         {
             location = this.indexCache.lookup(rowId);
         }
@@ -126,10 +126,7 @@ public class MainIndexBuffer implements Closeable
     public IndexProto.RowLocation lookup(long rowId) throws MainIndexException
     {
         IndexProto.RowLocation location = null;
-        if (this.enableCache)
-        {
-            location = this.indexCache.lookup(rowId);
-        }
+        location = this.indexCache.lookup(rowId);
         if (location == null)
         {
             for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : this.indexBuffer.entrySet())
@@ -149,8 +146,8 @@ public class MainIndexBuffer implements Closeable
     /**
      * Flush the (row id -> row location) mappings of the given file id into ranges and remove them from the buffer.
      * This method does not evict the main index cache bind to this buffer as the cached entries are not out of date.
-     * However, this method may disable and clear the cache if remaining file ids in the buffer is below or equals to
-     * the {@link #CACHE_ENABLE_THRESHOLD}.
+     * However, this method may disable synchronous cache population and clear the cache if remaining file ids in the
+     * buffer is below or equals to the {@link #CACHE_POP_ENABLE_THRESHOLD}.
      * @param fileId the given file id to flush
      * @return the flushed row id ranges to be persisited into the storage
      * @throws MainIndexException
@@ -213,9 +210,9 @@ public class MainIndexBuffer implements Closeable
         // release the flushed file index buffer
         fileBuffer.clear();
         this.indexBuffer.remove(fileId);
-        if (this.indexBuffer.size() <= CACHE_ENABLE_THRESHOLD)
+        if (this.indexBuffer.size() <= CACHE_POP_ENABLE_THRESHOLD)
         {
-            this.enableCache = false;
+            this.populateCache = false;
             this.indexCache.evictAllEntries();
         }
         return ranges.build();
