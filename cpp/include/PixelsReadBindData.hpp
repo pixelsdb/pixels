@@ -42,7 +42,7 @@ namespace duckdb
         std::shared_ptr <PixelsReader> initialPixelsReader;
         std::shared_ptr <TypeDescription> fileSchema;
         vector <string> files;
-        atomic <idx_t> curFileId;
+        atomic <int> curFileId;
     };
 
 }
