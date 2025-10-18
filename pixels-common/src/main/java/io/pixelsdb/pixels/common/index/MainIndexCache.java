@@ -182,5 +182,6 @@ public class MainIndexCache implements Closeable
             bucket.clear();
         }
         this.entryCacheBuckets.clear();
+        this.rangeCache.clear();
     }
 }

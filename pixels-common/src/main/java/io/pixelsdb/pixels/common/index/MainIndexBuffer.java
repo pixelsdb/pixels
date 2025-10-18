@@ -230,5 +230,6 @@ public class MainIndexBuffer implements Closeable
     public void close() throws IOException
     {
         this.indexBuffer.clear();
+        this.indexCache.close();
     }
 }

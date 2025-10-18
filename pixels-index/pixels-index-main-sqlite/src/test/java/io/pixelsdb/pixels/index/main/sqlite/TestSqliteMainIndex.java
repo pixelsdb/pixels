@@ -140,20 +140,20 @@ public class TestSqliteMainIndex
         {
             mainIndex.putEntry(rowIdBase + i, locationBuilder.setRgRowOffset(i).build());
         }
-        System.out.println(System.currentTimeMillis() - start);
+        System.out.println("put 10M entries in " + (System.currentTimeMillis() - start) + " ms");
         start = System.currentTimeMillis();
         for (int i = 0; i < 10000000; i++)
         {
             mainIndex.getLocation(rowIdBase + i);
         }
-        System.out.println(System.currentTimeMillis() - start);
+        System.out.println("get 10M entries in " + (System.currentTimeMillis() - start) + " ms");
         start = System.currentTimeMillis();
         mainIndex.flushCache(1);
-        System.out.println(System.currentTimeMillis() - start);
+        System.out.println("flush cache in " + (System.currentTimeMillis() - start) + " ms");
         start = System.currentTimeMillis();
         mainIndex.deleteRowIdRange(new RowIdRange(
                 0L, 10_000_000L, 1L, 0, 0, 10_000_000));
-        System.out.println(System.currentTimeMillis() - start);
+        System.out.println("delete all entries in " + (System.currentTimeMillis() - start) + " ms");
     }
 
     @Test
