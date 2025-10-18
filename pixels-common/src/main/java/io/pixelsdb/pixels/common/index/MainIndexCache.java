@@ -19,11 +19,14 @@
  */
 package io.pixelsdb.pixels.common.index;
 
+import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.*;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * This is the index cache for a main index to accelerate main index lookups.
@@ -49,6 +52,8 @@ public class MainIndexCache implements Closeable
      */
     private final List<Map<Long, IndexProto.RowLocation>> entryCacheBuckets;
 
+    private final TreeSet<Object> rangeCache;
+
     public MainIndexCache()
     {
         this.entryCacheBuckets = new ArrayList<>(NUM_BUCKETS);
@@ -56,6 +61,25 @@ public class MainIndexCache implements Closeable
         {
             this.entryCacheBuckets.add(new HashMap<>());
         }
+        this.rangeCache = new TreeSet<>((o1, o2) -> {
+            /* Issue #1150:
+             * o1 is the new element to compare with the existing elements in the set.
+             * As we only put RowIdRange into the set, we do not need to check the type of o2.
+             *
+             * Using such a comparator makes range cache lookup simpler and slightly faster as we do not need to create
+             * a dummy RowIdRange for every lookup.
+             */
+            if (o1 instanceof RowIdRange)
+            {
+                return ((RowIdRange) o1).compareTo(((RowIdRange) o2));
+            }
+            else
+            {
+                long rowId = (Long) o1;
+                RowIdRange range = (RowIdRange) o2;
+                return rowId < range.getRowIdStart() ? -1 : rowId >= range.getRowIdEnd() ? 1 : 0;
+            }
+        });
     }
 
     /**
@@ -63,7 +87,7 @@ public class MainIndexCache implements Closeable
      * @param rowId the table row id of the entry
      * @param location the row location of the entry
      */
-    public void insert(long rowId, IndexProto.RowLocation location)
+    public void admit(long rowId, IndexProto.RowLocation location)
     {
         int bucketId = (int) (rowId % NUM_BUCKETS);
         Map<Long, IndexProto.RowLocation> bucket = this.entryCacheBuckets.get(bucketId);
@@ -78,14 +102,76 @@ public class MainIndexCache implements Closeable
     }
 
     /**
-     * @param rowId the row id of the table
-     * @return the row location of the row id, or null if not found
+     * @param rowId the row id to delete
+     * @return true if the row id is found and deleted
      */
-    public IndexProto.RowLocation lookup(long rowId)
+    public boolean evict(long rowId)
     {
         int bucketId = (int) (rowId % NUM_BUCKETS);
         Map<Long, IndexProto.RowLocation> bucket = this.entryCacheBuckets.get(bucketId);
-        return bucket.get(rowId);
+        return bucket.remove(rowId) != null;
+    }
+
+    /**
+     * Delete all cached entries in the cache. This does not delete the cached row id ranges.
+     */
+    public void evictAllEntries()
+    {
+        for (Map<Long, IndexProto.RowLocation> bucket : this.entryCacheBuckets)
+        {
+            bucket.clear();
+        }
+    }
+
+    public void admitRange(RowIdRange range)
+    {
+        this.rangeCache.add(range);
+    }
+
+    /**
+     * @param range the range to delete
+     * @return true if the range is found and deleted
+     */
+    public boolean evictRange(RowIdRange range)
+    {
+        final long rowIdStart = range.getRowIdStart();
+        final long rowIdEnd = range.getRowIdEnd();
+        checkArgument(rowIdStart < rowIdEnd, "invalid range to evict");
+        RowIdRange endRange = (RowIdRange) this.rangeCache.floor(rowIdEnd);
+        boolean rangesRemoved = false;
+        while (endRange != null && endRange.getRowIdEnd() > rowIdStart)
+        {
+            this.rangeCache.remove(endRange);
+            rangesRemoved = true;
+            endRange = (RowIdRange) this.rangeCache.floor(endRange.getRowIdEnd());
+        }
+        return rangesRemoved;
+    }
+
+    /**
+     * @param rowId the row id of the table
+     * @return the row location of the row id, or null if not found
+     */
+    public IndexProto.RowLocation lookup(long rowId) throws MainIndexException
+    {
+        int bucketId = (int) (rowId % NUM_BUCKETS);
+        Map<Long, IndexProto.RowLocation> bucket = this.entryCacheBuckets.get(bucketId);
+        IndexProto.RowLocation location = bucket.get(rowId);
+        if (location == null)
+        {
+            RowIdRange range = (RowIdRange) rangeCache.floor(rowId);
+            if (range != null)
+            {
+                // check if the floor range equals to (covers) the target row id
+                if (range.getRowIdStart() <= rowId && rowId < range.getRowIdEnd())
+                {
+                    int offset = (int) (rowId - range.getRowIdStart());
+                    location = IndexProto.RowLocation.newBuilder().setFileId(range.getFileId())
+                            .setRgId(range.getRgId()).setRgRowOffset(range.getRgRowOffsetStart() + offset).build();
+                }
+            }
+        }
+        return location;
     }
 
     @Override
@@ -96,5 +182,6 @@ public class MainIndexCache implements Closeable
             bucket.clear();
         }
         this.entryCacheBuckets.clear();
+        this.rangeCache.clear();
     }
 }

@@ -29,7 +29,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class LocalIndexServiceTest
+class TestLocalIndexService
 {
 
     private static LocalIndexService indexService;

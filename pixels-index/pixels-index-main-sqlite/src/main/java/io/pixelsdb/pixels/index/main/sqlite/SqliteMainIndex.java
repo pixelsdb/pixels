@@ -245,6 +245,8 @@ public class SqliteMainIndex implements MainIndex
         try
         {
             RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
+            // Issue #1150: add the range to cache to accelerate main index lookups
+            this.indexCache.admitRange(rowIdRange);
             if (rowIdRange != null)
             {
                 long rowIdStart = rowIdRange.getRowIdStart();
@@ -340,6 +342,8 @@ public class SqliteMainIndex implements MainIndex
         }
         finally
         {
+            // Issue #1150: evict the range from cache anyway
+            this.indexCache.evictRange(rowIdRange);
             this.dbRwLock.writeLock().unlock();
         }
     }
