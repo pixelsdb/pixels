@@ -42,7 +42,7 @@ public class RocksDBIndex implements SinglePointIndex
     private final RocksDB rocksDB;
     private final String rocksDBPath;
     private final WriteOptions writeOptions;
-    private final ReadOptions readOptions;
+    private final ReadOptionsThreadFactory readOptionsFactory;
     private final long tableId;
     private final long indexId;
     private final boolean unique;
@@ -58,7 +58,7 @@ public class RocksDBIndex implements SinglePointIndex
         this.rocksDB = RocksDBFactory.getRocksDB();
         this.unique = unique;
         this.writeOptions = new WriteOptions();
-        this.readOptions = new ReadOptions();
+        this.readOptionsFactory = new ReadOptionsThreadFactory();
     }
 
     /**
@@ -76,7 +76,7 @@ public class RocksDBIndex implements SinglePointIndex
         this.rocksDB = rocksDB;  // Use injected mock directly
         this.unique = unique;
         this.writeOptions = new WriteOptions();
-        this.readOptions = new ReadOptions();
+        this.readOptionsFactory = new ReadOptionsThreadFactory();
     }
 
     @Override
@@ -104,6 +104,7 @@ public class RocksDBIndex implements SinglePointIndex
         byte[] keyBytes = toKeyBytes(key);
         long timestamp = key.getTimestamp();
         byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+        ReadOptions readOptions = readOptionsFactory.getReadOptions();
         setIteratorBounds(readOptions, copyBytes, timestamp + 1);
         long rowId = -1L;
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
@@ -125,6 +126,7 @@ public class RocksDBIndex implements SinglePointIndex
         byte[] keyBytes = toKeyBytes(key);
         long timestamp = key.getTimestamp();
         byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+        ReadOptions readOptions = readOptionsFactory.getReadOptions();
         setIteratorBounds(readOptions, copyBytes, timestamp+1);
         // Use RocksDB iterator for prefix search
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
@@ -478,6 +480,7 @@ public class RocksDBIndex implements SinglePointIndex
                 byte[] keyBytes = toKeyBytes(key);
                 long timestamp = key.getTimestamp();
                 byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+                ReadOptions readOptions = readOptionsFactory.getReadOptions();
                 setIteratorBounds(readOptions, copyBytes, timestamp+1);
                 try (RocksIterator iterator = rocksDB.newIterator(readOptions))
                 {
@@ -520,6 +523,7 @@ public class RocksDBIndex implements SinglePointIndex
             closed = true;
             // Issue #1158: do not directly close the rocksDB instance as it is shared by other indexes
             RocksDBFactory.close();
+            readOptionsFactory.shutdownAllThreads();
         }
     }
 
