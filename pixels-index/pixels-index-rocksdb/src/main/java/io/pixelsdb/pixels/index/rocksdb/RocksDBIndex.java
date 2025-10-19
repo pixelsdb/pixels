@@ -30,7 +30,6 @@ import org.rocksdb.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -100,12 +99,8 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public long getUniqueRowId(IndexProto.IndexKey key)
     {
-        // Get prefix
-        byte[] keyBytes = toKeyBytes(key);
-        long timestamp = key.getTimestamp();
-        byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
         ReadOptions readOptions = readOptionsFactory.getReadOptions();
-        setIteratorBounds(readOptions, copyBytes, timestamp + 1);
+        byte[] keyBytes = setIteratorBounds(readOptions, key);
         long rowId = -1L;
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
@@ -123,11 +118,8 @@ public class RocksDBIndex implements SinglePointIndex
     public List<Long> getRowIds(IndexProto.IndexKey key)
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
-        byte[] keyBytes = toKeyBytes(key);
-        long timestamp = key.getTimestamp();
-        byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
         ReadOptions readOptions = readOptionsFactory.getReadOptions();
-        setIteratorBounds(readOptions, copyBytes, timestamp+1);
+        byte[] keyBytes = setIteratorBounds(readOptions, key);
         // Use RocksDB iterator for prefix search
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
@@ -477,11 +469,9 @@ public class RocksDBIndex implements SinglePointIndex
         {
             for (IndexProto.IndexKey key : indexKeys)
             {
-                byte[] keyBytes = toKeyBytes(key);
-                long timestamp = key.getTimestamp();
-                byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+                toKeyBytes(key);
                 ReadOptions readOptions = readOptionsFactory.getReadOptions();
-                setIteratorBounds(readOptions, copyBytes, timestamp+1);
+                byte[] keyBytes = setIteratorBounds(readOptions, key);
                 try (RocksIterator iterator = rocksDB.newIterator(readOptions))
                 {
                     iterator.seekForPrev(keyBytes);
@@ -614,35 +604,33 @@ public class RocksDBIndex implements SinglePointIndex
         return true;
     }
 
-    protected static void setIteratorBounds(ReadOptions readOptions, byte[] keyBytes, long timestamp)
+    /**
+     * Set iterator bounds in the read options to [indexId_keyString_0, indexId_keyString_ts+1) and return the key bytes
+     * of indexId_keyString_ts that can be further used to seek to in the iterator.
+     * @param readOptions the read options
+     * @param key
+     * @return
+     */
+    protected static byte[] setIteratorBounds(ReadOptions readOptions, IndexProto.IndexKey key)
     {
+        byte[] keyBytes = toBytes(key.getIndexId(), key.getKey(), 0);
         // Build lower bound (timestamp = 0)
-        int offset = keyBytes.length - 8;
-        for (int i = 0; i < Long.BYTES; i++)
-        {
-            keyBytes[offset + i] = 0;
-        }
         Slice lowerBound = new Slice(keyBytes);
         // Build upper bound (timestamp = timestamp + 1)
-        for (int i = Long.BYTES - 1; i >= 0; i--)
-        {
-            keyBytes[offset + i] = (byte)(timestamp & 0xFF);
-            timestamp >>>= 8;
-        }
+        final int offset = keyBytes.length - 8;
+        writeLongBE(keyBytes, offset, key.getTimestamp() + 1);
         Slice upperBound = new Slice(keyBytes);
-        // Build readOptions
         readOptions.setIterateLowerBound(lowerBound);
         readOptions.setIterateUpperBound(upperBound);
+        // Recover the timestamp postfix in the key bytes
+        writeLongBE(keyBytes, offset, key.getTimestamp());
+        return keyBytes;
     }
 
     // Extract rowId from key
     protected static long extractRowIdFromKey(byte[] keyBytes)
     {
         // Extract rowId portion (last 8 bytes of key)
-        byte[] rowIdBytes = new byte[Long.BYTES];
-        System.arraycopy(keyBytes, keyBytes.length - Long.BYTES, rowIdBytes, 0, Long.BYTES);
-
-        // Convert rowId to long
-        return ByteBuffer.wrap(rowIdBytes).getLong();
+        return ByteBuffer.wrap(keyBytes).getLong(keyBytes.length - Long.BYTES);
     }
 }

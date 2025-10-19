@@ -43,14 +43,12 @@ public class ReadOptionsThreadFactory implements ThreadFactory
      * Keep weak references to all threads created by this factory
      * for cleanup on JVM shutdown.
      */
-    private final Set<Thread> createdThreads =
-            Collections.newSetFromMap(new WeakHashMap<>());
+    private final Set<Thread> createdThreads = Collections.newSetFromMap(new WeakHashMap<>());
 
     /**
      * Thread-local ReadOptions for each thread.
      */
-    private final ThreadLocal<ReadOptions> threadLocalReadOptions =
-            ThreadLocal.withInitial(ReadOptions::new);
+    private final ThreadLocal<ReadOptions> threadLocalReadOptions = ThreadLocal.withInitial(ReadOptions::new);
 
     public ReadOptionsThreadFactory()
     {
@@ -62,23 +60,31 @@ public class ReadOptionsThreadFactory implements ThreadFactory
     public Thread newThread(Runnable r)
     {
         Thread thread = delegate.newThread(() -> {
-            try {
+            try
+            {
                 r.run();
-            } finally {
+            }
+            finally
+            {
                 // When the thread exits, close its ReadOptions
                 ReadOptions opt = threadLocalReadOptions.get();
-                if (opt != null) {
-                    try {
+                if (opt != null)
+                {
+                    try
+                    {
                         opt.close();
-                    } catch (Exception ignored) {
+                    }
+                    catch (Exception ignored)
+                    {
                         // ignore cleanup errors
-                    } finally {
+                    }
+                    finally
+                    {
                         threadLocalReadOptions.remove();
                     }
                 }
             }
         });
-
         createdThreads.add(thread);
         return thread;
     }
@@ -105,10 +111,15 @@ public class ReadOptionsThreadFactory implements ThreadFactory
                 ReadOptions opt = threadLocalReadOptions.get();
                 if (opt != null)
                 {
-                    try {
+                    try
+                    {
                         opt.close();
-                    } catch (Exception ignored) {
-                    } finally {
+                    }
+                    catch (Exception ignored)
+                    {
+                    }
+                    finally
+                    {
                         threadLocalReadOptions.remove();
                     }
                 }
