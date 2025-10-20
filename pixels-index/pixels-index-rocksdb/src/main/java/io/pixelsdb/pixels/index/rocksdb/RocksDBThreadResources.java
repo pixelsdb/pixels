@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class RocksDBThreadResources
 {
-    private static final ThreadLocal<ThreadId> threadIds = new ThreadLocal<>();
+    private static final ThreadLocal<ThreadId> threadIds = ThreadLocal.withInitial(ThreadId::new);
     /**
      * Thread-local ReadOptions for each thread.
      */
