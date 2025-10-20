@@ -50,7 +50,7 @@ final class RocksDBThreadResources
     private static final int DEFAULT_KEY_LENGTH = 32;
     private static final int VALUE_LENGTH = 8;
 
-    protected static final ByteBuffer EMPTY_VALUE_BUFFER = ByteBuffer.allocateDirect(0);
+    static final ByteBuffer EMPTY_VALUE_BUFFER = ByteBuffer.allocateDirect(0);
 
     static
     {
