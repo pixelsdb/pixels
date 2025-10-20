@@ -152,7 +152,7 @@ public class FileWriterManager
     /**
      * Create a background thread to write the block of data responsible in minio to a file
      */
-    public CompletableFuture<Void> finish() {
+    public CompletableFuture<Void> finish(int hashCode) {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         new Thread(() -> {
@@ -166,6 +166,8 @@ public class FileWriterManager
                      *
                      */
                     ByteBuffer data = objectStorageManager.read(this.tableId, blockId);
+                    System.out.printf("Read Table %d entry %d MD5 %s identity %d\n",
+                            this.tableId, blockId, Md5Util.md5(data), hashCode);
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();

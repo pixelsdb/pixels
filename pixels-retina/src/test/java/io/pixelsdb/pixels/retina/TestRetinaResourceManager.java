@@ -23,6 +23,8 @@ import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
+
 public class TestRetinaResourceManager
 {
     private final RetinaResourceManager retinaResourceManager = RetinaResourceManager.Instance();
@@ -68,13 +70,13 @@ public class TestRetinaResourceManager
         }
     }
 
-    private byte[][] createTpchNationRow(int nationKey, String name, int regionKey, String comment)
+    private byte[][] createTpchNationRow(long nationKey, String name, long regionKey, String comment)
     {
         byte[][] row  = new byte[4][];
-        row[0] = String.valueOf(nationKey).getBytes();
-        row[1] = name.getBytes();
-        row[2] = String.valueOf(regionKey).getBytes();
-        row[3] = comment.getBytes();
+        row[0] = ByteBuffer.allocate(8).putLong(nationKey).array();  // bigint
+        row[1] = name.getBytes();                                      // char(25)
+        row[2] = ByteBuffer.allocate(8).putLong(regionKey).array();  // bigint
+        row[3] = comment.getBytes();                                   // varchar(152)
         return row;
     }
 

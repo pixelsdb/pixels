@@ -271,7 +271,10 @@ public class PixelsWriterBuffer
             {
                 // put into minio
                 long id = flushMemTable.getId();
-                this.objectStorageManager.write(this.tableId, id, flushMemTable.serialize());
+                byte[] data = flushMemTable.serialize();
+                System.out.printf("Write Table %d Entry %d MD5 %s Identity %d\n",
+                        this.tableId, id, Md5Util.md5(data), System.identityHashCode(this));
+                this.objectStorageManager.write(this.tableId, id, data);
 
                 ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getFileId(),
                         flushMemTable.getStartIndex(), flushMemTable.getLength());
@@ -339,7 +342,7 @@ public class PixelsWriterBuffer
                     FileWriterManager fileWriterManager = iterator.next();
                     if (fileWriterManager.getLastBlockId() <= this.maxObjectKey.get())
                     {
-                        CompletableFuture<Void> finished = fileWriterManager.finish();
+                        CompletableFuture<Void> finished = fileWriterManager.finish(System.identityHashCode(this));
                         iterator.remove();
 
                         // update super version
@@ -426,7 +429,7 @@ public class PixelsWriterBuffer
                     iterator.remove();
                 }
             }
-            this.currentFileWriterManager.finish().get();
+            this.currentFileWriterManager.finish(0).get();
 
             // process the remaining fileWriterManager
             for (FileWriterManager fileWriterManager : this.fileWriterManagers)
@@ -437,7 +440,7 @@ public class PixelsWriterBuffer
                 // all written to minio
                 if (lastBlockId <= maxObjectKey)
                 {
-                    futures.add(fileWriterManager.finish());
+                    futures.add(fileWriterManager.finish(0));
                 } else
                 {
                     // process elements in immutable memTable
@@ -455,7 +458,7 @@ public class PixelsWriterBuffer
 
                     // elements in minio will be processed in finish() later
                     fileWriterManager.setLastBlockId(maxObjectKey);
-                    futures.add(fileWriterManager.finish());
+                    futures.add(fileWriterManager.finish(0));
                 }
             }
         } catch (Exception e)
