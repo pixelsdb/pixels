@@ -134,7 +134,9 @@ public class RocksDBIndex implements SinglePointIndex
                 {
                     long rowId = extractRowIdFromKey(keyFound);
                     if (rowId < 0)
+                    {
                         break;
+                    }
                     builder.add(rowId);
                     iterator.prev();
                 }
@@ -252,10 +254,10 @@ public class RocksDBIndex implements SinglePointIndex
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
             if(unique)
             {
+                builder.add(this.getUniqueRowId(key));
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
-                builder.add(this.getUniqueRowId(key));
                 rocksDB.put(writeOptions, keyBuffer, valueBuffer);
             }
             else
@@ -282,10 +284,10 @@ public class RocksDBIndex implements SinglePointIndex
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
+                builder.add(this.getUniqueRowId(key));
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
-                builder.add(this.getUniqueRowId(key));
                 writeBatch.put(keyBuffer, valueBuffer);
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -310,10 +312,10 @@ public class RocksDBIndex implements SinglePointIndex
 
                 if(unique)
                 {
+                    builder.add(this.getUniqueRowId(key));
                     ByteBuffer keyBuffer = toKeyBuffer(key);
                     ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                     valueBuffer.putLong(rowId).position(0);
-                    builder.add(this.getUniqueRowId(key));
                     writeBatch.put(keyBuffer, valueBuffer);
                 }
                 else
@@ -358,15 +360,15 @@ public class RocksDBIndex implements SinglePointIndex
         {
             if(unique)
             {
-                ByteBuffer keyBuffer = toKeyBuffer(key);
-                ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
-                valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
                 long rowId = getUniqueRowId(key);
                 if(rowId < 0) // indicates there is a delete before put
                 {
                     return ImmutableList.of();
                 }
                 builder.add(rowId);
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+                valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
                 rocksDB.put(writeOptions, keyBuffer, valueBuffer);
             }
             else
@@ -399,15 +401,15 @@ public class RocksDBIndex implements SinglePointIndex
             {
                 if(unique)
                 {
-                    ByteBuffer keyBuffer = toKeyBuffer(key);
-                    ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
-                    valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
                     long rowId = getUniqueRowId(key);
                     if(rowId < 0) // indicates there is a delete before put
                     {
                         return ImmutableList.of();
                     }
                     builder.add(rowId);
+                    ByteBuffer keyBuffer = toKeyBuffer(key);
+                    ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+                    valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
                     writeBatch.put(keyBuffer, valueBuffer);
                 }
                 else
@@ -516,18 +518,6 @@ public class RocksDBIndex implements SinglePointIndex
         return true;
     }
 
-    protected static void writeLongBE(byte[] buf, int offset, long value)
-    {
-        buf[offset]     = (byte)(value >>> 56);
-        buf[offset + 1] = (byte)(value >>> 48);
-        buf[offset + 2] = (byte)(value >>> 40);
-        buf[offset + 3] = (byte)(value >>> 32);
-        buf[offset + 4] = (byte)(value >>> 24);
-        buf[offset + 5] = (byte)(value >>> 16);
-        buf[offset + 6] = (byte)(value >>> 8);
-        buf[offset + 7] = (byte)(value);
-    }
-
     protected static ByteBuffer toBuffer(long indexId, ByteString key, long postValue, int bufferNum)
             throws SinglePointIndexException
     {
@@ -600,10 +590,11 @@ public class RocksDBIndex implements SinglePointIndex
     {
         ByteBuffer lowerBoundBuffer = toBuffer(key.getIndexId(), key.getKey(), 0, 2);
         // Build lower bound (timestamp = 0)
-        DirectSlice lowerBound = new DirectSlice(lowerBoundBuffer);
+        // Issue #1174: due to a bug in rocksdbjni, we much set the buffer length to create DirectSlice correctly.
+        DirectSlice lowerBound = new DirectSlice(lowerBoundBuffer, lowerBoundBuffer.limit());
         // Build upper bound (timestamp = timestamp + 1)
         ByteBuffer upperBoundBuffer = toBuffer(key.getIndexId(), key.getKey(), key.getTimestamp() + 1, 3);
-        DirectSlice upperBound = new DirectSlice(upperBoundBuffer);
+        DirectSlice upperBound = new DirectSlice(upperBoundBuffer, upperBoundBuffer.limit());
         readOptions.setIterateLowerBound(lowerBound);
         readOptions.setIterateUpperBound(upperBound);
     }

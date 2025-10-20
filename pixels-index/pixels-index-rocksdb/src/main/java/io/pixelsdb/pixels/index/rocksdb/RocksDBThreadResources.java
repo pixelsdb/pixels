@@ -154,5 +154,8 @@ final class RocksDBThreadResources
         threadReadOptions.clear();
         threadValueBuffers.clear();
         threadKeyBuffers.clear();
+        threadKeyBuffers2.clear();
+        threadKeyBuffers3.clear();
+        threadKeyBuffers4.clear();
     }
 }
