@@ -38,6 +38,8 @@ import java.util.List;
  */
 public class RocksDBIndex implements SinglePointIndex
 {
+    private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+
     private final RocksDB rocksDB;
     private final String rocksDBPath;
     private final WriteOptions writeOptions;
@@ -164,7 +166,7 @@ public class RocksDBIndex implements SinglePointIndex
                 // Create composite key
                 byte[] nonUniqueKey = toNonUniqueKeyBytes(key, rowId);
                 // Store in RocksDB
-                rocksDB.put(nonUniqueKey, new byte[0]);
+                rocksDB.put(nonUniqueKey, EMPTY_BYTE_ARRAY);
             }
             return true;
         }
@@ -225,7 +227,7 @@ public class RocksDBIndex implements SinglePointIndex
                 else
                 {
                     byte[] nonUniqueKey = toNonUniqueKeyBytes(key, rowId);
-                    writeBatch.put(nonUniqueKey, new byte[0]);
+                    writeBatch.put(nonUniqueKey, EMPTY_BYTE_ARRAY);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -280,7 +282,7 @@ public class RocksDBIndex implements SinglePointIndex
                 builder.addAll(this.getRowIds(key));
                 // Write to RocksDB
                 byte[] nonUniqueKey = toNonUniqueKeyBytes(key, rowId);
-                rocksDB.put(nonUniqueKey, new byte[0]);
+                rocksDB.put(nonUniqueKey, EMPTY_BYTE_ARRAY);
             }
             return builder.build();
         }
@@ -348,7 +350,7 @@ public class RocksDBIndex implements SinglePointIndex
                     builder.addAll(this.getRowIds(key));
                     // Write to RocksDB
                     byte[] nonUniqueKey = toNonUniqueKeyBytes(key, rowId);
-                    writeBatch.put(nonUniqueKey, new byte[0]);
+                    writeBatch.put(nonUniqueKey, EMPTY_BYTE_ARRAY);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -406,7 +408,7 @@ public class RocksDBIndex implements SinglePointIndex
                 }
                 builder.addAll(rowIds);
                 byte[] nonUniqueKey = toNonUniqueKeyBytes(key, -1L);
-                rocksDB.put(nonUniqueKey, new byte[0]);
+                rocksDB.put(nonUniqueKey, EMPTY_BYTE_ARRAY);
             }
             return builder.build();
         }
@@ -448,7 +450,7 @@ public class RocksDBIndex implements SinglePointIndex
                     }
                     builder.addAll(rowIds);
                     byte[] nonUniqueKey = toNonUniqueKeyBytes(key, -1L);
-                    writeBatch.put(nonUniqueKey, new byte[0]);
+                    writeBatch.put(nonUniqueKey, EMPTY_BYTE_ARRAY);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
