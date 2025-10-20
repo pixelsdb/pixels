@@ -33,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.rocksdb.Options;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
@@ -42,7 +43,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.pixelsdb.pixels.index.rocksdb.RocksDBIndex.toKeyBytes;
+import static io.pixelsdb.pixels.index.rocksdb.RocksDBIndex.toKeyBuffer;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TestRocksDBIndex
@@ -95,15 +96,17 @@ public class TestRocksDBIndex
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-        byte[] keyBytes = toKeyBytes(keyProto);
+        ByteBuffer keyBuffer = toKeyBuffer(keyProto);
         boolean success = rocksDBIndex.putEntry(keyProto, rowId);
         assertTrue(success, "putEntry should return true");
 
+        ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+        ReadOptions readOptions = new ReadOptions();
         // Assert index has been written to rocksDB
-        byte[] storedValue = rocksDB.get(keyBytes);
-        assertNotNull(storedValue);
+        int ret = rocksDB.get(readOptions, keyBuffer, valueBuffer);
+        assertTrue(ret != RocksDB.NOT_FOUND);
 
-        long storedRowId = ByteBuffer.wrap(storedValue).getLong();
+        long storedRowId = valueBuffer.getLong();
         assertEquals(rowId, storedRowId);
     }
 
@@ -141,10 +144,12 @@ public class TestRocksDBIndex
         for (int i = 0; i < entries.size(); i++)
         {
             IndexProto.PrimaryIndexEntry entry = entries.get(i);
-            byte[] keyBytes = toKeyBytes(entry.getIndexKey());
-            byte[] storedValue = rocksDB.get(keyBytes);
-            assertNotNull(storedValue);
-            long storedRowId = ByteBuffer.wrap(storedValue).getLong();
+            ByteBuffer keyBuffer = toKeyBuffer(entry.getIndexKey());
+            ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+            ReadOptions readOptions = new ReadOptions();
+            int ret = rocksDB.get(readOptions, keyBuffer, valueBuffer);
+            assertTrue(ret != RocksDB.NOT_FOUND);
+            long storedRowId = valueBuffer.getLong();
             assertEquals(i* 1000L, storedRowId);
         }
     }
@@ -342,9 +347,11 @@ public class TestRocksDBIndex
                     .setKey(ByteString.copyFrom(key))
                     .setTimestamp(timestamps[i])
                     .build();
-
-            byte[] storedValue = rocksDB.get(toKeyBytes(keyProto));
-            assertNotNull(storedValue, "Before purge: key version " + i + " should exist");
+            ByteBuffer keyBuffer = toKeyBuffer(keyProto);
+            ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+            ReadOptions readOptions = new ReadOptions();
+            int ret = rocksDB.get(readOptions, keyBuffer, valueBuffer);
+            assertTrue(ret != RocksDB.NOT_FOUND, "Before purge: key version " + i + " should exist");
         }
 
         // use latest version to purge
@@ -368,8 +375,11 @@ public class TestRocksDBIndex
                     .setKey(ByteString.copyFrom(key))
                     .setTimestamp(timestamps[i])
                     .build();
-            byte[] storedValue = rocksDB.get(toKeyBytes(keyProto));
-            assertNull(storedValue, "After purge: key version " + i + " should be deleted");
+            ByteBuffer keyBuffer = toKeyBuffer(keyProto);
+            ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+            ReadOptions readOptions = new ReadOptions();
+            int ret = rocksDB.get(readOptions, keyBuffer, valueBuffer);
+            assertEquals(RocksDB.NOT_FOUND, ret, "After purge: key version " + i + " should be deleted");
         }
 
         System.out.println("Purged RowIds: " + purgedRowIds);
