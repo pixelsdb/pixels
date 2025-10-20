@@ -37,6 +37,8 @@ public class LocalIndexService implements IndexService
         return defaultInstance;
     }
 
+    private LocalIndexService() {}
+
     @Override
     public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws IndexException
     {
@@ -57,10 +59,8 @@ public class LocalIndexService implements IndexService
         {
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
-
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
-
             long rowId = singlePointIndex.getUniqueRowId(key);
             if (rowId >= 0)
             {
@@ -134,7 +134,6 @@ public class LocalIndexService implements IndexService
             IndexProto.IndexKey key = entry.getIndexKey();
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
-
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
             // Insert into single point index

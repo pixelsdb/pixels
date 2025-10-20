@@ -96,7 +96,7 @@
         <dep.awssdk.version>2.30.17</dep.awssdk.version>
         <dep.jedis.version>4.2.0</dep.jedis.version>
         <dep.gcp.version>26.1.2</dep.gcp.version>
-        <dep.rocksdb.version>9.10.0</dep.rocksdb.version>
+        <dep.rocksdb.version>10.2.1</dep.rocksdb.version>
         <dep.sqlite.version>3.50.2.0</dep.sqlite.version>
 
         <!-- common libraries -->

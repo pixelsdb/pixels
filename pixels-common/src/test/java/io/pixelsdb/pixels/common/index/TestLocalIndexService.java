@@ -43,7 +43,7 @@ class TestLocalIndexService
     @BeforeAll
     static void setup() throws Exception
     {
-        indexService = new LocalIndexService();
+        indexService = LocalIndexService.Instance();
 
         // open index
         assertTrue(indexService.openIndex(TABLE_ID, PRIMARY_INDEX_ID, true));
