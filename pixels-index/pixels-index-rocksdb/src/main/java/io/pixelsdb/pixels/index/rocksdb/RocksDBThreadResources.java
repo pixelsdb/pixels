@@ -36,15 +36,16 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class RocksDBThreadResources
 {
+    private static final ThreadLocal<ThreadId> threadIds = new ThreadLocal<>();
     /**
      * Thread-local ReadOptions for each thread.
      */
-    private static final Map<Long, ReadOptions> threadReadOptions = new ConcurrentHashMap<>();
-    private static final Map<Long, ByteBuffer> threadKeyBuffers = new ConcurrentHashMap<>();
-    private static final Map<Long, ByteBuffer> threadKeyBuffers2 = new ConcurrentHashMap<>();
-    private static final Map<Long, ByteBuffer> threadKeyBuffers3 = new ConcurrentHashMap<>();
-    private static final Map<Long, ByteBuffer> threadKeyBuffers4 = new ConcurrentHashMap<>();
-    private static final Map<Long, ByteBuffer> threadValueBuffers = new ConcurrentHashMap<>();
+    private static final Map<ThreadId, ReadOptions> threadReadOptions = new ConcurrentHashMap<>();
+    private static final Map<ThreadId, ByteBuffer> threadKeyBuffers = new ConcurrentHashMap<>();
+    private static final Map<ThreadId, ByteBuffer> threadKeyBuffers2 = new ConcurrentHashMap<>();
+    private static final Map<ThreadId, ByteBuffer> threadKeyBuffers3 = new ConcurrentHashMap<>();
+    private static final Map<ThreadId, ByteBuffer> threadKeyBuffers4 = new ConcurrentHashMap<>();
+    private static final Map<ThreadId, ByteBuffer> threadValueBuffers = new ConcurrentHashMap<>();
 
     private static final int DEFAULT_KEY_LENGTH = 32;
     private static final int VALUE_LENGTH = 8;
@@ -64,7 +65,7 @@ final class RocksDBThreadResources
      */
     static ReadOptions getReadOptions()
     {
-        long threadId = Thread.currentThread().getId();
+        ThreadId threadId = threadIds.get();
         ReadOptions readOptions = threadReadOptions.get(threadId);
         if (readOptions == null)
         {
@@ -80,8 +81,7 @@ final class RocksDBThreadResources
      */
     static ByteBuffer getKeyBuffer(int length)
     {
-        long threadId = Thread.currentThread().getId();
-        return internalGetKeyBuffer(threadId, threadKeyBuffers, length);
+        return internalGetKeyBuffer(threadKeyBuffers, length);
     }
 
     /**
@@ -89,8 +89,7 @@ final class RocksDBThreadResources
      */
     static ByteBuffer getKeyBuffer2(int length)
     {
-        long threadId = Thread.currentThread().getId();
-        return internalGetKeyBuffer(threadId, threadKeyBuffers2, length);
+        return internalGetKeyBuffer(threadKeyBuffers2, length);
     }
 
     /**
@@ -98,8 +97,7 @@ final class RocksDBThreadResources
      */
     static ByteBuffer getKeyBuffer3(int length)
     {
-        long threadId = Thread.currentThread().getId();
-        return internalGetKeyBuffer(threadId, threadKeyBuffers3, length);
+        return internalGetKeyBuffer(threadKeyBuffers3, length);
     }
 
     /**
@@ -107,12 +105,12 @@ final class RocksDBThreadResources
      */
     static ByteBuffer getKeyBuffer4(int length)
     {
-        long threadId = Thread.currentThread().getId();
-        return internalGetKeyBuffer(threadId, threadKeyBuffers4, length);
+        return internalGetKeyBuffer(threadKeyBuffers4, length);
     }
 
-    static ByteBuffer internalGetKeyBuffer(long threadId, Map<Long, ByteBuffer> keyBuffers, int length)
+    static ByteBuffer internalGetKeyBuffer(Map<ThreadId, ByteBuffer> keyBuffers, int length)
     {
+        ThreadId threadId = threadIds.get();
         ByteBuffer keyBuffer = keyBuffers.get(threadId);
         // no need to add a lock as concurrent threads have unique thread ids
         if (keyBuffer == null)
@@ -135,7 +133,7 @@ final class RocksDBThreadResources
      */
     static ByteBuffer getValueBuffer()
     {
-        long threadId = Thread.currentThread().getId();
+        ThreadId threadId = threadIds.get();
         ByteBuffer valueBuffer = threadValueBuffers.get(threadId);
         // no need to add a lock as concurrent threads have unique thread ids
         if (valueBuffer == null)
@@ -157,5 +155,34 @@ final class RocksDBThreadResources
         threadKeyBuffers2.clear();
         threadKeyBuffers3.clear();
         threadKeyBuffers4.clear();
+    }
+
+    private static class ThreadId implements Comparable<ThreadId>
+    {
+        private final long threadId;
+
+        public ThreadId()
+        {
+            this.threadId = Thread.currentThread().getId();
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            ThreadId that = (ThreadId) obj;
+            return this.threadId == that.threadId;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Long.hashCode(threadId);
+        }
+
+        @Override
+        public int compareTo(ThreadId that)
+        {
+            return Long.compare(this.threadId, that.threadId);
+        }
     }
 }
