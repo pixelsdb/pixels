@@ -63,11 +63,13 @@ public class RocksDBFactory
         // 3. Prepare column family descriptors
         List<ColumnFamilyDescriptor> descriptors = existingColumnFamilies.stream()
                 .map(name -> {
+                    ConfigFactory config = ConfigFactory.Instance();
+                    long writeBufferSize = Long.parseLong(config.getProperty("index.rocksdb.write.buffer.size"));
                     BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
                     tableConfig.setFilterPolicy(new BloomFilter(10, false));
                     tableConfig.setWholeKeyFiltering(false);
                     ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
-                    cfOptions.setWriteBufferSize(6 * 1024 * 1024 * 1024L); // 6 GB
+                    cfOptions.setWriteBufferSize(writeBufferSize);
                     cfOptions.setMemtablePrefixBloomSizeRatio(0.1);
                     cfOptions.setTableFormatConfig(tableConfig);
                     return new ColumnFamilyDescriptor(name, cfOptions);

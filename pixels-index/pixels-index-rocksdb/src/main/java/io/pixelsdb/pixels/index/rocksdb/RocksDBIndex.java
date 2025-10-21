@@ -120,23 +120,6 @@ public class RocksDBIndex implements SinglePointIndex
             }
         }
         return rowId;
-//        // Get prefix
-//        byte[] keyBytes = toKeyBytes(key);
-//        long timestamp = key.getTimestamp();
-//        byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
-//        ReadOptions readOptions = readOptionsFactory.getReadOptions();
-//        setIteratorBounds(readOptions, copyBytes, timestamp + 1);
-//        long rowId = -1L;
-//        try (RocksIterator iterator = rocksDB.newIterator(readOptions))
-//        {
-//            iterator.seekForPrev(keyBytes);
-//            if (iterator.isValid())
-//            {
-//                byte[] valueBytes = iterator.value();
-//                rowId = ByteBuffer.wrap(valueBytes).getLong();
-//            }
-//        }
-//        return rowId;
     }
 
     @Override
