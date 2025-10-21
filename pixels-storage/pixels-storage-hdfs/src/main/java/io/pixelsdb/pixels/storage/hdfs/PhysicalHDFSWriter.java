@@ -28,6 +28,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 /**
@@ -94,7 +95,14 @@ public class PhysicalHDFSWriter implements PhysicalWriter
     @Override
     public long append(ByteBuffer buffer) throws IOException
     {
-        buffer.flip();
+        /**
+         * Issue #217:
+         * For compatibility reasons if this code is compiled by jdk>=9 but executed in jvm8.
+         *
+         * In jdk8, ByteBuffer.flip() is extended from Buffer.flip(), but in jdk11, different kind of ByteBuffer
+         * has its own flip implementation and may lead to errors.
+         */
+        ((Buffer)buffer).flip();
         int length = buffer.remaining();
         return append(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
     }

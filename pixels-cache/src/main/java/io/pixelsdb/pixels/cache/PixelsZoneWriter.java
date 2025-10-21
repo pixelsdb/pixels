@@ -25,6 +25,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
@@ -184,7 +185,14 @@ public class PixelsZoneWriter
             nodeBuffer.putLong(childId);
         }
         byte[] nodeBytes = new byte[node.getChildren().size() * 8];
-        nodeBuffer.flip();
+        /**
+         * Issue #217:
+         * For compatibility reasons if this code is compiled by jdk>=9 but executed in jvm8.
+         *
+         * In jdk8, ByteBuffer.flip() is extended from Buffer.flip(), but in jdk11, different kind of ByteBuffer
+         * has its own flip implementation and may lead to errors.
+         */
+        ((Buffer)nodeBuffer).flip();
         nodeBuffer.get(nodeBytes);
         indexFile.setBytes(currentIndexOffset, nodeBytes); // children
         currentIndexOffset += nodeBytes.length;
