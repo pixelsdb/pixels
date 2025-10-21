@@ -102,6 +102,7 @@ public class RocksDBIndex implements SinglePointIndex
     {
         byte[] keyBytes = toKeyBytes(key);
         ReadOptions readOptions = readOptionsFactory.getReadOptions();
+        readOptions.setPrefixSameAsStart(true);
         long rowId = -1L;
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
