@@ -50,6 +50,7 @@ import static java.util.Objects.requireNonNull;
 public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServiceImplBase
 {
     private static final Logger logger = LogManager.getLogger(RetinaServerImpl.class);
+
     private final MetadataService metadataService;
     private final IndexService indexService;
     private final RetinaResourceManager retinaResourceManager;
