@@ -100,23 +100,42 @@ public class RocksDBIndex implements SinglePointIndex
     @Override
     public long getUniqueRowId(IndexProto.IndexKey key)
     {
-        // Get prefix
         byte[] keyBytes = toKeyBytes(key);
-        long timestamp = key.getTimestamp();
-        byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
         ReadOptions readOptions = readOptionsFactory.getReadOptions();
-        setIteratorBounds(readOptions, copyBytes, timestamp + 1);
         long rowId = -1L;
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
-            iterator.seekForPrev(keyBytes);
+            iterator.seek(keyBytes);
+
             if (iterator.isValid())
             {
-                byte[] valueBytes = iterator.value();
-                rowId = ByteBuffer.wrap(valueBytes).getLong();
+                byte[] currentKeyBytes = iterator.key();
+                byte[] keyPrefix = Arrays.copyOf(keyBytes, keyBytes.length - Long.BYTES);
+                if (startsWith(currentKeyBytes, keyPrefix))
+                {
+                    byte[] valueBytes = iterator.value();
+                    rowId = ByteBuffer.wrap(valueBytes).getLong();
+                }
             }
         }
         return rowId;
+//        // Get prefix
+//        byte[] keyBytes = toKeyBytes(key);
+//        long timestamp = key.getTimestamp();
+//        byte[] copyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+//        ReadOptions readOptions = readOptionsFactory.getReadOptions();
+//        setIteratorBounds(readOptions, copyBytes, timestamp + 1);
+//        long rowId = -1L;
+//        try (RocksIterator iterator = rocksDB.newIterator(readOptions))
+//        {
+//            iterator.seekForPrev(keyBytes);
+//            if (iterator.isValid())
+//            {
+//                byte[] valueBytes = iterator.value();
+//                rowId = ByteBuffer.wrap(valueBytes).getLong();
+//            }
+//        }
+//        return rowId;
     }
 
     @Override
@@ -586,7 +605,7 @@ public class RocksDBIndex implements SinglePointIndex
     // Convert IndexKey to byte array
     protected static byte[] toKeyBytes(IndexProto.IndexKey key)
     {
-        return toBytes(key.getIndexId(), key.getKey(), key.getTimestamp());
+        return toBytes(key.getIndexId(), key.getKey(), Long.MAX_VALUE - key.getTimestamp());
     }
 
     // Create composite key with rowId
