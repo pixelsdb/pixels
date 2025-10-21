@@ -26,6 +26,8 @@ import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.rocksdb.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,6 +42,8 @@ import static io.pixelsdb.pixels.index.rocksdb.RocksDBThreadResources.EMPTY_VALU
  */
 public class RocksDBIndex implements SinglePointIndex
 {
+    private static final Logger indexLogger = LoggerFactory.getLogger("index");
+
     private final RocksDB rocksDB;
     private final String rocksDBPath;
     private final WriteOptions writeOptions;
@@ -166,6 +170,12 @@ public class RocksDBIndex implements SinglePointIndex
                 ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
                 rocksDB.put(writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
+            indexLogger.info("P\t{}\t{}\t{}\t{}\t{}",
+                    tableId,
+                    indexId,
+                    key.getKey().asReadOnlyByteBuffer().getInt(),
+                    key.getTimestamp(),
+                    rowId);
             return true;
         }
         catch (RocksDBException e)
@@ -187,6 +197,13 @@ public class RocksDBIndex implements SinglePointIndex
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
                 writeBatch.put(keyBuffer, valueBuffer);
+                indexLogger.info("P\t{}\t{}\t{}\t{}\t{}",
+                        tableId,
+                        indexId,
+                        entry.getIndexKey().getKey().asReadOnlyByteBuffer().getInt(),
+                        entry.getIndexKey().getTimestamp(),
+                        entry.getRowId()
+                );
             }
             rocksDB.write(writeOptions, writeBatch);
             return true;
@@ -238,6 +255,13 @@ public class RocksDBIndex implements SinglePointIndex
             ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
             valueBuffer.putLong(rowId).position(0);
             rocksDB.put(writeOptions, keyBuffer, valueBuffer);
+            indexLogger.info("U\t{}\t{}\t{}\t{}\t{}",
+                    tableId,
+                    indexId,
+                    key.getKey().asReadOnlyByteBuffer().getInt(),
+                    key.getTimestamp(),
+                    rowId
+            );
             return prevRowId;
         }
         catch (RocksDBException e)
@@ -289,6 +313,13 @@ public class RocksDBIndex implements SinglePointIndex
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
                 writeBatch.put(keyBuffer, valueBuffer);
+                indexLogger.info("U\t{}\t{}\t{}\t{}\t{}",
+                        tableId,
+                        indexId,
+                        key.getKey().asReadOnlyByteBuffer().getInt(),
+                        key.getTimestamp(),
+                        rowId
+                );
             }
             rocksDB.write(writeOptions, writeBatch);
             return builder.build();
@@ -399,6 +430,11 @@ public class RocksDBIndex implements SinglePointIndex
             // Delete single point index
             for(IndexProto.IndexKey key : keys)
             {
+                indexLogger.info("D\t{}\t{}\t{}\t{}",
+                        tableId,
+                        indexId,
+                        key.getKey().asReadOnlyByteBuffer().getInt(),
+                        key.getTimestamp());
                 if(unique)
                 {
                     long rowId = getUniqueRowId(key);
