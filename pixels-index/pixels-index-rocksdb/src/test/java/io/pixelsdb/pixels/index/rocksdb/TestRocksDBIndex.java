@@ -52,7 +52,8 @@ public class TestRocksDBIndex
     private final String rocksDBpath = "/tmp/rocksdb";
     private final long tableId = 100L;
     private final long indexId = 100L;
-    private SinglePointIndex rocksDBIndex; // Class under test
+    private SinglePointIndex uniqueRocksDBIndex;
+    private SinglePointIndex nonUniqueRocksDBIndex;
 
     @BeforeEach
     public void setUp() throws RocksDBException
@@ -80,9 +81,14 @@ public class TestRocksDBIndex
         System.out.println("Debug: Creating RocksDBIndex.."); // Debug log
         Options options = new Options().setCreateIfMissing(true);
         rocksDB = RocksDB.open(options, rocksDBpath);
-        rocksDBIndex = new RocksDBIndex(tableId, indexId, rocksDB, rocksDBpath, true);
-        System.out.println("Debug: RocksDBIndex instance: " + rocksDBIndex); // Check for null
-        assertNotNull(rocksDBIndex);
+        uniqueRocksDBIndex = new RocksDBIndex(tableId, indexId, rocksDB, rocksDBpath, true);
+        nonUniqueRocksDBIndex = new RocksDBIndex(tableId, indexId + 1, rocksDB, rocksDBpath, false);
+
+        System.out.println("Debug: uniqueRocksDBIndex instance: " + uniqueRocksDBIndex); // Check for null
+        System.out.println("Debug: nonUniqueRocksDBIndex instance: " + uniqueRocksDBIndex); // Check for null
+
+        assertNotNull(uniqueRocksDBIndex);
+        assertNotNull(nonUniqueRocksDBIndex);
     }
 
     @Test
@@ -96,10 +102,10 @@ public class TestRocksDBIndex
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-        ByteBuffer keyBuffer = toKeyBuffer(keyProto);
-        boolean success = rocksDBIndex.putEntry(keyProto, rowId);
+        boolean success = uniqueRocksDBIndex.putEntry(keyProto, rowId);
         assertTrue(success, "putEntry should return true");
 
+        ByteBuffer keyBuffer = toKeyBuffer(keyProto);
         ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
         ReadOptions readOptions = new ReadOptions();
         // Assert index has been written to rocksDB
@@ -137,7 +143,7 @@ public class TestRocksDBIndex
             entries.add(entry);
         }
 
-        boolean success = rocksDBIndex.putPrimaryEntries(entries);
+        boolean success = uniqueRocksDBIndex.putPrimaryEntries(entries);
         assertTrue(success, "putEntries should return true");
 
         // Assert every index has been written to rocksDB
@@ -171,7 +177,7 @@ public class TestRocksDBIndex
                 .setTimestamp(timestamp1)
                 .build();
 
-        rocksDBIndex.putEntry(key1, rowId1);
+        uniqueRocksDBIndex.putEntry(key1, rowId1);
 
         IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
@@ -179,9 +185,9 @@ public class TestRocksDBIndex
                 .setTimestamp(timestamp2)
                 .build();
 
-        rocksDBIndex.putEntry(key2,rowId2);
+        uniqueRocksDBIndex.putEntry(key2,rowId2);
 
-        long result = rocksDBIndex.getUniqueRowId(key2);
+        long result = uniqueRocksDBIndex.getUniqueRowId(key2);
         assertEquals(rowId2, result, "getUniqueRowId should return the rowId of the latest timestamp entry");
     }
 
@@ -196,8 +202,8 @@ public class TestRocksDBIndex
         long rowId1 = 111L;
         long rowId2 = 222L; // expected
         List<Long> rowIds = new ArrayList<>();
-        rowIds.add(rowId1);
         rowIds.add(rowId2);
+        rowIds.add(rowId1);
 
         IndexProto.IndexKey key1 = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
@@ -205,7 +211,7 @@ public class TestRocksDBIndex
                 .setTimestamp(timestamp1)
                 .build();
 
-        rocksDBIndex.putEntry(key1, rowId1);
+        nonUniqueRocksDBIndex.putEntry(key1, rowId1);
 
         IndexProto.IndexKey key2 = IndexProto.IndexKey.newBuilder()
                 .setIndexId(indexId)
@@ -213,9 +219,9 @@ public class TestRocksDBIndex
                 .setTimestamp(timestamp2)
                 .build();
 
-        rocksDBIndex.putEntry(key2,rowId2);
+        nonUniqueRocksDBIndex.putEntry(key2,rowId2);
 
-        List<Long> result = rocksDBIndex.getRowIds(key2);
+        List<Long> result = nonUniqueRocksDBIndex.getRowIds(key2);
         assertEquals(rowIds, result, "getRowIds should return the rowId of all entry");
     }
 
@@ -228,9 +234,9 @@ public class TestRocksDBIndex
         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder().setIndexId(indexId)
                 .setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-        rocksDBIndex.putEntry(keyProto, 0L);
+        uniqueRocksDBIndex.putEntry(keyProto, 0L);
         // Delete index
-        List<Long> rets = rocksDBIndex.deleteEntry(keyProto);
+        List<Long> rets = uniqueRocksDBIndex.deleteEntry(keyProto);
         // Assert return value
         for(long ret : rets)
         {
@@ -265,10 +271,10 @@ public class TestRocksDBIndex
             entries.add(entry);
         }
 
-        rocksDBIndex.putPrimaryEntries(entries);
+        uniqueRocksDBIndex.putPrimaryEntries(entries);
 
         // delete Indexes
-        List<Long> ret = rocksDBIndex.deleteEntries(keyList);
+        List<Long> ret = uniqueRocksDBIndex.deleteEntries(keyList);
         assertNotNull(ret, "deleteEntries should return true");
     }
 
@@ -283,14 +289,14 @@ public class TestRocksDBIndex
         long updatedRowId = 200L;
 
         // Put initial entry
-        rocksDBIndex.putEntry(indexKey, initialRowId);
+        uniqueRocksDBIndex.putEntry(indexKey, initialRowId);
 
         // Update entry
-        long prevRowId = rocksDBIndex.updatePrimaryEntry(indexKey, updatedRowId);
+        long prevRowId = uniqueRocksDBIndex.updatePrimaryEntry(indexKey, updatedRowId);
         assertEquals(initialRowId, prevRowId, "Previous rowId should match the one inserted before");
 
         // Verify the updated value
-        long actualRowId = rocksDBIndex.getUniqueRowId(indexKey);
+        long actualRowId = uniqueRocksDBIndex.getUniqueRowId(indexKey);
         assertEquals(updatedRowId, actualRowId, "RowId should be updated correctly");
     }
 
@@ -305,15 +311,15 @@ public class TestRocksDBIndex
         long updatedRowId = 600L;
 
         // Put initial entry
-        rocksDBIndex.putEntry(indexKey, initialRowId);
+        uniqueRocksDBIndex.putEntry(indexKey, initialRowId);
 
         // Update entry
-        List<Long> prevRowIds = rocksDBIndex.updateSecondaryEntry(indexKey, updatedRowId);
+        List<Long> prevRowIds = uniqueRocksDBIndex.updateSecondaryEntry(indexKey, updatedRowId);
         assertEquals(1, prevRowIds.size());
         assertEquals(initialRowId, prevRowIds.get(0));
 
         // Verify the new value
-        long actualRowId = rocksDBIndex.getUniqueRowId(indexKey);
+        long actualRowId = uniqueRocksDBIndex.getUniqueRowId(indexKey);
         assertEquals(updatedRowId, actualRowId);
     }
 
@@ -336,7 +342,7 @@ public class TestRocksDBIndex
                     .setKey(ByteString.copyFrom(key))
                     .setTimestamp(timestamps[i])
                     .build();
-            rocksDBIndex.putEntry(keyProto, rowIds[i]);
+            uniqueRocksDBIndex.putEntry(keyProto, rowIds[i]);
         }
 
         // check entry exist
@@ -364,7 +370,7 @@ public class TestRocksDBIndex
         List<IndexProto.IndexKey> purgeList = new ArrayList<>();
         purgeList.add(purgeKey);
 
-        List<Long> purgedRowIds = rocksDBIndex.purgeEntries(purgeList);
+        List<Long> purgedRowIds = uniqueRocksDBIndex.purgeEntries(purgeList);
 
         assertEquals(3, purgedRowIds.size(), "All three versions should be purged");
 
@@ -405,14 +411,14 @@ public class TestRocksDBIndex
                     .setTimestamp(timestamp)
                     .build();
 
-            rocksDBIndex.putEntry(keyProto, i);
+            uniqueRocksDBIndex.putEntry(keyProto, i);
             builder.add(keyProto);
         }
         // get rowId
         long start = System.nanoTime();
         for (IndexProto.IndexKey keyProto : builder.build())
         {
-            rocksDBIndex.getUniqueRowId(keyProto);
+            uniqueRocksDBIndex.getUniqueRowId(keyProto);
         }
         long end = System.nanoTime();
         double durationMs = (end - start) / 1_000_000.0;
@@ -436,7 +442,7 @@ public class TestRocksDBIndex
                     .setTimestamp(timestamp)
                     .build();
 
-            rocksDBIndex.putEntry(keyProto, i);
+            uniqueRocksDBIndex.putEntry(keyProto, i);
         }
         long end = System.nanoTime();
         double durationMs = (end - start) / 1_000_000.0;
@@ -463,7 +469,7 @@ public class TestRocksDBIndex
                     .setTimestamp(timestamp)
                     .build();
 
-            rocksDBIndex.putEntry(keyProto, i);
+            uniqueRocksDBIndex.putEntry(keyProto, i);
             builder.add(keyProto);
         }
 
@@ -471,7 +477,7 @@ public class TestRocksDBIndex
         long start = System.nanoTime();
         for (IndexProto.IndexKey keyProto : builder.build())
         {
-            rocksDBIndex.deleteEntry(keyProto);
+            uniqueRocksDBIndex.deleteEntry(keyProto);
         }
         long end = System.nanoTime();
         double durationMs = (end - start) / 1_000_000.0;
