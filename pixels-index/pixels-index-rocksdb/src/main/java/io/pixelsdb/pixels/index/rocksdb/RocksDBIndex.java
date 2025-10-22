@@ -107,9 +107,13 @@ public class RocksDBIndex implements SinglePointIndex
             iterator.seek(keyBuffer);
             if (iterator.isValid())
             {
-                ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
-                iterator.value(valueBuffer);
-                rowId = valueBuffer.getLong();
+                ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
+                if (startsWith(keyFound, keyBuffer))
+                {
+                    ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+                    iterator.value(valueBuffer);
+                    rowId = valueBuffer.getLong();
+                }
             }
         }
         return rowId;
@@ -120,13 +124,12 @@ public class RocksDBIndex implements SinglePointIndex
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
-        setIteratorBounds(readOptions, key);
+        readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
         // Use RocksDB iterator for prefix search
         try (RocksIterator iterator = rocksDB.newIterator(readOptions))
         {
-            iterator.seekForPrev(keyBuffer);
-            // Search in reverse order if index entry isn't deleted.
+            iterator.seek(keyBuffer);
             while (iterator.isValid())
             {
                 ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
@@ -138,7 +141,7 @@ public class RocksDBIndex implements SinglePointIndex
                         break;
                     }
                     builder.add(rowId);
-                    iterator.prev();
+                    iterator.next();
                 }
                 else
                 {
@@ -441,13 +444,12 @@ public class RocksDBIndex implements SinglePointIndex
         {
             for (IndexProto.IndexKey key : indexKeys)
             {
-                toKeyBuffer(key);
                 ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
-                setIteratorBounds(readOptions, key);
+                readOptions.setPrefixSameAsStart(true);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 try (RocksIterator iterator = rocksDB.newIterator(readOptions))
                 {
-                    iterator.seekForPrev(keyBuffer);
+                    iterator.seek(keyBuffer);
                     while (iterator.isValid())
                     {
                         ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
@@ -455,13 +457,15 @@ public class RocksDBIndex implements SinglePointIndex
                         {
                             if(unique)
                             {
-                                long rowId = ByteBuffer.wrap(iterator.value()).getLong();
+                                ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+                                iterator.value(valueBuffer);
+                                long rowId = valueBuffer.getLong();
                                 if(rowId > 0)
                                     builder.add(rowId);
                             }
                             // keyFound is not direct, must use its backing array
                             writeBatch.delete(keyFound.array());
-                            iterator.prev();
+                            iterator.next();
                         }
                         else
                         {
@@ -560,7 +564,7 @@ public class RocksDBIndex implements SinglePointIndex
     // Create composite key with rowId
     protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        return toBuffer(key.getIndexId(), key.getKey(), rowId, 1);
+        return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - rowId, 1);
     }
 
     // Check if byte array starts with specified prefix
@@ -581,29 +585,10 @@ public class RocksDBIndex implements SinglePointIndex
         return keyFound1.compareTo(keyCurrent1) == 0;
     }
 
-    /**
-     * Set iterator bounds in the read options to [indexId_keyString_0, indexId_keyString_ts+1) and return the key bytes
-     * of indexId_keyString_ts that can be further used to seek to in the iterator.
-     * @param readOptions the read options
-     * @param key the index key
-     */
-    protected static void setIteratorBounds(ReadOptions readOptions, IndexProto.IndexKey key) throws SinglePointIndexException
-    {
-        ByteBuffer lowerBoundBuffer = toBuffer(key.getIndexId(), key.getKey(), 0, 2);
-        // Build lower bound (timestamp = 0)
-        // Issue #1174: due to a bug in rocksdbjni, we much set the buffer length to create DirectSlice correctly.
-        DirectSlice lowerBound = new DirectSlice(lowerBoundBuffer, lowerBoundBuffer.limit());
-        // Build upper bound (timestamp = timestamp + 1)
-        ByteBuffer upperBoundBuffer = toBuffer(key.getIndexId(), key.getKey(), key.getTimestamp() + 1, 3);
-        DirectSlice upperBound = new DirectSlice(upperBoundBuffer, upperBoundBuffer.limit());
-        readOptions.setIterateLowerBound(lowerBound);
-        readOptions.setIterateUpperBound(upperBound);
-    }
-
     // Extract rowId from key
     protected static long extractRowIdFromKey(ByteBuffer keyBuffer)
     {
         // Extract rowId portion (last 8 bytes of key)
-        return keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
+        return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
     }
 }
