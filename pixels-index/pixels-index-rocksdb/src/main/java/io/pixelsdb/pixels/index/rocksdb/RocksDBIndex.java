@@ -237,6 +237,8 @@ public class RocksDBIndex implements SinglePointIndex
         try
         {
             long prevRowId = getUniqueRowId(key);
+            if (prevRowId < 0)
+                return prevRowId;
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
             valueBuffer.putLong(rowId).position(0);
@@ -257,7 +259,12 @@ public class RocksDBIndex implements SinglePointIndex
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
             if(unique)
             {
-                builder.add(this.getUniqueRowId(key));
+                long prevRowId = getUniqueRowId(key);
+                if (prevRowId < 0)   // no previous row ids are found
+                {
+                    return ImmutableList.of();
+                }
+                builder.add(prevRowId);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
@@ -266,6 +273,10 @@ public class RocksDBIndex implements SinglePointIndex
             else
             {
                 builder.addAll(this.getRowIds(key));
+                if (builder.build().isEmpty())  // no previous row ids are found
+                {
+                    return ImmutableList.of();
+                }
                 ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
                 rocksDB.put(writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
@@ -287,7 +298,12 @@ public class RocksDBIndex implements SinglePointIndex
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-                builder.add(this.getUniqueRowId(key));
+                long prevRowId = getUniqueRowId(key);
+                if (prevRowId < 0)  // indicates that this entry hasn't put or has been deleted
+                {
+                    return ImmutableList.of();
+                }
+                builder.add(prevRowId);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
@@ -315,7 +331,12 @@ public class RocksDBIndex implements SinglePointIndex
 
                 if(unique)
                 {
-                    builder.add(this.getUniqueRowId(key));
+                    long prevRowId = getUniqueRowId(key);
+                    if (prevRowId < 0)
+                    {
+                        return ImmutableList.of();
+                    }
+                    builder.add(prevRowId);
                     ByteBuffer keyBuffer = toKeyBuffer(key);
                     ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                     valueBuffer.putLong(rowId).position(0);
@@ -324,6 +345,10 @@ public class RocksDBIndex implements SinglePointIndex
                 else
                 {
                     builder.addAll(this.getRowIds(key));
+                    if (builder.build().isEmpty())
+                    {
+                        return ImmutableList.of();
+                    }
                     ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
                     writeBatch.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
