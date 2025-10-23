@@ -148,7 +148,7 @@ public interface SinglePointIndex extends Closeable
      * <b>Note: this method does not check the existence of the entry.<b/> For entries not found or deleted, update equals to put.
      * @param key the index key
      * @param rowId the row id in the table
-     * @return previous rowId if the index entry is update successfully, or negative if now previous row id is found
+     * @return previous rowId if the index entry is update successfully, or negative if no previous row id is found
      * @throws SinglePointIndexException
      */
     long updatePrimaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
@@ -169,7 +169,7 @@ public interface SinglePointIndex extends Closeable
      * <br/>
      * <b>Note: this method does not check the existence of the entry.<b/> For entries not found or deleted, update equals to put.
      * @param entries the primary index entries
-     * @return list of previous rowIds if the index entries are update successfully, or empty if no previous index entry is found or any key
+     * @return list of previous rowIds if the index entries are update successfully, or empty if no previous index entry is found for any key
      * @throws SinglePointIndexException
      */
     List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
