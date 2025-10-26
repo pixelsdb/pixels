@@ -358,4 +358,17 @@ public class SinglePointIndexFactory
             return this.indexId == that.indexId && this.tableId == that.tableId;
         }
     }
+
+    public synchronized void printCacheStats()
+    {
+        for (Map.Entry<TableIndex, SinglePointIndex> entry : singlePointIndexImpls.entrySet())
+        {
+            SinglePointIndex spi = entry.getValue();
+            if (spi instanceof CachingSinglePointIndex)
+            {
+                CachingSinglePointIndex cachingSPI = (CachingSinglePointIndex) spi;
+                System.out.println(cachingSPI.getCacheStats());
+            }
+        }
+    }
 }

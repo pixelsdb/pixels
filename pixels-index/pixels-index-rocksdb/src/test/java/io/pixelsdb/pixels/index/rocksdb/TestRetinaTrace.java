@@ -29,6 +29,7 @@ import org.junit.jupiter.api.BeforeAll;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -238,6 +239,7 @@ public class TestRetinaTrace
     @Test
     public void testIndex()
     {
+        System.out.println("pid: " + ManagementFactory.getRuntimeMXBean().getName().split("@")[0]);
         System.out.println("Loading baseTrace...");
         List<TraceOperation> operations = new ArrayList<>();
         long putCount = 0, delCount = 0;
@@ -325,5 +327,7 @@ public class TestRetinaTrace
         System.out.printf("DELETE throughput:       %,.2f ops/sec\n", deleteThroughput);
         System.out.printf("Total throughput:        %,.2f ops/sec\n", totalThroughput);
         System.out.println("------------------------------------\n");
+
+        indexService.printCacheHint();
     }
 }

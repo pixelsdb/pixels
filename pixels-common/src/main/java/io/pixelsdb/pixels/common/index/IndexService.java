@@ -214,5 +214,6 @@ public interface IndexService
      */
     boolean removeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
 
+    void printCacheHint();
 }
 
