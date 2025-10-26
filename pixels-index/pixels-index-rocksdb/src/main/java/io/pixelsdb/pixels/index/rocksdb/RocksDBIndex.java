@@ -180,7 +180,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
+    public boolean putPrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         try (WriteBatch writeBatch = new WriteBatch())
         {
@@ -203,7 +203,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
+    public boolean putSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -254,7 +254,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    public List<Long> updateSecondaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try
         {
@@ -291,7 +291,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
+    public List<Long> updatePrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         try (WriteBatch writeBatch = new WriteBatch())
         {
@@ -321,7 +321,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public List<Long> updateSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
+    public List<Long> updateSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -383,7 +383,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    public List<Long> deleteEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try
@@ -421,7 +421,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public List<Long> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
+    public List<Long> deleteEntriesInternal(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try(WriteBatch writeBatch = new WriteBatch())
@@ -464,7 +464,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
+    public List<Long> purgeEntriesInternal(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try (WriteBatch writeBatch = new WriteBatch())
