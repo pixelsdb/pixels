@@ -531,10 +531,4 @@ public class RPCIndexService implements IndexService
         }
         return true;
     }
-
-    @Override
-    public void printCacheHint()
-    {
-
-    }
 }

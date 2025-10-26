@@ -327,7 +327,5 @@ public class TestRetinaTrace
         System.out.printf("DELETE throughput:       %,.2f ops/sec\n", deleteThroughput);
         System.out.printf("Total throughput:        %,.2f ops/sec\n", totalThroughput);
         System.out.println("------------------------------------\n");
-
-        indexService.printCacheHint();
     }
 }

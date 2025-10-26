@@ -24,22 +24,9 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.common.index.LatestVersionCache.CacheEntry;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 public abstract class CachingSinglePointIndex implements SinglePointIndex
 {
     protected final LatestVersionCache cache;
-    private final AtomicLong hits = new AtomicLong(0);
-    private final AtomicLong requests = new AtomicLong(0);
-
-    public String getCacheStats()
-    {
-        long req = requests.get();
-        long hit = hits.get();
-        double hitRate = req == 0 ? 0.0 : (double) hit / req * 100.0;
-        return String.format("Index[%d] Cache Stats: Requests=%d, Hits=%d, HitRate=%.2f%%",
-                getTableId(), req, hit, hitRate);
-    }
 
     public CachingSinglePointIndex()
     {
@@ -60,13 +47,11 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
     @Override
     public long getUniqueRowId(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        requests.incrementAndGet();
         if (cache != null)
         {
             CacheEntry cacheEntry = cache.get(key);
             if (cacheEntry != null && cacheEntry.timestamp <= key.getTimestamp())
             {
-                hits.incrementAndGet();
                 return cacheEntry.rowId;
             }
         }

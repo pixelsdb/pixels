@@ -601,10 +601,4 @@ public class LocalIndexService implements IndexService
             throw new IndexException("Failed to remove index for tableId=" + tableId + ", indexId=" + indexId, e);
         }
     }
-
-    @Override
-    public void printCacheHint()
-    {
-        SinglePointIndexFactory.Instance().printCacheStats();
-    }
 }

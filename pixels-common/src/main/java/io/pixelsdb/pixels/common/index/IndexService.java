@@ -213,7 +213,5 @@ public interface IndexService
      * @return true on success
      */
     boolean removeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
-
-    void printCacheHint();
 }
 
