@@ -19,8 +19,8 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Cache;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.Objects;
@@ -84,7 +84,7 @@ public class LatestVersionCache
 
     public LatestVersionCache(long maximumSize, long expireAfterAccessSeconds)
     {
-        this.cache = CacheBuilder.newBuilder()
+        this.cache = Caffeine.newBuilder()
                 .maximumSize(maximumSize)
                 .expireAfterAccess(expireAfterAccessSeconds, TimeUnit.SECONDS)
                 .build();
