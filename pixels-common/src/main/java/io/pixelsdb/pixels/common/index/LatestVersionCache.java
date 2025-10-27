@@ -97,7 +97,17 @@ public class LatestVersionCache
 
     public void put(IndexProto.IndexKey key, long rowId)
     {
-        cache.put(new CacheKey(key), new CacheEntry(rowId, key.getTimestamp()));
+        CacheKey cacheKey = new CacheKey(key);
+        long newTimestamp = key.getTimestamp();
+        cache.asMap().compute(cacheKey, (k, existingEntry) -> {
+            if (existingEntry == null || newTimestamp >= existingEntry.timestamp)
+            {
+                return new CacheEntry(rowId, newTimestamp);
+            } else
+            {
+                return existingEntry;
+            }
+        });
     }
 
     public void invalidate(IndexProto.IndexKey key)
