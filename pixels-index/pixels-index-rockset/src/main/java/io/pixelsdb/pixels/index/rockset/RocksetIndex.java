@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.index.rockset;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.index.CachingSinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -31,7 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-public class RocksetIndex implements SinglePointIndex
+public class RocksetIndex extends CachingSinglePointIndex
 {
     private final RocksetIndexStub stub = new RocksetIndexStub();
 
@@ -187,7 +187,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public long getUniqueRowId(IndexProto.IndexKey key)
+    public long getUniqueRowIdInternal(IndexProto.IndexKey key)
     {
         byte[] prefix = toByteArray(key); // indexId + key (NO timestamp)
         long ts = key.getTimestamp();
@@ -255,7 +255,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    public boolean putEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try
         {
@@ -280,7 +280,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
+    public boolean putPrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries)
             throws SinglePointIndexException
     {
         long wb = 0;
@@ -314,7 +314,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
+    public boolean putSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
         long wb = 0;
         try
@@ -355,7 +355,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public long updatePrimaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    public long updatePrimaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try
         {
@@ -373,7 +373,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    public List<Long> updateSecondaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try
         {
@@ -401,7 +401,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
+    public List<Long> updatePrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         long wb = 0;
         try
@@ -439,7 +439,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updateSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
+    public List<Long> updateSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
         long wb = 0;
         try
@@ -492,7 +492,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public long deleteUniqueEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    public long deleteUniqueEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         try
         {
@@ -511,7 +511,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    public List<Long> deleteEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         long wb = 0;
         try
@@ -560,7 +560,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
+    public List<Long> deleteEntriesInternal(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
         long wb = 0;
         try
@@ -611,7 +611,7 @@ public class RocksetIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
+    public List<Long> purgeEntriesInternal(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         long wb = 0;

@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.index.rocksdb;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.index.CachingSinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.rocksdb.*;
@@ -38,7 +38,7 @@ import static io.pixelsdb.pixels.index.rocksdb.RocksDBThreadResources.EMPTY_VALU
  * @author hank, Rolland1944
  * @create 2025-02-09
  */
-public class RocksDBIndex implements SinglePointIndex
+public class RocksDBIndex extends CachingSinglePointIndex
 {
     private final RocksDB rocksDB;
     private final String rocksDBPath;
@@ -52,6 +52,7 @@ public class RocksDBIndex implements SinglePointIndex
 
     public RocksDBIndex(long tableId, long indexId, boolean unique) throws RocksDBException
     {
+        super();
         this.tableId = tableId;
         this.indexId = indexId;
         // Initialize RocksDB instance
@@ -71,6 +72,7 @@ public class RocksDBIndex implements SinglePointIndex
     @Deprecated
     protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB, String rocksDBPath, boolean unique)
     {
+        super();
         this.tableId = tableId;
         this.indexId = indexId;
         this.rocksDBPath = rocksDBPath;
@@ -99,7 +101,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long getUniqueRowId(IndexProto.IndexKey key) throws SinglePointIndexException
+    public long getUniqueRowIdInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
         readOptions.setPrefixSameAsStart(true);
@@ -160,7 +162,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    public boolean putEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try
         {
@@ -185,7 +187,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
+    public boolean putPrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         try (WriteBatch writeBatch = new WriteBatch())
         {
@@ -208,7 +210,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
+    public boolean putSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -239,7 +241,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long updatePrimaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    public long updatePrimaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try
         {
@@ -259,7 +261,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    public List<Long> updateSecondaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         try
         {
@@ -296,7 +298,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
+    public List<Long> updatePrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         try (WriteBatch writeBatch = new WriteBatch())
         {
@@ -326,7 +328,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updateSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
+    public List<Long> updateSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
         try(WriteBatch writeBatch = new WriteBatch())
         {
@@ -370,7 +372,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public long deleteUniqueEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    public long deleteUniqueEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         long rowId = getUniqueRowId(key);
         try
@@ -388,7 +390,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
+    public List<Long> deleteEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try
@@ -426,7 +428,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
+    public List<Long> deleteEntriesInternal(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try(WriteBatch writeBatch = new WriteBatch())
@@ -469,7 +471,7 @@ public class RocksDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
+    public List<Long> purgeEntriesInternal(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try (WriteBatch writeBatch = new WriteBatch())
