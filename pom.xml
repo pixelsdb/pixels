@@ -133,6 +133,9 @@
         <dep.async-profiler.version>2.9</dep.async-profiler.version>
         <dep.commons-net.version>3.9.0</dep.commons-net.version>
 
+        <!--cache-->
+        <dep.caffeine.version>2.9.3</dep.caffeine.version>
+
         <!-- logging -->
         <!-- log4j-2.18.0 is compatible with slf4j-1.7.36 -->
         <dep.log4j.version>2.18.0</dep.log4j.version>
@@ -892,6 +895,13 @@
                 <groupId>commons-net</groupId>
                 <artifactId>commons-net</artifactId>
                 <version>${dep.commons-net.version}</version>
+            </dependency>
+
+            <!-- cache -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${dep.caffeine.version}</version>
             </dependency>
 
             <!-- testing -->

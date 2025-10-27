@@ -34,8 +34,8 @@ public class TestCachingSinglePointIndex
 {
     private CachingSinglePointIndex index;
     public final int threadNum = 16;
-    public final int dataGenPerThread = 10_000_000;
-    public final int opsPerThread = 1000_000;
+    public final int dataGenPerThread = 200_000;
+    public final int opsPerThread = 10_000;
 
     public static void main(String[] args)
     {
