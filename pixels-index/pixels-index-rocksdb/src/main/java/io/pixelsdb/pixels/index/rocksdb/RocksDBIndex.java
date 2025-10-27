@@ -43,6 +43,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     private final RocksDB rocksDB;
     private final String rocksDBPath;
     private final WriteOptions writeOptions;
+    private final ColumnFamilyHandle columnFamilyHandle;
     private final long tableId;
     private final long indexId;
     private final boolean unique;
@@ -59,6 +60,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         this.rocksDB = RocksDBFactory.getRocksDB();
         this.unique = unique;
         this.writeOptions = new WriteOptions();
+        this.columnFamilyHandle = RocksDBFactory.getOrCreateColumnFamily(tableId, indexId);
     }
 
     /**
@@ -77,6 +79,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         this.rocksDB = rocksDB;  // Use injected mock directly
         this.unique = unique;
         this.writeOptions = new WriteOptions();
+        this.columnFamilyHandle = RocksDBFactory.getDefaultColumnFamily();
     }
 
     @Override
@@ -104,7 +107,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
         long rowId = -1L;
-        try (RocksIterator iterator = rocksDB.newIterator(readOptions))
+        try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
         {
             iterator.seek(keyBuffer);
             if (iterator.isValid())
@@ -117,6 +120,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
                     rowId = valueBuffer.getLong();
                 }
             }
+        } catch (Exception e)
+        {
+            throw new SinglePointIndexException("Error reading from RocksDB CF for tableId="
+                    + tableId + ", indexId=" + indexId, e);
         }
         return rowId;
     }
@@ -129,7 +136,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
         // Use RocksDB iterator for prefix search
-        try (RocksIterator iterator = rocksDB.newIterator(readOptions))
+        try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
         {
             iterator.seek(keyBuffer);
             while (iterator.isValid())
@@ -164,12 +171,12 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
-                rocksDB.put(writeOptions, keyBuffer, valueBuffer);
+                rocksDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             }
             else
             {
                 ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
-                rocksDB.put(writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                rocksDB.put(columnFamilyHandle, writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
             return true;
         }
@@ -191,7 +198,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
-                writeBatch.put(keyBuffer, valueBuffer);
+                writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
             }
             rocksDB.write(writeOptions, writeBatch);
             return true;
@@ -216,12 +223,12 @@ public class RocksDBIndex extends CachingSinglePointIndex
                     ByteBuffer keyBuffer = toKeyBuffer(key);
                     ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                     valueBuffer.putLong(rowId).position(0);
-                    writeBatch.put(keyBuffer, valueBuffer);
+                    writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
                 }
                 else
                 {
                     ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
-                    writeBatch.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                    writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -244,7 +251,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
             valueBuffer.putLong(rowId).position(0);
-            rocksDB.put(writeOptions, keyBuffer, valueBuffer);
+            rocksDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             return prevRowId;
         }
         catch (RocksDBException e)
@@ -270,7 +277,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
-                rocksDB.put(writeOptions, keyBuffer, valueBuffer);
+                rocksDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             }
             else
             {
@@ -280,7 +287,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                     return ImmutableList.of();
                 }
                 ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
-                rocksDB.put(writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                rocksDB.put(columnFamilyHandle, writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
             return builder.build();
         }
@@ -309,7 +316,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
-                writeBatch.put(keyBuffer, valueBuffer);
+                writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
             }
             rocksDB.write(writeOptions, writeBatch);
             return builder.build();
@@ -342,7 +349,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                     ByteBuffer keyBuffer = toKeyBuffer(key);
                     ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                     valueBuffer.putLong(rowId).position(0);
-                    writeBatch.put(keyBuffer, valueBuffer);
+                    writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
                 }
                 else
                 {
@@ -352,7 +359,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                         return ImmutableList.of();
                     }
                     ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
-                    writeBatch.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                    writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -373,7 +380,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
             valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
-            rocksDB.put(writeOptions, keyBuffer, valueBuffer);
+            rocksDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             return rowId;
         }
         catch (RocksDBException e)
@@ -399,7 +406,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
-                rocksDB.put(writeOptions, keyBuffer, valueBuffer);
+                rocksDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             }
             else
             {
@@ -410,7 +417,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 }
                 builder.addAll(rowIds);
                 ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, -1L);
-                rocksDB.put(writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                rocksDB.put(columnFamilyHandle, writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
             return builder.build();
         }
@@ -440,7 +447,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                     ByteBuffer keyBuffer = toKeyBuffer(key);
                     ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                     valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
-                    writeBatch.put(keyBuffer, valueBuffer);
+                    writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
                 }
                 else
                 {
@@ -451,7 +458,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                     }
                     builder.addAll(rowIds);
                     ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, -1L);
-                    writeBatch.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                    writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -474,7 +481,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
                 readOptions.setPrefixSameAsStart(true);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
-                try (RocksIterator iterator = rocksDB.newIterator(readOptions))
+                try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
                 {
                     iterator.seek(keyBuffer);
                     while (iterator.isValid())
@@ -491,7 +498,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                                     builder.add(rowId);
                             }
                             // keyFound is not direct, must use its backing array
-                            writeBatch.delete(keyFound.array());
+                            writeBatch.delete(columnFamilyHandle, keyFound.array());
                             iterator.next();
                         }
                         else
