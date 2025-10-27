@@ -348,7 +348,7 @@ public class LocalIndexService implements IndexService
             // Update the entry in the single point index and get the previous row ID
             long prevRowId = singlePointIndex.updatePrimaryEntry(key, indexEntry.getRowId());
             IndexProto.RowLocation prevLocation;
-            if (prevRowId > 0)
+            if (prevRowId >= 0)
             {
                 // Retrieve the previous RowLocation from the main index
                 prevLocation = mainIndex.getLocation(prevRowId);
