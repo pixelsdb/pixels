@@ -38,8 +38,8 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         if (cacheEnabled)
         {
             long capacity = Long.parseLong(config.getProperty("index.cache.capacity"));
-            long expireAfterAccessSeconds = Long.parseLong(config.getProperty("index.cache.expiration.seconds"));
-            this.cache = new LatestVersionCache();
+            long expirationSeconds = Long.parseLong(config.getProperty("index.cache.expiration.seconds"));
+            this.cache = new LatestVersionCache(capacity, expirationSeconds);
         } else
         {
             this.cache = null;

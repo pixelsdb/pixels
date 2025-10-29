@@ -24,24 +24,23 @@ import com.github.benmanes.caffeine.cache.Cache;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class LatestVersionCache
 {
-    private final ConcurrentHashMap<String, String> cache;
+    private final Cache<String, String> cache;
 
-    public LatestVersionCache()
+    public LatestVersionCache(long capacity, long expirationSeconds)
     {
-        this.cache = new ConcurrentHashMap<>();
+        this.cache = Caffeine.newBuilder()
+                .maximumSize(capacity)
+                .expireAfterWrite(expirationSeconds, TimeUnit.SECONDS)
+                .build();
     }
 
     public String get(String key)
     {
-        return cache.get(key);
+        return cache.getIfPresent(key);
     }
 
     public void put(String key, String value)
@@ -51,12 +50,17 @@ public class LatestVersionCache
 
     public void invalidate(String key)
     {
-        cache.remove(key);
+        cache.invalidate(key);
     }
 
     public static String buildCacheKey(IndexProto.IndexKey key)
     {
-        return key.getTableId() + key.getIndexId() + key.getKey().toString(StandardCharsets.ISO_8859_1);
+        String indexKey = key.getKey().toString(StandardCharsets.ISO_8859_1);
+        return new StringBuilder(20 + 20 + indexKey.length())
+                .append(key.getTableId())
+                .append(key.getIndexId())
+                .append(indexKey)
+                .toString();
     }
 
     public static String buildCacheValue(long timestamp, long rowId)
