@@ -23,95 +23,68 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Cache;
 import io.pixelsdb.pixels.index.IndexProto;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class LatestVersionCache
 {
-    private final Cache<CacheKey, CacheEntry> cache;
+    private final ConcurrentHashMap<String, String> cache;
 
-    /**
-     * A wrapper for {@link IndexProto.IndexKey} that is used as a key in the cache.
-     * The {@link #equals(Object)} and {@link #hashCode()} methods are implemented based on
-     * the table ID, index ID, and key value, ignoring the timestamp. This allows cache
-     * lookups to succeed for the same logical key regardless of the transaction timestamp.
-     */
-    private static class CacheKey
+    public LatestVersionCache()
     {
-        private final IndexProto.IndexKey indexKey;
-
-        public CacheKey(IndexProto.IndexKey indexKey)
-        {
-            this.indexKey = indexKey;
-        }
-
-        public IndexProto.IndexKey getIndexKey()
-        {
-            return indexKey;
-        }
-
-        @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            CacheKey other = (CacheKey) o;
-            // Compare based on tableId
-            return indexKey.getTableId() == other.indexKey.getTableId() &&
-                    indexKey.getIndexId() == other.indexKey.getIndexId() &&
-                    Objects.equals(indexKey.getKey(), other.indexKey.getKey());
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Objects.hash(indexKey.getTableId(), indexKey.getIndexId(), indexKey.getKey());
-        }
+        this.cache = new ConcurrentHashMap<>();
     }
 
-    public static class CacheEntry
+    public String get(String key)
     {
-        final long rowId;
-        final long timestamp;
+        return cache.get(key);
+    }
 
-        CacheEntry (long rowId, long timestamp)
+    public void put(String key, String value)
+    {
+        cache.put(key, value);
+    }
+
+    public void invalidate(String key)
+    {
+        cache.remove(key);
+    }
+
+    public static String buildCacheKey(IndexProto.IndexKey key)
+    {
+        return key.getTableId() + key.getIndexId() + key.getKey().toString(StandardCharsets.ISO_8859_1);
+    }
+
+    public static String buildCacheValue(long timestamp, long rowId)
+    {
+        char[] chars = new char[16];
+        for (int i = 0; i < 8; i++)
         {
-            this.rowId = rowId;
-            this.timestamp = timestamp;
+            chars[i] = (char) ((timestamp >> (i * 8)) & 0xFF);
+            chars[8 + i] = (char) ((rowId >> (i * 8)) & 0xFF);
         }
+        return new String(chars);
     }
 
-    public LatestVersionCache(long maximumSize, long expireAfterAccessSeconds)
+    public static long[] parseCacheValue(String value)
     {
-        this.cache = Caffeine.newBuilder()
-                .maximumSize(maximumSize)
-                .expireAfterAccess(expireAfterAccessSeconds, TimeUnit.SECONDS)
-                .build();
-    }
+        if (value == null || value.length() != 16)
+        {
+            return null;
+        }
+        long timestamp = 0;
+        long rowId = 0;
+        char[] chars = value.toCharArray();
 
-    public CacheEntry get(IndexProto.IndexKey key)
-    {
-        return cache.getIfPresent(new CacheKey(key));
-    }
-
-    public void put(IndexProto.IndexKey key, long rowId)
-    {
-        CacheKey cacheKey = new CacheKey(key);
-        long newTimestamp = key.getTimestamp();
-        cache.asMap().compute(cacheKey, (k, existingEntry) -> {
-            if (existingEntry == null || newTimestamp >= existingEntry.timestamp)
-            {
-                return new CacheEntry(rowId, newTimestamp);
-            } else
-            {
-                return existingEntry;
-            }
-        });
-    }
-
-    public void invalidate(IndexProto.IndexKey key)
-    {
-        cache.invalidate(new CacheKey(key));
+        for (int i = 0; i < 8; i++)
+        {
+            timestamp |= (long) (chars[i] & 0xFF) << (i * 8);
+            rowId |= (long) (chars[8 + i] & 0xFF) << (i * 8);
+        }
+        return new long[] { timestamp, rowId };
     }
 }
