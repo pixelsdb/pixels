@@ -90,8 +90,8 @@ public class PixelsWriterBuffer
     // Wait to refresh to shared storage
     private final List<MemTable> immutableMemTables;
 
-    // minio
-    private final MinioManager minioManager;
+    // object storage manager
+    private final ObjectStorageManager objectStorageManager;
     private final List<ObjectEntry> objectEntries;
 
     // Current data view
@@ -145,8 +145,7 @@ public class PixelsWriterBuffer
         this.fileWriterManagers = new ArrayList<>();
         this.maxObjectKey = new AtomicLong(-1);
 
-        // minio
-        this.minioManager = MinioManager.Instance();
+        this.objectStorageManager = ObjectStorageManager.Instance();
 
         this.currentFileWriterManager = new FileWriterManager(
                 this.tableId, this.schema, this.targetOrderedDirPath,
@@ -164,7 +163,7 @@ public class PixelsWriterBuffer
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
         this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize, IndexServiceProvider.ServiceMode.local);
 
-        startFlushMinioToDiskScheduler();
+        startFlushMinioToDiskScheduler(Long.parseLong(configFactory.getProperty("retina.buffer.flush.interval")));
     }
 
     /**
@@ -272,7 +271,7 @@ public class PixelsWriterBuffer
             {
                 // put into minio
                 long id = flushMemTable.getId();
-                this.minioManager.write(this.tableId, id, flushMemTable.serialize());
+                this.objectStorageManager.write(this.tableId, id, flushMemTable.serialize());
 
                 ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getFileId(),
                         flushMemTable.getStartIndex(), flushMemTable.getLength());
@@ -329,7 +328,7 @@ public class PixelsWriterBuffer
      * been written to minio. If it has been written, execute the file write
      * operation and delete the corresponding ObjectEntry in the unified view.
      */
-    private void startFlushMinioToDiskScheduler()
+    private void startFlushMinioToDiskScheduler(long intervalSeconds)
     {
         this.flushDiskFuture = this.flushDiskExecutor.scheduleWithFixedDelay(() -> {
             try
@@ -363,7 +362,7 @@ public class PixelsWriterBuffer
                         {
                             if (objectEntry.unref())
                             {
-                                this.minioManager.delete(this.tableId, objectEntry.getId());
+                                this.objectStorageManager.delete(this.tableId, objectEntry.getId());
                             }
                         }
                     }
@@ -372,7 +371,7 @@ public class PixelsWriterBuffer
             {
                 throw new RuntimeException(e);
             }
-        }, 0, 30, TimeUnit.SECONDS);
+        }, 0, intervalSeconds, TimeUnit.SECONDS);
     }
 
     /**
@@ -486,7 +485,7 @@ public class PixelsWriterBuffer
             for (ObjectEntry objectEntry : sv.getObjectEntries())
             {
                 objectEntry.unref();
-                this.minioManager.delete(this.tableId, objectEntry.getId());
+                this.objectStorageManager.delete(this.tableId, objectEntry.getId());
             }
         }
     }
