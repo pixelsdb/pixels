@@ -377,9 +377,9 @@ public class PixelsWriterBuffer
     /**
      * collect resources
      *
-     * @throws IOException
+     * @throws RetinaException
      */
-    public void close() throws IOException
+    public void close() throws RetinaException
     {
         // First, shut down the flush process to prevent changes to the data view.
         this.flushMinioExecutor.shutdown();
