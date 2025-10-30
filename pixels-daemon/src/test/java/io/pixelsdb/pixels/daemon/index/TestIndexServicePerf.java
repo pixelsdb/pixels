@@ -57,13 +57,14 @@ public class TestIndexServicePerf
     private static Config config;
     private static class Config
     {
-        public final int indexNum = 8;
+        public final int indexNum = 1;
         public final int opsPerTable = 1000000;
         public final boolean destroyBeforeStart = true;
         public final int idRange = 10_000;
         public final int bucketNum = 4;
-        public final AccessMode accessMode = AccessMode.skew;
+        public AccessMode accessMode = AccessMode.uniform;
         public double skewAlpha = 1.0;
+        public String indexScheme = "rocksdb";
 
         public enum AccessMode
         {
@@ -109,7 +110,7 @@ public class TestIndexServicePerf
             tableIds.add(metaTableId);
             Layout latestLayout = metadataService.getLatestLayout(testSchemaName, tableName);
             MetadataProto.SinglePointIndex singlePointIndexProto = MetadataProto.SinglePointIndex.newBuilder()
-                    .setIndexScheme("rocksdb")
+                    .setIndexScheme(config.indexScheme)
                     .setPrimary(true)
                     .setUnique(true)
                     .setTableId(metaTableId)
@@ -138,14 +139,26 @@ public class TestIndexServicePerf
     }
 
     @Test
-    public void setDb() throws MetadataException
+    public void testUniformIndexServicePerf() throws Exception
     {
-
+        fillSequentialData();
+        testMultiThreadUpdate();
     }
 
     @Test
-    public void testIndexServicePerf() throws Exception
+    public void testSkew0_5IndexServicePerf() throws Exception
     {
+        config.accessMode = Config.AccessMode.skew;
+        config.skewAlpha = 0.5;
+        fillSequentialData();
+        testMultiThreadUpdate();
+    }
+
+    @Test
+    public void testSkew1_0IndexServicePerf() throws Exception
+    {
+        config.accessMode = Config.AccessMode.skew;
+        config.skewAlpha = 1.0;
         fillSequentialData();
         testMultiThreadUpdate();
     }
@@ -165,7 +178,7 @@ public class TestIndexServicePerf
                 RowIdAllocator rowIdAllocator = rowIdAllocators.get(threadId);
                 Long tableId = tableIds.get(threadId);
                 Long indexId = indexIds.get(threadId);
-                byte[] k = new byte[RocksDBUtil.KEY_LENGTH];
+                byte[] k = new byte[IndexPerfUtil.KEY_LENGTH];
 
                 for (int i = 0; i < config.idRange; ++i)
                 {
@@ -178,12 +191,12 @@ public class TestIndexServicePerf
                         throw new RuntimeException(e);
                     }
                     IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                            .setFileId(0)
+                            .setFileId(rowId % 10000)
                             .setRgId(0)
                             .setRgRowOffset(i)
                             .build();
 
-                    RocksDBUtil.encodeKey(i, k);
+                    IndexPerfUtil.encodeKey(i, k);
 
                     IndexProto.IndexKey indexKey = IndexProto.IndexKey.newBuilder()
                             .setIndexId(indexId)
@@ -237,7 +250,7 @@ public class TestIndexServicePerf
                 totalOpsCount, sec, (long) (totalOpsCount / sec));
     }
 
-    public static class RocksDBUtil
+    public static class IndexPerfUtil
     {
         private static final int KEY_LENGTH = Integer.BYTES;
         private static final int VALUE_LENGTH = Long.BYTES;       // rowId(8)
@@ -304,7 +317,6 @@ public class TestIndexServicePerf
     {
         private final Long tableId;
         private final Long indexId;
-        private final byte[] putKeyBuffer;
 
         private final List<BlockingQueue<Integer>> buckets;
         private final List<Thread> consumers;
@@ -314,7 +326,6 @@ public class TestIndexServicePerf
         {
             this.tableId = tableIds.get(indexNum);
             this.indexId = indexIds.get(indexNum);
-            this.putKeyBuffer = new byte[RocksDBUtil.KEY_LENGTH];
             this.rowIdAllocator = rowIdAllocators.get(indexNum);
 
             this.buckets = new ArrayList<>(config.bucketNum);
@@ -333,7 +344,7 @@ public class TestIndexServicePerf
                 consumers.add(consumer);
             }
 
-            powerLawCdf = RocksDBUtil.buildSegmentedPowerLawCdf(config.idRange, config.skewAlpha, 1000);
+            powerLawCdf = IndexPerfUtil.buildSegmentedPowerLawCdf(config.idRange, config.skewAlpha, 1000);
 
         }
 
@@ -377,17 +388,17 @@ public class TestIndexServicePerf
             BlockingQueue<Integer> queue = buckets.get(bucketId);
             try
             {
+                byte[] putKeyBuffer = new byte[IndexPerfUtil.KEY_LENGTH];
                 while (true)
                 {
                     int key = queue.take();
                     if (key == -1)
                         break;
-
                     long tQuery = System.currentTimeMillis();
-                    RocksDBUtil.encodeKey(key, putKeyBuffer);
+                    IndexPerfUtil.encodeKey(key, putKeyBuffer);
                     long rowId = rowIdAllocator.getRowId();
                     IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                            .setFileId(0)
+                            .setFileId(rowId % 10000)
                             .setRgId(0)
                             .setRgRowOffset((int)rowId).build();
 
@@ -431,7 +442,7 @@ public class TestIndexServicePerf
                 }
                 case skew:
                 {
-                    return RocksDBUtil.sampleSegmentedPowerLaw(powerLawCdf, config.idRange);
+                    return IndexPerfUtil.sampleSegmentedPowerLaw(powerLawCdf, config.idRange);
                 }
                 default:
                 {
