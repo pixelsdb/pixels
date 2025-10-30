@@ -57,11 +57,11 @@ public class TestIndexServicePerf
     private static Config config;
     private static class Config
     {
-        public final int indexNum = 1;
+        public final int indexNum = 8;
         public final int opsPerTable = 1000000;
         public final boolean destroyBeforeStart = true;
-        public final int idRange = 10_000;
-        public final int bucketNum = 4;
+        public final int idRange = 10_000_000;
+        public final int bucketNum = 8;
         public AccessMode accessMode = AccessMode.uniform;
         public double skewAlpha = 1.0;
         public String indexScheme = "rocksdb";
