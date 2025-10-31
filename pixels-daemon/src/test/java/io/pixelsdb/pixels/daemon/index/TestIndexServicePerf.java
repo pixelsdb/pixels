@@ -15,7 +15,7 @@
  *
  */
 
-package io.pixelsdb.pixels.index.rocksdb;
+package io.pixelsdb.pixels.daemon.index;
 
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
@@ -23,25 +23,29 @@ import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.index.IndexService;
 import io.pixelsdb.pixels.common.index.IndexServiceProvider;
+import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.index.IndexProto;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestIndexServicePerf
 {
+    private static final Logger LOGGER = LogManager.getLogger(TestIndexServicePerf.class);
     private static final IndexService indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
     private static final MetadataService metadataService = MetadataService.Instance();
     private static final String testSchemaName = "testSchema";
@@ -49,7 +53,26 @@ public class TestIndexServicePerf
     private static final String filePath = "file:///tmp/testIndexServicePerf";
     private static final List<Long> tableIds = new ArrayList<>();
     private static final List<Long> indexIds = new ArrayList<>();
+    private static final List<RowIdAllocator> rowIdAllocators = new ArrayList<>();
     private static Config config;
+    private static class Config
+    {
+        public final int indexNum = 8;
+        public final int opsPerTable = 1000000;
+        public final boolean destroyBeforeStart = true;
+        public final int idRange = 10_000_000;
+        public final int bucketNum = 8;
+        public AccessMode accessMode = AccessMode.uniform;
+        public double skewAlpha = 1.0;
+        public String indexScheme = "rocksdb";
+
+        public enum AccessMode
+        {
+            uniform,
+            skew
+        }
+
+    }
 
     @BeforeAll
     static void setup() throws MetadataException
@@ -69,7 +92,7 @@ public class TestIndexServicePerf
             }
         }
 
-        for (int localTableId = 0; localTableId < config.threadNum; localTableId++)
+        for (int localTableId = 0; localTableId < config.indexNum; localTableId++)
         {
             String tableName = testTableName + "_" + localTableId;
             String tableStoragePath = filePath + "/" + tableName;
@@ -87,7 +110,7 @@ public class TestIndexServicePerf
             tableIds.add(metaTableId);
             Layout latestLayout = metadataService.getLatestLayout(testSchemaName, tableName);
             MetadataProto.SinglePointIndex singlePointIndexProto = MetadataProto.SinglePointIndex.newBuilder()
-                    .setIndexScheme("rocksdb")
+                    .setIndexScheme(config.indexScheme)
                     .setPrimary(true)
                     .setUnique(true)
                     .setTableId(metaTableId)
@@ -98,6 +121,8 @@ public class TestIndexServicePerf
             metadataService.createSinglePointIndex(singlePointIndex);
             SinglePointIndex primaryIndex = metadataService.getPrimaryIndex(metaTableId);
             indexIds.add(primaryIndex.getId());
+
+            rowIdAllocators.add(new RowIdAllocator(metaTableId, 1000, IndexServiceProvider.ServiceMode.local));
         }
 
     }
@@ -114,14 +139,26 @@ public class TestIndexServicePerf
     }
 
     @Test
-    public void setDb() throws MetadataException
+    public void testUniformIndexServicePerf() throws Exception
     {
-
+        fillSequentialData();
+        testMultiThreadUpdate();
     }
 
     @Test
-    public void testIndexServicePerf() throws Exception
+    public void testSkew0_5IndexServicePerf() throws Exception
     {
+        config.accessMode = Config.AccessMode.skew;
+        config.skewAlpha = 0.5;
+        fillSequentialData();
+        testMultiThreadUpdate();
+    }
+
+    @Test
+    public void testSkew1_0IndexServicePerf() throws Exception
+    {
+        config.accessMode = Config.AccessMode.skew;
+        config.skewAlpha = 1.0;
         fillSequentialData();
         testMultiThreadUpdate();
     }
@@ -129,28 +166,37 @@ public class TestIndexServicePerf
     private void fillSequentialData() throws Exception
     {
         final long timestamp = 0;
-        System.out.println("Start sequential data load: " + config.idRange + " entries per thread * " + config.threadNum + " threads");
+        System.out.println("Start sequential data load: " + config.idRange + " entries per thread * " + config.indexNum + " threads");
         List<Thread> threads = new ArrayList<>();
         AtomicLong counter = new AtomicLong(0);
 
-        for (int t = 0; t < config.threadNum; ++t)
+        for (int t = 0; t < config.indexNum; ++t)
         {
             final int threadId = t;
             threads.add(new Thread(() ->
             {
+                RowIdAllocator rowIdAllocator = rowIdAllocators.get(threadId);
                 Long tableId = tableIds.get(threadId);
                 Long indexId = indexIds.get(threadId);
-                byte[] k = new byte[RocksDBUtil.KEY_LENGTH];
+                byte[] k = new byte[IndexPerfUtil.KEY_LENGTH];
 
-                for (int rowId = 0; rowId < config.idRange; ++rowId)
+                for (int i = 0; i < config.idRange; ++i)
                 {
-
+                    long rowId = 0;
+                    try
+                    {
+                        rowId = rowIdAllocator.getRowId();
+                    } catch (IndexException e)
+                    {
+                        throw new RuntimeException(e);
+                    }
                     IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                            .setFileId(0)
+                            .setFileId(rowId % 10000)
                             .setRgId(0)
-                            .setRgRowOffset(rowId).build();
+                            .setRgRowOffset(i)
+                            .build();
 
-                    RocksDBUtil.encodeKey(rowId, k);
+                    IndexPerfUtil.encodeKey(i, k);
 
                     IndexProto.IndexKey indexKey = IndexProto.IndexKey.newBuilder()
                             .setIndexId(indexId)
@@ -189,9 +235,9 @@ public class TestIndexServicePerf
         System.err.println("Start update test");
         long start = System.nanoTime();
         List<Thread> threads = new ArrayList<>();
-        for (int i = 0; i < config.threadNum; ++i)
+        for (int i = 0; i < config.indexNum; ++i)
         {
-            threads.add(new Thread(new Worker(tableIds.get(i), indexIds.get(i))));
+            threads.add(new Thread(new Worker(i)));
         }
 
         for (Thread t : threads) t.start();
@@ -199,23 +245,16 @@ public class TestIndexServicePerf
 
         long end = System.nanoTime();
         double sec = (end - start) / 1_000_000_000.0;
-        long totalOpsCount = config.opsPerThread * config.threadNum;
+        long totalOpsCount = config.opsPerTable * config.indexNum;
         System.out.printf("Total ops: %d, time: %.2fs, throughput: %d ops/s%n",
                 totalOpsCount, sec, (long) (totalOpsCount / sec));
     }
 
-    public static class Config
-    {
-        public final int threadNum = 16;
-        public final int opsPerThread = 1000000;
-        public final boolean destroyBeforeStart = true;
-        public final int idRange = 10_000_000;
-    }
-
-    public static class RocksDBUtil
+    public static class IndexPerfUtil
     {
         private static final int KEY_LENGTH = Integer.BYTES;
         private static final int VALUE_LENGTH = Long.BYTES;       // rowId(8)
+        private final Random random = new Random();
 
         private static void putIntLE(byte[] buffer, int value)
         {
@@ -230,50 +269,138 @@ public class TestIndexServicePerf
             putIntLE(buffer, key);
         }
 
-
-        public static long decodeLong(byte[] bytes)
+        public static double[] buildSegmentedPowerLawCdf(int range, double alpha, int segments)
         {
-            if (bytes == null || bytes.length < VALUE_LENGTH)
+            double[] cdf = new double[segments];
+            double segmentSize = (double) range / segments;
+            double sum = 0.0;
+
+            for (int i = 0; i < segments; i++)
             {
-                return -1;
+                double start = i * segmentSize + 1;
+                double end = Math.min(range, (i + 1) * segmentSize);
+                double weight = (1.0 / Math.pow(start, alpha) + 1.0 / Math.pow(end, alpha)) / 2;
+                sum += weight;
+                cdf[i] = sum;
             }
-            return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getLong();
+
+            for (int i = 0; i < segments; i++)
+            {
+                cdf[i] /= sum;
+            }
+            cdf[segments - 1] = 1.0;
+            return cdf;
+        }
+
+        public static int sampleSegmentedPowerLaw(double[] cdf, int range)
+        {
+            double u = ThreadLocalRandom.current().nextDouble();
+            int low = 0, high = cdf.length - 1;
+
+            while (low < high)
+            {
+                int mid = (low + high) >>> 1;
+                if (cdf[mid] >= u)
+                    high = mid;
+                else
+                    low = mid + 1;
+            }
+
+            double segmentSize = (double) range / cdf.length;
+            int start = (int) (low * segmentSize);
+            int end = (int) Math.min(range, (low + 1) * segmentSize);
+            return ThreadLocalRandom.current().nextInt(start, end);
         }
     }
 
     private static class Worker implements Runnable
     {
-
         private final Long tableId;
         private final Long indexId;
-        private final byte[] putKeyBuffer;
-        private long nextRowId;
 
-        public Worker(long tableId, long indexId)
+        private final List<BlockingQueue<Integer>> buckets;
+        private final List<Thread> consumers;
+        private double[] powerLawCdf = null;
+        private final RowIdAllocator rowIdAllocator;
+        public Worker(int indexNum)
         {
-            this.tableId = tableId;
-            this.indexId = indexId;
-            this.nextRowId = config.idRange;
-            this.putKeyBuffer = new byte[RocksDBUtil.KEY_LENGTH];
+            this.tableId = tableIds.get(indexNum);
+            this.indexId = indexIds.get(indexNum);
+            this.rowIdAllocator = rowIdAllocators.get(indexNum);
+
+            this.buckets = new ArrayList<>(config.bucketNum);
+            for (int i = 0; i < config.bucketNum; ++i)
+            {
+                buckets.add(new LinkedBlockingQueue<>());
+            }
+
+            this.consumers = new ArrayList<>(config.bucketNum);
+            for (int i = 0; i < config.bucketNum; ++i)
+            {
+                final int bucketId = i;
+                Thread consumer = new Thread(() -> consumeBucket(bucketId));
+                consumer.setDaemon(true);
+                consumer.start();
+                consumers.add(consumer);
+            }
+
+            powerLawCdf = IndexPerfUtil.buildSegmentedPowerLawCdf(config.idRange, config.skewAlpha, 1000);
+
         }
 
         @Override
         public void run()
         {
-
+            for (int i = 0; i < config.opsPerTable; ++i)
             {
-                for (int i = 0; i < config.opsPerThread; ++i)
+                int key = generateKey(i);
+                int bucketId = key % config.bucketNum;
+
+                try
                 {
-                    int key = i % config.idRange;
+                    buckets.get(bucketId).put(key);
+                } catch (InterruptedException e)
+                {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while enqueuing key", e);
+                }
+            }
+
+            for (BlockingQueue<Integer> q : buckets)
+            {
+                q.add(-1);
+            }
+
+            for (Thread t : consumers)
+            {
+                try
+                {
+                    t.join();
+                } catch (InterruptedException e)
+                {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+
+        private void consumeBucket(int bucketId)
+        {
+            BlockingQueue<Integer> queue = buckets.get(bucketId);
+            try
+            {
+                byte[] putKeyBuffer = new byte[IndexPerfUtil.KEY_LENGTH];
+                while (true)
+                {
+                    int key = queue.take();
+                    if (key == -1)
+                        break;
                     long tQuery = System.currentTimeMillis();
-
-
-                    RocksDBUtil.encodeKey(key, putKeyBuffer);
-
+                    IndexPerfUtil.encodeKey(key, putKeyBuffer);
+                    long rowId = rowIdAllocator.getRowId();
                     IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                            .setFileId(0)
+                            .setFileId(rowId % 10000)
                             .setRgId(0)
-                            .setRgRowOffset((int) nextRowId).build();
+                            .setRgRowOffset((int)rowId).build();
 
                     IndexProto.IndexKey indexKey = IndexProto.IndexKey.newBuilder()
                             .setKey(ByteString.copyFrom(putKeyBuffer))
@@ -285,8 +412,9 @@ public class TestIndexServicePerf
                     IndexProto.PrimaryIndexEntry primaryIndexEntry = IndexProto.PrimaryIndexEntry.newBuilder()
                             .setIndexKey(indexKey)
                             .setRowLocation(rowLocation)
-                            .setRowId(nextRowId++)
+                            .setRowId(rowId)
                             .build();
+
                     try
                     {
                         indexService.updatePrimaryIndexEntry(primaryIndexEntry);
@@ -294,6 +422,31 @@ public class TestIndexServicePerf
                     {
                         throw new RuntimeException(e);
                     }
+                }
+            } catch (InterruptedException e)
+            {
+                Thread.currentThread().interrupt();
+            } catch (IndexException e)
+            {
+                throw new RuntimeException(e);
+            }
+        }
+
+        private int generateKey(int i)
+        {
+            switch (config.accessMode)
+            {
+                case uniform:
+                {
+                    return i % config.idRange;
+                }
+                case skew:
+                {
+                    return IndexPerfUtil.sampleSegmentedPowerLaw(powerLawCdf, config.idRange);
+                }
+                default:
+                {
+                    throw new IllegalArgumentException("Unsupported access mode " + config.accessMode);
                 }
             }
         }
