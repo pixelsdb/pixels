@@ -49,9 +49,11 @@ public class TestObjectStorage
             assert (objectStorageManager.exist(tableId, entryId));
 
             // test read
-            ByteBuffer readBytes = objectStorageManager.read(tableId, entryId);
-            System.out.println(Arrays.toString(readBytes.array()));
-            assert (Arrays.equals(bytes, readBytes.array()));
+            ByteBuffer readBuffer = objectStorageManager.read(tableId, entryId);
+            byte[] readBytes = new byte[readBuffer.remaining()];
+            readBuffer.get(readBytes);
+            System.out.println(Arrays.toString(readBytes));
+            assert (Arrays.equals(bytes, readBytes));
 
             // test delete
             objectStorageManager.delete(tableId, entryId);

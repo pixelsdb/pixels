@@ -35,9 +35,14 @@ public class ObjectStorageManager
     private ObjectStorageManager() throws RetinaException
     {
         ConfigFactory config = ConfigFactory.Instance();
-        this.path = config.getProperty("retina.buffer.object.storage.folder");
-        String storageSchema = config.getProperty("retina.buffer.object.storage.schema");
+        String folder = config.getProperty("retina.buffer.object.storage.folder");
+        if (!folder.endsWith("/"))
+        {
+            folder += "/";
+        }
+        this.path = folder;
 
+        String storageSchema = config.getProperty("retina.buffer.object.storage.schema");
         try
         {
             switch(storageSchema)
