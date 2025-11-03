@@ -157,14 +157,15 @@ public class FileWriterManager
 
         new Thread(() -> {
             try {
-                for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId) {
-                    MinioManager minioManager = MinioManager.Instance();
+                for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId)
+                {
+                    ObjectStorageManager objectStorageManager = ObjectStorageManager.Instance();
                     /**
                      * Issue-1083: Since we obtain a read-only ByteBuffer from the S3 Reader,
                      * we cannot read a byte[]. Instead, we should return the ByteBuffer directly.
                      *
                      */
-                    ByteBuffer data = minioManager.read(this.tableId, blockId);
+                    ByteBuffer data = objectStorageManager.read(this.tableId, blockId);
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();
@@ -175,7 +176,8 @@ public class FileWriterManager
                 metadataService.updateFile(this.file);
 
                 future.complete(null);
-            } catch (Exception e) {
+            } catch (Exception e)
+            {
                 logger.error("Failed to flush to disk file", e);
                 future.completeExceptionally(e);
             }
