@@ -73,9 +73,11 @@ public class RocksDBFactory
 
         // 4. Open DB
         List<ColumnFamilyHandle> handles = new ArrayList<>();
+        int maxBackgroundFlushed = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.max.background.flushes"));
         DBOptions dbOptions = new DBOptions()
                 .setCreateIfMissing(true)
-                .setCreateMissingColumnFamilies(true);
+                .setCreateMissingColumnFamilies(true)
+                .setMaxBackgroundFlushes(maxBackgroundFlushed);
 
         RocksDB db = RocksDB.open(dbOptions, dbPath, descriptors, handles);
 
@@ -92,11 +94,13 @@ public class RocksDBFactory
     {
         ConfigFactory config = ConfigFactory.Instance();
         long writeBufferSize = Long.parseLong(config.getProperty("index.rocksdb.write.buffer.size"));
+        int maxWriteBufferNumber = Integer.parseInt(config.getProperty("index.rocksdb.max.write.buffer.number"));
         BlockBasedTableConfig tableConfig = new BlockBasedTableConfig()
                 .setFilterPolicy(new BloomFilter(10, false))
                 .setWholeKeyFiltering(false);
         ColumnFamilyOptions cfOptions = new ColumnFamilyOptions()
                 .setWriteBufferSize(writeBufferSize)
+                .setMaxWriteBufferNumber(maxWriteBufferNumber)
                 .setMemtablePrefixBloomSizeRatio(0.1)
                 .setTableFormatConfig(tableConfig);
         return new ColumnFamilyDescriptor(name, cfOptions);
