@@ -151,7 +151,7 @@ public class PixelsWriterBuffer
                 this.tableId, this.schema, this.targetOrderedDirPath,
                 this.targetOrderedStorage, this.memTableSize, this.blockSize,
                 this.replication, this.encodingLevel, this.nullsPadding,
-                0, this.memTableSize * this.maxMemTableCount);
+                idCounter, this.memTableSize * this.maxMemTableCount);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
                 TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
