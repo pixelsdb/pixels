@@ -83,7 +83,7 @@ public class ShutdownHookManager
     private final Queue<ShutdownHook> shutdownHooks = new ConcurrentLinkedQueue<>();
 
     public void registerShutdownHook(Class<?> clazz, boolean serial, Runnable runnable)
-    {?
+    {
         this.shutdownHooks.offer(new ShutdownHook(clazz, serial, runnable));
     }
 
