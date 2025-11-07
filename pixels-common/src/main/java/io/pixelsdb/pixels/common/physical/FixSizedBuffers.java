@@ -28,7 +28,7 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
- * @create 2025-09-22
+ * @since 2025-09-22
  */
 public class FixSizedBuffers
 {
@@ -38,6 +38,7 @@ public class FixSizedBuffers
 
     public FixSizedBuffers(int bufferSize)
     {
+        checkArgument(bufferSize > 0, "bufferSize must be positive");
         this.bufferSize = bufferSize;
     }
 
@@ -47,7 +48,6 @@ public class FixSizedBuffers
         if (buffer == null)
         {
             buffer = new byte[bufferSize];
-            this.freeBuffers.add(buffer);
         }
         return buffer;
     }
@@ -57,7 +57,7 @@ public class FixSizedBuffers
         requireNonNull(buffer, "buffer cannot be null");
         checkArgument(buffer.length == this.bufferSize,
                 "buffer length does not match expected size");
-        this.freeBuffers.add(buffer);
+        this.freeBuffers.offer(buffer);
     }
 
     public int getBufferSize()
