@@ -25,10 +25,7 @@ import org.junit.Test;
 import com.google.common.util.concurrent.RateLimiter;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
@@ -135,17 +132,19 @@ public class TestFlushObject
         } catch (Exception e)
         {
             System.out.println("Error during record insertion: " + e.getMessage());
+            future1.cancel(true);
+            future2.cancel(true);
         } finally
         {
             executor.shutdown();
+            if (!executor.awaitTermination(20, TimeUnit.SECONDS))
+            {
+                System.err.println("Threads did not terminate in time. Forcing shutdown.");
+                executor.shutdownNow();
+            }
+            Thread.sleep(30000); // sleep 30 seconds to ensure s3 put/write are done
+            System.out.println("Record insertion test completed for both tables.");
         }
-
-        if (!executor.awaitTermination(180, TimeUnit.SECONDS))
-        {
-            System.err.println("Threads did not terminate in time. Forcing shutdown.");
-            executor.shutdownNow();
-        }
-        System.out.println("Record insertion test completed for both tables.");
     }
 }
 
