@@ -152,7 +152,7 @@ public class FileWriterManager
     /**
      * Create a background thread to write the block of data responsible in minio to a file
      */
-    public CompletableFuture<Void> finish( {
+    public CompletableFuture<Void> finish() {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         new Thread(() -> {
