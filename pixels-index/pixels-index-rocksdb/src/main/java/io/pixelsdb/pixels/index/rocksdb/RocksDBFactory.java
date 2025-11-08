@@ -96,6 +96,11 @@ public class RocksDBFactory
                 .setMaxSubcompactions(maxSubcompactions)
                 .setMaxOpenFiles(maxOpenFiles);
 
+        Statistics stats = new Statistics();
+        dbOptions.setStatistics(stats)
+                .setStatsDumpPeriodSec(5)
+                .setDbLogDir("/tmp/rocksdbLog");
+
         RocksDB db = RocksDB.open(dbOptions, dbPath, descriptors, handles);
 
         // 5. Save handles for reuse
