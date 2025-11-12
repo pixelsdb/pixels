@@ -35,12 +35,17 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class TestIndexServicePerf
@@ -55,6 +60,9 @@ public class TestIndexServicePerf
     private static final List<Long> indexIds = new ArrayList<>();
     private static final List<RowIdAllocator> rowIdAllocators = new ArrayList<>();
     private static Config config;
+    private static AtomicBoolean running = new AtomicBoolean(true);
+
+
     private static class Config
     {
         public final int indexNum = 8;
@@ -65,7 +73,8 @@ public class TestIndexServicePerf
         public AccessMode accessMode = AccessMode.uniform;
         public double skewAlpha = 1.0;
         public String indexScheme = "rocksdb";
-
+        public final long monitorReportInterval = 5000;
+        public final String monitorReportPath = "/tmp/rocksDBReport.csv";
         public enum AccessMode
         {
             uniform,
@@ -74,10 +83,12 @@ public class TestIndexServicePerf
 
     }
 
+    private static Thread monitorThread;
+
     @BeforeAll
-    static void setup() throws MetadataException
+    static void setup() throws MetadataException, InterruptedException
     {
-        tearDown();
+        dropSchema();
         config = new Config();
         List<Schema> schemas = metadataService.getSchemas();
         boolean exists = schemas.stream()
@@ -125,17 +136,39 @@ public class TestIndexServicePerf
             rowIdAllocators.add(new RowIdAllocator(metaTableId, 1000, IndexServiceProvider.ServiceMode.local));
         }
 
+        monitorThread = new Thread(() -> {
+            while (running.get())
+            {
+                try
+                {
+                    Thread.sleep(config.monitorReportInterval);
+                } catch (InterruptedException e)
+                {
+                    throw new RuntimeException(e);
+                }
+                logPerformance();
+            }
+        });
+        monitorThread.start();
     }
 
-    @AfterAll
-    static void tearDown()
+    static void dropSchema()
     {
+
         try
         {
             metadataService.dropSchema(testSchemaName);
         } catch (MetadataException ignore)
         {}
+    }
 
+
+    @AfterAll
+    static void tearDown() throws InterruptedException
+    {
+        monitorThread.join();
+        running.set(false);
+        dropSchema();
     }
 
     @Test
@@ -211,6 +244,7 @@ public class TestIndexServicePerf
                             .build();
                     try
                     {
+                        currentRowWrite.incrementAndGet();
                         indexService.putPrimaryIndexEntry(primaryIndexEntry);
                     } catch (IndexException e)
                     {
@@ -417,6 +451,7 @@ public class TestIndexServicePerf
 
                     try
                     {
+                        currentRowWrite.incrementAndGet();
                         indexService.updatePrimaryIndexEntry(primaryIndexEntry);
                     } catch (IndexException e)
                     {
@@ -449,6 +484,40 @@ public class TestIndexServicePerf
                     throw new IllegalArgumentException("Unsupported access mode " + config.accessMode);
                 }
             }
+        }
+    }
+
+    private static final AtomicLong currentRowWrite = new AtomicLong(0L);
+    private static final AtomicLong lastRowWrite = new AtomicLong(0L);
+
+    private static void logPerformance()
+    {
+        long currentRows = currentRowWrite.get();
+
+        long deltaRows = currentRows - lastRowWrite.get();
+
+        lastRowWrite.set(currentRows);
+
+        double seconds = config.monitorReportInterval / 1000.0;
+
+        double rowOips = deltaRows / seconds;
+
+        LOGGER.info(
+                "Performance report: +{} rows (+{}/s)" +
+                        " in {} ms",
+                deltaRows, String.format("%.2f", rowOips),
+                config.monitorReportInterval
+        );
+
+        String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        // Append to CSV for plotting
+        try (FileWriter fw = new FileWriter(config.monitorReportPath, true))
+        {
+            fw.write(String.format("%s,%.2f%n",
+                    time, rowOips));
+        } catch (IOException e)
+        {
+            LOGGER.warn("Failed to write perf metrics: " + e.getMessage());
         }
     }
 }
