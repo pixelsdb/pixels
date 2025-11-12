@@ -88,6 +88,8 @@ public class RocksDBFactory
         int maxBackgroundCompactions = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.max.background.compactions"));
         int maxSubcompactions = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.max.subcompactions"));
         int maxOpenFiles = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.max.open.files"));
+        boolean enableRocksDBStats = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rocksdb.stats.enabled"));
+
         DBOptions dbOptions = new DBOptions()
                 .setCreateIfMissing(true)
                 .setCreateMissingColumnFamilies(true)
@@ -96,10 +98,15 @@ public class RocksDBFactory
                 .setMaxSubcompactions(maxSubcompactions)
                 .setMaxOpenFiles(maxOpenFiles);
 
-        Statistics stats = new Statistics();
-        dbOptions.setStatistics(stats)
-                .setStatsDumpPeriodSec(5)
-                .setDbLogDir("/tmp/rocksdbLog");
+        if(enableRocksDBStats)
+        {
+            String statsPath = ConfigFactory.Instance().getProperty("index.rocksdb.stats.path");
+            int statsInterval = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.stats.interval"));
+            Statistics stats = new Statistics();
+            dbOptions.setStatistics(stats)
+                    .setStatsDumpPeriodSec(statsInterval)
+                    .setDbLogDir(statsPath);
+        }
 
         RocksDB db = RocksDB.open(dbOptions, dbPath, descriptors, handles);
 
@@ -134,6 +141,7 @@ public class RocksDBFactory
         int maxBytesForLevelMultiplier = Integer.parseInt(config.getProperty("index.rocksdb.max.bytes.for.level.multiplier"));
         long targetFileSizeBase = Long.parseLong(config.getProperty("index.rocksdb.target.file.size.base"));
         int targetFileSizeMultiplier = Integer.parseInt(config.getProperty("index.rocksdb.target.file.size.multiplier"));
+        CompactionStyle compactionStyle = CompactionStyle.valueOf(config.getProperty("index.rocksdb.compaction.style"));
 
         // Compression Options
         CompressionType compressionType = CompressionType.valueOf(config.getProperty("index.rocksdb.compression.type"));
@@ -151,7 +159,9 @@ public class RocksDBFactory
                 .setTargetFileSizeBase(targetFileSizeBase)
                 .setTargetFileSizeMultiplier(targetFileSizeMultiplier)
                 .setCompressionType(compressionType)
-                .setBottommostCompressionType(bottommostCompressionType);
+                .setBottommostCompressionType(bottommostCompressionType)
+                .setCompactionStyle(compactionStyle);
+
         return new ColumnFamilyDescriptor(name, cfOptions);
     }
 
