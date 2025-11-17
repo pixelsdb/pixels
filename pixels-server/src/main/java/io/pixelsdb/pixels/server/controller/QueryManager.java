@@ -273,7 +273,7 @@ public class QueryManager
                         {
                             // put it into finished query before removing from query results, to avoid unknown query status
                             this.finishedQueries.put(traceToken, traceToken);
-                            this.queryResults.remove(traceToken);
+                            //this.queryResults.remove(traceToken);
                         }
                     }
                 } catch (InterruptedException e)
@@ -366,8 +366,6 @@ public class QueryManager
                 long pendingTimeMs = System.currentTimeMillis() - query.getReceivedTimeMs();
                 long start = System.currentTimeMillis();
                 ResultSet resultSet = statement.executeQuery(request.getQuery());
-                long finishTimestampMs = System.currentTimeMillis();
-                long executeTimeMs = finishTimestampMs - start;
 
                 int columnCount = resultSet.getMetaData().getColumnCount();
                 int[] columnPrintSizes = new int[columnCount];
@@ -390,6 +388,8 @@ public class QueryManager
 
                 resultSet.close();
                 statement.close();
+                long finishTimestampMs = System.currentTimeMillis();
+                long executeTimeMs = finishTimestampMs - start;
 
                 GetQueryResultResponse result = new GetQueryResultResponse(ErrorCode.SUCCESS, "",
                         request.getExecutionHint(), columnPrintSizes, columnNames, rows, pendingTimeMs,
@@ -485,6 +485,7 @@ public class QueryManager
                     }
                     double billedCents = PriceModel.billedCents(scanBytes, response.getExecutionHint());
                     response.setBilledCents(billedCents);
+		    log.info(vmCostCents + " " + cfCostCents);
                 } catch (TransException e)
                 {
                     log.error("failed to get trans context with trace token " + traceToken, e);
