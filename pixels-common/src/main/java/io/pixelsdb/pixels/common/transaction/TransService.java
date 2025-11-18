@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.transaction;
 
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.Empty;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
@@ -422,5 +423,16 @@ public class TransService
                     + response.getErrorCode());
         }
         return true;
+    }
+
+    public long getSafeGcTimestamp() throws TransException
+    {
+        TransProto.GetSafeGcTimestampResponse response = this.stub.getSafeGcTimestamp(Empty.getDefaultInstance());
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to get safe garbage collection timestamp"
+                    + response.getErrorCode());
+        }
+        return response.getTimestamp();
     }
 }

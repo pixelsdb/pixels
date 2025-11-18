@@ -194,11 +194,7 @@ void TileVisibility::collectTileGarbage(uint64_t ts) {
     // The upper layers have ensured that there are no reads or writes at this point
     // so we can safely delete the records
 
-    if (ts < baseTimestamp) {
-        throw std::runtime_error("need to read checkpoint from disk");
-    }
-
-    if (ts == baseTimestamp) {
+    if (ts <= baseTimestamp) {
         return;
     }
 
@@ -212,7 +208,7 @@ void TileVisibility::collectTileGarbage(uint64_t ts) {
                            : DeleteIndexBlock::BLOCK_CAPACITY;
         if (count > DeleteIndexBlock::BLOCK_CAPACITY) {
             throw std::runtime_error(
-                "The number of item in block is bigger than BLOCK_CAPCITY");
+                "The number of item in block is bigger than BLOCK_CAPACITY");
         }
 
         uint64_t lastItemTs = extractTimestamp(blk->items[count - 1]);

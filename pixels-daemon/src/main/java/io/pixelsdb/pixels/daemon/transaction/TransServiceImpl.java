@@ -469,4 +469,17 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
+
+    @Override
+    public void getSafeGcTimestamp(com.google.protobuf.Empty request,
+                                   StreamObserver<TransProto.GetSafeGcTimestampResponse> responseObserver)
+    {
+        long safeTs = Math.min(0, lowWatermark.get() - 1);
+        TransProto.GetSafeGcTimestampResponse response = TransProto.GetSafeGcTimestampResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS)
+                .setTimestamp(safeTs)
+                .build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
 }

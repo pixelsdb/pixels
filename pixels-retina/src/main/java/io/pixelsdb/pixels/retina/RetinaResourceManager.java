@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.retina;
 
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -29,6 +30,8 @@ import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.transaction.TransService;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.index.IndexProto;
@@ -39,6 +42,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -51,11 +57,42 @@ public class RetinaResourceManager
     private final Map<String, RGVisibility> rgVisibilityMap;
     private final Map<String, PixelsWriterBuffer> pixelsWriterBufferMap;
 
+    // GC related fields
+    private final ScheduledExecutorService gcExecutor;
+    private final long gcIntervalSeconds;
+
+
     private RetinaResourceManager()
     {
         this.metadataService = MetadataService.Instance();
         this.rgVisibilityMap = new ConcurrentHashMap<>();
         this.pixelsWriterBufferMap = new ConcurrentHashMap<>();
+
+        try
+        {
+            ConfigFactory config = ConfigFactory.Instance();
+            this.gcIntervalSeconds = Long.parseLong(config.getProperty("retina.gc.interval"));
+
+            this.gcExecutor = Executors.newSingleThreadScheduledExecutor(r ->
+            {
+                Thread t = new Thread(r, "retina-gc-thread");
+                t.setDaemon(true);
+                return t;
+            });
+
+            if (this.gcIntervalSeconds > 0)
+            {
+                this.gcExecutor.scheduleAtFixedRate(
+                        this::runGC,
+                        gcIntervalSeconds,
+                        gcIntervalSeconds,
+                        TimeUnit.SECONDS
+                );
+            }
+        } catch (Exception e)
+        {
+            throw new RuntimeException("Failed to start retina background gc", e);
+        }
     }
 
     private static final class InstanceHolder
@@ -310,6 +347,26 @@ public class RetinaResourceManager
         } catch (Exception e)
         {
             throw new RetinaException("Error while checking writer buffer", e);
+        }
+    }
+
+    /**
+     * Runs garbage collection on all registered RGVisibility
+     */
+    private void runGC()
+    {
+        long timestamp = 0;
+        try
+        {
+            timestamp = TransService.Instance().getSafeGcTimestamp();
+        } catch (TransException e)
+        {
+            logger.error("Error while getting saft garbage collection timestamp", e);
+        }
+        for (Map.Entry<String, RGVisibility> entry: this.rgVisibilityMap.entrySet())
+        {
+            RGVisibility rgVisibility = entry.getValue();
+            rgVisibility.garbageCollect(timestamp);
         }
     }
 }
