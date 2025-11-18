@@ -361,7 +361,7 @@ public class RetinaResourceManager
             timestamp = TransService.Instance().getSafeGcTimestamp();
         } catch (TransException e)
         {
-            logger.error("Error while getting saft garbage collection timestamp", e);
+            logger.error("Error while getting safe garbage collection timestamp", e);
         }
         for (Map.Entry<String, RGVisibility> entry: this.rgVisibilityMap.entrySet())
         {
