@@ -23,7 +23,6 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
-import io.pixelsdb.pixels.common.index.LatestVersionCache.CacheEntry;
 
 import java.util.List;
 
@@ -39,8 +38,8 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         if (cacheEnabled)
         {
             long capacity = Long.parseLong(config.getProperty("index.cache.capacity"));
-            long expireAfterAccessSeconds = Long.parseLong(config.getProperty("index.cache.expiration.seconds"));
-            this.cache = new LatestVersionCache(capacity, expireAfterAccessSeconds);
+            long expirationSeconds = Long.parseLong(config.getProperty("index.cache.expiration.seconds"));
+            this.cache = new LatestVersionCache(capacity, expirationSeconds);
         } else
         {
             this.cache = null;
@@ -52,10 +51,16 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
     {
         if (cache != null)
         {
-            CacheEntry cacheEntry = cache.get(key);
-            if (cacheEntry != null && cacheEntry.timestamp <= key.getTimestamp())
+            final String cacheKey = LatestVersionCache.buildCacheKey(key);
+            final String cacheValue = cache.get(cacheKey);
+
+            if (cacheValue != null)
             {
-                return cacheEntry.rowId;
+                long[] entry = LatestVersionCache.parseCacheValue(cacheValue);
+                if (entry[0] <= key.getTimestamp())
+                {
+                    return entry[1];
+                }
             }
         }
 
@@ -68,7 +73,9 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         boolean success = putEntryInternal(key, rowId);
         if (isUnique() && cache != null && success)
         {
-            cache.put(key, rowId);
+            final String cacheKey = LatestVersionCache.buildCacheKey(key);
+            final String cacheValue = LatestVersionCache.buildCacheValue(key.getTimestamp(), rowId);
+            cache.put(cacheKey, cacheValue);
         }
         return success;
     }
@@ -81,7 +88,9 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         {
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
-                cache.put(entry.getIndexKey(), entry.getRowId());
+                final String cacheKey = LatestVersionCache.buildCacheKey(entry.getIndexKey());
+                final String cacheValue = LatestVersionCache.buildCacheValue(entry.getIndexKey().getTimestamp(), entry.getRowId());
+                cache.put(cacheKey, cacheValue);
             }
         }
         return success;
@@ -95,7 +104,9 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         {
             for (IndexProto.SecondaryIndexEntry entry : entries)
             {
-                cache.put(entry.getIndexKey(), entry.getRowId());
+                final String cacheKey = LatestVersionCache.buildCacheKey(entry.getIndexKey());
+                final String cacheValue = LatestVersionCache.buildCacheValue(entry.getIndexKey().getTimestamp(), entry.getRowId());
+                cache.put(cacheKey, cacheValue);
             }
         }
         return success;
@@ -107,7 +118,9 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         long previousRowId = updatePrimaryEntryInternal(key, rowId);
         if (cache != null)
         {
-            cache.put(key, rowId);
+            final String cacheKey = LatestVersionCache.buildCacheKey(key);
+            final String cacheValue = LatestVersionCache.buildCacheValue(key.getTimestamp(), rowId);
+            cache.put(cacheKey, cacheValue);
         }
         return previousRowId;
     }
@@ -118,7 +131,9 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         List<Long> previousRowIds = updateSecondaryEntryInternal(key, rowId);
         if (isUnique() && cache != null)
         {
-            cache.put(key, rowId);
+            final String cacheKey = LatestVersionCache.buildCacheKey(key);
+            final String cacheValue = LatestVersionCache.buildCacheValue(key.getTimestamp(), rowId);
+            cache.put(cacheKey, cacheValue);
         }
         return previousRowIds;
     }
@@ -131,7 +146,9 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         {
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
-                cache.put(entry.getIndexKey(), entry.getRowId());
+                final String cacheKey = LatestVersionCache.buildCacheKey(entry.getIndexKey());
+                final String cacheValue = LatestVersionCache.buildCacheValue(entry.getIndexKey().getTimestamp(), entry.getRowId());
+                cache.put(cacheKey, cacheValue);
             }
         }
         return previousRowIds;
@@ -145,7 +162,9 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         {
             for (IndexProto.SecondaryIndexEntry entry : entries)
             {
-                cache.put(entry.getIndexKey(), entry.getRowId());
+                final String cacheKey = LatestVersionCache.buildCacheKey(entry.getIndexKey());
+                final String cacheValue = LatestVersionCache.buildCacheValue(entry.getIndexKey().getTimestamp(), entry.getRowId());
+                cache.put(cacheKey, cacheValue);
             }
         }
         return previousRowIds;
@@ -157,7 +176,8 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         long deleteRowId = deleteUniqueEntryInternal(indexKey);
         if (cache != null && deleteRowId >= 0)
         {
-            cache.invalidate(indexKey);
+            final String cacheKey = LatestVersionCache.buildCacheKey(indexKey);
+            cache.invalidate(cacheKey);
         }
         return deleteRowId;
     }
@@ -168,7 +188,8 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         List<Long> deletedRowIds = deleteEntryInternal(key);
         if (isUnique() && cache != null && !deletedRowIds.isEmpty())
         {
-            cache.invalidate(key);
+            final String cacheKey = LatestVersionCache.buildCacheKey(key);
+            cache.invalidate(cacheKey);
         }
         return deletedRowIds;
     }
@@ -181,7 +202,8 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         {
             for (IndexProto.IndexKey key : keys)
             {
-                cache.invalidate(key);
+                final String cacheKey = LatestVersionCache.buildCacheKey(key);
+                cache.invalidate(cacheKey);
             }
         }
         return deletedRowIds;
@@ -195,7 +217,8 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
         {
             for (IndexProto.IndexKey key : indexKeys)
             {
-                cache.invalidate(key);
+                final String cacheKey = LatestVersionCache.buildCacheKey(key);
+                cache.invalidate(cacheKey);
             }
         }
         return purgedRowIds;
