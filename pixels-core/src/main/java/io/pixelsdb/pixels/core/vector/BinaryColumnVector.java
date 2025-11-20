@@ -828,30 +828,36 @@ public class BinaryColumnVector extends ColumnVector
         IdentityHashMap<byte[], Integer> bufToIndex = new IdentityHashMap<>();
         ArrayList<byte[]> physicalList = new ArrayList<>();
 
-        for (int i = 0; i < writeIndex; ++i) {
+        for (int i = 0; i < writeIndex; ++i)
+        {
             byte[] buf = vector[i];
-            if (buf == null) {
+            if (buf == null)
+            {
                 continue;
             }
-            if (!bufToIndex.containsKey(buf)) {
+            if (!bufToIndex.containsKey(buf))
+            {
                 int idx = physicalList.size();
                 physicalList.add(buf);
                 bufToIndex.put(buf, idx);
             }
         }
 
-        if (this.buffer != null && !bufToIndex.containsKey(this.buffer)) {
+        if (this.buffer != null && !bufToIndex.containsKey(this.buffer))
+        {
             bufToIndex.put(this.buffer, physicalList.size());
             physicalList.add(this.buffer);
         }
-        if (this.smallBuffer != null && !bufToIndex.containsKey(this.smallBuffer)) {
+        if (this.smallBuffer != null && !bufToIndex.containsKey(this.smallBuffer))
+        {
             bufToIndex.put(this.smallBuffer, physicalList.size());
             physicalList.add(this.smallBuffer);
         }
 
         int physicalSize = physicalList.size();
         int[] physicalOffsets = new int[physicalSize];
-        for (int i = 0; i < physicalSize; ++i) {
+        for (int i = 0; i < physicalSize; ++i)
+        {
             byte[] bytes = physicalList.get(i);
             // create bytes vector (raw content)
             int bytesVec = ByteArray.createBytesVector(builder, bytes == null ? new byte[0] : bytes);
@@ -861,55 +867,68 @@ public class BinaryColumnVector extends ColumnVector
         }
 
         int physicalBufferOffset = 0;
-        if (physicalSize > 0) {
+        if (physicalSize > 0)
+        {
             physicalBufferOffset = BinaryColumnVectorFlat.createPhysicalBufferVector(builder, physicalOffsets);
         }
 
         int[] vectorIndices = new int[writeIndex];
-        for (int i = 0; i < writeIndex; ++i) {
+        for (int i = 0; i < writeIndex; ++i)
+        {
             byte[] buf = vector[i];
-            if (buf == null) {
+            if (buf == null)
+            {
                 vectorIndices[i] = -1;
-            } else {
+            } else
+            {
                 vectorIndices[i] = bufToIndex.get(buf);
             }
         }
         int vectorVectorOffset = 0;
-        if (vectorIndices.length > 0) {
+        if (vectorIndices.length > 0)
+        {
             vectorVectorOffset = BinaryColumnVectorFlat.createVectorVector(builder, vectorIndices);
         }
 
         int startVectorOffset = 0;
-        if (start != null && start.length > 0) {
+        if (start != null && start.length > 0)
+        {
             startVectorOffset = BinaryColumnVectorFlat.createStartVector(builder, start);
         }
         int lensVectorOffset = 0;
-        if (lens != null && lens.length > 0) {
+        if (lens != null && lens.length > 0)
+        {
             lensVectorOffset = BinaryColumnVectorFlat.createLensVector(builder, lens);
         }
 
         int bufferIndex = -1;
-        if (this.buffer != null) {
+        if (this.buffer != null)
+        {
             bufferIndex = bufToIndex.getOrDefault(this.buffer, -1);
         }
         int smallBufferIndex = -1;
-        if (this.smallBuffer != null) {
+        if (this.smallBuffer != null)
+        {
             smallBufferIndex = bufToIndex.getOrDefault(this.smallBuffer, -1);
         }
 
         // build final table
         BinaryColumnVectorFlat.startBinaryColumnVectorFlat(builder);
         BinaryColumnVectorFlat.addBase(builder, baseOffset);
-        if (physicalSize > 0) {
+        if (physicalSize > 0)
+        {
             BinaryColumnVectorFlat.addPhysicalBuffer(builder, physicalBufferOffset);
         }
-        if (vectorIndices.length > 0) {
+        if (vectorIndices.length > 0)
+        {
             BinaryColumnVectorFlat.addVector(builder, vectorVectorOffset);
         }
-        if (start != null && start.length > 0) {
+        if (start != null && start.length > 0)
+        {
             BinaryColumnVectorFlat.addStart(builder, startVectorOffset);
         }
-        if (lens != null && lens.length > 0) {
+        if (lens != null && lens.length > 0)
+        {
             BinaryColumnVectorFlat.addLens(builder, lensVectorOffset);
         }
         // buffer / nextFree
@@ -934,33 +953,40 @@ public class BinaryColumnVector extends ColumnVector
     {
         BinaryColumnVector vector = new BinaryColumnVector(flat.base().length());
 
-        for (int i = 0; i < flat.startLength(); ++i) {
+        for (int i = 0; i < flat.startLength(); ++i)
+        {
             vector.start[i] = flat.start(i);
         }
-        for (int i = 0; i < flat.lensLength(); ++i) {
+        for (int i = 0; i < flat.lensLength(); ++i)
+        {
             vector.lens[i] = flat.lens(i);
         }
 
         int physicalCount = flat.physicalBufferLength();
         byte[][] physical = new byte[physicalCount][];
-        for (int i = 0; i < physicalCount; ++i) {
+        for (int i = 0; i < physicalCount; ++i)
+        {
             ByteArray arr = flat.physicalBuffer(i);
             physical[i] = getBytesFromFlatArray(arr);
         }
 
         int bufferIndex = flat.buffer();
-        if (bufferIndex >= 0) {
+        if (bufferIndex >= 0)
+        {
             vector.buffer = physical[bufferIndex];
-        } else {
+        } else
+        {
             vector.buffer = null;
         }
 
         vector.nextFree = flat.nextFree();
 
         int smallBufferIndex = flat.smallBuffer();
-        if (smallBufferIndex >= 0) {
+        if (smallBufferIndex >= 0)
+        {
             vector.smallBuffer = physical[smallBufferIndex];
-        } else {
+        } else
+        {
             vector.smallBuffer = null;
         }
 
@@ -969,11 +995,14 @@ public class BinaryColumnVector extends ColumnVector
 
         vector.deserializeBase(flat.base());
 
-        for (int i = 0; i < vector.writeIndex; ++i) {
+        for (int i = 0; i < vector.writeIndex; ++i)
+        {
             int idx = flat.vector(i);
-            if (idx < 0) {
+            if (idx < 0)
+            {
                 vector.vector[i] = null;
-            } else {
+            } else
+            {
                 vector.vector[i] = physical[idx];
             }
         }

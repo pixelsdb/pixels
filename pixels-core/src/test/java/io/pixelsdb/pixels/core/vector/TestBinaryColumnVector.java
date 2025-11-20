@@ -19,21 +19,18 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
-import com.google.flatbuffers.FlatBufferBuilder;
-import io.pixelsdb.pixels.core.flat.VectorizedRowBatchFlat;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.nio.charset.StandardCharsets;
-
-public class TestBinaryColumnVector {
+public class TestBinaryColumnVector
+{
     @Test
     public void testSerialize()
     {
         VectorizedRowBatch vectorizedRowBatch = new VectorizedRowBatch(1, 10240);
         BinaryColumnVector columnVector = new BinaryColumnVector(10240);
         vectorizedRowBatch.cols[0] = columnVector;
-        for(int i = 0; i < 10000; ++i)
+        for (int i = 0; i < 10000; ++i)
         {
             columnVector.add("test" + i);
         }
@@ -41,11 +38,11 @@ public class TestBinaryColumnVector {
         int length = data.length;
         Assert.assertEquals(length < 4 * 1024 * 1024, true);
         VectorizedRowBatch newBatch = VectorizedRowBatch.deserialize(data);
-        BinaryColumnVector col = (BinaryColumnVector)newBatch.cols[0];
-        for(int i = 0; i < 10000; ++i)
+        BinaryColumnVector col = (BinaryColumnVector) newBatch.cols[0];
+        for (int i = 0; i < 10000; ++i)
         {
-             String decode = new String(col.vector[i], col.start[i], col.lens[i]);
-             Assert.assertEquals(decode, "test" + i);
+            String decode = new String(col.vector[i], col.start[i], col.lens[i]);
+            Assert.assertEquals(decode, "test" + i);
         }
     }
 }
