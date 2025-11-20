@@ -53,10 +53,12 @@ public class ShutdownHookManager
                 if (hook.serial)
                 {
                     serialHookRunner.submit(hook);
+                    logger.info("Invoke serial shutdown hook from {}", hook.getClass().getName());
                 }
                 else
                 {
                     concurrentHookRunner.submit(hook);
+                    logger.info("Invoke parallel shutdown hook from {}", hook.getClass().getName());
                 }
             }
             serialHookRunner.shutdown();
@@ -80,30 +82,46 @@ public class ShutdownHookManager
         }));
     }
 
+    private ShutdownHookManager() { }
+
+    /**
+     * The queue of shutdown hooks that are invoked when the process is shutting down.
+     */
     private final Queue<ShutdownHook> shutdownHooks = new ConcurrentLinkedQueue<>();
 
+    /**
+     * @param clazz the class that registers this shutdown hook
+     * @param serial true if this shutdown hook should be called serially with other shutdown hooks marked serial
+     * @param runnable the handler of the shutdown hook
+     */
     public void registerShutdownHook(Class<?> clazz, boolean serial, Runnable runnable)
     {
         this.shutdownHooks.offer(new ShutdownHook(clazz, serial, runnable));
     }
 
+    /**
+     * The shutdown hook that denotes which class registered which shutdown handler.
+     */
     public static class ShutdownHook implements Runnable
     {
         private final Class<?> clazz;
+        /**
+         * All the shutdown hook marked serial will be invoked serially.
+         */
         private final boolean serial;
-        private final Runnable hook;
+        private final Runnable handler;
 
-        public ShutdownHook(Class<?> clazz, boolean serial, Runnable hook)
+        public ShutdownHook(Class<?> clazz, boolean serial, Runnable handler)
         {
             this.clazz = clazz;
             this.serial = serial;
-            this.hook = hook;
+            this.handler = handler;
         }
 
         @Override
         public void run()
         {
-            this.hook.run();
+            this.handler.run();
         }
     }
 }
