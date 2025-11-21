@@ -76,7 +76,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     private final Storage storage;
 
     private final long tableId;
-    private final String minioPathPrefix;
+    private final String retinaBufferStorageFolder;
 
     private final TypeDescription typeDescription;
     private final int colNum;
@@ -111,7 +111,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     ) throws IOException
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
-        this.minioPathPrefix = configFactory.getProperty("minio.path.prefix");
+        this.retinaBufferStorageFolder = configFactory.getProperty("retina.buffer.object.storage.folder");
 
         this.option = option;
         this.activeMemtableData = activeMemtableData;
@@ -216,7 +216,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
             return false;
         }
 
-        String path = getMinioPathFromId(fileIds.get(fileIdIndex++));
+        String path = getRetinaBufferStoragePathFromId(fileIds.get(fileIdIndex++));
         getMemtableDataFromStorage(path);
         return true;
     }
@@ -345,16 +345,16 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         scheduler.shutdown();
     }
 
-    private String getMinioPathFromId(long entryId)
+    private String getRetinaBufferStoragePathFromId(long entryId)
     {
-        return this.minioPathPrefix + String.format("%d/%d", tableId, entryId);
+        return this.retinaBufferStorageFolder + String.format("%d/%d", tableId, entryId);
     }
 
     private void getMemtableDataFromStorage(String path) throws IOException
     {
         // Firstly, if the id is an immutable memtable,
         // we need to wait for it to be flushed to the storage
-        // (currently implemented using minio)
+        // (currently implemented using minio or s3)
         CountDownLatch latch = new CountDownLatch(1);
         final AtomicBoolean fileExists = new AtomicBoolean(false);
 
