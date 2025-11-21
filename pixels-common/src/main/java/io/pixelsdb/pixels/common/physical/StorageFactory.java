@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -88,8 +89,7 @@ public class StorageFactory
                 if (instance == null)
                 {
                     instance = new StorageFactory();
-                    Runtime.getRuntime().addShutdownHook(new Thread(() ->
-                    {
+                    ShutdownHookManager.Instance().registerShutdownHook(StorageFactory.class, false, () -> {
                         try
                         {
                             instance.closeAll();
@@ -98,7 +98,7 @@ public class StorageFactory
                             logger.error("Failed to close all storage instances.", e);
                             e.printStackTrace();
                         }
-                    }));
+                    });
                 }
             }
         }
