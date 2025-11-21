@@ -55,12 +55,12 @@ public class ShutdownHookManager
                 if (hook.serial)
                 {
                     serialHookRunner.submit(hook);
-                    logger.info("Invoke serial shutdown hook from {}", hook.getClass().getName());
+                    logger.info("Invoke serial shutdown hook from {}", hook.clazz.getName());
                 }
                 else
                 {
                     concurrentHookRunner.submit(hook);
-                    logger.info("Invoke parallel shutdown hook from {}", hook.getClass().getName());
+                    logger.info("Invoke parallel shutdown hook from {}", hook.clazz.getName());
                 }
             }
             serialHookRunner.shutdown();
