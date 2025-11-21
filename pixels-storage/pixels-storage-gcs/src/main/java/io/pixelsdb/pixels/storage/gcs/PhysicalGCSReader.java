@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -70,7 +71,7 @@ public class PhysicalGCSReader implements PhysicalReader
             return thread;
         });
 
-        Runtime.getRuntime().addShutdownHook(new Thread(clientService::shutdownNow));
+        ShutdownHookManager.Instance().registerShutdownHook(PhysicalGCSReader.class, true, clientService::shutdownNow);
     }
 
     protected final GCS gcs;

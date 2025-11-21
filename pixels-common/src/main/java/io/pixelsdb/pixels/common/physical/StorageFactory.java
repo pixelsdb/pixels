@@ -89,7 +89,7 @@ public class StorageFactory
                 if (instance == null)
                 {
                     instance = new StorageFactory();
-                    ShutdownHookManager.Instance().registerShutdownHook(StorageFactory.class, false, () -> {
+                    ShutdownHookManager.Instance().registerShutdownHook(StorageFactory.class, true, () -> {
                         try
                         {
                             instance.closeAll();

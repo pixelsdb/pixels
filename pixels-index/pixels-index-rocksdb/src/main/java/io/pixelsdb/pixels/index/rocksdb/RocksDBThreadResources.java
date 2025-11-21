@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.rocksdb.ReadOptions;
 
 import java.nio.ByteBuffer;
@@ -55,7 +56,8 @@ final class RocksDBThreadResources
     static
     {
         // Release resources when the process is shutting down.
-        Runtime.getRuntime().addShutdownHook(new Thread(RocksDBThreadResources::release));
+        ShutdownHookManager.Instance().registerShutdownHook(
+                RocksDBThreadResources.class, false, RocksDBThreadResources::release);
     }
 
     private RocksDBThreadResources() { }

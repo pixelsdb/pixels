@@ -22,8 +22,8 @@ package io.pixelsdb.pixels.common.utils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +48,9 @@ public class ShutdownHookManager
         ExecutorService serialHookRunner = Executors.newSingleThreadExecutor();
         ExecutorService concurrentHookRunner = Executors.newCachedThreadPool();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            for (ShutdownHook hook : instance.shutdownHooks)
+            ShutdownHook hook;
+            // Execute the hooks in the reverse order of registration.
+            while ((hook = instance.shutdownHooks.pollLast()) != null)
             {
                 if (hook.serial)
                 {
@@ -87,7 +89,7 @@ public class ShutdownHookManager
     /**
      * The queue of shutdown hooks that are invoked when the process is shutting down.
      */
-    private final Queue<ShutdownHook> shutdownHooks = new ConcurrentLinkedQueue<>();
+    private final Deque<ShutdownHook> shutdownHooks = new ConcurrentLinkedDeque<>();
 
     /**
      * @param clazz the class that registers this shutdown hook
