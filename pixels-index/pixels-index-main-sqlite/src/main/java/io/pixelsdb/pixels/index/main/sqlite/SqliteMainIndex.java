@@ -153,7 +153,7 @@ public class SqliteMainIndex implements MainIndex
                 }
                 catch (EtcdException e)
                 {
-                    throw new RuntimeException(e); // wrap to unchecked, will rethrow
+                    throw new RowIdException("Failed to create persistent auto-increment for table " + tblId, e);
                 }
             });
             // 2. allocate numRowIds

@@ -255,7 +255,8 @@ public class PixelsWriterBuffer
             triggerFlushToMinio(oldMemTable);
         } catch (Exception e)
         {
-            logger.error("Failed to create switch memTable", e);
+            logger.error("Failed to switch memTable", e);
+            throw new RetinaException("Failed to switch memTable", e);
         } finally
         {
             this.versionLock.writeLock().unlock();
@@ -295,7 +296,8 @@ public class PixelsWriterBuffer
                 }
             } catch (Exception e)
             {
-                logger.error("Failed to flush to minio ", e);
+                logger.error("Failed to flush memTable to minio, memTableId=" + flushMemTable.getId(), e);
+                // Continue execution to ensure flushMemTable.unref() is called
             } finally
             {
                 flushMemTable.unref();  // unref in the end

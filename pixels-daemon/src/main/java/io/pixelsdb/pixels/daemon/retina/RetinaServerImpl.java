@@ -656,7 +656,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             }
         } catch (Throwable e)
         {
-            throw new RuntimeException("failed to parse storage scheme from paths", e);
+            throw new RetinaException("failed to parse storage scheme from paths", e);
         }
     }
 

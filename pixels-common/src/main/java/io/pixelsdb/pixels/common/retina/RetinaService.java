@@ -169,11 +169,11 @@ public class RetinaService
             this.requestObserver = requestObserver;
         }
 
-        public CompletableFuture<RetinaProto.UpdateRecordResponse> updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData)
+        public CompletableFuture<RetinaProto.UpdateRecordResponse> updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
         {
             if (isClosed)
             {
-                throw new IllegalStateException("Stream is already closed");
+                throw new RetinaException("Stream is already closed");
             }
             
             String token = UUID.randomUUID().toString();
@@ -191,8 +191,7 @@ public class RetinaService
                 requestObserver.onNext(request);
             } catch (Exception e)
             {
-                logger.error("Failed to send update record request", e);
-                throw new RuntimeException("Failed to send update record request", e);
+                throw new RetinaException("Failed to send update record request", e);
             }
 
             return future;
