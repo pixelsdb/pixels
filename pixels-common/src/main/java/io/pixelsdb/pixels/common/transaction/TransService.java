@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.daemon.TransProto;
 import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -55,24 +56,20 @@ public class TransService
         String transHost = ConfigFactory.Instance().getProperty("trans.server.host");
         int transPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
         defaultInstance = new TransService(transHost, transPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run() {
-                try
+        ShutdownHookManager.Instance().registerShutdownHook(TransService.class, false, () -> {
+            try
+            {
+                defaultInstance.shutdown();
+                for (TransService otherTransService : otherInstances.values())
                 {
-                    defaultInstance.shutdown();
-                    for (TransService otherTransService : otherInstances.values())
-                    {
-                        otherTransService.shutdown();
-                    }
-                    otherInstances.clear();
-                } catch (InterruptedException e)
-                {
-                    logger.error("failed to shut down trans service", e);
+                    otherTransService.shutdown();
                 }
+                otherInstances.clear();
+            } catch (InterruptedException e)
+            {
+                logger.error("failed to shut down trans service", e);
             }
-        }));
+        });
     }
 
     /**

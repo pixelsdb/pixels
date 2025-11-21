@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical.scheduler;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -56,7 +57,7 @@ public class RetryPolicy
         this.intervalMs = intervalMs;
         this.requests = new ConcurrentLinkedQueue<>();
         this.start();
-        Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
+        ShutdownHookManager.Instance().registerShutdownHook(RetryPolicy.class, true, this::stop);
     }
 
     private void start()

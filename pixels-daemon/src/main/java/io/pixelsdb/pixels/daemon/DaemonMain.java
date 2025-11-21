@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.daemon;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
 import io.pixelsdb.pixels.daemon.cache.CacheWorker;
 import io.pixelsdb.pixels.daemon.index.IndexServer;
@@ -182,8 +183,7 @@ public class DaemonMain
 
             // The shutdown hook ensures the servers are shutdown graceful
             // if this main daemon is terminated by SIGTERM(15) signal.
-            Runtime.getRuntime().addShutdownHook(new Thread(() ->
-            {
+            ShutdownHookManager.Instance().registerShutdownHook(DaemonMain.class, false, () -> {
                 for (String serverName : container.getServerNames())
                 {
                     // shutdown the server threads.
@@ -225,7 +225,7 @@ public class DaemonMain
                  */
                 mainDaemon.shutdown();
                 log.info("all the servers are shutdown, bye...");
-            }));
+            });
 
             // continue the main thread, start and check the server threads.
             // main thread will be terminated with the daemon thread.

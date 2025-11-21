@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.natives.PixelsRandomAccessFile;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -62,7 +63,7 @@ public class PhysicalLocalReader implements PhysicalReader
             return thread;
         });
 
-        Runtime.getRuntime().addShutdownHook(new Thread(readerService::shutdownNow));
+        ShutdownHookManager.Instance().registerShutdownHook(PhysicalLocalReader.class, true, readerService::shutdownNow);
     }
 
     public PhysicalLocalReader(Storage storage, String path) throws IOException
