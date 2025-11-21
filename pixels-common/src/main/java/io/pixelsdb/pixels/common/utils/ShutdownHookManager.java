@@ -29,6 +29,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * This class is to manage and execute the shutdown hooks in a managed order.
+ * {@link ShutdownHook} is a handler to be invoked for a class when the process is shutting down.
  * @author hank
  * @create 2025-11-07
  */
