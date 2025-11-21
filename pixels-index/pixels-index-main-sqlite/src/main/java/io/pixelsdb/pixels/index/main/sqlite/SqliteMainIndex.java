@@ -153,7 +153,6 @@ public class SqliteMainIndex implements MainIndex
                 }
                 catch (EtcdException e)
                 {
-                    logger.error(e);
                     throw new RuntimeException(e); // wrap to unchecked, will rethrow
                 }
             });

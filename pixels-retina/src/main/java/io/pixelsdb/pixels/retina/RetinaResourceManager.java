@@ -91,7 +91,7 @@ public class RetinaResourceManager
             }
         } catch (Exception e)
         {
-            throw new RuntimeException("Failed to start retina background gc", e);
+            logger.error("Failed to start retina background gc", e);
         }
     }
 
@@ -117,21 +117,23 @@ public class RetinaResourceManager
         try
         {
             Storage storage = StorageFactory.Instance().getStorage(filePath);
-            PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(storage, filePath);
-            long fileLen = fsReader.getFileLength();
-            fsReader.seek(fileLen - Long.BYTES);
-            long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
-            int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
-            fsReader.seek(fileTailOffset);
-            ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
-            PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
-            PixelsProto.Footer footer = fileTail.getFooter();
-            // TODO: fileId can be obtained directly through File.getId() method.
-            long fileId = this.metadataService.getFileId(filePath);
-            for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
+            try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(storage, filePath))
             {
-                int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
-                addVisibility(fileId, rgId, recordNum);
+                long fileLen = fsReader.getFileLength();
+                fsReader.seek(fileLen - Long.BYTES);
+                long fileTailOffset = fsReader.readLong(ByteOrder.BIG_ENDIAN);
+                int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
+                fsReader.seek(fileTailOffset);
+                ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
+                PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
+                PixelsProto.Footer footer = fileTail.getFooter();
+                // TODO: fileId can be obtained directly through File.getId() method.
+                long fileId = this.metadataService.getFileId(filePath);
+                for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
+                {
+                    int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
+                    addVisibility(fileId, rgId, recordNum);
+                }
             }
         } catch (Exception e)
         {
@@ -145,7 +147,6 @@ public class RetinaResourceManager
         long[] visibilityBitmap = rgVisibility.getVisibilityBitmap(timestamp);
         if (visibilityBitmap == null)
         {
-            logger.error("Error while getting visibility bitmap");
             throw new RetinaException("Error while getting visibility bitmap");
         }
         return visibilityBitmap;
@@ -315,19 +316,13 @@ public class RetinaResourceManager
      */
     private RGVisibility checkRGVisibility(long fileId, int rgId) throws RetinaException
     {
-        try
+        String retinaKey = fileId + "_" + rgId;
+        RGVisibility rgVisibility = this.rgVisibilityMap.get(retinaKey);
+        if (rgVisibility == null)
         {
-            String retinaKey = fileId + "_" + rgId;
-            RGVisibility rgVisibility = this.rgVisibilityMap.get(retinaKey);
-            if (rgVisibility == null)
-            {
-                throw new RetinaException("Retina not found for fileId: " + fileId + " and rgId: " + rgId);
-            }
-            return rgVisibility;
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while checking retina", e);
+            throw new RetinaException("Retina not found for fileId: " + fileId + " and rgId: " + rgId);
         }
+        return rgVisibility;
     }
 
     /**
@@ -335,19 +330,13 @@ public class RetinaResourceManager
      */
     private PixelsWriterBuffer checkPixelsWriterBuffer(String schema, String table) throws RetinaException
     {
-        try
+        String writerBufferKey = schema + "_" + table;
+        PixelsWriterBuffer writerBuffer = this.pixelsWriterBufferMap.get(writerBufferKey);
+        if (writerBuffer == null)
         {
-            String writerBufferKey = schema + "_" + table;
-            PixelsWriterBuffer writerBuffer = this.pixelsWriterBufferMap.get(writerBufferKey);
-            if (writerBuffer == null)
-            {
-                throw new RetinaException("Writer buffer not found for schema: " + schema + " and table: " + table);
-            }
-            return writerBuffer;
-        } catch (Exception e)
-        {
-            throw new RetinaException("Error while checking writer buffer", e);
+            throw new RetinaException("Writer buffer not found for schema: " + schema + " and table: " + table);
         }
+        return writerBuffer;
     }
 
     /**
@@ -362,6 +351,7 @@ public class RetinaResourceManager
         } catch (TransException e)
         {
             logger.error("Error while getting safe garbage collection timestamp", e);
+            return;
         }
         for (Map.Entry<String, RGVisibility> entry: this.rgVisibilityMap.entrySet())
         {

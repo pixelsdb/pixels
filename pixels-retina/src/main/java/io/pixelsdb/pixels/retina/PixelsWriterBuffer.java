@@ -51,10 +51,10 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
  * for writing data. Once the memTable is full, data is written to an immutable
  * memTable, and multiple immutable memTables can exist. Currently, to simplify
  * the distributed design, the immutable memTable is first written to the shared
- * storage minio, and then the data in minio is dumped to a disk file.
- *  -----        --------------------------------      -------      -----------
- * | CDC | ===> | memTable -> immutable memTable | -> | minio | -> | disk file |
- *  -----        --------------------------------      -------      -----------
+ * storage, and then the data in shared storage is dumped to a disk file.
+ *  -----        --------------------------------      ----------------      -----------
+ * | CDC | ===> | memTable -> immutable memTable | -> | shared storage | -> | disk file |
+ *  -----        --------------------------------      ----------------      -----------
  */
 public class PixelsWriterBuffer
 {
@@ -127,7 +127,6 @@ public class PixelsWriterBuffer
             this.targetCompactStorage = StorageFactory.Instance().getStorage(targetCompactDirPath.getUri());
         } catch (Exception e)
         {
-            logger.error("Failed to get storage", e);
             throw new RetinaException("Failed to get storage", e);
         }
         this.blockSize = Long.parseLong(configFactory.getProperty("block.size"));
@@ -257,7 +256,6 @@ public class PixelsWriterBuffer
         } catch (Exception e)
         {
             logger.error("Failed to create switch memTable", e);
-            throw new RuntimeException("Failed to create switch memTable", e);
         } finally
         {
             this.versionLock.writeLock().unlock();
@@ -297,7 +295,7 @@ public class PixelsWriterBuffer
                 }
             } catch (Exception e)
             {
-                throw new RuntimeException("Failed to flush to minio ", e);
+                logger.error("Failed to flush to minio ", e);
             } finally
             {
                 flushMemTable.unref();  // unref in the end
@@ -369,7 +367,7 @@ public class PixelsWriterBuffer
                 }
             } catch (Exception e)
             {
-                throw new RuntimeException(e);
+                logger.error("Failed to flush minio to disk", e);
             }
         }, 0, intervalSeconds, TimeUnit.SECONDS);
     }
@@ -477,15 +475,25 @@ public class PixelsWriterBuffer
             try
             {
                 all.get();
-            } catch (InterruptedException | ExecutionException e)
+            } catch (ExecutionException e)
             {
                 logger.error("Error in close: ", e);
+            } catch (InterruptedException e)
+            {
+                logger.error("Error in close: ", e);
+                Thread.currentThread().interrupt();
             }
 
             for (ObjectEntry objectEntry : sv.getObjectEntries())
             {
                 objectEntry.unref();
-                this.objectStorageManager.delete(this.tableId, objectEntry.getId());
+                try
+                {
+                    this.objectStorageManager.delete(this.tableId, objectEntry.getId());
+                } catch (RetinaException e)
+                {
+                    logger.error("Failed to delete object entry: " + objectEntry.getId(), e);
+                }
             }
         }
     }

@@ -46,7 +46,6 @@ public class SqliteMainIndexProvider implements MainIndexProvider
         String path = ConfigFactory.Instance().getProperty("index.sqlite.path");
         if (path == null || path.isEmpty())
         {
-            logger.error("Sqlite path not set");
             throw new RuntimeException("index.sqlite.path is not set");
         }
         sqlitePath = path;
@@ -56,7 +55,6 @@ public class SqliteMainIndexProvider implements MainIndexProvider
         }
         catch (IOException e)
         {
-            logger.error("failed to create sqlite data path", e);
             throw new RuntimeException("failed to create sqlite data path", e);
         }
     }

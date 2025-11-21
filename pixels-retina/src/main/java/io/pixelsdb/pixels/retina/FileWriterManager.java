@@ -93,7 +93,6 @@ public class FileWriterManager
             this.file.setId(metadataService.getFileId(targetFilePath));
         } catch (MetadataException e)
         {
-            logger.error("Failed to add file into metadata", e);
             throw new RetinaException("Failed to add file into metadata", e);
         }
 
@@ -119,7 +118,6 @@ public class FileWriterManager
                     .build();
         } catch (Exception e)
         {
-            logger.error("Failed to create pixels writer", e);
             throw new RetinaException("Failed to create pixels writer", e);
         }
     }
@@ -178,7 +176,6 @@ public class FileWriterManager
                 future.complete(null);
             } catch (Exception e)
             {
-                logger.error("Failed to flush to disk file", e);
                 future.completeExceptionally(e);
             }
         }).start();

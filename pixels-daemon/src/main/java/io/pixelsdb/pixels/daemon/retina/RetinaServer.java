@@ -129,10 +129,15 @@ public class RetinaServer implements Server
                 Thread.sleep(1000);
             } catch (InterruptedException e)
             {
-                throw new RuntimeException("failed to sleep for retry to check metadata server status", e);
+                log.error("failed to sleep for retry to check metadata server status", e);
+                Thread.currentThread().interrupt();
+                break;
             }
         }
         channel.shutdown();
-        throw new RuntimeException("timeout waiting for metadata server to be ready");
+        if (retry >= maxRetry)
+        {
+            log.error("timeout waiting for metadata server to be ready");
+        }
     }
 }

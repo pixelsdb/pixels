@@ -84,12 +84,10 @@ public class ObjectStorageManager
 
     public void write(long tableId, long entryId, byte[] data) throws RetinaException
     {
-        try
+        String key = buildKey(tableId, entryId);
+        try (PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(this.storage, key, true))
         {
-            String key = buildKey(tableId, entryId);
-            PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(this.storage, key, true);
             writer.append(data, 0, data.length);
-            writer.close();
         } catch (IOException e)
         {
             throw new RetinaException("Failed to write data to object storage.", e);
@@ -98,10 +96,9 @@ public class ObjectStorageManager
 
     public ByteBuffer read(long tableId, long entryId) throws RetinaException
     {
-        try
+        String key = buildKey(tableId, entryId);
+        try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.storage, key))
         {
-            String key = buildKey(tableId, entryId);
-            PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.storage, key);
             int length = (int) reader.getFileLength();
             return reader.readFully(length);
         } catch (IOException e)
