@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 project(pixels-retina)
 
+if(POLICY CMP0177)
+    cmake_policy(SET CMP0177 NEW)
+endif()
+
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -22,7 +26,7 @@ FetchContent_Declare(
     # SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/googletest
 
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG release-1.12.1
+    GIT_TAG v1.17.0
 )
 FetchContent_MakeAvailable(googletest)
 enable_testing()
@@ -75,23 +79,21 @@ gtest_discover_tests(tile_visibility_tests)
 gtest_discover_tests(rg_visibility_tests)
 
 # Set build type to Debug if not specified
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug)
-endif ()
-
-
+# if (NOT CMAKE_BUILD_TYPE)
+#     set(CMAKE_BUILD_TYPE Debug)
+# endif ()
 
 if (RETINA_SIMD)
     include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag("-mavx" COMPILER_SUPPORTS_AVX)
-    if(COMPILER_SUPPORTS_AVX)
-        message(STATUS "AVX supported: enabling AVX code path")
+    check_cxx_compiler_flag("-mavx2" COMPILER_SUPPORTS_AVX2)
+    if(COMPILER_SUPPORTS_AVX2)
+        message(STATUS "AVX2 supported: enabling AVX2 code path")
         target_compile_options(pixels-retina PRIVATE
-                -mavx
                 -mavx2
         )
+        target_compile_definitions(pixels-retina PRIVATE RETINA_SIMD)
     else()
-        message(STATUS "AVX not supported: falling back to scalar code path")
+        message(STATUS "AVX2 not supported: falling back to scalar code path")
     endif ()
 endif()
 
