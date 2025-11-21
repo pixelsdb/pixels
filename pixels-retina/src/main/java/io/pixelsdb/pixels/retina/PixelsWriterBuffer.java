@@ -297,7 +297,7 @@ public class PixelsWriterBuffer
             } catch (Exception e)
             {
                 logger.error("Failed to flush memTable to minio, memTableId=" + flushMemTable.getId(), e);
-                // Continue execution to ensure flushMemTable.unref() is called
+                return;
             } finally
             {
                 flushMemTable.unref();  // unref in the end
