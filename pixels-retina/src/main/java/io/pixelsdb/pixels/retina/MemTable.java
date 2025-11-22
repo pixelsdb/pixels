@@ -56,6 +56,7 @@ public class MemTable implements Referenceable
      *
      * @param values
      * @param timestamp
+     * @return the index of the added record, or -1 if the MemTable is full
      * @throws RetinaException
      */
     public synchronized int add(byte[][] values, long timestamp) throws RetinaException

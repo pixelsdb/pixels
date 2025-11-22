@@ -49,7 +49,7 @@ public class RGVisibility implements AutoCloseable
         File libFile = new File(libPath);
         if (!libFile.exists())
         {
-            throw new IllegalStateException("libpixels-retina.so not found at " +  libPath);
+            throw new IllegalStateException("libpixels-retina.so not found at " + libPath);
         }
         if (!libFile.canRead())
         {

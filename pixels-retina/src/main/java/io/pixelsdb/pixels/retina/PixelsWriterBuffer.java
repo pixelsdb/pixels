@@ -173,6 +173,7 @@ public class PixelsWriterBuffer
      * @param values
      * @param timestamp
      * @param builder
+     * @return the unique row identifier (rowId) allocated for the added row
      */
     public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
     {

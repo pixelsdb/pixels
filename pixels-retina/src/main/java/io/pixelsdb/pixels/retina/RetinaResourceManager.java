@@ -123,7 +123,7 @@ public class RetinaResourceManager
                 ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
                 PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
                 PixelsProto.Footer footer = fileTail.getFooter();
-                // TODO: fileId can be obtained directly through File.getId() method
+                // TODO: fileId can be obtained directly through File.getId() method.
                 long fileId = this.metadataService.getFileId(filePath);
                 for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
                 {
