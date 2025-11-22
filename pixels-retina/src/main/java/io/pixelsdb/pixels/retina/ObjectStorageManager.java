@@ -54,11 +54,11 @@ public class ObjectStorageManager
                     this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                     break;
                 default:
-                    throw new RetinaException("Unsupported storage schema: " + storageSchema);
+                    throw new RetinaException(String.format("Unsupported storage schema: %s.", storageSchema));
             }
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to initialize object storage manager.", e);
+            throw new RetinaException("Failed to get storage.", e);
         }
     }
 

@@ -38,22 +38,22 @@ public class RGVisibility implements AutoCloseable
         String pixelsHome = System.getenv("PIXELS_HOME");
         if (pixelsHome == null || pixelsHome.isEmpty())
         {
-            throw new IllegalStateException("Environment variable PIXELS_HOME is not set");
+            throw new IllegalStateException("Environment variable PIXELS_HOME is not set.");
         }
 
         if (!Platform.isLinux())
         {
-            logger.error("direct io is not supported on OS other than Linux");
+            logger.error("direct io is not supported on OS other than Linux.");
         }
         String libPath = Paths.get(pixelsHome, "lib/libpixels-retina.so").toString();
         File libFile = new File(libPath);
         if (!libFile.exists())
         {
-            throw new IllegalStateException("libpixels-retina.so not found at " + libPath);
+            throw new IllegalStateException(String.format("libpixels-retina.so not found at %s.", libPath));
         }
         if (!libFile.canRead())
         {
-            throw new IllegalStateException("libpixels-retina.so is not readable at " + libPath);
+            throw new IllegalStateException(String.format("libpixels-retina.so is not readable at %s.", libPath));
         }
         System.load(libPath);
     }

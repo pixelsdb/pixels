@@ -26,7 +26,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 public class MemTable implements Referenceable
 {
     private final ReferenceCounter refCounter = new ReferenceCounter();
-    private final long id;  // unique identifier
+    private final long id;  // The unique identifier for the memory table.
     private final TypeDescription schema;
     private final VectorizedRowBatch rowBatch;
 
@@ -45,15 +45,15 @@ public class MemTable implements Referenceable
         this.startIndex = startIndex;
         this.length = length;
 
-        // init reference count
+        // Init reference count.
         this.refCounter.ref();
     }
 
     /**
-     * values is one record with all column values and timestamp.
+     * Values is one record with all column values and timestamp.
+     *
      * @param values
      * @param timestamp
-     * @return rowOffset
      * @throws RetinaException
      */
     public synchronized int add(byte[][] values, long timestamp) throws RetinaException

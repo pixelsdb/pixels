@@ -31,8 +31,6 @@ import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -44,8 +42,6 @@ import java.util.concurrent.CompletableFuture;
  */
 public class FileWriterManager
 {
-    private static final Logger logger = LogManager.getLogger(FileWriterManager.class);
-
     private final long tableId;
     private final PixelsWriter writer;
     private final File file;
@@ -57,6 +53,7 @@ public class FileWriterManager
     /**
      * Creating pixelsWriter by passing in parameters avoids the need to read
      * the configuration file for each call.
+     *
      * @param tableId
      * @param schema
      * @param targetOrderedDirPath
@@ -82,7 +79,7 @@ public class FileWriterManager
         String targetFilePath = targetOrderedDirPath.getUri() + "/" + targetFileName;
         try
         {
-            // add file information to the metadata
+            // Add file information to the metadata.
             MetadataService metadataService = MetadataService.Instance();
             file = new File();
             this.file.setName(targetFileName);
@@ -93,15 +90,16 @@ public class FileWriterManager
             this.file.setId(metadataService.getFileId(targetFilePath));
         } catch (MetadataException e)
         {
-            throw new RetinaException("Failed to add file into metadata", e);
+            throw new RetinaException("Failed to add file information to the metadata.", e);
         }
 
-        // add the file's visibility
+        // Add the corresponding visibility for the file.
         RetinaResourceManager retinaResourceManager = RetinaResourceManager.Instance();
         retinaResourceManager.addVisibility(this.file.getId(), 0, recordNum);
 
         try
         {
+            // Create file writer.
             this.writer = PixelsWriterImpl.newBuilder()
                     .setSchema(schema)
                     .setHasHiddenColumn(true)
@@ -118,7 +116,7 @@ public class FileWriterManager
                     .build();
         } catch (Exception e)
         {
-            throw new RetinaException("Failed to create pixels writer", e);
+            throw new RetinaException("Failed to create pixels writer.", e);
         }
     }
 
@@ -142,15 +140,22 @@ public class FileWriterManager
         return this.lastBlockId;
     }
 
-    public void addRowBatch(VectorizedRowBatch rowBatch) throws IOException
+    public void addRowBatch(VectorizedRowBatch rowBatch) throws RetinaException
     {
-        this.writer.addRowBatch(rowBatch);
+        try
+        {
+            this.writer.addRowBatch(rowBatch);
+        } catch (IOException e)
+        {
+            throw new RetinaException("Failed to add rowBatch.", e);
+        }
     }
 
     /**
-     * Create a background thread to write the block of data responsible in minio to a file
+     * Create a background thread to write the block of data responsible in minio to a file.
      */
-    public CompletableFuture<Void> finish() {
+    public CompletableFuture<Void> finish()
+    {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         new Thread(() -> {
@@ -161,14 +166,13 @@ public class FileWriterManager
                     /**
                      * Issue-1083: Since we obtain a read-only ByteBuffer from the S3 Reader,
                      * we cannot read a byte[]. Instead, we should return the ByteBuffer directly.
-                     *
                      */
                     ByteBuffer data = objectStorageManager.read(this.tableId, blockId);
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();
 
-                // update file's type
+                // Update the file's type.
                 this.file.setType(File.Type.REGULAR);
                 MetadataService metadataService = MetadataService.Instance();
                 metadataService.updateFile(this.file);
