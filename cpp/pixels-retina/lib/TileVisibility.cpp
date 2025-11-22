@@ -107,14 +107,16 @@ void TileVisibility::deleteTileRecord(uint8_t rowId, uint64_t ts) {
 inline void process_bitmap_block_256(const DeleteIndexBlock *blk,
                                      uint32_t offset,
                                      uint64_t outBitmap[4],
-                                     const __m256i &vThr,
-                                     const __m256i &tsMask) {
+                                     const __m256i &vThrFlip,
+                                     const __m256i &tsMask,
+                                     const __m256i &signBit) {
     __m256i vItems = _mm256_loadu_si256((const __m256i *)&blk->items[offset]);
     __m256i vTs = _mm256_and_si256(vItems, tsMask);
+    __m256i vTsFlip = _mm256_xor_si256(vTs, signBit);
 
     __m256i cmp = _mm256_or_si256(
-        _mm256_cmpgt_epi64(vThr, vTs),
-        _mm256_cmpeq_epi64(vThr, vTs)
+        _mm256_cmpgt_epi64(vThrFlip, vTsFlip),
+        _mm256_cmpeq_epi64(vThrFlip, vTsFlip)
         );
 
     uint8_t mask = _mm256_movemask_pd(_mm256_castsi256_pd(cmp));
@@ -144,7 +146,8 @@ void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4])
 
     DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
 #ifdef RETINA_SIMD
-    const __m256i vThr = _mm256_set1_epi64x(ts);
+    const __m256i signBit = _mm256_set1_epi64x(0x8000000000000000ULL);
+    const __m256i vThrFlip = _mm256_xor_si256(_mm256_set1_epi64x(ts), signBit);
     const __m256i tsMask = _mm256_set1_epi64x(0x00FFFFFFFFFFFFFFULL);
 #endif
 
@@ -160,11 +163,11 @@ void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4])
         uint64_t start_blk_offset = 0;
 #ifdef RETINA_SIMD
         if (count == DeleteIndexBlock::BLOCK_CAPACITY) {
-            process_bitmap_block_256(blk, 0, outBitmap, vThr, tsMask);
-            process_bitmap_block_256(blk, 4, outBitmap, vThr, tsMask);
-        } else if (count > 4) {
+            process_bitmap_block_256(blk, 0, outBitmap, vThrFlip, tsMask, signBit);
+            process_bitmap_block_256(blk, 4, outBitmap, vThrFlip, tsMask, signBit);
+        } else if (count >= 4) {
             start_blk_offset = 4;
-            process_bitmap_block_256(blk, 0, outBitmap, vThr, tsMask);
+            process_bitmap_block_256(blk, 0, outBitmap, vThrFlip, tsMask, signBit);
         }
 #endif
         for (uint64_t i = start_blk_offset; i < count; i++) {

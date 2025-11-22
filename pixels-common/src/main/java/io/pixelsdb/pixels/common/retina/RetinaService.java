@@ -25,6 +25,7 @@ import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -51,25 +52,20 @@ public class RetinaService
         String retinaHost = ConfigFactory.Instance().getProperty("retina.server.host");
         int retinaPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
         defaultInstance = new RetinaService(retinaHost, retinaPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run()
+        ShutdownHookManager.Instance().registerShutdownHook(RetinaService.class, false, () -> {
+            try
             {
-                try
+                defaultInstance.shutdown();
+                for (RetinaService otherRetinaService : otherInstances.values())
                 {
-                    defaultInstance.shutdown();
-                    for (RetinaService otherRetinaService : otherInstances.values())
-                    {
-                        otherRetinaService.shutdown();
-                    }
-                    otherInstances.clear();
-                } catch (InterruptedException e)
-                {
-                    logger.error("Failed to shut down retina service", e);
+                    otherRetinaService.shutdown();
                 }
+                otherInstances.clear();
+            } catch (InterruptedException e)
+            {
+                logger.error("failed to shut down retina service", e);
             }
-        }));
+        });
     }
 
     /**
