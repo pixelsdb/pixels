@@ -76,7 +76,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     {
                         if (layout.isReadable())
                         {
-                            /**
+                            /*
                              * Issue #946: always add visibility to all files
                              */
                             // add visibility for ordered files
@@ -160,28 +160,28 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("error processing streaming update (retina)", e);
+                    logger.error("Error processing streaming update (retina)", e);
                 } catch (IndexException e)
                 {
                     headerBuilder.setErrorCode(2).setErrorMsg("Index: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("error processing streaming update (index)", e);
+                    logger.error("Error processing streaming update (index)", e);
                 } catch (Exception e)
                 {
                     headerBuilder.setErrorCode(3).setErrorMsg("Internal error: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("unexpected error processing streaming update", e);
+                    logger.error("Unexpected error processing streaming update", e);
                 } catch (Throwable t)
                 {
                     headerBuilder.setErrorCode(4).setErrorMsg("Fatal error: " + t.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("fatal error processing streaming update", t);
+                    logger.error("Fatal error processing streaming update", t);
                 }
             }
 
@@ -640,7 +640,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
      *
      * @param paths the order or compact paths from pixels metadata.
      */
-    public static void validateOrderedOrCompactPaths(List<Path> paths)
+    public static void validateOrderedOrCompactPaths(List<Path> paths) throws RetinaException
     {
         requireNonNull(paths, "paths is null");
         checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
@@ -656,7 +656,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             }
         } catch (Throwable e)
         {
-            throw new RetinaException("failed to parse storage scheme from paths", e);
+            throw new RetinaException("Failed to parse storage scheme from paths", e);
         }
     }
 
