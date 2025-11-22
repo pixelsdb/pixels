@@ -26,6 +26,9 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+/**
+ * ObjectStorageManager manages the interaction with object storage systems like S3 or MinIO.
+ */
 public class ObjectStorageManager
 {
     private static volatile ObjectStorageManager instance;
@@ -58,7 +61,7 @@ public class ObjectStorageManager
             }
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to initialize object storage manager.", e);
+            throw new RetinaException("Failed to get storage", e);
         }
     }
 
@@ -84,29 +87,26 @@ public class ObjectStorageManager
 
     public void write(long tableId, long entryId, byte[] data) throws RetinaException
     {
-        try
+        String key = buildKey(tableId, entryId);
+        try (PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(this.storage, key, true))
         {
-            String key = buildKey(tableId, entryId);
-            PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(this.storage, key, true);
             writer.append(data, 0, data.length);
-            writer.close();
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to write data to object storage.", e);
+            throw new RetinaException("Failed to write data to object storage", e);
         }
     }
 
     public ByteBuffer read(long tableId, long entryId) throws RetinaException
     {
-        try
+        String key = buildKey(tableId, entryId);
+        try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.storage, key))
         {
-            String key = buildKey(tableId, entryId);
-            PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.storage, key);
             int length = (int) reader.getFileLength();
             return reader.readFully(length);
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to read data from object storage.", e);
+            throw new RetinaException("Failed to read data from object storage", e);
         }
     }
 
@@ -118,7 +118,7 @@ public class ObjectStorageManager
             return this.storage.exists(key);
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to check existence in object storage.", e);
+            throw new RetinaException("Failed to check existence in object storage", e);
         }
     }
 
@@ -130,7 +130,7 @@ public class ObjectStorageManager
             this.storage.delete(key,false);
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to delete data from object storage.", e);
+            throw new RetinaException("Failed to delete data from object storage", e);
         }
     }
 }

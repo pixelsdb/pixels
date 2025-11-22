@@ -54,10 +54,10 @@ public class RocksetIndexProvider implements SinglePointIndexProvider
              }
              catch (Exception e)
              {
-                 throw new SinglePointIndexException("failed to create Rockset instance", e);
+                 throw new SinglePointIndexException("Failed to create Rockset instance", e);
              }
         }
-        throw new SinglePointIndexException("unsupported scheme: " + scheme);
+        throw new SinglePointIndexException("Unsupported scheme: " + scheme);
     }
 
     @Override

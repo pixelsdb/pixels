@@ -165,7 +165,8 @@ public class MainIndexBuffer implements Closeable
         long prevRowId = Long.MIN_VALUE;
         int prevRgId = Integer.MIN_VALUE;
         int prevRgRowOffset = Integer.MIN_VALUE;
-        /* Issue #1115: do post-sorting, build a row id array and sorted it in ascending order.
+        /*
+         * Issue #1115: do post-sorting, build a row id array and sorted it in ascending order.
          * This consumes less memory and is much faster than building a tree map from fileBuffer.
          */
         Long[] rowIds = new Long[fileBuffer.size()];

@@ -23,6 +23,9 @@ import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
+/**
+ * MemTable is an in-memory table that stores data before it is flushed to disk.
+ */
 public class MemTable implements Referenceable
 {
     private final ReferenceCounter refCounter = new ReferenceCounter();
@@ -45,15 +48,15 @@ public class MemTable implements Referenceable
         this.startIndex = startIndex;
         this.length = length;
 
-        // init reference count
-        this.refCounter.ref();
+        this.refCounter.ref(); // init reference count
     }
 
     /**
-     * values is one record with all column values and timestamp.
+     * Add a record with all column values and a timestamp.
+     *
      * @param values
      * @param timestamp
-     * @return rowOffset
+     * @return the index of the added record, or -1 if the MemTable is full
      * @throws RetinaException
      */
     public synchronized int add(byte[][] values, long timestamp) throws RetinaException

@@ -274,8 +274,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (RuntimeException e)
         {
-            LOGGER.error("failed to put rockset index entry", e);
-            throw new SinglePointIndexException("failed to put rockset index entry", e);
+            throw new SinglePointIndexException("Failed to put rockset index entry", e);
         }
     }
 
@@ -300,8 +299,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to put rockset primary index entries", e);
-            throw new SinglePointIndexException("failed to put rockset primary index entries", e);
+            throw new SinglePointIndexException("Failed to put rockset primary index entries", e);
         }
         finally
         {
@@ -341,8 +339,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to put rockset secondary index entries", e);
-            throw new SinglePointIndexException("failed to put rockset secondary index entries", e);
+            throw new SinglePointIndexException("Failed to put rockset secondary index entries", e);
         }
         finally
         {
@@ -367,8 +364,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to update primary entry", e);
-            throw new SinglePointIndexException("failed to update primary entry", e);
+            throw new SinglePointIndexException("Failed to update primary entry", e);
         }
     }
 
@@ -395,8 +391,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to update secondary entry", e);
-            throw new SinglePointIndexException("failed to update secondary entry", e);
+            throw new SinglePointIndexException("Failed to update secondary entry", e);
         }
     }
 
@@ -425,8 +420,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to update primary index entries", e);
-            throw new SinglePointIndexException("failed to update primary index entries", e);
+            throw new SinglePointIndexException("Failed to update primary index entries", e);
         }
         finally
         {
@@ -478,8 +472,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to update secondary index entries", e);
-            throw new SinglePointIndexException("failed to update secondary index entries", e);
+            throw new SinglePointIndexException("Failed to update secondary index entries", e);
         }
         finally
         {
@@ -505,8 +498,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to delete unique entry", e);
-            throw new SinglePointIndexException("failed to delete unique entry", e);
+            throw new SinglePointIndexException("Failed to delete unique entry", e);
         }
     }
 
@@ -546,8 +538,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to delete entry", e);
-            throw new SinglePointIndexException("failed to delete entry", e);
+            throw new SinglePointIndexException("Failed to delete entry", e);
         }
         finally
         {
@@ -597,8 +588,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to delete entries", e);
-            throw new SinglePointIndexException("failed to delete entries", e);
+            throw new SinglePointIndexException("Failed to delete entries", e);
         }
         finally
         {
@@ -664,8 +654,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (Exception e)
         {
-            LOGGER.error("failed to purge entries by prefix", e);
-            throw new SinglePointIndexException("failed to purge entries by prefix", e);
+            throw new SinglePointIndexException("Failed to purge entries by prefix", e);
         }
         finally
         {
@@ -698,7 +687,7 @@ public class RocksetIndex extends CachingSinglePointIndex
         }
         catch (IOException e)
         {
-            throw new SinglePointIndexException("failed to close rockset index", e);
+            throw new SinglePointIndexException("Failed to close rockset index", e);
         }
     }
 

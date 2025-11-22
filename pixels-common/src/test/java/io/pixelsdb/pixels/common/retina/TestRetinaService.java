@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.daemon.MetadataProto;
@@ -219,18 +220,24 @@ public class TestRetinaService
         tableUpdateData.add(tableUpdateDataBuilder.build());
 
         RetinaService.StreamHandler streamHandler = threadLocalStreamHandler.get();
-        CompletableFuture<RetinaProto.UpdateRecordResponse> future = streamHandler.updateRecord(schemaName, tableUpdateData);
-
-        future.whenComplete(((response, throwable) ->
+        try
         {
-            if (throwable == null)
+            CompletableFuture<RetinaProto.UpdateRecordResponse> future = streamHandler.updateRecord(schemaName, tableUpdateData);
+
+            future.whenComplete(((response, throwable) ->
             {
-                onCompleteCallback.accept(result);
-            } else
-            {
-                System.err.println("Update failed: " + throwable);
-            }
-        }));
+                if (throwable == null)
+                {
+                    onCompleteCallback.accept(result);
+                } else
+                {
+                    System.err.println("Update failed: " + throwable);
+                }
+            }));
+        } catch (RetinaException e)
+        {
+            System.out.printf("Update failed: %s\n", e.getMessage());
+        }
     }
 
     @Test

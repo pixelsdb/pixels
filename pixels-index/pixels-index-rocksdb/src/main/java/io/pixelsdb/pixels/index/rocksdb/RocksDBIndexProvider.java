@@ -44,10 +44,10 @@ public class RocksDBIndexProvider implements SinglePointIndexProvider
             }
             catch (RocksDBException e)
             {
-                throw new SinglePointIndexException("failed to create RocksDB instance", e);
+                throw new SinglePointIndexException("Failed to create RocksDB instance", e);
             }
         }
-        throw new SinglePointIndexException("unsupported scheme: " + scheme);
+        throw new SinglePointIndexException("Unsupported scheme: " + scheme);
     }
 
     @Override

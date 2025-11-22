@@ -61,7 +61,7 @@ public class IndexServer implements Server
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e)
         {
-            log.error("interrupted when shutdown index server", e);
+            log.error("Interrupted when shutdown index server", e);
         }
     }
 
@@ -78,7 +78,7 @@ public class IndexServer implements Server
             log.error("I/O error when running", e);
         } catch (InterruptedException e)
         {
-            log.error("interrupted when running", e);
+            log.error("Interrupted when running", e);
         } finally
         {
             this.shutdown();

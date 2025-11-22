@@ -215,6 +215,11 @@ public class RocksDBFactory
     {
         if (instance != null && reference.decrementAndGet() == 0)
         {
+            for (ColumnFamilyHandle handle : cfHandles.values())
+            {
+                handle.close();
+            }
+            cfHandles.clear();
             instance.close();
             instance = null;
         }

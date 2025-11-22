@@ -56,7 +56,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             rowIdBatch = MainIndexFactory.Instance().getMainIndex(tableId).allocateRowIdBatch(tableId, numRowIds);
         } catch (RowIdException | MainIndexException e)
         {
-            logger.error("failed to allocate row ids", e);
+            logger.error("Failed to allocate row ids", e);
             response.setErrorCode(ErrorCode.INDEX_GET_ROW_ID_FAIL);
         }
         if(rowIdBatch != null)
@@ -222,7 +222,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             {
                 if(!mainSuccess)
                 {
-                    throw new MainIndexException("failed to put entry into main index");
+                    throw new MainIndexException("Failed to put entry into main index");
                 }
             }
         }
@@ -515,7 +515,7 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
             {
                 if(!mainSuccess)
                 {
-                    throw new MainIndexException("failed to put entry into main index");
+                    throw new MainIndexException("Failed to put entry into main index");
                 }
             }
 
