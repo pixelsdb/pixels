@@ -38,7 +38,7 @@ import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Responsible for several blocks of data and written to a file
+ * Responsible for managing several blocks of data and writing them to a file.
  */
 public class FileWriterManager
 {
@@ -74,7 +74,7 @@ public class FileWriterManager
         this.tableId = tableId;
         this.firstBlockId = firstBlockId;
 
-        // create pixels writer
+        // Create pixels writer.
         String targetFileName = DateUtil.getCurTime() + ".pxl";
         String targetFilePath = targetOrderedDirPath.getUri() + "/" + targetFileName;
         try
@@ -90,7 +90,7 @@ public class FileWriterManager
             this.file.setId(metadataService.getFileId(targetFilePath));
         } catch (MetadataException e)
         {
-            throw new RetinaException("Failed to add file information to the metadata.", e);
+            throw new RetinaException("Failed to add file information to the metadata", e);
         }
 
         // Add the corresponding visibility for the file.
@@ -116,7 +116,7 @@ public class FileWriterManager
                     .build();
         } catch (Exception e)
         {
-            throw new RetinaException("Failed to create pixels writer.", e);
+            throw new RetinaException("Failed to create pixels writer", e);
         }
     }
 
@@ -147,12 +147,12 @@ public class FileWriterManager
             this.writer.addRowBatch(rowBatch);
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to add rowBatch.", e);
+            throw new RetinaException("Failed to add rowBatch to pixels writer", e);
         }
     }
 
     /**
-     * Create a background thread to write the block of data responsible in minio to a file.
+     * Create a background thread to write the block of data stored in shared storage to a file.
      */
     public CompletableFuture<Void> finish()
     {
@@ -163,7 +163,7 @@ public class FileWriterManager
                 for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId)
                 {
                     ObjectStorageManager objectStorageManager = ObjectStorageManager.Instance();
-                    /**
+                    /*
                      * Issue-1083: Since we obtain a read-only ByteBuffer from the S3 Reader,
                      * we cannot read a byte[]. Instead, we should return the ByteBuffer directly.
                      */
