@@ -401,7 +401,7 @@ public class PixelsWriterBuffer
         this.flushDiskExecutor.shutdown();
         try
         {
-            if (this.flushDiskExecutor.awaitTermination(60, TimeUnit.NANOSECONDS))
+            if (!this.flushDiskExecutor.awaitTermination(60, TimeUnit.SECONDS))
             {
                 this.flushDiskExecutor.shutdown();
             }
