@@ -55,7 +55,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         super();
         this.tableId = tableId;
         this.indexId = indexId;
-        // Initialize RocksDB instance
+        // initialize RocksDB instance
         this.rocksDBPath = RocksDBFactory.getDbPath();
         this.rocksDB = RocksDBFactory.getRocksDB();
         this.unique = unique;
@@ -64,7 +64,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     }
 
     /**
-     * The constructor only for testing (direct RocksDB injection)
+     * The constructor only for testing (direct RocksDB injection).
      * @param tableId the table id
      * @param indexId the index id
      * @param rocksDB the rocksdb instance
@@ -76,7 +76,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         this.tableId = tableId;
         this.indexId = indexId;
         this.rocksDBPath = rocksDBPath;
-        this.rocksDB = rocksDB;  // Use injected mock directly
+        this.rocksDB = rocksDB;  // use injected mock directly
         this.unique = unique;
         this.writeOptions = new WriteOptions();
         this.columnFamilyHandle = RocksDBFactory.getDefaultColumnFamily();
@@ -135,7 +135,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
         readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
-        // Use RocksDB iterator for prefix search
+        // use RocksDB iterator for prefix search
         try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
         {
             iterator.seek(keyBuffer);
@@ -182,7 +182,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to put rocksdb index entry", e);
+            throw new SinglePointIndexException("Failed to put rocksdb index entry", e);
         }
     }
 
@@ -205,7 +205,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to put rocksdb index entries", e);
+            throw new SinglePointIndexException("Failed to put rocksdb index entries", e);
         }
     }
 
@@ -236,7 +236,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to put secondary entries", e);
+            throw new SinglePointIndexException("Failed to put secondary entries", e);
         }
     }
 
@@ -256,7 +256,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to update primary entry", e);
+            throw new SinglePointIndexException("Failed to update primary entry", e);
         }
     }
 
@@ -293,7 +293,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to update secondary entry", e);
+            throw new SinglePointIndexException("Failed to update secondary entry", e);
         }
     }
 
@@ -323,7 +323,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to update primary index entries", e);
+            throw new SinglePointIndexException("Failed to update primary index entries", e);
         }
     }
 
@@ -367,7 +367,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to put secondary entries", e);
+            throw new SinglePointIndexException("Failed to put secondary entries", e);
         }
     }
 
@@ -385,7 +385,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to delete unique entry", e);
+            throw new SinglePointIndexException("Failed to delete unique entry", e);
         }
     }
 
@@ -423,7 +423,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to delete entry", e);
+            throw new SinglePointIndexException("Failed to delete entry", e);
         }
     }
 
@@ -433,7 +433,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try(WriteBatch writeBatch = new WriteBatch())
         {
-            // Delete single point index
+            // delete single point index
             for(IndexProto.IndexKey key : keys)
             {
                 if(unique)
@@ -466,7 +466,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to delete entries", e);
+            throw new SinglePointIndexException("Failed to delete entries", e);
         }
     }
 
@@ -513,7 +513,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("failed to purge entries by prefix", e);
+            throw new SinglePointIndexException("Failed to purge entries by prefix", e);
         }
     }
 
@@ -537,7 +537,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
             this.close();
         } catch (IOException e)
         {
-            throw new SinglePointIndexException("failed to close single point index", e);
+            throw new SinglePointIndexException("Failed to close single point index", e);
         }
 
         if (!removed)
@@ -550,7 +550,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
             }
             catch (IOException e)
             {
-                throw new SinglePointIndexException("failed to clean up RocksDB directory: " + e);
+                throw new SinglePointIndexException("Failed to clean up RocksDB directory: " + e);
             }
         }
         return true;
@@ -576,7 +576,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         else
         {
-            throw new SinglePointIndexException("invalid buffer number");
+            throw new SinglePointIndexException("Invalid buffer number");
         }
         // Write indexId (8 bytes, big endian)
         compositeKey.putLong(indexId);
@@ -588,20 +588,20 @@ public class RocksDBIndex extends CachingSinglePointIndex
         return compositeKey;
     }
 
-    // Convert IndexKey to byte array
+    // convert IndexKey to byte array
     protected static ByteBuffer toKeyBuffer(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - key.getTimestamp(), 1);
 
     }
 
-    // Create composite key with rowId
+    // create composite key with rowId
     protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - rowId, 1);
     }
 
-    // Check if byte array starts with specified prefix
+    // check if byte array starts with specified prefix
     protected static boolean startsWith(ByteBuffer keyFound, ByteBuffer keyCurrent)
     {
         // prefix is indexId + key, without timestamp
@@ -619,10 +619,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
         return keyFound1.compareTo(keyCurrent1) == 0;
     }
 
-    // Extract rowId from key
+    // extract rowId from key
     protected static long extractRowIdFromKey(ByteBuffer keyBuffer)
     {
-        // Extract rowId portion (last 8 bytes of key)
+        // extract rowId portion (last 8 bytes of key)
         return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
     }
 }

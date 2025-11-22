@@ -48,7 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * Uses the singleton pattern to manage data resources in the retina service.
+ * Use the singleton pattern to manage data resources in the retina service.
  */
 public class RetinaResourceManager
 {
@@ -304,7 +304,7 @@ public class RetinaResourceManager
     }
 
     /**
-     * Checks if the retina exists for the given filePath and rgId.
+     * Check if the retina exists for the given filePath and rgId.
      *
      * @param fileId the file id.
      * @param rgId the row group id.
@@ -322,7 +322,7 @@ public class RetinaResourceManager
     }
 
     /**
-     * Checks if the writer buffer exists for the given schema and table.
+     * Check if the writer buffer exists for the given schema and table.
      */
     private PixelsWriterBuffer checkPixelsWriterBuffer(String schema, String table) throws RetinaException
     {
@@ -336,7 +336,7 @@ public class RetinaResourceManager
     }
 
     /**
-     * Runs garbage collection on all registered RGVisibility.
+     * Run garbage collection on all registered RGVisibility.
      */
     private void runGC()
     {

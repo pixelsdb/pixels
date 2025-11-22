@@ -168,7 +168,7 @@ public class PixelsWriterBuffer
     }
 
     /**
-     * Adds all column values and timestamp into the buffer.
+     * Add all column values and timestamp into the buffer.
      *
      * @param values
      * @param timestamp
@@ -309,7 +309,7 @@ public class PixelsWriterBuffer
     }
 
     /**
-     * Gets the current version.
+     * Get the current version.
      * Caller must call unref().
      */
     public SuperVersion getCurrentVersion()
@@ -326,7 +326,7 @@ public class PixelsWriterBuffer
     }
 
     /**
-     * Determines whether the last data block managed by fileWriterManager has
+     * Determine whether the last data block managed by fileWriterManager has
      * been written to MinIO. If it has been written, execute the file write
      * operation and delete the corresponding ObjectEntry in the unified view.
      */
@@ -377,7 +377,7 @@ public class PixelsWriterBuffer
     }
 
     /**
-     * Gracefully closes the writer buffer, ensuring all in-memory data is persisted.
+     * Gracefully close the writer buffer, ensuring all in-memory data is persisted.
      */
     public void close() throws RetinaException
     {

@@ -52,7 +52,7 @@ public class MemTable implements Referenceable
     }
 
     /**
-     * Adds a record with all column values and a timestamp.
+     * Add a record with all column values and a timestamp.
      *
      * @param values
      * @param timestamp
