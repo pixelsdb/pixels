@@ -43,7 +43,8 @@ public interface SinglePointIndex extends Closeable
     {
         rocksdb,  // single point index stored in rocksdb
         rockset,  // single point index stored in rockset (rocksdb-cloud)
-        memory;   // single point index stored in memory
+        memory,   // single point index stored in memory
+        mapdb;    // single point index stored in mapdb
 
         /**
          * Case-insensitive parsing from String name to enum value.
