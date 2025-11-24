@@ -388,10 +388,11 @@ public class PixelsWriterBuffer
         {
             if (!this.flushMinioExecutor.awaitTermination(60, TimeUnit.SECONDS))
             {
-                this.flushMinioExecutor.shutdown();
+                this.flushMinioExecutor.shutdownNow();
             }
         } catch (InterruptedException e)
         {
+            this.flushMinioExecutor.shutdownNow();
             Thread.currentThread().interrupt();
             throw new RetinaException("Close process was interrupted while waiting for flushMinioExecutor", e);
         }
@@ -404,10 +405,11 @@ public class PixelsWriterBuffer
         {
             if (!this.flushDiskExecutor.awaitTermination(60, TimeUnit.SECONDS))
             {
-                this.flushDiskExecutor.shutdown();
+                this.flushDiskExecutor.shutdownNow();
             }
         } catch (InterruptedException e)
         {
+            this.flushDiskExecutor.shutdownNow();
             Thread.currentThread().interrupt();
             throw new RetinaException("Close process was interrupted while waiting for flushDiskExecutor", e);
         }
