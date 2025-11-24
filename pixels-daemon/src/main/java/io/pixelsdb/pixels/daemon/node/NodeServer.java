@@ -17,6 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 package io.pixelsdb.pixels.daemon.node;
 
 import io.grpc.ServerBuilder;
