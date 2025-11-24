@@ -67,7 +67,7 @@ public class NodeService
 
     private final ManagedChannel channel;
     private final NodeServiceGrpc.NodeServiceBlockingStub stub;
-    private boolean isShutDown;
+    private volatile boolean isShutDown;
     private NodeService(String host, int port)
     {
         assert host != null;

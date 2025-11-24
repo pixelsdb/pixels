@@ -26,7 +26,7 @@ import java.util.List;
 
 public class TestNodeService
 {
-    Logger logger = LoggerFactory.getLogger(TestNodeService.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestNodeService.class);
     @Test
     public void testGetRetinaList()
     {
