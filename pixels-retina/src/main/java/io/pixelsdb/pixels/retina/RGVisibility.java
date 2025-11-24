@@ -43,7 +43,7 @@ public class RGVisibility implements AutoCloseable
 
         if (!Platform.isLinux())
         {
-            logger.error("direct io is not supported on OS other than Linux");
+            logger.error("Direct io is not supported on OS other than Linux");
         }
         String libPath = Paths.get(pixelsHome, "lib/libpixels-retina.so").toString();
         File libFile = new File(libPath);
@@ -59,7 +59,7 @@ public class RGVisibility implements AutoCloseable
     }
 
     /**
-     * Constructor creates C++ object and returns handle
+     * Constructor creates C++ object and returns handle.
      */
     private final long nativeHandle;
 

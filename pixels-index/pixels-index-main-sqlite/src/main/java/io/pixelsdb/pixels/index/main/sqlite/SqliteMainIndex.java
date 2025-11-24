@@ -50,7 +50,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class SqliteMainIndex implements MainIndex
 {
     private static final Logger logger = LogManager.getLogger(SqliteMainIndex.class);
-    /**
+    
+    /*
      * Issue-1085: Use ConcurrentHashMap to avoid
      * <code>ConcurrentModificationException</code> when allocating row IDs under high load.
      */
@@ -74,13 +75,13 @@ public class SqliteMainIndex implements MainIndex
     private static final String deleteRangesSql = "DELETE FROM row_id_ranges WHERE ? <= row_id_start AND row_id_end <= ?";
 
     /**
-     * The SQL statement to update the width of the give row id range
+     * The SQL statement to update the width of the give row id range.
      */
     private static final String updateRangeWidthSql = "UPDATE row_id_ranges SET row_id_start = ?, row_id_end = ?, " +
             "rg_row_offset_start = ?, rg_row_offset_end = ? WHERE row_id_start = ? AND row_id_end = ?";
 
     /**
-     * The SQL statement to insert a new row id range
+     * The SQL statement to insert a new row id range.
      */
     private static final String insertRangeSql = "INSERT INTO row_id_ranges VALUES(?, ?, ?, ?, ?, ?)";
 
@@ -101,7 +102,7 @@ public class SqliteMainIndex implements MainIndex
         this.indexBuffer = new MainIndexBuffer(this.indexCache);
         if (sqlitePath == null || sqlitePath.isEmpty())
         {
-            throw new MainIndexException("invalid sqlite path");
+            throw new MainIndexException("Invalid sqlite path");
         }
         if (!sqlitePath.endsWith("/"))
         {
@@ -119,7 +120,7 @@ public class SqliteMainIndex implements MainIndex
         }
         catch (SQLException e)
         {
-            throw new MainIndexException("failed to connect to sqlite and open/create table", e);
+            throw new MainIndexException("Failed to connect to sqlite and open/create table", e);
         }
     }
 
@@ -144,7 +145,8 @@ public class SqliteMainIndex implements MainIndex
             PersistentAutoIncrement autoIncrement = persistentAIMap.computeIfAbsent(tableId, tblId -> {
                 try
                 {
-                    /* Issue #986:
+                    /*
+                     * Issue #986:
                      * We use numRowIds * 10L as the step for etcd auto-increment generation, reducing the etcd-overhead
                      * to less than 10%.
                      */
@@ -153,12 +155,13 @@ public class SqliteMainIndex implements MainIndex
                 }
                 catch (EtcdException e)
                 {
-                    logger.error(e);
-                    throw new RuntimeException(e); // wrap to unchecked, will rethrow
+                    logger.error("Failed to create persistent auto-increment for table " + tblId, e);
+                    throw new RuntimeException("Failed to create persistent auto-increment for table " + tblId, e); // wrap to unchecked, will rethrow
                 }
             });
             // 2. allocate numRowIds
-            /* Issue #1099: auto increment starts from 1, whereas row id starts from 0,
+            /*
+             * Issue #1099: auto increment starts from 1, whereas row id starts from 0,
              * so we use auto increment minus 1 as the row id start.
              */
             long start = autoIncrement.getAndIncrement(numRowIds) - 1;
@@ -260,7 +263,7 @@ public class SqliteMainIndex implements MainIndex
         }
         catch (RowIdException e)
         {
-            throw new MainIndexException("failed to query row location from sqlite", e);
+            throw new MainIndexException("Failed to query row location from sqlite", e);
         }
         finally
         {
@@ -315,8 +318,6 @@ public class SqliteMainIndex implements MainIndex
             long rowIdEnd = rowIdRange.getRowIdEnd();
             pst.setLong(1, rowIdStart);
             pst.setLong(2, rowIdEnd);
-            int n = pst.executeUpdate();
-            logger.debug("deleted {} rows from sqlite", n);
             RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdStart);
             RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdEnd - 1);
             boolean res = true;
@@ -338,7 +339,7 @@ public class SqliteMainIndex implements MainIndex
         }
         catch (SQLException | RowIdException e)
         {
-            throw new MainIndexException("failed to delete row id ranges from sqlite", e);
+            throw new MainIndexException("Failed to delete row id ranges from sqlite", e);
         }
         finally
         {
@@ -372,7 +373,7 @@ public class SqliteMainIndex implements MainIndex
                     int rgRowOffsetEnd = rs.getInt("rg_row_offset_end");
                     if (rowIdEnd - rowIdStart != rgRowOffsetEnd - rgRowOffsetStart)
                     {
-                        throw new RowIdException("the width of row id range (" + rowIdStart + ", " +
+                        throw new RowIdException("The width of row id range (" + rowIdStart + ", " +
                                 rgRowOffsetEnd + ") does not match the width of row group row offset range (" +
                                 rgRowOffsetStart + ", " + rgRowOffsetEnd + ")");
                     }
@@ -386,12 +387,12 @@ public class SqliteMainIndex implements MainIndex
         }
         catch (SQLException e)
         {
-            throw new RowIdException("failed to query row id range from sqlite", e);
+            throw new RowIdException("Failed to query row id range from sqlite", e);
         }
     }
 
     /**
-     * Update the width of an existing row id range
+     * Update the width of an existing row id range.
      * @param oldRange the old row id range
      * @param newRange the new row id range
      * @return true if any row id range is updated successfully
@@ -411,7 +412,7 @@ public class SqliteMainIndex implements MainIndex
         }
         catch (SQLException e)
         {
-            throw new RowIdException("failed to update row id range width", e);
+            throw new RowIdException("Failed to update row id range width", e);
         }
     }
 
@@ -441,7 +442,7 @@ public class SqliteMainIndex implements MainIndex
         }
         catch (MainIndexException | SQLException e)
         {
-            throw new MainIndexException("failed to flush index cache into sqlite", e);
+            throw new MainIndexException("Failed to flush index cache into sqlite", e);
         }
         finally
         {
@@ -469,7 +470,7 @@ public class SqliteMainIndex implements MainIndex
                         this.flushCache(fileId);
                     } catch (MainIndexException e)
                     {
-                        throw new IOException("failed to flush main index cache of file id " + fileId, e);
+                        throw new IOException("Failed to flush main index cache of file id " + fileId, e);
                     }
                 }
                 this.indexBuffer.close();
@@ -478,7 +479,7 @@ public class SqliteMainIndex implements MainIndex
                     this.connection.close();
                 } catch (SQLException e)
                 {
-                    throw new IOException("failed to close sqlite connection", e);
+                    throw new IOException("Failed to close sqlite connection", e);
                 }
             }
             finally
@@ -498,7 +499,7 @@ public class SqliteMainIndex implements MainIndex
             this.close();
         } catch (IOException e)
         {
-            throw new MainIndexException("failed to close main index", e);
+            throw new MainIndexException("Failed to close main index", e);
         }
 
         if (!removed)
@@ -510,7 +511,7 @@ public class SqliteMainIndex implements MainIndex
                 FileUtils.deleteDirectory(new File(sqlitePath));
             } catch (IOException e)
             {
-                throw new MainIndexException("failed to clean up SQLite directory: " + e);
+                throw new MainIndexException("Failed to clean up SQLite directory", e);
             }
         }
         return true;

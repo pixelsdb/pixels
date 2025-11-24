@@ -67,7 +67,7 @@ public class MainIndexFactory
         }
         if (!providerExists)
         {
-            throw new MainIndexException("no main index provider exists for enabled scheme " + enabledScheme.name());
+            throw new MainIndexException("No main index provider exists for enabled scheme " + enabledScheme.name());
         }
     }
 
@@ -153,7 +153,7 @@ public class MainIndexFactory
             catch (IOException e)
             {
                 throw new MainIndexException(
-                        "failed to close main index of table " + tableId, e);
+                        "Failed to close main index of table " + tableId, e);
             }
         }
         mainIndexImpls.clear();
@@ -184,7 +184,7 @@ public class MainIndexFactory
             catch (IOException e)
             {
                 throw new MainIndexException(
-                        "failed to close main index of table " + tableId, e);
+                        "Failed to close main index of table " + tableId, e);
             }
         }
     }

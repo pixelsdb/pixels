@@ -38,7 +38,6 @@ import java.io.IOException;
  */
 public class SqliteMainIndexProvider implements MainIndexProvider
 {
-    private static final Logger logger = LogManager.getLogger(SqliteMainIndexProvider.class);
     private static final String sqlitePath;
 
     static
@@ -46,7 +45,6 @@ public class SqliteMainIndexProvider implements MainIndexProvider
         String path = ConfigFactory.Instance().getProperty("index.sqlite.path");
         if (path == null || path.isEmpty())
         {
-            logger.error("Sqlite path not set");
             throw new RuntimeException("index.sqlite.path is not set");
         }
         sqlitePath = path;
@@ -56,8 +54,7 @@ public class SqliteMainIndexProvider implements MainIndexProvider
         }
         catch (IOException e)
         {
-            logger.error("failed to create sqlite data path", e);
-            throw new RuntimeException("failed to create sqlite data path", e);
+            throw new RuntimeException("Failed to create sqlite data path", e);
         }
     }
 
@@ -72,10 +69,10 @@ public class SqliteMainIndexProvider implements MainIndexProvider
             }
             catch (MainIndexException e)
             {
-                throw new MainIndexException("failed to create SQLite instance", e);
+                throw new MainIndexException("Failed to create SQLite instance", e);
             }
         }
-        throw new MainIndexException("unsupported scheme: " + scheme);
+        throw new MainIndexException("Unsupported scheme: " + scheme);
     }
 
     @Override

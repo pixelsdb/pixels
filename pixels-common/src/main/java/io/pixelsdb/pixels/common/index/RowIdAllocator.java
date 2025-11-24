@@ -52,7 +52,7 @@ public class RowIdAllocator
     }
 
     /**
-     * get a unique rowId
+     * Get a unique rowId.
      * @return
      * @throws IndexException
      */
@@ -80,7 +80,7 @@ public class RowIdAllocator
                 this.tableId, this.batchSize);
         if (newBatch == null || newBatch.getLength() <= 0)
         {
-            throw new IndexException("failed to get row id batch");
+            throw new IndexException("Failed to get row id batch");
         }
         this.currentBatchStart = newBatch.getRowIdStart();
         this.currentBatchLength = newBatch.getLength();
