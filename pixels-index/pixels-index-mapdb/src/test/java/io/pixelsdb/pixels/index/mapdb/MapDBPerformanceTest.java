@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.mapdb;
 
+import org.junit.Test;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -33,27 +34,25 @@ import java.util.concurrent.TimeUnit;
  */
 public class MapDBPerformanceTest
 {
-    private final int testDataSize;
+    private final int testDataSize = 1000000;
     private DB db;
     private BTreeMap<String, String> map;
 
-    public MapDBPerformanceTest(int testDataSize)
+    @Test
+    public void testMapDBPerformance()
     {
-        this.testDataSize = testDataSize;
-    }
-
-    public static void main(String[] args)
-    {
-        MapDBPerformanceTest test = new MapDBPerformanceTest(10000000);
+        MapDBPerformanceTest test = new MapDBPerformanceTest();
 
         try
         {
             test.runFullPerformanceTest();
 
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             e.printStackTrace();
-        } finally
+        }
+        finally
         {
             test.cleanup();
         }
@@ -62,8 +61,9 @@ public class MapDBPerformanceTest
     public void initFileDB(String filePath)
     {
         db = DBMaker.fileDB(filePath)
-                .fileMmapEnableIfSupported() // 启用内存映射
+                .fileMmapEnableIfSupported()
                 .closeOnJvmShutdown()
+                .transactionEnable()
                 .make();
 
         map = db.treeMap("testMap")
@@ -154,7 +154,7 @@ public class MapDBPerformanceTest
         System.out.println("\n=== random read performance ===");
 
         Random random = new Random();
-        int readCount = Math.min(testDataSize, 100000); // 限制读取次数
+        int readCount = Math.min(testDataSize, 100000);
 
         long startTime = System.nanoTime();
 
@@ -215,13 +215,12 @@ public class MapDBPerformanceTest
                 {
                     if (j % 2 == 0)
                     {
-                        // 写操作
                         String key = "concurrent_key_" + threadId + "_" + j;
                         String value = "concurrent_value_" + random.nextInt(1000000);
                         map.put(key, value);
-                    } else
+                    }
+                    else
                     {
-                        // 读操作
                         String key = "concurrent_key_" + threadId + "_" + (j - 1);
                         map.get(key);
                     }
@@ -231,7 +230,6 @@ public class MapDBPerformanceTest
             thread.start();
         }
 
-        // 等待所有线程完成
         for (Thread thread : threads)
         {
             thread.join();

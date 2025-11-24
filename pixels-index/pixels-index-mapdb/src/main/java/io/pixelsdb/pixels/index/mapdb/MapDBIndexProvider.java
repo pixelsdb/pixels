@@ -22,8 +22,12 @@ package io.pixelsdb.pixels.index.mapdb;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import org.apache.commons.io.FileUtils;
 
 import javax.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
 
 /**
  * @author hank
@@ -31,13 +35,33 @@ import javax.annotation.Nonnull;
  */
 public class MapDBIndexProvider implements SinglePointIndexProvider
 {
+    private static final String mapdbPath;
+
+    static
+    {
+        String path = ConfigFactory.Instance().getProperty("index.mapdb.path");
+        if (path == null || path.isEmpty())
+        {
+            throw new RuntimeException("index.mapdb.path is not set");
+        }
+        mapdbPath = path;
+        try
+        {
+            FileUtils.forceMkdir(new File(mapdbPath));
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Failed to create mapdb data path", e);
+        }
+    }
+
     @Override
     public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme,
                                            boolean unique) throws SinglePointIndexException
     {
         if (scheme == SinglePointIndex.Scheme.mapdb)
         {
-            return new MapDBIndex(tableId, indexId, unique);
+            return new MapDBIndex(tableId, indexId, unique, mapdbPath);
         }
         throw new SinglePointIndexException("unsupported scheme: " + scheme);
     }

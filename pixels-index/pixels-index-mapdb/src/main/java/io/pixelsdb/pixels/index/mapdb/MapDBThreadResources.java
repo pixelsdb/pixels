@@ -17,32 +17,27 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.rocksdb;
+package io.pixelsdb.pixels.index.mapdb;
 
 import io.pixelsdb.pixels.common.index.ThreadId;
 import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
-import org.rocksdb.ReadOptions;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * This class manages the resources such as rocksdb ReadOptions and key-value byte buffer
- * for each thread. The resources are automatically release when the process is shutting down.
+ * This class manages the resources such as key-value byte buffer for each thread.
+ * The resources are automatically release when the process is shutting down.
  * <b>Note: do not maintain any state on the resources</b>, as we can not control the scheduling of
  * the threads, hence a thread may be scheduled to work on different indexes and the thread id may be
  * reused when a thread terminates.
  * <p/>
- * This class should be used only by {@link RocksDBIndex} and should not be extended.
+ * This class should be used only by {@link MapDBIndex} and should not be extended.
  */
-final class RocksDBThreadResources
+final class MapDBThreadResources
 {
     private static final ThreadLocal<ThreadId> threadIds = ThreadLocal.withInitial(ThreadId::new);
-    /**
-     * Thread-local ReadOptions for each thread.
-     */
-    private static final Map<ThreadId, ReadOptions> threadReadOptions = new ConcurrentHashMap<>();
     private static final Map<ThreadId, ByteBuffer> threadKeyBuffers = new ConcurrentHashMap<>();
     private static final Map<ThreadId, ByteBuffer> threadKeyBuffers2 = new ConcurrentHashMap<>();
     private static final Map<ThreadId, ByteBuffer> threadKeyBuffers3 = new ConcurrentHashMap<>();
@@ -58,26 +53,10 @@ final class RocksDBThreadResources
     {
         // Release resources when the process is shutting down.
         ShutdownHookManager.Instance().registerShutdownHook(
-                RocksDBThreadResources.class, false, RocksDBThreadResources::release);
+                MapDBThreadResources.class, false, MapDBThreadResources::release);
     }
 
-    private RocksDBThreadResources() { }
-
-    /**
-     * Get the current thread's ReadOptions.
-     */
-    static ReadOptions getReadOptions()
-    {
-        ThreadId threadId = threadIds.get();
-        ReadOptions readOptions = threadReadOptions.get(threadId);
-        if (readOptions == null)
-        {
-            // no need to add a lock as concurrent threads have unique thread ids
-            readOptions = new ReadOptions();
-            threadReadOptions.put(threadId, readOptions);
-        }
-        return readOptions;
-    }
+    private MapDBThreadResources() { }
 
     /**
      * Get the current thread's key buffer.
@@ -118,12 +97,12 @@ final class RocksDBThreadResources
         // no need to add a lock as concurrent threads have unique thread ids
         if (keyBuffer == null)
         {
-            keyBuffer = ByteBuffer.allocateDirect(Math.max(length, DEFAULT_KEY_LENGTH));
+            keyBuffer = ByteBuffer.allocate(Math.max(length, DEFAULT_KEY_LENGTH));
             keyBuffers.put(threadId, keyBuffer);
         }
         else if (keyBuffer.capacity() < length)
         {
-            keyBuffer = ByteBuffer.allocateDirect(length);
+            keyBuffer = ByteBuffer.allocate(length);
             keyBuffers.put(threadId, keyBuffer);
         }
         keyBuffer.position(0);
@@ -139,7 +118,7 @@ final class RocksDBThreadResources
         ThreadId threadId = threadIds.get();
         // no need to add a lock as concurrent threads have unique thread ids
         ByteBuffer valueBuffer = threadValueBuffers.computeIfAbsent(threadId,
-                k -> ByteBuffer.allocateDirect(VALUE_LENGTH));
+                k -> ByteBuffer.allocate(VALUE_LENGTH));
         valueBuffer.position(0);
         valueBuffer.limit(VALUE_LENGTH);
         return valueBuffer;
@@ -147,8 +126,6 @@ final class RocksDBThreadResources
 
     private static void release()
     {
-        threadReadOptions.forEach((threadId, options) -> options.close());
-        threadReadOptions.clear();
         threadValueBuffers.clear();
         threadKeyBuffers.clear();
         threadKeyBuffers2.clear();
