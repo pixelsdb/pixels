@@ -24,6 +24,7 @@ import io.etcd.jetcd.Lease;
 import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.daemon.NodeProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -45,13 +46,15 @@ public class HeartbeatWorker implements Server
     private static final AtomicInteger currentStatus = new AtomicInteger(NodeStatus.READY.StatusCode);
     private final HeartbeatConfig heartbeatConfig = new HeartbeatConfig();
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+    private final NodeProto.NodeRole role;
     private String hostName;
     private WorkerRegister workerRegister;
     private boolean initializeSuccess = false;
     private CountDownLatch runningLatch;
 
-    public HeartbeatWorker()
+    public HeartbeatWorker(NodeProto.NodeRole role)
     {
+        this.role = role;
         this.hostName = System.getenv("HOSTNAME");
         logger.debug("HostName from system env: {}", hostName);
         if (hostName == null)
@@ -91,7 +94,18 @@ public class HeartbeatWorker implements Server
             // 2. register the worker
             Lease leaseClient = EtcdUtil.Instance().getClient().getLeaseClient();
             long leaseId = leaseClient.grant(heartbeatConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            String key = Constants.HEARTBEAT_WORKER_LITERAL + hostName;
+            String key;
+            switch (role)
+            {
+                case WORKER:
+                    key = Constants.HEARTBEAT_WORKER_LITERAL + hostName;
+                    break;
+                case RETINA:
+                    key = Constants.HEARTBEAT_RETINA_LITERAL + hostName;
+                    break;
+                default:
+                    throw new IllegalStateException("Unknown heartbeat role: " + role);
+            }
             EtcdUtil.Instance().putKeyValueWithLeaseId(key, String.valueOf(currentStatus.get()), leaseId);
             // start a scheduled thread to update node status periodically
             this.workerRegister = new WorkerRegister(key, leaseClient, leaseId);
@@ -123,7 +137,18 @@ public class HeartbeatWorker implements Server
         {
             workerRegister.stop();
         }
-        EtcdUtil.Instance().deleteByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
+        switch (role)
+        {
+            case WORKER:
+                EtcdUtil.Instance().deleteByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
+                break;
+            case RETINA:
+                EtcdUtil.Instance().deleteByPrefix(Constants.HEARTBEAT_RETINA_LITERAL);
+                break;
+            default:
+                throw new IllegalStateException("Unknown heartbeat role: " + role);
+        }
+
         if (runningLatch != null)
         {
             runningLatch.countDown();
